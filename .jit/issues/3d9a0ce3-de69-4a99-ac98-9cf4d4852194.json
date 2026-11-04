@@ -1,9 +1,18 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-15T13:20:31.806679584Z",
   "context": {},
   "created_at": "2026-10-15T11:05:36.732638299Z",
   "dependencies": [
+    "03ce8d2c-98f7-4ab6-bcae-08406bb3b5c1",
+    "0838348a-2fb7-4a57-a75c-c3a7f1252f42",
+    "12a0a694-5dca-441d-8a3f-9e9fcf72364c",
+    "17fbcf25-67cd-41a8-acc4-adb6df43b4a2",
+    "180e7f33-2d61-4e21-8548-fc533e06e400",
+    "1b0c2b75-acdc-4630-b9ab-e1fa4d534175",
+    "2a504b17-f54b-4f66-94cc-5d34defb9511",
+    "2ded6cd5-89a3-428a-abbf-1590089ed2ec",
     "39710b3b-2b92-4fc1-bbc2-4c230577e350",
     "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
     "5a3a886f-96cb-420d-9070-5f8e6dcedb1d",
@@ -11,54 +20,58 @@
     "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
     "856f0520-7af9-4c2d-9297-5abbd9eae365",
     "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+    "998eedbc-50e0-4202-ae51-a836b7474f88",
+    "9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7",
+    "9c008d2d-decc-4845-b309-e01a42e98eda",
+    "ab797eed-1d0f-4255-acc3-e327c9001632",
+    "aeafc378-3073-4b32-be1b-53a05b656168",
+    "cba1bff8-58ec-4102-b56a-96d767ac05a2",
     "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
     "da12ad66-7451-4700-9731-74a36c895bb9",
+    "dbbfcd6c-562a-4691-86e7-feb687c79ce5",
     "dcbfc47a-16be-4868-9fa1-2991cc06a725",
+    "ddca5431-273f-473c-a897-548fa5e62054",
     "e643ef66-8474-4d78-9986-670e0c7db465",
+    "edc8544d-5f5e-497e-9706-c7b4e7235036",
     "f9ab44aa-1df9-49f7-a335-2a3c2880ac06"
   ],
   "description": "Remove the friction an execution lead meets when gating, linking and configuring many issues, preferring changes that delete mechanism over changes that add it.\n\n## Background\n\nA downstream execution lead (gf2, epic `1a379447`, session 38, 2026-10-15) closed about 30 issues and reported where jit cost time or misled. Several reports were already solved by existing features the repository had not configured. The rest are real defects or missing simplifications. They cluster around three surfaces:\n\n- **Gates.** Two reuse mechanisms (a commit-based skip and a digest over declared inputs) coexist; the commit-based record calls the tree dirty because of jit's own tracker writes; checker infrastructure faults are recorded as verdicts.\n- **Documents.** Artifacts produced in linked worktrees need a tracker write after merge before they count as linked, and link checking fails on warnings.\n- **Configuration and output.** Changing one profile-owned gate field took five steps and a suggested remedy that worsened the state; CLI output uses emoji status markers; small inconsistencies in gate status and rejection.\n\nThe guiding direction for this work is `@/charter/D-18`: each fix should shrink code, configuration or procedure.\n\nThe profile code also repeats its own mechanism, beyond the ownership machinery that `@/charter/D-8` deletes. Plan, apply, diff, reconfigure and upgrade repeat one selection-preparation skeleton (`commands/profile.rs:1163-1840`, folded into `lifecycle_selection_from_sources` at 1540 for only some callers). Each `*_from_sources` entry point resolves selectors and the package graph, then delegates to a `*_with_inputs` routine that resolves both again (`commands/profile.rs:1206/1173`, `1347/1290`). `init.rs:133-167` repeats the same double resolution. One selection captures the repository three times, rebuilds its inputs three times, and composes every package 2 + 2N times. The registry TOML is re-parsed for each rendered contribution. Variable-input validation runs twice per command, and `validate_model_references` runs both in the package constructor (`profile/package.rs:623`) and again in `profile/variables.rs:311,337`. The executor keeps dead or test-only public plan/apply entry points.\n\nFive private canonical-JSON functions exist: `profile/package.rs:980`, `profile/wire.rs:240`, `profile/variables.rs:512`, `repository_state/profile_apply.rs:1367` and `repository_state/mutation.rs:576-588`. With `serde_json`'s `preserve_order` feature off, `Map` is already sorted, so each one is an identity transform. Several types come in pairs. `ProfileApplyResult` (`profile/application.rs:41`) duplicates `ProfilePlanEntry` (`:272`), and a trait exists only to bridge the two. `ContributionConflictOwner` (`profile_apply.rs:241`) and `ProfileConflictOccupant` (`:586`) are one enum with two wire spellings. `ProfileDependencyError` (`commands/profile.rs:262`) mirrors `ProfileGraphError` (`profile/graph.rs:215`) through a field-by-field translator. `ProfilePackage` and `CapturedPackageTree` (`profile/package_capture.rs:133`) are parallel validated-package types. `ProfilePackageSource` (`profile/package.rs:45`) has a single variant. Result types carry hand-written wire and schema mirrors (`ProfileDivergenceWire`, `ProfileDivergenceSchema`, `ProfileTargetConflictWire`). Registry target paths are spelled four times instead of derived from the registry declaration, and the registry merge renderers re-implement the presence lookup that `contribution_in_registry` owns.\n\n## Success Criteria\n\n- [hard] REQ-01: Gating several issues over unchanged checker inputs executes each checker once, whatever commits the tracker makes between evaluations.\n- [hard] REQ-02: Every gate-run record distinguishes a checker infrastructure fault from a verdict on the repository content.\n- [hard] REQ-03: An artifact produced in a linked worktree under its issue's artifact directory is linked to the issue after merge with no further tracker write.\n- [hard] REQ-04: Profile packages apply once, with no ownership records to keep in sync (`@/charter/D-8`).\n- [hard] REQ-05: CLI human-readable status output uses words, not emoji.\n- [hard] REQ-06: Plan, apply, diff and repository initialization reach package selection through one selection path, which resolves selectors and the package dependency graph once per invocation and builds composition inputs once.\n- [hard] REQ-07: Plan is a read-only run of the apply computation and reports through the same result type as apply; no twin plan and apply result types, and no trait bridging them, remain.\n- [hard] REQ-08: Exactly one canonical-JSON serialization function exists in `crates/jit`, and it fails to build or test when `serde_json`'s `preserve_order` feature is enabled.\n- [hard] REQ-09: The profile model declares each concept once: one package-graph error type, one conflict-origin type, one validated in-memory package type, and no single-variant package-source enum.\n- [hard] REQ-10: Package model validation and variable-input validation each run once per command, and the registry TOML is parsed once per composition.\n- [hard] REQ-11: Registry target paths derive from the one registry declaration, and every registry renderer finds an existing entry through the one presence lookup.\n- [hard] REQ-12: Every profile result type serializes and publishes its schema through derived implementations; no hand-written wire or schema mirror remains.\n- [hard] REQ-13: The profile executor exposes no public entry point that is dead or reached only from tests.\n- [hard] REQ-14: The surviving profile model identifies packages by the domain `ProfileId`; no separate unvalidated package identifier type (`ProfilePackageId`) remains.\n- [hard] REQ-15: Profile versions and version requirements are semver types in the package model, parsed once at decode; graph resolution has no error variant for an unparseable version.\n\n## Notes\n\n- Source: gf2 friction report relayed 2026-10-15; gf2's configuration was fixed separately (declared `cargo-ci` inputs, profile `sim-research` 1.2.7).",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "eb4188988af13ec6b2c29890333e8a376799c2c7d0b75094ee5021040ce5dd65",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation-children.md",
-          "resolved_path": "dev/active/3d9a0ce3-lead-friction/investigation-children.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "29a8acacedd7c6be0d0a8e1a55d36219ee6bc4daecc44fcafcd9edc8bd89845b",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "plan.md",
-          "resolved_path": "dev/active/3d9a0ce3-lead-friction/plan.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "b122a44a9f86ef6215c79cdd816d76ce4ea962ef2e7b97c5364b3f1cc8452701",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/3d9a0ce3-lead-friction/breakdown.json"
-        }
-      ],
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "handoff",
-      "path": "dev/active/3d9a0ce3-lead-friction/handoff.md"
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "report",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/completion-report.md"
     }
   ],
+  "done_at": "2026-11-01T20:36:11.650253791Z",
   "first_ready_at": "2026-10-15T11:05:36.732638299Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "8cd298f0-23ef-4159-9734-aa1576377b12",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:33:21.587483802Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "8f25e005-d028-4d52-ac35-59e6eb694a79",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:19:55.395092903Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
   "labels": [
     "type:epic",
@@ -68,7 +81,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "archived",
   "title": "Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-10-22T01:58:54.570642347Z"
+  "updated_at": "2026-11-01T20:36:41.366218511Z"
 }

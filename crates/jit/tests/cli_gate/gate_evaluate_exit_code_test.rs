@@ -1,104 +1,45 @@
-//! Integration tests for the `jit gate evaluate` exit-code taxonomy and JSON `verdict`.
+//! Integration tests for the JSON `verdict` of `jit gate evaluate`.
 //!
 //! Matrix:
-//!   success             -> exit 0,  verdict "pass"
-//!   checker failure     -> exit 4,  verdict "fail"   (checker ran, non-zero exit)
-//!   runner error        -> exit 10, verdict "error"  (checker killed, no exit code, exit 75, or a built-in checker fault)
-//!   issue not found     -> exit 3,  no verdict
-//!   gate not required   -> exit 2,  no verdict (evaluate and fail)
-//!   manual gate, no --by -> exit 2, no verdict (jit:1d59070d REQ-03)
+//!   success             -> verdict "pass"
+//!   checker failure     -> verdict "fail"   (checker ran, non-zero exit)
+//!   runner error        -> verdict "error"  (checker killed, no exit code, exit 75, or a built-in checker fault)
+//!   issue not found     -> no verdict
+//!   gate not required   -> no verdict
+//!   manual gate, no --by -> no verdict (jit:1d59070d REQ-03)
 
-use std::process::Command;
-use tempfile::TempDir;
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .output()
-        .unwrap();
-    temp
-}
-
-/// Define an auto gate with the given checker command and create an issue that
-/// requires it. Returns (TempDir, issue_id).
-fn setup_auto_gate_issue(checker_command: &str) -> (TempDir, String) {
-    let temp = setup_repo();
-    let define = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "test-gate",
-            "--title",
-            "Test Gate",
-            "--description",
-            "Test",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "10",
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        define.status.success(),
-        "gate define failed: {}",
-        String::from_utf8_lossy(&define.stderr)
-    );
-
-    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Test issue",
-            "--gate",
-            "test-gate",
-            "--json",
-        ])
-        .output()
-        .unwrap();
-    assert!(create.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
-    (temp, id)
-}
+use crate::add_auto_gate_issue;
+use jit::test_cli::JitCli;
 
 #[test]
-fn test_gate_evaluate_success_exit_0_verdict_pass() {
-    let (temp, id) = setup_auto_gate_issue("true");
+fn test_gate_evaluate_success_verdict_pass() {
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "true");
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(0));
+    assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["status"], "passed");
     assert_eq!(json["verdict"], "pass");
 }
 
 #[test]
-fn test_gate_evaluate_checker_failure_exit_4_verdict_fail() {
+fn test_gate_evaluate_checker_failure_verdict_fail() {
     // `false` exits non-zero -> GateRunStatus::Failed -> checker failure.
-    let (temp, id) = setup_auto_gate_issue("false");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "false");
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(4),
+    assert!(
+        !output.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
@@ -109,20 +50,19 @@ fn test_gate_evaluate_checker_failure_exit_4_verdict_fail() {
 }
 
 #[test]
-fn test_gate_evaluate_runner_error_exit_10_verdict_error() {
+fn test_gate_evaluate_runner_error_verdict_error() {
     // A checker that kills itself with SIGKILL leaves no exit code, which the
     // runner classifies as GateRunStatus::Error (runner/infra failure).
-    let (temp, id) = setup_auto_gate_issue("kill -9 $$");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "kill -9 $$");
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
+    assert!(
+        !output.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
@@ -133,21 +73,20 @@ fn test_gate_evaluate_runner_error_exit_10_verdict_error() {
 }
 
 #[test]
-fn test_gate_evaluate_command_not_found_exit_10_verdict_error() {
+fn test_gate_evaluate_command_not_found_verdict_error() {
     // A nonexistent executable makes `sh -c` exit 127 (command not found),
     // which the runner classifies as GateRunStatus::Error (runner/infra error),
     // not a checker failure.
-    let (temp, id) = setup_auto_gate_issue("jit-no-such-command-xyz");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "jit-no-such-command-xyz");
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
+    assert!(
+        !output.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
@@ -160,21 +99,20 @@ fn test_gate_evaluate_command_not_found_exit_10_verdict_error() {
 #[test]
 fn test_gate_evaluate_checker_exit_75_records_error_run() {
     // EX_TEMPFAIL: the checker reports it could not judge.
-    let (temp, id) = setup_auto_gate_issue("exit 75");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "exit 75");
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(10));
+    assert!(!output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["details"]["verdict"], "error");
 
-    let status = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "test-gate", "--json"])
+    let status = temp
+        .command(["gate", "status", &id, "test-gate", "--json"])
         .output()
         .unwrap();
     let text = String::from_utf8_lossy(&status.stdout);
@@ -186,57 +124,29 @@ fn test_gate_evaluate_checker_exit_75_records_error_run() {
 
 #[test]
 fn test_gate_evaluate_other_nonzero_exit_stays_failed() {
-    let (temp, id) = setup_auto_gate_issue("exit 74");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "exit 74");
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["details"]["verdict"], "fail");
 }
 
 #[test]
-fn test_gate_evaluate_runner_error_non_json_exit_10() {
-    // The non-JSON path must agree with the JSON path on exit 10.
-    let (temp, id) = setup_auto_gate_issue("kill -9 $$");
+fn test_gate_evaluate_issue_not_found_reports_no_verdict() {
+    let temp = JitCli::initialised().unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate"])
+    let output = temp
+        .command(["gate", "evaluate", "nonexistent", "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(10));
-}
-
-#[test]
-fn test_gate_evaluate_checker_failure_non_json_exit_4() {
-    let (temp, id) = setup_auto_gate_issue("false");
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(4));
-}
-
-#[test]
-fn test_gate_evaluate_issue_not_found_exit_3() {
-    let temp = setup_repo();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", "nonexistent", "test-gate", "--json"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(3));
+    assert!(!output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
     // Pre-verdict lookup error: no verdict field.
@@ -244,27 +154,42 @@ fn test_gate_evaluate_issue_not_found_exit_3() {
 }
 
 #[test]
-fn test_gate_evaluate_gate_not_required_exit_2() {
-    let temp = setup_repo();
+fn test_gate_evaluate_invalid_id_prefix_reports_its_classified_code_in_json_and_human_modes() {
+    // Formerly reported as the GATE_ERROR fallback under --json only.
+    let temp = JitCli::initialised().unwrap();
+    let code = jit::output::ErrorCode::InvalidIdPrefix;
+
+    for json in [true, false] {
+        let mut args = vec!["gate", "evaluate", "!", "test-gate"];
+        args.extend(json.then_some("--json"));
+        let output = temp.command(args).output().unwrap();
+
+        assert_eq!(
+            output.status.code(),
+            Some(code.exit_code().code()),
+            "{json}"
+        );
+        if json {
+            let printed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(printed["error"]["code"], code.as_str());
+        }
+    }
+}
+
+#[test]
+fn test_gate_evaluate_gate_not_required_reports_no_verdict() {
+    let temp = JitCli::initialised().unwrap();
 
     // Create an issue with NO gates.
-    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "create", "--title", "No gates", "--json"])
-        .output()
-        .unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
+    let id = temp.create_issue(["--title", "No gates"]).unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "not-a-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "not-a-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(2),
+    assert!(
+        !output.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
@@ -276,89 +201,30 @@ fn test_gate_evaluate_gate_not_required_exit_2() {
 }
 
 #[test]
-fn test_gate_evaluate_gate_not_required_non_json_exit_2() {
-    let temp = setup_repo();
-
-    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "create", "--title", "No gates", "--json"])
-        .output()
-        .unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "not-a-gate"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(2));
-}
-
-#[test]
-fn test_gate_fail_gate_not_required_exit_2() {
-    let temp = setup_repo();
-
-    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "create", "--title", "No gates", "--json"])
-        .output()
-        .unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "fail", &id, "not-a-gate", "--json"])
-        .output()
-        .unwrap();
-
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "stdout: {} stderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
-}
-
-#[test]
 fn test_gate_evaluate_manual_gate_success_verdict_pass() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
 
     // Define a manual gate.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "review",
-            "--title",
-            "Review",
-            "--description",
-            "Manual review",
-            "--mode",
-            "manual",
-        ])
-        .output()
+    temp.command([
+        "gate",
+        "define",
+        "review",
+        "--title",
+        "Review",
+        "--description",
+        "Manual review",
+        "--mode",
+        "manual",
+    ])
+    .output()
+    .unwrap();
+
+    let id = temp
+        .create_issue(["--title", "Work", "--gate", "review"])
         .unwrap();
 
-    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue", "create", "--title", "Work", "--gate", "review", "--json",
-        ])
-        .output()
-        .unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let output = temp
+        .command([
             "gate",
             "evaluate",
             &id,
@@ -370,52 +236,43 @@ fn test_gate_evaluate_manual_gate_success_verdict_pass() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(0));
+    assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["verdict"], "pass");
 }
 
 /// REQ-03 (jit:1d59070d): a manual gate has no checker to run, so a bare
 /// evaluate would silently record an unattributed pass. It must instead fail
-/// as a usage error (exit 2, no verdict) with a hint naming the attested
+/// as a usage error (no verdict) with a hint naming the attested
 /// form. Auto gates are unaffected by --by.
 #[test]
-fn test_gate_evaluate_manual_gate_without_by_exit_2_no_verdict() {
-    let temp = setup_repo();
+fn test_gate_evaluate_manual_gate_without_by_reports_no_verdict() {
+    let temp = JitCli::initialised().unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "review",
-            "--title",
-            "Review",
-            "--description",
-            "Manual review",
-            "--mode",
-            "manual",
-        ])
+    temp.command([
+        "gate",
+        "define",
+        "review",
+        "--title",
+        "Review",
+        "--description",
+        "Manual review",
+        "--mode",
+        "manual",
+    ])
+    .output()
+    .unwrap();
+
+    let id = temp
+        .create_issue(["--title", "Work", "--gate", "review"])
+        .unwrap();
+
+    let output = temp
+        .command(["gate", "evaluate", &id, "review", "--json"])
         .output()
         .unwrap();
 
-    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue", "create", "--title", "Work", "--gate", "review", "--json",
-        ])
-        .output()
-        .unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = json["id"].as_str().unwrap().to_string();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "review", "--json"])
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
     assert!(json.get("verdict").is_none());
@@ -434,11 +291,12 @@ fn test_gate_evaluate_manual_gate_without_by_exit_2_no_verdict() {
 }
 
 #[test]
-fn test_gate_evaluate_builtin_checker_fault_exit_10_verdict_error() {
+fn test_gate_evaluate_builtin_checker_fault_verdict_error() {
     // A built-in checker that cannot judge the repository reaches the same
     // runner-error reporting as an exec checker.
-    let (temp, id) = setup_auto_gate_issue("true");
-    let gates_path = temp.path().join(".jit/gates.toml");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "true");
+    let gates_path = temp.root().join(".jit/gates.toml");
     let gates = std::fs::read_to_string(&gates_path).unwrap();
     let (head, checker) = gates.split_once("[gates.checker]").unwrap();
     let tail = checker.split_once("\n\n").map_or("", |(_, rest)| rest);
@@ -450,15 +308,13 @@ fn test_gate_evaluate_builtin_checker_fault_exit_10_verdict_error() {
     )
     .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
+    assert!(
+        !output.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:17:12.327621819Z",
+  "duration_ms": 132622,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current gate declaration, input roots, registry projection, and recorded passing evidence satisfy both hard requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e8ea2608-830f-4596-8452-f3df28a8ffbe",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:14:59.704823460Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a3a544db371502761d74bab7032b97c03795dd7d (`jit:2c453337`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-10 (issue description); @/gate/manifest-tool-test (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code not recorded); manifest-tool-test passed (exit 0)\nTruncation recovery: reread the gate declaration, source records, self-test, and gate execution behavior in bounded calls after an initial combined read truncated\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current gate declaration, input roots, registry projection, and recorded passing evidence satisfy both hard requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

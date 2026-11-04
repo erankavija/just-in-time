@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T01:16:20.163820803Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -7,14 +8,28 @@
     "b06cee74-7635-49c0-bc13-448bcfa28324",
     "e98ae5a4-595a-4d49-9c88-2d2422198e9e"
   ],
-  "description": "Decide whether `jit claim acquire` appends `IssueClaimed` from the issue record's assignee alone, so a claim parses no event-log record.\n\n## Background\n\n`jit claim acquire` synchronizes the issue through `MutationIntent::ClaimIssue` (`crates/jit/src/commands/claim.rs:170-212`). Its capture requests the whole event log (`:189-197`). The finalizer parses it (`captured_events`, `repository_state/mutation.rs:675-688`) and asks whether the log's tail already shows this claim (`event_tail_reflects_claim`, `:693-708`) before deciding at `:851-888`. Acquire, unassign, acquire again therefore reassigns the issue with no event, and an issue assigned outside jit gets a repair event. Every event append already reads only the log's bounded end (`CaptureSpec::discover_tail`, `repository_state/image.rs:581-589`), and the issue write and its events publish in one redo record. Tests asserting today's rule: `mutation.rs:2021-2160`, `commands/claim.rs:1780-1830`.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim acquire` captures the issue record and the log's tail only. It appends `IssueClaimed` exactly when the captured issue's assignee differs from the claimant, in the same redo record as the issue write, and appends nothing otherwise.\n- [hard] REQ-02: `captured_events` and `event_tail_reflects_claim` no longer exist, and the claim decision reads no event-log record.\n- [hard] REQ-03: Tests show that acquire, unassign, acquire appends two claim events; that a repeated claim appends nothing; and that a claim of an issue already assigned to the claimant outside jit appends nothing.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- This reverses the earlier rule that a claim repairs a missing claim event for an assignment made outside jit.\n",
+  "description": "Decide whether `jit claim acquire` and `jit issue claim` append `IssueClaimed` from the issue record's assignee alone, so a claim parses no event-log record and writes its event exactly when the assignment changes.\n\n## Background\n\n`jit claim acquire` synchronizes the issue through `MutationIntent::ClaimIssue` (`crates/jit/src/commands/claim.rs`). Its capture requests the whole event log. The finalizer parses it (`captured_events`, `repository_state/mutation.rs`) and asks whether the log's tail already shows this claim (`event_tail_reflects_claim`). So after acquire and `issue unassign`, a second acquire writes the issue with no event, against @/inv/event-log, and an issue assigned outside jit with no claim event gets a repair event. Every event append already reads only the log's bounded end (`CaptureSpec::discover_tail`, `repository_state/image.rs`), and the issue write and its events publish in one redo record. The doc comments on the claim capture in `commands/claim.rs` describe the whole-log read.\n\n`jit issue claim` (lifecycle `Claim`, `commands/mod.rs`) pushes `IssueClaimed` unconditionally, including when a Ready issue already assigned to the claimant is promoted. `issue assign` emits it only when the assignee changes.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim acquire` captures the issue record and the log's tail only. It appends `IssueClaimed` exactly when the captured issue's assignee differs from the claimant, in the same redo record as the issue write, and appends nothing otherwise.\n- [hard] REQ-02: `captured_events` and `event_tail_reflects_claim` no longer exist, the claim decision reads no event-log record, and the doc comments on the claim capture match.\n- [hard] REQ-03: Tests show that acquire, unassign, acquire appends two claim events; that a repeated claim appends nothing; and that a claim of an issue already assigned to the claimant outside jit appends nothing.\n- [hard] REQ-04: `issue claim` appends `IssueClaimed` exactly when the assignee changes; a same-assignee promotion appends only the state change, and a test pins it.\n\n## Notes\n\n- A claim does not repair a missing claim event for an assignment made outside jit.\n- `claim acquire` overwriting another assignee with no refusal or release event is existing behaviour and out of scope.\n",
   "documents": [],
+  "done_at": "2026-11-03T01:28:44.087487073Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "486c5dd4-7cb9-4aaa-a024-55e2487df81a",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:26:10.102897794Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cdd6cd39-05e4-4cfd-8143-4cb18fdbd323",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:28:43.642785897Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "63de0883-1cfb-4d01-a7d2-b444221783b2",
   "labels": [
     "type:task",
@@ -25,10 +40,11 @@
     "per:@/charter/D-19",
     "per:@/charter/D-17",
     "enforces:@/invariant/event-log",
-    "satisfies:f8a6b298/REQ-08"
+    "satisfies:f8a6b298/REQ-08",
+    "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Claim acquire emits its event exactly when the assignee changes",
-  "updated_at": "2026-10-21T10:40:07.723087612Z"
+  "updated_at": "2026-11-03T01:28:44.087487073Z"
 }

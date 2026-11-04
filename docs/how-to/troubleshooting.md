@@ -51,8 +51,8 @@ To fix:
   - jit gate status-all def67890
   - jit gate evaluate def67890 code-review --by <attestor>
 
-Issue transitioned to `gated`. Evaluate or attest the listed gates, inspect
-`jit gate status-all`, then retry `jit issue update <issue-id> --state done`.
+Issue transitioned to `gated`. Evaluate or attest the listed gates; passing the
+last one moves it to `done`.
 ```
 
 A manual gate's `evaluate` requires `--by <attestor>` (e.g. `--by
@@ -82,7 +82,7 @@ become ready or complete. Required gates must pass before an issue can become
    jit gate evaluate <issue-id> <gate-key>                    # auto gate: runs the checker
    jit gate evaluate <issue-id> <gate-key> --by <attestor>    # manual gate: records attestation
    jit gate status-all <issue-id>
-   jit issue update <issue-id> --state done
+   jit issue update <issue-id> --state done   # completes an in_progress issue; no change once done
    ```
 
 For scripts and MCP clients, use `--json` on `issue update`, `issue claim`, or
@@ -100,7 +100,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Solutions:**
 
-1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; force-evict it)
+1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; once its heartbeat is stale, `jit recover` reclaims it)
 2. **Check who has it:**
    ```bash
    jit claim status --issue abc123
@@ -108,18 +108,18 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 3. **Coordinate** — If you know the other agent, ask them to release
 4. **Force evict (admin)** — For crashed agents:
    ```bash
-   jit claim force-evict <lease-id> --reason "Agent crashed"
+   jit claim force-evict <issue-id> --reason "Agent crashed"
    ```
 
 ### Lease Expired During Work
 
-**Symptom:** Pre-commit hook rejects your commit, or another agent claimed your issue.
+**Symptom:** A `jit` write refuses because another agent holds a lease on your issue.
 
-**Cause:** Your lease expired before you committed.
+**Cause:** Your lease expired, and another agent claimed the issue.
 
 **Prevention:**
 - Use longer TTL: `jit claim acquire <issue> --ttl 3600`
-- Renew before expiration: `jit claim renew <lease-id>`
+- Renew before expiration: `jit claim renew <issue-id>`
 - Use indefinite lease for manual work: `jit claim acquire <issue> --ttl 0 --reason "..."`
 
 **Recovery:**
@@ -136,7 +136,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Symptom:**
 ```
-⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
+  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
 
 **Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the built-in claim stale threshold ([Runtime Defaults](../reference/runtime-defaults.md)).
@@ -145,15 +145,15 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 1. **Send heartbeat** if still working:
    ```bash
-   jit claim heartbeat <lease-id>
+   jit claim heartbeat <issue-id>
    ```
 2. **Release** if done:
    ```bash
    jit claim release <issue-id>
    ```
-3. **Force evict** if agent is gone:
+3. **Reclaim** if the agent is gone:
    ```bash
-   jit claim force-evict <lease-id> --reason "Agent abandoned"
+   jit recover
    ```
 
 ### Exceeded Indefinite Lease Limit
@@ -212,27 +212,24 @@ jit recover
 
 This cleans up stale locks by checking if owning PIDs are still running.
 
-### Corrupted Claims Index
+### Malformed Lease Record
 
 **Symptom:**
 ```
-Error: Failed to parse claims index
+Error: Failed to parse lease record at .git/jit/leases/<issue-id>.json
 ```
 
-Or inconsistent claim status.
-
-**Solution:** Rebuild from audit log:
+**Solution:** The record is that issue's lease alone. Removing it releases the
+lease and leaves every other lease intact:
 ```bash
-jit recover
+rm .git/jit/leases/<issue-id>.json
 ```
-
-The claims index can always be rebuilt from the append-only `claims.jsonl` log.
 
 ### Coordination-State Repair
 
-`jit validate` reports repository validation findings. Stale locks, expired
-leases, and a corrupted claims index are coordination state for `jit recover` to
-repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
+`jit validate` reports repository validation findings. Use `jit recover` to
+clear stale locks, evict expired leases, and reclaim stale indefinite leases.
+It also removes orphaned `*.tmp` files, lease stage files included. It never removes `redo.record`
 from the scratch directory `.jit/tmp/`: that record is a pending mutation's
 commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
 names what is safe to remove by hand.
@@ -259,8 +256,10 @@ application are defined in
 Error: applying the leftover redo record failed: <cause>
 ```
 
-`jit recover` prints `Recovery failed:` in place of `Error:`, and under `--json`
-reports `recovery_failed` where other mutating commands report `GENERIC_ERROR`.
+`jit recover` prints `Recovery failed:` in place of `Error:`. Under `--json`,
+`jit recover` and the commands that
+[read through the read driver](../reference/storage-format.md#publication-and-recovery)
+report `recovery_failed` where mutating commands report `GENERIC_ERROR`.
 
 **Cause:** Session open could not apply the record, for example because a path
 it writes is not writable or a file occupies a directory it creates. The record
@@ -306,42 +305,11 @@ then act on the reason:
 
 ## Git Hook Issues
 
-### Pre-Commit Hook Rejection
-
-**Symptom:**
-```
-❌ Pre-commit hook: Structural edit to issue abc123 without active lease
-```
-
-**Cause:** You're editing an issue file without holding a lease (in strict mode).
-
-**Solutions:**
-
-1. **Acquire a lease:**
-   ```bash
-   jit claim acquire abc123
-   git commit  # Retry
-   ```
-
-2. **Set your agent identity:**
-   ```bash
-   export JIT_AGENT_ID='agent:your-name'
-   ```
-   Or configure in `~/.config/jit/agent.toml`:
-   ```toml
-   id = "agent:your-name"
-   ```
-
-3. **Bypass (emergency only):**
-   ```bash
-   git commit --no-verify
-   ```
-
 ### Divergence Error
 
 **Symptom:**
 ```
-❌ Pre-commit hook: Global .jit/ changes require common history with main
+error: Pre-commit hook: Global .jit/ changes require common history with main
    Your branch has diverged from origin/main
 ```
 
@@ -358,7 +326,7 @@ git commit  # Retry
 
 **Symptom:** Hooks don't enforce anything.
 
-**Cause:** Hooks not installed or enforcement is off.
+**Cause:** The hook isn't installed or enforcement is off. The hook checks only branch divergence on shared configuration; leases are enforced when a mutation is written, and a hand edit of an issue record is not caught at commit.
 
 **Solution:**
 1. Install hooks:
@@ -415,12 +383,16 @@ rm .jit/worktree.json
 jit worktree info
 ```
 
+Over a data root outside every checkout, the file is
+`"$(git rev-parse --absolute-git-dir)/jit/worktree.json"` (see
+[Worktree Identity](../reference/storage-format.md#worktree-identity)).
+
 ### Secondary Worktree Can't See Issues
 
 **Symptom:** `jit query all` returns nothing in secondary worktree.
 
-**Cause:** The aggregated read path could not find the issue in this worktree,
-Git `HEAD`, or the recognized main worktree.
+**Cause:** The aggregated read path could not find the issue in this checkout's
+store or the primary checkout's store.
 
 **Solutions:**
 
@@ -430,16 +402,16 @@ Git `HEAD`, or the recognized main worktree.
    git rev-parse --git-common-dir
    ```
 
-2. **Verify the repository data is available from an aggregation source:**
+2. **Verify the issue record is in one of the two stores:**
    ```bash
-   git show HEAD:.jit/index.json
    git worktree list
+   ls .jit/issues/
+   ls "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.jit/issues/"
    ```
 
-3. **If the issue exists only as an uncommitted change,** keep the main
-   worktree available at the path Git reports. Secondary-worktree reads fall
-   back to that main worktree automatically when the standard Git layout can be
-   resolved.
+3. **If the issue exists only in the primary checkout,** keep that checkout
+   available at the path Git reports. Linked-checkout reads fall back to it
+   automatically when the standard Git layout can be resolved.
 
 ---
 
@@ -506,32 +478,16 @@ jit validate
 jit claim list
 ```
 
-### Manual Index Rebuild
-
-If automatic recovery fails:
-
-```bash
-# The claims index is derived from claims.jsonl
-# Remove the index and let recovery rebuild it from the log:
-rm .git/jit/claims.index.json
-jit recover  # Rebuilds the claims index from claims.jsonl
-```
-
 ### Emergency: Clear All Leases
 
 **Warning:** Only do this if coordination is completely broken.
 
 ```bash
 # Backup first
-cp .git/jit/claims.jsonl .git/jit/claims.jsonl.bak
-cp .git/jit/claims.index.json .git/jit/claims.index.json.bak
+cp -r .git/jit/leases .git/jit/leases.bak
 
-# Clear (loses all lease history)
-rm .git/jit/claims.jsonl
-rm .git/jit/claims.index.json
-
-# Reinitialize
-jit recover  # Rebuilds an empty index from the cleared log
+# Clear every lease; claims.jsonl keeps the history
+rm -r .git/jit/leases
 ```
 
 ---

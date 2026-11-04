@@ -2,17 +2,9 @@
 
 use super::*;
 
-impl<S: IssueStore> CommandExecutor<S> {
-    /// Get issue by ID.
-    ///
-    /// Note: Helper method for label operations, part of public API.
-    #[allow(dead_code)]
-    pub fn get_issue(&self, id: &str) -> Result<Issue> {
-        self.storage.load_issue(id)
-    }
-
+impl<S: IssueStore> IssueOps<'_, S> {
     pub fn list_label_values(&self, namespace: &str) -> Result<Vec<String>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let mut values = std::collections::HashSet::new();
 
         for issue in issues {

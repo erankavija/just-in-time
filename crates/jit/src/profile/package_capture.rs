@@ -30,8 +30,8 @@
 
 use super::nofollow::{classify_open_failure, is_executable, open_path_nofollow, OpenRefusal};
 use super::{
-    ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageModel,
-    LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
+    ProfilePackage, ProfilePackageError, ProfilePackageModel, LIVE_ASSET_SOURCE_PREFIX,
+    MANIFEST_FILE_NAME,
 };
 use crate::repository_state::{FileMode, RepositoryLayout, RepositoryLayoutError, VirtualPath};
 use cap_std::ambient_authority;
@@ -57,55 +57,6 @@ struct DeclaredSource {
     source: String,
     /// Where a capture draws its bytes from.
     authority: SourceAuthority,
-    /// Mode the manifest declares the captured file is published with.
-    mode: FileMode,
-}
-
-/// One file of a captured package tree.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CapturedFile {
-    /// Exact bytes drawn from the owning side.
-    pub bytes: Vec<u8>,
-    /// Mode the file is published with, taken from its declaration.
-    pub mode: FileMode,
-}
-
-/// A validated package tree drawn from the sources its manifest declares.
-///
-/// Holding one means the composed content already validated as a package, so a
-/// caller publishes bytes that decode rather than bytes that might.
-#[derive(Debug, Clone)]
-pub struct CapturedPackageTree {
-    model: ProfilePackageModel,
-    hashes: ProfilePackageHashes,
-    files: BTreeMap<String, CapturedFile>,
-}
-
-impl CapturedPackageTree {
-    /// Canonical package model the captured manifest declares.
-    pub fn model(&self) -> &ProfilePackageModel {
-        &self.model
-    }
-
-    /// Canonical package and per-repository-target hashes of the captured tree.
-    pub fn hashes(&self) -> &ProfilePackageHashes {
-        &self.hashes
-    }
-
-    /// Every captured file by its package-relative path, in canonical order.
-    pub fn files(&self) -> &BTreeMap<String, CapturedFile> {
-        &self.files
-    }
-
-    /// Captured file count, including `manifest.toml`.
-    pub fn file_count(&self) -> usize {
-        self.files.len()
-    }
-
-    /// Total captured byte size, including `manifest.toml`.
-    pub fn byte_size(&self) -> usize {
-        self.files.values().map(|file| file.bytes.len()).sum()
-    }
 }
 
 /// Why a package tree could not be captured.
@@ -189,11 +140,6 @@ fn declared_sources(model: &ProfilePackageModel) -> Vec<DeclaredSource> {
             } else {
                 SourceAuthority::Package
             },
-            mode: if asset.executable {
-                FileMode::Executable
-            } else {
-                FileMode::Regular
-            },
         })
         // A managed region's source is a fragment spliced into its target
         // rather than a copy of it, so the package authors it whatever prefix
@@ -201,7 +147,6 @@ fn declared_sources(model: &ProfilePackageModel) -> Vec<DeclaredSource> {
         .chain(model.regions.iter().map(|region| DeclaredSource {
             source: region.source.clone(),
             authority: SourceAuthority::Package,
-            mode: FileMode::Regular,
         }))
         .collect()
 }
@@ -230,7 +175,7 @@ fn declared_sources(model: &ProfilePackageModel) -> Vec<DeclaredSource> {
 pub fn capture_package_tree(
     package_source: &VirtualPath,
     layout: &RepositoryLayout,
-) -> Result<CapturedPackageTree, PackageCaptureError> {
+) -> Result<ProfilePackage, PackageCaptureError> {
     // Every source below is opened through this one handle, so "inside the
     // worktree" is established once, by the directory a capture may read,
     // rather than re-derived from a pathname per source.
@@ -261,68 +206,23 @@ pub fn capture_package_tree(
         .map(|declared| {
             let path = source_path(package_source, &declared, layout)?;
             let read = read_confined(&declared.source, &path, layout, &worktree)?;
-            // The published mode is the manifest's declaration, not the mode of
-            // the file the bytes came from: the manifest is what an application
-            // publishes a target's mode from. The mode that was read still
-            // decides validity below, so a source carrying permission its
-            // declaration did not is refused rather than quietly narrowed.
-            Ok((
-                declared.source,
-                (
-                    CapturedFile {
-                        bytes: read.bytes,
-                        mode: declared.mode,
-                    },
-                    read.mode,
-                ),
-            ))
+            // The mode that was read decides validity below, so a source carrying
+            // permission its declaration did not is refused.
+            Ok((declared.source, read))
         })
-        .collect::<Result<BTreeMap<String, (CapturedFile, FileMode)>, PackageCaptureError>>()?;
+        .collect::<Result<BTreeMap<String, ReadSource>, PackageCaptureError>>()?;
 
     let observed_executable = drawn
         .iter()
-        .filter(|(_, (_, read_mode))| *read_mode == FileMode::Executable)
+        .filter(|(_, read)| read.mode == FileMode::Executable)
         .map(|(source, _)| source.clone())
         .collect::<BTreeSet<_>>();
-    let files = std::iter::once((
-        MANIFEST_FILE_NAME.to_string(),
-        CapturedFile {
-            bytes: manifest.bytes,
-            mode: FileMode::Regular,
-        },
-    ))
-    .chain(drawn.into_iter().map(|(source, (file, _))| (source, file)))
-    .collect::<BTreeMap<_, _>>();
-
-    compose_captured_tree(files, observed_executable)
-        .map_err(PackageCaptureError::InvalidCapturedTree)
-}
-
-/// Validate composed package content and close it into a captured tree.
-///
-/// The single constructor of a [`CapturedPackageTree`], shared by both routes
-/// that compose one — drawing a tree from the repository files a manifest
-/// declares, and extracting one from a portable archive — so a tree that exists
-/// has passed the same package validation whichever route produced it
-/// (`@/inv/convention-convergence`).
-///
-/// `observed_executable` names the sources whose bytes came from a file
-/// carrying executable permission, which is what lets the shared package
-/// validation refuse one whose declaration did not.
-pub(super) fn compose_captured_tree(
-    files: BTreeMap<String, CapturedFile>,
-    observed_executable: BTreeSet<String>,
-) -> Result<CapturedPackageTree, ProfilePackageError> {
-    let bytes = files
-        .iter()
-        .map(|(source, file)| (source.clone(), file.bytes.clone()))
+    let files = std::iter::once((MANIFEST_FILE_NAME.to_string(), manifest.bytes))
+        .chain(drawn.into_iter().map(|(source, read)| (source, read.bytes)))
         .collect::<BTreeMap<_, _>>();
-    let (model, hashes) = ProfilePackage::validate_content(&bytes, &observed_executable)?;
-    Ok(CapturedPackageTree {
-        model,
-        hashes,
-        files,
-    })
+
+    ProfilePackage::from_files_with_modes(files, observed_executable, None)
+        .map_err(PackageCaptureError::InvalidCapturedTree)
 }
 
 /// One file as it was read, with the mode the filesystem reported.
@@ -471,6 +371,7 @@ fn worktree_relative(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::profile::{pack_package_archive, read_package_archive};
     use crate::storage::discover_repository_layout;
     use std::fs;
     use std::path::PathBuf;
@@ -589,7 +490,7 @@ target = "docs/guide.md"
             }
         }
 
-        fn capture(&self) -> Result<CapturedPackageTree, PackageCaptureError> {
+        fn capture(&self) -> Result<ProfilePackage, PackageCaptureError> {
             capture_package_tree(&self.package, &self.layout)
         }
     }
@@ -607,7 +508,7 @@ target = "docs/guide.md"
             .worktree
             .join("profiles/synthetic/assets/live")
             .exists());
-        let bytes = |source: &str| captured.files()[source].bytes.clone();
+        let bytes = |source: &str| captured.files()[source].clone();
         assert_eq!(
             bytes("assets/live/bin/check.sh"),
             fs::read(fixture.worktree.join("bin/check.sh")).unwrap()
@@ -702,11 +603,33 @@ target = "docs/guide.md"
 
         let executable = captured
             .files()
-            .iter()
-            .filter(|(_, file)| file.mode == FileMode::Executable)
-            .map(|(source, _)| source.as_str())
+            .keys()
+            .filter(|source| captured.model().file_mode(source) == FileMode::Executable)
+            .map(String::as_str)
             .collect::<Vec<_>>();
         assert_eq!(executable, vec!["assets/live/bin/check.sh"]);
+    }
+
+    #[test]
+    fn test_package_identity_is_one_hash_across_the_apply_pack_and_add_routes() {
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST);
+        let packed = fixture.capture().expect("the synthetic package captures");
+
+        let directory = fixture.worktree.join("copied-package");
+        for (source, bytes) in packed.files() {
+            write_file(
+                &directory.join(source),
+                bytes,
+                packed.model().file_mode(source) == FileMode::Executable,
+            );
+        }
+        let applied = ProfilePackage::from_directory(&directory).expect("the copy reads");
+        let added =
+            read_package_archive(&pack_package_archive(&packed).expect("the package packs"))
+                .expect("the archive extracts");
+
+        assert_eq!(applied.package_hash(), packed.package_hash());
+        assert_eq!(added.package_hash(), packed.package_hash());
     }
 
     /// The mode a source is judged against is the mode of the very object whose
@@ -746,11 +669,11 @@ target = "docs/guide.md"
             "{refused}"
         );
         assert_eq!(
-            before.files()["assets/live/docs/guide.md"].bytes,
-            after.files()["assets/live/docs/guide.md"].bytes,
+            before.files()["assets/live/docs/guide.md"],
+            after.files()["assets/live/docs/guide.md"],
             "the mode decision moved without the bytes moving with it"
         );
-        assert_eq!(before.hashes().package, after.hashes().package);
+        assert_eq!(before.package_hash(), after.package_hash());
     }
 
     /// A repository file carrying executable permission its declaration did not
@@ -886,8 +809,7 @@ target = "docs/guide.md"
 
         let first = fixture.capture().expect("the synthetic package captures");
         let repeated = fixture.capture().expect("the same sources capture again");
-        assert_eq!(first.hashes().package, repeated.hashes().package);
-        assert_eq!(first.hashes().targets, repeated.hashes().targets);
+        assert_eq!(first.package_hash(), repeated.package_hash());
 
         fs::write(
             fixture.worktree.join("docs/guide.md"),
@@ -897,12 +819,12 @@ target = "docs/guide.md"
         let edited = fixture.capture().expect("the edited package captures");
 
         assert_ne!(
-            first.hashes().package,
-            edited.hashes().package,
+            first.package_hash(),
+            edited.package_hash(),
             "an edit to an owned repository file left the package identity unchanged"
         );
         assert_eq!(
-            edited.files()["assets/live/docs/guide.md"].bytes,
+            edited.files()["assets/live/docs/guide.md"],
             b"# Edited in place\n"
         );
     }

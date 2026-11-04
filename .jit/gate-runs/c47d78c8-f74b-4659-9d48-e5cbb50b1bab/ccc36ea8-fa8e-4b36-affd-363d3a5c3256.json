@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "eb1bad66631593b80eaae83aef9f2c7b123ec179",
+  "completed_at": "2026-11-01T15:59:10.368282750Z",
+  "duration_ms": 304776,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria and prior blocking findings are resolved in the attributable current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c47d78c8-f74b-4659-9d48-e5cbb50b1bab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ccc36ea8-fa8e-4b36-affd-363d3a5c3256",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:54:05.591317987Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: eb1bad666, 451929125, 8d5048a5, 7f274ebc, 3c4db465, b6968e7c\nPolicy sources: AGENTS.md; docs/reference/storage-format.md; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci — passed, exit 0, 2026-11-01T15:52:36Z\nTruncation recovery: narrowed patch, current-code, source-policy, and event-tag reads by path and line range\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria and prior blocking findings are resolved in the attributable current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

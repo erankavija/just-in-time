@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T21:48:22.403667371Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -9,12 +10,26 @@
   ],
   "description": "Record on every graph finding the issue whose rule application fired it, so a selection can tell the firing subject apart from the issue the finding is attributed to.\n\n## Background\n\n- `GraphFinding` (`crates/jit/src/validation/graph.rs:262-307`) carries `issue_id` (attribution) and a private config-error flag. Constructors: `for_issue` (`:277`), `unattributed` (`:289`), `issue_finding` (`:742`) and `config_error` (`:753`); `evaluate_one` (`:600-690`) dispatches the assertion kinds.\n- Attribution and subject differ in two cases: a `label-coverage` finding with `container-from-label` is attributed to the resolved container while the breakdown issue fired it (`:960-1060`), and a pointer that resolves to no issue or to several is a configuration error with no attribution although one issue fired it (`resolve_container` call sites in the same range).\n- `label-uniqueness` findings (`:692-731`) and rule-level configuration errors have no firing subject.\n\n## Success Criteria\n\n- [hard] REQ-01: `GraphFinding` exposes `subject: Option<IssueId>`: the firing issue for every finding produced while applying a rule to one issue, configuration errors raised for one firing issue included, and `None` for `label-uniqueness` findings and rule-level configuration errors.\n- [hard] REQ-02: Graph unit tests show a `container-from-label` coverage finding attributed to the container with the breakdown issue as subject, an unresolvable pointer reported as a configuration error whose subject is the firing issue, and a `label-uniqueness` finding with no subject.\n- [hard] REQ-03: Attribution, messages and severities are unchanged, and the existing graph and validation suites pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-03T22:11:30.411418649Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f0f4e65e-8fa3-4d1c-af50-f4fe0822d4cd",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:07:11.756545269Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "570edfc3-e068-4deb-9975-67da9b35222a",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:10:15.446442964Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7eb443b2-3788-45ee-b65e-4d88b5c3c8de",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "satisfies:9876a23a/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Graph findings record their firing subject",
-  "updated_at": "2026-10-21T20:31:34.547934339Z"
+  "updated_at": "2026-11-03T22:11:30.411418649Z"
 }

@@ -1,0 +1,44 @@
+{
+  "branch": "worktree-agent-91081bd3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f91ef012dc141abc78cbcf963cac9906b76a44fd",
+  "completed_at": "2026-10-25T08:21:59.831232284Z",
+  "duration_ms": 248347,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 3031,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91081bd3/requirement/REQ-01",
+          "@/issue/91081bd3/requirement/REQ-02",
+          "@/issue/91081bd3/requirement/REQ-06",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "Multiple CLI issue-ID paths bypass resolve_issue_arg and leave parsing/resolution in command-layer code."
+      }
+    ],
+    "summary": "Raw CLI issue IDs still reach command-layer parsers instead of being resolved at the CLI boundary.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a37c93cf-04f1-4597-a8ed-a59077e9edb5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T08:17:51.483559501Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11001 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17223-321a-7142-8c68-9251233d90ea\n--------\nuser\n--- 10988 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e003ac083, b546c3da (`jit:91081bd3`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/issue/91081bd3/requirement/REQ-01, REQ-02, REQ-06 (issue description); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T08:16:26Z)\nTruncation recovery: reread e003ac083’s main.rs patch in bounded ranges and inspected affected current source and executor implementations\n\n1. **[blocking, issue-impact]** Several CLI issue-ID arguments still bypass `resolve_issue_arg` and are parsed or resolved in command-layer code: dependency targets at `crates/jit/src/main.rs:3031` and `:3105`, event query filters at `:4728`, document check-link scopes at `:5156-5157`, archive containers at `:5246` and `:5253`, and claim-status filters at `:6970-6974`. The downstream methods retain the parsing (`commands/dependency.rs:221-222`, `commands/events.rs:18-20`, `commands/document.rs:1114-1118`, `commands/archive.rs:179-195`). This violates the required CLI-only parse/resolve boundary; the new short-prefix test only observes rejection before a record read, so it passes even when the executor performs that parsing itself.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Raw CLI issue IDs still reach command-layer parsers instead of being resolved at the CLI boundary.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Multiple CLI issue-ID paths bypass resolve_issue_arg and leave parsing/resolution in command-layer code.\",\"file\":\"crates/jit/src/main.rs\",\"line\":3031,\"references\":[\"@/issue/91081bd3/requirement/REQ-01\",\"@/issue/91081bd3/requirement/REQ-02\",\"@/issue/91081bd3/requirement/REQ-06\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

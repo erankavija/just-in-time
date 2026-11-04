@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-3f026bb1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1f869f3ab4b0ff38ee599ba356efb9e1bcf7718b",
+  "completed_at": "2026-10-24T23:43:53.696836501Z",
+  "duration_ms": 67383,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed macro, GateStatus migration, callers, and owning test satisfy the issue criteria with no added dependency.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3f026bb1-9db7-4c5c-9a74-c6c96d619006",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "21beb0ad-8b0e-4328-b6c8-92bea3ae76b8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:42:46.313260280Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 835a9f1b6 (`jit:3f026bb1`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-4, D-18 (dev/vision/9db27a3a-charter.md); @/invariant/* (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml); @/issue/2195c98f/requirement/REQ-10, REQ-13 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json)\nGate evidence: cargo-ci passed (exit 0, 2026-10-24T23:41:07Z); code-review pending\nTruncation recovery: gates and item-source reads rerun separately after a combined lookup stopped on a non-match; no truncation markers\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed macro, GateStatus migration, callers, and owning test satisfy the issue criteria with no added dependency.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

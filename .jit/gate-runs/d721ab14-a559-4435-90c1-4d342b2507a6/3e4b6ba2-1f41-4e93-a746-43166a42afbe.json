@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "95ed1fb574d04940b29fff867f01e80b06c87cdb",
+  "completed_at": "2026-11-01T18:46:44.404321994Z",
+  "duration_ms": 209342,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; conflict parties are package ProfileIds with one derived output/schema spelling.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d721ab14-a559-4435-90c1-4d342b2507a6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3e4b6ba2-1f41-4e93-a746-43166a42afbe",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T18:43:15.061343635Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 737ab1a55; 95ed1fb57\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8, @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-09, REQ-12 (.jit/issues/3d9a0ce3-de69-4a99-ac98-9cf4d4852194.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T18:42:52Z); code-review pending\nTruncation recovery: inspected tagged commits and merge-parent diffs in bounded path/range reads; recovered profile_apply.rs patch ranges and governing sources\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; conflict parties are package ProfileIds with one derived output/schema spelling.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

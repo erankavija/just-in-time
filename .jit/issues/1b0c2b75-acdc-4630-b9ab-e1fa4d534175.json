@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:29:53.919649613Z",
+  "context": {},
+  "created_at": "2026-11-01T08:05:07.461403592Z",
+  "dependencies": [],
+  "description": "Make `jit profile diff` and `jit profile apply --dry-run` report the projection conflict that `jit profile apply` refuses on.\n\n## Background\n\nFound while testing c780514e's 14c08f51 on an unseeded copy of this repository. `diff` and `apply --dry-run` report `would_apply` and exit 0. `apply` exits 4 with `PROFILE_CONFLICT`, naming `docs/reference/rules-and-gates.md: stale`: applying new rules makes a configured rules-and-gates projection stale, and neither preview catches it. `docs/reference/profiles.md` says a rehearsal runs the same planning and validation as its `apply`.\n\n## Success Criteria\n\n- [hard] REQ-01: A selection that `apply` refuses for a stale projection is reported as a conflict by `diff` and by `apply --dry-run`.\n",
+  "documents": [],
+  "done_at": "2026-11-01T15:06:33.762384774Z",
+  "first_ready_at": "2026-11-01T08:05:07.461403592Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "71eae72f-fae9-42ef-ac85-2d4cd45c08dd",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:02:41.274238726Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8f628bad-be72-4f7e-9949-453fb16b35f6",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:03:56.313696344Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "1b0c2b75-acdc-4630-b9ab-e1fa4d534175",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Profile previews report the projection conflict apply refuses on",
+  "updated_at": "2026-11-01T15:06:33.762384774Z"
+}

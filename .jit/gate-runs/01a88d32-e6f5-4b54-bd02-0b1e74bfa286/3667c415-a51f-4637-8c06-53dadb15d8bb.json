@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "75afd6c9648e2e63ff25f75e435bfe864056f2e0",
+  "completed_at": "2026-11-04T16:01:48.787516631Z",
+  "duration_ms": 191491,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied by the attributable current-tree changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "01a88d32-e6f5-4b54-bd02-0b1e74bfa286",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3667c415-a51f-4637-8c06-53dadb15d8bb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T15:58:37.295706403Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 261290b1d, 41838806d\nPolicy sources: AGENTS.md\nResolved items: @/issue/b697a3f7/requirement/REQ-16 (.jit issue description); @/charter/D-17, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T15:56:55Z)\nTruncation recovery: narrowed the truncated broad call-site search to commit, storage, server, and affected-test paths; inspected both individual patches and current implementations.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied by the attributable current-tree changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

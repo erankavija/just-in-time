@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bfede9adb86b834caf1d8f78e7f9934b67eb3b72",
+  "completed_at": "2026-11-04T02:23:22.790874345Z",
+  "duration_ms": 258681,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable pure validation-report refactor meets the issue criteria and is covered by the recorded CI run.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6ba4f623-99fb-420a-9c47-3f3655db3815",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "397e4f65-e20b-4d11-bc07-4893c1c40d59",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:19:04.109381249Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 995afbd3a, 311736962, a1f27bd1f, 673c5daaa, fb57fb860, ee23aa586\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-01 and REQ-06 (parent issue Markdown); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); its commit contains the tagged implementation and affected paths are unchanged afterward\nTruncation recovery: reread narrowed 311736962 patches for repository.rs and commands/validate.rs\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable pure validation-report refactor meets the issue criteria and is covered by the recorded CI run.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -12,10 +12,14 @@ use crate::domain::artifact_discovery::{
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, PlanTarget,
 };
-use crate::repository_state::RootRelativePath;
+use crate::domain::identity::IssueId;
+use crate::domain::relative_path::RootRelativePath;
+use crate::storage::capability_fs::{
+    open_absolute_dir_nofollow, open_child_dir_nofollow, open_regular_file_nofollow,
+    CapabilityFsError,
+};
 use crate::storage::repository_state_store::{
-    is_advisory_permission_denied, open_absolute_dir_nofollow, open_child_dir_nofollow,
-    open_regular_file_nofollow, RepositoryStateStoreError,
+    is_advisory_permission_denied, RepositoryStateStoreError,
 };
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};
@@ -29,7 +33,7 @@ pub fn resolve_container_destination<S: IssueStore>(
     storage: &S,
     preferred_root: &str,
     legacy_root: &str,
-    container_id: &str,
+    container_id: &IssueId,
 ) -> Result<ResolvedContainerDestination> {
     validate_repo_relative_path(preferred_root)?;
     validate_repo_relative_path(legacy_root)?;
@@ -231,6 +235,12 @@ fn is_permission_denied(error: &(dyn std::error::Error + 'static)) -> bool {
         if cause
             .downcast_ref::<std::io::Error>()
             .is_some_and(|error| error.kind() == ErrorKind::PermissionDenied)
+            || cause
+                .downcast_ref::<CapabilityFsError>()
+                .is_some_and(|error| {
+                    matches!(error, CapabilityFsError::Io(error)
+                        if error.kind() == ErrorKind::PermissionDenied)
+                })
             || cause
                 .downcast_ref::<RepositoryStateStoreError>()
                 .is_some_and(is_advisory_permission_denied)
@@ -460,7 +470,6 @@ mod tests {
     use std::os::unix::fs::symlink;
     use tempfile::TempDir;
 
-    const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
     const CITED_SOURCE: &str = "dev/active/plan.md";
     const DESTINATION_ROOT: &str = "dev/archive/abcdef12";
 
@@ -500,7 +509,7 @@ mod tests {
     /// does.
     fn plan_with_scan(storage: &JsonFileStorage, roots: &[&str]) -> ArtifactPlan {
         let target = PlanTarget::Container {
-            id: CONTAINER.to_string(),
+            id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
         };
         let artifacts = vec![ArtifactPlanEntry::new(
             CITED_SOURCE,
@@ -509,7 +518,7 @@ mod tests {
         )
         .with_provenance(vec![ArtifactProvenance::Explicit])
         .with_owners(vec![ArtifactOwner {
-            issue: "owner".to_string(),
+            issue: crate::test_utils::issue_id(175),
             document_index: 0,
             state: State::Done,
             archived_from: None,
@@ -548,7 +557,7 @@ mod tests {
         );
         plan.artifacts()
             .iter()
-            .flat_map(ArtifactPlanEntry::warnings)
+            .flat_map(ArtifactPlanEntry::plan_warnings)
             .filter(|warning| warning.code == WarningCode::MovingPathCitation)
             .filter_map(|warning| warning.path.as_deref())
             .filter_map(|location| location.rsplitn(3, ':').nth(2))

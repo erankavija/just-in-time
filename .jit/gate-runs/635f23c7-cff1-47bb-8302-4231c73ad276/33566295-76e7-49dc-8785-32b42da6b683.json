@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ce7406bbdd910b6995a00feeddfdfb5697d40a58",
+  "completed_at": "2026-11-04T18:39:12.988016877Z",
+  "duration_ms": 335833,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/issue.rs",
+        "id": "F1",
+        "line": 3465,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/635f23c7/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Rejection tests do not prove dependent readiness promotion occurs in the rejecting session for either reason form."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_issue/readiness_coherence_tests.rs",
+        "id": "F2",
+        "line": 47,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/635f23c7/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "Batch-creation coverage omits required assertions for no Ready-to-Backlog event and no first_ready_at on an internally blocked draft."
+      }
+    ],
+    "summary": "Two hard success-criterion test gaps remain in rejection session proof and batch-creation lifecycle evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "635f23c7-cff1-47bb-8302-4231c73ad276",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "33566295-76e7-49dc-8785-32b42da6b683",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T18:33:37.154304971Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15409 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a7d6-8b8a-7293-8fa0-3bf6cc471ba5\n--------\nuser\n--- 15396 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2ed79f45d8bd066285c709b7fad2a48a4f1ba0fc (`jit:635f23c7`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml); @/issue/b697a3f7/requirement/REQ-01, REQ-02, REQ-20 and @/issue/635f23c7/{requirement/REQ-01–REQ-06,decision/D-01} (.jit issue descriptions); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T18:31:56Z); code-review pending (no run)\nTruncation recovery: narrowed commit reads by path and inspected current command, domain, test, mutation, and documentation line ranges\n\n1. [blocking][issue-impact] `crates/jit/src/commands/issue.rs:3465` verifies both rejection forms promote the dependent, but does not use a session-open baseline. It would still pass if promotion occurred in a follow-up session, so it does not prove REQ-02’s required same-session behavior for rejection with and without a reason. References: @/issue/635f23c7/requirement/REQ-02.\n\n2. [blocking][issue-impact] `crates/jit/tests/fast_issue/readiness_coherence_tests.rs:47` verifies batch-created sibling state, but does not assert the blocked draft has no `first_ready_at` and no `Ready → Backlog` event. Those required REQ-05 guarantees are covered for templates but not batch creation. References: @/issue/635f23c7/requirement/REQ-05.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two hard success-criterion test gaps remain in rejection session proof and batch-creation lifecycle evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Rejection tests do not prove dependent readiness promotion occurs in the rejecting session for either reason form.\",\"file\":\"crates/jit/src/commands/issue.rs\",\"line\":3465,\"references\":[\"@/issue/635f23c7/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Batch-creation coverage omits required assertions for no Ready-to-Backlog event and no first_ready_at on an internally blocked draft.\",\"file\":\"crates/jit/tests/fast_issue/readiness_coherence_tests.rs\",\"line\":47,\"references\":[\"@/issue/635f23c7/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

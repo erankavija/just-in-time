@@ -211,7 +211,7 @@ const getClusterAwareLayout = (
     // Only render the visual container box if expanded
     if (isExpanded) {
       const containerNode = nodes.find(n => n.id === clusterId);
-      const clusterTitle = containerNode?.data?.label || clusterId.substring(0, 8);
+      const clusterTitle = containerNode?.data?.label || (cluster.nodes.find(n => n.id === clusterId)?.short_id ?? clusterId);
       
       const CLUSTER_PADDING = 40;
       const NODE_PADDING = 10; // Vertical padding from ClusterNode style
@@ -677,7 +677,7 @@ export function GraphView({
               state: node.state,
               priority: node.priority,
               labels: node.labels,
-              nodeId: node.id, // For reference
+              shortId: node.short_id,
             },
             style: {
               opacity: isDimmed ? 0.4 : 1,
@@ -712,7 +712,7 @@ export function GraphView({
                   <span>
                     {typeIcon && `${typeIcon} `}
                     {nodeType && `${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)} `}
-                    #{node.id.substring(0, 8)}
+                    #{node.short_id}
                   </span>
                 </div>
                 <div style={{ 

@@ -1,28 +1,40 @@
 //! `jit validate --scope <id>` — scoped bracket-subtree validation (T2, D14, R2).
 //!
-//! `--scope` evaluates the declarative rules over a container's bracket subtree:
-//! the container's transitive dependency closure INCLUDING the `type:breakdown`
-//! node `B` (bounded so the walk stops at `B` and never pulls in `P`/upstream).
-//! For each in-slice issue the rules whose `when` selector matches it fire — so a
-//! rule keyed on `type:breakdown` runs because `B` is in scope. Whole-repo rule
-//! kinds (`label-uniqueness`, repo-wide `label-reference`, `type-hierarchy`) are
-//! EXCLUDED exactly as at transition time (R2 / CC-2a). The command exits 4 with
-//! findings shown when an error-severity finding is produced, 0 when clean.
-//!
-//! These are in-process tests over `CommandExecutor::validate_scope` (fast and
-//! deterministic); the exit-4 CLI contract is covered by a subprocess test.
+//! `--scope` selects, from the one report computed over the whole repository,
+//! the findings of a container's bracket subtree: its dependency closure bounded
+//! at the template's breakdown node. The selection's filtering matrix is owned by
+//! `ValidationReport::select`; these harness tests prove the wiring from one
+//! validation capture to that selection, and a subprocess test covers the
+//! failure presentation.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
+use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
-use jit::test_utils::document_reference;
+use jit::test_utils::add_reducing_edge;
+use jit::test_utils::{document_reference, issue_id};
+use jit::validation::report::{BuiltInPass, Selection};
+use jit::validation::RuleReport;
+
+/// The report `jit validate --scope <container>` renders.
+fn scope_view<S: IssueStore + RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    container: &IssueId,
+) -> anyhow::Result<RuleReport> {
+    executor
+        .validation()
+        .selection_report()?
+        .select(&Selection::Scope(IssueIdPrefix::from(container)))
+}
 
 trait ScopeFixtureStore: IssueStore + RepositoryStateStore {
-    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String;
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId;
 }
 
 impl ScopeFixtureStore for InMemoryStorage {
-    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId {
         let id = issue.id.clone();
         jit::test_harness::seed_memory_issue(executor.storage(), &issue);
         id
@@ -30,7 +42,7 @@ impl ScopeFixtureStore for InMemoryStorage {
 }
 
 impl ScopeFixtureStore for jit::storage::JsonFileStorage {
-    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId {
         let dependencies = issue.dependencies.clone();
         let documents = issue.documents.clone();
         let target_state = issue.state;
@@ -47,9 +59,10 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
                 false,
             )
             .unwrap()
-            .0;
+            .issue
+            .id;
         for dependency in dependencies {
-            executor.add_dependency(&id, &dependency).unwrap();
+            add_reducing_edge(executor, &id, &dependency).unwrap();
         }
         if executor.storage().load_issue(&id).unwrap().state != target_state {
             executor
@@ -70,6 +83,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
         }
         for document in documents {
             executor
+                .documents()
                 .add_document_reference(
                     &id,
                     &document.path,
@@ -95,10 +109,10 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
 /// the template path. The container itself is not modified.
 fn wire_plan_bracket<S: ScopeFixtureStore>(
     executor: &CommandExecutor<S>,
-    container_id: &str,
+    container_id: &IssueId,
     plan_path: &str,
     planning_state: State,
-) -> String {
+) -> IssueId {
     let c_short = executor
         .storage()
         .load_issue(container_id)
@@ -106,7 +120,7 @@ fn wire_plan_bracket<S: ScopeFixtureStore>(
         .short_id();
 
     let mut p = crate::fixture_issue("planning".to_string(), String::new());
-    p.id = format!("plan-{container_id}");
+    p.id = derived_id(&["plan", container_id.as_str()]);
     p.labels = vec!["type:planning".to_string()];
     p.state = planning_state;
     p.documents.push(DocumentReference {
@@ -116,7 +130,7 @@ fn wire_plan_bracket<S: ScopeFixtureStore>(
     let p_id = S::publish_scope_issue(executor, p);
 
     let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
-    b.id = format!("break-{container_id}");
+    b.id = derived_id(&["break", container_id.as_str()]);
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{c_short}")];
     b.dependencies = vec![p_id.clone()];
     b.state = State::Backlog;
@@ -148,53 +162,28 @@ labels = ["brackets:{container.short_id}"]
 depends_on = ["planning"]
 "#;
 
-/// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml` and whose
-/// `.jit/templates.toml` declares an inline `plan` bracket, so the `--scope` walk
-/// halts at `type:breakdown` nodes. NO flat planning-config block is written: the
-/// boundary and breakable types come purely from the template registry.
-fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    executor_with_rules_and_templates(rules_toml, PLAN_TEMPLATE_INLINE)
-}
-
-/// Build an executor with explicit declaration files. The empty `config.toml`
-/// keeps the fixture compatible with closed-image validation capture; the
-/// boundary/breakable-types/doc-location are still derived entirely from the
-/// template registry.
-fn executor_with_rules_and_templates(
-    rules_toml: &str,
-    templates_toml: &str,
-) -> CommandExecutor<InMemoryStorage> {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage.add_data_file("config.toml", "");
-    storage.add_data_file("templates.toml", templates_toml);
-    storage.add_data_file("rules.toml", rules_toml);
-    let layout =
-        jit::storage::discover_repository_layout(storage.root().parent().unwrap(), storage.root())
-            .unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Seed an exact issue preimage into the in-memory aggregate, returning its id.
 /// The deterministic id [`seed`] assigns, so a child can name its container's
 /// short id before the container exists.
-fn seed_id(title: &str, description: &str) -> String {
-    let hash = title
-        .bytes()
-        .chain(description.bytes())
+fn seed_id(title: &str, description: &str) -> IssueId {
+    derived_id(&[title, description])
+}
+
+/// A canonical issue id determined by `parts`, so equal inputs name one issue.
+fn derived_id(parts: &[&str]) -> IssueId {
+    let hash = parts
+        .iter()
+        .flat_map(|part| part.bytes())
         .fold(0xcbf29ce484222325_u64, |hash, byte| {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         });
-    format!("{hash:016x}-fixture")
+    issue_id(u128::from(hash))
 }
 
 /// The `satisfies` label crediting criterion `req` of the issue `seed` creates
 /// from `title` and `description`.
 fn credit(title: &str, description: &str, req: &str) -> String {
-    format!("satisfies:{}/{req}", &seed_id(title, description)[..8])
+    format!("satisfies:{}/{req}", seed_id(title, description).short_id())
 }
 
 fn seed(
@@ -202,8 +191,8 @@ fn seed(
     title: &str,
     labels: &[&str],
     description: &str,
-    deps: &[String],
-) -> String {
+    deps: &[IssueId],
+) -> IssueId {
     let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
     issue.id = seed_id(title, description);
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
@@ -231,7 +220,7 @@ assert = { label-coverage = { } }
 fn spine_with_breakdown_criteria(
     executor: &CommandExecutor<InMemoryStorage>,
     impl_satisfies: bool,
-) -> (String, String) {
+) -> (IssueId, IssueId) {
     // B declares the criterion; impl depends on B; C depends on impl.
     let b = seed(
         executor,
@@ -240,7 +229,7 @@ fn spine_with_breakdown_criteria(
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
         &[],
     );
-    let credit = format!("satisfies:{}/REQ-01", &b[..8]);
+    let credit = format!("satisfies:{}/REQ-01", b.short_id());
     let impl_labels: Vec<&str> = if impl_satisfies {
         vec!["type:task", &credit]
     } else {
@@ -257,202 +246,48 @@ fn spine_with_breakdown_criteria(
     (c, b)
 }
 
-/// A selected breakdown whose configured rule reads criteria from its bracketed
-/// container, plus a satisfying child in that container's dependency context.
-fn selected_rule_fixture(executor: &CommandExecutor<InMemoryStorage>) -> (String, String) {
-    let criteria = "## Success Criteria\n\n- [hard] REQ-01: selected work\n";
-    let child = seed(
-        executor,
-        "selected implementation",
-        &[
-            "type:task",
-            &credit("selected container", criteria, "REQ-01"),
-        ],
-        "",
-        &[],
-    );
-    let container = seed(
-        executor,
-        "selected container",
-        &["type:epic"],
-        criteria,
-        std::slice::from_ref(&child),
-    );
-    let container_short = executor
-        .storage()
-        .load_issue(&container)
-        .unwrap()
-        .short_id();
-    let selected = seed(
-        executor,
-        "selected breakdown",
-        &["type:breakdown", &format!("brackets:{container_short}")],
-        "",
-        &[],
-    );
-    (selected, container)
-}
-
-const SELECTED_RULE: &str = r#"
-[[rules]]
-name = "selected-coverage"
-when = { type = "breakdown" }
-severity = "error"
-enforce = true
-assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", container-from-label = "brackets", child-link = "dependencies" } }
-"#;
-
 #[test]
-fn test_rule_validation_uses_selected_issue_and_repository_context() {
-    let executor = executor_with_rules(SELECTED_RULE);
-    let (selected, _container) = selected_rule_fixture(&executor);
-
-    // Keep an unrelated historical application and a rejected target in the
-    // repository context. It would fail the same rule if it became a firing
-    // subject, but must not affect the selected application.
-    let rejected = seed(
-        &executor,
-        "rejected historical container",
-        &["type:epic"],
-        "## Success Criteria\n\n- [hard] REQ-99: old work\n",
-        &[],
+fn test_rule_selection_reports_rules_file_finding_for_unloadable_rules() {
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some("[[rules]\nname = \"unterminated\"\n"),
+            after_initialization: true,
+            ..Default::default()
+        },
     );
-    let mut rejected_issue = executor.storage().load_issue(&rejected).unwrap();
-    rejected_issue.state = State::Rejected;
-    jit::test_harness::seed_memory_issue(executor.storage(), &rejected_issue);
-    let rejected_short = rejected_issue.short_id();
-    let historical = seed(
-        &executor,
-        "historical breakdown",
-        &["type:breakdown", &format!("brackets:{rejected_short}")],
-        "",
-        &[],
-    );
-
-    let selected_report = executor
-        .validate_rule(&selected, "selected-coverage")
-        .expect("selected rule validation runs");
-    assert!(
-        !selected_report.has_errors(),
-        "unrelated historical applications cannot fail the selected result: {:?}",
-        selected_report.findings
-    );
-
-    let historical_report = executor
-        .validate_rule(&historical, "selected-coverage")
-        .expect("historical rule validation runs");
-    assert!(historical_report.has_errors());
-    assert!(historical_report
-        .findings
-        .iter()
-        .any(|finding| finding.message.contains("REQ-99")));
-}
-
-#[test]
-fn test_rule_validation_selection_errors_are_non_vacuous() {
-    let executor = executor_with_rules(&format!(
-        "{SELECTED_RULE}\n[[rules]]\nname = \"disabled-rule\"\nwhen = {{ type = \"breakdown\" }}\nseverity = \"off\"\nenforce = false\nassert = {{ label-coverage = {{ }} }}\n"
-    ));
-    let (selected, _container) = selected_rule_fixture(&executor);
-    let task = seed(&executor, "nonmatching task", &["type:task"], "", &[]);
-
-    for (rule, expected) in [
-        ("missing-rule", "was not found"),
-        ("disabled-rule", "is off"),
-        ("selected-coverage", "does not match selected issue"),
-    ] {
-        let target = if rule == "selected-coverage" {
-            &task
-        } else {
-            &selected
-        };
-        let report = executor
-            .validate_rule(target, rule)
-            .expect("selection error is reported as a rule finding");
-        assert!(report.has_errors(), "{rule} must not pass vacuously");
-        assert!(
-            report
-                .findings
-                .iter()
-                .any(|finding| finding.message.contains(expected)),
-            "{rule} error should name the selection problem: {:?}",
-            report.findings
-        );
-    }
-}
-
-#[test]
-fn test_rule_validation_reports_selected_container_errors_precisely() {
-    let executor = executor_with_rules(SELECTED_RULE);
-
-    let missing = seed(
-        &executor,
-        "missing target breakdown",
-        &["type:breakdown", "brackets:missing-target"],
-        "",
-        &[],
-    );
-    let missing_report = executor
-        .validate_rule(&missing, "selected-coverage")
-        .expect("missing selected target is a validation finding");
-    assert!(missing_report.has_errors());
-    assert!(missing_report
-        .findings
-        .iter()
-        .any(|finding| finding.message.contains("names no known issue")));
-
-    [
-        ("deadbeef-a", "ambiguous target one"),
-        ("deadbeef-b", "ambiguous target two"),
-    ]
-    .into_iter()
-    .for_each(|(id, title)| {
-        let mut target = crate::fixture_issue(title.to_string(), String::new());
-        target.id = id.to_string();
-        target.labels = vec!["type:epic".to_string()];
-        jit::test_harness::seed_memory_issue(executor.storage(), &target);
-    });
-    let ambiguous = seed(
-        &executor,
-        "ambiguous target breakdown",
-        &["type:breakdown", "brackets:deadbeef"],
-        "",
-        &[],
-    );
-    let ambiguous_report = executor
-        .validate_rule(&ambiguous, "selected-coverage")
-        .expect("ambiguous selected target is a validation finding");
-    assert!(ambiguous_report.has_errors());
-    assert!(ambiguous_report
-        .findings
-        .iter()
-        .any(|finding| finding.message.contains("ambiguous")));
-}
-
-#[test]
-fn test_rule_validation_resolves_rejected_selected_container() {
-    let executor = executor_with_rules(SELECTED_RULE);
-    let (selected, container) = selected_rule_fixture(&executor);
-    let mut rejected = executor.storage().load_issue(&container).unwrap();
-    rejected.state = State::Rejected;
-    jit::test_harness::seed_memory_issue(executor.storage(), &rejected);
+    let issue = seed(&executor, "selected issue", &["type:task"], "", &[]);
 
     let report = executor
-        .validate_rule(&selected, "selected-coverage")
-        .expect("rejected selected target remains resolvable");
-    assert!(
-        !report.has_errors(),
-        "a directly selected rejected target must still resolve: {:?}",
-        report.findings
-    );
+        .validation()
+        .selection_report()
+        .expect("the captured validation report is available");
+    let selected = report
+        .select(&Selection::Rule {
+            issue: IssueIdPrefix::from(&issue),
+            rule: "selected-coverage".to_string(),
+        })
+        .expect("an unloadable rule set is reported as a finding");
+
+    assert!(selected
+        .findings
+        .iter()
+        .any(|finding| finding.rule == "rules-file"));
 }
 
 #[test]
 fn test_scope_fires_breakdown_rule_and_fails_on_uncovered_criterion() {
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_BREAKDOWN),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         report.has_errors(),
@@ -476,10 +311,17 @@ fn test_scope_fires_breakdown_rule_and_fails_on_uncovered_criterion() {
 
 #[test]
 fn test_scope_passes_when_criterion_is_covered() {
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_BREAKDOWN),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (c, _b) = spine_with_breakdown_criteria(&executor, true);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -489,10 +331,77 @@ fn test_scope_passes_when_criterion_is_covered() {
 }
 
 #[test]
+fn test_scope_counts_a_coverage_child_outside_the_dependency_closure() {
+    // The container's criterion is credited by a dependent, which the scope's
+    // dependency closure never reaches; coverage still reads the whole repository.
+    let rules = r#"
+[[rules]]
+name = "epic-coverage"
+when = { type = "epic" }
+severity = "error"
+assert = { label-coverage = { } }
+"#;
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(rules),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
+    let description = "## Success Criteria\n\n- [hard] REQ-01: do the thing\n";
+    let c = seed(&executor, "container", &["type:epic"], description, &[]);
+    let uncovered = scope_view(&executor, &c).expect("scope validation runs");
+    assert!(
+        uncovered
+            .findings
+            .iter()
+            .any(|f| f.rule == "epic-coverage" && f.message.contains("REQ-01")),
+        "{:?}",
+        uncovered.findings
+    );
+
+    let credit = credit("container", description, "REQ-01");
+    seed(
+        &executor,
+        "dependent",
+        &["type:task", &credit],
+        "",
+        std::slice::from_ref(&c),
+    );
+
+    let report = scope_view(&executor, &c).expect("scope validation runs");
+    assert!(!report.has_errors(), "{:?}", report.findings);
+}
+
+#[test]
+fn test_scope_reports_an_unloadable_rule_set_as_the_rules_file_finding() {
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some("not toml = ["),
+            after_initialization: true,
+            ..Default::default()
+        },
+    );
+    let c = seed(&executor, "container", &["type:epic"], "", &[]);
+
+    let report = scope_view(&executor, &c).expect("scope validation runs");
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|f| f.rule == BuiltInPass::RulesFile.as_str()),
+        "{:?}",
+        report.findings
+    );
+}
+
+#[test]
 fn test_scope_excludes_repo_wide_label_uniqueness() {
-    // A repo-wide `label-uniqueness` rule (CC-2a / R2): two issues IN the slice
-    // share a unique label, which would fail a whole-repo check, but `--scope`
-    // must NOT evaluate repo-wide rules, so the scope stays clean.
+    // Two in-scope issues share a unique label: the whole-repository report
+    // holds the `label-uniqueness` finding, tagged repo-wide, so `--scope` drops it.
     let rules = r#"
 [[rules]]
 name = "unique-key"
@@ -500,7 +409,14 @@ when = { type = "task" }
 severity = "error"
 assert = { label-uniqueness = { namespace = "key", scope = "all" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(rules),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
 
     let b = seed(&executor, "breakdown", &["type:breakdown"], "", &[]);
     let t1 = seed(
@@ -525,73 +441,11 @@ assert = { label-uniqueness = { namespace = "key", scope = "all" } }
         std::slice::from_ref(&t2),
     );
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
         "repo-wide label-uniqueness must be excluded from --scope: {:?}",
-        report.findings
-    );
-}
-
-#[test]
-fn test_scope_does_not_pull_in_plan_or_upstream() {
-    // C -> impl -> B -> P, where P carries a violating criterion under a
-    // breakdown-keyed-like rule. Because the walk halts at B, P is out of scope
-    // and its rules never fire. We model this with a coverage rule keyed on
-    // type:planning: it would fire if P were in scope, but it must not.
-    let rules = r#"
-[[rules]]
-name = "planning-coverage"
-when = { type = "planning" }
-severity = "error"
-enforce = true
-assert = { label-coverage = { } }
-"#;
-    let executor = executor_with_rules(rules);
-
-    let p = seed(
-        &executor,
-        "plan",
-        &["type:planning"],
-        "## Success Criteria\n\n- [hard] PLAN-01: uncovered\n",
-        &[],
-    );
-    let b = seed(
-        &executor,
-        "breakdown",
-        &["type:breakdown"],
-        "",
-        std::slice::from_ref(&p),
-    );
-    let impl_id = seed(
-        &executor,
-        "impl",
-        &["type:task"],
-        "",
-        std::slice::from_ref(&b),
-    );
-    let c = seed(
-        &executor,
-        "container",
-        &["type:epic"],
-        "",
-        std::slice::from_ref(&impl_id),
-    );
-
-    let report = executor.validate_scope(&c).expect("scope validation runs");
-
-    assert!(
-        !report.has_errors(),
-        "P is beyond the breakdown boundary, so its rules must not fire under --scope: {:?}",
-        report.findings
-    );
-    assert!(
-        !report
-            .findings
-            .iter()
-            .any(|f| f.rule == "planning-coverage"),
-        "the planning-keyed rule must not have been evaluated: {:?}",
         report.findings
     );
 }
@@ -633,7 +487,14 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { } }
 "#;
-    let executor = executor_with_rules_and_templates(rules, templates);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(rules),
+            templates: Some(templates),
+            ..Default::default()
+        },
+    );
 
     // P (planning) declares an uncovered criterion: it is BEYOND the boundary, so
     // its rule must not fire.
@@ -668,7 +529,7 @@ assert = { label-coverage = { } }
         std::slice::from_ref(&impl_id),
     );
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         report
@@ -692,10 +553,9 @@ assert = { label-coverage = { } }
 // Container-pointer resolution under scope (ef0065ad): a `container-from-label`
 // coverage rule (the repo's `coverage-preview` shape) fires on a breakdown node
 // and redirects to the bracketed container. Under `--scope`, the pointer must
-// resolve against the COMPLETE repository index — not the partial slice — so an
+// resolve against the COMPLETE repository issue set — not the partial slice — so an
 // unrelated breakdown that entered the closure without its container is
-// recognized and skipped rather than mis-reported as a dangling pointer, while a
-// genuinely dangling pointer still fails precisely.
+// recognized and skipped rather than mis-reported as a dangling pointer.
 // ---------------------------------------------------------------------------
 
 /// A `label-coverage` rule keyed on the breakdown node that redirects to the
@@ -717,10 +577,10 @@ fn seed_breakdown_bracketing(
     executor: &CommandExecutor<InMemoryStorage>,
     pointer: &str,
     state: State,
-    deps: &[String],
-) -> String {
+    deps: &[IssueId],
+) -> IssueId {
     let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
-    b.id = format!("break-{pointer}");
+    b.id = derived_id(&["break", pointer]);
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{pointer}")];
     b.dependencies = deps.to_vec();
     b.state = state;
@@ -732,11 +592,18 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
     // REQ-02 (ef0065ad): a completed, UNRELATED breakdown B2 enters the scoped
     // slice through the dependency closure (as a breakdown boundary node), but
     // the container it brackets (C2) is not in the slice. Its `brackets:` pointer
-    // resolves against the FULL repository index, so the out-of-scope container is
+    // resolves against the FULL repository issue set, so the out-of-scope container is
     // recognized and B2's coverage is simply not the requested bracket — no false
     // missing-pointer finding. Before the fix, resolving `brackets:C2` against the
     // partial slice found nothing and raised a spurious `config error`.
-    let executor = executor_with_rules(COVERAGE_VIA_BRACKETS);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_VIA_BRACKETS),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
 
     // C2 lives OUTSIDE the scoped container's closure (unreachable from C1).
     let c2 = seed(
@@ -748,7 +615,7 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
     );
     // B2 is completed and brackets C2; it is reachable from C1 via task1, so it
     // enters C1's slice as a breakdown boundary node while C2 does not.
-    let b2 = seed_breakdown_bracketing(&executor, &c2[..8], State::Done, &[]);
+    let b2 = seed_breakdown_bracketing(&executor, c2.short_id(), State::Done, &[]);
     let task1 = seed(
         &executor,
         "task1",
@@ -764,7 +631,7 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
         std::slice::from_ref(&task1),
     );
 
-    let report = executor.validate_scope(&c1).expect("scope validation runs");
+    let report = scope_view(&executor, &c1).expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -779,51 +646,6 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
         "no false missing-pointer finding for the unrelated breakdown: {:?}",
         report.findings
     );
-}
-
-#[test]
-fn test_scope_dangling_brackets_pointer_still_fails_precisely() {
-    // REQ-03 (ef0065ad): a breakdown IN the requested scope whose `brackets:`
-    // pointer names no issue ANYWHERE (not merely outside the slice) is a genuine
-    // configuration error and must still fail with the precise finding. Full-index
-    // resolution must not mask a truly dangling pointer.
-    let executor = executor_with_rules(COVERAGE_VIA_BRACKETS);
-    let b1 = seed_breakdown_bracketing(&executor, "deadbeef", State::Done, &[]);
-    let c1 = seed(
-        &executor,
-        "scoped-container",
-        &["type:epic"],
-        "",
-        std::slice::from_ref(&b1),
-    );
-
-    let report = executor.validate_scope(&c1).expect("scope validation runs");
-
-    assert!(
-        report.has_errors(),
-        "a genuinely dangling brackets pointer must fail: {:?}",
-        report.findings
-    );
-    assert!(
-        report.findings.iter().any(
-            |f| f.message.contains("brackets:deadbeef") && f.message.contains("no known issue")
-        ),
-        "the finding must precisely name the dangling pointer: {:?}",
-        report.findings
-    );
-}
-
-#[test]
-fn test_scope_resolves_partial_container_id() {
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
-    let (c, _b) = spine_with_breakdown_criteria(&executor, true);
-
-    // A short prefix of the container id resolves like every other jit command.
-    let short = &c[..8];
-    let report = executor
-        .validate_scope(short)
-        .expect("partial container id resolves");
-    assert!(!report.has_errors(), "{:?}", report.findings);
 }
 
 // ---------------------------------------------------------------------------
@@ -872,7 +694,7 @@ assert = { label-coverage = { satisfies-namespace = "satisfies", child-link = "d
 fn container_with_external_plan(
     executor: &CommandExecutor<InMemoryStorage>,
     impl_satisfies: bool,
-) -> String {
+) -> IssueId {
     let body = "no criteria in the body — the plan lives in the external file";
     let credit = credit("container", body, "REQ-77");
     let impl_labels: Vec<&str> = if impl_satisfies {
@@ -910,10 +732,17 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
     // satisfy it -> the engine must read the FILE and report it uncovered. This
     // is the failing-before-the-wiring case: with the resolver unwired the engine
     // reads the (criteria-free) body and the scope is spuriously clean.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let c = container_with_external_plan(&executor, false);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         report.has_errors(),
@@ -931,10 +760,17 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
 fn test_scope_reads_criteria_from_external_plan_covered_clean() {
     // Same external-plan criterion, now satisfied by the child -> clean. Proves
     // the file content (not the empty body) drove coverage.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let c = container_with_external_plan(&executor, true);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -950,7 +786,14 @@ fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
     // planning node has NOT completed -> the plan is legitimately not authored
     // yet, so the boundary skips it rather than erroring. This is the
     // freshly-applied-bracket case: validate must stay clean before the plan exists.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
     let c = seed(
         &executor,
@@ -966,8 +809,7 @@ fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
         &format!("dev/active/{c}-plan.md"),
         State::Backlog,
     );
-    let report = executor
-        .validate_scope(&c)
+    let report = scope_view(&executor, &c)
         .expect("a not-yet-authored plan must not surface as a hard error");
     assert!(
         !report.has_errors(),
@@ -981,7 +823,14 @@ fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
     // Once the bracket's planning node is `done`, the plan it references MUST
     // exist (downstream coverage reads it). A still-missing plan file then
     // surfaces as a contextual error rather than silently passing.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
 
     let c = seed(
         &executor,
@@ -998,10 +847,10 @@ fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
         State::Done,
     );
 
-    let err = executor.validate_scope(&c).unwrap_err();
+    let err = scope_view(&executor, &c).unwrap_err();
     let message = err.to_string();
     assert!(
-        message.contains("plan document") && message.contains(&c[..8]),
+        message.contains("plan document") && message.contains(c.short_id()),
         "a plan missing after planning completed must surface as a contextual error: {message}"
     );
 }
@@ -1013,7 +862,14 @@ fn test_scope_resolves_plan_from_relinked_nondefault_path() {
     // `dev/active/{id}-plan.md` default. Validate must read the criteria from the
     // re-linked path (proving the template path is not consulted at validation
     // time). The criterion there is uncovered, so the scope must fail naming it.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
     let c = seed(
         &executor,
@@ -1033,7 +889,7 @@ fn test_scope_resolves_plan_from_relinked_nondefault_path() {
     // The (done) planning node's `plan` reference points at the archived path.
     wire_plan_bracket(&executor, &c, &archived, State::Done);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
     assert!(
         report.has_errors() && report.findings.iter().any(|f| f.message.contains("REQ-77")),
         "the criterion read from the re-linked archived plan must drive coverage: {:?}",
@@ -1046,7 +902,14 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
     // The same re-linked archived plan, now with its criterion satisfied by the
     // child, leaves the scope clean — a moved/archived + re-linked plan keeps
     // `jit validate` green with no leniency.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let impl_id = seed(
         &executor,
         "impl",
@@ -1072,7 +935,7 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
     );
     wire_plan_bracket(&executor, &c, &archived, State::Done);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
     assert!(
         !report.has_errors(),
         "a covered criterion in the re-linked archived plan must leave the scope clean: {:?}",
@@ -1085,10 +948,17 @@ fn test_inline_template_still_validates_from_body() {
     // With a `plan` template whose planning node declares no `doc` (an inline
     // plan), the engine must keep reading the issue body: the empty plan-content
     // map reproduces the legacy behavior.
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_BREAKDOWN),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = scope_view(&executor, &c).expect("scope validation runs");
 
     assert!(
         report.has_errors() && report.findings.iter().any(|f| f.message.contains("REQ-01")),
@@ -1107,32 +977,23 @@ fn test_inline_template_still_validates_from_body() {
 // ---------------------------------------------------------------------------
 
 mod file_backed_external_plan {
-    use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
+    use super::{scope_view, COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
+    use jit::domain::identity::IssueId;
     use jit::domain::State;
-    use jit::storage::{IssueStore, JsonFileStorage};
+    use jit::storage::JsonFileStorage;
+    use jit::test_utils::setup_test_repo_with_config;
     use tempfile::TempDir;
 
-    /// Build a `JsonFileStorage`-backed executor rooted at `<tmp>/.jit`, with the
-    /// rule set and the external-`doc` `plan` template written into `.jit/` (NO
-    /// flat planning-config block: the doc location comes from the template registry).
-    /// Returns the temp dir (kept alive = the repo root) and the executor.
-    fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
-        jit::test_mode::enable();
-        let repo = crate::setup_test_repo_with_taxonomy();
-        let repo_root = repo.temp;
+    const CONFIG: &str =
+        "[type_hierarchy]\ntypes = { epic = 2, planning = 3, breakdown = 3, task = 4 }\n";
+
+    /// Declares the external-`doc` `plan` template and the coverage rule in
+    /// the repository's `.jit/` (the doc location comes from the template registry).
+    fn declare_external_plan(repo_root: &TempDir) {
         let jit_dir = repo_root.path().join(".jit");
-        std::fs::write(
-            jit_dir.join("config.toml"),
-            "[type_hierarchy]\ntypes = { epic = 2, planning = 3, breakdown = 3, task = 4 }\n",
-        )
-        .unwrap();
         std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_EXTERNAL).unwrap();
         std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        let layout =
-            jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
-        (repo_root, CommandExecutor::new(storage).with_layout(layout))
     }
 
     fn seed(
@@ -1140,8 +1001,8 @@ mod file_backed_external_plan {
         title: &str,
         labels: &[&str],
         description: &str,
-        deps: &[String],
-    ) -> String {
+        deps: &[IssueId],
+    ) -> IssueId {
         let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
         issue.id = super::seed_id(title, description);
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
@@ -1159,7 +1020,7 @@ mod file_backed_external_plan {
         repo_root: &TempDir,
         executor: &CommandExecutor<JsonFileStorage>,
         impl_satisfies: bool,
-    ) -> String {
+    ) -> IssueId {
         let c = seed(
             executor,
             "container",
@@ -1167,14 +1028,14 @@ mod file_backed_external_plan {
             "no criteria in the body — the plan lives in the external file",
             &[],
         );
-        let credit = format!("satisfies:{}/REQ-77", &c[..8]);
+        let credit = format!("satisfies:{}/REQ-77", c.short_id());
         let impl_labels: Vec<&str> = if impl_satisfies {
             vec!["type:task", &credit]
         } else {
             vec!["type:task"]
         };
         let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
-        executor.add_dependency(&c, &impl_id).unwrap();
+        super::add_reducing_edge(executor, &c, &impl_id).unwrap();
 
         // Write the plan under the REPO ROOT, NOT under `.jit/`.
         let plan_dir = repo_root.path().join("dev/active");
@@ -1199,10 +1060,11 @@ mod file_backed_external_plan {
         // `storage.root()` base dir the file under `.jit/dev/active` is absent, so
         // resolution errored (or the criterion was never seen) — this test FAILS
         // before the fix.
-        let (repo_root, executor) = executor();
+        let (repo_root, executor) = setup_test_repo_with_config(CONFIG).unwrap();
+        declare_external_plan(&repo_root);
         let c = container_with_repo_root_plan(&repo_root, &executor, false);
 
-        let report = executor.validate_scope(&c).expect("scope validation runs");
+        let report = scope_view(&executor, &c).expect("scope validation runs");
 
         assert!(
             report.has_errors(),
@@ -1221,10 +1083,11 @@ mod file_backed_external_plan {
         // Same repo-root plan criterion, now satisfied by the child -> clean,
         // proving the file content (not the empty body) drove coverage AND that
         // the file was found at the repo root rather than under `.jit/`.
-        let (repo_root, executor) = executor();
+        let (repo_root, executor) = setup_test_repo_with_config(CONFIG).unwrap();
+        declare_external_plan(&repo_root);
         let c = container_with_repo_root_plan(&repo_root, &executor, true);
 
-        let report = executor.validate_scope(&c).expect("scope validation runs");
+        let report = scope_view(&executor, &c).expect("scope validation runs");
 
         assert!(
             !report.has_errors(),
@@ -1235,50 +1098,17 @@ mod file_backed_external_plan {
 }
 
 // ---------------------------------------------------------------------------
-// CLI exit-code contract (subprocess): the gate-checker behaviour the
-// coverage-preview gate relies on — exit 4 with findings on failure, 0 clean.
+// CLI failure presentation (subprocess): the gate-checker behaviour the
+// coverage-preview gate relies on — findings shown on failure.
 // ---------------------------------------------------------------------------
 
 mod cli {
+    use jit::domain::identity::IssueId;
+    use jit::test_cli::JitCli;
+    use jit::test_taxonomy::{
+        setup_test_repo_with_taxonomy, type_label, TaxonomyRepo, TestTaxonomy,
+    };
     use std::fs;
-    use std::process::Command;
-    use tempfile::TempDir;
-
-    fn jit() -> &'static str {
-        env!("CARGO_BIN_EXE_jit")
-    }
-
-    fn run(dir: &TempDir, args: &[&str]) -> std::process::Output {
-        Command::new(jit())
-            .current_dir(dir)
-            .args(args)
-            .output()
-            .expect("jit runs")
-    }
-
-    fn create(dir: &TempDir, title: &str, description: &str, labels: &[&str]) -> String {
-        let mut args = vec![
-            "issue",
-            "create",
-            "--title",
-            title,
-            "--description",
-            description,
-            "--json",
-        ];
-        for label in labels {
-            args.push("--label");
-            args.push(label);
-        }
-        let out = run(dir, &args);
-        assert!(
-            out.status.success(),
-            "create failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-        json["id"].as_str().unwrap().to_string()
-    }
 
     /// Coverage rule keyed on the breakdown node; error-severity, enforcing.
     fn coverage_rules(breakdown_type: &str) -> String {
@@ -1294,50 +1124,75 @@ assert = {{ label-coverage = {{ }} }}
         )
     }
 
-    /// Build a `C -> impl -> B` spine where B carries the criterion from the
-    /// shared taxonomy fixture. Returns (repository, container-id). The impl child credits
+    /// Seed a `C -> impl -> B` spine into `cli` where B carries the criterion from
+    /// the shared taxonomy fixture. Returns the container id. The impl child credits
     /// B's REQ-01 only when `covered`.
-    fn setup_spine(covered: bool) -> (crate::TaxonomyRepo, String) {
-        let dir = crate::setup_test_repo_with_taxonomy();
-        let breakdown_type = dir.taxonomy.type_at_level(3);
+    fn seed_spine(cli: &JitCli, taxonomy: &TestTaxonomy, covered: bool) -> String {
+        let config_path = cli.root().join(".jit/config.toml");
+        let config = fs::read_to_string(&config_path).unwrap();
         fs::write(
-            dir.path().join(".jit/rules.toml"),
-            coverage_rules(breakdown_type),
+            config_path,
+            format!("{config}\n[namespaces.satisfies]\ndescription = \"Criterion coverage\"\nunique = false\n"),
+        )
+        .unwrap();
+        fs::write(
+            cli.root().join(".jit/rules.toml"),
+            coverage_rules(taxonomy.type_at_level(3)),
         )
         .unwrap();
 
-        let breakdown_label = crate::type_label(&dir.taxonomy, 3);
-        let b = create(
-            &dir,
-            "breakdown",
-            "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
-            &[breakdown_label.as_str()],
-        );
-        let implementation_label = crate::type_label(&dir.taxonomy, 4);
-        let credit = format!("satisfies:{}/REQ-01", &b[..8]);
+        let b = cli
+            .create_issue([
+                "--title",
+                "breakdown",
+                "--description",
+                "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
+                "--label",
+                &type_label(taxonomy, 3),
+            ])
+            .unwrap();
+        let b_id: IssueId = b.parse().expect("the binary prints a canonical issue id");
+        let credit = format!("satisfies:{}/REQ-01", b_id.short_id());
+        let implementation_label = type_label(taxonomy, 4);
         let impl_labels: &[&str] = if covered {
-            &[implementation_label.as_str(), credit.as_str()]
+            &[&implementation_label, &credit]
         } else {
-            &[implementation_label.as_str()]
+            &[&implementation_label]
         };
-        let impl_id = create(&dir, "impl", "", impl_labels);
-        assert!(run(&dir, &["dep", "add", &impl_id, &b]).status.success());
+        let impl_id = cli
+            .create_issue(
+                ["--title", "impl", "--description", ""]
+                    .into_iter()
+                    .chain(impl_labels.iter().flat_map(|label| ["--label", *label])),
+            )
+            .unwrap();
+        cli.run(["dep", "add", &impl_id, &b]).unwrap();
 
-        let container_label = crate::type_label(&dir.taxonomy, 2);
-        let c = create(&dir, "container", "", &[container_label.as_str()]);
-        assert!(run(&dir, &["dep", "add", &c, &impl_id]).status.success());
-
-        (dir, c)
+        let c = cli
+            .create_issue([
+                "--title",
+                "container",
+                "--description",
+                "",
+                "--label",
+                &type_label(taxonomy, 2),
+            ])
+            .unwrap();
+        cli.run(["dep", "add", &c, &impl_id]).unwrap();
+        c
     }
 
     #[test]
-    fn test_cli_scope_exits_4_with_findings_on_failure() {
-        let (dir, c) = setup_spine(false);
-        let out = run(&dir, &["validate", "--scope", &c]);
-        assert_eq!(
-            out.status.code(),
-            Some(4),
-            "an enforcing-rule failure must exit 4 (ValidationFailed); stderr: {}",
+    fn test_cli_scope_failure_shows_findings() {
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, false);
+
+        let out = cli.command(["validate", "--scope", &c]).output().unwrap();
+
+        assert!(
+            !out.status.success(),
+            "an enforcing-rule failure must fail; stderr: {}",
             String::from_utf8_lossy(&out.stderr)
         );
         let combined = format!(
@@ -1353,9 +1208,16 @@ assert = {{ label-coverage = {{ }} }}
 
     #[test]
     fn test_cli_scope_json_failure_emits_one_validation_envelope() {
-        let (dir, c) = setup_spine(false);
-        let out = run(&dir, &["validate", "--scope", &c, "--json"]);
-        assert_eq!(out.status.code(), Some(4));
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, false);
+
+        let out = cli
+            .command(["validate", "--scope", &c, "--json"])
+            .output()
+            .unwrap();
+
+        assert!(!out.status.success());
         assert!(out.stderr.is_empty(), "JSON failure stays stream-pure");
         let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(json.as_object().map(|object| object.len()), Some(1));
@@ -1371,23 +1233,13 @@ assert = {{ label-coverage = {{ }} }}
     }
 
     #[test]
-    fn test_cli_scope_exits_0_when_clean() {
-        let (dir, c) = setup_spine(true);
-        let out = run(&dir, &["validate", "--scope", &c]);
-        assert_eq!(
-            out.status.code(),
-            Some(0),
-            "a clean scope must exit 0; stderr: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    }
-
-    #[test]
     fn test_cli_scope_json_success_keeps_the_scope_report() {
-        let (dir, c) = setup_spine(true);
-        let out = run(&dir, &["validate", "--scope", &c, "--json"]);
-        assert_eq!(out.status.code(), Some(0));
-        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, true);
+
+        let json = cli.run_json(["validate", "--scope", &c]).unwrap();
+
         assert!(
             json["findings"].is_array(),
             "successful report stays direct: {json}"
@@ -1397,8 +1249,13 @@ assert = {{ label-coverage = {{ }} }}
 
     #[test]
     fn test_cli_scope_rejects_combination_with_id() {
-        let dir = crate::setup_test_repo_with_taxonomy();
-        let out = run(&dir, &["validate", "someid", "--scope", "other"]);
+        let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+
+        let out = cli
+            .command(["validate", "someid", "--scope", "other"])
+            .output()
+            .unwrap();
+
         assert!(
             !out.status.success(),
             "`--scope` combined with a positional id must be rejected"

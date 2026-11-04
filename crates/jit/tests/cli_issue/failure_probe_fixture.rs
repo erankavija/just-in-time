@@ -3,31 +3,24 @@
 use super::failure_lever_registry::{failure_lever_registry, FailureLever, REGISTRY_TOML};
 use anyhow::{bail, Context, Result};
 use clap::Parser;
+use jit::domain::identity::IssueId;
 use jit::output::ErrorCode;
-use jit::storage::{
-    publish_fixture_directory_noreplace, publish_fixture_file_noreplace, FileLocker,
-};
+use jit::storage::worktree_paths::WorktreePaths;
+use jit::test_cli::{created_issue_id, JitCli};
+use jit::test_lease_store::{corrupt_lease, LeaseCorruption};
+use jit::test_utils::{copy_tree_exact, keyed_fixture, keyed_fixture_key, CRATE_SOURCE_SHA256};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::fs;
+use std::num::NonZero;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Output};
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-use tempfile::TempDir;
+use std::process::{ExitStatus, Output};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-const CORPUS_SCHEMA: u32 = 1;
-const CORPUS_CACHE_DIRECTORY: &str = "jit-recorded-failure-corpus";
-const CORPUS_RECEIPT: &str = "JIT_RECORDED_FAILURE_CORPUS_RECEIPT";
-const CORPUS_SETUP_MODE: &str = "JIT_RECORDED_FAILURE_CORPUS_SETUP";
+const CORPUS_FAMILY: &str = "recorded-failure-corpus";
+const CORPUS_FILE: &str = "corpus.json";
+/// How a recorded failure is driven, which the crate source does not cover.
 const FIXTURE_CONTRACT: &str = include_str!("failure_probe_fixture.rs");
-static DIRECT_CORPUS: OnceLock<Result<Arc<RecordedFailureCorpus>, String>> = OnceLock::new();
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
 
 /// Observable result of driving a registry invocation through its recorded setup.
 pub(crate) struct ForcedFailure {
@@ -35,7 +28,6 @@ pub(crate) struct ForcedFailure {
     pub(crate) argv: Vec<String>,
     pub(crate) expected_failure: String,
     pub(crate) expected_code: ErrorCode,
-    pub(crate) expected_exit: i32,
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,
     pub(crate) status: ExitStatus,
@@ -105,26 +97,6 @@ impl RecordedFailureObservation {
 
 pub(crate) type RecordedFailureCorpus = Vec<RecordedFailureObservation>;
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct CorpusManifest {
-    schema_version: u32,
-    key: String,
-    corpus_sha256: String,
-    build_invocations: u32,
-    invoked_rows: usize,
-    exempt_rows: usize,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct CorpusReceipt {
-    schema_version: u32,
-    run_id: String,
-    key: String,
-    entry: PathBuf,
-}
-
 /// Names the registry-defined arm to drive. Where one arm has several measured
 /// invocations, the first committed row is the canonical representative.
 pub(crate) fn drive_named_failure(path: &str) -> RecordedFailure {
@@ -160,28 +132,49 @@ pub(crate) fn drive_failure_lever(lever: &FailureLever) -> RecordedFailure {
     }
 }
 
-fn observe_failure_lever(lever: &FailureLever) -> RecordedFailureObservation {
-    match drive_failure_lever(lever) {
-        RecordedFailure::Invoked(failure) => RecordedFailureObservation::Invoked {
-            path: failure.path,
-            argv: failure.argv,
-            repository_root: failure.repository_root,
-            stdout: failure.stdout,
-            stderr: failure.stderr,
-            status: ObservedStatus::from_exit_status(failure.status),
-        },
-        RecordedFailure::Exempt { path, reason } => {
-            RecordedFailureObservation::Exempt { path, reason }
+fn observe_failure_lever(lever: &FailureLever, init_baseline: &Path) -> RecordedFailureObservation {
+    match lever {
+        FailureLever::Invocation(invocation) => {
+            let failure = drive_recorded_failure_from(invocation, Some(init_baseline));
+            RecordedFailureObservation::Invoked {
+                path: failure.path,
+                argv: failure.argv,
+                repository_root: failure.repository_root,
+                stdout: failure.stdout,
+                stderr: failure.stderr,
+                status: ObservedStatus::from_exit_status(failure.status),
+            }
         }
+        FailureLever::Exemption(exemption) => RecordedFailureObservation::Exempt {
+            path: exemption.path.clone(),
+            reason: exemption.exemption_reason.clone(),
+        },
     }
 }
 
-fn build_recorded_failure_corpus() -> RecordedFailureCorpus {
-    failure_lever_registry()
-        .arms
-        .iter()
-        .map(observe_failure_lever)
-        .collect()
+fn build_recorded_failure_corpus() -> Result<RecordedFailureCorpus> {
+    let init_baseline = JitCli::initialised().context("initialise the corpus baseline")?;
+    let arms = failure_lever_registry().arms;
+    let next = AtomicUsize::new(0);
+    let observe_rows = || {
+        std::iter::from_fn(|| {
+            let index = next.fetch_add(1, Ordering::Relaxed);
+            arms.get(index)
+                .map(|lever| (index, observe_failure_lever(lever, init_baseline.root())))
+        })
+        .collect::<Vec<_>>()
+    };
+    // Rows share no state, and concurrent syncs share the journal commit they wait on.
+    Ok(std::thread::scope(|scope| {
+        (0..std::thread::available_parallelism().map_or(1, NonZero::get))
+            .map(|_| scope.spawn(observe_rows))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .flat_map(|worker| worker.join().expect("observe a recorded failure"))
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .collect()
+    }))
 }
 
 fn validate_recorded_failure_corpus(corpus: &RecordedFailureCorpus) -> Result<()> {
@@ -211,8 +204,7 @@ fn validate_recorded_failure_corpus(corpus: &RecordedFailureCorpus) -> Result<()
             ) if path == &invocation.path
                 && argv == &invocation.argv
                 && repository_root.is_absolute()
-                && !stdout.is_empty()
-                && status.code() == Some(invocation.expected_exit) =>
+                && !stdout.is_empty() =>
             {
                 Ok(())
             }
@@ -224,193 +216,8 @@ fn validate_recorded_failure_corpus(corpus: &RecordedFailureCorpus) -> Result<()
                 "recorded failure corpus row for `{}` does not match the live registry",
                 lever.path()
             ),
-        })
-}
-
-/// The one complete raw observation set used by the three aggregate contracts.
-pub(crate) fn recorded_failure_corpus() -> Result<Arc<RecordedFailureCorpus>> {
-    if std::env::var_os(CORPUS_RECEIPT).is_some() {
-        return read_nextest_corpus().map(Arc::new);
-    }
-    memoized_corpus(&DIRECT_CORPUS, || {
-        let key = corpus_key()?;
-        let entry = ensure_corpus_entry(&key, build_recorded_failure_corpus)?;
-        read_corpus_entry(&entry, &key)
-    })
-}
-
-fn memoized_corpus(
-    cell: &OnceLock<Result<Arc<RecordedFailureCorpus>, String>>,
-    build: impl FnOnce() -> Result<RecordedFailureCorpus>,
-) -> Result<Arc<RecordedFailureCorpus>> {
-    cell.get_or_init(|| build().map(Arc::new).map_err(|error| format!("{error:#}")))
-        .as_ref()
-        .map(Arc::clone)
-        .map_err(|error| anyhow::anyhow!(error.clone()))
-}
-
-fn corpus_cache_root() -> Result<PathBuf> {
-    let executable = std::env::current_exe().context("resolve failure corpus test executable")?;
-    let profile = executable
-        .parent()
-        .and_then(Path::parent)
-        .context("failure corpus executable has no Cargo profile output")?;
-    Ok(profile.join(CORPUS_CACHE_DIRECTORY))
-}
-
-fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_le_bytes());
-    hasher.update(bytes);
-}
-
-fn hash_file(hasher: &mut Sha256, path: &Path) -> Result<()> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("inspect corpus provenance {}", path.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        bail!(
-            "corpus provenance {} is not an ordinary file",
-            path.display()
-        );
-    }
-    hash_field(hasher, &metadata.len().to_le_bytes());
-    let mut file = File::open(path)?;
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(())
-}
-
-fn corpus_key() -> Result<String> {
-    corpus_key_from_sources(
-        REGISTRY_TOML.as_bytes(),
-        FIXTURE_CONTRACT.as_bytes(),
-        Path::new(jit_binary()),
-        &std::env::current_exe().context("resolve corpus setup executable")?,
-    )
-}
-
-fn corpus_key_from_sources(
-    registry: &[u8],
-    fixture_contract: &[u8],
-    scenario_executable: &Path,
-    setup_executable: &Path,
-) -> Result<String> {
-    let mut hasher = Sha256::new();
-    hash_field(&mut hasher, b"recorded-failure-corpus/v1");
-    hash_field(&mut hasher, std::env::consts::OS.as_bytes());
-    hash_field(&mut hasher, registry);
-    hash_field(&mut hasher, fixture_contract);
-    hash_file(&mut hasher, scenario_executable)?;
-    hash_file(&mut hasher, setup_executable)?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-fn ensure_corpus_entry(
-    key: &str,
-    build: impl FnOnce() -> RecordedFailureCorpus,
-) -> Result<PathBuf> {
-    let cache_root = corpus_cache_root()?;
-    ensure_corpus_entry_at(&cache_root, key, build)
-}
-
-fn ensure_corpus_entry_at(
-    cache_root: &Path,
-    key: &str,
-    build: impl FnOnce() -> RecordedFailureCorpus,
-) -> Result<PathBuf> {
-    fs::create_dir_all(cache_root)?;
-    let lock_root = cache_root.join("locks");
-    fs::create_dir_all(&lock_root)?;
-    let _lock = FileLocker::new(Duration::from_secs(120))
-        .lock_exclusive(&lock_root.join(format!("{key}.lock")))?;
-    let entry = cache_root.join(key);
-    match fs::symlink_metadata(&entry) {
-        Ok(_) => {
-            read_corpus_entry(&entry, key)?;
-            return Ok(entry);
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(error.into()),
-    }
-
-    let staging = tempfile::Builder::new()
-        .prefix(".recorded-failure-corpus-")
-        .tempdir_in(cache_root)?;
-    let corpus = build();
-    validate_recorded_failure_corpus(&corpus)?;
-    let corpus_bytes = serde_json::to_vec(&corpus)?;
-    let corpus_sha256 = format!("{:x}", Sha256::digest(&corpus_bytes));
-    let corpus_path = staging.path().join("corpus.json");
-    fs::write(&corpus_path, &corpus_bytes)?;
-    File::open(&corpus_path)?.sync_all()?;
-    let manifest = CorpusManifest {
-        schema_version: CORPUS_SCHEMA,
-        key: key.to_owned(),
-        corpus_sha256,
-        build_invocations: 1,
-        invoked_rows: corpus
-            .iter()
-            .filter(|row| matches!(row, RecordedFailureObservation::Invoked { .. }))
-            .count(),
-        exempt_rows: corpus
-            .iter()
-            .filter(|row| matches!(row, RecordedFailureObservation::Exempt { .. }))
-            .count(),
-    };
-    let manifest_path = staging.path().join("manifest.json");
-    fs::write(&manifest_path, serde_json::to_vec(&manifest)?)?;
-    File::open(&manifest_path)?.sync_all()?;
-    let staging = staging.keep();
-    if let Err(error) = publish_fixture_directory_noreplace(&staging, &entry) {
-        let _ = fs::remove_dir_all(&staging);
-        return Err(error).context("publish recorded failure corpus without replacement");
-    }
-    read_corpus_entry(&entry, key)?;
-    Ok(entry)
-}
-
-fn read_ordinary_file(path: &Path, description: &str) -> Result<Vec<u8>> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("inspect {description} {}", path.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        bail!("{description} {} is not an ordinary file", path.display());
-    }
-    fs::read(path).with_context(|| format!("read {description} {}", path.display()))
-}
-
-fn read_corpus_entry(entry: &Path, expected_key: &str) -> Result<RecordedFailureCorpus> {
-    let metadata = fs::symlink_metadata(entry)?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        bail!("recorded failure corpus entry is not an ordinary directory");
-    }
-    let names = fs::read_dir(entry)?
-        .map(|entry| Ok(entry?.file_name()))
-        .collect::<std::io::Result<BTreeSet<_>>>()?;
-    if names != BTreeSet::from(["corpus.json".into(), "manifest.json".into()]) {
-        bail!("recorded failure corpus entry contains unexpected files");
-    }
-    let manifest: CorpusManifest = serde_json::from_slice(&read_ordinary_file(
-        &entry.join("manifest.json"),
-        "corpus manifest",
-    )?)?;
-    if manifest.schema_version != CORPUS_SCHEMA
-        || manifest.key != expected_key
-        || manifest.build_invocations != 1
-    {
-        bail!("recorded failure corpus manifest identity mismatch");
-    }
-    let bytes = read_ordinary_file(&entry.join("corpus.json"), "recorded failure corpus")?;
-    if format!("{:x}", Sha256::digest(&bytes)) != manifest.corpus_sha256 {
-        bail!("recorded failure corpus content mismatch");
-    }
-    let corpus = serde_json::from_slice(&bytes)?;
-    validate_recorded_failure_corpus(&corpus)?;
-    let invoked_roots = corpus
+        })?;
+    let invoked = corpus
         .iter()
         .filter_map(|row| match row {
             RecordedFailureObservation::Invoked {
@@ -418,80 +225,75 @@ fn read_corpus_entry(entry: &Path, expected_key: &str) -> Result<RecordedFailure
             } => Some(repository_root),
             RecordedFailureObservation::Exempt { .. } => None,
         })
-        .collect::<BTreeSet<_>>();
-    if invoked_roots.len() != manifest.invoked_rows
-        || manifest.invoked_rows + manifest.exempt_rows != corpus.len()
-    {
+        .collect::<Vec<_>>();
+    if invoked.iter().collect::<BTreeSet<_>>().len() != invoked.len() {
         bail!("recorded failure corpus does not preserve unique mutable probe roots");
     }
-    Ok(corpus)
-}
-
-fn prepare_nextest_corpus() -> Result<()> {
-    let run_id = std::env::var("NEXTEST_RUN_ID").context("corpus setup has no nextest run id")?;
-    let nextest_env = PathBuf::from(
-        std::env::var_os("NEXTEST_ENV").context("corpus setup has no nextest env file")?,
-    );
-    let key = corpus_key()?;
-    let entry = ensure_corpus_entry(&key, build_recorded_failure_corpus)?;
-    let receipt = CorpusReceipt {
-        schema_version: CORPUS_SCHEMA,
-        run_id,
-        key,
-        entry,
-    };
-    let receipt_bytes = serde_json::to_vec(&receipt)?;
-    let sha = format!("{:x}", Sha256::digest(&receipt_bytes));
-    let cache_root = corpus_cache_root()?;
-    let receipt_path = cache_root.join(format!("run-{}.json", receipt.run_id));
-    let staging = tempfile::NamedTempFile::new_in(&cache_root)?;
-    fs::write(staging.path(), receipt_bytes)?;
-    staging.as_file().sync_all()?;
-    publish_fixture_file_noreplace(staging.path(), &receipt_path)?;
-    let mut environment = fs::OpenOptions::new().append(true).open(nextest_env)?;
-    writeln!(environment, "{CORPUS_RECEIPT}={}", receipt_path.display())?;
-    writeln!(environment, "{CORPUS_RECEIPT}_SHA256={sha}")?;
-    environment.sync_all()?;
     Ok(())
 }
 
-fn read_nextest_corpus() -> Result<RecordedFailureCorpus> {
-    let run_id = std::env::var("NEXTEST_RUN_ID").context("corpus consumer has no run id")?;
-    let path = PathBuf::from(
-        std::env::var_os(CORPUS_RECEIPT).context("recorded failure corpus receipt is absent")?,
-    );
-    let bytes = read_ordinary_file(&path, "recorded failure corpus receipt")?;
-    let expected_sha = std::env::var(format!("{CORPUS_RECEIPT}_SHA256"))
-        .context("recorded failure corpus receipt SHA is absent")?;
-    let cache_root = corpus_cache_root()?;
-    let receipt = validate_receipt(&bytes, &expected_sha, &run_id, &cache_root)?;
-    read_corpus_entry(&receipt.entry, &receipt.key)
+/// The one complete raw observation set used by the three aggregate contracts.
+pub(crate) fn recorded_failure_corpus() -> Result<RecordedFailureCorpus> {
+    let lease = keyed_fixture(CORPUS_FAMILY, &live_corpus_key(), |tree| {
+        let corpus = build_recorded_failure_corpus()?;
+        validate_recorded_failure_corpus(&corpus)?;
+        Ok(fs::write(
+            tree.join(CORPUS_FILE),
+            serde_json::to_vec(&corpus)?,
+        )?)
+    })?;
+    Ok(serde_json::from_slice(&fs::read(
+        lease.tree().join(CORPUS_FILE),
+    )?)?)
 }
 
-fn validate_receipt(
-    bytes: &[u8],
-    expected_sha: &str,
-    run_id: &str,
-    cache_root: &Path,
-) -> Result<CorpusReceipt> {
-    if format!("{:x}", Sha256::digest(bytes)) != expected_sha {
-        bail!("recorded failure corpus receipt content mismatch");
-    }
-    let receipt: CorpusReceipt = serde_json::from_slice(bytes)?;
-    if receipt.schema_version != CORPUS_SCHEMA
-        || receipt.run_id != run_id
-        || receipt.entry != cache_root.join(&receipt.key)
-    {
-        bail!("recorded failure corpus receipt does not belong to this nextest run");
-    }
-    Ok(receipt)
+fn live_corpus_key() -> String {
+    corpus_key(REGISTRY_TOML, CRATE_SOURCE_SHA256, FIXTURE_CONTRACT)
+}
+
+fn corpus_key(registry: &str, crate_source_sha256: &str, fixture_contract: &str) -> String {
+    keyed_fixture_key(&[
+        registry.as_bytes(),
+        crate_source_sha256.as_bytes(),
+        fixture_contract.as_bytes(),
+    ])
 }
 
 pub(crate) fn drive_recorded_failure(
     invocation: &super::failure_lever_registry::FailureLeverInvocation,
 ) -> ForcedFailure {
-    assert_recorded_invocation_parses(&invocation.path, &invocation.argv);
-    let mut fixture = FailureFixture::new();
+    drive_recorded_failure_from(invocation, None)
+}
+
+pub(crate) fn drive_named_failure_with_args(path: &str, argv: Vec<String>) -> ForcedFailure {
+    let invocation = failure_lever_registry()
+        .arms
+        .into_iter()
+        .find_map(|lever| match lever {
+            FailureLever::Invocation(invocation) if invocation.path == path => Some(invocation),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("failure-lever registry has no invocation `{path}`"));
+    drive_recorded_failure_from_args(&invocation, None, &argv)
+}
+
+fn drive_recorded_failure_from(
+    invocation: &super::failure_lever_registry::FailureLeverInvocation,
+    init_baseline: Option<&Path>,
+) -> ForcedFailure {
+    drive_recorded_failure_from_args(invocation, init_baseline, &invocation.argv)
+}
+
+fn drive_recorded_failure_from_args(
+    invocation: &super::failure_lever_registry::FailureLeverInvocation,
+    init_baseline: Option<&Path>,
+    argv: &[String],
+) -> ForcedFailure {
+    assert_recorded_invocation_parses(&invocation.path, argv);
+    let mut fixture = FailureFixture::new(
+        JitCli::uninitialised().expect("create failure-probe repository"),
+        init_baseline,
+    );
     invocation.setup.iter().for_each(|step| {
         fixture.apply(
             SetupStep::parse(step)
@@ -499,15 +301,14 @@ pub(crate) fn drive_recorded_failure(
         );
     });
 
-    let output = fixture.run_jit(&invocation.argv);
+    let output = fixture.run_jit(argv);
     let repository_root = fixture.root().to_path_buf();
 
     ForcedFailure {
         path: invocation.path.clone(),
-        argv: invocation.argv.clone(),
+        argv: argv.to_vec(),
         expected_failure: invocation.expected_failure.clone(),
         expected_code: invocation.expected_code,
-        expected_exit: invocation.expected_exit,
         stdout: output.stdout,
         stderr: output.stderr,
         status: output.status,
@@ -529,16 +330,20 @@ fn require_parser_acceptance<T>(path: &str, parsed: Result<T, clap::Error>) {
 }
 
 struct FailureFixture {
-    repository: TempDir,
+    cli: JitCli,
+    claimed_issue: Option<IssueId>,
     environment: BTreeMap<String, Option<String>>,
+    /// An initialised tree the `init` step copies instead of running `jit init`,
+    /// whose syncs across every row would wait on the host's writeback backlog.
+    init_baseline: Option<PathBuf>,
 }
 
 impl FailureFixture {
-    fn new() -> Self {
-        let repository = TempDir::new().expect("create failure-probe repository");
-        let git_ceiling = repository.path().display().to_string();
+    fn new(cli: JitCli, init_baseline: Option<&Path>) -> Self {
+        let git_ceiling = cli.root().display().to_string();
         Self {
-            repository,
+            cli,
+            claimed_issue: None,
             // Git may discover a repository inherited from the host's `/tmp`.
             // Stop discovery at the temporary repository so `git:absent`
             // observes only the fixture it was asked to inspect.
@@ -546,40 +351,31 @@ impl FailureFixture {
                 "GIT_CEILING_DIRECTORIES".to_owned(),
                 Some(git_ceiling),
             )]),
+            init_baseline: init_baseline.map(Path::to_path_buf),
         }
     }
 
     fn root(&self) -> &Path {
-        self.repository.path()
+        self.cli.root()
     }
 
-    fn run_jit(&self, args: &[String]) -> Output {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(self.root()).args(args);
+    fn run_jit<S: AsRef<std::ffi::OsStr>>(&self, args: &[S]) -> Output {
+        let set = self
+            .environment
+            .iter()
+            .filter_map(|(name, value)| value.as_ref().map(|value| (name, value)));
+        let mut command = self.cli.command_with_env(args, set);
         self.environment
             .iter()
-            .for_each(|(name, value)| match value {
-                Some(value) => {
-                    command.env(name, value);
-                }
-                None => {
-                    command.env_remove(name);
-                }
+            .filter(|(_, value)| value.is_none())
+            .for_each(|(name, _)| {
+                command.env_remove(name);
             });
         command.output().expect("run recorded jit invocation")
     }
 
-    fn run_setup_jit(&self, args: &[&str]) -> Output {
-        self.run_jit(
-            &args
-                .iter()
-                .map(|argument| (*argument).to_owned())
-                .collect::<Vec<_>>(),
-        )
-    }
-
     fn require_setup_jit(&self, args: &[&str]) -> Output {
-        let output = self.run_setup_jit(args);
+        let output = self.run_jit(args);
         assert!(
             output.status.success(),
             "setup command {args:?} failed: stdout={} stderr={}",
@@ -589,24 +385,16 @@ impl FailureFixture {
         output
     }
 
-    fn run_git(&self, args: &[&str]) {
-        let output = Command::new("git")
-            .current_dir(self.root())
-            .args(args)
-            .output()
-            .expect("run git setup command");
-        assert!(
-            output.status.success(),
-            "git {args:?} failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
     fn apply(&mut self, step: SetupStep) {
         match step {
-            SetupStep::Init => {
-                self.require_setup_jit(&["init"]);
-            }
+            SetupStep::Init => match &self.init_baseline {
+                Some(baseline) => {
+                    copy_tree_exact(baseline, self.root()).expect("copy the initialised baseline");
+                }
+                None => {
+                    self.require_setup_jit(&["init"]);
+                }
+            },
             SetupStep::MalformedIndex => {
                 fs::write(self.root().join(".jit/index.json"), "not-json")
                     .expect("write malformed index");
@@ -627,9 +415,16 @@ impl FailureFixture {
                 fs::write(self.root().join(".jit/server.pid.json"), "{")
                     .expect("write malformed server PID file");
             }
-            SetupStep::MalformedClaimIndex => {
-                fs::write(self.root().join(".git/jit/claims.index.json"), "{")
-                    .expect("write malformed claim index");
+            SetupStep::MalformedLeaseRecord => {
+                let paths =
+                    WorktreePaths::detect_for_data_root(&self.root().join(".jit"), self.root())
+                        .unwrap();
+                corrupt_lease(
+                    &paths.shared_jit,
+                    self.claimed_issue.as_ref().expect("claim fixture issue"),
+                    LeaseCorruption::MalformedJson,
+                )
+                .expect("write malformed lease record");
             }
             SetupStep::MalformedWorktreeIdentity => {
                 self.require_setup_jit(&["worktree", "info", "--json"]);
@@ -644,9 +439,12 @@ impl FailureFixture {
             }
             SetupStep::SelectedLinkedWorktree => {
                 // The linked checkout only carries a store if HEAD tracks one.
-                self.run_git(&["add", "-A"]);
-                self.run_git(&["commit", "-q", "-m", "track the jit store"]);
-                self.run_git(&["worktree", "add", "linked"]);
+                self.cli
+                    .commit("track the jit store")
+                    .expect("commit the jit store");
+                self.cli
+                    .git(["worktree", "add", "linked"])
+                    .expect("add the linked worktree");
                 self.environment.insert(
                     "JIT_DATA_DIR".to_owned(),
                     Some(self.root().join("linked/.jit").display().to_string()),
@@ -659,13 +457,14 @@ impl FailureFixture {
                     .expect("write malformed preset");
             }
             SetupStep::GitRepositoryWithHead => {
-                self.run_git(&["init"]);
-                self.run_git(&["config", "user.email", "fixture@example.com"]);
-                self.run_git(&["config", "user.name", "Failure Fixture"]);
-                self.run_git(&["commit", "--allow-empty", "-m", "fixture"]);
+                self.cli
+                    .init_git()
+                    .expect("initialise git")
+                    .commit("fixture")
+                    .expect("commit the fixture HEAD");
             }
             SetupStep::GitRepositoryWithoutHead => {
-                self.run_git(&["init"]);
+                self.cli.init_git().expect("initialise git");
             }
             SetupStep::GitAbsent => {
                 assert!(!self.root().join(".git").exists(), "git must remain absent");
@@ -676,7 +475,19 @@ impl FailureFixture {
             SetupStep::UnsetEnvironment(name) => {
                 self.environment.insert(name, None);
             }
-            SetupStep::ActiveClaimIndex => {
+            SetupStep::SeedIssue(seed) => {
+                let issue = jit::domain::Issue::draft(
+                    jit::test_utils::issue_id(seed),
+                    "Failure fixture".into(),
+                    String::new(),
+                );
+                std::fs::write(
+                    self.root().join(format!(".jit/issues/{}.json", issue.id)),
+                    serde_json::to_vec(&issue).unwrap(),
+                )
+                .unwrap();
+            }
+            SetupStep::ActiveLease => {
                 let created = self.require_setup_jit(&[
                     "issue",
                     "create",
@@ -686,11 +497,12 @@ impl FailureFixture {
                 ]);
                 let created: serde_json::Value = serde_json::from_slice(&created.stdout)
                     .expect("claim fixture issue creation emits JSON");
-                let issue_id = created["id"].as_str().expect("created issue id");
+                let issue_id = created_issue_id(&created).expect("created issue id");
+                self.claimed_issue = Some(issue_id.parse().expect("valid created issue id"));
                 self.require_setup_jit(&[
                     "claim",
                     "acquire",
-                    issue_id,
+                    &issue_id,
                     "--ttl",
                     "600",
                     "--agent-id",
@@ -773,7 +585,7 @@ enum SetupStep {
     MalformedEventsLog,
     MalformedGateRegistry,
     MalformedServerPid,
-    MalformedClaimIndex,
+    MalformedLeaseRecord,
     MalformedWorktreeIdentity,
     MalformedIssueRecord(String),
     MalformedPreset(String),
@@ -783,7 +595,10 @@ enum SetupStep {
     GitAbsent,
     SetEnvironment(String, String),
     UnsetEnvironment(String),
-    ActiveClaimIndex,
+    ActiveLease,
+    /// Seed the issue whose id the canonical-id fixture derives from this
+    /// hexadecimal seed.
+    SeedIssue(u128),
     DuplicateGate(String),
     DanglingInvariant(String),
     MissingFile(String),
@@ -809,12 +624,12 @@ impl SetupStep {
             "malformed-events-log" => Ok(Self::MalformedEventsLog),
             "malformed-gate-registry" => Ok(Self::MalformedGateRegistry),
             "malformed-server-pid-file" => Ok(Self::MalformedServerPid),
-            "malformed-claim-index" => Ok(Self::MalformedClaimIndex),
+            "malformed-lease-record" => Ok(Self::MalformedLeaseRecord),
             "malformed-worktree-identity" => Ok(Self::MalformedWorktreeIdentity),
             "git:repository-with-head" => Ok(Self::GitRepositoryWithHead),
             "git:repository-without-head" => Ok(Self::GitRepositoryWithoutHead),
             "git:absent" => Ok(Self::GitAbsent),
-            "claim:index-with-active-lease" => Ok(Self::ActiveClaimIndex),
+            "claim:active-lease" => Ok(Self::ActiveLease),
             "no-ready-issue" => Ok(Self::MissingReadyIssue),
             "worktree:primary" => Ok(Self::PrimaryWorktree),
             "worktree:linked-selected" => Ok(Self::SelectedLinkedWorktree),
@@ -834,6 +649,11 @@ impl SetupStep {
                     prefixed("dangling-invariant-enforcement:").map(Self::DanglingInvariant)
                 })
                 .or_else(|| prefixed("file-absent:").map(Self::MissingFile))
+                .or_else(|| {
+                    prefixed("seed-issue:")
+                        .and_then(|seed| u128::from_str_radix(&seed, 16).ok())
+                        .map(Self::SeedIssue)
+                })
                 .or_else(|| prefixed("no-issue:").map(Self::MissingIssue))
                 .or_else(|| prefixed("unknown-gate:").map(Self::UnknownGate))
                 .or_else(|| prefixed("unknown-preset:").map(Self::UnknownPreset))
@@ -854,7 +674,7 @@ impl SetupStep {
             | Self::MalformedEventsLog
             | Self::MalformedGateRegistry
             | Self::MalformedServerPid
-            | Self::MalformedClaimIndex
+            | Self::MalformedLeaseRecord
             | Self::MalformedWorktreeIdentity
             | Self::MalformedIssueRecord(_)
             | Self::MalformedPreset(_) => SetupClass::CorruptRepositoryFile,
@@ -862,7 +682,8 @@ impl SetupStep {
                 SetupClass::GitTopology
             }
             Self::SetEnvironment(_, _) | Self::UnsetEnvironment(_) => SetupClass::Environment,
-            Self::ActiveClaimIndex
+            Self::ActiveLease
+            | Self::SeedIssue(_)
             | Self::DuplicateGate(_)
             | Self::DanglingInvariant(_)
             | Self::BuiltinPreset(_) => SetupClass::SeededDomainState,
@@ -882,9 +703,6 @@ impl SetupStep {
 
 #[test]
 fn test_failure_probe_fixture_accepts_every_recorded_setup_step() {
-    if std::env::var_os(CORPUS_SETUP_MODE).is_some() {
-        prepare_nextest_corpus().expect("prepare the run-bound recorded failure corpus");
-    }
     failure_lever_registry()
         .arms
         .iter()
@@ -896,213 +714,116 @@ fn test_failure_probe_fixture_accepts_every_recorded_setup_step() {
         .for_each(|step| {
             SetupStep::parse(step).unwrap_or_else(|error| panic!("{step}: {error}"));
         });
-    if std::env::var_os(CORPUS_SETUP_MODE).is_none() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        let cache = OnceLock::new();
-        let builds = AtomicUsize::new(0);
-        let build = || {
-            builds.fetch_add(1, Ordering::Relaxed);
-            Ok(vec![RecordedFailureObservation::Exempt {
-                path: "version".to_owned(),
-                reason: "source-only".to_owned(),
-            }])
-        };
-        let first = memoized_corpus(&cache, build).expect("build tiny corpus");
-        let second = memoized_corpus(&cache, build).expect("reuse tiny corpus");
-        assert!(Arc::ptr_eq(&first, &second));
-        assert_eq!(builds.load(Ordering::Relaxed), 1);
+}
 
-        let failed_cache = OnceLock::new();
-        let failed_builds = AtomicUsize::new(0);
-        let fail = || {
-            failed_builds.fetch_add(1, Ordering::Relaxed);
-            bail!("synthetic corpus failure")
-        };
-        assert!(memoized_corpus(&failed_cache, fail).is_err());
-        assert!(memoized_corpus(&failed_cache, fail).is_err());
-        assert_eq!(failed_builds.load(Ordering::Relaxed), 1);
+#[test]
+fn test_recorded_failure_corpus_is_served_from_its_keyed_fixture_entry() {
+    let corpus = recorded_failure_corpus().expect("load the recorded failure corpus");
+    let lease = keyed_fixture(CORPUS_FAMILY, &live_corpus_key(), |_| {
+        bail!("the corpus must already be published under its live key")
+    })
+    .expect("lease the published corpus");
+    let published: RecordedFailureCorpus = serde_json::from_slice(
+        &fs::read(lease.tree().join(CORPUS_FILE)).expect("read the published corpus"),
+    )
+    .expect("parse the published corpus");
+    assert_eq!(corpus, published);
+}
 
-        let key_inputs = TempDir::new().expect("create corpus key inputs");
-        let scenario = key_inputs.path().join("jit");
-        let setup = key_inputs.path().join("cli_issue");
-        fs::write(&scenario, b"scenario-a").expect("write scenario input");
-        fs::write(&setup, b"setup-a").expect("write setup input");
-        let key = corpus_key_from_sources(b"registry-a", b"fixture-a", &scenario, &setup)
-            .expect("key corpus inputs");
-        assert_ne!(
-            key,
-            corpus_key_from_sources(b"registry-b", b"fixture-a", &scenario, &setup)
-                .expect("key changed registry")
-        );
-        assert_ne!(
-            key,
-            corpus_key_from_sources(b"registry-a", b"fixture-b", &scenario, &setup)
-                .expect("key changed fixture")
-        );
-        fs::write(&scenario, b"scenario-b").expect("change scenario bytes");
-        assert_ne!(
-            key,
-            corpus_key_from_sources(b"registry-a", b"fixture-a", &scenario, &setup)
-                .expect("key changed scenario")
-        );
-        fs::write(&scenario, b"scenario-a").expect("restore scenario bytes");
-        fs::write(&setup, b"setup-b").expect("change setup bytes");
-        assert_ne!(
-            key,
-            corpus_key_from_sources(b"registry-a", b"fixture-a", &scenario, &setup)
-                .expect("key changed setup")
-        );
+#[test]
+fn test_corpus_key_changes_with_the_registry_the_crate_source_and_the_fixture_contract() {
+    let key = corpus_key("registry", "crate-source", "contract");
+    assert_ne!(key, corpus_key("registry-b", "crate-source", "contract"));
+    assert_ne!(key, corpus_key("registry", "crate-source-b", "contract"));
+    assert_ne!(key, corpus_key("registry", "crate-source", "contract-b"));
+}
 
-        let cache_root = key_inputs.path().join("cache");
-        let receipt = CorpusReceipt {
-            schema_version: CORPUS_SCHEMA,
-            run_id: "run-a".to_owned(),
-            key: "key".to_owned(),
-            entry: cache_root.join("key"),
-        };
-        let receipt_bytes = serde_json::to_vec(&receipt).expect("serialize receipt");
-        let receipt_sha = format!("{:x}", Sha256::digest(&receipt_bytes));
-        assert!(validate_receipt(&receipt_bytes, &receipt_sha, "run-a", &cache_root).is_ok());
-        assert!(validate_receipt(&receipt_bytes, "wrong-sha", "run-a", &cache_root).is_err());
-        assert!(validate_receipt(&receipt_bytes, &receipt_sha, "run-b", &cache_root).is_err());
-        let sibling_receipt = CorpusReceipt {
-            entry: cache_root.join("sibling"),
-            ..receipt
-        };
-        let sibling_bytes =
-            serde_json::to_vec(&sibling_receipt).expect("serialize sibling receipt");
-        let sibling_sha = format!("{:x}", Sha256::digest(&sibling_bytes));
-        assert!(validate_receipt(&sibling_bytes, &sibling_sha, "run-a", &cache_root).is_err());
-
-        let occupied = key_inputs.path().join("occupied");
-        fs::write(&occupied, b"do-not-replace").expect("seed irregular occupied entry");
-        assert!(read_corpus_entry(&occupied, "key").is_err());
-        assert_eq!(
-            fs::read(&occupied).expect("read unchanged occupied entry"),
-            b"do-not-replace"
-        );
-
-        let synthetic = failure_lever_registry()
-            .arms
-            .iter()
-            .enumerate()
-            .map(|(index, lever)| match lever {
-                FailureLever::Invocation(invocation) => RecordedFailureObservation::Invoked {
-                    path: invocation.path.clone(),
-                    argv: invocation.argv.clone(),
-                    repository_root: std::env::temp_dir().join(format!("synthetic-{index}")),
-                    stdout: b"{}".to_vec(),
-                    stderr: Vec::new(),
-                    status: ObservedStatus {
-                        code: Some(invocation.expected_exit),
-                        signal: None,
-                    },
-                },
-                FailureLever::Exemption(exemption) => RecordedFailureObservation::Exempt {
-                    path: exemption.path.clone(),
-                    reason: exemption.exemption_reason.clone(),
-                },
-            })
-            .collect::<Vec<_>>();
-        let corrupt_cache = key_inputs.path().join("corrupt-cache");
-        let first_builds = AtomicUsize::new(0);
-        let corrupt_entry = ensure_corpus_entry_at(&corrupt_cache, "fixed-key", || {
-            first_builds.fetch_add(1, Ordering::Relaxed);
-            synthetic.clone()
-        })
-        .expect("publish a valid occupied entry");
-        assert_eq!(first_builds.load(Ordering::Relaxed), 1);
-        let reuse_builds = AtomicUsize::new(0);
-        ensure_corpus_entry_at(&corrupt_cache, "fixed-key", || {
-            reuse_builds.fetch_add(1, Ordering::Relaxed);
-            synthetic.clone()
-        })
-        .expect("reuse a valid occupied entry");
-        assert_eq!(reuse_builds.load(Ordering::Relaxed), 0);
-
-        fs::write(corrupt_entry.join("corpus.json"), b"corrupt")
-            .expect("corrupt the occupied corpus");
-        let corrupt_builds = AtomicUsize::new(0);
-        let result = ensure_corpus_entry_at(&corrupt_cache, "fixed-key", || {
-            corrupt_builds.fetch_add(1, Ordering::Relaxed);
-            synthetic.clone()
-        });
-        assert!(result.is_err());
-        assert_eq!(corrupt_builds.load(Ordering::Relaxed), 0);
-        assert_eq!(
-            fs::read(corrupt_entry.join("corpus.json")).expect("read corrupt occupant"),
-            b"corrupt"
-        );
-        assert!(
-            fs::read_dir(&corrupt_cache)
-                .expect("list corrupt cache")
-                .all(|entry| !entry
-                    .expect("read cache entry")
-                    .file_name()
-                    .to_string_lossy()
-                    .starts_with(".recorded-failure-corpus-")),
-            "corruption refusal must not leave staging residue"
-        );
-
-        let invoked = failure_lever_registry()
-            .arms
-            .iter()
-            .filter(|arm| matches!(arm, FailureLever::Invocation(_)))
-            .count();
-        let old_aggregate_work = invoked * 3;
-        let new_aggregate_work = invoked;
-        assert!(new_aggregate_work * 100 <= old_aggregate_work * 40);
-
-        let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(Path::parent)
-            .expect("workspace is two levels above the jit crate");
-        let helper = workspace.join("scripts/setup-recorded-failure-corpus.sh");
-        let self_test = Command::new(&helper)
-            .arg("--self-test")
-            .current_dir(workspace)
-            .output()
-            .expect("run recorded-failure setup self-test");
-        assert!(
-            self_test.status.success()
-                && String::from_utf8_lossy(&self_test.stdout).contains("self-test: PASS"),
-            "setup self-test failed: stdout={} stderr={}",
-            String::from_utf8_lossy(&self_test.stdout),
-            String::from_utf8_lossy(&self_test.stderr)
-        );
-        let nextest_config = fs::read_to_string(workspace.join(".config/nextest.toml"))
-            .expect("read nextest configuration");
-        let configured: toml::Value = nextest_config.parse().expect("parse nextest configuration");
-        let rules = configured["profile"]["default"]["scripts"]
-            .as_array()
-            .expect("nextest setup rules");
-        let failure_rule = rules
-            .iter()
-            .find(|rule| rule["setup"].as_str() == Some("recorded-failure-corpus"))
-            .expect("recorded failure setup rule");
-        let filter = failure_rule["filter"]
-            .as_str()
-            .expect("failure setup filter");
-        [
-            "failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope",
-            "failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes",
-            "payload_stream_purity_tests::test_machine_readable_failures_emit_one_json_document_on_payload_stream",
-        ]
+fn corpus_conforming_to_the_registry() -> RecordedFailureCorpus {
+    failure_lever_registry()
+        .arms
         .iter()
-        .for_each(|identity| assert!(filter.contains(identity)));
+        .enumerate()
+        .map(|(index, lever)| match lever {
+            FailureLever::Invocation(invocation) => RecordedFailureObservation::Invoked {
+                path: invocation.path.clone(),
+                argv: invocation.argv.clone(),
+                repository_root: std::env::temp_dir().join(format!("probe-{index}")),
+                stdout: b"{}".to_vec(),
+                stderr: Vec::new(),
+                status: ObservedStatus {
+                    code: Some(1),
+                    signal: None,
+                },
+            },
+            FailureLever::Exemption(exemption) => RecordedFailureObservation::Exempt {
+                path: exemption.path.clone(),
+                reason: exemption.exemption_reason.clone(),
+            },
+        })
+        .collect()
+}
 
-        #[cfg(unix)]
-        {
-            let signaled = Command::new("sh")
-                .args(["-c", "kill -TERM $$"])
-                .status()
-                .expect("observe a signaled child");
-            let observed = ObservedStatus::from_exit_status(signaled);
-            assert_eq!(observed.code(), None);
-            assert_eq!(observed.signal, Some(15));
-            assert!(!observed.success());
-        }
-    }
+#[test]
+fn test_validate_recorded_failure_corpus_accepts_a_corpus_conforming_to_the_registry() {
+    validate_recorded_failure_corpus(&corpus_conforming_to_the_registry())
+        .expect("a conforming corpus validates");
+}
+
+#[test]
+fn test_validate_recorded_failure_corpus_refuses_a_missing_row() {
+    let mut corpus = corpus_conforming_to_the_registry();
+    corpus.pop();
+    assert!(validate_recorded_failure_corpus(&corpus).is_err());
+}
+
+#[test]
+fn test_validate_recorded_failure_corpus_refuses_rows_sharing_a_repository_root() {
+    let mut corpus = corpus_conforming_to_the_registry();
+    let mut roots = corpus.iter_mut().filter_map(|row| match row {
+        RecordedFailureObservation::Invoked {
+            repository_root, ..
+        } => Some(repository_root),
+        RecordedFailureObservation::Exempt { .. } => None,
+    });
+    let first = roots.next().expect("first invocation").clone();
+    *roots.next().expect("second invocation") = first;
+    assert!(validate_recorded_failure_corpus(&corpus).is_err());
+}
+
+#[test]
+fn test_failure_probe_fixture_init_baseline_observes_what_a_run_init_observes() {
+    let registry = failure_lever_registry();
+    let invocation = registry
+        .arms
+        .iter()
+        .find_map(|lever| match lever {
+            FailureLever::Invocation(invocation) if invocation.path == "config get" => {
+                Some(invocation)
+            }
+            _ => None,
+        })
+        .expect("config get has a recorded invocation");
+    let baseline = JitCli::initialised().expect("initialise the baseline");
+
+    let run = drive_recorded_failure(invocation);
+    let copied = drive_recorded_failure_from(invocation, Some(baseline.root()));
+
+    assert_eq!(copied.status, run.status);
+    assert_eq!(copied.stdout, run.stdout);
+    assert_eq!(copied.stderr, run.stderr);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_observed_status_reports_a_signaled_child_as_a_failure_without_an_exit_code() {
+    let signaled = std::process::Command::new("sh")
+        .args(["-c", "kill -TERM $$"])
+        .status()
+        .expect("observe a signaled child");
+    let observed = ObservedStatus::from_exit_status(signaled);
+    assert_eq!(observed.code(), None);
+    assert_eq!(observed.signal, Some(15));
+    assert!(!observed.success());
 }
 
 #[test]
@@ -1141,10 +862,8 @@ fn test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class() {
         .arms
         .iter()
         .filter_map(|arm| match arm {
-            FailureLever::Invocation(invocation) if invocation.expected_exit != 0 => {
-                Some(invocation)
-            }
-            FailureLever::Invocation(_) | FailureLever::Exemption(_) => None,
+            FailureLever::Invocation(invocation) => Some(invocation),
+            FailureLever::Exemption(_) => None,
         })
         .flat_map(|invocation| {
             invocation
@@ -1181,7 +900,6 @@ fn test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class() {
         assert_eq!(result.argv, invocation.argv);
         assert_eq!(result.expected_failure, invocation.expected_failure);
         assert_eq!(result.expected_code, invocation.expected_code);
-        assert_eq!(result.expected_exit, invocation.expected_exit);
         assert!(
             !result.status.success(),
             "representative {} for setup class {class:?} succeeded: stdout={} stderr={}",
@@ -1248,10 +966,22 @@ fn test_failure_probe_fixture_names_arms_from_registry() {
 fn test_failure_probe_fixture_keeps_git_absent_from_inheriting_tmp_ancestor() {
     match drive_named_failure("hooks install") {
         RecordedFailure::Invoked(result) => {
-            assert_eq!(result.status.code(), Some(1));
+            assert!(!result.status.success());
             let envelope: serde_json::Value = serde_json::from_slice(&result.stdout)
                 .expect("git-absent hook probe emits a JSON error envelope");
-            assert_eq!(envelope["error"]["code"], "HOOKS_INSTALL_ERROR");
+            assert_eq!(envelope["error"]["code"], "INVALID_ARGUMENT");
+            assert_eq!(result.status.code(), Some(2));
+
+            let human = drive_named_failure_with_args(
+                "hooks install",
+                vec!["hooks".to_owned(), "install".to_owned()],
+            );
+            assert!(!human.status.success());
+            assert_eq!(human.status.code(), result.status.code());
+            assert_eq!(
+                String::from_utf8(human.stderr).unwrap(),
+                "Error: Not in a git repository (no .git directory found)\n"
+            );
         }
         RecordedFailure::Exempt { .. } => panic!("hooks install has a recorded invocation"),
     }

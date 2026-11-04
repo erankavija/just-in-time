@@ -1,17 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T22:18:25.097270194Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
     "6100b960-193f-40e2-9e62-970815412930"
   ],
   "description": "Replace the private image-building helpers in the export, initialization and profile-application test modules with the shared test image builder.\n\n## Background\n\n- `jit::test_harness` offers a builder that closes a `RepositoryImage` over any declared entries, listings and pinned evidence, with a derived or caller-supplied capture spec and layout.\n- Private closers in these test modules:\n  - `crates/jit/src/repository_state/export.rs`: `layout` and `image` (`:311-340`), over directory and symlink entries and the spec `RepositoryExportIntent::capture_spec` produces, and the inline close at `:471`;\n  - `repository_state/initialize.rs`: `image_with_records` (`:1305-1328`), over directory entries;\n  - `repository_state/profile_apply.rs`: `image_owning` (`:3385`), `image_with_profile_owner` (`:3506`) and the inline closes at `:4466,4624`, over directory entries.\n\n## Success Criteria\n\n- [hard] REQ-01: The listed test modules build images through the shared builder, and none of them closes a `RepositoryImage` through a helper or inline call of its own.\n- [hard] REQ-02: Each rewritten test asserts the property it asserted before, and the repository-state suites pass.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "cargo-ci evidence and commit ancestry",
+      "path": "dev/archive/9876a23a-one-validation-report/active/evidence-70ac98fc-ci-ancestry.md"
+    }
+  ],
+  "done_at": "2026-11-03T22:41:25.800104712Z",
+  "first_ready_at": "2026-11-03T22:11:30.801919415Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fca270bd-e48e-486f-83c7-ec5ba54d2919",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:28:14.219826912Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7f99dbe5-a018-4903-ae1a-6d0a08cd8176",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:41:03.990540079Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "70ac98fc-0fa7-4d4b-b3c0-f67dbe1df2a1",
   "labels": [
     "type:task",
@@ -23,7 +47,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Export, initialization and profile test images use the shared builder",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-04T13:29:05.488724168Z"
 }

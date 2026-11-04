@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "eaa610c525f9d4966996c38e8b836fa80131bc58",
+  "completed_at": "2026-10-29T07:09:20.722491978Z",
+  "duration_ms": 210419,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The moved envelope tests satisfy all issue-scoped criteria and resolve the prior code-prose finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "55cd1ae4-9957-4724-af8d-1219dfbe477b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fdf2094f-ee00-4aa5-89ab-6edf02c5c39a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:05:50.303281361Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4db750dce, 43e860862, fd7389ae0 (`jit:55cd1ae4`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code not recorded, 2026-10-29T07:05:47.597190271+00:00)\nTruncation recovery: narrowed tagged patches by commit and affected path; separated unrelated merge-side changes; reread current moved-test ranges and policy sources\n\n1. No findings. All moved cases have one owner in the specified suites, retain their non-exit assertions, omit numeric exit-code assertions, and the prior rustdoc finding is resolved.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The moved envelope tests satisfy all issue-scoped criteria and resolve the prior code-prose finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

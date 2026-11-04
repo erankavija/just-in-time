@@ -11,9 +11,12 @@
 
 use jit::commands::BatchIssueDef;
 use jit::declarations::GateMode;
+use jit::domain::identity::IssueId;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
+use jit::test_utils::toml_string_array;
 
 const CONFIG_TOML: &str = r#"
 [version]
@@ -25,6 +28,12 @@ types = { epic = 2, story = 3, planning = 3, breakdown = 3, task = 4 }
 [type_hierarchy.label_associations]
 epic = "epic"
 story = "story"
+
+[namespaces]
+type = { description = "Issue type", unique = true }
+component = { description = "Component", unique = false }
+brackets = { description = "Bracket container", unique = true }
+satisfies = { description = "Criterion coverage", unique = false }
 "#;
 
 const TEMPLATES_TOML: &str = r#"
@@ -42,70 +51,85 @@ applies_to = ["epic"]
   depends_on = ["planning"]
 "#;
 
-const RULES_TOML: &str = r#"
+fn rules_toml() -> String {
+    format!(
+        r#"
 [[rules]]
 name = "coverage-preview"
 origin = "bracket"
 description = "coverage preview for tests"
-when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
+when = {{ type = "breakdown", state = {states} }}
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }
-"#;
+assert = {{ label-coverage = {{ criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] }} }}
+"#,
+        states = toml_string_array(&[State::InProgress, State::Gated, State::Done]),
+    )
+}
 
 /// Write the config/templates/rules files a batch export reads. Must be called
 /// before any executor operation, since config is cached on first access.
 fn configure(h: &TestHarness) {
-    let root = h.storage.root();
-    std::fs::create_dir_all(root).unwrap();
-    std::fs::write(root.join("config.toml"), CONFIG_TOML).unwrap();
-    std::fs::write(root.join("templates.toml"), TEMPLATES_TOML).unwrap();
-    std::fs::write(root.join("rules.toml"), RULES_TOML).unwrap();
+    let layout = h.storage.repository_layout();
+    let rules = rules_toml();
+    for (virtual_path, contents) in [
+        (jit::repository_state::VirtualPath::CONFIG, CONFIG_TOML),
+        (
+            jit::repository_state::VirtualPath::TEMPLATES,
+            TEMPLATES_TOML,
+        ),
+        (jit::repository_state::VirtualPath::RULES, rules.as_str()),
+    ] {
+        let path = layout.resolve(&virtual_path).unwrap();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
 }
 
 fn new_issue(
     h: &TestHarness,
     title: &str,
     priority: Priority,
-    gates: &[&str],
+    gates: &[jit::domain::identity::GateKey],
     labels: &[&str],
-) -> String {
+) -> IssueId {
     h.executor
         .issues()
         .create_issue(
             title.to_string(),
             String::new(),
             priority,
-            gates.iter().map(|s| s.to_string()).collect(),
+            gates.to_vec(),
             labels.iter().map(|s| s.to_string()).collect(),
             None,
             None,
             false,
         )
         .unwrap()
-        .0
+        .issue
+        .id
 }
 
-fn short(id: &str) -> String {
-    id.chars().take(8).collect()
+fn short(id: &IssueId) -> String {
+    id.short_id().to_string()
 }
 
 struct Scenario {
-    e: String,
+    e: IssueId,
     #[allow(dead_code)]
-    e2: String,
-    p: String,
-    b: String,
-    c1: String,
-    c2: String,
-    ext: String,
+    e2: IssueId,
+    p: IssueId,
+    b: IssueId,
+    c1: IssueId,
+    c2: IssueId,
+    ext: IssueId,
 }
 
 /// Build the bracketed-epic scenario and return the full ids.
 fn build_scenario(h: &TestHarness) -> Scenario {
     configure(h);
     h.add_gate(
-        "code-review",
+        &"code-review".parse().unwrap(),
         "Code review",
         "review",
         GateMode::Manual,
@@ -116,7 +140,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
         h,
         "Auth epic",
         Priority::High,
-        &["code-review"],
+        &["code-review".parse().unwrap()],
         &["type:epic"],
     );
     let e2 = new_issue(h, "Billing epic", Priority::Normal, &[], &["type:epic"]);
@@ -132,7 +156,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
         h,
         "Login",
         Priority::Normal,
-        &["code-review"],
+        &["code-review".parse().unwrap()],
         &[
             "type:task",
             &format!("epic:{}", short(&e)),
@@ -151,13 +175,13 @@ fn build_scenario(h: &TestHarness) -> Scenario {
 
     // E → {c1, c2, B}; children → B; B → P; c1 → ext (boundary); E2 → ext.
     for dep in [&c1, &c2, &b] {
-        h.executor.add_dependency(&e, dep).unwrap();
+        add_reducing_edge(&h.executor, &e, dep).unwrap();
     }
-    h.executor.add_dependency(&c1, &b).unwrap();
-    h.executor.add_dependency(&c2, &b).unwrap();
-    h.executor.add_dependency(&b, &p).unwrap();
-    h.executor.add_dependency(&c1, &ext).unwrap();
-    h.executor.add_dependency(&e2, &ext).unwrap();
+    add_reducing_edge(&h.executor, &c1, &b).unwrap();
+    add_reducing_edge(&h.executor, &c2, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &p).unwrap();
+    add_reducing_edge(&h.executor, &c1, &ext).unwrap();
+    add_reducing_edge(&h.executor, &e2, &ext).unwrap();
 
     Scenario {
         e,
@@ -170,7 +194,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
     }
 }
 
-fn def_for<'a>(defs: &'a [BatchIssueDef], id: &str) -> &'a BatchIssueDef {
+fn def_for<'a>(defs: &'a [BatchIssueDef], id: &IssueId) -> &'a BatchIssueDef {
     defs.iter()
         .find(|d| d.key == short(id))
         .unwrap_or_else(|| panic!("no def for {}", short(id)))
@@ -183,7 +207,7 @@ fn test_batch_export_scope_projects_membership_and_lifts_type() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let keys: Vec<String> = export.defs.iter().map(|d| d.key.clone()).collect();
 
     // Only the non-bracket in-scope nodes: E, c1, c2 (ext is out of scope),
@@ -195,8 +219,13 @@ fn test_batch_export_scope_projects_membership_and_lifts_type() {
     let e_def = def_for(&export.defs, &s.e);
     assert_eq!(e_def.title, "Auth epic");
     assert_eq!(e_def.r#type.as_deref(), Some("epic"));
-    assert_eq!(e_def.priority.as_deref(), Some("high"));
-    assert_eq!(e_def.gates, vec!["code-review".to_string()]);
+    assert_eq!(e_def.priority, Some(Priority::High));
+    assert_eq!(
+        e_def.gates,
+        vec!["code-review"
+            .parse::<jit::domain::identity::GateKey>()
+            .unwrap()]
+    );
     // E depends on c1 and c2 (E → B dropped as a bracket edge). depends_on is
     // sorted by short id, so compare against the sorted expectation.
     let mut expected_deps = vec![short(&s.c1), short(&s.c2)];
@@ -211,7 +240,7 @@ fn test_batch_export_strips_identity_bound_labels_keeps_generic() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let c1_def = def_for(&export.defs, &s.c1);
 
     assert_eq!(c1_def.r#type.as_deref(), Some("task"));
@@ -225,7 +254,7 @@ fn test_batch_export_excludes_bracket_nodes_and_their_edges() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let keys: Vec<String> = export.defs.iter().map(|d| d.key.clone()).collect();
 
     assert!(!keys.contains(&short(&s.b)), "breakdown node exported");
@@ -249,7 +278,7 @@ fn test_batch_export_reports_boundary_edges() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
 
     assert_eq!(export.boundary_edges.len(), 1);
     let edge = &export.boundary_edges[0];
@@ -285,7 +314,7 @@ fn test_batch_export_omits_lifecycle_and_includes_all_states() {
         )
         .unwrap();
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let keys: Vec<String> = export.defs.iter().map(|d| d.key.clone()).collect();
     assert!(keys.contains(&short(&s.c2)), "rejected node dropped");
 
@@ -314,13 +343,19 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
         GraphExportFormat::Dot,
         GraphExportFormat::Mermaid,
     ] {
-        let output = h.executor.export_graph(format, false, Some(&s.e)).unwrap();
+        let output = h
+            .executor
+            .graph()
+            .export_graph(format, false, Some(&s.e))
+            .unwrap()
+            .document_text()
+            .unwrap();
         assert!(
-            output.contains(&s.c1),
+            output.contains(s.c1.as_str()),
             "{format:?}: in-scope node c1 must be exported"
         );
         assert!(
-            !output.contains(&s.ext),
+            !output.contains(s.ext.as_str()),
             "{format:?}: out-of-scope node ext must not appear as node or edge:\n{output}"
         );
     }
@@ -328,7 +363,10 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
     // The full-record JSON shape shares the same edges list.
     let full = h
         .executor
+        .graph()
         .export_graph(GraphExportFormat::Json, true, Some(&s.e))
+        .unwrap()
+        .document_text()
         .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&full).unwrap();
     let edges = parsed["edges"].as_array().unwrap();
@@ -347,7 +385,7 @@ fn test_batch_export_whole_graph_without_scope() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(None).unwrap();
+    let export = h.executor.graph().export_graph_batch(None).unwrap();
     let keys: std::collections::HashSet<String> =
         export.defs.iter().map(|d| d.key.clone()).collect();
 
@@ -371,12 +409,16 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     // priorities, gates, in-scope edges) and passes repository validation.
     let source = TestHarness::new();
     let s = build_scenario(&source);
-    let export = source.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = source
+        .executor
+        .graph()
+        .export_graph_batch(Some(&s.e))
+        .unwrap();
 
     let fresh = TestHarness::new();
     configure(&fresh);
     fresh.add_gate(
-        "code-review",
+        &"code-review".parse().unwrap(),
         "Code review",
         "review",
         GateMode::Manual,
@@ -385,6 +427,7 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
 
     let outcome = fresh
         .executor
+        .issues()
         .batch_create_from_json(export.defs.clone())
         .unwrap();
     let map = outcome.as_map();
@@ -395,13 +438,23 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     assert_eq!(e_new.title, "Auth epic");
     assert_eq!(jit::labels::type_label_value(&e_new.labels), Some("epic"));
     assert_eq!(e_new.priority, Priority::High);
-    assert_eq!(e_new.gates_required, vec!["code-review".to_string()]);
+    assert_eq!(
+        e_new.gates_required,
+        vec!["code-review"
+            .parse::<jit::domain::identity::GateKey>()
+            .unwrap()]
+    );
 
     let c1_new = fresh.storage.load_issue(&map[&short(&s.c1)]).unwrap();
     assert_eq!(c1_new.title, "Login");
     assert_eq!(jit::labels::type_label_value(&c1_new.labels), Some("task"));
     assert!(c1_new.labels.contains(&"component:core".to_string()));
-    assert_eq!(c1_new.gates_required, vec!["code-review".to_string()]);
+    assert_eq!(
+        c1_new.gates_required,
+        vec!["code-review"
+            .parse::<jit::domain::identity::GateKey>()
+            .unwrap()]
+    );
 
     // In-scope edges round-trip: E depends on both children; the boundary edge
     // (c1 → ext) and bracket edges did not travel.
@@ -410,7 +463,12 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     assert_eq!(c1_new.dependencies.len(), 0);
 
     // The recreated repository passes whole-repo validation.
-    let report = fresh.executor.run_rules(None).unwrap();
+    let report = fresh
+        .executor
+        .validation()
+        .validate_repository_report()
+        .unwrap()
+        .rule_report();
     assert!(
         !report.has_errors(),
         "fresh repo failed validation: {:?}",

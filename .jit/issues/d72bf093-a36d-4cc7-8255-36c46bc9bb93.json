@@ -1,18 +1,35 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T08:16:15.734601941Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
     "3625b18b-b774-4226-9029-43b0f0b8e543",
+    "b01208cb-b85f-4705-bd2f-311129e01b56",
     "e3d06f82-6f82-48ea-b102-97f6bed674b4"
   ],
-  "description": "Make `Event` hold `id` and `timestamp` once around a tagged body, while serialized event-log lines keep their bytes.\n\n## Background\n\nEach event variant repeats `id` and `timestamp` (`crates/jit/src/domain/types.rs:1292-1616`). Draft constructors (`types.rs:1689-1980`) build variants with an empty id and an epoch timestamp, and the mutation finalizer stamps both through `assign_identity` (`types.rs:1653`, called at `repository_state/mutation.rs:1217`), with `sentinel_time` at `mutation.rs:495-500`. The canonical writer `serialize_event` (`mutation.rs:571-601`) sorts keys, so field order inside the struct does not reach the log. `parse_known_events` (`domain/event_log.rs:42`) decodes through `serde_json::Value`. Every matcher outside `domain/types.rs` already goes through `Event::body()`, a temporary `EventBody` alias and the identity accessors, and every construction outside it goes through draft constructors or the `test_utils` stamping helper.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` is a struct with `id`, `timestamp` and a flattened `body: EventBody`, and `EventBody` is the internally tagged enum whose variants carry neither id nor timestamp.\n- [hard] REQ-02: Draft constructors return `EventBody`. In production only the mutation finalizer, event decoding and `EventTag::sample` (`domain/event_catalog.rs:280`, used by the generated reference and the events command) build an `Event`; `assign_identity`, the epoch sentinel and the `EventBody` alias no longer exist.\n- [hard] REQ-03: Each line of this repository's event log decodes through the unchanged `parse_known_events` and re-serializes through the canonical writer to identical bytes.\n- [hard] REQ-04: The published event schema still pins each variant's `type`, and the event catalog conformance tests pass.\n\n## Notes\n\nRaw `serde_json::to_string` key order changes from `type,id,...` to `id,timestamp,type,...`; this affects only the event command's stdout, which is not a stored shape.\n",
+  "description": "Make `Event` hold `id` and `timestamp` once around a tagged body, while serialized event-log lines keep their bytes.\n\n## Background\n\nEach event variant repeats `id` and `timestamp` (`crates/jit/src/domain/types.rs:1292-1616`). Draft constructors (`types.rs:1689-1980`) build variants with an empty id and an epoch timestamp, and the mutation finalizer stamps both through `assign_identity` (`types.rs:1653`, called at `repository_state/mutation.rs:1217`), with `sentinel_time` at `mutation.rs:495-500`. The canonical writer `serialize_event` (`mutation.rs:571-601`) sorts keys, so field order inside the struct does not reach the log. `parse_known_events` (`domain/event_log.rs:42`) decodes through `serde_json::Value`. Every matcher outside `domain/types.rs` already goes through `Event::body()`, a temporary `EventBody` alias and the identity accessors, and every construction outside it goes through draft constructors or the `test_utils` stamping helper.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` is a struct with `id`, `timestamp` and a flattened `body: EventBody`, and `EventBody` is the internally tagged enum whose variants carry neither id nor timestamp.\n- [hard] REQ-02: Draft constructors return `EventBody`. In production only the mutation finalizer, event decoding and `EventTag::sample` (`domain/event_catalog.rs:280`, used by the generated reference and the events command) build an `Event`; `assign_identity`, the epoch sentinel and the `EventBody` alias no longer exist.\n- [hard] REQ-03: Each line of this repository's event log whose tag is a current event type decodes through the unchanged `parse_known_events` and re-serializes through the canonical writer to identical bytes, and the lines `parse_known_events` skips are exactly the lines carrying the retired tags `document_archived` and `lifecycle_timestamps_backfilled`.\n- [hard] REQ-04: The published event schema still pins each variant's `type`, and the event catalog conformance tests pass.\n\n## Notes\n\nRaw `serde_json::to_string` key order changes from `type,id,...` to `id,timestamp,type,...`; this affects only the event command's stdout, which is not a stored shape.\n",
   "documents": [],
+  "done_at": "2026-10-25T22:45:29.508030636Z",
+  "first_ready_at": "2026-10-25T06:59:57.046682838Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3aa980f0-00c8-4f01-a357-20b0143af8e5",
+      "status": "passed",
+      "updated_at": "2026-10-25T22:45:18.286546970Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "124d1fc4-a642-481d-bab1-b80e1a974102",
+      "status": "passed",
+      "updated_at": "2026-10-25T22:16:29.069917007Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d72bf093-a36d-4cc7-8255-36c46bc9bb93",
   "labels": [
     "type:task",
@@ -26,7 +43,7 @@
     "enforces:@/invariant/event-log"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Event becomes an envelope around a tagged body",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T22:45:29.508030636Z"
 }

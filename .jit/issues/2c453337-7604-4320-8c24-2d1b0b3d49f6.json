@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:25.390073480Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,13 +8,33 @@
   ],
   "description": "Make the `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` self-test pass as the registered gate `manifest-tool-test` over the script it tests.\n\n## Background\n\n`.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` is a re-runnable self-test of `.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py` over the fixtures in `.agents/skills/jit-planning-lead/evals/fixtures/` and the shared batch structural-conformance fixture. It needs `python3` and runs under `set -e`, so a missing interpreter exits non-zero. Until planning, no gate ran it. The gate `manifest-tool-test` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `manifest-tool-test` runs `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `manifest-tool-test` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:18:31.410202642Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "manifest-tool-test"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a87d47f7-0e38-4574-914f-855942a70a2d",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.965355162Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e8ea2608-830f-4596-8452-f3df28a8ffbe",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:17:12.764404867Z",
+      "updated_by": "auto:executor"
+    },
+    "manifest-tool-test": {
+      "run_id": "46d3f92d-19c2-4383-a0f0-87ce956b8c2c",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:23.657031706Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
   "labels": [
     "type:task",
@@ -29,7 +49,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Breakdown-manifest tool test suite runs as a declared gate",
-  "updated_at": "2026-10-22T14:44:28.731548979Z"
+  "updated_at": "2026-10-24T23:18:31.410202642Z"
 }

@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb9f94b994520574769a4740194171fde3eb7c91",
+  "completed_at": "2026-10-27T01:03:25.094001486Z",
+  "duration_ms": 252703,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/nested_checker_recovery_test.rs",
+        "id": "F1",
+        "line": 25,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "Nested-checker recovery retains a local binary locator instead of relying solely on shared fixture support."
+      }
+    ],
+    "summary": "The migration retains a private binary locator in one scoped test file.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "870e8e46-825b-4bab-a01a-f1cdea845fb5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "26cc6df7-384d-4891-b49c-03c3e2bd77b8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:59:12.390620316Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14361 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17ade-512f-7f53-ac1e-5b14d4af2360\n--------\nuser\n--- 14348 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 65859734b, 37c5200f8, a20aef62b, 5f0e15931, 604d610cc, cb9f94b99\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T00:57:46Z)\nTruncation recovery: per-commit, per-path patch reads and targeted current-source reads\n\n1. **[blocking, issue-impact]** `nested_checker_recovery_test.rs` still defines and calls a private binary locator: `fixture_binary` extracts the program from a fixture command at lines 25–27 and is called at line 66. This violates the attributed hard requirement that no migration-scope test file define or call its own binary locator; the nested-checker path should use a shared-fixture capability rather than retain a local locator.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The migration retains a private binary locator in one scoped test file.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Nested-checker recovery retains a local binary locator instead of relying solely on shared fixture support.\",\"file\":\"crates/jit/tests/cli_gate/nested_checker_recovery_test.rs\",\"line\":25,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

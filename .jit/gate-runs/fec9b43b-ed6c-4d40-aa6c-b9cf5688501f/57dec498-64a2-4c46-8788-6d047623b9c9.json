@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2b6635372b56ba33a4d1d8b909a5fd590d7f10bf",
+  "completed_at": "2026-10-27T00:26:32.351339028Z",
+  "duration_ms": 180779,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared CLI and taxonomy fixtures satisfy the scoped migration criteria; the prior taxonomy-setup finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fec9b43b-ed6c-4d40-aa6c-b9cf5688501f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "57dec498-64a2-4c46-8788-6d047623b9c9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:23:31.571488010Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2b663537, 97116d05, fd77e353, d523871d (`jit:fec9b43b`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/fec9b43b/requirement/REQ-01..REQ-04 and @/issue/c780514e/requirement/REQ-05..REQ-06 (issue Markdown)\nGate evidence: cargo-ci passed (2026-10-27T00:23:26Z; exit code none)\nTruncation recovery: focused scoped fixture/pattern reads after broad search truncation\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared CLI and taxonomy fixtures satisfy the scoped migration criteria; the prior taxonomy-setup finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

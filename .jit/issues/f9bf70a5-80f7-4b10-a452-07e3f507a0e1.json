@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T01:57:37.561842473Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -7,14 +8,28 @@
     "b06cee74-7635-49c0-bc13-448bcfa28324",
     "e98ae5a4-595a-4d49-9c88-2d2422198e9e"
   ],
-  "description": "Factor the payload of an archive-execution event into one domain struct that the archive evidence folds take directly, so evidence can be stored outside the event log without a second shape.\n\n## Background\n\n`EventBody::ArtifactArchiveExecuted` (`crates/jit/src/domain/types.rs:1410-1426`, matched at `:1633,1665`, built at `:1808`) inlines its payload: target, destination root, publications, reference changes, planned deletions and the reconciling flag. Three folds read prior executions from events: `recorded_archived_copies` (`domain/artifact_discovery.rs:165`), `archive_coverage` (`repository_state/archive.rs:560`) and `apply_recorded_residue_identities` (`commands/archive.rs:107`). Kept as one change for a build reason: extracting the payload changes the three folds' parameter type, and they compile only together. The variant is also cited by the event catalog (`domain/event_catalog.rs`, seven sites), by the storage trait's archive reader (`storage/mod.rs:249-256`) and by the file backend's archive reader (`storage/json.rs:1357-1393`).\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::artifact_execution::ArchiveExecution` holds the payload, and the event variant wraps it. The serialized event bytes are unchanged, and the generated event reference is unchanged.\n- [hard] REQ-02: The three folds take `&[ArchiveExecution]`, and their tests build executions without events.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Factor the payload of an archive-execution event into one domain struct that the archive evidence folds take directly, so evidence can be stored outside the event log without a second shape.\n\n## Background\n\n`EventBody::ArtifactArchiveExecuted` (`crates/jit/src/domain/types.rs`) inlines its payload: target, destination root, publications, reference changes, planned deletions and the reconciling flag. `EventBody` is internally tagged. Three folds read prior executions from events: `recorded_archived_copies` (`domain/artifact_discovery.rs`), `archive_coverage` (`repository_state/archive.rs`) and `apply_recorded_residue_identities` (`commands/archive.rs`). Kept as one change for a build reason: extracting the payload changes the three folds' parameter type, and they compile only together. The variant is also cited by the event catalog (`domain/event_catalog.rs`), by the storage trait's archive reader (`storage/mod.rs`) and by the file backend's archive reader (`storage/json.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::artifact_execution::ArchiveExecution` holds the payload, and the event variant wraps it. The serialized event bytes are unchanged, and the generated event reference is unchanged.\n- [hard] REQ-02: The three folds take `&[ArchiveExecution]`, and their tests build executions without events.\n",
   "documents": [],
+  "done_at": "2026-11-03T02:11:14.114247735Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5ff0e6be-ad32-4305-bb74-035690ee6abf",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:10:00.209296757Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6ba7e221-7e20-4f28-ba7b-2d5ce16816ae",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:11:13.690918470Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f9bf70a5-80f7-4b10-a452-07e3f507a0e1",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "satisfies:f8a6b298/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Archive executions are one domain record type",
-  "updated_at": "2026-10-21T10:40:08.927587930Z"
+  "updated_at": "2026-11-03T02:11:14.114247735Z"
 }

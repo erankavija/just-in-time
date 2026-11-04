@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "086f080e6e0958908b05237712a96f2ef45c6322",
+  "completed_at": "2026-10-31T23:19:54.297147290Z",
+  "duration_ms": 155336,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Tagged changes remove duplicated exit-code assertions while preserving verdict, error-class, remediation, and behavior assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc5ef0ef-da15-445b-ad19-439fb9b98060",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ac60f64b-2e5b-49be-9173-791437e8262d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:17:18.961016613Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 58cf47f1d, 695d5d6bc, ea622441c, c25ce771d (relevant merge-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-10-31T23:17:17Z (latest recorded projection; reused)\nTruncation recovery: recovered initial combined patch output with individual commit, affected-path, current-file, and merge-parent reads\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged changes remove duplicated exit-code assertions while preserving verdict, error-class, remediation, and behavior assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:29:52.835503717Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Applying a package writes the package's value over the entry a registry holds under the same identity, so a newer package version or new variable values take effect and the adopter keeps local edits through git.\n\n## Background\n\nCharter decision D-8 says applying \"writes the new rendering\". The registry renderers are insert-only today: each returns early when an entry under the contributed identity exists, whatever that entry says (`merge_scalar`, `merge_map_entry`, `merge_set_string`, `merge_keyed_array`, `merge_projection` at `crates/jit/src/repository_state/profile_apply.rs:3101-3276`, contract described at 2370-2399; line numbers at the investigation baseline).\n\nThe chosen semantics is whole-entry replacement under the identity. A deep merge was rejected: it keeps fields the package no longer declares and adds a merge engine that git already provides. Keeping insert-only was rejected because it contradicts D-8.\n\n## Success Criteria\n\n- [hard] REQ-01: For each contribution kind, applying a package whose value differs from the entry the registry holds under the same identity leaves the package's value in the registry.\n- [hard] REQ-02: Replacement is whole-entry: no field of the prior entry survives unless the package value declares it.\n- [hard] REQ-03: Entries under identities the package does not contribute keep their bytes.\n- [hard] REQ-04: Unit tests over the registry renderers own replacement semantics for each contribution kind.\n",
   "documents": [],
+  "done_at": "2026-11-01T15:06:05.461036895Z",
   "first_ready_at": "2026-10-22T15:01:36.222515789Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f67ec6a0-1a27-4476-8f2e-02df3299ae44",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:02:40.942480440Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b5df578f-3264-4657-b2fb-bf19159dd46b",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:03:57.767208484Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5c0bd3ad-1d1b-4eae-a003-08e08a7a3206",
   "labels": [
     "type:task",
@@ -23,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Write the package value over an existing registry entry",
-  "updated_at": "2026-10-22T15:01:36.222515789Z"
+  "updated_at": "2026-11-01T15:06:05.461036895Z"
 }

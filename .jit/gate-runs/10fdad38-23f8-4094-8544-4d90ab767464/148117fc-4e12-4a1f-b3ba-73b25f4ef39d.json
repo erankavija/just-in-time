@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "baa3a76ba6279ba51abeb26f651459099e4a77d2",
+  "completed_at": "2026-11-04T13:44:17.136497080Z",
+  "duration_ms": 268433,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 34,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/10fdad38/requirement/REQ-03",
+          "@/invariant/canonical-cutover",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "The new add_reducing_edge test helper recreates the removed single-edge wrapper, so migrated tests do not call add_dependencies_with_policy directly as REQ-03 requires."
+      }
+    ],
+    "summary": "A new test-only single-edge wrapper means migrated tests do not call the production dependency entry point directly.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "10fdad38-23f8-4094-8544-4d90ab767464",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "148117fc-4e12-4a1f-b3ba-73b25f4ef39d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:39:48.702678740Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4910 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a6c9-8bf1-7b81-8615-8ee08a6218cc\n--------\nuser\n--- 4897 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d7ce0ceeb (claim); a69d0f5ca (refactor)\nPolicy sources: AGENTS.md\nResolved items: @/issue/10fdad38/requirement/REQ-01–REQ-05 (.jit/issues/10fdad38-23f8-4094-8544-4d90ab767464.json); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, at current HEAD baa3a76ba; code-review none\nTruncation recovery: initial combined policy read was truncated; recovered with focused registry, per-commit, per-path patch, and current-source reads\n\n1. **[blocking][issue-impact] F1:** `add_reducing_edge` recreates the removed single-edge convenience wrapper in test support instead of having migrated tests call `add_dependencies_with_policy` directly. It hardcodes the one-element slice and `Reduce` policy at [crates/jit/src/test_utils.rs:34](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/test_utils.rs:34), and former `add_dependency` callers now invoke it (for example, [readiness_coherence_tests.rs:84](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/fast_issue/readiness_coherence_tests.rs:84)). This leaves REQ-03 unmet and reintroduces the superseded abstraction. References: `@/issue/10fdad38/requirement/REQ-03`, `@/invariant/canonical-cutover`, `@/charter/D-18`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A new test-only single-edge wrapper means migrated tests do not call the production dependency entry point directly.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new add_reducing_edge test helper recreates the removed single-edge wrapper, so migrated tests do not call add_dependencies_with_policy directly as REQ-03 requires.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":34,\"references\":[\"@/issue/10fdad38/requirement/REQ-03\",\"@/invariant/canonical-cutover\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

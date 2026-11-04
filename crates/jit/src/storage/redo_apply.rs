@@ -11,18 +11,69 @@ use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::capability_fs::{
+    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
+    CapabilityFsError, CapabilityRoots, DataRoot,
+};
 use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
-};
-use crate::storage::repository_state_store::{
-    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
-    CapabilityRoots, RepositoryStateStoreError,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, File, OpenOptions};
 use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
+
+/// Write `record` under the scratch directory of `root`, returning once it is
+/// durable: the bytes are synced and every directory entry naming them is
+/// fsynced. This is the mutation's commit point — the first live write follows
+/// it, because a redo-only protocol has no way back once a live file is
+/// replaced.
+///
+/// The record is written in place rather than staged and renamed: an
+/// interrupted write leaves a truncated record, which [`RedoRecord::parse`]
+/// rejects; session open then refuses to proceed with `UnreadableRedoRecord`
+/// rather than skipping it. An occupied record path is refused instead of
+/// replaced: what occupies it is a mutation no session applied, and session
+/// open decides its fate. A scratch directory this call creates carries the
+/// root's own mode, since `mkdir`'s mode is masked by the umask.
+///
+/// # Errors
+///
+/// Returns an error when the record cannot be serialized, the record path is
+/// occupied, or a write or sync fails.
+pub fn commit_redo_record(root: &DataRoot, record: &RedoRecord) -> anyhow::Result<()> {
+    let bytes = record.serialize()?;
+    let dir = root.dir();
+    let scratch = match dir.create_dir(RECORD_SCRATCH_DIR) {
+        Ok(()) => {
+            adopt_mode(dir, RECORD_SCRATCH_DIR)?;
+            let scratch = open_child_dir_nofollow(dir, RECORD_SCRATCH_DIR)?;
+            root.sync()?;
+            scratch
+        }
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            open_child_dir_nofollow(dir, RECORD_SCRATCH_DIR)?
+        }
+        Err(error) => return Err(error.into()),
+    };
+    write_staged_file(&scratch, RECORD_FILE_NAME, &bytes, FileMode::Regular)?;
+    sync_capability_directory(&scratch).map_err(Into::into)
+}
+
+#[cfg(unix)]
+fn adopt_mode(root: &Dir, directory: &str) -> anyhow::Result<()> {
+    use cap_std::fs::{Permissions, PermissionsExt};
+
+    let mode = root.dir_metadata()?.permissions().mode() & 0o7777;
+    root.set_permissions(directory, Permissions::from_mode(mode))
+        .map_err(Into::into)
+}
+
+#[cfg(not(unix))]
+fn adopt_mode(_root: &Dir, _directory: &str) -> anyhow::Result<()> {
+    Ok(())
+}
 
 /// One step of a record's application, named so an interruption matrix can stop
 /// the pass at it.
@@ -79,7 +130,7 @@ pub enum RedoApplyError {
     #[error("redo record makes directory {path}, which something other than a directory occupies")]
     OccupiedDirectory { path: String },
     #[error(transparent)]
-    Roots(#[from] RepositoryStateStoreError),
+    Roots(#[from] CapabilityFsError),
     #[error(transparent)]
     Path(#[from] RepositoryLayoutError),
     #[error(transparent)]
@@ -617,6 +668,7 @@ mod tests {
     use crate::repository_state::FileMode;
     use crate::storage::temp_cleanup::cleanup_orphaned_temp_files;
     use std::collections::HashSet;
+    use std::path::PathBuf;
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -626,6 +678,132 @@ mod tests {
             bytes: bytes.to_vec(),
             mode: FileMode::Regular,
         }
+    }
+
+    fn sample_record() -> RedoRecord {
+        RedoRecord::new(
+            vec![VirtualPath::data("templates").unwrap()],
+            vec![put(VirtualPath::data("records/a.json").unwrap(), b"a")],
+            vec![VirtualPath::worktree("dev/note.md").unwrap()],
+            None,
+        )
+        .unwrap()
+    }
+
+    fn held(path: &Path) -> DataRoot {
+        DataRoot::open(path).unwrap()
+    }
+
+    fn committed_path(data_root: &Path) -> PathBuf {
+        data_root.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME)
+    }
+
+    #[test]
+    fn test_commit_redo_record_writes_a_record_a_later_session_parses() {
+        let data_root = tempfile::tempdir().unwrap();
+        let record = sample_record();
+
+        commit_redo_record(&held(data_root.path()), &record).unwrap();
+
+        assert_eq!(
+            RedoRecord::parse(&std::fs::read(committed_path(data_root.path())).unwrap()).unwrap(),
+            record
+        );
+    }
+
+    #[test]
+    fn test_commit_redo_record_lands_in_the_held_root_when_its_path_is_rebound() {
+        let parent = tempfile::tempdir().unwrap();
+        let path = parent.path().join("data");
+        std::fs::create_dir(&path).unwrap();
+        let root = held(&path);
+        let moved = parent.path().join("moved");
+        std::fs::rename(&path, &moved).unwrap();
+        std::fs::create_dir(&path).unwrap();
+
+        commit_redo_record(&root, &sample_record()).unwrap();
+
+        assert!(
+            committed_path(&moved).exists(),
+            "the record missed the root the handle holds"
+        );
+        assert!(
+            !committed_path(&path).exists(),
+            "the record landed in the directory that replaced the held root"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_commit_redo_record_creates_an_absent_scratch_directory_with_the_data_root_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mode =
+            |directory: &Path| std::fs::metadata(directory).unwrap().permissions().mode() & 0o7777;
+        let parent = tempfile::tempdir().unwrap();
+        // A directory the ambient umask alone shaped, so the mode the data root
+        // is given differs from it whatever that umask is: a scratch directory
+        // left to the umask carries this control's mode, not the data root's.
+        let control = parent.path().join("control");
+        std::fs::create_dir(&control).unwrap();
+        let data_mode = if mode(&control) == 0o700 {
+            0o750
+        } else {
+            0o700
+        };
+        let data_root = parent.path().join("data");
+        std::fs::create_dir(&data_root).unwrap();
+        std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(data_mode)).unwrap();
+
+        commit_redo_record(&held(&data_root), &sample_record()).unwrap();
+
+        assert_eq!(
+            mode(&data_root.join(RECORD_SCRATCH_DIR)),
+            mode(&data_root),
+            "the scratch directory does not carry the data root's mode"
+        );
+    }
+
+    /// The record write follows the root's fsync: a root whose fsync fails
+    /// receives no record.
+    #[test]
+    fn test_commit_redo_record_writes_nothing_when_the_root_fsync_fails() {
+        let data_root = tempfile::tempdir().unwrap();
+        let root = held(data_root.path()).refusing_sync();
+
+        let outcome = commit_redo_record(&root, &sample_record());
+
+        assert!(outcome.is_err(), "the unsyncable data root went unreported");
+        assert!(
+            !committed_path(data_root.path()).exists(),
+            "the record was written under a scratch directory the data root never made durable"
+        );
+    }
+
+    #[test]
+    fn test_commit_redo_record_writes_into_a_scratch_directory_that_already_exists() {
+        let data_root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(data_root.path().join(RECORD_SCRATCH_DIR)).unwrap();
+
+        commit_redo_record(&held(data_root.path()), &sample_record()).unwrap();
+
+        assert!(committed_path(data_root.path()).exists());
+    }
+
+    #[test]
+    fn test_commit_redo_record_leaves_a_record_a_previous_mutation_left_behind() {
+        let data_root = tempfile::tempdir().unwrap();
+        let root = held(data_root.path());
+        commit_redo_record(&root, &sample_record()).unwrap();
+        let leftover = std::fs::read(committed_path(data_root.path())).unwrap();
+
+        assert!(commit_redo_record(&root, &RedoRecord::default()).is_err());
+
+        assert_eq!(
+            std::fs::read(committed_path(data_root.path())).unwrap(),
+            leftover,
+            "the commit overwrote a record no session had applied"
+        );
     }
 
     /// An applier whose held injector lets every point proceed.
@@ -688,7 +866,8 @@ mod tests {
             None,
         )
         .unwrap();
-        let committed = record.commit(&data_root(&worktree)).unwrap();
+        commit_redo_record(&held(&data_root(&worktree)), &record).unwrap();
+        let committed = committed_path(&data_root(&worktree));
 
         uninterrupted().apply(&roots, &record).unwrap();
 
@@ -734,7 +913,8 @@ mod tests {
             None,
         )
         .unwrap();
-        let committed = record.commit(&data_root(&worktree)).unwrap();
+        commit_redo_record(&held(&data_root(&worktree)), &record).unwrap();
+        let committed = committed_path(&data_root(&worktree));
         let published = data_root(&worktree).join("issues/2026/09/a.json");
 
         let outcome =

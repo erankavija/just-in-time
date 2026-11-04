@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "ab2dced072f06ae9064b7410672be66493d9f8d1",
+  "completed_at": "2026-11-04T02:32:33.336327646Z",
+  "duration_ms": 115420,
+  "evaluation_stability": "stable",
+  "exit_code": 75,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "5269df4774c85df4725c4b5f656b696194b85dfcb309af973fde1da7644b3f32",
+  "issue_id": "b23faa59-8451-4fc4-97b8-a139d1b210e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce5a9302-ffe7-4262-beb0-58dae9ba839f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:30:37.916163918Z",
+  "status": "error",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 31286 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 31286 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 45487 ms, warmed 18 executables (2102067552 bytes) in 123 ms.\n  ✓ fmt: ok (2066 ms)\n  ✓ clippy: ok (35971 ms)\n  ✓ suite-build: built in 45487 ms, warmed 18 executables (2102067552 bytes) in 123 ms (45613 ms)\n  ✓ test: 4861 passed, 0 failed, 0 skipped (16984 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (14275 ms)\n  ✓ suite-clock: 31286 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (96 ms)\n\ncargo-ci: infrastructure fault (exit 75): failing steps (budget) are environment-sensitive; baseline load1=7.66 >= threshold 4.08 (0.17 x 24 CPUs); rerun when the host is quiet\n"
+}

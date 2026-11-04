@@ -8,86 +8,10 @@
 //!
 //! Every view supports `--json`, and argument errors are machine-readable.
 
+use crate::{create_issue_requiring, define_auto_gate, run_gate_forced};
 use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use predicates::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit()
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-    temp
-}
-
-/// Define an auto gate with the given checker command.
-fn define_auto_gate(temp: &TempDir, key: &str, checker_command: &str) {
-    jit()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            key,
-            "--title",
-            key,
-            "--description",
-            "Test gate for REQ-08",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "10",
-        ])
-        .assert()
-        .success();
-}
-
-/// Create an issue requiring the given gate keys, returning the short id.
-fn create_issue(temp: &TempDir, gate_keys: &[&str]) -> String {
-    let mut args: Vec<String> = vec![
-        "issue".into(),
-        "create".into(),
-        "--title".into(),
-        "Test issue".into(),
-    ];
-    for k in gate_keys {
-        args.push("--gate".into());
-        args.push((*k).into());
-    }
-    let out = jit()
-        .current_dir(temp.path())
-        .args(&args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&out);
-    s.lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-/// Run `gate evaluate --force` for a gate (records a fresh run regardless of verdict).
-fn run_gate(temp: &TempDir, issue_id: &str, gate_key: &str) {
-    // Verdict may be pass or fail; we only need the run recorded.
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", issue_id, gate_key, "--force"])
-        .assert();
-}
 
 // ---------------------------------------------------------------------------
 // Latest-by-default: unchanged behaviour (regression guard)
@@ -95,47 +19,72 @@ fn run_gate(temp: &TempDir, issue_id: &str, gate_key: &str) {
 
 #[test]
 fn test_status_latest_by_default_unchanged() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo hello; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests"])
+    temp.command(["gate", "status", &id, "tests"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
+        .stdout(predicate::str::contains("passed"));
+}
+
+#[test]
+fn test_gate_status_reused_verdict_names_source_issue_and_run() {
+    let temp = JitCli::initialised().unwrap();
+    define_auto_gate(&temp, "tests", "exit 0");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
+    let summary = temp.run_json(["gate", "status", &id, "tests"]).unwrap();
+    let run_id = serde_json::from_value(summary["run_id"].clone()).unwrap();
+    let path = temp.root().join(".jit").join(
+        jit::repository_state::VirtualPath::gate_run_record(&id.parse().unwrap(), &run_id)
+            .relative()
+            .as_path(),
+    );
+    let mut run: jit::domain::GateRunResult =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let source_issue = jit::test_utils::issue_id(160);
+    let source_run = jit::test_utils::gate_run_id(1);
+    run.origin = jit::domain::GateVerdictOrigin::Reused {
+        source_issue: source_issue.clone(),
+        source_run: source_run.clone(),
+    };
+    std::fs::write(path, serde_json::to_vec(&run).unwrap()).unwrap();
+
+    temp.command(["gate", "status", &id, "tests"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains(source_issue.to_string())
+                .and(predicate::str::contains(source_run.to_string())),
+        );
 }
 
 #[test]
 fn test_status_latest_run_shows_manual_attestation_with_attestor_and_time() {
-    let temp = setup_repo();
-    jit()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "review",
-            "--title",
-            "review",
-            "--description",
-            "Review",
-            "--mode",
-            "manual",
-        ])
-        .assert()
-        .success();
-    let id = create_issue(&temp, &["review"]);
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "review", "--by", "human:me"])
+    let temp = JitCli::initialised().unwrap();
+    temp.command([
+        "gate",
+        "define",
+        "review",
+        "--title",
+        "review",
+        "--description",
+        "Review",
+        "--mode",
+        "manual",
+    ])
+    .assert()
+    .success();
+    let id = create_issue_requiring(&temp, &["review"]);
+    temp.command(["gate", "evaluate", &id, "review", "--by", "human:me"])
         .assert()
         .success();
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "review", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "review", "--json"])
         .assert()
         .success()
         .get_output()
@@ -146,9 +95,7 @@ fn test_status_latest_run_shows_manual_attestation_with_attestor_and_time() {
         .as_str()
         .expect("the attestation is the gate's latest run");
 
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "review"])
+    temp.command(["gate", "status", &id, "review"])
         .assert()
         .success()
         .stdout(predicate::str::contains("human:me").and(predicate::str::contains(attested_at)));
@@ -160,16 +107,15 @@ fn test_status_latest_run_shows_manual_attestation_with_attestor_and_time() {
 
 #[test]
 fn test_status_history_lists_prior_runs() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo run; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
-    run_gate(&temp, &id, "tests");
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
+    run_gate_forced(&temp, &id, "tests");
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "--all", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "--all", "--json"])
         .assert()
         .success()
         .get_output()
@@ -192,16 +138,15 @@ fn test_status_history_lists_prior_runs() {
 
 #[test]
 fn test_status_limit_caps_history() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo run; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
-    run_gate(&temp, &id, "tests");
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
+    run_gate_forced(&temp, &id, "tests");
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "--limit", "2", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "--limit", "2", "--json"])
         .assert()
         .success()
         .get_output()
@@ -218,16 +163,15 @@ fn test_status_limit_caps_history() {
 
 #[test]
 fn test_status_history_gate_filter() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo t; exit 0");
     define_auto_gate(&temp, "clippy", "echo c; exit 0");
-    let id = create_issue(&temp, &["tests", "clippy"]);
-    run_gate(&temp, &id, "tests");
-    run_gate(&temp, &id, "clippy");
+    let id = create_issue_requiring(&temp, &["tests", "clippy"]);
+    run_gate_forced(&temp, &id, "tests");
+    run_gate_forced(&temp, &id, "clippy");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "--all", "--gate", "tests", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "--all", "--gate", "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -241,16 +185,15 @@ fn test_status_history_gate_filter() {
 
 #[test]
 fn test_status_history_status_filter() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "passing", "echo ok; exit 0");
     define_auto_gate(&temp, "failing", "echo boom; exit 1");
-    let id = create_issue(&temp, &["passing", "failing"]);
-    run_gate(&temp, &id, "passing");
-    run_gate(&temp, &id, "failing");
+    let id = create_issue_requiring(&temp, &["passing", "failing"]);
+    run_gate_forced(&temp, &id, "passing");
+    run_gate_forced(&temp, &id, "failing");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args([
+    let out = temp
+        .command([
             "gate", "status", &id, "--all", "--status", "failed", "--json",
         ])
         .assert()
@@ -266,15 +209,14 @@ fn test_status_history_status_filter() {
 
 #[test]
 fn test_status_history_invalid_status_json_error() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo ok; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
     for status in ["bogus", "skipped"] {
-        let out = jit()
-            .current_dir(temp.path())
-            .args(["gate", "status", &id, "--all", "--status", status, "--json"])
+        let out = temp
+            .command(["gate", "status", &id, "--all", "--status", status, "--json"])
             .assert()
             .failure()
             .get_output()
@@ -292,14 +234,13 @@ fn test_status_history_invalid_status_json_error() {
 
 #[test]
 fn test_status_stdout_flat_verbatim() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo FLAT_MARKER_LINE; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--stdout"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--stdout"])
         .assert()
         .success()
         .get_output()
@@ -319,15 +260,14 @@ fn test_status_stdout_flat_is_byte_exact_no_injected_newline() {
     // The flat view must emit the stored report text byte-for-byte. A checker
     // whose stdout has NO trailing newline must come back with NO trailing
     // newline — `print!`, not `println!` (which would append one).
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     // `printf` (no `\n`) stores stdout with no trailing newline.
     define_auto_gate(&temp, "tests", "printf NO_TRAILING_NL; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--stdout"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--stdout"])
         .assert()
         .success()
         .get_output()
@@ -343,14 +283,13 @@ fn test_status_stdout_flat_is_byte_exact_no_injected_newline() {
 
 #[test]
 fn test_status_stderr_flat_verbatim() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo ERRLINE 1>&2; exit 1");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--stderr"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--stderr"])
         .assert()
         .success()
         .get_output()
@@ -362,14 +301,13 @@ fn test_status_stderr_flat_verbatim() {
 
 #[test]
 fn test_status_tail_limits_lines() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "printf 'a\\nb\\nc\\nd\\ne\\n'; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--stdout", "--tail", "2"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--stdout", "--tail", "2"])
         .assert()
         .success()
         .get_output()
@@ -385,14 +323,13 @@ fn test_status_tail_limits_lines() {
 
 #[test]
 fn test_status_stdout_flat_json() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo JSONFLAT; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--stdout", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--stdout", "--json"])
         .assert()
         .success()
         .get_output()
@@ -412,14 +349,13 @@ fn test_status_stdout_flat_json() {
 
 #[test]
 fn test_status_history_and_flat_conflict_json_error() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo ok; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args([
+    let out = temp
+        .command([
             "gate", "status", &id, "tests", "--all", "--stdout", "--json",
         ])
         .assert()
@@ -433,14 +369,13 @@ fn test_status_history_and_flat_conflict_json_error() {
 
 #[test]
 fn test_status_flag_requires_history_json_error() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo ok; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args([
+    let out = temp
+        .command([
             "gate", "status", &id, "tests", "--status", "passed", "--json",
         ])
         .assert()

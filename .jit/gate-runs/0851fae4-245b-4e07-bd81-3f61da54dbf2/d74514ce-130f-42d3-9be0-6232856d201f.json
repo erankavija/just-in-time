@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "46a52f2c56a10085a5bbf844ddeff4169292653f",
+  "completed_at": "2026-11-04T02:42:32.592024269Z",
+  "duration_ms": 242532,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All reviewed hard criteria are met and the prior shared-test coverage gap is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0851fae4-245b-4e07-bd81-3f61da54dbf2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d74514ce-130f-42d3-9be0-6232856d201f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:38:30.059705218Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e0e278181, d896e1434\nPolicy sources: AGENTS.md\nResolved items: @/issue/0851fae4/requirement/REQ-01, REQ-02, REQ-03; @/issue/f8a6b298/requirement/REQ-01; @/charter/D-19; @/invariant/convention-convergence; @/invariant/shared-test-contracts; @/invariant/orthogonal-tests\nGate evidence: cargo-ci passed (exit code 0, 2026-11-04T02:36:27Z); prior code-review F1 is addressed by d896e1434\nTruncation recovery: recovered JSON and memory patches through bounded per-file reads after a combined diff truncated\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All reviewed hard criteria are met and the prior shared-test coverage gap is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:05:38.679996269Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the template, validate and worktree command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `template.rs`, `template_expand.rs`, `worktree.rs`, `validate.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:32:57.959513961Z",
   "first_ready_at": "2026-10-22T15:28:23.945234467Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "14281b82-5d32-484b-a689-e22a90894737",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:02.611114533Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1995debc-f13f-411d-b439-9c699e264ae8",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:30:01.718419151Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9964af3f-46ff-455a-b9b6-ce55d778aff4",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Template, validate and worktree command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:23.945234467Z"
+  "updated_at": "2026-10-27T00:32:57.959513961Z"
 }

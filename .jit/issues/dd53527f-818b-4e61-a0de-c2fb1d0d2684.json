@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T04:26:38.908680902Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "915be53e-b0e0-4085-86d1-7f96fb3b0a2c",
-    "a085ca6a-9017-4f08-a937-b0074b0efe86"
+    "becea20a-ff56-4499-8b13-d88ad816448f",
+    "c3e3e2ff-f7bd-44cd-bb89-e9b05c3310bc"
   ],
-  "description": "Move acquire, renew, heartbeat, force-evict and lease listing onto the held lease lock, so no operation repeats the lock and publish steps by hand.\n\n## Background\n\nEach lease operation in `crates/jit/src/storage/claim_coordinator.rs` hand-rolls its lock, load, evict, append and write steps (`acquire_claim_synchronized` `:659`, `heartbeat` `:824`, `renew_lease` `:1016`, `force_evict_lease` `:1142`, `get_active_leases` `:1188`). Two paths evict an expired lease in memory and then fail without writing the index, so the eviction is dropped and logged again by the next reader: `renew_lease` evicts at `:1024-1025` and then returns `LeaseNotFound` (`:1028-1034`) or the not-owner error (`:1037-1046`); the acquire path does the same in `acquire_claim_with_reason`, which evicts at `:556-558` and bails at `:568`, `:584` and `:599` before its index write at `:636`; that method is test-only and is deleted before this change, but the production acquire must not reintroduce its drop when it moves onto `apply`. `acquire_claim_synchronized` writes the index right after evicting (`:712-713`), so its later failures at `:738`, `:751` and `:763` keep the eviction; a failure of its repository synchronization (`:799`) happens after the lease write. `evict_expired_at` appends the eviction record to `claims.jsonl` before removing the lease from the in-memory index (`:911-921`), so what a failing renew drops is only the index write, which the lock-free `read_leases` returns. The indefinite-lease limits count every lease (`:744-771`). `ClaimCoordinator::lock()` returns a `LeaseLock` with `load`, `list` and `apply`.\n\n## Success Criteria\n\n- [hard] REQ-01: Acquire, renew, heartbeat, force-evict and lease listing each take one `LeaseLock` and change leases only through `apply`. Acquire checks the indefinite-lease limits through `list()` and runs its repository synchronization while holding the lock.\n- [hard] REQ-02: Renew, heartbeat and force-evict, still addressed by lease id, find the lease through `list()`; this is `lease-id-scan-bridge`, an interim lookup whose removal is issue addressing.\n- [hard] REQ-03: When a renew or an acquire evicts an expired lease and then fails, the eviction stays persisted in the store `apply` publishes. Regression tests cover a renew that fails as not found or not owned, and an acquire that fails after evicting. After each failure, a lock-free `read_leases` no longer returns the evicted lease, and after a later listing through the lease lock the claims log still holds exactly one eviction record for it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Add a lease lock handle that holds the claims lock and offers load, list and apply, move acquire, renew, heartbeat, force-evict and release onto it, and make `claim list` and `claim status` read unexpired leases without the lock, marking stale ones, so every change shares one sequence and no reader waits on a writer.\n\n## Background\n\n`ClaimCoordinator` repeats the lock, load, evict, append and write steps by hand in each operation (`crates/jit/src/storage/claim_coordinator.rs`: `acquire_claim_synchronized`, `heartbeat`, `renew_lease`, `force_evict_lease`, `get_active_leases`). Today's store is the index `claims.index.json` plus the log `claims.jsonl`, written through `write_index_atomic` and `append_claim_op`. `CoordinationOrderGuard::enter` refuses while a repository order guard is held (`storage/guard_order.rs`), and the claims lock is `locks/claims.lock`.\n\n`renew_lease` evicts an expired lease in memory and then fails as not found or not owned without writing the index, so the eviction is dropped and logged again by the next reader. `acquire_claim_synchronized` writes the index right after evicting. `evict_expired_at` appends the eviction record before removing the lease from the in-memory index. The indefinite-lease limits count every lease.\n\nThe claims family's release-by-issue operation takes the claims lock twice and lists every lease: once through `get_active_leases` and once per lease through `force_evict_lease`.\n\n`claim list` and `claim status` are classified read-only (`cli.rs`) yet take the exclusive claims lock through `get_active_leases`, which also persists evictions (`test_get_active_leases_persists_eviction_of_expired_lease_once`). Claims-first mutations hold that lock across their repository session, so a listing waits on them, against @/charter/D-22. Their `stale` field is whatever the index stored, and `main.rs` renders a STALE block with a heartbeat remedy from it.\n\n`read_leases`, `Lease::is_expired`, `Lease::is_stale` and `Lease::is_active` exist in `storage/claim_coordinator.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ClaimCoordinator::lock()` returns a `LeaseLock` that enters `CoordinationOrderGuard` and holds `claims.lock` until dropped.\n- [hard] REQ-02: `LeaseLock` offers `load(&IssueId)`, `list()` and `apply(&IssueId, op)`, where `op(current, now)` is pure and returns keep, put or remove. Over the current store, `load` and `list` read the stored lease index under the held lock. `apply` evicts an expired lease, publishes the change through the current store, and appends the operation's history lines in one write. Every change, an eviction included, is persisted before `apply` returns.\n- [hard] REQ-03: Acquire, renew, heartbeat, force-evict and release-by-issue each take one `LeaseLock` and change leases only through `apply`. Acquire checks the indefinite-lease limits through `list()` and runs its repository synchronization while holding the lock. Release reads its lease through `load`.\n- [hard] REQ-04: Renew, heartbeat and force-evict, still addressed by lease id, find the lease through `list()`; this is `lease-id-scan-bridge`, an interim lookup.\n- [hard] REQ-05: When a renew or an acquire evicts an expired lease and then fails, the eviction stays persisted. Regression tests cover a renew that fails as not found or not owned, and an acquire that fails after evicting; after each failure `read_leases` no longer returns the evicted lease, and the claims log holds exactly one eviction record for it.\n- [hard] REQ-06: `claim list` and `claim status` read through `read_leases` without the claims lock, keep each lease that is not `Lease::is_expired`, report `stale` as `Lease::is_stale(now)`, and write nothing: a listing over an expired lease does not report it, a listing over a stale unexpired lease reports it marked stale, and both leave the lease store and the claims log unchanged. `--issue` with a prefix opens only the records whose ids match. `get_active_leases` and its two tests no longer exist, and the STALE block in `main.rs` renders the computed flag. Evictions come only from `apply` and from `jit recover`.\n- [hard] REQ-07: Unit tests cover load, list, apply's keep, put, remove and eviction cases, and that `lock()` inside a repository order guard fails.\n\n## Decisions\n\n- D-1: The user decided that the claims-log scan in `LeaseLock::apply` (through `next_claim_seq`) that allocates each claims-log sequence number is accepted for this issue; 2f563673 is planned to replace it with the `claims.seq` counter.\n\n## Notes\n\n- Sequence numbers still come from the claims log until lease-per-issue-records introduces `claims.seq`.\n- Acquire keeps returning the caller's own stale lease without renewing it.\n- A stale lease is inactive, so it blocks no writer; listings show it marked stale. `claim heartbeat` still refreshes it, and `jit recover` reclaims it.\n",
   "documents": [],
+  "done_at": "2026-11-03T23:10:30.908841358Z",
+  "first_ready_at": "2026-11-02T23:39:53.058937881Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3be7936c-4ee6-477e-b59e-45f276524475",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:05:34.005094699Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "97811661-1fb7-42a5-8c1e-ac7fb9b114de",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:10:30.475278253Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dd53527f-818b-4e61-a0de-c2fb1d0d2684",
   "labels": [
     "type:task",
@@ -23,10 +39,11 @@
     "component:cli",
     "per:@/charter/D-19",
     "enforces:@/invariant/convention-convergence",
-    "satisfies:f8a6b298/REQ-06"
+    "satisfies:f8a6b298/REQ-06",
+    "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Lease operations run through the lease lock",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-03T23:10:30.908841358Z"
 }

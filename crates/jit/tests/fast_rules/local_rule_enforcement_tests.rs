@@ -7,28 +7,18 @@
 //! - an `enforce` rule blocks a non-forced write;
 //! - `--force` bypasses it AND logs the new `LocalRuleBypassed` event;
 //! - a `warn` rule never blocks;
-//! - a graph-scope rule is NOT evaluated on the write path;
+//! - a graph-scope rule never blocks a write; creation returns its findings;
 //! - the batch path (`apply_bulk_update`) is also enforced.
 
 use jit::commands::bulk_update::UpdateOperations;
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::commands::test_helpers::{
+    memory_executor_declaring, memory_executor_wrapping, MemoryDeclarations,
+};
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, Issue, Priority, State};
+use jit::domain::{Event, EventBody, Issue, Priority, State};
 use jit::query_engine::QueryFilter;
 use jit::storage::{InMemoryStorage, IssueStore};
-
-/// Build an executor whose `.jit/rules.toml` contains `rules_toml`.
-fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    // Disable lease enforcement so updates do not require a claim.
-    let config = "[worktree]\nenforce_leases = \"off\"\n";
-    std::fs::write(storage.root().join("config.toml"), config).unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage.add_data_file("config.toml", config);
-    storage.add_data_file("rules.toml", rules_toml);
-    let layout = storage.repository_layout();
-    CommandExecutor::new(storage).with_layout(layout)
-}
 
 /// An enforce rule: epics must carry a `req:*` label.
 const EPIC_NEEDS_REQ_ENFORCE: &str = r#"
@@ -46,13 +36,21 @@ fn bypass_events(executor: &CommandExecutor<InMemoryStorage>) -> Vec<Event> {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::LocalRuleBypassed { .. }))
         .collect()
 }
 
 #[test]
 fn test_create_enforce_rule_blocks_without_force() {
-    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     // An epic without a req: label violates the enforce rule -> blocked.
     let result = executor.issues().create_issue(
@@ -79,7 +77,15 @@ fn test_create_enforce_rule_blocks_without_force() {
 
 #[test]
 fn test_create_satisfying_issue_passes() {
-    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let result = executor.issues().create_issue(
         "An epic".to_string(),
@@ -98,9 +104,17 @@ fn test_create_satisfying_issue_passes() {
 
 #[test]
 fn test_create_force_bypasses_and_logs_event() {
-    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
-    let (id, _warnings) = executor
+    let id = executor
         .issues()
         .create_issue(
             "An epic".to_string(),
@@ -112,7 +126,9 @@ fn test_create_force_bypasses_and_logs_event() {
             None,
             true, // --force
         )
-        .expect("force must allow the create");
+        .expect("force must allow the create")
+        .issue
+        .id;
 
     // The issue exists despite the violation.
     assert_eq!(executor.storage().list_issues().unwrap().len(), 1);
@@ -120,8 +136,8 @@ fn test_create_force_bypasses_and_logs_event() {
     // Exactly one bypass event was logged, naming the rule and issue.
     let events = bypass_events(&executor);
     assert_eq!(events.len(), 1, "one bypass event per bypassed rule");
-    match &events[0] {
-        Event::LocalRuleBypassed { issue_id, rule, .. } => {
+    match events[0].body() {
+        EventBody::LocalRuleBypassed { issue_id, rule, .. } => {
             assert_eq!(issue_id, &id);
             assert_eq!(rule, "epic-needs-req");
         }
@@ -131,17 +147,25 @@ fn test_create_force_bypasses_and_logs_event() {
 
 #[test]
 fn test_warn_rule_does_not_block_create() {
-    let executor = executor_with_rules(
-        r#"
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "epic-warns-req"
 when = { type = "epic" }
 severity = "warn"
 assert = { require-label = { label = "req:*", min = 1 } }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
 
-    let (_, warnings) = executor
+    let jit::commands::IssueCreation { findings, .. } = executor
         .issues()
         .create_issue(
             "An epic".to_string(),
@@ -155,8 +179,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
         )
         .expect("a warn rule must not block");
     assert!(
-        warnings.iter().any(|w| w.contains("epic-warns-req")),
-        "the warning should be surfaced: {warnings:?}"
+        findings.iter().any(|f| f.rule == "epic-warns-req"),
+        "the finding should be surfaced: {findings:?}"
     );
     assert!(bypass_events(&executor).is_empty());
 }
@@ -167,8 +191,17 @@ fn test_raw_schema_requiring_sections_triggers_body_parse() {
     // references the body through a STRING VALUE, not an object key. Body-need
     // detection must still trigger the lazy description parse, otherwise the
     // schema validates against a body-less projection and falsely rejects.
-    let executor = executor_with_rules(
-        r#"
+    let storage = InMemoryStorage::new();
+    storage.add_data_file(
+        "schemas/needs-sections.json",
+        r#"{ "type": "object", "required": ["sections"] }"#,
+    );
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "must-have-body"
 when = { type = "epic" }
@@ -176,12 +209,11 @@ severity = "error"
 enforce = true
 assert = { json-schema = "schemas/needs-sections.json" }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
-    executor.storage().add_data_file(
-        "schemas/needs-sections.json",
-        r#"{ "type": "object", "required": ["sections"] }"#,
-    );
-
     // An epic with a body section: the description parses into a `sections`
     // projection, so `required: ["sections"]` is satisfied. Without the body
     // parse being triggered, `sections` is absent and this would wrongly fail.
@@ -204,8 +236,12 @@ assert = { json-schema = "schemas/needs-sections.json" }
 #[test]
 fn test_graph_rule_not_evaluated_on_create() {
     // A graph-scope enforce rule that would "fail" must be skipped on write.
-    let executor = executor_with_rules(
-        r#"
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
@@ -213,6 +249,10 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { child-state = "done" } }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
     let result = executor.issues().create_issue(
         "An epic".to_string(),
@@ -227,9 +267,80 @@ assert = { label-coverage = { child-state = "done" } }
     assert!(result.is_ok(), "graph rules must not block writes");
 }
 
+/// Rule findings `create_issue` returns for a new issue carrying `labels`,
+/// over the shared test taxonomy with an `orphan-leaf` graph rule declared.
+fn creation_findings(labels: Vec<String>) -> Vec<jit::validation::ReportedFinding> {
+    let config = format!(
+        "{}\n[worktree]\nenforce_leases = \"off\"\n",
+        jit::test_taxonomy::test_taxonomy().config_fragment()
+    );
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&config),
+            rules: Some(
+                r#"
+[[rules]]
+name = "orphan-leaf"
+severity = "warn"
+assert = { type-hierarchy = { kind = "orphan-leaf" } }
+"#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
+    executor
+        .issues()
+        .create_issue(
+            "A leaf".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            labels,
+            None,
+            None,
+            false,
+        )
+        .expect("a warn rule must not block")
+        .findings
+}
+
+#[test]
+fn test_create_issue_returns_orphan_leaf_graph_finding() {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
+
+    let findings = creation_findings(vec![jit::test_taxonomy::type_label(&taxonomy, 4)]);
+
+    assert!(
+        findings.iter().any(|finding| finding.rule == "orphan-leaf"),
+        "{findings:?}"
+    );
+}
+
+#[test]
+fn test_create_issue_returns_no_findings_for_compliant_issue() {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
+
+    let findings = creation_findings(vec![
+        jit::test_taxonomy::type_label(&taxonomy, 4),
+        jit::test_taxonomy::membership_label(&taxonomy, 2, "auth"),
+    ]);
+
+    assert!(findings.is_empty(), "{findings:?}");
+}
+
 #[test]
 fn test_update_enforce_rule_blocks_and_force_logs() {
-    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     // Seed a satisfying epic directly (bypassing create enforcement).
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
@@ -285,7 +396,10 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
 
     let events = bypass_events(&executor);
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].get_issue_id(), id);
+    assert_eq!(
+        events[0].issue_id().map(|id| id.as_str()),
+        Some(id.as_str())
+    );
 }
 
 #[test]
@@ -296,8 +410,12 @@ fn test_update_force_noop_logs_bypass_for_each_violated_rule() {
     // the override; dropping the audit entry just because no other field changed
     // would lose that signal. Two enforce rules are violated, so exactly two
     // bypass events must be appended.
-    let executor = executor_with_rules(
-        r#"
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "epic-needs-req"
 when = { type = "epic" }
@@ -312,6 +430,10 @@ severity = "error"
 enforce = true
 assert = { require-label = { label = "owner:*", min = 1 } }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
 
     // Seed an epic that violates BOTH enforce rules (no req:, no owner:),
@@ -353,8 +475,8 @@ assert = { require-label = { label = "owner:*", min = 1 } }
     );
     let mut rules: Vec<String> = events
         .iter()
-        .map(|e| match e {
-            Event::LocalRuleBypassed { rule, issue_id, .. } => {
+        .map(|e| match e.body() {
+            EventBody::LocalRuleBypassed { rule, issue_id, .. } => {
                 assert_eq!(issue_id, &id);
                 rule.clone()
             }
@@ -382,8 +504,16 @@ assert = { require-label = { label = "owner:*", min = 1 } }
 #[test]
 fn test_bulk_update_enforce_rule_blocks() {
     // The batch path must enforce too: `--filter` cannot slip past enforce rules.
-    let mut executor = executor_with_rules(
-        r#"
+    let schema = r#"{ "type": "object",
+             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
+    let storage = InMemoryStorage::new();
+    storage.add_data_file("schemas/no-bad.json", schema);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "no-bad-label"
 when = { type = "epic" }
@@ -391,14 +521,11 @@ severity = "error"
 enforce = true
 assert = { json-schema = "schemas/no-bad.json" }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
-    // Schema: the `bad` namespace must NOT be present.
-    let schema = r#"{ "type": "object",
-             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
-    executor
-        .storage()
-        .add_data_file("schemas/no-bad.json", schema);
-
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
@@ -411,7 +538,10 @@ assert = { json-schema = "schemas/no-bad.json" }
         add_labels: vec!["bad:value".to_string()],
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, false)
+        .unwrap();
     assert_eq!(result.summary.total_errors, 1, "bulk write must be blocked");
     assert_eq!(result.summary.total_modified, 0);
     // The label must not have been added.
@@ -424,7 +554,10 @@ assert = { json-schema = "schemas/no-bad.json" }
     assert!(bypass_events(&executor).is_empty());
 
     // With --force the bulk write goes through and logs a bypass.
-    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, true)
+        .unwrap();
     assert_eq!(
         result.summary.total_modified, 1,
         "force must allow the write"
@@ -445,8 +578,12 @@ fn test_update_gate_blocked_force_logs_bypass_and_persists_gated() {
     // --state done`. The Done transition diverts to `Gated` (unpassed gate), the
     // forced enforce-rule bypass is still audited, yet the call returns Err
     // (gate-blocked). This is the audit-sensitive captured transition path.
-    let executor = executor_with_rules(
-        r#"
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "task-needs-req"
 when = { type = "task" }
@@ -454,12 +591,16 @@ severity = "error"
 enforce = true
 assert = { require-label = { label = "req:*", min = 1 } }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
 
     let mut issue = crate::fixture_issue("A task".to_string(), String::new());
     issue.labels = vec!["type:task".to_string()]; // no req: -> violates the rule
     issue.state = State::InProgress;
-    issue.gates_required = vec!["manual-gate".to_string()]; // unpassed
+    issue.gates_required = vec!["manual-gate".parse().unwrap()]; // unpassed
     let id = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
@@ -494,8 +635,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
         1,
         "a forced enforce-rule bypass must be audited on the gate-blocked path"
     );
-    match &events[0] {
-        Event::LocalRuleBypassed { rule, .. } => assert_eq!(rule, "task-needs-req"),
+    match events[0].body() {
+        EventBody::LocalRuleBypassed { rule, .. } => assert_eq!(rule, "task-needs-req"),
         other => panic!("expected LocalRuleBypassed, got {other:?}"),
     }
 }
@@ -505,8 +646,16 @@ fn test_bulk_update_force_noop_logs_bypass() {
     // A forced bulk update that makes NO effective field change to an issue which
     // ALREADY violates an enforce rule must still audit the `--force` override
     // (the bulk path must not gate bypass logging behind persistence).
-    let mut executor = executor_with_rules(
-        r#"
+    let schema = r#"{ "type": "object",
+             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
+    let storage = InMemoryStorage::new();
+    storage.add_data_file("schemas/no-bad.json", schema);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(
+                r#"
 [[rules]]
 name = "no-bad-label"
 when = { type = "epic" }
@@ -514,13 +663,11 @@ severity = "error"
 enforce = true
 assert = { json-schema = "schemas/no-bad.json" }
 "#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
     );
-    let schema = r#"{ "type": "object",
-             "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
-    executor
-        .storage()
-        .add_data_file("schemas/no-bad.json", schema);
-
     // Seed an issue that already violates the rule (it carries a `bad:` label).
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string(), "bad:value".to_string()];
@@ -534,7 +681,10 @@ assert = { json-schema = "schemas/no-bad.json" }
         add_labels: vec!["bad:value".to_string()],
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, true)
+        .unwrap();
     assert_eq!(result.summary.total_errors, 0, "force must allow the write");
     assert_eq!(
         result.summary.total_modified, 0,
@@ -566,7 +716,15 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
     // keyed on `state = "ready"` must therefore fire even though the issue was
     // constructed in Backlog. This fails unless the final (Ready) shape is
     // validated.
-    let executor = executor_with_rules(READY_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(READY_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let blocked = executor.issues().create_issue(
         "A task".to_string(),
@@ -586,7 +744,7 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
     assert!(executor.storage().list_issues().unwrap().is_empty());
 
     // A satisfying issue (carrying req:) is created and promoted to Ready.
-    let (id, _) = executor
+    let id = executor
         .issues()
         .create_issue(
             "A task".to_string(),
@@ -598,7 +756,9 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
             None,
             false,
         )
-        .expect("satisfying issue must be created");
+        .expect("satisfying issue must be created")
+        .issue
+        .id;
     assert_eq!(
         executor.storage().load_issue(&id).unwrap().state,
         State::Ready
@@ -610,7 +770,15 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
     // Seed a Backlog issue with NO req: label. While Backlog, the
     // `state = "ready"` rule does not match. Transitioning it to Ready must
     // make the rule fire (final-shape evaluation), blocking the transition.
-    let executor = executor_with_rules(READY_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(READY_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let mut issue = crate::fixture_issue("A task".to_string(), String::new());
     issue.labels = vec!["type:task".to_string()];
@@ -670,7 +838,15 @@ fn test_force_bypass_event_emitted_after_successful_create_publication() {
     // forced create, IssueCreated is appended only after publication succeeds, so
     // the LocalRuleBypassed event (now logged after the save) must come AFTER
     // the IssueCreated event in the log — proving it is not emitted pre-write.
-    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     executor
         .issues()
@@ -689,11 +865,11 @@ fn test_force_bypass_event_emitted_after_successful_create_publication() {
     let events = executor.storage().read_events().unwrap();
     let created_idx = events
         .iter()
-        .position(|e| matches!(e, Event::IssueCreated { .. }))
+        .position(|e| matches!(e.body(), EventBody::IssueCreated { .. }))
         .expect("an IssueCreated event must be logged");
     let bypass_idx = events
         .iter()
-        .position(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .position(|e| matches!(e.body(), EventBody::LocalRuleBypassed { .. }))
         .expect("a LocalRuleBypassed event must be logged");
     assert!(
         bypass_idx > created_idx,
@@ -707,29 +883,16 @@ fn test_no_bypass_event_when_publication_fails() {
     // A storage whose mutation publication always fails. A forced create that bypasses an
     // enforce rule must NOT leave a LocalRuleBypassed entry when the write fails,
     // because the bypass event is now emitted only after a successful save.
-    let inner = InMemoryStorage::new();
-    std::fs::create_dir_all(inner.root()).unwrap();
-    let config = "[worktree]\nenforce_leases = \"off\"\n";
-    std::fs::write(inner.root().join("config.toml"), config).unwrap();
-    std::fs::write(inner.root().join("rules.toml"), EPIC_NEEDS_REQ_ENFORCE).unwrap();
-    inner.add_data_file("config.toml", config);
-    inner.add_data_file("rules.toml", EPIC_NEEDS_REQ_ENFORCE);
-
-    let storage = FailingMutationStorage::new(inner);
-    let layout = jit::repository_state::RepositoryLayout::new(
-        jit::repository_state::RepositoryRootEvidence::new(
-            "/jit-failing-memory-worktree",
-            "failing-memory-worktree",
-            true,
-        ),
-        jit::repository_state::RepositoryRootEvidence::new(
-            "/jit-failing-memory-worktree/.jit",
-            "failing-memory-data",
-            true,
-        ),
-    )
-    .unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+        FailingMutationStorage::new,
+    );
 
     let result = executor.issues().create_issue(
         "An epic".to_string(),
@@ -749,7 +912,7 @@ fn test_no_bypass_event_when_publication_fails() {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::LocalRuleBypassed { .. }))
         .collect();
     assert!(
         bypasses.is_empty(),
@@ -760,7 +923,15 @@ fn test_no_bypass_event_when_publication_fails() {
 #[test]
 fn test_ordinary_rejection_is_not_logged() {
     // A blocked (non-forced) write must NOT append any event at all.
-    let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let before = executor.storage().read_events().unwrap().len();
     let _ = executor.issues().create_issue(
         "An epic".to_string(),
@@ -794,13 +965,9 @@ struct FailingMutationSession {
     inner: Box<dyn jit::storage::RepositoryMutationSession>,
 }
 
-impl jit::storage::RepositoryMutationSession for FailingMutationSession {
+impl jit::storage::RepositoryReadSession for FailingMutationSession {
     fn layout(&self) -> &jit::repository_state::RepositoryLayout {
         self.inner.layout()
-    }
-
-    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
-        self.inner.recovery_report()
     }
 
     fn capture(
@@ -818,6 +985,18 @@ impl jit::storage::RepositoryMutationSession for FailingMutationSession {
     ) -> Result<jit::repository_state::RepositoryImage, jit::storage::RepositoryStateStoreError>
     {
         self.inner.extend(image, spec)
+    }
+
+    fn read_history_log(
+        &mut self,
+    ) -> Result<Option<Vec<u8>>, jit::storage::RepositoryStateStoreError> {
+        self.inner.read_history_log()
+    }
+}
+
+impl jit::storage::RepositoryMutationSession for FailingMutationSession {
+    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
     }
 
     fn apply(
@@ -842,6 +1021,14 @@ impl jit::storage::RepositoryStateStore for FailingMutationStorage {
             inner: self.inner.open_mutation_session(layout)?,
         }))
     }
+
+    fn open_read_session(
+        &self,
+        layout: jit::repository_state::RepositoryLayout,
+    ) -> Result<Box<dyn jit::storage::OptimisticReadSession>, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.open_read_session(layout)
+    }
 }
 
 impl IssueStore for FailingMutationStorage {
@@ -853,14 +1040,14 @@ impl IssueStore for FailingMutationStorage {
         self.inner.acquire_repo_write_lock()
     }
 
-    fn load_issue(&self, id: &str) -> anyhow::Result<Issue> {
+    fn load_issue(&self, id: &jit::domain::identity::IssueId) -> anyhow::Result<Issue> {
         self.inner.load_issue(id)
     }
 
     fn resolve_issue_id(
         &self,
-        prefix: &jit::domain::issue_id::IssueIdPrefix,
-    ) -> anyhow::Result<String> {
+        prefix: &jit::domain::identity::IssueIdPrefix,
+    ) -> anyhow::Result<jit::domain::identity::IssueId> {
         self.inner.resolve_issue_id(prefix)
     }
 
@@ -876,23 +1063,26 @@ impl IssueStore for FailingMutationStorage {
         self.inner.read_events()
     }
 
-    fn load_gate_run_result(&self, run_id: &str) -> anyhow::Result<jit::domain::GateRunResult> {
-        self.inner.load_gate_run_result(run_id)
+    fn read_archive_evidence_record(
+        &self,
+        target: &jit::domain::artifact_plan::PlanTarget,
+    ) -> anyhow::Result<Option<jit::domain::artifact_execution::ArchiveEvidenceRecord>> {
+        self.inner.read_archive_evidence_record(target)
+    }
+
+    fn load_gate_run_result(
+        &self,
+        issue_id: &jit::domain::identity::IssueId,
+        run_id: &jit::domain::identity::GateRunId,
+    ) -> anyhow::Result<jit::domain::GateRunResult> {
+        self.inner.load_gate_run_result(issue_id, run_id)
     }
 
     fn list_gate_runs_for_issue(
         &self,
-        issue_id: &str,
+        issue_id: &jit::domain::identity::IssueId,
     ) -> anyhow::Result<Vec<jit::domain::GateRunResult>> {
         self.inner.list_gate_runs_for_issue(issue_id)
-    }
-
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &str,
-        digest: &jit::domain::repository_inputs::InputsDigest,
-    ) -> anyhow::Result<Option<jit::domain::GateRunResult>> {
-        self.inner.find_reusable_gate_run(gate_key, digest)
     }
 
     fn root(&self) -> &std::path::Path {

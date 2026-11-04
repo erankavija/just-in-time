@@ -1,0 +1,40 @@
+{
+  "assignee": null,
+  "claimed_at": "2026-11-01T10:25:56.672055178Z",
+  "context": {},
+  "created_at": "2026-11-01T10:25:11.246990434Z",
+  "dependencies": [],
+  "description": "Move a gated issue to done when `jit gate evaluate` passes its last gate, or stop saying it will.\n\n## Background\n\n`jit issue update <id> --state done` on an issue with unpassed gates moves it to `gated` and prints \"Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.\" (`crates/jit/src/errors.rs:918`). d2b7d19b stayed `gated` after `jit gate evaluate` passed its `cargo-ci` (2026-11-01T09:51:45Z) and then `code-review` (09:55:15Z) with `all_passed` true, and moved only on a further `jit issue update --state done`. `auto_transition_to_done` runs from `gate.rs:881` and `gate_check.rs:1560`, and the evaluate path did not reach it in this case. Found under c780514e.\n\n## Success Criteria\n\n- [hard] REQ-01: After `jit gate evaluate` passes the last unpassed gate of a gated issue, the issue is done and dependents promote, through the existing `auto_transition_to_done`.\n- [hard] REQ-02: A failed gate, or an evaluate on an issue that isn't gated, leaves the state unchanged.\n- [hard] REQ-03: All sites that advance after a gate pass share one path. Remove `run_postchecks` if its only remaining reachability is the library-only `State::Gated` branch at `issue.rs:687`, or state in the issue why it stays. Report net lines.\n- [hard] REQ-04: Sweep `.jit/`, `contrib/`, skills and docs for steps that follow evaluate with `jit issue update --state done`. Those steps must not fail on an issue already done; remove them where now redundant.\n",
+  "documents": [],
+  "done_at": "2026-11-01T13:47:33.267923546Z",
+  "first_ready_at": "2026-11-01T10:25:11.246990434Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "77138a20-271f-48ea-a345-e7dd09a737ef",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:42:30.272851403Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "21a41d27-4ed1-4dad-ade6-a24fbe4ba620",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:46:30.580970200Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "ddca5431-273f-473c-a897-548fa5e62054",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Passing a gated issue's last gate through evaluate moves it to done",
+  "updated_at": "2026-11-01T14:09:26.514626179Z"
+}

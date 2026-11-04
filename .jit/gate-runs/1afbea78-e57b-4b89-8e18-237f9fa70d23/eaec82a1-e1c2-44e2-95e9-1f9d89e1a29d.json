@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "086f080e6e0958908b05237712a96f2ef45c6322",
+  "completed_at": "2026-10-31T23:18:20.449629175Z",
+  "duration_ms": 60151,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four affected tests retain failure and typed-envelope assertions while exit-code projection ownership remains centralized.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1afbea78-e57b-4b89-8e18-237f9fa70d23",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "eaec82a1-e1c2-44e2-95e9-1f9d89e1a29d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:17:20.298250355Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1eb885294f984e2fa504b13d1b7ef036e526532a; fa8b68007a122e724de110478c5c9682c3827f65 (merge)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-31T23:16:46Z); code-review pending\nTruncation recovery: Re-read both merge-parent diffs and current contents for the four in-scope files; excluded the merge’s unrelated paths outside this issue’s impact cone.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four affected tests retain failure and typed-envelope assertions while exit-code projection ownership remains centralized.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,52 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T03:56:32.136426640Z",
+  "context": {},
+  "created_at": "2026-11-01T03:56:31.333855822Z",
+  "dependencies": [],
+  "description": "Carry node ids through the dependency graph as the node's own typed id, so issue ids stay `IssueId` across every graph operation.\n\n## Background\n\n`GraphNode` (`crates/jit/src/graph/mod.rs`) exposes `fn id(&self) -> &str`, and `DependencyGraph` takes and returns string ids: `validate_add_dependency(from_id: &str, to_id: &str)`, `get_dependents(node_id: &str)`, `get_transitive_dependents`, `get_transitive_dependencies`, `compute_transitive_reduction` and `GraphError::NodeNotFound { id: String }`. Callers convert with `as_str()` at each call. Implementors are `Issue`, the template-expansion prospective node (`crates/jit/src/commands/template_expand.rs`), the hierarchy edge view and test fixtures. `HierarchyNode` already declares an associated `Id` type, the form to converge on (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GraphNode` declares an associated id type, and `Issue`'s is `IssueId`.\n- [hard] REQ-02: `DependencyGraph` methods take and return that id type, and graph errors carry it, so no production caller converts an issue id to a string to call the graph.\n- [hard] REQ-03: Across `crates/`, no production code outside CLI argument structs, server extractors, serde impls and rendering holds an issue id, gate key or gate-run id as a raw string, with each remaining site listed and justified in the change's report.\n- [hard] REQ-04: Graph property tests still run over non-UUID fixture ids, and CLI and server JSON is unchanged.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2195c98f-semantic-types/active/raw-identity-sites.md"
+    }
+  ],
+  "done_at": "2026-11-01T04:32:13.043881582Z",
+  "first_ready_at": "2026-11-01T03:56:31.333855822Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "469f097b-e865-49b1-8104-024e4a229568",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:32:12.693169110Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1922d7a8-6129-4672-8e7b-c5d7e3312db3",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:18:46.282822227Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "1a3db2c3-0faa-42c9-9498-d7bf7c0efaee",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:core",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "satisfies:2195c98f/REQ-17",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "The dependency graph carries typed node ids",
+  "updated_at": "2026-11-01T05:30:35.035154985Z"
+}

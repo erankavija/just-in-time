@@ -7,8 +7,7 @@
 //! build timestamp appearing here would mean the build had started reading git
 //! or the clock again.
 
-use assert_cmd::Command;
-use serde_json::Value;
+use jit::test_cli::JitCli;
 
 /// Field names the version report must never carry again.
 const WITHDRAWN_FIELDS: [&str; 4] = [
@@ -20,14 +19,10 @@ const WITHDRAWN_FIELDS: [&str; 4] = [
 
 #[test]
 fn test_global_version_flag_reports_only_package_version_and_profile() {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .arg("--version")
-        .output()
-        .unwrap();
+    let cli = JitCli::uninitialised().unwrap();
 
-    assert!(output.status.success(), "--version should succeed");
+    let stdout = cli.run(["--version"]).unwrap();
 
-    let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains(env!("CARGO_PKG_VERSION")));
     assert!(stdout.contains("profile"));
     for absent in ["commit", "dirty"] {
@@ -40,20 +35,12 @@ fn test_global_version_flag_reports_only_package_version_and_profile() {
 
 #[test]
 fn test_version_command_reports_human_readable_metadata_without_repo() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
+    let cli = JitCli::uninitialised().unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_dir.path())
-        .arg("version")
-        .output()
-        .unwrap();
+    let stdout = cli
+        .run(["version"])
+        .expect("version command should not require .jit");
 
-    assert!(
-        output.status.success(),
-        "version command should not require .jit"
-    );
-
-    let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Version:"));
     assert!(stdout.contains("Profile:"));
     assert!(stdout.contains("Target:"));
@@ -67,20 +54,11 @@ fn test_version_command_reports_human_readable_metadata_without_repo() {
 
 #[test]
 fn test_version_command_reports_json_metadata_without_repo() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
+    let cli = JitCli::uninitialised().unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_dir.path())
-        .args(["version", "--json"])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "version --json should not require .jit"
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
+    let json = cli
+        .run_json(["version"])
+        .expect("version --json should not require .jit and emit JSON");
     assert_eq!(json["package"].as_str(), Some("jit"));
     assert_eq!(json["version"].as_str(), Some(env!("CARGO_PKG_VERSION")));
     assert!(json.get("build_profile").is_some());

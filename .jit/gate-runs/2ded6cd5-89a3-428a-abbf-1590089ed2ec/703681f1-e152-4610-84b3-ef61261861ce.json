@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0e02052cd2db1dab8ee9bd52b1350f97f995861e",
+  "completed_at": "2026-11-01T18:19:25.373594080Z",
+  "duration_ms": 195706,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard success criteria are satisfied; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2ded6cd5-89a3-428a-abbf-1590089ed2ec",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "703681f1-e152-4610-84b3-ef61261861ce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T18:16:09.667576972Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7ab359fed; 0e02052cd (merge)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T18:14:01Z); code-review pending (no run)\nTruncation recovery: reread relevant .jit/config.toml and .jit/gates.toml ranges after broad registry output truncated\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard success criteria are satisfied; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

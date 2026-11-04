@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-f265e748",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c80291d174e1b763c4fcc7aa54744042c219215",
+  "completed_at": "2026-10-26T22:33:07.190714320Z",
+  "duration_ms": 75702,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/repository_state_store_tests.rs",
+        "id": "F1",
+        "line": 2056,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f265e748/requirement/REQ-04",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "A unit test passes id.to_string() to a constructor that now requires IssueId, leaving REQ-04 unmet."
+      }
+    ],
+    "summary": "A remaining unit-test event constructor call passes String instead of IssueId.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f265e748-e350-4ba6-949f-575acf122bd9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "50e937dd-3aa9-4c13-b7d3-6a386b5b8923",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:31:51.487990709Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5993 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a57-6a6e-7b61-9e39-134c30b8e917\n--------\nuser\n--- 5980 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f1aaadc03, 5d83ac6e6, fb3e6f327, 0b9770767, 61400544b, 42a9d33e, 9308cd32, 67f48c045, 0c80291d\nPolicy sources: AGENTS.md\nResolved items: @/issue/f265e748/requirement/REQ-04 (issue description); @/invariant/semantic-types (.jit/invariants.toml); @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci pending (no exit code); code-review failed (exit 1, prior review)\nTruncation recovery: partitioned 67f48c045 by parent and path; reran targeted current-source and raw-constructor searches\n1. **[blocking][issue-impact] F1 —** `crates/jit/src/storage/repository_state_store_tests.rs:2056` passes `id.to_string()` to `EventBody::draft_issue_claimed`, whose parameter is now `IssueId`. This leaves the unit-test caller incompatible with the typed constructor and unmet REQ-04. References: @/issue/f265e748/requirement/REQ-04, @/invariant/semantic-types.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A remaining unit-test event constructor call passes String instead of IssueId.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A unit test passes id.to_string() to a constructor that now requires IssueId, leaving REQ-04 unmet.\",\"file\":\"crates/jit/src/storage/repository_state_store_tests.rs\",\"line\":2056,\"references\":[\"@/issue/f265e748/requirement/REQ-04\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

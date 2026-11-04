@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6993dbc67cefd6d3eeef8da04428edd9185642ad",
+  "completed_at": "2026-11-04T15:01:09.743791490Z",
+  "duration_ms": 310233,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 1147,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "ValidationOps returns and constructs the output-layer StatusResponse, reversing the required dependency direction."
+      }
+    ],
+    "summary": "One issue-impact architecture-boundary violation remains.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "993773cc-3628-4f4f-b857-5ca599448399",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T14:55:59.510558985Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7848 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a70f-4aba-71c2-9142-d4ea6497aec9\n--------\nuser\n--- 7835 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fca7ff50c (`jit:24a982b7`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (parent issue description)\nGate evidence: cargo-ci passed (exit 0); mcp-ci passed (exit 0); code-review pending\nTruncation recovery: Re-read truncated combined diffs and broad searches through bounded per-file patches, targeted renderer/schema reads, and focused plan/source excerpts.\n\n1. [blocking][issue-impact] F1 — `ValidationOps::get_status` now returns and constructs `crate::output::StatusResponse` at [crates/jit/src/commands/validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:1147). This pushes a serialized, schema-bearing, human-rendered output type into the command layer. The canonical design requires output constructors to wrap command-layer results, not to replace them; retain a command-layer status result and convert it in the dispatch/output boundary. References: @/invariant/architecture-dependency-direction.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact architecture-boundary violation remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"ValidationOps returns and constructs the output-layer StatusResponse, reversing the required dependency direction.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":1147,\"references\":[\"@/invariant/architecture-dependency-direction\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

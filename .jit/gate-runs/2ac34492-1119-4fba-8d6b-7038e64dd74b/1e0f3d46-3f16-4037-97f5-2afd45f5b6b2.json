@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-2ac34492",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "822d50876eceab2fac64225d5f5a007112cf5622",
+  "completed_at": "2026-11-01T02:12:49.134356893Z",
+  "duration_ms": 166656,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The removal is complete across parsing, evaluation, serialization, examples, documentation, and focused tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2ac34492-1119-4fba-8d6b-7038e64dd74b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1e0f3d46-3f16-4037-97f5-2afd45f5b6b2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T02:10:02.477963633Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c10ea6a, 344fe83, 96edf706, 822d508 (`jit:2ac34492`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/charter/D-18, @/invariant/semantic-types, @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/issue/2195c98f/requirement/REQ-01, @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T02:08:40Z); code-review pending as the current judgment\nTruncation recovery: re-read each tagged patch and affected source/test/document ranges separately; excluded historical archive records outside the impact cone\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The removal is complete across parsing, evaluation, serialization, examples, documentation, and focused tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

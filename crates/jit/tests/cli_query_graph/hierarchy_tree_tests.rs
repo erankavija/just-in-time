@@ -2,79 +2,42 @@
 //! `jit graph tree`, `jit graph export --full` (resolved fields), and
 //! `jit query divergence`.
 
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
-}
-
-/// Create an issue with the given type + membership labels; returns its full id.
-fn create<L: AsRef<str>>(temp: &TempDir, title: &str, labels: &[L]) -> String {
-    let mut args = vec!["issue", "create", "-t", title, "-d", "body"];
-    for label in labels {
-        args.push("-l");
-        args.push(label.as_ref());
-    }
-    let output = Command::new(jit_binary())
-        .args(&args)
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string()
-}
-
-fn add_dep(temp: &TempDir, from: &str, to: &str) {
-    Command::new(jit_binary())
-        .args(["dep", "add", from, to])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-}
-
-fn run_json(temp: &TempDir, args: &[&str]) -> serde_json::Value {
-    let output = Command::new(jit_binary())
-        .args(args)
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    serde_json::from_slice(&output.stdout).unwrap_or_else(|_| {
-        panic!(
-            "expected JSON from {args:?}: {}",
-            String::from_utf8_lossy(&output.stdout)
-        )
-    })
-}
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::{
+    membership_label, setup_test_repo_with_taxonomy, type_label, TaxonomyRepo,
+};
 
 #[test]
 fn test_graph_tree_resolves_parent_and_children() {
-    let temp = setup_test_repo();
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
     // epic → task (the epic depends on the work it contains)
-    let epic_label = crate::membership_label(&temp.taxonomy, 2, "auth");
-    let epic = create(
-        &temp,
-        "Epic",
-        &[crate::type_label(&temp.taxonomy, 2), epic_label],
-    );
-    let task = create(&temp, "Task", &[crate::type_label(&temp.taxonomy, 4)]);
-    add_dep(&temp, &epic, &task);
+    let epic_label = membership_label(&taxonomy, 2, "auth");
+    let epic = cli
+        .create_issue([
+            "-t",
+            "Epic",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 2),
+            "-l",
+            &epic_label,
+        ])
+        .unwrap();
+    let task = cli
+        .create_issue(["-t", "Task", "-d", "body", "-l", &type_label(&taxonomy, 4)])
+        .unwrap();
+    cli.run(["dep", "add", &epic, &task]).unwrap();
 
-    let doc = run_json(&temp, &["graph", "tree", "--json"]);
-    assert_eq!(doc["count"], 2);
+    let doc = cli.run_json(["graph", "tree"]).unwrap();
+    assert_eq!(doc["nodes"].as_array().unwrap().len(), 2);
     let nodes = doc["nodes"].as_array().unwrap();
 
     let epic_node = nodes.iter().find(|n| n["id"] == epic).unwrap();
     assert_eq!(epic_node["parent"], serde_json::Value::Null);
     assert_eq!(epic_node["children"][0], task);
-    assert_eq!(epic_node["type"], temp.taxonomy.type_at_level(2));
+    assert_eq!(epic_node["type"], taxonomy.type_at_level(2));
 
     let task_node = nodes.iter().find(|n| n["id"] == task).unwrap();
     assert_eq!(task_node["parent"], epic);
@@ -84,15 +47,29 @@ fn test_graph_tree_resolves_parent_and_children() {
 
 #[test]
 fn test_graph_tree_scoped_to_root_uses_dependency_closure() {
-    let temp = setup_test_repo();
-    let epic = create(&temp, "Epic", &[crate::type_label(&temp.taxonomy, 2)]);
-    let task = create(&temp, "Task", &[crate::type_label(&temp.taxonomy, 4)]);
-    let other = create(&temp, "Unrelated", &[crate::type_label(&temp.taxonomy, 4)]);
-    add_dep(&temp, &epic, &task);
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let epic = cli
+        .create_issue(["-t", "Epic", "-d", "body", "-l", &type_label(&taxonomy, 2)])
+        .unwrap();
+    let task = cli
+        .create_issue(["-t", "Task", "-d", "body", "-l", &type_label(&taxonomy, 4)])
+        .unwrap();
+    let other = cli
+        .create_issue([
+            "-t",
+            "Unrelated",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 4),
+        ])
+        .unwrap();
+    cli.run(["dep", "add", &epic, &task]).unwrap();
 
-    let doc = run_json(&temp, &["graph", "tree", &epic, "--json"]);
+    let doc = cli.run_json(["graph", "tree", &epic]).unwrap();
     // Only the epic and its dependency closure; `other` is excluded.
-    assert_eq!(doc["count"], 2);
+    assert_eq!(doc["nodes"].as_array().unwrap().len(), 2);
     let ids: Vec<&str> = doc["nodes"]
         .as_array()
         .unwrap()
@@ -106,12 +83,19 @@ fn test_graph_tree_scoped_to_root_uses_dependency_closure() {
 
 #[test]
 fn test_graph_export_full_carries_resolved_fields() {
-    let temp = setup_test_repo();
-    let epic = create(&temp, "Epic", &[crate::type_label(&temp.taxonomy, 2)]);
-    let task = create(&temp, "Task", &[crate::type_label(&temp.taxonomy, 4)]);
-    add_dep(&temp, &epic, &task);
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let epic = cli
+        .create_issue(["-t", "Epic", "-d", "body", "-l", &type_label(&taxonomy, 2)])
+        .unwrap();
+    let task = cli
+        .create_issue(["-t", "Task", "-d", "body", "-l", &type_label(&taxonomy, 4)])
+        .unwrap();
+    cli.run(["dep", "add", &epic, &task]).unwrap();
 
-    let doc = run_json(&temp, &["graph", "export", "--format", "json", "--full"]);
+    let doc = cli
+        .run_json(["graph", "export", "--format", "json", "--full"])
+        .unwrap();
     let nodes = doc["nodes"].as_array().unwrap();
     let task_node = nodes.iter().find(|n| n["id"] == task).unwrap();
     assert_eq!(task_node["parent"], epic);
@@ -124,7 +108,9 @@ fn test_graph_export_full_carries_resolved_fields() {
     assert_eq!(epic_node["rank"], 1);
 
     // Default summary shape stays free of the resolved fields.
-    let summary = run_json(&temp, &["graph", "export", "--format", "json"]);
+    let summary = cli
+        .run_json(["graph", "export", "--format", "json"])
+        .unwrap();
     let summary_node = &summary["nodes"][0];
     for field in ["parent", "children", "cluster", "rank"] {
         assert!(summary_node.get(field).is_none());
@@ -135,15 +121,31 @@ fn test_graph_export_full_carries_resolved_fields() {
 /// resolution fields: they share one serialization path.
 #[test]
 fn test_graph_export_full_and_tree_agree_on_resolution_fields() {
-    let temp = setup_test_repo();
-    let milestone = create(&temp, "Milestone", &[crate::type_label(&temp.taxonomy, 1)]);
-    let epic = create(&temp, "Epic", &[crate::type_label(&temp.taxonomy, 2)]);
-    let task = create(&temp, "Task", &[crate::type_label(&temp.taxonomy, 4)]);
-    add_dep(&temp, &milestone, &epic);
-    add_dep(&temp, &epic, &task);
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let milestone = cli
+        .create_issue([
+            "-t",
+            "Milestone",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 1),
+        ])
+        .unwrap();
+    let epic = cli
+        .create_issue(["-t", "Epic", "-d", "body", "-l", &type_label(&taxonomy, 2)])
+        .unwrap();
+    let task = cli
+        .create_issue(["-t", "Task", "-d", "body", "-l", &type_label(&taxonomy, 4)])
+        .unwrap();
+    cli.run(["dep", "add", &milestone, &epic]).unwrap();
+    cli.run(["dep", "add", &epic, &task]).unwrap();
 
-    let export = run_json(&temp, &["graph", "export", "--format", "json", "--full"]);
-    let tree = run_json(&temp, &["graph", "tree", "--json"]);
+    let export = cli
+        .run_json(["graph", "export", "--format", "json", "--full"])
+        .unwrap();
+    let tree = cli.run_json(["graph", "tree"]).unwrap();
 
     let pick = |node: &serde_json::Value| {
         serde_json::json!({
@@ -169,72 +171,113 @@ fn test_graph_export_full_and_tree_agree_on_resolution_fields() {
 
 #[test]
 fn test_query_divergence_flags_unbacked_membership_label() {
-    let temp = setup_test_repo();
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
     // The epic contains `inside` via the DAG but `stray` only claims the label.
-    let membership = crate::membership_label(&temp.taxonomy, 2, "auth");
-    let epic = create(
-        &temp,
-        "Auth",
-        &[crate::type_label(&temp.taxonomy, 2), membership.clone()],
-    );
-    let inside = create(
-        &temp,
-        "Inside",
-        &[crate::type_label(&temp.taxonomy, 4), membership.clone()],
-    );
-    let stray = create(
-        &temp,
-        "Stray",
-        &[crate::type_label(&temp.taxonomy, 4), membership.clone()],
-    );
-    add_dep(&temp, &epic, &inside);
+    let membership = membership_label(&taxonomy, 2, "auth");
+    let epic = cli
+        .create_issue([
+            "-t",
+            "Auth",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 2),
+            "-l",
+            &membership,
+        ])
+        .unwrap();
+    let inside = cli
+        .create_issue([
+            "-t",
+            "Inside",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 4),
+            "-l",
+            &membership,
+        ])
+        .unwrap();
+    let stray = cli
+        .create_issue([
+            "-t",
+            "Stray",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 4),
+            "-l",
+            &membership,
+        ])
+        .unwrap();
+    cli.run(["dep", "add", &epic, &inside]).unwrap();
 
-    let doc = run_json(&temp, &["query", "divergence", "--json"]);
-    assert_eq!(doc["count"], 1);
+    let doc = cli.run_json(["query", "divergence"]).unwrap();
+    assert_eq!(doc["divergences"].as_array().unwrap().len(), 1);
     assert_eq!(doc["divergences"][0]["id"], stray);
     assert_eq!(doc["divergences"][0]["label"], membership);
 }
 
 #[test]
 fn test_validate_surfaces_divergence_count_without_failing() {
-    let temp = setup_test_repo();
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
     // A connected, otherwise-valid graph: `stray` carries epic:auth but the DAG
     // places it under `other`, not under the `auth` epic → one divergence.
-    let auth_membership = crate::membership_label(&temp.taxonomy, 2, "auth");
-    let other_membership = crate::membership_label(&temp.taxonomy, 2, "other");
-    let auth = create(
-        &temp,
-        "Auth",
-        &[
-            crate::type_label(&temp.taxonomy, 2),
-            auth_membership.clone(),
-        ],
-    );
-    let inside = create(&temp, "Inside", &[crate::type_label(&temp.taxonomy, 4)]);
-    let other = create(
-        &temp,
-        "Other",
-        &[crate::type_label(&temp.taxonomy, 2), other_membership],
-    );
-    let stray = create(
-        &temp,
-        "Stray",
-        &[crate::type_label(&temp.taxonomy, 4), auth_membership],
-    );
-    add_dep(&temp, &auth, &inside);
-    add_dep(&temp, &other, &stray);
-
-    let output = Command::new(jit_binary())
-        .args(["validate", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let auth_membership = membership_label(&taxonomy, 2, "auth");
+    let other_membership = membership_label(&taxonomy, 2, "other");
+    let auth = cli
+        .create_issue([
+            "-t",
+            "Auth",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 2),
+            "-l",
+            &auth_membership,
+        ])
         .unwrap();
+    let inside = cli
+        .create_issue([
+            "-t",
+            "Inside",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 4),
+        ])
+        .unwrap();
+    let other = cli
+        .create_issue([
+            "-t",
+            "Other",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 2),
+            "-l",
+            &other_membership,
+        ])
+        .unwrap();
+    let stray = cli
+        .create_issue([
+            "-t",
+            "Stray",
+            "-d",
+            "body",
+            "-l",
+            &type_label(&taxonomy, 4),
+            "-l",
+            &auth_membership,
+        ])
+        .unwrap();
+    cli.run(["dep", "add", &auth, &inside]).unwrap();
+    cli.run(["dep", "add", &other, &stray]).unwrap();
+
     // Advisory: validate still exits 0 despite the divergence.
-    assert!(
-        output.status.success(),
-        "validate must not fail on divergence"
-    );
-    let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let doc = cli.run_json(["validate"]).unwrap();
     assert_eq!(doc["divergence_count"], 1);
     assert_eq!(doc["valid"], true);
 }

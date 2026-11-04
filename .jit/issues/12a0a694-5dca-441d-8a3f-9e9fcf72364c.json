@@ -1,0 +1,47 @@
+{
+  "assignee": "agent:gf2-coverage-fix",
+  "claimed_at": "2026-11-01T07:14:44.027922027Z",
+  "context": {},
+  "created_at": "2026-11-01T07:14:43.346215693Z",
+  "dependencies": [],
+  "description": "A gate using the `label_target_validation` checker reports a configuration fault for every target label holding a short id, which is the form the planning-bracket template writes. Breakdown nodes in adopting repositories cannot pass such a gate, so their containers cannot be released.\n\n## Background\n\nThe planning-bracket template labels a breakdown node `brackets:{container.short_id}`, and adopter documentation declares that form. The checker read the label value as a full issue id and compared it for equality, so `brackets:55c3e433` fails with \"Issue not found: 55c3e433\" although that issue exists and validates. The comparison arrived in commit `90439e25c`, when executor families moved to already-resolved issue ids. That change is correct for command arguments; a label value is unresolved input. It replaced a prefix resolution with an equality test, and the suite only exercised full-id labels, so nothing caught it. The defect reached gf2 on breakdown `228c4691`.\n\n## Success Criteria\n\n- [hard] REQ-01: A target label holding a unique short id validates the issue it names and returns that issue's verdict.\n- [hard] REQ-02: Target resolution goes through the shared issue-id prefix resolver, so unknown and ambiguous targets yield its typed errors as fault runs, with the offending label named in the message.\n- [hard] REQ-03: The checker reference states that a target may be a full id or a unique prefix.",
+  "documents": [],
+  "done_at": "2026-11-01T07:30:53.028336655Z",
+  "first_ready_at": "2026-11-01T07:14:43.346215693Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d1a0af0d-1dd0-4939-bbb8-ca9ee4af4f0e",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:30:39.883574642Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ce0559a9-df7b-428e-a24a-f2acacb0867c",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:28:49.103259560Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "6715aaa5-ade4-4720-a0d0-d6c63f00c2b0",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:18:55.921192504Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "12a0a694-5dca-441d-8a3f-9e9fcf72364c",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:gates"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Resolve short-id targets in label target validation",
+  "updated_at": "2026-11-01T07:30:53.028336655Z"
+}

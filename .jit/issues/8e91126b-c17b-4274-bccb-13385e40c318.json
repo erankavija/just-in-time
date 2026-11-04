@@ -1,18 +1,40 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:58.416440540Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
   ],
-  "description": "`project render` substitutes its own fallback codes. This moves it to a library handler.\n\n## Background\n\n`run_project`/`run_project_inner` in `crates/jit/src/main.rs` substitute `VALIDATION_FAILED` or `PROJECT_COMMAND_FAILED` for failures and serialize `ProjectRenderResult` (`crates/jit/src/commands/project.rs`, which stores its own `count`) directly. `project render` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `project render` to a handler in `crates/jit/src/dispatch/project.rs`, and `main.rs` keeps neither `run_project` nor `run_project_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, projections are a `ListEnvelope` instantiation, `ProjectRenderResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that a render failure reports its classified code on both paths instead of `PROJECT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "`project render` substitutes its own fallback codes. This moves it to a library handler.\n\n## Background\n\n`run_project`/`run_project_inner` in `crates/jit/src/main.rs` substitute `VALIDATION_FAILED` or `PROJECT_COMMAND_FAILED` for failures and serialize `ProjectRenderResult` (`crates/jit/src/commands/project.rs`, which stores its own `count`) directly. `project render` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `project render` to a handler in `crates/jit/src/dispatch/project.rs`, and `main.rs` keeps neither `run_project` nor `run_project_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, projections are a `ListEnvelope` instantiation, `ProjectRenderResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that a render failure reports its classified code on both paths instead of `PROJECT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-02 is met as written: the leaf returns its registered response type, even though `ProjectRenderResult` is command-owned. Command-owned response types are the intended design: the output layer depending on command-defined result types follows `@/inv/architecture-dependency-direction` (steward ruling, 2026-11-04, correcting the earlier output-ownership ruling; plan D-59).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:41:25.934488335Z",
+  "first_ready_at": "2026-11-03T23:08:01.817572376Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "44479e0b-947c-483c-b1bb-545f9f95aa2a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.676756556Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3f255520-6ec0-46ea-8344-488c6cd71ea4",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:37:26.491212860Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "fc0b7346-8600-432b-b48c-05723c524f42",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.800009074Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8e91126b-c17b-4274-bccb-13385e40c318",
   "labels": [
     "type:task",
@@ -28,7 +50,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Project command moves to a library handler",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T17:43:10.047320877Z"
 }

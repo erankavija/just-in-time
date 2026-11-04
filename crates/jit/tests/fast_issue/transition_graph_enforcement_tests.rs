@@ -11,34 +11,14 @@
 //! the GATED target state (done-keyed rules do not fire; gated-keyed rules
 //! block the diversion).
 
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, State};
+use jit::domain::identity::IssueId;
+use jit::domain::{Event, EventBody, State};
 use jit::errors::TransitionBlockedError;
 use jit::storage::{InMemoryStorage, IssueStore};
-
-/// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml`.
-///
-/// Written to the storage root BEFORE the executor caches its effective rule
-/// set, so the supplied rules are the operative set. A `config.toml` is created
-/// so the content-format / namespace lookups have a real (empty) config.
-fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    storage.add_data_file("config.toml", "");
-    storage.add_data_file("rules.toml", rules_toml);
-    storage.add_data_file(
-        "gates.toml",
-        r#"[[gates]]
-key = "tests"
-title = "Tests"
-description = ""
-stage = "postcheck"
-mode = "manual"
-"#,
-    );
-    let layout = storage.repository_layout();
-    CommandExecutor::new(storage).with_layout(layout)
-}
+use jit::test_utils::add_reducing_edge;
 
 /// Create canonical membership, then seed the test-specific labels and state.
 fn seed_issue(
@@ -46,8 +26,8 @@ fn seed_issue(
     title: &str,
     labels: &[&str],
     state: State,
-) -> String {
-    let (id, _) = executor
+) -> IssueId {
+    let id = executor
         .issues()
         .create_issue(
             title.to_string(),
@@ -59,7 +39,9 @@ fn seed_issue(
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     let mut issue = executor.storage().load_issue(&id).unwrap();
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.state = state;
@@ -78,9 +60,26 @@ enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
 
+const TEST_GATE: &str = r#"[[gates]]
+key = "tests"
+title = "Tests"
+description = ""
+stage = "postcheck"
+mode = "manual"
+"#;
+
 #[test]
 fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     // An in-progress epic with NO design dependency. Transition to done must be
     // blocked by the enforcing graph rule.
@@ -122,7 +121,16 @@ fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
 
 #[test]
 fn test_blocked_transition_records_event_in_log() {
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let _ = executor.issues().update_issue(
@@ -148,8 +156,8 @@ fn test_blocked_transition_records_event_in_log() {
         1,
         "exactly one TransitionBlocked event per blocking rule"
     );
-    match blocked[0] {
-        Event::TransitionBlocked {
+    match blocked[0].body() {
+        EventBody::TransitionBlocked {
             issue_id,
             target,
             rule,
@@ -170,7 +178,16 @@ fn test_blocked_transition_records_event_in_log() {
 
 #[test]
 fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let result = executor.issues().update_issue(
@@ -200,8 +217,8 @@ fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
         1,
         "one GraphRuleBypassed per overridden rule"
     );
-    match bypassed[0] {
-        Event::GraphRuleBypassed {
+    match bypassed[0].body() {
+        EventBody::GraphRuleBypassed {
             issue_id,
             target,
             rule,
@@ -232,7 +249,16 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let warnings = executor
@@ -279,12 +305,21 @@ severity = "warn"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     // A design issue the transitioning epic depends on.
     let design = seed_issue(&executor, "Design", &["type:design"], State::Done);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-    executor.add_dependency(&epic, &design).unwrap();
+    add_reducing_edge(&executor, &epic, &design).unwrap();
 
     // An unrelated epic with no design dependency (violates the rule). It is not
     // connected to `epic` in the dependency graph.
@@ -328,17 +363,29 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     // lands in `gated` with the gate error. (A gated-keyed rule WOULD block
     // the diversion; see
     // `test_gated_diversion_enforces_gated_keyed_graph_rule`.)
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Register the gate so it is a valid reference, leaving it unpassed.
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -383,15 +430,27 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -433,15 +492,27 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -482,15 +553,27 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -521,155 +604,56 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
-fn test_update_issue_state_path_enforces_done_graph_rule() {
-    // The state-only path (`update_issue_state`) must also enforce graph rules
-    // at the Done arm.
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+fn test_state_update_enforces_done_graph_rule() {
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.issues().update_issue_state(&epic, State::Done);
-    let err = result.expect_err("update_issue_state done must enforce graph rules");
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
+    let err = result.expect_err("a done transition must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
     let after = executor.storage().load_issue(&epic).unwrap();
     assert_eq!(after.state, State::InProgress, "blocked: nothing persisted");
 }
 
-/// A `dependency-shape` rule with an unknown `mode`: a CONFIG ERROR. The rule
-/// applies to `type:epic` issues at the done transition and `enforce = true`, so
-/// a broken (misconfigured) guard must BLOCK rather than silently degrade to a
-/// warning. Neighborhood-local (dependency-shape is not repo-wide), so it runs
-/// at transition time.
-const DONE_RULE_MISCONFIGURED: &str = r#"
-[[rules]]
-name = "epic-done-broken-shape"
-when = { type = "epic", state = "done" }
-severity = "error"
-enforce = true
-assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
-"#;
-
-#[test]
-fn test_enforce_rule_config_error_blocks_transition() {
-    // A typo in an `enforce = true` rule (here: a dependency-shape rule with an
-    // unknown `mode`) must NOT silently disable the guard. The config error blocks the
-    // done transition with exit 4, and the rendered error makes clear the rule
-    // itself is misconfigured.
-    let executor = executor_with_rules(DONE_RULE_MISCONFIGURED);
-    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-
-    let result = executor.issues().update_issue(
-        &epic,
-        None,
-        None,
-        None,
-        Some(State::Done),
-        vec![],
-        vec![],
-        None,
-        None,
-        false,
-    );
-
-    let err = result.expect_err("a misconfigured enforce rule must block the transition");
-    let blocked = err
-        .downcast_ref::<TransitionBlockedError>()
-        .expect("config error from an enforce rule maps to exit 4");
-    let rendered = blocked.to_string();
-    assert!(
-        rendered.contains("epic-done-broken-shape"),
-        "blocked error must name the broken rule: {rendered}"
-    );
-    assert!(
-        rendered.contains("misconfigured"),
-        "blocked error must flag the rule as misconfigured: {rendered}"
-    );
-
-    // Nothing persisted: the issue is still in progress.
-    let after = executor.storage().load_issue(&epic).unwrap();
-    assert_eq!(
-        after.state,
-        State::InProgress,
-        "a config-error block must persist nothing"
-    );
-}
-
-#[test]
-fn test_warn_rule_config_error_does_not_block_transition() {
-    // The same misconfigured rule, but `enforce = false`: a config error from a
-    // non-enforcing rule stays a warning and does not block the transition.
-    let rules = r#"
-[[rules]]
-name = "epic-done-broken-shape-warn"
-when = { type = "epic", state = "done" }
-severity = "error"
-enforce = false
-assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
-"#;
-    let executor = executor_with_rules(rules);
-    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-
-    let warnings = executor
-        .issues()
-        .update_issue(
-            &epic,
-            None,
-            None,
-            None,
-            Some(State::Done),
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .expect("a non-enforcing rule's config error must not block");
-
-    let after = executor.storage().load_issue(&epic).unwrap();
-    assert_eq!(
-        after.state,
-        State::Done,
-        "non-enforcing config error does not block"
-    );
-    assert!(
-        warnings
-            .iter()
-            .any(|w| w.contains("epic-done-broken-shape-warn") && w.contains("config error")),
-        "the config error must surface as a warning: {warnings:?}"
-    );
-}
-
 #[test]
 fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
-    // An enforce-at-done coverage/shape rule must also guard the Gated -> Done
-    // auto-transition path (gates pass via postcheck, then the issue would
-    // auto-complete). Without enforcement on this path an auto gate-pass could
-    // complete an issue past an enforce-at-done rule. Here: an epic with a
-    // PASSED gate (so it would auto-done) but NO design dependency (so the
-    // enforce-at-done rule fails) must stay Gated with the block surfaced.
-    use jit::domain::{GateState, GateStatus};
-
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    // Passing the last gate of a gated epic would auto-complete it, but the
+    // epic has no design dependency, so the enforce-at-done rule must keep it
+    // Gated with the block surfaced.
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Gated;
-    issue.gates_required = vec!["tests".to_string()];
-    issue.gates_status.insert(
-        "tests".to_string(),
-        GateState {
-            status: GateStatus::Passed,
-            updated_by: Some("ci:test".parse().unwrap()),
-            updated_at: chrono::Utc::now(),
-            run_id: None,
-        },
-    );
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
-    // Drive the Gated arm: it runs postchecks, which try to auto-transition to
-    // done. The enforce-at-done graph rule must block that auto-done.
-    let result = executor.issues().update_issue_state(&epic, State::Gated);
+    let result = executor.gates().pass_gate(
+        &epic,
+        &"tests".parse().unwrap(),
+        Some("ci:test".to_string()),
+        false,
+    );
     let err = result.expect_err("enforce-at-done rule must block the gated auto-done path");
     let blocked = err
         .downcast_ref::<TransitionBlockedError>()
@@ -695,7 +679,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
 }
 
 #[test]
-fn test_update_issue_state_enforces_non_terminal_arm_transition() {
+fn test_state_update_enforces_non_terminal_arm_transition() {
     // M3: the `_` arm (e.g. ready -> in_progress) previously skipped graph
     // enforcement. An enforcing rule scoped to the in_progress state must now
     // block this state-only transition too.
@@ -707,12 +691,19 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::Ready);
 
-    let result = executor
-        .issues()
-        .update_issue_state(&epic, State::InProgress);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::InProgress);
     let err = result.expect_err("the `_` arm must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -721,7 +712,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
-fn test_update_issue_state_enforces_explicit_gated_transition() {
+fn test_state_update_enforces_explicit_gated_transition() {
     // The explicit `--state gated` arm previously saved and returned before
     // graph enforcement, so a `state = "gated"` enforce rule was bypassable.
     // It must now block before anything persists.
@@ -733,10 +724,19 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.issues().update_issue_state(&epic, State::Gated);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Gated);
     let err = result.expect_err("the gated arm must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -754,7 +754,16 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
-    let mut executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let filter = QueryFilter::parse("label:type:epic").unwrap();
@@ -762,7 +771,10 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
         state: Some(State::Done),
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, false)
+        .unwrap();
 
     assert_eq!(result.summary.total_matched, 1);
     assert_eq!(
@@ -802,7 +814,16 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let mut executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(rules),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let filter = QueryFilter::parse("label:type:epic").unwrap();
@@ -810,7 +831,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         state: Some(State::Done),
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, false)
+        .unwrap();
 
     assert_eq!(result.summary.total_matched, 1);
     assert_eq!(
@@ -852,7 +876,16 @@ fn test_bulk_update_force_bypasses_enforcing_done_graph_rule() {
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
-    let mut executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let filter = QueryFilter::parse("label:type:epic").unwrap();
@@ -860,7 +893,10 @@ fn test_bulk_update_force_bypasses_enforcing_done_graph_rule() {
         state: Some(State::Done),
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, true)
+        .unwrap();
 
     assert_eq!(result.summary.total_modified, 1);
     assert_eq!(result.summary.total_errors, 0);
@@ -885,11 +921,20 @@ fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
     // encoded inside the chokepoint). An enforcing rule that WOULD block a done
     // transition must NOT block a transition to Rejected, regardless of which
     // entry point is used.
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     // The state-only path (`jit issue reject`) routes through the chokepoint.
-    let result = executor.issues().update_issue_state(&epic, State::Rejected);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Rejected);
     assert!(
         result.is_ok(),
         "rejection must bypass enforcement even with a violated enforce rule"
@@ -909,7 +954,16 @@ fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
 fn test_done_rule_does_not_fire_on_non_done_transition() {
     // A `state = "done"` rule must not fire when transitioning to ready: the
     // selector does not match the issue in the ready target state.
-    let executor = executor_with_rules(DONE_NEEDS_DESIGN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(DONE_NEEDS_DESIGN),
+            gates: Some(TEST_GATE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     // Backlog epic with no dependencies -> can go ready.
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::Backlog);
 

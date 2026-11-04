@@ -1,77 +1,30 @@
 //! Tests for the jit recover command
 
-use assert_cmd::Command;
+use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use predicates::prelude::*;
 use serde_json::Value;
-use tempfile::TempDir;
-
-fn jit_cmd() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    // Initialize git repo first (required for recover)
-    std::process::Command::new("git")
-        .current_dir(temp.path())
-        .args(["init"])
-        .output()
-        .expect("Failed to init git repo");
-
-    // Configure git user for commits
-    std::process::Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "user.email", "test@test.com"])
-        .output()
-        .expect("Failed to configure git email");
-    std::process::Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "user.name", "Test"])
-        .output()
-        .expect("Failed to configure git name");
-
-    // Create initial commit so we have a branch
-    std::fs::write(temp.path().join("README.md"), "# Test").unwrap();
-    std::process::Command::new("git")
-        .current_dir(temp.path())
-        .args(["add", "."])
-        .output()
-        .expect("Failed to git add");
-    std::process::Command::new("git")
-        .current_dir(temp.path())
-        .args(["commit", "-m", "Initial commit"])
-        .output()
-        .expect("Failed to git commit");
-
-    // Initialize jit
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["init"])
-        .assert()
-        .success();
-
-    temp
-}
 
 #[test]
 fn test_recover_command_exists() {
-    let temp = setup_test_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
+    cli.commit("Initial commit").unwrap();
+    cli.run(["init"]).unwrap();
 
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover"])
-        .assert()
-        .success();
+    cli.command(["recover"]).assert().success();
 }
 
 #[test]
 fn test_recover_with_json_output() {
-    let temp = setup_test_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
+    cli.commit("Initial commit").unwrap();
+    cli.run(["init"]).unwrap();
 
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover", "--json"])
+    cli.command(["recover", "--json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"success\""));
@@ -79,24 +32,11 @@ fn test_recover_with_json_output() {
 
 #[test]
 fn test_recover_json_failure_writes_registered_pretty_envelope_to_stdout() {
-    let temp = TempDir::new().unwrap();
+    let cli = JitCli::initialised().unwrap();
 
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["init"])
-        .assert()
-        .success();
-    std::process::Command::new("git")
-        .current_dir(temp.path())
-        .args(["init"])
-        .output()
-        .expect("Failed to initialize headless git repository");
+    cli.init_git().unwrap();
 
-    let assert = jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover", "--json"])
-        .assert()
-        .code(jit::output::ErrorCode::RecoveryFailed.exit_code().code());
+    let assert = cli.command(["recover", "--json"]).assert().failure();
     let output = assert.get_output();
     let stdout = std::str::from_utf8(&output.stdout).unwrap();
     let stderr = std::str::from_utf8(&output.stderr).unwrap();
@@ -119,12 +59,13 @@ fn test_recover_json_failure_writes_registered_pretty_envelope_to_stdout() {
 
 #[test]
 fn test_recover_reports_actions_taken() {
-    let temp = setup_test_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
+    cli.commit("Initial commit").unwrap();
+    cli.run(["init"]).unwrap();
 
-    // Run recover - should succeed even with nothing to recover
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover"])
+    cli.command(["recover"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Recovery complete"));
@@ -132,8 +73,8 @@ fn test_recover_reports_actions_taken() {
 
 #[test]
 fn test_recover_help_describes_purpose() {
-    jit_cmd()
-        .args(["recover", "--help"])
+    let cli = JitCli::uninitialised().unwrap();
+    cli.command(["recover", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("recovery"))
@@ -142,11 +83,15 @@ fn test_recover_help_describes_purpose() {
 
 #[test]
 fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
-    use jit::storage::{PutFile, RedoRecord};
+    use jit::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
 
-    let temp = setup_test_repo();
-    let published = temp.path().join("applied-by-recovery.md");
-    RedoRecord::new(
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
+    cli.commit("Initial commit").unwrap();
+    cli.run(["init"]).unwrap();
+    let published = cli.root().join("applied-by-recovery.md");
+    let record = RedoRecord::new(
         Vec::new(),
         vec![PutFile {
             path: jit::repository_state::VirtualPath::worktree("applied-by-recovery.md").unwrap(),
@@ -156,13 +101,11 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
         Vec::new(),
         None,
     )
-    .unwrap()
-    .commit(&temp.path().join(".jit"))
     .unwrap();
+    commit_redo_record(&DataRoot::open(&cli.root().join(".jit")).unwrap(), &record).unwrap();
 
-    let output = jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover", "--json"])
+    let output = cli
+        .command(["recover", "--json"])
         .assert()
         .success()
         .get_output()
@@ -188,19 +131,22 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
 /// failure; applying one is the command's own work.
 #[test]
 fn test_recover_json_classifies_an_unreadable_leftover_record_as_recovery_failed() {
-    let temp = setup_test_repo();
-    let scratch = temp
-        .path()
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
+    cli.commit("Initial commit").unwrap();
+    cli.run(["init"]).unwrap();
+    let scratch = cli
+        .root()
         .join(".jit")
         .join(jit::storage::RECORD_SCRATCH_DIR);
     std::fs::create_dir_all(&scratch).unwrap();
     std::fs::write(scratch.join(jit::storage::RECORD_FILE_NAME), b"no header").unwrap();
 
-    let output = jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover", "--json"])
+    let output = cli
+        .command(["recover", "--json"])
         .assert()
-        .code(jit::output::ErrorCode::RecoveryFailed.exit_code().code())
+        .failure()
         .get_output()
         .stdout
         .clone();

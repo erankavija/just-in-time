@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "92aa09e0c26792d40bdb6139843e9c21088f63c5",
+  "completed_at": "2026-11-04T02:24:29.761552772Z",
+  "duration_ms": 362204,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/invariant.rs",
+        "id": "F1",
+        "line": 32,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b23faa59/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The generated invariant-check schema is named for generic ListEnvelope rather than InvariantCheckResult."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/invariant.rs",
+        "id": "F2",
+        "line": 14,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b23faa59/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "Human drift stderr gains an Error: prefix, changing the required existing output."
+      }
+    ],
+    "summary": "The migration misses the required schema name and changes human drift stderr output.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b23faa59-8451-4fc4-97b8-a139d1b210e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7d8b1bac-38c2-4f2b-bbc9-a78c8651275b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:18:27.556819167Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8723 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a459-c022-7c93-ab80-6ea2a9bea019\n--------\nuser\n--- 8710 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 3aea7dbac, de2af6bd2, 56cb43269 (`jit:b23faa59`)\nPolicy sources: /home/vkaskivuo/Projects/just-in-time/AGENTS.md\nResolved items: @/issue/b23faa59/requirement/REQ-01–REQ-05 and @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (markdown-first issue descriptions); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T02:14:11Z); mcp-ci failed (exit code none, 2026-11-04T02:17:58Z)\nTruncation recovery: recovered initial truncated output with per-commit, per-path patches and bounded current-file reads\n\n1. [blocking, issue-impact] `invariant check` no longer publishes `InvariantCheckResult` as its schema success name. The registered lookup invokes `OutputSchema::of::<InvariantCheckResult>()`, whose alias resolves to `ListEnvelope`’s generic `JsonSchema::schema_name`, replacing the previous explicit `InvariantCheckResult` name. This misses REQ-02’s schema-name criterion. [`crates/jit/src/dispatch/invariant.rs:32`](@/issue/b23faa59/requirement/REQ-02)\n\n2. [blocking, issue-impact] Human drift output changed: the former inline command printed `Enforcement drift: N finding(s)` on stderr, while the new findings path adds `Error: ` through the shared renderer. The new handler returns that findings outcome and the updated integration test only checks stdout content, leaving the REQ-05 compatibility regression unguarded. [`crates/jit/src/dispatch/invariant.rs:14`](@/issue/b23faa59/requirement/REQ-05)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The migration misses the required schema name and changes human drift stderr output.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The generated invariant-check schema is named for generic ListEnvelope rather than InvariantCheckResult.\",\"file\":\"crates/jit/src/dispatch/invariant.rs\",\"line\":32,\"references\":[\"@/issue/b23faa59/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Human drift stderr gains an Error: prefix, changing the required existing output.\",\"file\":\"crates/jit/src/dispatch/invariant.rs\",\"line\":14,\"references\":[\"@/issue/b23faa59/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

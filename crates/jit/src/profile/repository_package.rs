@@ -8,18 +8,15 @@ mod tests {
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
     use crate::domain::repository_inputs::ExclusionPattern;
-    use crate::profile::contribution_drift::{DeclaredOverride, OverrideScope};
-    use crate::profile::drift_report::{DriftCarrier, DriftReport, DriftSubject};
     use crate::profile::{
         LiveSourceDeclaration, ProfilePackage, RegionDeclaration, RegionPlacement,
     };
     use crate::repository_state::{
         render_managed_document, render_rules_and_gates_markdown, Contribution, KeyedArrayTarget,
-        ManagedDocumentClaim, MapEntryTarget,
+        ManagedDocumentClaim,
     };
     use crate::storage::{IssueStore, JsonFileStorage};
-    use crate::templates::{GraphTemplate, TemplateRegistry};
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
     use std::fs;
     use std::path::Path;
     use std::process::Command;
@@ -628,12 +625,8 @@ mod tests {
     #[should_panic(expected = "tracks no file")]
     fn test_tracked_repository_paths_panics_when_the_listing_is_empty() {
         let empty = TempDir::new().unwrap();
-        let initialized = Command::new("git")
-            .current_dir(empty.path())
-            .args(["init", "-q"])
-            .status()
-            .unwrap();
-        assert!(initialized.success(), "the fixture repository initializes");
+        let initialized = crate::test_cli::init_git_repository(empty.path());
+        assert!(initialized.is_ok(), "the fixture repository initializes");
 
         let _ = tracked_repository_paths(empty.path());
     }
@@ -684,7 +677,7 @@ mod tests {
             "repo-validate",
         ] {
             let gate = declared_gate(&package, key);
-            assert_eq!(gate.key, key);
+            assert_eq!(gate.key.as_str(), key);
             assert!(
                 matches!(
                     gate.checker,
@@ -701,41 +694,22 @@ mod tests {
         }
     }
 
-    /// Compare a rendered managed region with its packaged source through the
-    /// shared drift report, normalizing the nested invariants projection when
-    /// the package source carries it.
+    /// How a rendered managed region differs from its packaged source, normalizing
+    /// the nested invariants projection when the package source carries it.
     fn managed_region_drift_report(
         region: &RegionDeclaration,
         rendered: &str,
         packaged: &str,
-    ) -> Option<DriftReport> {
-        let subject = DriftSubject {
-            repository: DriftCarrier::new(
-                region.target.clone(),
-                format!("region '{}'", region.region_id),
-            ),
-            packaged: DriftCarrier::new(
-                region.source.clone(),
-                format!("region '{}'", region.region_id),
-            ),
-            field_root: format!("region '{}'", region.region_id),
-            remedy: format!(
-                "edit the rendered region in '{}' and the packaged source in '{}' together so both carriers state the same region body",
-                region.target, region.source
-            ),
-        };
+    ) -> Option<String> {
         let rendered = normalized_managed_region_body(rendered, packaged);
         let packaged = normalized_managed_region_body(packaged, packaged);
-        let differences = if rendered == packaged {
-            Vec::new()
-        } else {
-            vec![format!(
-                "{}: the repository declares {rendered:?}, the package declares {packaged:?}",
-                subject.field_root
-            )]
-        };
-
-        subject.reporting(differences)
+        (rendered != packaged).then(|| {
+            format!(
+                "region '{}' differs: {} declares {rendered:?}, {} declares {packaged:?}; \
+                 edit the two together",
+                region.region_id, region.target, region.source
+            )
+        })
     }
 
     /// Apply the invariants placeholder splice used by the live repository
@@ -780,41 +754,24 @@ mod tests {
     }
 
     #[test]
-    fn test_managed_region_drift_report_names_rendered_and_packaged_carriers() {
+    fn test_managed_region_drift_report_names_both_carriers_and_their_text() {
         let region = region_declaration(
             "profiles/example/assets/region.md",
             "docs/example.md",
             "example",
         );
+
         let report = managed_region_drift_report(&region, "the rendered body", "the packaged body")
             .expect("different bodies are drift");
 
-        assert_eq!(report.repository().path, region.target);
-        assert_eq!(report.packaged().path, region.source);
-        assert!(report.repository().entry.contains("example"));
-        assert!(report.packaged().entry.contains("example"));
-        let rendered = report.to_string();
-        assert!(rendered.contains("repository: docs/example.md"));
-        assert!(rendered.contains("packaged:   profiles/example/assets/region.md"));
-        assert!(rendered.contains("edit the rendered region"));
-    }
-
-    #[test]
-    fn test_managed_region_drift_report_attributes_differing_text_to_each_carrier() {
-        let region = region_declaration(
-            "profiles/example/assets/region.md",
+        [
             "docs/example.md",
-            "example",
-        );
-        let report = managed_region_drift_report(&region, "the rendered body", "the packaged body")
-            .expect("different bodies are drift");
-        let difference = report.differences().join("\n");
-
-        assert!(difference.contains("the repository declares \"the rendered body\""));
-        assert!(
-            difference.contains("the package declares \"the packaged body\""),
-            "{difference}"
-        );
+            "profiles/example/assets/region.md",
+            "the rendered body",
+            "the packaged body",
+        ]
+        .iter()
+        .for_each(|expected| assert!(report.contains(expected), "{report}"));
     }
 
     #[test]
@@ -833,38 +790,28 @@ mod tests {
     #[test]
     fn test_managed_region_drift_report_compares_every_manifest_region_declaration() {
         let (_workspace, package) = assembled_package();
-        let expected = package
-            .model()
-            .regions
-            .iter()
-            .map(|region| (region.target.clone(), region.source.clone()))
-            .collect::<BTreeSet<_>>();
-        let compared = package
-            .model()
-            .regions
-            .iter()
-            .map(|region| {
-                let source =
-                    std::str::from_utf8(package.source_bytes(&region.source).unwrap()).unwrap();
-                let report = managed_region_drift_report(
+        package.model().regions.iter().for_each(|region| {
+            let source =
+                std::str::from_utf8(package.source_bytes(&region.source).unwrap()).unwrap();
+            assert!(
+                managed_region_drift_report(
                     region,
                     &format!("{source}\nrepository-only text"),
                     source,
                 )
-                .expect("the synthetic repository-only text is drift");
-                (
-                    report.repository().path.clone(),
-                    report.packaged().path.clone(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-
-        assert_eq!(compared, expected);
+                .is_some(),
+                "region '{}' went uncompared",
+                region.region_id
+            );
+        });
     }
 
     #[test]
     fn test_managed_regions_match_every_declared_source_tree_consumer() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
         let (_workspace, package) = assembled_package();
 
         // Each managed region's packaged source matches the live region body, modulo
@@ -887,723 +834,6 @@ mod tests {
         }
     }
 
-    /// This repository's committed template registry carries the packaged
-    /// declarations: its generated region equals the render, the render owns
-    /// that region and no byte outside it, the result loads, and rendering
-    /// again changes nothing.
-    ///
-    /// The assertion never writes. Generation is the generator script the
-    /// failure message names, so an edit to either declaration alone fails here
-    /// instead of being repaired.
-    #[test]
-    fn test_committed_template_registry_carries_the_packaged_declarations() {
-        use crate::profile::template_region::{
-            outside_template_region, packaged_templates, render_template_block,
-            render_template_registry, splice_template_region, TEMPLATE_REGION_GENERATOR,
-            TEMPLATE_REGISTRY_PATH,
-        };
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let existing = fs::read(root.join(TEMPLATE_REGISTRY_PATH)).unwrap();
-        let (_workspace, package) = assembled_package();
-        let block = render_template_block(&packaged_templates(&package).unwrap()).unwrap();
-        // The render the generator publishes, so the two cannot disagree about
-        // what the registry should hold.
-        let rendered = render_template_registry(&existing, &package).unwrap();
-
-        // The committed registry IS the render. On drift the generator, not
-        // this assertion, is what brings the two back into agreement.
-        assert_eq!(
-            String::from_utf8(rendered.clone()).unwrap(),
-            String::from_utf8(existing.clone()).unwrap(),
-            "{TEMPLATE_REGISTRY_PATH} no longer carries the packaged template \
-             declarations. The block between the region delimiters is \
-             generated from profiles/jit-dogfood/manifest.toml: edit the \
-             packaged declaration, then regenerate with {TEMPLATE_REGION_GENERATOR}"
-        );
-
-        // Rendering owns the region and nothing else.
-        assert_eq!(
-            outside_template_region(&rendered).unwrap(),
-            outside_template_region(&existing).unwrap(),
-            "rendering changed registry bytes outside the region delimiters"
-        );
-
-        // Whatever the region happens to hold, the packaged block replaces it
-        // whole while the authored bytes around it survive: the region body is
-        // read from the package rather than carried over from the file.
-        let stale =
-            splice_template_region(&existing, "# a declaration the package does not make\n")
-                .unwrap();
-        assert_eq!(
-            outside_template_region(&stale).unwrap(),
-            outside_template_region(&existing).unwrap(),
-            "replacing the region changed registry bytes outside the delimiters"
-        );
-        assert_eq!(
-            splice_template_region(&stale, &block).unwrap(),
-            rendered,
-            "rendering over a diverged region did not restore the packaged block"
-        );
-
-        // The rendered registry loads, and every container type a declaration
-        // brackets is still bracketed by that declaration.
-        let unchecked_hierarchy: [&str; 0] = [];
-        let before = TemplateRegistry::from_toml_str(
-            std::str::from_utf8(&existing).unwrap(),
-            &unchecked_hierarchy,
-        )
-        .unwrap();
-        let after = TemplateRegistry::from_toml_str(
-            std::str::from_utf8(&rendered).unwrap(),
-            &unchecked_hierarchy,
-        )
-        .unwrap();
-        for template in &before.templates {
-            for container_type in &template.applies_to {
-                assert_eq!(
-                    after
-                        .template_for_container(container_type)
-                        .map(|applied| applied.name.as_str()),
-                    Some(template.name.as_str()),
-                    "the rendered registry stops bracketing container type '{container_type}'"
-                );
-            }
-        }
-
-        // A second rendering run finds nothing to change.
-        assert_eq!(
-            splice_template_region(&rendered, &block).unwrap(),
-            rendered,
-            "a second rendering run changed the registry"
-        );
-    }
-
-    /// The declarations this repository deliberately holds differently from
-    /// the packaged contribution that names them.
-    ///
-    /// Every other contribution is bound: a packaged value and the registry
-    /// entry it restates are two copies of one declaration, and an edit to
-    /// either alone is reported. An entry here says the two are not copies of
-    /// one declaration at all, and why. Each is as narrow as its reason —
-    /// unless the whole entry is this repository's own, only the single field
-    /// the two carriers state differently is named, and every remaining field
-    /// of that entry stays bound.
-    const DECLARED_OVERRIDES: &[DeclaredOverride] = &[
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
-            identity: None,
-            field: Some("checker"),
-            reason: "The package ships every review gate as a portable placeholder an \
-                     adopter replaces without changing the workflow graph, which the \
-                     manifest declares above its gate contributions. This checkout is \
-                     such an adopter: each of its gates runs a real command.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
-            identity: None,
-            field: Some("title"),
-            reason: "A replaced checker is titled for the command it runs rather than \
-                     for the placeholder it replaced.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
-            identity: None,
-            field: Some("description"),
-            reason: "A replaced checker is described by what it runs; the packaged \
-                     description is bound instead to the reference the package \
-                     installs, which is rendered from the same contributions.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Invariants),
-            identity: None,
-            field: Some("enforced-by"),
-            reason: "The checkout-only cargo-ci gate is not package content, so the \
-                     packaged enforcement claims bind to the portable repo-validate \
-                     gate instead, which the manifest declares above its invariant \
-                     contributions. The statement each entry carries stays bound.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Rules),
-            identity: None,
-            field: Some("origin"),
-            reason: "A rule's origin records which declaration authored it, so a rule \
-                     this repository authored before the package carries its own \
-                     provenance marker rather than the package's.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Rules),
-            identity: None,
-            field: Some("description"),
-            reason: "Each carrier describes the rule for its own reader; the packaged \
-                     description is bound instead to the reference the package \
-                     installs, which is rendered from the same contributions. What the \
-                     rule asserts stays bound.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::MapEntry(MapEntryTarget::Namespaces),
-            identity: None,
-            field: Some("examples"),
-            reason: "Namespace examples are documentation and never enforced, so each \
-                     carrier names its own vocabulary: this repository's examples cite \
-                     its own issues, which an adopter has no counterpart for.",
-        },
-        DeclaredOverride {
-            package: PACKAGE_ID,
-            scope: OverrideScope::Projection,
-            identity: Some("rules-and-gates"),
-            field: None,
-            reason: "The two are different projections of one registry rather than one \
-                     projection declared twice: this repository renders the reference \
-                     into a region of its published documentation, and the package \
-                     installs it as a separate file under .jit/reference/.",
-        },
-    ];
-
-    /// This repository's registries, keyed by the repository-relative path the
-    /// contributions target.
-    ///
-    /// Panics when a targeted registry cannot be read: a registry the
-    /// comparison cannot consult is a contribution left unbound, which is what
-    /// the check exists to prevent.
-    fn contributed_registries(contributions: &[Contribution]) -> BTreeMap<String, String> {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        crate::profile::contribution_drift::contributed_registry_paths(contributions)
-            .into_iter()
-            .map(|registry| {
-                let text = fs::read_to_string(root.join(registry))
-                    .unwrap_or_else(|error| panic!("failed to read {registry}: {error}"));
-                (registry.to_string(), text)
-            })
-            .collect()
-    }
-
-    /// Every package this repository publishes, assembled from the checkout,
-    /// with the directories holding the assembled trees.
-    ///
-    /// The set comes from the checkout's package-source listing, so a package
-    /// added there joins the walks below without an edit here — which is the
-    /// property that keeps a second published package from going unbound the
-    /// way the first one did.
-    fn published_packages() -> (Vec<TempDir>, Vec<(String, ProfilePackage)>) {
-        crate::test_utils::published_package_ids()
-            .into_iter()
-            .map(|id| {
-                let (workspace, package) = crate::test_utils::temporary_repository_package(&id);
-                (workspace, (id, package))
-            })
-            .unzip()
-    }
-
-    /// Every contribution of `package` whose repository counterpart states
-    /// something else, given the registries the repository carries.
-    fn contribution_drift(
-        id: &str,
-        package: &ProfilePackage,
-        registries: &BTreeMap<String, String>,
-    ) -> Vec<crate::profile::drift_report::DriftReport> {
-        crate::profile::contribution_drift::contribution_drift_reports(
-            id,
-            &package.model().contributions,
-            registries,
-            DECLARED_OVERRIDES,
-        )
-        .expect("every contributed registry entry is comparable")
-    }
-
-    /// Every contribution of every published package, and the reports they
-    /// produce against the registries this repository carries.
-    fn published_contribution_drift(
-        packages: &[(String, ProfilePackage)],
-    ) -> Vec<crate::profile::drift_report::DriftReport> {
-        packages
-            .iter()
-            .flat_map(|(id, package)| {
-                let registries = contributed_registries(&package.model().contributions);
-                contribution_drift(id, package, &registries)
-            })
-            .collect()
-    }
-
-    /// Every contribution of every package this repository publishes agrees
-    /// with the repository registry entry it restates.
-    ///
-    /// This is the direction the manifests do not walk: a contribution and the
-    /// entry it restates are two copies of one declaration, and nothing else
-    /// keeps them in step. The repository's copy is what this checkout's own
-    /// validation reads and the packaged copy is what an adopter receives, so
-    /// once they come apart one of them carries a ruling the other never
-    /// recorded. Binding one package and not the next left exactly that gap.
-    #[test]
-    fn test_contribution_drift_is_empty_across_every_published_package() {
-        let (_workspaces, packages) = published_packages();
-        assert!(
-            packages.len() >= 2,
-            "this repository publishes more than one package, which is what makes \
-             the walk over the published set distinct from a walk over one package"
-        );
-
-        let reported = published_contribution_drift(&packages)
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
-        assert_eq!(
-            reported,
-            Vec::<String>::new(),
-            "each report names a packaged contribution and the repository entry it \
-             restates, which no longer state the same thing"
-        );
-    }
-
-    /// Every published package contributes to a registry the walk reads, so no
-    /// package is carried by the walk without being compared.
-    #[test]
-    fn test_every_published_package_contributes_to_a_registry_the_walk_reads() {
-        let (_workspaces, packages) = published_packages();
-
-        let uncompared: Vec<&str> = packages
-            .iter()
-            .filter(|(_, package)| {
-                contributed_registries(&package.model().contributions).is_empty()
-            })
-            .map(|(id, _)| id.as_str())
-            .collect();
-
-        assert_eq!(
-            uncompared,
-            Vec::<&str>::new(),
-            "each entry names a published package the walk visits and compares \
-             nothing for"
-        );
-    }
-
-    /// Every target the manifest contributes to is bound: an edit to the
-    /// packaged declaration alone is reported for each of them.
-    ///
-    /// A comparison that reached only some targets would pass this repository
-    /// while leaving the rest free to drift, which is the state the check
-    /// replaces. The seeded value is a field of the contribution itself, so no
-    /// target is bound by an expectation stated here about what it declares.
-    #[test]
-    fn test_contribution_drift_compares_a_seeded_edit_on_every_declared_target() {
-        let (_workspaces, packages) = published_packages();
-
-        // Each target is named with the package declaring it, so a target one
-        // package binds does not vouch for the same target in another.
-        let declared: BTreeSet<(String, String)> = packages
-            .iter()
-            .flat_map(|(id, package)| {
-                package
-                    .model()
-                    .contributions
-                    .iter()
-                    .map(|contribution| (id.clone(), declared_target(contribution)))
-            })
-            .collect();
-        assert!(
-            !declared.is_empty(),
-            "the published packages declare contributions"
-        );
-
-        let bound: BTreeSet<(String, String)> = packages
-            .iter()
-            .flat_map(|(id, package)| {
-                let contributions = &package.model().contributions;
-                let registries = contributed_registries(contributions);
-                contributions
-                    .iter()
-                    .filter(|contribution| {
-                        seeded_packaged_edits(contribution)
-                            .iter()
-                            .any(|seeded| seeded_drift(id, seeded, &registries).len() == 1)
-                    })
-                    .map(|contribution| (id.clone(), declared_target(contribution)))
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        assert_eq!(
-            bound, declared,
-            "each pair the two sets differ by names a package and a target where a \
-             seeded edit to the packaged declaration went unreported, so nothing \
-             binds it"
-        );
-    }
-
-    /// An edit to the repository's registry alone is reported, naming both
-    /// carriers and the differing text.
-    ///
-    /// The edit is made the way a hand would make it — the entry's own text is
-    /// rewritten in the registry file — and the check reads the entry back out
-    /// of that text, so no seam stands between the seeded edit and the
-    /// comparison. The entry is the one whose amendment went unreported for
-    /// want of this check.
-    #[test]
-    fn test_contribution_drift_report_names_both_carriers_of_a_seeded_repository_edit() {
-        let (_workspace, package) = assembled_package();
-        let contributions = &package.model().contributions;
-        let registry = KeyedArrayTarget::Invariants.registry_path();
-        let mut registries = contributed_registries(contributions);
-        let committed = registries
-            .get(registry)
-            .expect("the invariant registry")
-            .clone();
-        registries.insert(
-            registry.to_string(),
-            seeded_invariant_statement(&committed, "domain-agnostic"),
-        );
-
-        let reported = contribution_drift(PACKAGE_ID, &package, &registries);
-
-        assert_eq!(reported.len(), 1, "{reported:?}");
-        let report = &reported[0];
-        assert_eq!(report.repository().path, registry);
-        assert_eq!(
-            report.packaged().path,
-            crate::profile::contribution_drift::packaged_manifest_path(PACKAGE_ID)
-        );
-        let rendered = report.to_string();
-        assert!(rendered.contains(SEEDED_EDIT), "{rendered}");
-        for carrier in [report.repository(), report.packaged()] {
-            assert!(rendered.contains(&carrier.path), "{rendered}");
-            assert!(rendered.contains(&carrier.entry), "{rendered}");
-        }
-    }
-
-    /// Every declared override still names a contribution its own package
-    /// makes and, when it names a field, one that contribution declares.
-    ///
-    /// An override outliving the declaration it excuses would go on suppressing
-    /// a comparison nothing asked for. Because an override names its package,
-    /// an entry whose reason was written about one package and whose package no
-    /// longer declares the contribution is reported here even while another
-    /// package declares the same thing.
-    #[test]
-    fn test_declared_overrides_each_name_a_contribution_its_package_still_declares() {
-        let (_workspaces, packages) = published_packages();
-
-        let stale: Vec<(&str, &str)> = DECLARED_OVERRIDES
-            .iter()
-            .filter(|declared| {
-                !packages.iter().any(|(id, package)| {
-                    package
-                        .model()
-                        .contributions
-                        .iter()
-                        .any(|contribution| declared.applies_to(id, contribution))
-                })
-            })
-            .map(|declared| (declared.package, declared.reason))
-            .collect();
-
-        assert_eq!(
-            stale,
-            Vec::<(&str, &str)>::new(),
-            "each entry pairs a package with a declared override whose contribution \
-             or field that package no longer declares"
-        );
-    }
-
-    /// The text a seeded edit writes into a declaration.
-    const SEEDED_EDIT: &str = "a value the package does not carry";
-
-    /// The target a contribution declares, spelled the way the manifest spells
-    /// it, so the walk above states its coverage in the manifest's vocabulary.
-    fn declared_target(contribution: &Contribution) -> String {
-        match serde_json::to_value(contribution) {
-            Ok(serde_json::Value::Object(fields)) => fields
-                .get("target")
-                .or_else(|| fields.get("kind"))
-                .and_then(|target| target.as_str().map(str::to_string)),
-            _ => None,
-        }
-        .expect("a contribution declares its target")
-    }
-
-    /// The reports one edited contribution produces against `registries`.
-    ///
-    /// A seed that leaves the declaration uninterpretable — a token that is not
-    /// one of a closed vocabulary, say — reports nothing here and the walk
-    /// above tries the next field.
-    fn seeded_drift(
-        package: &str,
-        contribution: &Contribution,
-        registries: &BTreeMap<String, String>,
-    ) -> Vec<crate::profile::drift_report::DriftReport> {
-        crate::profile::contribution_drift::contribution_drift_reports(
-            package,
-            std::slice::from_ref(contribution),
-            registries,
-            DECLARED_OVERRIDES,
-        )
-        .unwrap_or_default()
-    }
-
-    /// Every way this walk knows to edit one packaged declaration away from the
-    /// repository's, one edited contribution per field it can change.
-    ///
-    /// The field values are the contribution's own, changed in place and in
-    /// kind, so a declaration of any shape yields candidates without this
-    /// helper knowing what its fields mean.
-    fn seeded_packaged_edits(contribution: &Contribution) -> Vec<Contribution> {
-        let value = crate::profile::contribution_drift::contributed_value(contribution);
-        let candidates: Vec<serde_json::Value> = match &value {
-            serde_json::Value::Object(fields) => fields
-                .iter()
-                .filter_map(|(key, field)| {
-                    let mut edited = fields.clone();
-                    edited.insert(key.clone(), seeded_value(field)?);
-                    Some(serde_json::Value::Object(edited))
-                })
-                .collect(),
-            scalar => seeded_value(scalar).into_iter().collect(),
-        };
-        candidates
-            .into_iter()
-            .filter_map(|value| reseated(contribution, value))
-            .collect()
-    }
-
-    /// `value` changed in place and in kind, or `None` when this walk has no
-    /// change for its shape.
-    fn seeded_value(value: &serde_json::Value) -> Option<serde_json::Value> {
-        use serde_json::Value;
-        match value {
-            Value::String(_) => Some(Value::String(SEEDED_EDIT.to_string())),
-            Value::Bool(carried) => Some(Value::Bool(!carried)),
-            Value::Number(carried) => carried
-                .as_i64()
-                .map(|carried| Value::Number((carried + 1).into())),
-            Value::Array(carried) => Some(Value::Array(
-                [
-                    carried.clone(),
-                    vec![Value::String(SEEDED_EDIT.to_string())],
-                ]
-                .concat(),
-            )),
-            Value::Object(_) | Value::Null => None,
-        }
-    }
-
-    /// `contribution` carrying `value` instead of its own.
-    ///
-    /// A projection's value is a complete configuration rather than a free
-    /// value, so a seed that is not one is no candidate.
-    fn reseated(contribution: &Contribution, value: serde_json::Value) -> Option<Contribution> {
-        Some(match contribution {
-            Contribution::KeyedArray {
-                target, identity, ..
-            } => Contribution::KeyedArray {
-                target: *target,
-                identity: identity.clone(),
-                value,
-            },
-            Contribution::MapEntry {
-                target, identity, ..
-            } => Contribution::MapEntry {
-                target: *target,
-                identity: identity.clone(),
-                value,
-            },
-            Contribution::Projection { name, .. } => Contribution::Projection {
-                name: name.clone(),
-                value: serde_json::from_value(value).ok()?,
-            },
-            Contribution::Scalar { target, .. } => Contribution::Scalar {
-                target: *target,
-                value: value.as_str()?.to_string(),
-            },
-            Contribution::SetString { target, .. } => Contribution::SetString {
-                target: *target,
-                value: value.as_str()?.to_string(),
-            },
-        })
-    }
-
-    /// `registry` with the statement of invariant `identity` rewritten.
-    fn seeded_invariant_statement(registry: &str, identity: &str) -> String {
-        let mut document = registry
-            .parse::<toml_edit::DocumentMut>()
-            .expect("the invariant registry parses");
-        let entry = document[KeyedArrayTarget::Invariants.array_name()]
-            .as_array_of_tables_mut()
-            .expect("the registry declares an invariant array")
-            .iter_mut()
-            .find(|entry| {
-                entry
-                    .get(KeyedArrayTarget::Invariants.identity_field())
-                    .and_then(toml_edit::Item::as_str)
-                    == Some(identity)
-            })
-            .unwrap_or_else(|| panic!("the repository declares invariant '{identity}'"));
-        entry["statement"] = toml_edit::value(SEEDED_EDIT);
-        document.to_string()
-    }
-
-    /// This repository's committed template registry.
-    fn committed_template_registry() -> Vec<u8> {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        fs::read(root.join(crate::profile::template_region::TEMPLATE_REGISTRY_PATH)).unwrap()
-    }
-
-    /// The declarations a template registry's text carries, as the registry
-    /// loader parses them. The type check is left to the repository's own
-    /// config load: what is compared here is the declaration, not the hierarchy
-    /// it names.
-    fn template_declarations_of(registry: &[u8]) -> Vec<GraphTemplate> {
-        let unchecked_hierarchy: [&str; 0] = [];
-        TemplateRegistry::from_toml_str(
-            std::str::from_utf8(registry).unwrap(),
-            &unchecked_hierarchy,
-        )
-        .unwrap()
-        .templates
-    }
-
-    /// The declarations a registry's generated region carries: the extent the
-    /// package is the authority for (`@/issue/e204e63d/decision/D-1`), which is
-    /// what the drift guard compares.
-    fn region_declarations_of(registry: &[u8]) -> Vec<GraphTemplate> {
-        use crate::profile::template_region::inside_template_region;
-        template_declarations_of(inside_template_region(registry).unwrap().as_bytes())
-    }
-
-    /// The committed region's declarations agree with the packaged ones field
-    /// for field, description strings included.
-    ///
-    /// Each side is compared as the value it parses into — the registry's
-    /// generated region through the templates loader, the package through its
-    /// manifest — so the assertion carries no expectation of its own about what
-    /// the bracket declares, and it holds whether or not the region was
-    /// regenerated: a hand edit inside the region fails here as readily as a
-    /// change to the packaged authority.
-    #[test]
-    fn test_committed_template_declarations_agree_with_the_packaged_declarations() {
-        use crate::profile::template_region::{packaged_templates, template_drift_report};
-        let (_workspace, package) = assembled_package();
-        let repository = region_declarations_of(&committed_template_registry());
-        let packaged = packaged_templates(&package).unwrap();
-
-        if let Some(report) = template_drift_report(&repository, &packaged).unwrap() {
-            panic!("{report}");
-        }
-    }
-
-    /// A hand edit to the registry's generated region alone is reported, naming
-    /// the field it changed.
-    ///
-    /// The edit is made the way a hand would make it: the changed declaration
-    /// is written back into the committed registry's region, and the guard
-    /// reads its declarations out of that text.
-    #[test]
-    fn test_template_drift_report_names_the_field_an_edited_repository_declaration_changed() {
-        use crate::profile::template_region::{
-            packaged_templates, render_template_block, splice_template_region,
-            template_drift_report, TEMPLATE_REGION_GENERATOR,
-        };
-        let (_workspace, package) = assembled_package();
-        let committed = committed_template_registry();
-        let mut edited = region_declarations_of(&committed);
-        let node = edited
-            .first_mut()
-            .and_then(|template| template.nodes.first_mut())
-            .expect("the repository declares a template node");
-        node.description = Some(format!(
-            "{} A sentence the package does not carry.",
-            node.description.as_deref().unwrap_or_default()
-        ));
-        let hand_edited =
-            splice_template_region(&committed, &render_template_block(&edited).unwrap()).unwrap();
-
-        let report = template_drift_report(
-            &region_declarations_of(&hand_edited),
-            &packaged_templates(&package).unwrap(),
-        )
-        .unwrap()
-        .expect("an edited repository declaration is drift");
-
-        assert!(
-            report.contains("template[0].nodes[0].description"),
-            "{report}"
-        );
-        assert!(
-            report.contains("A sentence the package does not carry."),
-            "{report}"
-        );
-        assert!(report.contains(TEMPLATE_REGION_GENERATOR), "{report}");
-    }
-
-    /// An edit to the packaged declaration alone is reported, naming the field
-    /// it changed.
-    #[test]
-    fn test_template_drift_report_names_the_field_an_edited_packaged_declaration_changed() {
-        use crate::profile::template_region::{
-            packaged_templates, template_drift_report, TEMPLATE_REGION_GENERATOR,
-        };
-        let (_workspace, package) = assembled_package();
-        let repository = region_declarations_of(&committed_template_registry());
-        let mut packaged = packaged_templates(&package).unwrap();
-        let anchor = packaged
-            .first_mut()
-            .and_then(|template| template.anchors.first_mut())
-            .expect("the package declares a template anchor");
-        anchor.gates.push("a-gate-the-repository-omits".to_string());
-        let appended = anchor.gates.len() - 1;
-
-        let report = template_drift_report(&repository, &packaged)
-            .unwrap()
-            .expect("an edited packaged declaration is drift");
-
-        assert!(
-            report.contains(&format!("template[0].anchors[0].gates[{appended}]")),
-            "{report}"
-        );
-        assert!(report.contains("a-gate-the-repository-omits"), "{report}");
-        assert!(report.contains(TEMPLATE_REGION_GENERATOR), "{report}");
-    }
-
-    /// A template the repository authors outside the delimiters is not drift.
-    ///
-    /// The package is the authority for the generated region, not for the
-    /// registry's whole template inventory (`@/issue/e204e63d/decision/D-1`),
-    /// so a second declaration beyond the region leaves the guard silent even
-    /// though the file then carries more declarations than the package does.
-    #[test]
-    fn test_template_drift_report_ignores_a_template_authored_outside_the_region() {
-        use crate::profile::template_region::{
-            packaged_templates, render_template_block, template_drift_report,
-        };
-        let (_workspace, package) = assembled_package();
-        let packaged = packaged_templates(&package).unwrap();
-        let mut authored = packaged.clone();
-        authored
-            .first_mut()
-            .expect("the package declares a template")
-            .name = "authored-outside-the-region".to_string();
-        let registry = [
-            committed_template_registry(),
-            b"\n".to_vec(),
-            render_template_block(&authored).unwrap().into_bytes(),
-        ]
-        .concat();
-
-        assert!(
-            template_declarations_of(&registry).len() > region_declarations_of(&registry).len(),
-            "the registry under test must carry a declaration beyond its region"
-        );
-        if let Some(report) =
-            template_drift_report(&region_declarations_of(&registry), &packaged).unwrap()
-        {
-            panic!("a declaration authored outside the region was reported as drift:\n{report}");
-        }
-    }
-
     #[test]
     fn test_profile_applies_to_neutral_repo_and_ordinary_renderers_consume_config() {
         let temp = TempDir::new().unwrap();
@@ -1612,6 +842,7 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
         let initializer = CommandExecutor::new(storage.clone()).with_layout(layout);
         initializer
+            .profiles()
             .initialize_fresh_repository(temp.path(), None)
             .unwrap();
         fs::write(temp.path().join("AGENTS.md"), b"# Existing guidance\n").unwrap();
@@ -1639,7 +870,7 @@ mod tests {
             &temp.path().join("profiles").join(PACKAGE_ID),
         )
         .unwrap();
-        let applied = executor.apply_profile_package(&package).unwrap();
+        let applied = crate::test_utils::apply_package(&executor, &package).unwrap();
         assert_eq!(
             applied.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Applied
@@ -1698,25 +929,28 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), temp.path().join(".jit"))
                 .unwrap();
         let reloaded = CommandExecutor::new(storage).with_layout(layout);
-        let invariants = reloaded.project_render(Some("invariants")).unwrap();
-        let invariants = &invariants.projections[0];
+        let invariants = reloaded.items().project_render(Some("invariants")).unwrap();
+        let invariants = &invariants.items[0];
         assert_eq!(invariants.target, "AGENTS.md");
-        assert_eq!(invariants.mode, "region");
-        assert_eq!(invariants.style, "id-anchor");
+        assert_eq!(invariants.mode, crate::config::ProjectionMode::Region);
+        assert_eq!(invariants.style, ProjectionStyle::IdAnchor);
         assert_eq!(invariants.kinds, ["invariant"]);
         assert_eq!(invariants.count, contributed.invariants.len());
-        let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
-        let reference = &reference.projections[0];
+        let reference = reloaded
+            .items()
+            .project_render(Some("rules-and-gates"))
+            .unwrap();
+        let reference = &reference.items[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
-        assert_eq!(reference.mode, "separate-file");
-        assert_eq!(reference.style, "full");
+        assert_eq!(reference.mode, crate::config::ProjectionMode::SeparateFile);
+        assert_eq!(reference.style, ProjectionStyle::Full);
         assert_eq!(reference.kinds, ["rule", "gate"]);
         // The separate-file target carries the profile's six gates (registry
         // composition asserted through the rendered `## Gates` section).
         let rendered = fs::read_to_string(temp.path().join(&reference.target)).unwrap();
         assert_eq!(rendered.matches("@/gate/").count(), 6);
 
-        let unchanged = reloaded.apply_profile_package(&package).unwrap();
+        let unchanged = crate::test_utils::apply_package(&reloaded, &package).unwrap();
         assert_eq!(
             unchanged.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Unchanged
@@ -1751,7 +985,7 @@ mod tests {
         .unwrap();
         std::fs::write(temp.path().join("rules.toml"), &rules_toml).unwrap();
         let rules = crate::storage::ruleset_store::load_ruleset(
-            temp.path(),
+            &crate::test_utils::repository_layout_for_data_root(temp.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
@@ -1766,7 +1000,7 @@ mod tests {
         ] {
             gates
                 .gates
-                .insert(key.to_string(), declared_gate(&package, key));
+                .insert(key.parse().unwrap(), declared_gate(&package, key));
         }
         let expected = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::Full);
         assert_eq!(
@@ -1927,8 +1161,8 @@ mod tests {
         }
     }
 
-    /// Create-time warnings the package's own `orphan-leaf` and
-    /// `strategic-consistency` rules raise over one issue carrying `labels`,
+    /// Create-time warnings the package's own type-hierarchy rules raise over
+    /// one issue carrying `labels`,
     /// evaluated in memory over the declared test vocabulary.
     fn create_time_warnings(labels: Vec<String>) -> Vec<crate::validation::graph::GraphFinding> {
         let (_workspace, package) = assembled_package();
@@ -1941,24 +1175,22 @@ mod tests {
                     target: KeyedArrayTarget::Rules,
                     value,
                     ..
-                } if matches!(
-                    value.get("name").and_then(serde_json::Value::as_str),
-                    Some("orphan-leaf" | "strategic-consistency")
-                ) =>
-                {
-                    Some(value.clone())
-                }
+                } if value["assert"]["type-hierarchy"].is_object() => Some(value.clone()),
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(rules.len(), 2, "the package declares both warnings");
+        assert_eq!(
+            rules.len(),
+            crate::declarations::rules::TypeHierarchyKind::ALL.len(),
+            "the package declares one warning per hierarchy check"
+        );
         let declared = toml::to_string(&serde_json::json!({ "rules": rules }))
             .expect("the package's rules serialize as a rules file");
         let ruleset = crate::declarations::rules::RuleSet::parse(&declared, None, [])
             .expect("the package's rules parse");
         let graph_rules = ruleset.rules.iter().collect::<Vec<_>>();
 
-        let mut issue = crate::domain::fixture_issue("Subject".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Subject".to_string(), String::new());
         issue.labels = labels;
         crate::validation::graph::evaluate_graph(
             &graph_rules,

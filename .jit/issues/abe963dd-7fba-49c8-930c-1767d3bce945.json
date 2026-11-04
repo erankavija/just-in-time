@@ -8,12 +8,26 @@
   ],
   "description": "Plan, apply, diff and repository initialization reach package selection through one selection value built once per invocation, which resolves selectors, the package graph and variable inputs once.\n\n## Background\n\nSelection preparation is repeated across the profile executor (`crates/jit/src/commands/profile.rs`, line numbers at the investigation baseline):\n\n- Separate skeletons exist in `plan_profiles_with_inputs` (1168), `plan_profiles_from_sources` (1201), `apply_profile_with_inputs` (1285), `apply_profile_from_sources` (1342), `diff_profiles_from_sources` (1388) and `apply_profile_package_with_inputs` (1818).\n- Each `*_from_sources` entry resolves selectors and the graph, then its `*_with_inputs` routine resolves both again (1206/1173, 1347/1290).\n- Initialization resolves three times: `crates/jit/src/commands/init.rs:133-137,166-167` plus a preflight through `validate_profile_selection` (1792) from `crates/jit/src/main.rs:2552`.\n- `prepare_profile_selection` (2040) captures the repository three times and rebuilds its inputs three times (`profile_selection_inputs`, 2943), composing each package at least 2 + 4N times.\n- Variable inputs are validated at load (500) and again at 1177, 1293, 1403, 1824 and `init.rs:169`.\n- Package model references are validated in the package constructor (`crates/jit/src/profile/package.rs:623`) and again in `resolve_package` (`crates/jit/src/profile/variables.rs:311`).\n\nThe pure graph resolution (`ResolvedProfileGraph::resolve`, `crates/jit/src/profile/graph.rs:50`) stays the domain function. One command-layer selection, built from the selectors and variable options, holds the selected packages, their closure, the resolved graph, the validated inputs and the resolved content. The preparation step takes that value in place of four parallel slices with a length check (2050). Initialization's preflight becomes building the selection before its session opens.\n\n## Success Criteria\n\n- [hard] REQ-01: Plan, apply, diff and initialization with a profile each resolve selectors and the package dependency graph once per invocation.\n- [hard] REQ-02: Composition inputs are built once per invocation.\n- [hard] REQ-03: Variable-input validation and package model reference validation each run once per command.\n- [hard] REQ-04: Initialization reaches selection through the same path as apply, with no separate preflight resolution.\n- [hard] REQ-05: A counting probe at the harness layer observes the once-per-invocation properties.\n",
   "documents": [],
+  "done_at": "2026-11-01T13:33:08.649580601Z",
   "first_ready_at": "2026-10-22T15:47:04.771573815Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "981c887d-254f-494f-a76a-cb924e4f6873",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:32:49.513560133Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a11f9d9a-a292-43c3-97b8-9b2f2f344177",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:29:33.319270504Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "abe963dd-7fba-49c8-930c-1767d3bce945",
   "labels": [
     "type:task",
@@ -25,7 +39,7 @@
     "satisfies:3d9a0ce3/REQ-10"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Build one profile selection per invocation",
-  "updated_at": "2026-10-22T15:47:15.888258367Z"
+  "updated_at": "2026-11-01T13:33:08.649580601Z"
 }

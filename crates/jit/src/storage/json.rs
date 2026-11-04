@@ -6,37 +6,30 @@
 //! redo records through [`RepositoryStateStore`]. The directory
 //! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
+use super::gate_run_reader::TreeNode;
 use crate::declarations::GateRegistry;
 use crate::domain::event_log::parse_known_events;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
-    gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
-    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
-    SUPPORTED_INDEX_SCHEMA_VERSION,
+    RepositoryIndex, RepositoryIndexError, RepositoryLayout, RepositoryRootClass, VirtualPath,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
 };
 use crate::storage::{
-    FileLocker, GateRunNotFoundError, IssueNotFoundError, IssueStore, RecoveryDispatchReport,
-    RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError, RepositoryMutationSession,
-    RepositoryNotFoundError, RepositoryStateStore, RepositoryStateStoreError, WorktreePaths,
+    FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
+    RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
+    RepositoryNotFoundError, RepositoryStateStore, WorktreePaths,
 };
 use anyhow::{anyhow, Context, Result};
-use serde::Deserialize;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
-
-const ISSUES_DIR: &str = "issues";
-const INDEX_FILE: &str = "index.json";
-const EVENTS_FILE: &str = "events.jsonl";
-const GATE_RUNS_DIR: &str = "gate-runs";
 
 static NEXT_RETENTION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -51,7 +44,7 @@ thread_local! {
 /// The semantic records physically present in one selected JIT data root.
 ///
 /// Unlike [`IssueStore`] readers, this snapshot never consults repository
-/// history, index membership, or another checkout's data root. Issue order is
+/// history, tombstones, or another checkout's data root. Issue order is
 /// stable by physical file name; event order remains append-log order.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ExactStoreSnapshot {
@@ -63,21 +56,23 @@ pub struct ExactStoreSnapshot {
 
 /// Read exactly one JIT data root without aggregation or mutation.
 ///
-/// The absolute `data_root` is the sole location authority. The read does not
-/// construct a storage backend, acquire locks that could create sidecar files,
-/// invoke Git, inspect the process working directory, or fall back to a primary
-/// checkout. An absent data root, issue directory, or event log contributes no
-/// records.
+/// `layout` is the sole location authority, and well-known files are resolved
+/// through it. The read does not construct a storage backend, acquire locks
+/// that could create sidecar files, invoke Git, inspect the process working
+/// directory, or fall back to a primary checkout. An absent data root, issue
+/// directory, or event log contributes no records.
 ///
 /// # Errors
 ///
-/// Returns an error when the selected root is relative, contains an unsafe
-/// filesystem entry, a record cannot be read, or a physical issue/current event
-/// cannot be parsed.
-pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
-    let data = match super::repository_state_store::open_absolute_dir_nofollow(data_root) {
+/// Returns an error when the selected root contains an unsafe filesystem entry,
+/// a record cannot be read, or a physical issue/current event cannot be parsed.
+pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot> {
+    let data_root = layout.data_root();
+    let issues_path = layout.resolve(&VirtualPath::ISSUES)?;
+    let events_path = layout.resolve(&VirtualPath::EVENTS)?;
+    let data = match super::capability_fs::open_absolute_dir_nofollow(data_root) {
         Ok(data) => data,
-        Err(RepositoryStateStoreError::Io(error))
+        Err(super::capability_fs::CapabilityFsError::Io(error))
             if error.kind() == std::io::ErrorKind::NotFound =>
         {
             return Ok(ExactStoreSnapshot::default())
@@ -85,18 +80,20 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
         Err(error) => return Err(error.into()),
     };
 
-    let issues = match data.symlink_metadata(ISSUES_DIR) {
+    let issues = match data.symlink_metadata(VirtualPath::ISSUES.relative().as_str()) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(error) => return Err(error.into()),
         Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
             anyhow::bail!(
                 "Issue root at {} must be an ordinary directory",
-                data_root.join(ISSUES_DIR).display()
+                issues_path.display()
             )
         }
         Ok(_) => {
-            let issue_dir =
-                super::repository_state_store::open_child_dir_nofollow(&data, ISSUES_DIR)?;
+            let issue_dir = super::capability_fs::open_child_dir_nofollow(
+                &data,
+                VirtualPath::ISSUES.relative().as_str(),
+            )?;
             let mut names = issue_dir
                 .entries()?
                 .map(|entry| entry.map(|entry| entry.file_name()))
@@ -110,10 +107,10 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
                     let leaf = name.into_string().map_err(|name| {
                         anyhow!(
                             "Issue record name at {} is not valid UTF-8",
-                            data_root.join(ISSUES_DIR).join(name).display()
+                            issues_path.join(name).display()
                         )
                     })?;
-                    let path = data_root.join(ISSUES_DIR).join(&leaf);
+                    let path = issues_path.join(&leaf);
                     let metadata = issue_dir.symlink_metadata(&leaf)?;
                     if metadata.is_symlink() || !metadata.is_file() {
                         anyhow::bail!(
@@ -121,12 +118,11 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
                             path.display()
                         );
                     }
-                    let mut file = super::repository_state_store::open_regular_file_nofollow(
-                        &issue_dir, &leaf,
-                    )
-                    .with_context(|| {
-                        format!("Failed to open issue record at {}", path.display())
-                    })?;
+                    let mut file =
+                        super::capability_fs::open_regular_file_nofollow(&issue_dir, &leaf)
+                            .with_context(|| {
+                                format!("Failed to open issue record at {}", path.display())
+                            })?;
                     let mut bytes = Vec::new();
                     file.read_to_end(&mut bytes).with_context(|| {
                         format!("Failed to read issue record at {}", path.display())
@@ -139,8 +135,7 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
         }
     };
 
-    let events_path = data_root.join(EVENTS_FILE);
-    let events = match data.symlink_metadata(EVENTS_FILE) {
+    let events = match data.symlink_metadata(VirtualPath::EVENTS.relative().as_str()) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(error) => return Err(error.into()),
         Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
@@ -150,13 +145,13 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
             )
         }
         Ok(_) => {
-            let mut file =
-                super::repository_state_store::open_regular_file_nofollow(&data, EVENTS_FILE)
-                    .with_context(|| {
-                        format!("Failed to open event log at {}", events_path.display())
-                    })?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).with_context(|| {
+            let mut file = super::capability_fs::open_regular_file_nofollow(
+                &data,
+                VirtualPath::EVENTS.relative().as_str(),
+            )
+            .with_context(|| format!("Failed to open event log at {}", events_path.display()))?;
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).with_context(|| {
                 format!("Failed to read event log at {}", events_path.display())
             })?;
             parse_known_events(&contents).with_context(|| {
@@ -339,12 +334,53 @@ mod artifact_location_tests {
     }
 }
 
+/// The tombstones of the index at `path`; an absent index holds none.
+fn read_tombstones(path: &Path) -> Result<Vec<IssueId>> {
+    match fs::read(path) {
+        Ok(bytes) => Ok(parse_repository_index(&bytes)?.deleted_ids),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(error) => {
+            Err(error).with_context(|| format!("Failed to read file: {}", path.display()))
+        }
+    }
+}
+
+/// Merge one store's files and tombstones into `membership`, earlier sources winning.
+fn merge_store_membership(
+    index: &Path,
+    issues: &Path,
+    membership: &mut BTreeMap<IssueId, bool>,
+) -> Result<()> {
+    let names = match fs::read_dir(issues) {
+        Ok(entries) => entries
+            .map(|entry| {
+                entry?
+                    .file_name()
+                    .into_string()
+                    .map_err(|name| anyhow!("non-UTF-8 issue file name {name:?}"))
+            })
+            .collect::<Result<Vec<_>>>()?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read file: {}", issues.display()))
+        }
+    };
+    crate::repository_state::listed_issue_ids(&names)?
+        .into_iter()
+        .map(|id| (id, true))
+        .chain(read_tombstones(index)?.into_iter().map(|id| (id, false)))
+        .for_each(|(id, is_active)| {
+            membership.entry(id).or_insert(is_active);
+        });
+    Ok(())
+}
+
 /// Parse and validate one captured `index.json` without consulting ambient state.
 pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
     match RepositoryIndex::parse(bytes) {
         Ok(index) => Ok(index),
         Err(RepositoryIndexError::UnsupportedVersion { found, supported }) => {
-            Err(RepositoryFormatTooNewError::new(found, supported).into())
+            Err(RepositoryFormatUnsupportedError::new(found, supported).into())
         }
         Err(error) => Err(anyhow!(error)),
     }
@@ -473,6 +509,7 @@ impl JsonFileStorage {
         &self,
         repo_root: &Path,
         requests: &BTreeSet<(String, String)>,
+        kind_only: &BTreeSet<(String, String)>,
     ) -> BTreeMap<
         (String, String),
         Result<crate::storage::PinnedTargetRead, crate::storage::GitRevisionError>,
@@ -482,7 +519,7 @@ impl JsonFileStorage {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         crate::storage::GitRevisionResolver::with_git_program(repo_root, self.git_program.clone())
-            .inspect_pinned_targets(requests, &mut cache)
+            .inspect_pinned_targets(requests, kind_only, &mut cache)
     }
 
     /// Exclusive access to the pinned-evidence cache for one capture.
@@ -515,11 +552,48 @@ impl JsonFileStorage {
     }
 
     pub(crate) fn configured_layout(&self) -> Result<RepositoryLayout> {
-        self.repository_layout
+        if let Some(layout) = self
+            .repository_layout
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
-            .ok_or_else(|| anyhow!("no repository layout configured for storage reads"))
+        {
+            return Ok(layout);
+        }
+        anyhow::bail!("no repository layout configured for storage reads")
+    }
+
+    fn path_layout(&self) -> Result<RepositoryLayout> {
+        if let Ok(layout) = self.configured_layout() {
+            return Ok(layout);
+        }
+        let worktree_root = self.root.parent().unwrap_or_else(|| Path::new("."));
+        super::discover_repository_layout(worktree_root, &self.root).map_err(Into::into)
+    }
+
+    fn resolve_virtual_path(&self, path: &VirtualPath) -> Result<PathBuf> {
+        Ok(self.path_layout()?.resolve(path)?)
+    }
+
+    /// The root `path` is relative to.
+    fn class_root(&self, path: &VirtualPath) -> Result<PathBuf> {
+        Ok(match path.root_class() {
+            RepositoryRootClass::Data => self.root.clone(),
+            RepositoryRootClass::Worktree => self.path_layout()?.worktree_root().to_path_buf(),
+        })
+    }
+
+    fn primary_layout(&self) -> Result<Option<RepositoryLayout>> {
+        let paths = self.configured_worktree_paths()?;
+        let Some(worktree_root) = paths.primary_worktree_root()? else {
+            return Ok(None);
+        };
+        let Some(data_root) = paths.primary_data_root()? else {
+            return Ok(None);
+        };
+        super::discover_repository_layout(worktree_root, data_root)
+            .map(Some)
+            .map_err(Into::into)
     }
 
     /// Bind the invocation's authoritative classification of the selected store.
@@ -652,7 +726,7 @@ impl JsonFileStorage {
             return Err(RepositoryNotFoundError::new(self.root.display().to_string()).into());
         }
 
-        let index_path = self.root.join(INDEX_FILE);
+        let index_path = self.resolve_virtual_path(&VirtualPath::INDEX)?;
         if !index_path.exists() {
             anyhow::bail!(
                 "JIT repository at '{}' is not properly initialized (missing index.json)\n\n\
@@ -661,12 +735,8 @@ impl JsonFileStorage {
             );
         }
 
-        // Fail fast at startup when the on-disk format is newer than this binary
-        // supports. `validate()` runs for every non-init command, so routing the
-        // version check through it (via the shared typed index codec) guards even
-        // commands that never load the index themselves — e.g. `jit gate list`,
-        // which reads `gates.toml` directly — rather than letting them misread
-        // newer data (jit:def64ac4).
+        // `validate()` runs for every non-init command, so this version check guards
+        // even commands that never load the index themselves (jit:def64ac4).
         self.load_index()?;
 
         Ok(())
@@ -706,318 +776,142 @@ impl JsonFileStorage {
         }
     }
 
-    fn issue_path(&self, id: &str) -> PathBuf {
-        self.root.join(ISSUES_DIR).join(format!("{}.json", id))
-    }
-
-    fn read_json<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<T> {
+    fn read_issue_record(&self, path: &Path) -> Result<Issue> {
         let contents = fs::read_to_string(path)
             .with_context(|| format!("Failed to read file: {}", path.display()))?;
-        serde_json::from_str(&contents).context("Failed to deserialize data")
+        serde_json::from_str(&contents)
+            .with_context(|| format!("Failed to deserialize issue record at {}", path.display()))
     }
 
     fn load_index(&self) -> Result<Index> {
-        let index_path = self.root.join(INDEX_FILE);
+        let index_path = self.resolve_virtual_path(&VirtualPath::INDEX)?;
         let bytes = fs::read(&index_path)
             .with_context(|| format!("Failed to read file: {}", index_path.display()))?;
         parse_repository_index(&bytes)
     }
 
-    /// Load aggregated index from all sources (local + git + main worktree).
+    /// The active ids of this checkout's store layered over the primary checkout's.
     ///
-    /// This aggregates issue IDs from:
-    /// 1. Local .jit/index.json
-    /// 2. Git HEAD:.jit/index.json (if in git)
-    /// 3. Main worktree .jit/index.json (if in secondary worktree)
-    ///
-    /// Deduplicates IDs across sources.
-    fn load_aggregated_index(&self) -> Result<Index> {
-        use std::collections::BTreeMap;
-
-        // The first source that mentions an id wins: local, then HEAD, then the
-        // main worktree. This mirrors issue loading and lets a local restore
-        // override a stale lower-priority tombstone (and vice versa).
+    /// The first source that mentions an id wins, and within a source a file beats
+    /// a tombstone, so a local delete hides the primary's file and a local file
+    /// survives any tombstone. Only an absent file or directory is skipped; any
+    /// other failure aborts rather than exposing a plausible but incomplete set.
+    fn load_aggregated_issue_ids(&self) -> Result<Vec<IssueId>> {
         let mut membership = BTreeMap::new();
-
-        // Only a genuinely absent source may be skipped. Once index bytes exist,
-        // every read, parse, version, and membership-structure failure aborts the
-        // aggregation instead of exposing a plausible but incomplete issue set.
-        let merge_source = |loaded: Result<Option<Index>>,
-                            membership: &mut BTreeMap<String, bool>|
-         -> Result<()> {
-            match loaded {
-                Ok(Some(index)) => {
-                    index.all_ids.into_iter().for_each(|id| {
-                        membership.entry(id).or_insert(true);
-                    });
-                    index.deleted_ids.into_iter().for_each(|id| {
-                        membership.entry(id).or_insert(false);
-                    });
-                    Ok(())
-                }
-                Ok(None) => Ok(()),
-                Err(error) => Err(error),
-            }
-        };
-
-        // 1. Load local index
-        let local = match fs::read(self.root.join(INDEX_FILE)) {
-            Ok(bytes) => Some(parse_repository_index(&bytes)?),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error).context("Failed to read local index"),
-        };
-        merge_source(Ok(local), &mut membership)?;
-
-        // 2. Try loading index from git
-        merge_source(self.load_index_from_git(), &mut membership)?;
-
-        // 3. Try loading index from main worktree
-        merge_source(self.load_index_from_main_worktree(), &mut membership)?;
-
-        Ok(Index {
-            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: membership
-                .into_iter()
-                .filter_map(|(id, is_active)| is_active.then_some(id))
-                .collect(),
-            deleted_ids: vec![], // Don't propagate deleted_ids in aggregated index
-        })
-    }
-
-    /// Load every issue the aggregated index membership names, under an
-    /// already-held `.index.lock`.
-    ///
-    /// This is the enumeration both read-all paths share: an id the fallback
-    /// chain cannot load is skipped rather than failing the read.
-    fn read_indexed_issues(&self) -> Result<Vec<Issue>> {
-        // Use aggregated index to see all issues across sources, then load
-        // through the fallback chain (`load_issue` handles local/git/main).
-        Ok(self
-            .load_aggregated_index()?
-            .all_ids
-            .iter()
-            .filter_map(|id| self.load_issue(id).ok())
+        merge_store_membership(
+            &self.resolve_virtual_path(&VirtualPath::INDEX)?,
+            &self.resolve_virtual_path(&VirtualPath::ISSUES)?,
+            &mut membership,
+        )?;
+        if let Some(primary) = self.primary_layout()? {
+            merge_store_membership(
+                &primary.resolve(&VirtualPath::INDEX)?,
+                &primary.resolve(&VirtualPath::ISSUES)?,
+                &mut membership,
+            )?;
+        }
+        Ok(membership
+            .into_iter()
+            .filter_map(|(id, is_active)| is_active.then_some(id))
             .collect())
     }
 
-    /// Load index from git HEAD.
-    fn load_index_from_git(&self) -> Result<Option<Index>> {
-        let layout = self.configured_layout()?;
-        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
-        else {
-            return Ok(None);
-        };
-        let repository = match git2::Repository::discover(layout.worktree_root()) {
-            Ok(repository) => repository,
-            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error).context("Failed to open git repository"),
-        };
-        let head = match repository.head() {
-            Ok(head) => head,
-            Err(error)
-                if matches!(
-                    error.code(),
-                    git2::ErrorCode::NotFound | git2::ErrorCode::UnbornBranch
-                ) =>
-            {
-                return Ok(None)
-            }
-            Err(error) => return Err(error).context("Failed to resolve git HEAD"),
-        };
-        let tree = head
-            .peel_to_tree()
-            .context("Failed to resolve the git HEAD tree")?;
-        let entry = match tree.get_path(&data_relative.join(INDEX_FILE)) {
-            Ok(entry) => entry,
-            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error).context("Failed to resolve index from git HEAD"),
-        };
-        let object = entry
-            .to_object(&repository)
-            .context("Failed to load index object from git HEAD")?;
-        let blob = object
-            .as_blob()
-            .ok_or_else(|| anyhow!("git HEAD index path is not a file"))?;
-
-        parse_repository_index(blob.content())
-            .map(Some)
-            .context("Failed to parse index from git")
+    /// Load every issue the aggregated membership names, under an
+    /// already-held `.index.lock`.
+    ///
+    /// An id whose record vanished since membership was read is skipped; a
+    /// record that exists and cannot be read or parsed fails the listing,
+    /// naming it, so a listing never hides an issue.
+    fn read_member_issues(&self) -> Result<Vec<Issue>> {
+        self.load_aggregated_issue_ids()?
+            .iter()
+            .filter_map(|id| match self.load_issue(id) {
+                Err(error) if error.downcast_ref::<IssueNotFoundError>().is_some() => None,
+                loaded => Some(loaded),
+            })
+            .collect()
     }
 
-    /// Load index from main worktree.
-    fn load_index_from_main_worktree(&self) -> Result<Option<Index>> {
-        let Some(primary_data_root) = self.configured_worktree_paths()?.primary_data_root()? else {
-            return Ok(None);
-        };
-        let main_index_path = primary_data_root.join(INDEX_FILE);
-        let bytes = match fs::read(&main_index_path) {
-            Ok(bytes) => bytes,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => {
-                return Err(error)
-                    .with_context(|| format!("Failed to read file: {}", main_index_path.display()))
-            }
-        };
-        parse_repository_index(&bytes).map(Some)
-    }
-
-    /// Load an issue from git HEAD.
-    ///
-    /// This is used as a fallback when an issue doesn't exist in local storage
-    /// but may be committed in git (e.g., reading from a secondary worktree).
-    /// Load an issue from `HEAD:.jit/issues/<id>.json`.
-    ///
-    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when absent from git
-    /// (git ran successfully but reported the path is missing), and `Err` for
-    /// genuine failures (git not available, repo corrupt, parse error, etc.).
-    fn load_issue_from_git(&self, id: &str) -> Result<Option<Issue>> {
-        let layout = self.configured_layout()?;
-        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
-        else {
-            return Ok(None);
-        };
-        let git_path = format!(
-            "HEAD:{}",
-            data_relative
-                .join(ISSUES_DIR)
-                .join(format!("{id}.json"))
-                .display()
-        );
-        let output = Command::new("git")
-            .arg("show")
-            .arg(&git_path)
-            .current_dir(layout.worktree_root())
-            .output()
-            .context("Failed to execute git command")?;
-
-        if !output.status.success() {
-            // git ran but the path is absent — structurally "not found".
-            return Ok(None);
-        }
-
-        let issue =
-            serde_json::from_slice(&output.stdout).context("Failed to parse issue from git")?;
-        Ok(Some(issue))
-    }
-
-    /// Load an issue from the main worktree's .jit/ directory.
-    ///
-    /// This is used when in a secondary worktree to read uncommitted issues
-    /// from the main worktree.
     /// Load an issue from the main worktree's `.jit/` directory.
     ///
-    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when the issue is
-    /// absent or this worktree setup does not have an accessible main worktree
-    /// (not in git, already in main worktree, non-standard layout), and `Err`
-    /// for genuine I/O or parse failures on a file that does exist.
-    fn load_issue_from_main_worktree(&self, id: &str) -> Result<Option<Issue>> {
-        let Some(primary_data_root) = self.configured_worktree_paths()?.primary_data_root()? else {
+    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when this store's tombstone
+    /// hides it, when the issue is absent, or when this worktree setup does not have
+    /// an accessible main worktree (not in git, already in main worktree,
+    /// non-standard layout), and `Err` for genuine I/O or parse failures on a file
+    /// that does exist.
+    fn load_issue_from_main_worktree(&self, id: &IssueId) -> Result<Option<Issue>> {
+        let Some(layout) = self.primary_layout()? else {
             return Ok(None);
         };
-        let main_issue_path = primary_data_root
-            .join(ISSUES_DIR)
-            .join(format!("{}.json", id));
+        if read_tombstones(&self.resolve_virtual_path(&VirtualPath::INDEX)?)?.contains(id) {
+            return Ok(None);
+        }
+        let main_issue_path = layout.resolve(&VirtualPath::issue_record(id))?;
 
         if !main_issue_path.exists() {
             return Ok(None); // issue absent from main worktree
         }
 
         // File exists — read it; any I/O or parse error is a real failure.
-        self.read_json(&main_issue_path).map(Some)
+        self.read_issue_record(&main_issue_path).map(Some)
     }
 }
 
-impl JsonFileStorage {
-    /// Read every recorded gate run the predicate keeps.
-    ///
-    /// One enumeration of `gate-runs/` behind every whole-history question, so
-    /// a caller filtering by issue and one filtering by gate and digest walk
-    /// the directory the same way (`@/invariant/convention-convergence`).
-    fn read_gate_runs(
-        &self,
-        mut keep: impl FnMut(&crate::domain::GateRunResult) -> bool,
-    ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
-            Ok(data) => data,
-            Err(RepositoryStateStoreError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
+impl super::gate_run_reader::GateRunTree for JsonFileStorage {
+    fn list_directory(&self, directory: &VirtualPath) -> Result<TreeNode<Vec<String>>> {
+        let root = self.class_root(directory)?;
+        let relative = directory.relative().as_path();
+        let opened =
+            super::capability_fs::open_absolute_dir_nofollow(&root).and_then(|root| match relative
+                .as_os_str()
+                .is_empty()
             {
-                return Ok(Vec::new())
-            }
-            Err(error) => return Err(error.into()),
+                true => Ok(Some(root)),
+                false => super::capability_fs::open_capability_parent(&root, relative)?
+                    .map(|(parent, leaf)| {
+                        super::capability_fs::open_child_dir_nofollow(&parent, leaf)
+                    })
+                    .transpose(),
+            });
+        let names = |directory: cap_std::fs::Dir| -> Result<Vec<String>> {
+            directory
+                .entries()?
+                .filter_map(|entry| match entry {
+                    Ok(entry) => entry.file_name().into_string().ok().map(Ok),
+                    Err(error) => Some(Err(error.into())),
+                })
+                .collect()
         };
-        let gate_runs = match data.symlink_metadata(GATE_RUNS_DIR) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run root at {} must be an ordinary directory",
-                    self.root.join(GATE_RUNS_DIR).display()
-                )
-            }
-            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&data, GATE_RUNS_DIR)?,
-        };
-
-        let mut results = Vec::new();
-        for entry in gate_runs.entries()? {
-            let entry = entry?;
-            let Ok(run_id) = entry.file_name().into_string() else {
-                continue;
-            };
-            let Ok(relative) = gate_run_result_relative_path(&run_id) else {
-                continue;
-            };
-            let metadata = gate_runs.symlink_metadata(&run_id)?;
-            if metadata.is_symlink() || !metadata.is_dir() {
-                continue;
-            }
-            let run_dir =
-                super::repository_state_store::open_child_dir_nofollow(&gate_runs, &run_id)?;
-            let result_path = self.root.join(relative.as_path());
-            let result_leaf = relative
-                .as_path()
-                .file_name()
-                .and_then(|name| name.to_str())
-                .context("canonical gate run result path has no file name")?;
-            match run_dir.symlink_metadata(result_leaf) {
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(error.into()),
-                Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
-                    anyhow::bail!(
-                        "Gate run result at {} must be an ordinary file",
-                        result_path.display()
-                    )
-                }
-                Ok(_) => {}
-            }
-            let mut file =
-                super::repository_state_store::open_regular_file_nofollow(&run_dir, result_leaf)
-                    .with_context(|| {
-                        format!(
-                            "Failed to open gate run result at {}",
-                            result_path.display()
-                        )
-                    })?;
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).with_context(|| {
-                format!(
-                    "Failed to read gate run result at {}",
-                    result_path.display()
-                )
-            })?;
-            let result: crate::domain::GateRunResult = serde_json::from_slice(&contents)
-                .with_context(|| {
-                    format!(
-                        "Failed to deserialize gate run result at {}",
-                        result_path.display()
-                    )
-                })?;
-            if keep(&result) {
-                results.push(result);
-            }
+        match tree_node(opened)? {
+            TreeNode::Present(directory) => names(directory).map(TreeNode::Present),
+            TreeNode::Absent => Ok(TreeNode::Absent),
+            TreeNode::OtherKind => Ok(TreeNode::OtherKind),
         }
+    }
 
-        Ok(results)
+    fn read_regular_file(&self, file: &VirtualPath) -> Result<TreeNode<Vec<u8>>> {
+        tree_node(super::capability_fs::read_repository_file_nofollow(
+            &self.class_root(file)?,
+            file.relative(),
+        ))
+    }
+}
+
+/// Classify a no-follow read: a missing path or ancestor is absent, and a
+/// target refused as unsafe is an occupant of another kind.
+fn tree_node<T>(
+    read: Result<Option<T>, super::capability_fs::CapabilityFsError>,
+) -> Result<TreeNode<T>> {
+    match read {
+        Ok(Some(found)) => Ok(TreeNode::Present(found)),
+        Ok(None) => Ok(TreeNode::Absent),
+        Err(super::capability_fs::CapabilityFsError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            Ok(TreeNode::Absent)
+        }
+        Err(super::capability_fs::CapabilityFsError::UnsafeTarget(_)) => Ok(TreeNode::OtherKind),
+        Err(error) => Err(error.into()),
     }
 }
 
@@ -1155,9 +1049,9 @@ impl IssueStore for JsonFileStorage {
         }
     }
 
-    fn load_issue(&self, id: &str) -> Result<Issue> {
-        // Try local .jit/issues/ first (current behavior)
-        let issue_path = self.issue_path(id);
+    fn load_issue(&self, id: &IssueId) -> Result<Issue> {
+        // Try the selected data-root record first.
+        let issue_path = self.resolve_virtual_path(&VirtualPath::issue_record(id))?;
         if issue_path.exists() {
             // Read directly, taking no per-issue lock. Issue JSON is published by
             // atomic temp-file-plus-rename (see atomic_write), so a reader can never
@@ -1172,19 +1066,10 @@ impl IssueStore for JsonFileStorage {
             // files it writes under the repository write lock. The old `_lock` guard
             // was local and dropped before this method returned, so no caller ever
             // inherited serialization from it.
-            return self.read_json(&issue_path);
+            return self.read_issue_record(&issue_path);
         }
 
-        // Fallback 1: Try reading from git HEAD.
-        // load_issue_from_git returns Ok(Some(issue)), Ok(None) (absent),
-        // or Err (git infrastructure failure).
-        match self.load_issue_from_git(id) {
-            Ok(Some(issue)) => return Ok(issue),
-            Ok(None) => {} // file absent from git; continue
-            Err(_) => {}   // git unavailable or broken; continue to next source
-        }
-
-        // Fallback 2: Try reading from main worktree (if in secondary)
+        // Fallback: try reading from main worktree (if in secondary)
         match self.load_issue_from_main_worktree(id) {
             Ok(Some(issue)) => return Ok(issue),
             Ok(None) => {} // absent from main worktree or not applicable; continue
@@ -1195,10 +1080,15 @@ impl IssueStore for JsonFileStorage {
         Err(IssueNotFoundError::across_sources(id).into())
     }
 
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
+    fn load_issue_or_not_found(
+        &self,
+        id: &IssueId,
+    ) -> Result<Issue, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
 
-        let issue_path = self.issue_path(id);
+        let issue_path = self
+            .resolve_virtual_path(&VirtualPath::issue_record(id))
+            .map_err(PathReadError::Other)?;
 
         if issue_path.exists() {
             // File exists — delegate to load_issue for source selection and
@@ -1207,207 +1097,92 @@ impl IssueStore for JsonFileStorage {
             return self.load_issue(id).map_err(PathReadError::Other);
         }
 
-        // Local file is absent.  Try git and main-worktree fallbacks.
-        //
-        // load_issue_from_git now returns Ok(Some(issue)), Ok(None) (absent),
-        // or Err (infrastructure failure).  We can branch without string-matching:
-        //   Ok(Some(…)) → found, return it.
-        //   Ok(None)    → absent from git, continue to next source.
-        //   Err(…)      → git is broken or the object is corrupt → Other.
-        match self.load_issue_from_git(id) {
-            Ok(Some(issue)) => return Ok(issue),
-            Ok(None) => {} // absent from git; continue
-            Err(e) => return Err(PathReadError::Other(e)),
-        }
-
         // Main-worktree fallback (only meaningful in secondary-worktree setups).
-        // Now returns Ok(Option) so we can distinguish real I/O failures from
-        // "not applicable / not present".
         match self.load_issue_from_main_worktree(id) {
             Ok(Some(issue)) => return Ok(issue),
             Ok(None) => {} // absent or not applicable; fall through to NotFound
             Err(e) => return Err(PathReadError::Other(e)), // genuine I/O failure → 500
         }
 
-        Err(PathReadError::NotFound(format!(
-            "Issue {} not found in local storage, git, or main worktree",
-            id
-        )))
+        Err(PathReadError::NotFound(
+            IssueNotFoundError::across_sources(id).to_string(),
+        ))
     }
 
-    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String> {
-        let index = self.load_aggregated_index()?;
-        crate::storage::resolve_unique_issue_id(
-            prefix,
-            index.all_ids.iter().map(String::as_str),
-            |id| {
-                self.load_issue(id)
-                    .ok()
-                    .map(|issue| crate::storage::describe_issue(&issue))
-            },
-        )
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<crate::domain::identity::IssueId> {
+        let ids = self.load_aggregated_issue_ids()?;
+        crate::storage::resolve_unique_issue_id(prefix, ids.iter(), |id| {
+            self.load_issue(id)
+                .ok()
+                .map(|issue| crate::storage::describe_issue(&issue))
+        })
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
         let index_lock_path = self.root.join(INDEX_LOCK_FILE);
         let _lock = self.locker.lock_shared(&index_lock_path)?;
 
-        self.read_indexed_issues()
+        self.read_member_issues()
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        let gates_lock_path = self.root.join(GATES_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&gates_lock_path)?;
-        crate::storage::gate_store::load_gate_registry(&self.root)
+        // Lock-free (`@/charter/D-22`): the registry is replaced by atomic rename.
+        crate::storage::gate_store::load_gate_registry(&self.path_layout()?)
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {
-        let events_path = self.root.join(EVENTS_FILE);
+        let events_path = self.resolve_virtual_path(&VirtualPath::EVENTS)?;
         if !events_path.exists() {
             return Ok(Vec::new());
         }
 
-        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&events_lock_path)?;
-
-        let contents = fs::read_to_string(&events_path).context("Failed to read events file")?;
+        // Lock-free (`@/charter/D-22`): the parser ignores a partly written final line.
+        let contents = fs::read(&events_path).context("Failed to read events file")?;
         parse_known_events(&contents).context("Failed to deserialize event log")
     }
 
-    fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
-        let events_path = self.root.join(EVENTS_FILE);
-        if !events_path.exists() {
-            return Ok(Vec::new());
-        }
-        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&events_lock_path)?;
-        let reader =
-            BufReader::new(fs::File::open(&events_path).context("Failed to open events file")?);
-        let lines = reader
-            .lines()
-            .collect::<std::io::Result<Vec<_>>>()
-            .context("Failed to read line from events file")?;
-        let mut events = Vec::new();
-        for line in &lines {
-            if line.trim().is_empty() {
-                continue;
-            }
-            match serde_json::from_str::<serde_json::Value>(line) {
-                Ok(value) => {
-                    let event_type = value
-                        .as_object()
-                        .and_then(|object| object.get("type"))
-                        .and_then(serde_json::Value::as_str)
-                        .context("Event record is missing a string type")?;
-                    if event_type == "artifact_archive_executed" {
-                        let event = serde_json::from_value::<Event>(value)
-                            .context("Failed to deserialize artifact archive event")?;
-                        events.push(event);
-                    }
-                }
-                Err(error) if is_torn_event_prefix(line, &error) => {}
-                Err(error) => return Err(error).context("Failed to deserialize event"),
-            }
-        }
-        Ok(events)
-    }
-
-    fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
-        let relative = gate_run_result_relative_path(run_id)?;
-        let result_path = self.root.join(relative.as_path());
-        let result_leaf = relative
-            .as_path()
-            .file_name()
-            .and_then(|name| name.to_str())
-            .context("canonical gate run result path has no file name")?;
-        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
-            Ok(data) => data,
-            Err(RepositoryStateStoreError::Io(error))
+    fn read_archive_evidence_record(
+        &self,
+        target: &crate::domain::artifact_plan::PlanTarget,
+    ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>> {
+        let path = VirtualPath::archive_evidence_record(target);
+        let contents = match crate::storage::capability_fs::read_repository_file_confined(
+            &self.root,
+            path.relative(),
+        ) {
+            Ok(contents) => contents,
+            Err(super::capability_fs::CapabilityFsError::Io(error))
                 if error.kind() == std::io::ErrorKind::NotFound =>
             {
-                return Err(GateRunNotFoundError::new(run_id).into())
+                None
             }
             Err(error) => return Err(error.into()),
         };
-        let gate_runs = match data.symlink_metadata(GATE_RUNS_DIR) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(GateRunNotFoundError::new(run_id).into())
-            }
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run directory at {} must be an ordinary directory",
-                    self.root.join(GATE_RUNS_DIR).display()
-                )
-            }
-            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&data, GATE_RUNS_DIR)?,
-        };
-        let run_dir = match gate_runs.symlink_metadata(run_id) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(GateRunNotFoundError::new(run_id).into())
-            }
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run directory at {} must be an ordinary directory",
-                    self.root.join(GATE_RUNS_DIR).join(run_id).display()
-                )
-            }
-            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&gate_runs, run_id)?,
-        };
-        match run_dir.symlink_metadata(result_leaf) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(GateRunNotFoundError::new(run_id).into())
-            }
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
-                anyhow::bail!(
-                    "Gate run result at {} must be an ordinary file",
-                    result_path.display()
-                )
-            }
-            Ok(_) => {}
-        }
-        let mut file =
-            super::repository_state_store::open_regular_file_nofollow(&run_dir, result_leaf)
-                .with_context(|| {
+        contents
+            .map(|contents| {
+                serde_json::from_slice(&contents).with_context(|| {
                     format!(
-                        "Failed to open gate run result at {}",
-                        result_path.display()
+                        "Failed to deserialize archive evidence record at {}",
+                        path.relative().as_path().display()
                     )
-                })?;
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents).with_context(|| {
-            format!(
-                "Failed to read gate run result at {}",
-                result_path.display()
-            )
-        })?;
-        let result = serde_json::from_slice(&contents).with_context(|| {
-            format!(
-                "Failed to deserialize gate run result at {}",
-                result_path.display()
-            )
-        })?;
+                })
+            })
+            .transpose()
+    }
 
-        Ok(result)
+    fn load_gate_run_result(
+        &self,
+        issue_id: &IssueId,
+        run_id: &GateRunId,
+    ) -> Result<crate::domain::GateRunResult> {
+        super::gate_run_reader::load_gate_run_result(self, issue_id, run_id)
     }
 
     fn list_gate_runs_for_issue(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        self.read_gate_runs(|result| result.issue_id == issue_id)
-    }
-
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &str,
-        digest: &crate::domain::repository_inputs::InputsDigest,
-    ) -> Result<Option<crate::domain::GateRunResult>> {
-        Ok(crate::domain::latest_gate_run(self.read_gate_runs(
-            |result| result.is_reusable_for(gate_key, digest),
-        )?))
+        super::gate_run_reader::list_gate_runs_for_issue(self, issue_id)
     }
 
     fn root(&self) -> &Path {
@@ -1432,7 +1207,7 @@ impl IssueStore for JsonFileStorage {
             crate::repository_state::RepositoryRootClass::Worktree => layout.worktree_root(),
             crate::repository_state::RepositoryRootClass::Data => layout.data_root(),
         };
-        crate::storage::repository_state_store::read_repository_file_confined(root, path.relative())
+        crate::storage::capability_fs::read_repository_file_confined(root, path.relative())
             .map_err(|error| map_confined_read_error(error, rel_path))?
             .map(|bytes| {
                 String::from_utf8(bytes)
@@ -1443,12 +1218,12 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
+        let manager = crate::gate_presets::PresetManager::new(self.configured_layout()?)?;
         Ok(manager.list_presets())
     }
 
     fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
-        let manager = crate::gate_presets::PresetManager::new(self.root.clone())?;
+        let manager = crate::gate_presets::PresetManager::new(self.configured_layout()?)?;
         let preset = manager.get_preset(name)?;
         Ok(preset.clone())
     }
@@ -1500,38 +1275,28 @@ impl IssueStore for JsonFileStorage {
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
         } else {
-            let relative = crate::repository_state::RootRelativePath::parse(path)
+            let relative = crate::domain::relative_path::RootRelativePath::parse(path)
                 .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
-            crate::storage::repository_state_store::read_repository_file_confined(
-                repo_root, &relative,
-            )
-            .map_err(|error| map_confined_read_error(error, path))?
-            .map(|bytes| (bytes, "working-tree".to_string()))
-            .ok_or_else(|| PathReadError::NotFound(path.to_string()))
+            crate::storage::capability_fs::read_repository_file_confined(repo_root, &relative)
+                .map_err(|error| map_confined_read_error(error, path))?
+                .map(|bytes| (bytes, "working-tree".to_string()))
+                .ok_or_else(|| PathReadError::NotFound(path.to_string()))
         }
     }
 }
 
-fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
-    // The canonical mutation finalizer isolates a non-newline tail before
-    // publishing the next event. Before that retry it is still the final line. Such a record
-    // is therefore recognizable as an object-shaped JSON prefix that fails
-    // only because input ended. This admits a final torn append and every
-    // number of independently isolated predecessors (including prefixes ending
-    // after a nested `}`), while syntax and shape/data corruption remain fatal.
-    line.trim_start().starts_with('{') && error.is_eof()
-}
-
 fn map_confined_read_error(
-    error: RepositoryStateStoreError,
+    error: super::capability_fs::CapabilityFsError,
     relative: &str,
 ) -> crate::storage::PathReadError {
     use crate::storage::PathReadError;
     match error {
-        RepositoryStateStoreError::UnsafeTarget(_) => {
+        super::capability_fs::CapabilityFsError::UnsafeTarget(_) => {
             PathReadError::OutsideRepoRoot(relative.to_string())
         }
-        RepositoryStateStoreError::Io(error) if error.kind() == std::io::ErrorKind::NotFound => {
+        super::capability_fs::CapabilityFsError::Io(error)
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
             PathReadError::NotFound(relative.to_string())
         }
         error => PathReadError::Other(error.into()),
@@ -1541,6 +1306,8 @@ fn map_confined_read_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueIdPrefix;
+    use crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
@@ -1575,10 +1342,6 @@ mod tests {
         let foreign =
             crate::storage::discover_repository_layout(other_worktree.path(), &data).unwrap();
         storage.configure_repository_layout(&foreign);
-        assert_eq!(
-            storage.configured_layout().unwrap().worktree_root(),
-            worktree.path()
-        );
         assert!(matches!(
             storage.open_mutation_session(foreign),
             Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
@@ -1593,12 +1356,8 @@ mod tests {
         );
     }
 
-    fn retained_storage() -> (
-        TempDir,
-        RepositoryLayout,
-        JsonFileStorage,
-        RetainedMutationSessionGuard,
-    ) {
+    #[test]
+    fn test_external_process_reopens_retained_canonical_session() {
         let (temp, storage, _taxonomy) =
             crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let data = temp.path().join(".jit");
@@ -1606,12 +1365,6 @@ mod tests {
         let retained = storage
             .open_and_retain_mutation_session(layout.clone())
             .unwrap();
-        (temp, layout, storage, retained)
-    }
-
-    #[test]
-    fn test_external_process_reopens_retained_canonical_session() {
-        let (temp, _, storage, retained) = retained_storage();
 
         let competing = RepoWriteLock::for_lock_path(
             temp.path().join(".jit-bootstrap.lock"),
@@ -1671,9 +1424,29 @@ mod tests {
     }
 
     #[test]
+    fn test_read_events_does_not_wait_on_a_writer_holding_the_events_lock() {
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        fs::write(temp.path().join(".jit/events.jsonl"), "").unwrap();
+        let root = storage.root().to_path_buf();
+        drop(storage);
+        let storage =
+            JsonFileStorage::with_lock_timeout(root, std::time::Duration::from_millis(50));
+        let _writer = storage.acquire_events_write_lock().unwrap();
+
+        assert_eq!(storage.read_events().unwrap(), Vec::new());
+    }
+
+    #[test]
     fn test_retained_session_rejects_other_layout_and_thread() {
         let other_worktree = TempDir::new().unwrap();
-        let (_temp, _, storage, retained) = retained_storage();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
 
         let other_layout =
             crate::storage::discover_repository_layout(other_worktree.path(), storage.root())
@@ -1715,7 +1488,13 @@ mod tests {
 
     #[test]
     fn test_nested_external_process_fails_typed_without_deadlock() {
-        let (_temp, _, storage, retained) = retained_storage();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
 
         storage
             .run_external_process(|| {
@@ -1732,7 +1511,13 @@ mod tests {
 
     #[test]
     fn test_external_process_panic_does_not_leave_stale_owner() {
-        let (_temp, layout, storage, retained) = retained_storage();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
 
         let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _: Result<()> = storage.run_external_process(|| panic!("checker panic"));
@@ -1745,55 +1530,16 @@ mod tests {
         assert!(crate::storage::guard_order::CoordinationOrderGuard::enter().is_ok());
     }
 
-    fn setup_storage() -> (TempDir, JsonFileStorage) {
-        crate::test_utils::setup_test_repo().unwrap()
-    }
-
-    #[test]
-    fn test_read_repo_file_present_absent_and_path_safety() {
-        // Repo root is the parent of the .jit dir, so create storage at temp/.jit.
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        fs::create_dir(storage.root()).unwrap();
-        configure_test_layout(&storage, temp.path(), storage.root());
-
-        // Absent -> None (graceful).
-        assert!(storage
-            .read_repo_file("project-items.md")
-            .unwrap()
-            .is_none());
-
-        // Present -> Some(content).
-        std::fs::write(temp.path().join("project-items.md"), "hello").unwrap();
-        assert_eq!(
-            storage
-                .read_repo_file("project-items.md")
-                .unwrap()
-                .as_deref(),
-            Some("hello")
-        );
-
-        // Path-safety: absolute and `..`-traversal are typed InvalidPath, never a
-        // read outside the repository.
-        assert!(matches!(
-            storage.read_repo_file("/etc/passwd"),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
-        assert!(matches!(
-            storage.read_repo_file("../escape.md"),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
-    }
-
     #[test]
     fn test_disjoint_layout_reads_logical_data_and_worktree_roots() {
         let worktree = TempDir::new().unwrap();
         let external = TempDir::new().unwrap();
         let data = external.path().join("selected-data");
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
         fs::create_dir(&data).unwrap();
         fs::create_dir(worktree.path().join("docs")).unwrap();
         fs::write(worktree.path().join("docs/guide.md"), "worktree").unwrap();
-        fs::write(data.join("config.toml"), "data").unwrap();
+        fs::write(data_layout.resolve(&VirtualPath::CONFIG).unwrap(), "data").unwrap();
 
         let storage = JsonFileStorage::new(&data);
         configure_test_layout(&storage, worktree.path(), &data);
@@ -1804,7 +1550,7 @@ mod tests {
         );
         assert_eq!(
             storage
-                .read_repo_file(".jit/config.toml")
+                .read_repo_file(VirtualPath::CONFIG.repository_relative().as_str())
                 .unwrap()
                 .as_deref(),
             Some("data")
@@ -1816,187 +1562,73 @@ mod tests {
         assert!(!external.path().join("docs/guide.md").exists());
     }
 
-    #[test]
-    fn test_list_gate_runs_errors_on_corrupt_result() {
-        // A corrupt result.json must surface a contextual error (naming the
-        // offending path), not be silently dropped from the listing.
-        let (_temp, storage) = setup_storage();
-
-        let run_dir = storage.root.join("gate-runs").join("corrupt-run");
-        fs::create_dir_all(&run_dir).unwrap();
-        let result_path = run_dir.join("result.json");
-        fs::write(&result_path, "{ not valid json").unwrap();
-
-        let load_err = storage
-            .load_gate_run_result("corrupt-run")
-            .expect_err("loading corrupt gate-run JSON must fail");
-        assert!(
-            format!("{load_err:#}").contains(&result_path.display().to_string()),
-            "load errors must name the malformed record path"
-        );
-
-        let err = storage
-            .list_gate_runs_for_issue("any-issue")
-            .expect_err("corrupt gate-run record must produce an error, not a silent drop");
-
-        // Top-level context plus the deserialize cause and offending path.
-        let chain = format!("{err:#}");
-        assert!(
-            chain.contains("Failed to deserialize gate run result"),
-            "expected a deserialize context in the chain, got: {chain}"
-        );
-        assert!(
-            chain.contains("result.json"),
-            "error chain must name the offending path, got: {chain}"
-        );
-    }
-
-    #[test]
-    fn test_list_gate_runs_ignores_noncanonical_nested_result_shape() {
-        let (_temp, storage) = setup_storage();
-        let nested = storage.root.join("gate-runs/outer/nested/result.json");
-        fs::create_dir_all(nested.parent().unwrap()).unwrap();
-        fs::write(nested, "{ not valid json").unwrap();
-        fs::write(storage.root.join("gate-runs/direct-file"), "root clutter").unwrap();
-
-        assert!(storage
-            .list_gate_runs_for_issue("any-issue")
-            .unwrap()
-            .is_empty());
-        assert!(format!(
-            "{:#}",
-            storage.load_gate_run_result("direct-file").unwrap_err()
-        )
-        .contains("ordinary directory"));
-    }
-
-    #[test]
-    fn test_gate_run_readers_reject_non_directory_gate_runs_root() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        fs::create_dir(&data).unwrap();
-        fs::write(data.join("gate-runs"), "not a directory").unwrap();
-        let storage = JsonFileStorage::new(data);
-
-        for error in [
-            storage.load_gate_run_result("run-one").unwrap_err(),
-            storage.list_gate_runs_for_issue("issue-one").unwrap_err(),
-        ] {
-            assert!(format!("{error:#}").contains("ordinary directory"));
-        }
-    }
-
-    #[test]
-    fn test_gate_run_readers_reject_non_file_result_object() {
-        let (_temp, storage) = setup_storage();
-        fs::create_dir_all(storage.root.join("gate-runs/directory-run/result.json")).unwrap();
-
-        for error in [
-            storage.load_gate_run_result("directory-run").unwrap_err(),
-            storage.list_gate_runs_for_issue("any-issue").unwrap_err(),
-        ] {
-            let message = format!("{error:#}");
-            assert!(message.contains("directory-run/result.json"));
-            assert!(message.contains("ordinary file"));
-        }
-    }
-
     #[cfg(unix)]
     #[test]
-    fn test_gate_run_readers_reject_symlinked_result_object() {
-        let (_temp, storage) = setup_storage();
-        let run_dir = storage.root.join("gate-runs/symlink-run");
-        fs::create_dir_all(&run_dir).unwrap();
-        let target = storage.root.join("target.json");
-        fs::write(&target, "{}").unwrap();
-        std::os::unix::fs::symlink(target, run_dir.join("result.json")).unwrap();
-
-        let error = storage.load_gate_run_result("symlink-run").unwrap_err();
-        assert!(format!("{error:#}").contains("ordinary file"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_load_gate_run_rejects_symlinked_gate_runs_root() {
+    fn test_held_gate_run_issue_directory_capability_cannot_escape_after_parent_symlink_swaps() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
-        let outside = TempDir::new().unwrap();
-        fs::create_dir(&data).unwrap();
-        fs::create_dir_all(outside.path().join("escaped-run")).unwrap();
-        fs::write(outside.path().join("escaped-run/result.json"), "{}").unwrap();
-        std::os::unix::fs::symlink(outside.path(), data.join("gate-runs")).unwrap();
-        let storage = JsonFileStorage::new(data);
-
-        let error = storage.load_gate_run_result("escaped-run").unwrap_err();
-        assert!(format!("{error:#}").contains("ordinary directory"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_gate_run_readers_reject_targeted_symlinked_run_directory_but_list_ignores_it() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        let outside = TempDir::new().unwrap();
-        fs::create_dir_all(data.join("gate-runs")).unwrap();
-        fs::write(outside.path().join("result.json"), "{}").unwrap();
-        std::os::unix::fs::symlink(outside.path(), data.join("gate-runs/escaped-run")).unwrap();
-        let storage = JsonFileStorage::new(data);
-
-        let error = storage.load_gate_run_result("escaped-run").unwrap_err();
-        assert!(format!("{error:#}").contains("ordinary directory"));
-        assert!(storage
-            .list_gate_runs_for_issue("any-issue")
-            .unwrap()
-            .is_empty());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        let original_run = data.join("gate-runs/run-one");
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+        let issue = crate::test_utils::issue_id(1);
+        let record_path = VirtualPath::gate_run_record(&issue, &crate::test_utils::gate_run_id(1));
+        let record_name = record_path.file_name().unwrap();
+        let original_run = data_layout
+            .resolve(&VirtualPath::gate_run_issue_directory(&issue))
+            .unwrap();
+        let record = data_layout.resolve(&record_path).unwrap();
         fs::create_dir_all(&original_run).unwrap();
-        fs::write(original_run.join("result.json"), b"inside").unwrap();
+        fs::write(&record, b"inside").unwrap();
 
         let outside_run = TempDir::new().unwrap();
-        fs::write(outside_run.path().join("result.json"), b"outside-run").unwrap();
+        fs::write(outside_run.path().join(record_name), b"outside-run").unwrap();
         let outside_root = TempDir::new().unwrap();
-        fs::create_dir(outside_root.path().join("run-one")).unwrap();
+        fs::create_dir(outside_root.path().join(issue.as_str())).unwrap();
         fs::write(
-            outside_root.path().join("run-one/result.json"),
+            outside_root.path().join(issue.as_str()).join(record_name),
             b"outside-root",
         )
         .unwrap();
 
-        let data_handle =
-            super::super::repository_state_store::open_absolute_dir_nofollow(&data).unwrap();
-        let gate_runs_handle = super::super::repository_state_store::open_child_dir_nofollow(
+        let data_handle = super::super::capability_fs::open_absolute_dir_nofollow(&data).unwrap();
+        let gate_runs_handle = super::super::capability_fs::open_child_dir_nofollow(
             &data_handle,
-            "gate-runs",
+            VirtualPath::GATE_RUNS.relative().as_str(),
         )
         .unwrap();
-        let run_handle = super::super::repository_state_store::open_child_dir_nofollow(
-            &gate_runs_handle,
-            "run-one",
-        )
-        .unwrap();
+        let run_handle =
+            super::super::capability_fs::open_child_dir_nofollow(&gate_runs_handle, issue.as_str())
+                .unwrap();
 
-        fs::rename(&original_run, data.join("gate-runs/run-held")).unwrap();
+        fs::rename(
+            &original_run,
+            data_layout
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
+                .join("run-held"),
+        )
+        .unwrap();
         std::os::unix::fs::symlink(outside_run.path(), &original_run).unwrap();
-        fs::rename(data.join("gate-runs"), data.join("gate-runs-held")).unwrap();
-        std::os::unix::fs::symlink(outside_root.path(), data.join("gate-runs")).unwrap();
+        fs::rename(
+            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
+            data_layout
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
+                .with_extension("held"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(
+            outside_root.path(),
+            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
+        )
+        .unwrap();
 
         assert_eq!(
-            fs::read(data.join("gate-runs/run-one/result.json")).unwrap(),
+            fs::read(&record).unwrap(),
             b"outside-root",
             "the ambient path must demonstrate that the parent swap took effect"
         );
-        let mut held_file = super::super::repository_state_store::open_regular_file_nofollow(
-            &run_handle,
-            "result.json",
-        )
-        .unwrap();
+        let mut held_file =
+            super::super::capability_fs::open_regular_file_nofollow(&run_handle, record_name)
+                .unwrap();
         let mut held_bytes = Vec::new();
         held_file.read_to_end(&mut held_bytes).unwrap();
         assert_eq!(held_bytes, b"inside");
@@ -2007,33 +1639,6 @@ mod tests {
         use super::*;
         use std::fs;
         use std::process::Command;
-
-        fn setup_git_repo() -> (TempDir, PathBuf, JsonFileStorage) {
-            let (temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = temp_dir.path().to_path_buf();
-
-            // Initialize git repository
-            Command::new("git")
-                .args(["init"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["config", "user.name", "Test"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["config", "user.email", "test@example.com"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            (temp_dir, repo_path, storage)
-        }
 
         fn add_secondary_worktree(repo_path: &Path) -> (TempDir, PathBuf) {
             use std::time::{SystemTime, UNIX_EPOCH};
@@ -2061,26 +1666,28 @@ mod tests {
 
         fn seed_index_preimage(storage: &JsonFileStorage, index: &Index) {
             fs::write(
-                storage.root.join(INDEX_FILE),
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::INDEX)
+                    .unwrap(),
                 index.to_pretty_bytes().unwrap(),
             )
             .unwrap();
         }
 
         fn seed_issue_preimage(storage: &JsonFileStorage, issue: &Issue) {
-            let issue_dir = storage.root.join(ISSUES_DIR);
-            fs::create_dir_all(&issue_dir).unwrap();
+            let issue_path = storage
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::issue_record(&issue.id))
+                .unwrap();
+            fs::create_dir_all(issue_path.parent().unwrap()).unwrap();
             fs::write(
-                issue_dir.join(format!("{}.json", issue.id)),
+                issue_path,
                 crate::repository_state::serialize_issue(issue).unwrap(),
             )
             .unwrap();
-            let mut index = storage.load_index().unwrap_or_default();
-            if !index.all_ids.contains(&issue.id) {
-                index.all_ids.push(issue.id.clone());
-            }
-            index.deleted_ids.retain(|id| id != &issue.id);
-            seed_index_preimage(storage, &index);
         }
 
         fn physical_files(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
@@ -2114,7 +1721,10 @@ mod tests {
 
         #[test]
         fn test_read_exact_store_excludes_primary_only_records_without_writing_selected_store() {
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let add = Command::new("git")
                 .args(["add", "."])
                 .current_dir(&repo_path)
@@ -2138,54 +1748,60 @@ mod tests {
 
             let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
             let secondary_data = secondary_path.join(".jit");
+            let secondary_data_layout =
+                crate::test_utils::repository_layout_for_data_root(&secondary_data);
             let secondary_storage = JsonFileStorage::new(&secondary_data);
             configure_test_layout(&secondary_storage, &secondary_path, &secondary_data);
 
-            let primary_only = crate::domain::fixture_issue(
+            let primary_only = crate::test_utils::fixture_issue(
                 "Only in primary".to_string(),
                 "The exact linked read must not aggregate this record".to_string(),
             );
             seed_issue_preimage(&main_storage, &primary_only);
-            let linked_only = crate::domain::fixture_issue(
+            let linked_only = crate::test_utils::fixture_issue(
                 "Only in linked".to_string(),
                 "The exact linked read must return this physical record".to_string(),
             );
-            fs::create_dir_all(secondary_data.join(ISSUES_DIR)).unwrap();
+            let linked_path = secondary_data_layout
+                .resolve(&VirtualPath::issue_record(&linked_only.id))
+                .unwrap();
+            fs::create_dir_all(linked_path.parent().unwrap()).unwrap();
             fs::write(
-                secondary_data
-                    .join(ISSUES_DIR)
-                    .join(format!("{}.json", linked_only.id)),
+                linked_path,
                 crate::repository_state::serialize_issue(&linked_only).unwrap(),
             )
             .unwrap();
-            let primary_event = Event::IssueCreated {
-                id: "primary-event".to_string(),
-                issue_id: primary_only.id.clone(),
-                timestamp: chrono::Utc::now(),
-                title: primary_only.title.clone(),
-                priority: primary_only.priority,
-            };
+            let primary_event = crate::test_utils::stamped_event(
+                crate::domain::EventBody::draft_issue_created(&primary_only),
+                "primary-event",
+                chrono::Utc::now(),
+            );
             fs::write(
-                repo_path.join(".jit").join(EVENTS_FILE),
+                crate::test_utils::repository_layout_for_data_root(&repo_path.join(".jit"))
+                    .resolve(&VirtualPath::EVENTS)
+                    .unwrap(),
                 format!("{}\n", serde_json::to_string(&primary_event).unwrap()),
             )
             .unwrap();
-            let linked_event = Event::IssueCreated {
-                id: "linked-event".to_string(),
-                issue_id: "linked-issue".to_string(),
-                timestamp: chrono::Utc::now(),
-                title: "Only in linked event log".to_string(),
-                priority: crate::domain::Priority::Normal,
-            };
+            let linked_issue = crate::domain::Issue::draft(
+                crate::test_utils::issue_id(55),
+                "Only in linked event log".to_string(),
+                String::new(),
+            );
+            let linked_event = crate::test_utils::stamped_event(
+                crate::domain::EventBody::draft_issue_created(&linked_issue),
+                "linked-event",
+                chrono::Utc::now(),
+            );
             fs::write(
-                secondary_data.join(EVENTS_FILE),
+                secondary_data_layout.resolve(&VirtualPath::EVENTS).unwrap(),
                 format!("{}\n", serde_json::to_string(&linked_event).unwrap()),
             )
             .unwrap();
 
             assert_ne!(std::env::current_dir().unwrap(), secondary_path);
             let before = physical_files(&secondary_data);
-            let exact = read_exact_store(&secondary_data).unwrap();
+            let exact = read_exact_store(&secondary_storage.configured_layout().unwrap()).unwrap();
             assert_eq!(physical_files(&secondary_data), before);
             assert_eq!(exact.issues, vec![linked_only]);
             assert_eq!(exact.events, vec![linked_event]);
@@ -2196,7 +1812,11 @@ mod tests {
             let absent_data = secondary_path.join("absent-store");
             assert!(!absent_data.exists());
             assert_eq!(
-                read_exact_store(&absent_data).unwrap(),
+                read_exact_store(
+                    &crate::storage::discover_repository_layout(&secondary_path, &absent_data)
+                        .unwrap(),
+                )
+                .unwrap(),
                 ExactStoreSnapshot::default()
             );
             assert!(!absent_data.exists());
@@ -2205,11 +1825,13 @@ mod tests {
         #[test]
         fn test_load_issue_from_local_first() {
             // Setup: Create a local .jit directory
-            let (_temp, storage) = setup_storage();
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
             // Create and save an issue locally
-            let issue =
-                crate::domain::fixture_issue("Local Issue".to_string(), "Description".to_string());
+            let issue = crate::test_utils::fixture_issue(
+                "Local Issue".to_string(),
+                "Description".to_string(),
+            );
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2241,17 +1863,21 @@ mod tests {
         #[test]
         fn test_load_issue_creates_no_per_issue_sidecar_lock() {
             // REQ-01: reading an issue must not create a `<id>.lock` sidecar.
-            let (_temp, storage) = setup_storage();
-            let issue =
-                crate::domain::fixture_issue("Sidecar-free".to_string(), "Description".to_string());
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let issue = crate::test_utils::fixture_issue(
+                "Sidecar-free".to_string(),
+                "Description".to_string(),
+            );
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
             let _ = storage.load_issue(&issue_id).unwrap();
 
             let sidecar = storage
-                .root
-                .join(ISSUES_DIR)
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::ISSUES)
+                .unwrap()
                 .join(format!("{issue_id}.lock"));
             assert!(
                 !sidecar.exists(),
@@ -2264,26 +1890,28 @@ mod tests {
         fn test_read_all_lock_file_count_is_independent_of_issue_count() {
             // REQ-02: after a read-all, the number of lock files is O(1) in the
             // issue count — the surviving fixed lock set does not grow with N.
-            fn lock_count_after_reading_all(issue_count: usize) -> usize {
-                let (temp, storage) = setup_storage();
+            fn seed_issues(storage: &JsonFileStorage, issue_count: usize) {
                 for i in 0..issue_count {
-                    let issue = crate::domain::fixture_issue(
+                    let issue = crate::test_utils::fixture_issue(
                         format!("Issue {i}"),
                         "Description".to_string(),
                     );
-                    seed_issue_preimage(&storage, &issue);
+                    seed_issue_preimage(storage, &issue);
                 }
-
-                let loaded = storage.list_issues().unwrap();
-                assert_eq!(loaded.len(), issue_count, "every seeded issue must load");
-
-                // Count over the whole worktree so any per-issue sidecar would be
-                // caught wherever it is written.
-                count_lock_files(temp.path())
             }
 
-            let few = lock_count_after_reading_all(3);
-            let many = lock_count_after_reading_all(12);
+            let (few_temp, few_storage) = crate::test_utils::setup_test_repo().unwrap();
+            seed_issues(&few_storage, 3);
+            let few_loaded = few_storage.list_issues().unwrap();
+            assert_eq!(few_loaded.len(), 3, "every seeded issue must load");
+            // Count over the whole worktree so any per-issue sidecar would be
+            // caught wherever it is written.
+            let few = count_lock_files(few_temp.path());
+            let (many_temp, many_storage) = crate::test_utils::setup_test_repo().unwrap();
+            seed_issues(&many_storage, 12);
+            let many_loaded = many_storage.list_issues().unwrap();
+            assert_eq!(many_loaded.len(), 12, "every seeded issue must load");
+            let many = count_lock_files(many_temp.path());
             assert_eq!(
                 few, many,
                 "lock-file count must be independent of issue count \
@@ -2293,8 +1921,8 @@ mod tests {
 
         #[test]
         fn test_list_issues_changes_no_file_other_than_the_index_lock() {
-            let (_temp, storage) = setup_storage();
-            let issue = crate::domain::fixture_issue(
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let issue = crate::test_utils::fixture_issue(
                 "Listed without writes".to_string(),
                 "Description".to_string(),
             );
@@ -2311,55 +1939,39 @@ mod tests {
         }
 
         #[test]
-        fn test_load_issue_from_git_when_not_local() {
-            // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-
-            // Create an issue and commit it
-            let issue =
-                crate::domain::fixture_issue("Committed Issue".to_string(), "From git".to_string());
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
-
-            // Commit to git
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
+        fn test_list_issues_fails_naming_a_record_it_cannot_parse() {
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let sound = crate::test_utils::fixture_issue("Sound".to_string(), String::new());
+            let broken = crate::test_utils::fixture_issue("Broken".to_string(), String::new());
+            seed_issue_preimage(&storage, &sound);
+            seed_issue_preimage(&storage, &broken);
+            let broken_path = storage
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::issue_record(&broken.id))
                 .unwrap();
+            fs::write(&broken_path, "{ not an issue").unwrap();
 
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
+            let error = storage
+                .list_issues()
+                .expect_err("a listing must not hide an unparseable record");
 
-            // Remove from local .jit (simulate reading from different worktree)
-            let issue_path = jit_dir.join("issues").join(format!("{}.json", issue_id));
-            fs::remove_file(&issue_path).unwrap();
-
-            // Update index to not include the issue
-            let index = Index {
-                schema_version: 2,
-                all_ids: vec![],
-                deleted_ids: vec![],
-            };
-            seed_index_preimage(&storage, &index);
-
-            // Should fall back to reading from git
-            let loaded = storage.load_issue(&issue_id).unwrap();
-            assert_eq!(loaded.title, "Committed Issue");
-            assert_eq!(loaded.description, "From git");
+            assert!(
+                format!("{error:#}").contains(broken.id.as_str()),
+                "the failure names the record: {error:#}"
+            );
         }
 
         #[test]
-        fn test_load_issue_from_main_worktree_when_not_in_git() {
+        fn test_load_issue_from_main_worktree_when_not_local() {
             // Setup: Create git repo with main worktree
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             // Create an issue in main worktree (not committed)
-            let issue = crate::domain::fixture_issue(
+            let issue = crate::test_utils::fixture_issue(
                 "Main WT Issue".to_string(),
                 "Uncommitted".to_string(),
             );
@@ -2384,7 +1996,10 @@ mod tests {
 
             let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
             let secondary_jit = secondary_path.join(".jit");
-            fs::create_dir_all(secondary_jit.join("issues")).unwrap();
+            let secondary_jit_layout =
+                crate::test_utils::repository_layout_for_data_root(&secondary_jit);
+            fs::create_dir_all(secondary_jit_layout.resolve(&VirtualPath::ISSUES).unwrap())
+                .unwrap();
 
             // Initialize secondary storage
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
@@ -2397,163 +2012,15 @@ mod tests {
         }
 
         #[test]
-        fn test_load_aggregated_index_includes_git_issues() {
-            // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-
-            // Create and commit issue
-            let issue =
-                crate::domain::fixture_issue("Committed Issue".to_string(), "In git".to_string());
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
-
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Remove from local index and storage (simulate fresh worktree)
-            let issue_path = jit_dir.join("issues").join(format!("{}.json", issue_id));
-            fs::remove_file(&issue_path).unwrap();
-
-            let index = Index {
-                schema_version: 2,
-                all_ids: vec![],
-                deleted_ids: vec![],
-            };
-            seed_index_preimage(&storage, &index);
-
-            // load_aggregated_index should find it in git
-            let aggregated = storage.load_aggregated_index().unwrap();
-            assert!(aggregated.all_ids.contains(&issue_id));
-        }
-
-        #[test]
-        fn test_load_aggregated_index_rejects_invalid_git_index() {
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-
-            fs::write(jit_dir.join(INDEX_FILE), b"{ invalid json").unwrap();
-            Command::new("git")
-                .args(["add", ".jit/index.json"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            Command::new("git")
-                .args(["commit", "-m", "invalid index fixture"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            seed_index_preimage(&storage, &Index::default());
-            let error = storage
-                .load_aggregated_index()
-                .expect_err("a malformed fallback index must not be skipped");
-            assert!(error.to_string().contains("Failed to parse index from git"));
-        }
-
-        #[test]
-        fn test_local_membership_overrides_git_membership_in_both_states() {
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
-
-            seed_index_preimage(
-                &storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["deleted-locally".to_string()],
-                    deleted_ids: vec!["restored-locally".to_string()],
-                },
-            );
-            let add = Command::new("git")
-                .args(["add", ".jit/index.json"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(add.status.success());
-            let commit = Command::new("git")
-                .args(["commit", "-m", "record tombstone"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(commit.status.success());
-
-            seed_index_preimage(
-                &storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["restored-locally".to_string()],
-                    deleted_ids: vec!["deleted-locally".to_string()],
-                },
-            );
-
-            assert_eq!(
-                storage.load_aggregated_index().unwrap().all_ids,
-                vec!["restored-locally"]
-            );
-        }
-
-        #[test]
-        fn test_git_membership_overrides_main_worktree_in_both_states() {
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
-            seed_index_preimage(
-                &main_storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["active-in-head".to_string()],
-                    deleted_ids: vec!["deleted-in-head".to_string()],
-                },
-            );
-            let add = Command::new("git")
-                .args(["add", ".jit/index.json"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(add.status.success());
-            let commit = Command::new("git")
-                .args(["commit", "-m", "record head membership"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(commit.status.success());
-
-            let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
-            fs::remove_file(secondary_path.join(".jit/index.json")).unwrap();
-            seed_index_preimage(
-                &main_storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["deleted-in-head".to_string()],
-                    deleted_ids: vec!["active-in-head".to_string()],
-                },
-            );
-
-            let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
-            configure_test_layout(
-                &secondary_storage,
-                &secondary_path,
-                &secondary_path.join(".jit"),
-            );
-            assert_eq!(
-                secondary_storage.load_aggregated_index().unwrap().all_ids,
-                vec!["active-in-head"]
-            );
-        }
-
-        #[test]
-        fn test_load_aggregated_index_includes_main_worktree_issues() {
+        fn test_load_aggregated_issue_ids_includes_main_worktree_issues() {
             // Setup: Create git repo with main worktree
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             // Create issue in main worktree (not committed)
-            let issue = crate::domain::fixture_issue(
+            let issue = crate::test_utils::fixture_issue(
                 "Main WT Issue".to_string(),
                 "Uncommitted".to_string(),
             );
@@ -2578,23 +2045,29 @@ mod tests {
 
             let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
             let secondary_jit = secondary_path.join(".jit");
-            fs::create_dir_all(secondary_jit.join("issues")).unwrap();
+            let secondary_jit_layout =
+                crate::test_utils::repository_layout_for_data_root(&secondary_jit);
+            fs::create_dir_all(secondary_jit_layout.resolve(&VirtualPath::ISSUES).unwrap())
+                .unwrap();
 
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
             configure_test_layout(&secondary_storage, &secondary_path, &secondary_jit);
             seed_index_preimage(&secondary_storage, &Index::default());
 
-            // Aggregated index should include main worktree issue
-            let aggregated = secondary_storage.load_aggregated_index().unwrap();
-            assert!(aggregated.all_ids.contains(&issue_id));
+            let aggregated = secondary_storage.load_aggregated_issue_ids().unwrap();
+            assert!(aggregated.contains(&issue_id));
         }
 
         #[test]
         fn test_aggregated_index_propagates_main_worktree_failures() {
-            let (_temp_dir, repo_path, _main_storage) = setup_git_repo();
+            let (_temp_dir, _main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let main_jit = repo_path.join(".jit");
+            let main_jit_layout = crate::test_utils::repository_layout_for_data_root(&main_jit);
             let add = Command::new("git")
-                .args(["add", ".jit/index.json"])
+                .args(["add", VirtualPath::INDEX.repository_relative().as_str()])
                 .current_dir(&repo_path)
                 .output()
                 .unwrap();
@@ -2614,131 +2087,208 @@ mod tests {
                 &secondary_path.join(".jit"),
             );
 
-            fs::write(main_jit.join(INDEX_FILE), b"{ invalid json").unwrap();
+            fs::write(
+                main_jit_layout.resolve(&VirtualPath::INDEX).unwrap(),
+                b"{ invalid json",
+            )
+            .unwrap();
             let malformed = secondary_storage
-                .load_aggregated_index()
+                .load_aggregated_issue_ids()
                 .expect_err("a malformed main-worktree index must abort aggregation");
             assert!(malformed.to_string().contains("failed to parse index"));
 
-            fs::remove_file(main_jit.join(INDEX_FILE)).unwrap();
-            fs::create_dir(main_jit.join(INDEX_FILE)).unwrap();
+            fs::remove_file(main_jit_layout.resolve(&VirtualPath::INDEX).unwrap()).unwrap();
+            fs::create_dir(main_jit_layout.resolve(&VirtualPath::INDEX).unwrap()).unwrap();
             let unreadable = secondary_storage
-                .load_aggregated_index()
+                .load_aggregated_issue_ids()
                 .expect_err("an unreadable main-worktree index must abort aggregation");
             assert!(unreadable.to_string().contains("Failed to read file"));
         }
 
         #[test]
-        fn test_load_aggregated_index_deduplicates() {
-            // Setup: Create git repo
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+        fn test_committed_issue_deleted_locally_is_absent_from_every_read() {
+            use std::str::FromStr;
 
-            // Create and commit issue
+            let (temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
             let issue =
-                crate::domain::fixture_issue("Duplicate Issue".to_string(), "Test".to_string());
-            let issue_id = issue.id.clone();
+                crate::test_utils::fixture_issue("Committed".to_string(), "Test".to_string());
             seed_issue_preimage(&storage, &issue);
+            commit_all(temp_dir.path());
 
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
+            fs::remove_file(
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::issue_record(&issue.id))
+                    .unwrap(),
+            )
+            .unwrap();
+            let mut index = storage.load_index().unwrap();
+            index.mark_deleted(issue.id.clone());
+            seed_index_preimage(&storage, &index);
 
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
+            assert!(storage.load_issue(&issue.id).is_err());
+            assert!(matches!(
+                storage.load_issue_or_not_found(&issue.id),
+                Err(crate::storage::PathReadError::NotFound(_))
+            ));
+            for prefix in [issue.id.as_str(), &issue.id.as_str()[..8]] {
+                assert!(storage
+                    .resolve_issue_id(&IssueIdPrefix::from_str(prefix).unwrap())
+                    .is_err());
+            }
+            assert!(storage.list_issues().unwrap().is_empty());
+        }
 
-            // Issue is now in both local AND git
-            // Aggregated index should deduplicate
-            let aggregated = storage.load_aggregated_index().unwrap();
-            let count = aggregated
-                .all_ids
-                .iter()
-                .filter(|id| *id == &issue_id)
-                .count();
-            assert_eq!(count, 1, "Issue ID should appear exactly once");
+        fn linked_store(repo_path: &Path) -> (TempDir, JsonFileStorage) {
+            let (container, secondary_path) = add_secondary_worktree(repo_path);
+            let data = secondary_path.join(".jit");
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, &secondary_path, &data);
+            (container, storage)
+        }
+
+        fn commit_all(repo_path: &Path) {
+            for args in [&["add", "."][..], &["commit", "-m", "seed"][..]] {
+                let output = Command::new("git")
+                    .args(args)
+                    .current_dir(repo_path)
+                    .output()
+                    .unwrap();
+                assert!(output.status.success(), "{output:?}");
+            }
+        }
+
+        /// A linked store over a primary store; `linked` removes one store's file
+        /// and records nothing else.
+        fn stores_sharing_issue() -> (TempDir, JsonFileStorage, TempDir, JsonFileStorage, Issue) {
+            let (temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
+            let issue = crate::test_utils::fixture_issue("Shared".to_string(), String::new());
+            seed_issue_preimage(&main_storage, &issue);
+            commit_all(temp_dir.path());
+            let (container, linked) = linked_store(temp_dir.path());
+            (temp_dir, main_storage, container, linked, issue)
+        }
+
+        fn remove_issue_with_tombstone(storage: &JsonFileStorage, issue: &Issue) {
+            fs::remove_file(
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::issue_record(&issue.id))
+                    .unwrap(),
+            )
+            .unwrap();
+            add_tombstone(storage, issue);
+        }
+
+        fn add_tombstone(storage: &JsonFileStorage, issue: &Issue) {
+            let mut index = storage.load_index().unwrap();
+            index.mark_deleted(issue.id.clone());
+            seed_index_preimage(storage, &index);
         }
 
         #[test]
-        fn test_load_issue_prefers_local_over_git() {
-            // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+        fn test_membership_local_delete_hides_the_primary_checkout_file() {
+            let (_main_dir, _main, _container, linked, issue) = stores_sharing_issue();
 
-            // Create and commit an issue
+            remove_issue_with_tombstone(&linked, &issue);
+
+            assert!(linked.load_aggregated_issue_ids().unwrap().is_empty());
+            assert!(linked.list_issues().unwrap().is_empty());
+            assert!(linked
+                .resolve_issue_id(&IssueIdPrefix::from(&issue.id))
+                .is_err());
+            assert!(linked.load_issue(&issue.id).is_err());
+            assert!(matches!(
+                linked.load_issue_or_not_found(&issue.id),
+                Err(crate::storage::PathReadError::NotFound(_))
+            ));
+        }
+
+        #[test]
+        fn test_membership_local_file_wins_over_primary_checkout_tombstone() {
+            let (_main_dir, main, _container, linked, issue) = stores_sharing_issue();
+
+            remove_issue_with_tombstone(&main, &issue);
+
+            assert_eq!(linked.load_aggregated_issue_ids().unwrap(), vec![issue.id]);
+        }
+
+        #[test]
+        fn test_membership_file_wins_over_tombstone_within_one_source() {
+            let (_main_dir, main, _container, _linked, issue) = stores_sharing_issue();
+
+            add_tombstone(&main, &issue);
+
+            assert_eq!(main.load_aggregated_issue_ids().unwrap(), vec![issue.id]);
+        }
+
+        #[test]
+        fn test_membership_primary_checkout_file_shows_when_local_is_silent() {
+            let (_main_dir, main, _container, linked, _issue) = stores_sharing_issue();
+            let primary_only =
+                crate::test_utils::fixture_issue("Primary".to_string(), String::new());
+
+            seed_issue_preimage(&main, &primary_only);
+
+            assert!(linked
+                .load_aggregated_issue_ids()
+                .unwrap()
+                .contains(&primary_only.id));
+        }
+
+        #[test]
+        fn test_membership_treats_a_missing_issues_directory_as_empty() {
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            fs::remove_dir_all(
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::ISSUES)
+                    .unwrap(),
+            )
+            .unwrap();
+
+            assert!(storage.load_aggregated_issue_ids().unwrap().is_empty());
+        }
+
+        #[test]
+        fn test_load_aggregated_issue_ids_deduplicates_an_issue_in_both_checkouts() {
+            let (temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
+            let issue =
+                crate::test_utils::fixture_issue("Duplicate Issue".to_string(), "Test".to_string());
+            seed_issue_preimage(&main_storage, &issue);
+            commit_all(temp_dir.path());
+            let (_container, linked) = linked_store(temp_dir.path());
+
+            assert_eq!(linked.load_aggregated_issue_ids().unwrap(), vec![issue.id]);
+        }
+
+        #[test]
+        fn test_load_issue_prefers_local_over_main_worktree() {
+            let (temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
             let mut issue =
-                crate::domain::fixture_issue("Original".to_string(), "Old version".to_string());
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
+                crate::test_utils::fixture_issue("Original".to_string(), "Old version".to_string());
+            seed_issue_preimage(&main_storage, &issue);
+            commit_all(temp_dir.path());
+            let (_container, linked) = linked_store(temp_dir.path());
 
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Update issue locally (not committed)
             issue.title = "Updated Locally".to_string();
-            issue.description = "New version".to_string();
-            seed_issue_preimage(&storage, &issue);
+            seed_issue_preimage(&linked, &issue);
 
-            // Should prefer local version over git version
-            let loaded = storage.load_issue(&issue_id).unwrap();
-            assert_eq!(loaded.title, "Updated Locally");
-            assert_eq!(loaded.description, "New version");
-        }
-
-        #[test]
-        fn test_load_issue_fails_when_not_found_anywhere() {
-            let (_temp, storage) = setup_storage();
-
-            let fake_id = "00000000-0000-0000-0000-000000000000";
-            let result = storage.load_issue(fake_id);
-
-            assert!(result.is_err());
-            let err_msg = result.unwrap_err().to_string();
-            assert!(err_msg.contains("not found") || err_msg.contains("Issue"));
-        }
-
-        #[test]
-        fn test_load_issue_from_git_handles_invalid_json() {
-            // Setup: Create git repo with invalid JSON committed
-            let (_temp_dir, repo_path, _storage) = setup_git_repo();
-            let jit_dir = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&jit_dir);
-
-            // Create invalid JSON file
-            let issue_id = "11111111-1111-1111-1111-111111111111";
-            let issue_path = jit_dir.join("issues").join(format!("{}.json", issue_id));
-            fs::write(&issue_path, "{ invalid json }").unwrap();
-
-            // Commit it
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add invalid issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Remove from local
-            fs::remove_file(&issue_path).unwrap();
-
-            // Should fail gracefully with parse error (not panic)
-            let result = storage.load_issue(issue_id);
-            assert!(result.is_err());
+            assert_eq!(
+                linked.load_issue(&issue.id).unwrap().title,
+                "Updated Locally"
+            );
         }
     }
 
@@ -2747,182 +2297,31 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_index_v2_has_deleted_ids_field() {
-            // Create a new index - should be v2
-            let index = Index::default();
-
-            assert_eq!(index.schema_version, 2);
-            assert_eq!(index.all_ids, Vec::<String>::new());
-            assert_eq!(index.deleted_ids, Vec::<String>::new());
+        fn test_index_default_holds_no_tombstones() {
+            assert!(Index::default().deleted_ids.is_empty());
         }
 
         #[test]
-        fn test_index_v2_save_and_load() {
-            let (_temp_dir, storage) = setup_storage();
-
-            // Create index with deleted IDs
+        fn test_index_save_and_load_round_trips_tombstones() {
+            let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let tombstone = crate::test_utils::issue_id(44);
             let index = Index {
-                schema_version: 2,
-                all_ids: vec!["issue-1".to_string(), "issue-2".to_string()],
-                deleted_ids: vec!["issue-3".to_string()],
+                schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                deleted_ids: vec![tombstone.clone()],
             };
 
             fs::write(
-                storage.root.join(INDEX_FILE),
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::INDEX)
+                    .unwrap(),
                 index.to_pretty_bytes().unwrap(),
             )
             .unwrap();
 
-            // Load it back
-            let loaded = storage.load_index().unwrap();
-
-            assert_eq!(loaded.schema_version, 2);
-            assert_eq!(loaded.all_ids.len(), 2);
-            assert!(loaded.all_ids.contains(&"issue-1".to_string()));
-            assert!(loaded.all_ids.contains(&"issue-2".to_string()));
-            assert_eq!(loaded.deleted_ids.len(), 1);
-            assert!(loaded.deleted_ids.contains(&"issue-3".to_string()));
+            assert_eq!(storage.load_index().unwrap().deleted_ids, vec![tombstone]);
         }
-    }
-
-    #[test]
-    fn test_read_path_bytes_working_tree_resolves_against_repo_root() {
-        // Create a temp dir that acts as the repo root, with a .jit subdir.
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        // Write a fixture file inside the repo root.
-        let file_name = "test-doc.md";
-        let expected = b"# Hello from repo root";
-        fs::write(repo_root.path().join(file_name), expected).unwrap();
-
-        // Build storage rooted at .jit (root = .jit dir, repo root = its parent).
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        // Change CWD to a completely unrelated directory so that a naive
-        // fs::read(path) using process CWD would fail to find the file.
-        let result = {
-            let _cwd = crate::test_utils::CurrentDirGuard::new(std::env::temp_dir()).unwrap();
-            storage.read_path_bytes(file_name, None)
-        };
-
-        let (bytes, label) =
-            result.expect("read_path_bytes should succeed even when CWD != repo root");
-        assert_eq!(bytes, expected, "file contents should match");
-        assert_eq!(label, "working-tree");
-    }
-
-    #[test]
-    fn test_read_path_bytes_missing_file_returns_not_found() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes("does_not_exist.md", None);
-        assert!(
-            result.is_err(),
-            "reading a missing file should return an error"
-        );
-        assert!(
-            matches!(result.unwrap_err(), PathReadError::NotFound(_)),
-            "missing file should yield PathReadError::NotFound, not Other"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_empty_path() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes("", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "empty path must be rejected with InvalidPath"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_absolute_path() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes("/etc/passwd", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "absolute path must be rejected with InvalidPath (both at working-tree and git-commit read paths)"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_dotdot_traversal() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        for bad in &["../etc/passwd", "a/../b", "foo/..", "a/../../b"] {
-            let result = storage.read_path_bytes(bad, None);
-            assert!(
-                matches!(result, Err(PathReadError::InvalidPath(_))),
-                "`..` traversal must be rejected with InvalidPath: {bad}"
-            );
-        }
-    }
-
-    /// Path validation must ALLOW legitimate filenames that contain `..` as
-    /// part of a segment (e.g. `foo..bar.txt`).  Only `..` as a *whole segment*
-    /// is forbidden — dots *inside* a segment are fine.  This is explicitly
-    /// called out in the issue acceptance criteria and protects against over-
-    /// zealous validators that reject filenames like `archive..2024.tar.gz`.
-    #[test]
-    fn test_read_path_bytes_allows_dots_inside_segment() {
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        // Create the fixture file with `..` inside the segment name.
-        let expected = b"legitimate file contents";
-        fs::write(repo_root.path().join("foo..bar.txt"), expected).unwrap();
-        // Also cover a nested variant to be sure the segment-walker doesn't
-        // mis-classify a middle segment with embedded dots.
-        let nested_dir = repo_root.path().join("docs");
-        fs::create_dir_all(&nested_dir).unwrap();
-        fs::write(nested_dir.join("archive..2024.md"), expected).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let (bytes, label) = storage
-            .read_path_bytes("foo..bar.txt", None)
-            .expect("filename with dots INSIDE a segment must be allowed");
-        assert_eq!(bytes, expected);
-        assert_eq!(label, "working-tree");
-
-        let (bytes, label) = storage
-            .read_path_bytes("docs/archive..2024.md", None)
-            .expect("nested path with dots inside a segment must be allowed");
-        assert_eq!(bytes, expected);
-        assert_eq!(label, "working-tree");
     }
 
     #[cfg(unix)]
@@ -2983,25 +2382,8 @@ mod tests {
     /// Repository-format compatibility guard (issue def64ac4).
     mod format_compat_tests {
         use super::*;
-        use crate::storage::RepositoryFormatTooNewError;
+        use crate::storage::RepositoryFormatUnsupportedError;
 
-        /// Write a raw `index.json` carrying an explicit `schema_version` into a
-        /// freshly-created `.jit`, returning the storage handle.
-        fn storage_with_index_version(temp: &TempDir, version: u32) -> JsonFileStorage {
-            let data = temp.path().join(".jit");
-            fs::create_dir(&data).unwrap();
-            let storage = JsonFileStorage::new(&data);
-            configure_test_layout(&storage, temp.path(), &data);
-            let index_path = data.join(INDEX_FILE);
-            let raw = format!(
-                "{{\n  \"schema_version\": {version},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
-            );
-            fs::write(&index_path, raw).unwrap();
-            storage
-        }
-
-        // REQ-01: the constant is the single authoritative marker — a new index is
-        // stamped with SUPPORTED_INDEX_SCHEMA_VERSION.
         #[test]
         fn test_new_index_is_stamped_with_supported_version() {
             assert_eq!(
@@ -3009,28 +2391,32 @@ mod tests {
                 SUPPORTED_INDEX_SCHEMA_VERSION
             );
 
-            let (_temp_dir, storage) = setup_storage();
+            let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
             assert_eq!(
                 storage.load_index().unwrap().schema_version,
                 SUPPORTED_INDEX_SCHEMA_VERSION
             );
         }
 
-        // REQ-02: a repo whose format version exceeds the binary's support refuses
-        // to load, via a typed error naming BOTH versions on a single line, rather
-        // than a file-read/parse error.
         #[test]
         fn test_newer_repo_format_refused_on_direct_load() {
             let temp_dir = TempDir::new().unwrap();
             let newer = SUPPORTED_INDEX_SCHEMA_VERSION + 1;
-            let storage = storage_with_index_version(&temp_dir, newer);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!("{{\n  \"schema_version\": {newer},\n  \"deleted_ids\": []\n}}");
+            fs::write(&index_path, raw).unwrap();
 
             let err = storage
                 .load_index()
                 .expect_err("newer format must be refused");
             let typed = err
-                .downcast_ref::<RepositoryFormatTooNewError>()
-                .expect("must be the typed format-too-new error, not a parse/read error");
+                .downcast_ref::<RepositoryFormatUnsupportedError>()
+                .expect("must be the typed format error, not a parse/read error");
             assert_eq!(typed.repository_version(), newer);
             assert_eq!(typed.supported_version(), SUPPORTED_INDEX_SCHEMA_VERSION);
 
@@ -3047,49 +2433,55 @@ mod tests {
         }
 
         // REQ-02 (consistency): the aggregated read path (used by list/status) also
-        // surfaces the format-too-new error instead of swallowing it.
+        // surfaces the format error instead of swallowing it.
         #[test]
         fn test_newer_repo_format_refused_on_aggregated_read() {
             let temp_dir = TempDir::new().unwrap();
             let newer = SUPPORTED_INDEX_SCHEMA_VERSION + 1;
-            let storage = storage_with_index_version(&temp_dir, newer);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!("{{\n  \"schema_version\": {newer},\n  \"deleted_ids\": []\n}}");
+            fs::write(&index_path, raw).unwrap();
 
             let err = storage
                 .list_issues()
                 .expect_err("aggregated read must be refused");
-            assert!(err.downcast_ref::<RepositoryFormatTooNewError>().is_some());
+            assert!(err
+                .downcast_ref::<RepositoryFormatUnsupportedError>()
+                .is_some());
         }
 
         #[test]
         fn test_aggregated_read_rejects_every_invalid_local_index_shape() {
+            let id = crate::test_utils::issue_id(1);
             let cases = [
                 (
-                    r#"{"schema_version":2,"all_ids":["a","a"],"deleted_ids":[]}"#,
-                    "duplicate active issue id 'a'",
+                    serde_json::json!({"schema_version": SUPPORTED_INDEX_SCHEMA_VERSION, "deleted_ids": [id, id]}).to_string(),
+                    format!("duplicate deleted issue id '{id}'"),
                 ),
                 (
-                    r#"{"schema_version":2,"all_ids":[],"deleted_ids":["a","a"]}"#,
-                    "duplicate deleted issue id 'a'",
+                    "{ invalid json".to_string(),
+                    "failed to parse index".to_string(),
                 ),
-                (
-                    r#"{"schema_version":2,"all_ids":["a"],"deleted_ids":["a"]}"#,
-                    "both active and deleted",
-                ),
-                ("{ invalid json", "failed to parse index"),
             ];
 
             for (raw, expected) in cases {
                 let temp_dir = TempDir::new().unwrap();
                 let data = temp_dir.path().join(".jit");
+                let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
                 fs::create_dir(&data).unwrap();
                 let storage = JsonFileStorage::new(&data);
                 configure_test_layout(&storage, temp_dir.path(), &data);
-                fs::write(data.join(INDEX_FILE), raw).unwrap();
+                fs::write(data_layout.resolve(&VirtualPath::INDEX).unwrap(), raw).unwrap();
                 let error = storage
-                    .load_aggregated_index()
+                    .load_aggregated_issue_ids()
                     .expect_err("invalid local index must abort aggregation");
                 assert!(
-                    error.to_string().contains(expected),
+                    error.to_string().contains(&expected),
                     "expected {expected:?} in {error:#}"
                 );
             }
@@ -3100,21 +2492,39 @@ mod tests {
         #[test]
         fn test_equal_version_operates_normally() {
             let temp_dir = TempDir::new().unwrap();
-            let storage = storage_with_index_version(&temp_dir, SUPPORTED_INDEX_SCHEMA_VERSION);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!(
+                "{{\n  \"schema_version\": {SUPPORTED_INDEX_SCHEMA_VERSION},\n  \"deleted_ids\": []\n}}"
+            );
+            fs::write(&index_path, raw).unwrap();
             assert!(storage.load_index().is_ok());
             assert!(storage.list_issues().is_ok());
         }
 
-        // REQ-03: a repo whose version is LESS than the binary's support also
-        // operates normally.
         #[test]
-        fn test_older_version_operates_normally() {
+        fn test_older_repo_format_refused_on_direct_load() {
             let temp_dir = TempDir::new().unwrap();
             let older = SUPPORTED_INDEX_SCHEMA_VERSION - 1;
-            let storage = storage_with_index_version(&temp_dir, older);
-            let index = storage.load_index().expect("older format must still load");
-            assert_eq!(index.schema_version, older);
-            assert!(storage.list_issues().is_ok());
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!("{{\n  \"schema_version\": {older},\n  \"deleted_ids\": []\n}}");
+            fs::write(&index_path, raw).unwrap();
+            let err = storage
+                .load_index()
+                .expect_err("older format must be refused");
+            let typed = err
+                .downcast_ref::<RepositoryFormatUnsupportedError>()
+                .expect("must be the typed format error");
+            assert_eq!(typed.repository_version(), older);
         }
     }
 }

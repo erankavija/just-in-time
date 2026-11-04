@@ -5,48 +5,43 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
-use crate::errors::InvalidArgumentError;
-// `repository_state::path` is a self-contained identity vocabulary: it imports
-// nothing from this crate and performs no I/O, so naming its root-relative path
-// identity here keeps the domain layer pure while leaving one canonical type
-// for a normalized repository-root-relative path.
-use crate::repository_state::RootRelativePath;
-use anyhow::Result;
+use crate::domain::identity::{GateKey, GateRunId, IssueId, ProfileId};
+use crate::domain::vocabulary::wire_vocabulary;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str::FromStr;
-#[cfg(test)]
-use uuid::Uuid;
 
 /// Length of short issue ID (git-style short hash)
 pub const SHORT_ID_LENGTH: usize = 8;
 
-/// Issue lifecycle state
-///
-/// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
-/// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
-/// lets states be stored in ordered collections such as `BTreeSet<State>`.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum State {
-    /// Created but not actionable yet (blocked by dependencies)
-    Backlog,
-    /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
-    Ready,
-    /// Currently being worked on
-    InProgress,
-    /// Work complete, awaiting quality gate approval
-    Gated,
-    /// Completed successfully
-    Done,
-    /// Won't implement (bypasses gates)
-    Rejected,
-    /// No longer relevant
-    Archived,
+wire_vocabulary! {
+    /// Issue lifecycle state
+    ///
+    /// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
+    /// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
+    /// lets states be stored in ordered collections such as `BTreeSet<State>`.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+    )]
+    pub enum State {
+        /// Created but not actionable yet (blocked by dependencies)
+        Backlog = "backlog",
+        /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
+        Ready = "ready",
+        /// Currently being worked on
+        InProgress = "in_progress",
+        /// Work complete, awaiting quality gate approval
+        Gated = "gated",
+        /// Completed successfully
+        Done = "done",
+        /// Won't implement (bypasses gates)
+        Rejected = "rejected",
+        /// No longer relevant
+        Archived = "archived",
+    }
 }
 
 impl State {
@@ -56,41 +51,6 @@ impl State {
     /// or decision not to implement (Rejected). Both unblock dependent issues.
     pub fn is_terminal(self) -> bool {
         matches!(self, State::Done | State::Rejected)
-    }
-
-    /// The canonical snake_case string for this state.
-    ///
-    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
-    /// and to what [`State::from_str`] round-trips; use it when a `&'static str`
-    /// is needed (e.g. a compact one-line status render) without allocating.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            State::Backlog => "backlog",
-            State::Ready => "ready",
-            State::InProgress => "in_progress",
-            State::Gated => "gated",
-            State::Done => "done",
-            State::Rejected => "rejected",
-            State::Archived => "archived",
-        }
-    }
-
-    /// Every `State` variant, in canonical lifecycle order.
-    ///
-    /// Use this to enumerate the state space exhaustively instead of hardcoding
-    /// a state list at a call site (@/inv/domain-agnostic): a counts-by-state
-    /// rollup, for instance, must list every state so its shape stays stable
-    /// and complete as the enum evolves.
-    pub const fn all() -> [State; 7] {
-        [
-            State::Backlog,
-            State::Ready,
-            State::InProgress,
-            State::Gated,
-            State::Done,
-            State::Rejected,
-            State::Archived,
-        ]
     }
 }
 
@@ -145,78 +105,44 @@ pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
     is_effectively_terminal(state, archived_from)
 }
 
-impl FromStr for State {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        State::all()
-            .into_iter()
-            .find(|state| state.as_str() == s)
-            .ok_or_else(|| InvalidArgumentError::new(format!("Invalid state: {s}")).into())
+wire_vocabulary! {
+    /// Issue priority level
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+    pub enum Priority {
+        /// Low priority
+        Low = "low",
+        /// Normal priority (default)
+        Normal = "normal",
+        /// High priority
+        High = "high",
+        /// Critical priority
+        Critical = "critical",
     }
 }
 
-/// Issue priority level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Priority {
-    /// Low priority
-    Low,
-    /// Normal priority (default)
-    Normal,
-    /// High priority
-    High,
-    /// Critical priority
-    Critical,
-}
-
-impl FromStr for Priority {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "low" => Ok(Priority::Low),
-            "normal" => Ok(Priority::Normal),
-            "high" => Ok(Priority::High),
-            "critical" => Ok(Priority::Critical),
-            _ => Err(InvalidArgumentError::new(format!("Invalid priority: {s}")).into()),
-        }
+wire_vocabulary! {
+    /// The content format of an issue body, selecting which [`ContentParser`] the
+    /// validation projection uses to extract `sections`.
+    ///
+    /// When absent on an issue the repo default (`[validation].content_format`)
+    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. A markup format
+    /// other than the default is usable only when its cargo feature is built (see
+    /// [`content_parser_for`](crate::document::content_parser_for)).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum ContentFormat {
+        /// Markdown body (always available).
+        Markdown = "markdown",
+        /// HTML body (requires the `html` cargo feature to parse).
+        Html = "html",
+        /// XML body (requires the `xml` cargo feature to parse).
+        Xml = "xml",
     }
-}
-
-/// The content format of an issue body, selecting which [`ContentParser`] the
-/// validation projection uses to extract `sections`.
-///
-/// Serialized lowercase (`"markdown"`, `"html"`, `"xml"`) so issue JSON stays
-/// human-readable. When absent on an issue the repo default
-/// (`[validation].content_format`) applies; the final fallback is
-/// [`ContentFormat::DEFAULT`]. HTML/XML are only usable when the `html`/`xml`
-/// cargo features are built (see
-/// [`content_parser_for`](crate::document::content_parser_for)).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ContentFormat {
-    /// Markdown body (always available).
-    Markdown,
-    /// HTML body (requires the `html` cargo feature to parse).
-    Html,
-    /// XML body (requires the `xml` cargo feature to parse).
-    Xml,
 }
 
 impl ContentFormat {
     /// Format applied when neither the issue nor `[validation]` declares one.
     /// It must be a format that is always compiled in.
     pub const DEFAULT: Self = Self::Markdown;
-
-    /// The token naming this format, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ContentFormat::Markdown => "markdown",
-            ContentFormat::Html => "html",
-            ContentFormat::Xml => "xml",
-        }
-    }
 }
 
 impl Default for ContentFormat {
@@ -225,52 +151,16 @@ impl Default for ContentFormat {
     }
 }
 
-impl std::fmt::Display for ContentFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
-    }
-}
-
-impl FromStr for ContentFormat {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "markdown" | "md" => Ok(ContentFormat::Markdown),
-            "html" => Ok(ContentFormat::Html),
-            "xml" => Ok(ContentFormat::Xml),
-            _ => Err(InvalidArgumentError::new(format!(
-                "Invalid content format: '{s}' (expected markdown, html, or xml)"
-            ))
-            .into()),
-        }
-    }
-}
-
-/// Quality gate status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum GateStatus {
-    /// Gate not yet evaluated
-    Pending,
-    /// Gate passed successfully
-    Passed,
-    /// Gate failed
-    Failed,
-}
-
-impl GateStatus {
-    /// The canonical snake_case string for this status.
-    ///
-    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`);
-    /// use it when a `&'static str` is needed (e.g. a compact `key=status`
-    /// render) without allocating.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            GateStatus::Pending => "pending",
-            GateStatus::Passed => "passed",
-            GateStatus::Failed => "failed",
-        }
+wire_vocabulary! {
+    /// Quality gate status
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    pub enum GateStatus {
+        /// Gate not yet evaluated
+        Pending = "pending",
+        /// Gate passed successfully
+        Passed = "passed",
+        /// Gate failed
+        Failed = "failed",
     }
 }
 
@@ -284,17 +174,43 @@ impl GateStatus {
 /// via deserialization), so a raw, unvalidated string can never reach storage.
 ///
 /// The fields are private; construct an `Assignee` by parsing (`str::parse` /
-/// [`FromStr`]) and read the parts via [`Assignee::kind`] /
-/// [`Assignee::identifier`]. It serializes transparently as the
-/// `kind:identifier` string (through [`Display`] / [`FromStr`]), so on-disk
-/// issue JSON is unchanged.
+/// [`FromStr`]) or take an engine-owned actor from its associated constant, and
+/// read the parts via [`Assignee::kind`] / [`Assignee::identifier`]. It
+/// serializes transparently as the `kind:identifier` string (through
+/// [`Display`] / [`FromStr`]), so on-disk issue JSON is unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignee {
-    kind: String,
-    identifier: String,
+    kind: Cow<'static, str>,
+    identifier: Cow<'static, str>,
 }
 
 impl Assignee {
+    /// Coordinator actor for checking a lease.
+    pub const SYSTEM_CHECK: Self = Self::engine_actor("system", "check");
+    /// Coordinator actor for force-evicting a lease.
+    pub const SYSTEM_ADMIN: Self = Self::engine_actor("system", "admin");
+    /// Coordinator actor for claims and lease recovery.
+    pub const SYSTEM_RECOVERY: Self = Self::engine_actor("system", "recovery");
+    /// Coordinator actor guarding a repository mutation when no agent identity
+    /// resolves.
+    pub const SYSTEM_LEASE_CHECK: Self = Self::engine_actor("system", "lease-check");
+    /// Actor stamped on the `by` field of a gate run recorded by the automated
+    /// executor (as opposed to a human or agent attestation). A recorded pass
+    /// whose `updated_by` equals this value is an auto-era pass with no human
+    /// attestation behind it, which matters when a gate is later redefined to
+    /// manual mode.
+    pub const AUTO_EXECUTOR: Self = Self::engine_actor("auto", "executor");
+
+    /// Builds an engine-owned actor without parsing. Private so that only the
+    /// constants above use it; each must equal the parse of its spelling: a
+    /// non-empty, colon-free `kind` and a non-empty `identifier`.
+    const fn engine_actor(kind: &'static str, identifier: &'static str) -> Self {
+        Self {
+            kind: Cow::Borrowed(kind),
+            identifier: Cow::Borrowed(identifier),
+        }
+    }
+
     /// The kind segment before the first colon (e.g. `agent` in `agent:copilot`).
     pub fn kind(&self) -> &str {
         &self.kind
@@ -351,8 +267,8 @@ impl FromStr for Assignee {
             return Err(AssigneeParseError::EmptyIdentifier(s.to_string()));
         }
         Ok(Assignee {
-            kind: kind.to_string(),
-            identifier: identifier.to_string(),
+            kind: Cow::Owned(kind.to_string()),
+            identifier: Cow::Owned(identifier.to_string()),
         })
     }
 }
@@ -361,17 +277,6 @@ impl std::fmt::Display for Assignee {
     /// Render as the canonical `kind:identifier` string.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.kind, self.identifier)
-    }
-}
-
-/// Compare an [`Assignee`] against a raw `kind:identifier` string without
-/// allocating, so filter predicates can match a parsed assignee to user input.
-impl PartialEq<str> for Assignee {
-    fn eq(&self, other: &str) -> bool {
-        match other.split_once(':') {
-            Some((kind, identifier)) => self.kind == kind && self.identifier == identifier,
-            None => false,
-        }
     }
 }
 
@@ -420,20 +325,7 @@ pub struct GateState {
     /// selects; absent while no run has been recorded since the gate became
     /// required.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub run_id: Option<String>,
-}
-
-impl GateState {
-    /// The run of `gate_key` among `runs` this status was projected from.
-    pub fn projected_run<'a>(
-        &self,
-        gate_key: &str,
-        runs: &'a [GateRunResult],
-    ) -> Option<&'a GateRunResult> {
-        let run_id = self.run_id.as_deref()?;
-        runs.iter()
-            .find(|run| run.run_id == run_id && run.gate_key == gate_key)
-    }
+    pub run_id: Option<GateRunId>,
 }
 
 /// An issue representing a unit of work
@@ -441,7 +333,7 @@ impl GateState {
 #[serde(try_from = "IssueWire")]
 pub struct Issue {
     /// Unique identifier (UUID)
-    pub id: String,
+    pub id: IssueId,
     /// Short summary of the issue
     pub title: String,
     /// Detailed description and acceptance criteria
@@ -454,11 +346,11 @@ pub struct Issue {
     #[schemars(with = "Option<String>")]
     pub assignee: Option<Assignee>,
     /// IDs of issues that must be done first
-    pub dependencies: Vec<String>,
+    pub dependencies: Vec<IssueId>,
     /// Gate keys that must pass before ready/done
-    pub gates_required: Vec<String>,
+    pub gates_required: Vec<GateKey>,
     /// Current status of each required gate
-    pub gates_status: HashMap<String, GateState>,
+    pub gates_status: HashMap<GateKey, GateState>,
     /// Flexible key-value storage for agent-specific data
     pub context: HashMap<String, String>,
     /// References to design documents, notes, and artifacts
@@ -520,15 +412,15 @@ pub struct Issue {
 /// record carries `archived_from`.
 #[derive(Deserialize)]
 struct IssueWire {
-    id: String,
+    id: IssueId,
     title: String,
     description: String,
     state: State,
     priority: Priority,
     assignee: Option<Assignee>,
-    dependencies: Vec<String>,
-    gates_required: Vec<String>,
-    gates_status: HashMap<String, GateState>,
+    dependencies: Vec<IssueId>,
+    gates_required: Vec<GateKey>,
+    gates_status: HashMap<GateKey, GateState>,
     context: HashMap<String, String>,
     documents: Vec<DocumentReference>,
     labels: Vec<String>,
@@ -546,15 +438,17 @@ struct IssueWire {
     archived_from: Option<State>,
 }
 
-impl TryFrom<IssueWire> for Issue {
-    type Error = String;
+/// An archived issue record that does not say which state it was archived from.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("missing field `archived_from` on archived issue {0}")]
+pub struct MissingArchivedFrom(pub IssueId);
 
-    fn try_from(wire: IssueWire) -> std::result::Result<Self, Self::Error> {
+impl TryFrom<IssueWire> for Issue {
+    type Error = MissingArchivedFrom;
+
+    fn try_from(wire: IssueWire) -> Result<Self, Self::Error> {
         if wire.state == State::Archived && wire.archived_from.is_none() {
-            return Err(format!(
-                "missing field `archived_from` on archived issue {}",
-                wire.id
-            ));
+            return Err(MissingArchivedFrom(wire.id));
         }
         Ok(Self {
             id: wire.id,
@@ -580,20 +474,13 @@ impl TryFrom<IssueWire> for Issue {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn fixture_issue(title: String, description: String) -> Issue {
-    let mut issue = Issue::draft(title, description);
-    issue.id = Uuid::new_v4().to_string();
-    issue
-}
-
 /// The readiness change the dependency graph demands for a stored issue.
 ///
 /// Readiness is stored on the issue and is also derivable from the graph, so the
 /// two views must agree. [`Issue::derive_readiness_correction`] names the change
-/// that restores agreement, and every dependency-mutating path applies the
-/// direction it owns: an edge addition can only demote, an edge removal or a
-/// dependency reaching a terminal state can only promote.
+/// that restores agreement for one issue;
+/// [`derive_readiness_corrections`](crate::domain::queries::derive_readiness_corrections)
+/// collects them for the issues a mutation can affect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadinessCorrection {
     /// A [`State::Backlog`] issue nothing blocks belongs in [`State::Ready`].
@@ -604,16 +491,16 @@ pub enum ReadinessCorrection {
 }
 
 impl Issue {
-    /// Draft an issue carrying no authoritative id or lifecycle timestamps.
+    /// Draft issue `id` carrying no authoritative lifecycle timestamps.
     ///
-    /// The id is empty and the lifecycle timestamps hold a sentinel epoch; the
-    /// `repository_state` finalizer assigns the real id and stamps `created_at`,
-    /// `updated_at`, and `first_ready_at`. Command producers build drafts so time
-    /// and identity authority stay solely in the finalizer, never in a command.
-    pub fn draft(title: String, description: String) -> Self {
+    /// The lifecycle timestamps hold a sentinel epoch; the `repository_state`
+    /// finalizer stamps `created_at`, `updated_at`, and `first_ready_at`, so time
+    /// authority stays solely in the finalizer. A created issue's `id` is the one
+    /// its mutation context derived for it.
+    pub fn draft(id: IssueId, title: String, description: String) -> Self {
         let sentinel = DateTime::from_timestamp(0, 0).expect("epoch is representable");
         Self {
-            id: String::new(),
+            id,
             title,
             description,
             state: State::Backlog,
@@ -640,7 +527,7 @@ impl Issue {
     /// Returns a git-style short hash for human-readable output.
     /// Minimum length is 8 characters for reasonable collision resistance.
     pub fn short_id(&self) -> String {
-        self.id.chars().take(SHORT_ID_LENGTH).collect()
+        self.id.short_id().to_string()
     }
 
     /// The terminal state this issue counts as for dependency, readiness, and
@@ -663,7 +550,7 @@ impl Issue {
     /// Returns true if any dependency is unmet by [`is_dependency_met`], including
     /// a dependency whose id resolves to no issue.
     /// Note: Gates do not block work from starting, only from completing.
-    pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
+    pub fn is_blocked(&self, resolved_issues: &HashMap<IssueId, &Issue>) -> bool {
         self.dependencies.iter().any(|dep_id| {
             !matches!(resolved_issues.get(dep_id), Some(issue) if is_dependency_met(issue.state, issue.archived_from))
         })
@@ -682,7 +569,7 @@ impl Issue {
     /// Get list of unpassed gates
     ///
     /// Returns a vector of gate keys that have not yet passed.
-    pub fn get_unpassed_gates(&self) -> Vec<String> {
+    pub fn get_unpassed_gates(&self) -> Vec<GateKey> {
         self.gates_required
             .iter()
             .filter(|gate_key| !matches!(self.gates_status.get(*gate_key), Some(gate_state) if gate_state.status == GateStatus::Passed))
@@ -693,12 +580,9 @@ impl Issue {
     /// Derive the readiness correction the dependency graph demands for this
     /// issue, or `None` when the stored state already agrees with the graph.
     ///
-    /// This is the single derivation of readiness from the graph: every path
-    /// that mutates a dependency edge — `jit dep add`/`remove`, graph-template
-    /// application, and the `jit validate --fix` repair — decides here, so no two
-    /// of them can drift (`@/invariant/derived-state-coherence`). The
-    /// whole-repository check reports a [`ReadinessCorrection::Demote`] as a
-    /// violation.
+    /// This is the single derivation of readiness from the graph, so no two
+    /// paths can drift (`@/invariant/derived-state-coherence`). The
+    /// whole-repository check reports any correction as a violation.
     ///
     /// Only [`State::Backlog`] and [`State::Ready`] are graph-derived. Every
     /// other state is owned by an explicit transition — an issue already claimed,
@@ -706,22 +590,13 @@ impl Issue {
     /// `None`.
     pub fn derive_readiness_correction(
         &self,
-        resolved_issues: &HashMap<String, &Issue>,
+        resolved_issues: &HashMap<IssueId, &Issue>,
     ) -> Option<ReadinessCorrection> {
         match (self.state, self.is_blocked(resolved_issues)) {
             (State::Backlog, false) => Some(ReadinessCorrection::Promote),
             (State::Ready, true) => Some(ReadinessCorrection::Demote),
             _ => None,
         }
-    }
-
-    /// Check if this issue should auto-transition to Ready state
-    /// A Backlog issue transitions to Ready when it becomes unblocked
-    pub fn should_auto_transition_to_ready(
-        &self,
-        resolved_issues: &HashMap<String, &Issue>,
-    ) -> bool {
-        self.derive_readiness_correction(resolved_issues) == Some(ReadinessCorrection::Promote)
     }
 
     /// Check if this issue should auto-transition to Done state
@@ -759,13 +634,14 @@ impl Issue {
 /// for full details.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MinimalIssue {
-    pub id: String,
+    pub id: IssueId,
     pub title: String,
     pub state: State,
     pub priority: Priority,
     /// Assigned agent or person (optional for context)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub assignee: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub assignee: Option<Assignee>,
     /// Labels for categorization (optional for context)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
@@ -811,7 +687,7 @@ impl From<&Issue> for MinimalIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.as_ref().map(Assignee::to_string),
+            assignee: issue.assignee.clone(),
             labels: issue.labels.clone(),
             archived_from: issue.archived_from,
         }
@@ -821,7 +697,7 @@ impl From<&Issue> for MinimalIssue {
 impl MinimalIssue {
     /// Get short ID (first 8 characters of UUID)
     pub fn short_id(&self) -> String {
-        self.id.chars().take(SHORT_ID_LENGTH).collect()
+        self.id.short_id().to_string()
     }
 
     /// Whether this issue is terminal for dependency and readiness purposes,
@@ -835,11 +711,12 @@ impl MinimalIssue {
 /// Minimal blocked issue for queries - includes blocking reasons
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MinimalBlockedIssue {
-    pub id: String,
+    pub id: IssueId,
     pub title: String,
     pub state: State,
     pub priority: Priority,
-    pub assignee: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub assignee: Option<Assignee>,
     pub labels: Vec<String>,
     pub blocked_reasons: Vec<String>,
 }
@@ -872,7 +749,7 @@ impl Serialize for MinimalBlockedIssue {
 
 impl MinimalBlockedIssue {
     pub fn short_id(&self) -> String {
-        self.id.chars().take(SHORT_ID_LENGTH).collect()
+        self.id.short_id().to_string()
     }
 }
 
@@ -883,7 +760,7 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.as_ref().map(Assignee::to_string),
+            assignee: issue.assignee.clone(),
             labels: issue.labels.clone(),
             blocked_reasons,
         }
@@ -892,12 +769,14 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
 
 /// Implement GraphNode for Issue to enable dependency graph operations
 impl crate::graph::GraphNode for Issue {
-    fn id(&self) -> &str {
+    type Id = IssueId;
+
+    fn id(&self) -> &IssueId {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &IssueId> + '_ {
+        self.dependencies.iter()
     }
 }
 
@@ -946,11 +825,12 @@ pub struct GateContext {
 
 /// Record-format version stamped into every [`GateRunResult`] a gate execution
 /// records, and the version this binary writes into
-/// `.jit/gate-runs/<run-id>/result.json`.
+/// `.jit/gate-runs/<issue-id>/<run-id>.json`.
 pub const GATE_RUN_SCHEMA_VERSION: u32 = 1;
 
 /// Result of a gate execution, as persisted to
-/// `.jit/gate-runs/<run-id>/result.json`.
+/// `.jit/gate-runs/<issue-id>/<run-id>.json`; an issue's run history is one
+/// listing of its `.jit/gate-runs/<issue-id>/` directory.
 ///
 /// `JsonSchema` is derived so the storage reference's freshness guard can read
 /// this record's field set off the derived schema
@@ -962,13 +842,13 @@ pub struct GateRunResult {
     /// Schema version for future evolution ([`GATE_RUN_SCHEMA_VERSION`])
     pub schema_version: u32,
     /// Unique run identifier
-    pub run_id: String,
+    pub run_id: GateRunId,
     /// Gate key that was executed
-    pub gate_key: String,
+    pub gate_key: GateKey,
     /// Stage at which gate was executed
     pub stage: GateStage,
     /// Issue ID
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Git commit the checker was launched at, when one was available. `None`
     /// for a run that launched no checker — a verdict taken from an earlier run
     /// ([`origin`](Self::origin)) ran at no commit of its own, and the run it
@@ -994,7 +874,7 @@ pub struct GateRunResult {
     /// Command that was executed
     pub command: String,
     /// Who triggered this execution
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     /// Optional message
     pub message: Option<String>,
     /// Structured findings parsed from the checker's machine-readable block, if
@@ -1023,6 +903,17 @@ pub struct GateRunResult {
     pub evaluation_stability: GateEvaluationStability,
 }
 
+/// The reuse source for one gate over one inputs digest, as persisted to
+/// `.jit/gate-runs/verdicts/<gate-key>/<inputs-digest>.json`: the latest
+/// recorded run that [`GateRunResult::is_reusable_for`] that key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GateVerdictRecord {
+    /// Issue the named run was recorded against
+    pub issue_id: IssueId,
+    /// The run whose verdict an evaluation over this key may carry
+    pub run_id: GateRunId,
+}
+
 impl GateRunResult {
     /// Whether an evaluation of `gate_key` over inputs digesting to `digest`
     /// may carry this run's verdict.
@@ -1031,18 +922,26 @@ impl GateRunResult {
     /// makes the two evaluations questions about identical content. The run
     /// must have executed its own checker, so the record a reuse names is
     /// always the execution behind the verdict rather than another reference
-    /// to it. And the run must have reached a verdict — `passed` or `failed`;
-    /// an errored run reports the checker never getting there (a timeout, a
+    /// to it. And the run must have reached a verdict, passing or failing; an
+    /// errored run reports the checker never getting there (a timeout, a
     /// missing command), which says nothing about the inputs.
     pub fn is_reusable_for(
         &self,
-        gate_key: &str,
+        gate_key: &GateKey,
         digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> bool {
-        self.gate_key == gate_key
+        &self.gate_key == gate_key
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
             && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
+    }
+
+    /// The inputs digest under which this run is a reuse source
+    /// ([`is_reusable_for`](Self::is_reusable_for) its own gate), or `None`.
+    pub fn reusable_digest(&self) -> Option<&crate::domain::repository_inputs::InputsDigest> {
+        self.inputs_digest
+            .as_ref()
+            .filter(|digest| self.is_reusable_for(&self.gate_key, digest))
     }
 
     /// The draft record of a manual gate's attestation of `status` by `by`.
@@ -1051,20 +950,20 @@ impl GateRunResult {
     /// text, or inputs digest, and its [`GateVerdictOrigin::Attested`] origin
     /// keeps it out of verdict reuse.
     pub fn attestation(
-        issue_id: &str,
-        gate_key: &str,
+        run_id: &GateRunId,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
         stage: GateStage,
         status: GateStatus,
         by: Option<&Assignee>,
     ) -> Self {
         Self {
             schema_version: GATE_RUN_SCHEMA_VERSION,
-            // Repository mutation finalization assigns the durable run identity
-            // and stamps the attestation time.
-            run_id: String::new(),
-            gate_key: gate_key.to_string(),
+            // Repository mutation finalization stamps the attestation time.
+            run_id: run_id.clone(),
+            gate_key: gate_key.clone(),
             stage,
-            issue_id: issue_id.to_string(),
+            issue_id: issue_id.clone(),
             commit: None,
             branch: None,
             status: match status {
@@ -1079,7 +978,7 @@ impl GateRunResult {
             stdout: String::new(),
             stderr: String::new(),
             command: String::new(),
-            by: by.map(ToString::to_string),
+            by: by.cloned(),
             message: None,
             findings: None,
             inputs_digest: None,
@@ -1087,18 +986,6 @@ impl GateRunResult {
             evaluation_stability: GateEvaluationStability::Stable,
         }
     }
-}
-
-/// The most recently started run among `runs`, or `None` when empty.
-///
-/// Ties on the start instant fall back to the run id so one repository state
-/// always selects one run.
-pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
-    runs.into_iter().max_by(|left, right| {
-        left.started_at
-            .cmp(&right.started_at)
-            .then_with(|| left.run_id.cmp(&right.run_id))
-    })
 }
 
 /// Where a recorded gate verdict came from.
@@ -1109,19 +996,17 @@ pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
 /// that many independent verifications, and the named run is where the report
 /// text and findings that produced the verdict live.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(
-    tag = "derivation",
-    content = "source_run",
-    rename_all = "snake_case",
-    deny_unknown_fields
-)]
+#[serde(tag = "derivation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GateVerdictOrigin {
     /// This run executed the checker and the verdict is its own.
     #[default]
     Executed,
-    /// The verdict was taken from the run with this id, whose declared inputs
+    /// The verdict was taken from the addressed run, whose declared inputs
     /// digested to the same value. That run executed the checker.
-    Reused(String),
+    Reused {
+        source_issue: IssueId,
+        source_run: GateRunId,
+    },
     /// The verdict is a manual gate's attestation: `by` names the attestor and
     /// `started_at` the time. No checker ran.
     Attested,
@@ -1147,10 +1032,10 @@ pub enum GateEvaluationStability {
 impl GateVerdictOrigin {
     /// The earlier run this verdict was taken from, or `None` when the verdict
     /// is this run's own.
-    pub fn source_run(&self) -> Option<&str> {
+    pub fn source_run(&self) -> Option<&GateRunId> {
         match self {
             Self::Executed | Self::Attested => None,
-            Self::Reused(run_id) => Some(run_id),
+            Self::Reused { source_run, .. } => Some(source_run),
         }
     }
 
@@ -1160,39 +1045,19 @@ impl GateVerdictOrigin {
     }
 }
 
-/// Gate run status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum GateRunStatus {
-    /// Check succeeded
-    Passed,
-    /// Check failed (expected failure, e.g., tests failed)
-    Failed,
-    /// Unexpected error (timeout, command not found, crash)
-    Error,
-    /// Not yet run (for manual gates)
-    Pending,
-}
-
-/// Origin vocabulary persisted for an installed profile package.
-///
-/// The location a package was read from is carried by the origin itself, so a
-/// persisted origin cannot name a repository location without saying which. The
-/// payload is [`RootRelativePath`], the repository's own normalized
-/// root-relative path identity, whose parse and deserialization reject an
-/// absolute, traversing, or otherwise non-canonical spelling; a location is
-/// relative to the worktree root, so a stored record stays readable wherever
-/// the repository is checked out.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(
-    tag = "source",
-    content = "location",
-    rename_all = "snake_case",
-    deny_unknown_fields
-)]
-pub enum ProfileOrigin {
-    /// Package bytes were read from this worktree-relative directory.
-    Directory(RootRelativePath),
+wire_vocabulary! {
+    /// Gate run status
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum GateRunStatus {
+        /// Check succeeded
+        Passed = "passed",
+        /// Check failed (expected failure, e.g., tests failed)
+        Failed = "failed",
+        /// Unexpected error (timeout, command not found, crash)
+        Error = "error",
+        /// Not yet run (for manual gates)
+        Pending = "pending",
+    }
 }
 
 /// The lifecycle operation requested by a profile mutation.
@@ -1220,9 +1085,10 @@ pub enum ProfileLifecycleStatus {
 #[serde(deny_unknown_fields)]
 pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
-    pub id: crate::profile::ProfileId,
+    pub id: ProfileId,
     /// The package version applied.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: semver::Version,
     /// The action observed for this profile.
     pub status: ProfileLifecycleStatus,
     /// The variable values applied, by name.
@@ -1323,7 +1189,7 @@ impl std::fmt::Display for LinkedCheckoutWriteStance {
     }
 }
 
-/// System event types for audit log
+/// The tagged body of an [`Event`]: its variant and payload fields.
 ///
 /// `JsonSchema` is derived so the event catalog's freshness guard can read the
 /// serde `type` tag of every variant off the derived schema
@@ -1331,15 +1197,11 @@ impl std::fmt::Display for LinkedCheckoutWriteStance {
 /// variant appears there whether or not it was given a distinct [`EventTag`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum Event {
+pub enum EventBody {
     /// A new issue was created
     IssueCreated {
-        /// Event ID
-        id: String,
         /// Issue that was created
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Issue title
         title: String,
         /// Issue priority
@@ -1347,23 +1209,15 @@ pub enum Event {
     },
     /// An issue was claimed by an agent
     IssueClaimed {
-        /// Event ID
-        id: String,
         /// Issue that was claimed
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Who claimed it (format: "type:identifier")
         assignee: Assignee,
     },
     /// Issue state transitioned
     IssueStateChanged {
-        /// Event ID
-        id: String,
         /// Issue that changed
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Previous state
         from: State,
         /// New state
@@ -1371,110 +1225,64 @@ pub enum Event {
     },
     /// A quality gate passed
     GatePassed {
-        /// Event ID
-        id: String,
         /// Issue with the gate
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Gate that passed
-        gate_key: String,
+        gate_key: GateKey,
         /// Who marked it as passed (format: "type:identifier")
         updated_by: Option<Assignee>,
     },
     /// A quality gate failed
     GateFailed {
-        /// Event ID
-        id: String,
         /// Issue with the gate
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Gate that failed
-        gate_key: String,
+        gate_key: GateKey,
         /// Who marked it as failed (format: "type:identifier")
         updated_by: Option<Assignee>,
     },
     /// A quality gate was added to an issue
     GateAdded {
-        /// Event ID
-        id: String,
         /// Issue to which gate was added
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Gate that was added
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A quality gate was removed from an issue
     GateRemoved {
-        /// Event ID
-        id: String,
         /// Issue from which gate was removed
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Gate that was removed
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// Issue was completed
     IssueCompleted {
-        /// Event ID
-        id: String,
         /// Issue that completed
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
     },
     /// Issue was permanently deleted
     IssueDeleted {
-        /// Event ID
-        id: String,
         /// Issue that was deleted
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
     },
     /// Issue was released from assignee
     IssueReleased {
-        /// Event ID
-        id: String,
         /// Issue that was released
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Previous assignee (format: "type:identifier")
         assignee: Assignee,
         /// Reason for release
         reason: String,
+        /// Who released it; null means recorded before the field existed
+        #[serde(deserialize_with = "Option::deserialize")]
+        released_by: Option<Assignee>,
     },
     /// A dependency-aware archive execution reached its durable commit point.
-    ArtifactArchiveExecuted {
-        /// Event ID.
-        id: String,
-        /// When the commit point was recorded.
-        timestamp: DateTime<Utc>,
-        /// Container or document selected for archival.
-        target: crate::domain::artifact_plan::PlanTarget,
-        /// Repository-relative mirror root used by the operation.
-        destination_root: String,
-        /// New or adopted publications made durable before this record.
-        publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
-        /// Exact issue-document reference changes made durable before this record.
-        reference_changes: Vec<crate::domain::artifact_plan::ReferenceChange>,
-        /// Identity-guarded removals attempted after this record.
-        planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
-        /// Whether the record reconciles durable state left by an earlier failed append.
-        reconciling: bool,
-    },
+    ArtifactArchiveExecuted(crate::domain::artifact_execution::ArchiveExecution),
     /// Issue was updated (labels, priority, assignee, etc.)
     IssueUpdated {
-        /// Event ID
-        id: String,
         /// Issue that was updated
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Who updated it (e.g., "bulk-update", "human:alice", "agent:copilot")
         updated_by: String,
         /// Fields that changed
@@ -1482,18 +1290,14 @@ pub enum Event {
     },
     /// Redundant dependencies were removed by transitive reduction during validate --fix
     DependencyReduced {
-        /// Event ID
-        id: String,
         /// Issue whose dependencies were reduced
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Number of dependencies before reduction
         old_count: usize,
         /// Number of dependencies after reduction
         new_count: usize,
         /// IDs of the removed (redundant) dependencies
-        removed_deps: Vec<String>,
+        removed_deps: Vec<IssueId>,
     },
     /// A blocking validation rule was bypassed via `--force` on a write.
     ///
@@ -1502,12 +1306,8 @@ pub enum Event {
     /// audit-sensitive override (DR §7.6): ordinary rule rejections and
     /// read-only `jit validate` runs are NOT logged, only the deliberate bypass.
     LocalRuleBypassed {
-        /// Event ID
-        id: String,
         /// Issue whose write bypassed the rule
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// Name of the enforce rule that was bypassed
         rule: String,
     },
@@ -1519,12 +1319,8 @@ pub enum Event {
     /// true` produced an `error` finding attributed to the issue in its target
     /// state, so the transition into `target` was refused.
     TransitionBlocked {
-        /// Event ID
-        id: String,
         /// Issue whose transition was blocked
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// State the issue was attempting to enter
         target: State,
         /// Name of the enforcing graph rule that blocked the transition
@@ -1533,7 +1329,7 @@ pub enum Event {
     /// An enforcing graph rule was bypassed via `--force` at a state transition
     /// (CC-2).
     ///
-    /// The transition-path counterpart of [`Event::LocalRuleBypassed`]: emitted
+    /// The transition-path counterpart of [`EventBody::LocalRuleBypassed`]: emitted
     /// once per enforce graph rule whose `error` finding was overridden by
     /// `--force` during a `--state` transition. Unlike `LocalRuleBypassed` (which
     /// the write path emits AFTER its save commits), this event is appended inside
@@ -1543,12 +1339,8 @@ pub enum Event {
     /// bypass so the audit log can tell apart a forced write from a forced
     /// transition.
     GraphRuleBypassed {
-        /// Event ID
-        id: String,
         /// Issue whose transition bypassed the rule
-        issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
+        issue_id: IssueId,
         /// State the issue transitioned into
         target: State,
         /// Name of the enforce graph rule that was bypassed
@@ -1559,38 +1351,26 @@ pub enum Event {
     /// Registry-scoped: it carries no issue id
     /// because it mutates the shared gate registry rather than a single issue.
     GateDefinitionUpdated {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Registry key of the gate that was updated
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A gate definition was added to the registry (`jit gate define`).
     ///
-    /// Registry-scoped, like [`Event::GateDefinitionUpdated`]: it carries no
+    /// Registry-scoped, like [`EventBody::GateDefinitionUpdated`]: it carries no
     /// issue id because it mutates the shared gate registry rather than a
     /// single issue.
     GateDefinitionCreated {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Registry key of the gate that was created
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A gate definition was removed from the registry (`jit gate remove`).
     ///
-    /// Registry-scoped, like [`Event::GateDefinitionUpdated`]: it carries no
+    /// Registry-scoped, like [`EventBody::GateDefinitionUpdated`]: it carries no
     /// issue id because it mutates the shared gate registry rather than a
     /// single issue.
     GateDefinitionRemoved {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Registry key of the gate that was removed
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A complete profile lifecycle mutation reached its durable commit point.
     ///
@@ -1598,22 +1378,15 @@ pub enum Event {
     /// dependency-first aggregate, with each package's id, version and applied
     /// variable values.
     ProfileLifecycle {
-        /// Event ID.
-        id: String,
-        /// When the lifecycle operation was recorded.
-        timestamp: DateTime<Utc>,
         /// Requested lifecycle operation.
         operation: ProfileLifecycleOperation,
         /// Per-profile outcomes in stable aggregate order.
         profiles: Vec<ProfileLifecycleProfile>,
-        /// Whether this append isolated a pre-existing non-newline,
-        /// malformed event tail immediately before this record.
-        isolated_torn_tail: bool,
     },
     /// An explicit per-invocation override permitted a state-mutating command
     /// inside a linked non-primary checkout.
     ///
-    /// Repository-scoped, like [`Event::ProfileLifecycle`]: the override is
+    /// Repository-scoped, like [`EventBody::ProfileLifecycle`]: the override is
     /// decided for the whole invocation before any issue is known, so the record
     /// carries no issue id. It exists because an ordinary mutation record cannot
     /// show that the invocation was permitted by an override rather than by a
@@ -1624,10 +1397,6 @@ pub enum Event {
     /// invocation-scoped annotation the dispatch site installs, so the record and
     /// the mutation it explains become durable together or not at all.
     LinkedCheckoutWriteOverridden {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Root of the linked checkout whose store the invocation mutated.
         checkout: std::path::PathBuf,
         /// The stance declared for the repository, which would have refused the
@@ -1637,79 +1406,75 @@ pub enum Event {
         /// permitted the invocation.
         invocation_override: LinkedCheckoutWriteStance,
     },
+    /// A write that records no domain event reached its commit point.
+    ///
+    /// Repository-scoped: it stands in for the domain event such a write lacks,
+    /// so every redo record grows the log by at least one record.
+    FilesPublished {
+        /// Sorted repository-relative paths the write wrote, made or deleted.
+        paths: Vec<String>,
+    },
+}
+
+/// One event-log record: an id and a timestamp around a tagged [`EventBody`].
+///
+/// The body is flattened, so a record is the body's tagged object plus `id`
+/// and `timestamp`; flattening rules out `deny_unknown_fields`. Only the
+/// mutation finalizer, event decoding and
+/// [`EventTag::sample`](crate::domain::event_catalog::EventTag::sample) build
+/// one; everything else drafts an [`EventBody`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct Event {
+    /// Finalizer-assigned event id.
+    id: String,
+    /// The single timestamp of the mutation that recorded this event.
+    timestamp: DateTime<Utc>,
+    /// What this event records.
+    #[serde(flatten)]
+    body: EventBody,
 }
 
 impl Event {
-    /// This event's identity, as assigned by [`Self::assign_identity`].
-    ///
-    /// A drafted event that has not reached the mutation finalizer carries an
-    /// empty id.
+    /// Stamp `body` with the identity the mutation finalizer assigns.
+    pub(crate) fn new(id: String, timestamp: DateTime<Utc>, body: EventBody) -> Self {
+        Self {
+            id,
+            timestamp,
+            body,
+        }
+    }
+
+    /// The tagged body this event records.
+    pub fn body(&self) -> &EventBody {
+        &self.body
+    }
+
+    /// This event's id.
     pub fn id(&self) -> &str {
-        match self {
-            Event::IssueCreated { id, .. }
-            | Event::IssueClaimed { id, .. }
-            | Event::IssueStateChanged { id, .. }
-            | Event::GatePassed { id, .. }
-            | Event::GateFailed { id, .. }
-            | Event::GateAdded { id, .. }
-            | Event::GateRemoved { id, .. }
-            | Event::IssueCompleted { id, .. }
-            | Event::IssueDeleted { id, .. }
-            | Event::IssueReleased { id, .. }
-            | Event::ArtifactArchiveExecuted { id, .. }
-            | Event::IssueUpdated { id, .. }
-            | Event::DependencyReduced { id, .. }
-            | Event::LocalRuleBypassed { id, .. }
-            | Event::TransitionBlocked { id, .. }
-            | Event::GraphRuleBypassed { id, .. }
-            | Event::GateDefinitionUpdated { id, .. }
-            | Event::GateDefinitionCreated { id, .. }
-            | Event::GateDefinitionRemoved { id, .. }
-            | Event::ProfileLifecycle { id, .. }
-            | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
-        }
+        self.id.as_str()
     }
 
-    /// Overwrite this event's id and timestamp with finalizer-assigned values.
-    ///
-    /// The `repository_state` mutation finalizer is the sole authority over event
-    /// identity and time: it assigns a deterministic id and stamps the single
-    /// mutation timestamp, overriding whatever an intermediate constructor set.
-    pub fn assign_identity(&mut self, new_id: String, new_timestamp: DateTime<Utc>) {
-        match self {
-            Event::IssueCreated { id, timestamp, .. }
-            | Event::IssueClaimed { id, timestamp, .. }
-            | Event::IssueStateChanged { id, timestamp, .. }
-            | Event::GatePassed { id, timestamp, .. }
-            | Event::GateFailed { id, timestamp, .. }
-            | Event::GateAdded { id, timestamp, .. }
-            | Event::GateRemoved { id, timestamp, .. }
-            | Event::IssueCompleted { id, timestamp, .. }
-            | Event::IssueDeleted { id, timestamp, .. }
-            | Event::IssueReleased { id, timestamp, .. }
-            | Event::ArtifactArchiveExecuted { id, timestamp, .. }
-            | Event::IssueUpdated { id, timestamp, .. }
-            | Event::DependencyReduced { id, timestamp, .. }
-            | Event::LocalRuleBypassed { id, timestamp, .. }
-            | Event::TransitionBlocked { id, timestamp, .. }
-            | Event::GraphRuleBypassed { id, timestamp, .. }
-            | Event::GateDefinitionUpdated { id, timestamp, .. }
-            | Event::GateDefinitionCreated { id, timestamp, .. }
-            | Event::GateDefinitionRemoved { id, timestamp, .. }
-            | Event::ProfileLifecycle { id, timestamp, .. }
-            | Event::LinkedCheckoutWriteOverridden { id, timestamp, .. } => {
-                *id = new_id;
-                *timestamp = new_timestamp;
-            }
-        }
+    /// When this event occurred.
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        self.timestamp
     }
 
+    /// The issue this event names; see [`EventBody::issue_id`].
+    pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
+        self.body.issue_id()
+    }
+
+    /// This event's `type` tag; see [`EventBody::get_type`].
+    pub fn get_type(&self) -> &str {
+        self.body.get_type()
+    }
+}
+
+impl EventBody {
     /// Create an issue created event
     pub fn draft_issue_created(issue: &Issue) -> Self {
-        Event::IssueCreated {
-            id: String::new(),
+        EventBody::IssueCreated {
             issue_id: issue.id.clone(),
-            timestamp: DateTime::UNIX_EPOCH,
             title: issue.title.clone(),
             priority: issue.priority,
         }
@@ -1720,24 +1485,13 @@ impl Event {
     /// Takes a typed [`Assignee`] so a malformed actor can never be logged; the
     /// caller parses (and thereby validates) the actor before constructing the
     /// event.
-    pub fn draft_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
-        Event::IssueClaimed {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            assignee,
-        }
+    pub fn draft_issue_claimed(issue_id: IssueId, assignee: Assignee) -> Self {
+        EventBody::IssueClaimed { issue_id, assignee }
     }
 
     /// Create an issue state changed event
-    pub fn draft_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
-        Event::IssueStateChanged {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            from,
-            to,
-        }
+    pub fn draft_issue_state_changed(issue_id: IssueId, from: State, to: State) -> Self {
+        EventBody::IssueStateChanged { issue_id, from, to }
     }
 
     /// Create a gate passed event.
@@ -1745,14 +1499,12 @@ impl Event {
     /// `updated_by` is a typed [`Assignee`] (the actor who passed the gate), so
     /// no malformed actor can be logged.
     pub fn draft_gate_passed(
-        issue_id: String,
-        gate_key: String,
+        issue_id: IssueId,
+        gate_key: GateKey,
         updated_by: Option<Assignee>,
     ) -> Self {
-        Event::GatePassed {
-            id: String::new(),
+        EventBody::GatePassed {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
             updated_by,
         }
@@ -1763,46 +1515,30 @@ impl Event {
     /// `updated_by` is a typed [`Assignee`] (the actor who failed the gate), so
     /// no malformed actor can be logged.
     pub fn draft_gate_failed(
-        issue_id: String,
-        gate_key: String,
+        issue_id: IssueId,
+        gate_key: GateKey,
         updated_by: Option<Assignee>,
     ) -> Self {
-        Event::GateFailed {
-            id: String::new(),
+        EventBody::GateFailed {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
             updated_by,
         }
     }
 
     /// Create a gate added event
-    pub fn draft_gate_added(issue_id: String, gate_key: String) -> Self {
-        Event::GateAdded {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+    pub fn draft_gate_added(issue_id: IssueId, gate_key: GateKey) -> Self {
+        EventBody::GateAdded { issue_id, gate_key }
     }
 
     /// Create a gate removed event
-    pub fn draft_gate_removed(issue_id: String, gate_key: String) -> Self {
-        Event::GateRemoved {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+    pub fn draft_gate_removed(issue_id: IssueId, gate_key: GateKey) -> Self {
+        EventBody::GateRemoved { issue_id, gate_key }
     }
 
     /// Create an issue completed event
-    pub fn draft_issue_completed(issue_id: String) -> Self {
-        Event::IssueCompleted {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-        }
+    pub fn draft_issue_completed(issue_id: IssueId) -> Self {
+        EventBody::IssueCompleted { issue_id }
     }
 
     /// Create an issue released event.
@@ -1810,48 +1546,36 @@ impl Event {
     /// `assignee` is the typed [`Assignee`] being released; callers emit this
     /// event only when a prior assignee existed, so the actor is always a valid
     /// `kind:identifier`.
-    pub fn draft_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
-        Event::IssueReleased {
-            id: String::new(),
+    pub fn draft_issue_released(
+        issue_id: IssueId,
+        assignee: Assignee,
+        reason: String,
+        released_by: Assignee,
+    ) -> Self {
+        EventBody::IssueReleased {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             assignee,
             reason,
+            released_by: Some(released_by),
         }
     }
 
     /// Create the durable commit record for dependency-aware archival.
     pub fn draft_artifact_archive_executed(
-        target: crate::domain::artifact_plan::PlanTarget,
-        destination_root: String,
-        publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
-        reference_changes: Vec<crate::domain::artifact_plan::ReferenceChange>,
-        planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
-        reconciling: bool,
+        execution: crate::domain::artifact_execution::ArchiveExecution,
     ) -> Self {
-        Event::ArtifactArchiveExecuted {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            target,
-            destination_root,
-            publications,
-            reference_changes,
-            planned_deletions,
-            reconciling,
-        }
+        EventBody::ArtifactArchiveExecuted(execution)
     }
 
     /// Create a dependency reduced event
     pub fn draft_dependency_reduced(
-        issue_id: String,
+        issue_id: IssueId,
         old_count: usize,
         new_count: usize,
-        removed_deps: Vec<String>,
+        removed_deps: Vec<IssueId>,
     ) -> Self {
-        Event::DependencyReduced {
-            id: String::new(),
+        EventBody::DependencyReduced {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             old_count,
             new_count,
             removed_deps,
@@ -1859,11 +1583,9 @@ impl Event {
     }
 
     /// Create an issue updated event
-    pub fn draft_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
-        Event::IssueUpdated {
-            id: String::new(),
+    pub fn draft_issue_updated(issue_id: IssueId, updated_by: String, fields: Vec<String>) -> Self {
+        EventBody::IssueUpdated {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             updated_by,
             fields,
         }
@@ -1873,25 +1595,16 @@ impl Event {
     ///
     /// Records that an issue was permanently deleted, preserving an audit trail
     /// of the removal in the event log (the issue file itself is gone).
-    pub fn draft_issue_deleted(issue_id: String) -> Self {
-        Event::IssueDeleted {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-        }
+    pub fn draft_issue_deleted(issue_id: IssueId) -> Self {
+        EventBody::IssueDeleted { issue_id }
     }
 
     /// Create a local-rule-bypassed event.
     ///
     /// Records that a `--force` write deliberately bypassed an `enforce` rule
     /// whose `error` finding would otherwise have blocked the write (DR §7.6).
-    pub fn draft_local_rule_bypassed(issue_id: String, rule: String) -> Self {
-        Event::LocalRuleBypassed {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            rule,
-        }
+    pub fn draft_local_rule_bypassed(issue_id: IssueId, rule: String) -> Self {
+        EventBody::LocalRuleBypassed { issue_id, rule }
     }
 
     /// Create a transition-blocked event.
@@ -1899,11 +1612,9 @@ impl Event {
     /// Records that an enforcing graph rule blocked the issue's transition into
     /// `target` (CC-2). Appended before the blocking error is returned, one per
     /// blocking rule.
-    pub fn draft_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
-        Event::TransitionBlocked {
-            id: String::new(),
+    pub fn draft_transition_blocked(issue_id: IssueId, target: State, rule: String) -> Self {
+        EventBody::TransitionBlocked {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             target,
             rule,
         }
@@ -1914,11 +1625,9 @@ impl Event {
     /// Records that a `--force` transition deliberately bypassed an enforcing
     /// graph rule whose `error` finding would otherwise have blocked the
     /// transition into `target` (CC-2).
-    pub fn draft_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
-        Event::GraphRuleBypassed {
-            id: String::new(),
+    pub fn draft_graph_rule_bypassed(issue_id: IssueId, target: State, rule: String) -> Self {
+        EventBody::GraphRuleBypassed {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             target,
             rule,
         }
@@ -1928,12 +1637,8 @@ impl Event {
     ///
     /// Registry-scoped (issue-less): records that the
     /// gate registry entry `gate_key` was edited via `jit gate update`.
-    pub fn draft_gate_definition_updated(gate_key: String) -> Self {
-        Event::GateDefinitionUpdated {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+    pub fn draft_gate_definition_updated(gate_key: GateKey) -> Self {
+        EventBody::GateDefinitionUpdated { gate_key }
     }
 
     /// Create a gate-definition-created event.
@@ -1942,12 +1647,8 @@ impl Event {
     /// [`draft_gate_definition_updated`](Self::draft_gate_definition_updated)):
     /// records that `gate_key` was added to the gate registry via `jit gate
     /// define`.
-    pub fn draft_gate_definition_created(gate_key: String) -> Self {
-        Event::GateDefinitionCreated {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+    pub fn draft_gate_definition_created(gate_key: GateKey) -> Self {
+        EventBody::GateDefinitionCreated { gate_key }
     }
 
     /// Create a gate-definition-removed event.
@@ -1956,12 +1657,8 @@ impl Event {
     /// [`draft_gate_definition_updated`](Self::draft_gate_definition_updated)):
     /// records that `gate_key` was removed from the gate registry via `jit
     /// gate remove`.
-    pub fn draft_gate_definition_removed(gate_key: String) -> Self {
-        Event::GateDefinitionRemoved {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+    pub fn draft_gate_definition_removed(gate_key: GateKey) -> Self {
+        EventBody::GateDefinitionRemoved { gate_key }
     }
 
     /// Create the aggregate profile lifecycle audit event.
@@ -1969,12 +1666,9 @@ impl Event {
         operation: ProfileLifecycleOperation,
         profiles: Vec<ProfileLifecycleProfile>,
     ) -> Self {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
+        EventBody::ProfileLifecycle {
             operation,
             profiles,
-            isolated_torn_tail: false,
         }
     }
 
@@ -1990,39 +1684,44 @@ impl Event {
         declared_stance: LinkedCheckoutWriteStance,
         invocation_override: LinkedCheckoutWriteStance,
     ) -> Self {
-        Event::LinkedCheckoutWriteOverridden {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
+        EventBody::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
         }
     }
 
-    /// Get the issue ID associated with this event
-    pub fn get_issue_id(&self) -> &str {
+    /// Draft the record of an event-less write naming the sorted
+    /// repository-relative `paths` it wrote, made or deleted.
+    pub fn draft_files_published(paths: Vec<String>) -> Self {
+        EventBody::FilesPublished { paths }
+    }
+
+    /// The issue this event names; `None` for repository- and registry-scoped events.
+    pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
         match self {
-            Event::IssueCreated { issue_id, .. } => issue_id,
-            Event::IssueClaimed { issue_id, .. } => issue_id,
-            Event::IssueStateChanged { issue_id, .. } => issue_id,
-            Event::GatePassed { issue_id, .. } => issue_id,
-            Event::GateFailed { issue_id, .. } => issue_id,
-            Event::GateAdded { issue_id, .. } => issue_id,
-            Event::GateRemoved { issue_id, .. } => issue_id,
-            Event::IssueCompleted { issue_id, .. } => issue_id,
-            Event::IssueDeleted { issue_id, .. } => issue_id,
-            Event::IssueReleased { issue_id, .. } => issue_id,
-            Event::IssueUpdated { issue_id, .. } => issue_id,
-            Event::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
-            Event::DependencyReduced { issue_id, .. } => issue_id,
-            Event::LocalRuleBypassed { issue_id, .. } => issue_id,
-            Event::TransitionBlocked { issue_id, .. } => issue_id,
-            Event::GraphRuleBypassed { issue_id, .. } => issue_id,
-            Event::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
-            Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
-            Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
-            Event::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
-            Event::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
+            EventBody::IssueCreated { issue_id, .. } => Some(issue_id),
+            EventBody::IssueClaimed { issue_id, .. } => Some(issue_id),
+            EventBody::IssueStateChanged { issue_id, .. } => Some(issue_id),
+            EventBody::GatePassed { issue_id, .. } => Some(issue_id),
+            EventBody::GateFailed { issue_id, .. } => Some(issue_id),
+            EventBody::GateAdded { issue_id, .. } => Some(issue_id),
+            EventBody::GateRemoved { issue_id, .. } => Some(issue_id),
+            EventBody::IssueCompleted { issue_id, .. } => Some(issue_id),
+            EventBody::IssueDeleted { issue_id, .. } => Some(issue_id),
+            EventBody::IssueReleased { issue_id, .. } => Some(issue_id),
+            EventBody::IssueUpdated { issue_id, .. } => Some(issue_id),
+            EventBody::ArtifactArchiveExecuted(_) => None,
+            EventBody::DependencyReduced { issue_id, .. } => Some(issue_id),
+            EventBody::LocalRuleBypassed { issue_id, .. } => Some(issue_id),
+            EventBody::TransitionBlocked { issue_id, .. } => Some(issue_id),
+            EventBody::GraphRuleBypassed { issue_id, .. } => Some(issue_id),
+            EventBody::GateDefinitionUpdated { .. } => None,
+            EventBody::GateDefinitionCreated { .. } => None,
+            EventBody::GateDefinitionRemoved { .. } => None,
+            EventBody::ProfileLifecycle { .. } => None,
+            EventBody::LinkedCheckoutWriteOverridden { .. } => None,
+            EventBody::FilesPublished { .. } => None,
         }
     }
 
@@ -2031,7 +1730,7 @@ impl Event {
     /// The string is the value serde writes into the record's `type` field, and
     /// the value `jit events query --event-type` matches against. It is supplied
     /// by [`EventTag::as_str`](crate::domain::event_catalog::EventTag::as_str), the single
-    /// definition of the tag vocabulary, via [`Event::tag`].
+    /// definition of the tag vocabulary, via [`EventBody::tag`].
     pub fn get_type(&self) -> &str {
         self.tag().as_str()
     }
@@ -2040,13 +1739,104 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{document_reference, document_reference_at, document_reference_typed};
+    use crate::test_utils::{
+        document_reference, document_reference_at, document_reference_typed, fixture_issue,
+    };
+
+    #[test]
+    fn test_gate_verdict_origin_reused_round_trips_the_source_address() {
+        let source_issue = crate::test_utils::issue_id(160);
+        let source_run = crate::test_utils::gate_run_id(1);
+        let encoded = serde_json::json!({
+            "derivation": "reused",
+            "source_issue": source_issue,
+            "source_run": source_run,
+        });
+
+        let decoded: GateVerdictOrigin = serde_json::from_value(encoded.clone()).unwrap();
+
+        assert_eq!(serde_json::to_value(decoded).unwrap(), encoded);
+    }
+
+    #[test]
+    fn test_gate_verdict_origin_reused_requires_source_issue() {
+        let encoded = serde_json::json!({
+            "derivation": "reused",
+            "source_run": crate::test_utils::gate_run_id(1),
+        });
+
+        assert!(serde_json::from_value::<GateVerdictOrigin>(encoded).is_err());
+    }
+
+    #[test]
+    fn test_gate_verdict_origin_non_reused_variants_are_tag_only() {
+        for (origin, derivation) in [
+            (GateVerdictOrigin::Executed, "executed"),
+            (GateVerdictOrigin::Attested, "attested"),
+        ] {
+            let encoded = serde_json::json!({ "derivation": derivation });
+            assert_eq!(serde_json::to_value(&origin).unwrap(), encoded);
+            assert_eq!(
+                serde_json::from_value::<GateVerdictOrigin>(encoded).unwrap(),
+                origin
+            );
+        }
+    }
+
+    #[test]
+    fn test_gate_run_result_missing_origin_decodes_as_executed() {
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &crate::test_utils::issue_id(160),
+            &"review".parse().unwrap(),
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        let mut encoded = serde_json::to_value(run).unwrap();
+        encoded.as_object_mut().unwrap().remove("origin");
+
+        let decoded: GateRunResult = serde_json::from_value(encoded).unwrap();
+
+        assert_eq!(decoded.origin, GateVerdictOrigin::Executed);
+    }
+
+    #[test]
+    fn test_priority_ord_follows_rank() {
+        let mut priorities = Priority::ALL;
+        priorities.sort();
+
+        assert_eq!(
+            priorities,
+            [
+                Priority::Low,
+                Priority::Normal,
+                Priority::High,
+                Priority::Critical,
+            ]
+        );
+    }
 
     fn issue_record(state: State, archived_from: Option<State>) -> serde_json::Value {
         let mut issue = fixture_issue("Archived".to_string(), String::new());
         issue.state = state;
         issue.archived_from = archived_from;
         serde_json::to_value(&issue).unwrap()
+    }
+
+    #[test]
+    fn test_stamped_event_reads_back_its_body_and_identity() {
+        let body = EventBody::draft_gate_added(
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
+            "tests".parse().unwrap(),
+        );
+        let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+
+        let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
+
+        assert_eq!(event.id(), "event");
+        assert_eq!(event.timestamp(), timestamp);
+        assert_eq!(event.body(), &body);
     }
 
     #[test]
@@ -2063,6 +1853,13 @@ mod tests {
     }
 
     #[test]
+    fn test_issue_from_wire_rejects_archived_record_with_typed_error() {
+        let wire: IssueWire = serde_json::from_value(issue_record(State::Archived, None)).unwrap();
+        let id = wire.id.clone();
+        assert_eq!(Issue::try_from(wire), Err(MissingArchivedFrom(id)));
+    }
+
+    #[test]
     fn test_issue_schema_describes_archived_from() {
         let schema = serde_json::to_value(schemars::schema_for!(Issue)).unwrap();
         assert!(schema["properties"].get("archived_from").is_some());
@@ -2075,15 +1872,35 @@ mod tests {
                 .finish();
         let attestor: Assignee = "human:reviewer".parse().unwrap();
         let mut attested = GateRunResult::attestation(
-            "issue",
-            "review",
+            &crate::test_utils::gate_run_id(1),
+            &crate::test_utils::issue_id(160),
+            &"review".parse().unwrap(),
             GateStage::Postcheck,
             GateStatus::Passed,
             Some(&attestor),
         );
         attested.inputs_digest = Some(digest.clone());
 
-        assert!(!attested.is_reusable_for("review", &digest));
+        assert!(!attested.is_reusable_for(&"review".parse().unwrap(), &digest));
+    }
+
+    #[test]
+    fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
+        let mut run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &crate::test_utils::issue_id(160),
+            &"review".parse().unwrap(),
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.by = Some(Assignee::AUTO_EXECUTOR);
+
+        let encoded = serde_json::to_string(&run).unwrap();
+        let decoded: GateRunResult = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.by, run.by);
+        assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
     }
 
     #[test]
@@ -2202,8 +2019,7 @@ mod tests {
 
     #[test]
     fn test_new_issue_has_correct_defaults() {
-        let issue =
-            crate::domain::fixture_issue("Test Issue".to_string(), "Description".to_string());
+        let issue = fixture_issue("Test Issue".to_string(), "Description".to_string());
 
         assert_eq!(issue.title, "Test Issue");
         assert_eq!(issue.description, "Description");
@@ -2214,7 +2030,6 @@ mod tests {
         assert!(issue.gates_required.is_empty());
         assert!(issue.gates_status.is_empty());
         assert!(issue.context.is_empty());
-        assert!(!issue.id.is_empty());
         assert_eq!(issue.first_ready_at, None);
         assert_eq!(issue.claimed_at, None);
         assert_eq!(issue.done_at, None);
@@ -2222,7 +2037,7 @@ mod tests {
 
     #[test]
     fn test_mark_lifecycle_timestamps_are_first_occurrence_only() {
-        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
+        let mut issue = fixture_issue("t".to_string(), String::new());
         let first = Utc::now();
         let later = first + chrono::Duration::hours(1);
 
@@ -2244,8 +2059,8 @@ mod tests {
         // none of the three keys. It must deserialize (fields default to None)
         // and re-serialize WITHOUT introducing the keys, so old files round-trip
         // byte-stable (skip_serializing_if = Option::is_none).
-        let json = r#"{
-            "id": "11111111-2222-3333-4444-555555555555",
+        let json = serde_json::json!({
+            "id": crate::test_utils::issue_id(1),
             "title": "Legacy",
             "description": "",
             "state": "ready",
@@ -2259,9 +2074,9 @@ mod tests {
             "labels": [],
             "created_at": "2026-01-01T00:00:00Z",
             "updated_at": "2026-01-01T00:00:00Z"
-        }"#;
+        });
 
-        let issue: Issue = serde_json::from_str(json).unwrap();
+        let issue: Issue = serde_json::from_value(json).unwrap();
         assert_eq!(issue.first_ready_at, None);
         assert_eq!(issue.claimed_at, None);
         assert_eq!(issue.done_at, None);
@@ -2274,7 +2089,7 @@ mod tests {
 
     #[test]
     fn test_issue_with_timestamps_serializes_the_fields() {
-        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
+        let mut issue = fixture_issue("t".to_string(), String::new());
         let at = Utc::now();
         issue.mark_first_ready(at);
         issue.mark_claimed(at);
@@ -2293,7 +2108,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_with_no_dependencies_or_gates() {
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
+        let issue = fixture_issue("Test".to_string(), "Desc".to_string());
         let resolved = HashMap::new();
 
         assert!(!issue.is_blocked(&resolved));
@@ -2301,8 +2116,8 @@ mod tests {
 
     #[test]
     fn test_issue_blocked_by_unmet_dependency() {
-        let mut issue = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
 
         issue.dependencies.push(dependency.id.clone());
 
@@ -2314,9 +2129,8 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_dependency_is_done() {
-        let mut issue = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
-        let mut dependency =
-            crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let mut dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Done;
 
         issue.dependencies.push(dependency.id.clone());
@@ -2329,8 +2143,8 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_unpassed_gate() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
+        issue.gates_required.push("review".parse().unwrap());
 
         let resolved = HashMap::new();
 
@@ -2342,10 +2156,10 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_pending_gate() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Pending,
                 updated_by: None,
@@ -2364,10 +2178,10 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_failed_gate() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Failed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -2386,10 +2200,10 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_gate_passed() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -2419,7 +2233,7 @@ mod tests {
 
     #[test]
     fn test_issue_with_documents() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.documents.len(), 0);
 
         issue.documents.push(document_reference("docs/design.md"));
@@ -2429,7 +2243,7 @@ mod tests {
 
     #[test]
     fn test_issue_serialization_with_documents() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.documents.push(DocumentReference {
             label: Some("Design".to_string()),
             ..document_reference_at("docs/design.md", "abc123")
@@ -2446,36 +2260,14 @@ mod tests {
 
     #[test]
     fn test_new_issue_starts_in_backlog() {
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let issue = fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.state, State::Backlog);
-    }
-
-    #[test]
-    fn test_backlog_issue_should_auto_transition_to_ready_when_unblocked() {
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
-        let resolved = HashMap::new();
-
-        assert_eq!(issue.state, State::Backlog);
-        assert!(issue.should_auto_transition_to_ready(&resolved));
-    }
-
-    #[test]
-    fn test_backlog_issue_should_not_transition_to_ready_when_blocked() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
-        issue.dependencies.push(dependency.id.clone());
-
-        let mut resolved = HashMap::new();
-        resolved.insert(dependency.id.clone(), &dependency);
-
-        assert_eq!(issue.state, State::Backlog);
-        assert!(!issue.should_auto_transition_to_ready(&resolved));
     }
 
     #[test]
     fn test_derive_readiness_correction_demotes_a_ready_issue_an_unmet_dependency_blocks() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
+        let dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
         issue.state = State::Ready;
         issue.dependencies.push(dependency.id.clone());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
@@ -2488,9 +2280,8 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_promotes_a_backlog_issue_nothing_blocks() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
-        let mut dependency =
-            crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
+        let mut dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Done;
         issue.dependencies.push(dependency.id.clone());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
@@ -2503,10 +2294,10 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_leaves_a_state_that_already_agrees_with_the_graph() {
-        let mut ready = crate::domain::fixture_issue("Ready".to_string(), "Desc".to_string());
+        let mut ready = fixture_issue("Ready".to_string(), "Desc".to_string());
         ready.state = State::Ready;
-        let mut blocked = crate::domain::fixture_issue("Blocked".to_string(), "Desc".to_string());
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut blocked = fixture_issue("Blocked".to_string(), "Desc".to_string());
+        let dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
         blocked.dependencies.push(dependency.id.clone());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
 
@@ -2516,7 +2307,7 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_leaves_a_state_no_dependency_owns() {
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
         let blocked_by_unmet_dependency = [
             State::InProgress,
@@ -2526,7 +2317,7 @@ mod tests {
             State::Archived,
         ]
         .map(|state| {
-            let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
+            let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
             issue.state = state;
             issue.dependencies.push(dependency.id.clone());
             issue
@@ -2544,11 +2335,11 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_auto_transition_to_done_when_gates_pass() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -2562,11 +2353,11 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_not_transition_to_done_when_gates_pending() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Pending,
                 updated_by: None,
@@ -2580,11 +2371,11 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_not_transition_to_done_when_gates_failed() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Failed,
                 updated_by: Some("ci:tests".parse().unwrap()),
@@ -2598,43 +2389,36 @@ mod tests {
 
     #[test]
     fn test_in_progress_issue_should_not_auto_transition() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::InProgress;
 
-        let resolved = HashMap::new();
-        assert!(!issue.should_auto_transition_to_ready(&resolved));
         assert!(!issue.should_auto_transition_to_done());
     }
 
     #[test]
-    fn test_state_serialization_backlog() {
-        let state = State::Backlog;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"backlog\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
-    }
-
-    #[test]
-    fn test_state_serialization_gated() {
-        let state = State::Gated;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"gated\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
+    fn test_state_enumeration_preserves_lifecycle_order() {
+        let lifecycle = [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ];
+        assert_eq!(State::ALL, lifecycle);
+        assert!(lifecycle.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
     fn test_new_issue_has_empty_labels() {
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let issue = fixture_issue("Test".to_string(), "Description".to_string());
         assert!(issue.labels.is_empty());
     }
 
     #[test]
     fn test_issue_serialization_with_labels() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
         issue.labels.push("milestone:v1.0".to_string());
         issue.labels.push("epic:auth".to_string());
         issue.labels.push("type:task".to_string());
@@ -2652,7 +2436,7 @@ mod tests {
 
     #[test]
     fn test_issue_labels_can_be_modified() {
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
         assert!(issue.labels.is_empty());
 
         issue.labels.push("component:backend".to_string());
@@ -2746,9 +2530,8 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_dependency_is_rejected() {
-        let mut issue = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
-        let mut dependency =
-            crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let mut dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Rejected;
 
         issue.dependencies.push(dependency.id.clone());
@@ -2892,157 +2675,6 @@ mod tests {
         assert_eq!(deserialized.assets.len(), 0);
     }
 
-    // FromStr trait tests
-    mod fromstr_tests {
-        use super::*;
-        use crate::declarations::GateMode;
-        use std::str::FromStr;
-
-        #[test]
-        fn test_state_from_str_accepts_only_serde_tokens() {
-            for state in State::all() {
-                let token = state.as_str();
-                assert_eq!(serde_json::to_value(state).unwrap(), token);
-                let letters: Vec<usize> = token
-                    .char_indices()
-                    .filter(|(_, c)| c.is_ascii_alphabetic())
-                    .map(|(i, _)| i)
-                    .collect();
-                // Every case assignment of the token's letters; mask 0 is canonical.
-                (0u32..1 << letters.len()).for_each(|mask| {
-                    let variant: String = token
-                        .char_indices()
-                        .map(|(i, c)| match letters.iter().position(|&l| l == i) {
-                            Some(bit) if mask & (1 << bit) != 0 => c.to_ascii_uppercase(),
-                            _ => c,
-                        })
-                        .collect();
-                    match mask {
-                        0 => assert_eq!(State::from_str(&variant).unwrap(), state),
-                        _ => assert!(State::from_str(&variant).is_err(), "accepted {variant:?}"),
-                    }
-                });
-                assert!(State::from_str(&format!(" {token}")).is_err());
-            }
-            for token in ["open", "inprogress", "invalid", "pending", ""] {
-                assert!(State::from_str(token).is_err(), "accepted {token:?}");
-            }
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_lowercase() {
-            assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("high").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("critical").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_uppercase() {
-            assert_eq!(Priority::from_str("LOW").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("NORMAL").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("HIGH").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("CRITICAL").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_mixedcase() {
-            assert_eq!(Priority::from_str("Low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("Normal").unwrap(), Priority::Normal);
-        }
-
-        #[test]
-        fn test_priority_from_str_invalid() {
-            assert!(Priority::from_str("invalid").is_err());
-            assert!(Priority::from_str("").is_err());
-            assert!(Priority::from_str("medium").is_err());
-        }
-
-        #[test]
-        fn test_state_parse_method() {
-            // Test using str::parse() method
-            let state: State = "ready".parse().unwrap();
-            assert_eq!(state, State::Ready);
-        }
-
-        #[test]
-        fn test_priority_parse_method() {
-            // Test using str::parse() method
-            let priority: Priority = "high".parse().unwrap();
-            assert_eq!(priority, Priority::High);
-        }
-
-        // GateStage FromStr/Display/as_str
-
-        #[test]
-        fn test_gate_stage_from_str_accepts_valid() {
-            assert_eq!(
-                GateStage::from_str("precheck").unwrap(),
-                GateStage::Precheck
-            );
-            assert_eq!(
-                GateStage::from_str("postcheck").unwrap(),
-                GateStage::Postcheck
-            );
-        }
-
-        #[test]
-        fn test_gate_stage_from_str_rejects_invalid() {
-            assert!(GateStage::from_str("invalid").is_err());
-            assert!(GateStage::from_str("").is_err());
-            assert!(GateStage::from_str("PRECHECK").is_err());
-        }
-
-        #[test]
-        fn test_gate_stage_display_and_as_str_round_trip() {
-            assert_eq!(GateStage::Precheck.to_string(), "precheck");
-            assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
-            assert_eq!(GateStage::Precheck.as_str(), "precheck");
-            assert_eq!(GateStage::Postcheck.as_str(), "postcheck");
-        }
-
-        #[test]
-        fn test_gate_stage_display_equals_serde() {
-            // Display/as_str must match what serde produces (snake_case).
-            let json_pre = serde_json::to_string(&GateStage::Precheck).unwrap();
-            let json_post = serde_json::to_string(&GateStage::Postcheck).unwrap();
-            assert_eq!(json_pre, format!("\"{}\"", GateStage::Precheck));
-            assert_eq!(json_post, format!("\"{}\"", GateStage::Postcheck));
-        }
-
-        // GateMode FromStr/Display/as_str
-
-        #[test]
-        fn test_gate_mode_from_str_accepts_valid() {
-            assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
-            assert_eq!(GateMode::from_str("auto").unwrap(), GateMode::Auto);
-        }
-
-        #[test]
-        fn test_gate_mode_from_str_rejects_invalid() {
-            assert!(GateMode::from_str("invalid").is_err());
-            assert!(GateMode::from_str("").is_err());
-            assert!(GateMode::from_str("MANUAL").is_err());
-        }
-
-        #[test]
-        fn test_gate_mode_display_and_as_str_round_trip() {
-            assert_eq!(GateMode::Manual.to_string(), "manual");
-            assert_eq!(GateMode::Auto.to_string(), "auto");
-            assert_eq!(GateMode::Manual.as_str(), "manual");
-            assert_eq!(GateMode::Auto.as_str(), "auto");
-        }
-
-        #[test]
-        fn test_gate_mode_display_equals_serde() {
-            // Display/as_str must match what serde produces (snake_case).
-            let json_manual = serde_json::to_string(&GateMode::Manual).unwrap();
-            let json_auto = serde_json::to_string(&GateMode::Auto).unwrap();
-            assert_eq!(json_manual, format!("\"{}\"", GateMode::Manual));
-            assert_eq!(json_auto, format!("\"{}\"", GateMode::Auto));
-        }
-    }
-
     mod assignee_tests {
         use super::*;
         use std::str::FromStr;
@@ -3101,11 +2733,22 @@ mod tests {
         }
 
         #[test]
-        fn test_assignee_partial_eq_str() {
+        fn test_assignee_system_actor_constants_equal_parsed_spelling() {
+            for (constant, spelling) in [
+                (Assignee::SYSTEM_CHECK, "system:check"),
+                (Assignee::SYSTEM_ADMIN, "system:admin"),
+                (Assignee::SYSTEM_RECOVERY, "system:recovery"),
+                (Assignee::SYSTEM_LEASE_CHECK, "system:lease-check"),
+                (Assignee::AUTO_EXECUTOR, "auto:executor"),
+            ] {
+                assert_eq!(Assignee::from_str(spelling).unwrap(), constant);
+            }
+        }
+
+        #[test]
+        fn test_assignee_display_renders_canonical_spelling() {
             let a = Assignee::from_str("agent:copilot").unwrap();
-            assert!(a == *"agent:copilot");
-            assert!(a != *"agent:other");
-            assert!(a != *"nocolon");
+            assert_eq!(a.to_string(), "agent:copilot");
         }
 
         #[test]
@@ -3127,7 +2770,7 @@ mod tests {
 
         #[test]
         fn test_issue_assignee_serializes_unchanged() {
-            let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
+            let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
             issue.assignee = Some(Assignee::from_str("agent:copilot").unwrap());
 
             let json = serde_json::to_string(&issue).unwrap();
@@ -3140,7 +2783,7 @@ mod tests {
 
     #[test]
     fn test_issue_timestamps_serialize_as_rfc3339() {
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
+        let issue = fixture_issue("Test".to_string(), "Desc".to_string());
 
         let value: serde_json::Value =
             serde_json::from_str(&serde_json::to_string(&issue).unwrap()).unwrap();
@@ -3155,8 +2798,8 @@ mod tests {
     fn test_issue_loads_legacy_offset_timestamp() {
         // Issue files predating the DateTime migration store `+00:00` offsets
         // rather than chrono's `Z`; both are RFC 3339 and must still load.
-        let json = r#"{
-            "id": "11111111-2222-3333-4444-555555555555",
+        let json = serde_json::json!({
+            "id": crate::test_utils::issue_id(1),
             "title": "Legacy",
             "description": "Body",
             "state": "backlog",
@@ -3170,9 +2813,9 @@ mod tests {
             "labels": [],
             "created_at": "2026-06-22T21:59:04.464226946+00:00",
             "updated_at": "2026-06-22T21:59:04.464226946+00:00"
-        }"#;
+        });
 
-        let issue: Issue = serde_json::from_str(json).unwrap();
+        let issue: Issue = serde_json::from_value(json).unwrap();
         assert_eq!(issue.assignee.unwrap().to_string(), "agent:copilot");
         assert_eq!(issue.created_at.timezone(), Utc);
     }
@@ -3184,38 +2827,68 @@ mod tests {
         #[test]
         fn test_issue_claimed_assignee_serde_round_trips_as_string() {
             let actor = Assignee::from_str("agent:copilot").unwrap();
-            let event = Event::draft_issue_claimed("issue-1".to_string(), actor);
+            let event = EventBody::draft_issue_claimed(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
+                actor,
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"agent:copilot\""));
 
-            let back: Event = serde_json::from_str(&json).unwrap();
+            let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
         }
 
         #[test]
         fn test_issue_released_assignee_serde_round_trips_as_string() {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
-            let event =
-                Event::draft_issue_released("issue-1".to_string(), prev, "timeout".to_string());
+            let event = EventBody::draft_issue_released(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
+                prev.clone(),
+                "timeout".to_string(),
+                prev,
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"copilot:session-1\""));
 
-            let back: Event = serde_json::from_str(&json).unwrap();
+            let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
+        }
+
+        #[test]
+        fn test_issue_released_records_the_acting_identity_and_requires_the_key() {
+            let holder = Assignee::from_str("agent:holder").unwrap();
+            let actor = Assignee::from_str("agent:actor").unwrap();
+            let event = EventBody::draft_issue_released(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0001),
+                holder,
+                "timeout".to_string(),
+                actor,
+            );
+            let mut json = serde_json::to_value(&event).unwrap();
+            assert_eq!(json["released_by"], "agent:actor");
+
+            json["released_by"] = serde_json::Value::Null;
+            assert!(serde_json::from_value::<EventBody>(json.clone()).is_ok());
+
+            json.as_object_mut().unwrap().remove("released_by");
+            assert!(serde_json::from_value::<EventBody>(json).is_err());
         }
 
         #[test]
         fn test_gate_event_updated_by_serde_round_trips_as_string() {
             let by = Assignee::from_str("ci:runner").unwrap();
-            let event =
-                Event::draft_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
+            let event = EventBody::draft_gate_passed(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
+                "tests".parse().unwrap(),
+                Some(by),
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"updated_by\":\"ci:runner\""));
 
-            let back: Event = serde_json::from_str(&json).unwrap();
+            let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
         }
 
@@ -3231,8 +2904,12 @@ mod tests {
 
         #[test]
         fn test_event_deserialize_rejects_malformed_assignee() {
-            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"i1","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
-            assert!(serde_json::from_str::<Event>(json).is_err());
+            let json = serde_json::json!({
+                "type": "issue_claimed", "id": "e1", "issue_id": crate::test_utils::issue_id(1),
+                "timestamp": "2026-01-01T00:00:00Z", "assignee": "nocolon",
+            })
+            .to_string();
+            assert!(serde_json::from_str::<Event>(&json).is_err());
         }
     }
 }

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f27fe3eddc33b01c1314d3cb64ac76a7e50fae16",
+  "completed_at": "2026-11-01T16:07:35.158643310Z",
+  "duration_ms": 103679,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/profile/application.rs",
+        "id": "F1",
+        "line": 31,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Publish-mode rustdoc incorrectly says an unpublishable decision publishes the remaining work, although the whole plan is rejected before publication."
+      }
+    ],
+    "summary": "Dependent-wins composition satisfies the hard criteria; one advisory rustdoc correction remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0dcabcca-d6f5-415f-90f2-12dc29f97313",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8baf242e-0b86-4a81-9bf8-ba1c3d943d9d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:05:51.479489403Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a347a6317, 5ff5ecbef, 661c51e71, 126847420, f27fe3edd (jit:0dcabcca)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/3d9a0ce3/requirement/REQ-04 (.jit/issues/3d9a0ce3-de69-4a99-ac98-9cf4d4852194.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T16:04:18Z); code-review pending\nTruncation recovery: split 5ff5ecbef and 126847420 patches by affected path; read current composition, graph, selection, tests, and documentation in bounded ranges\n\n1. [advisory][issue-impact][low] `crates/jit/src/profile/application.rs:31` says `Publish` “publish[es] the rest” after refusing an unpublishable decision, but the shared preparation path rejects the entire plan before any publication. Correct the misleading rustdoc. References: `@/invariant/essential-code-prose`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Dependent-wins composition satisfies the hard criteria; one advisory rustdoc correction remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Publish-mode rustdoc incorrectly says an unpublishable decision publishes the remaining work, although the whole plan is rejected before publication.\",\"file\":\"crates/jit/src/profile/application.rs\",\"line\":31,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

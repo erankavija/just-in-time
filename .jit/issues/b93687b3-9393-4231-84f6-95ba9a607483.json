@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:51:02.090957709Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the item and validate CLI tests in `crates/jit/tests/cli_item_validate` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\n`cli_item_validate` has 15 test files. 12 define `fn jit_binary`, 14 use `env!(\"CARGO_BIN_EXE_jit\")`, 9 define a local setup, and 3 hand-roll `git init`.\n\nThis entry covers `invariant_check_cli_tests.rs`, `project_render_cli_tests.rs`, `registry_json_tests.rs`, `main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-03: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-27T20:55:10.644997485Z",
   "first_ready_at": "2026-10-22T15:47:00.586001018Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cd4a30d4-3262-4ff3-bcb9-cbb0724f3c43",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:48:09.615824121Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "45913580-3f6b-4f21-940d-028cf4dedb18",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:53:16.356607790Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b93687b3-9393-4231-84f6-95ba9a607483",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "registry and render tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:47:00.586001018Z"
+  "updated_at": "2026-10-27T20:55:10.644997485Z"
 }

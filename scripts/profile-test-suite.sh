@@ -15,6 +15,7 @@ set -euo pipefail
 #   PROFILE_TEST_SUITE_OUTPUT  Artifact path (default:
 #                              dev/benchmarks/suite-profile.json)
 #   CARGO_CI_BUILD_LOCK        Host-wide build lock shared with cargo-ci.sh
+#   CARGO_CI_LOCK_TIMEOUT      Seconds to wait for that lock (default 1800)
 #
 # The result contract is schema_version 1. Consumers select overrides from
 # `.tests[] | select(.warm_duration_ms > LIMIT)` and use the same sorted
@@ -315,8 +316,9 @@ PYEOF
 
 # Keep the warmup and measured run together behind the same host-wide lock as
 # cargo-ci.sh. The profile is only meaningful without a competing repository
-# build consuming CPU or filesystem cache; `flock -o` avoids leaking the lock
-# descriptor into Cargo descendants.
+# build consuming CPU or filesystem cache. The parent holds the descriptor and
+# closes it in the child so Cargo descendants cannot retain the lock; the wait
+# is bounded and its status is separate from the child's.
 #
 # Only the measured profiling run compiles or executes anything, so only it
 # takes the lock. `--validate` parses a JSON artifact and `--self-test` drives
@@ -324,8 +326,22 @@ PYEOF
 # it would deadlock callers that already hold it.
 if [[ $# -eq 0 && -z "${PROFILE_TEST_SUITE_LOCKED:-}" ]]; then
   build_lock="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
+  lock_timeout="${CARGO_CI_LOCK_TIMEOUT:-1800}"
   if command -v flock >/dev/null 2>&1; then
-    exec env PROFILE_TEST_SUITE_LOCKED=1 flock -o "$build_lock" "$0" "$@"
+    lock_status=0
+    exec {build_lock_fd}>"$build_lock"
+    if ! flock -n "$build_lock_fd" 2>/dev/null; then
+      printf 'profile-test-suite: another build holds %s; waiting up to %ss\n' "$build_lock" "$lock_timeout" >&2
+      flock -w "$lock_timeout" -E 75 "$build_lock_fd" || lock_status=$?
+    fi
+    if [[ $lock_status -eq 75 ]]; then
+      printf 'ERROR: profile-test-suite: timed out after %ss waiting for %s\n' "$lock_timeout" "$build_lock" >&2
+      exit 2
+    fi
+    [[ $lock_status -eq 0 ]] || exit "$lock_status"
+    child_status=0
+    env PROFILE_TEST_SUITE_LOCKED=1 "$0" "$@" {build_lock_fd}>&- || child_status=$?
+    exit "$child_status"
   fi
   printf 'profile-test-suite: flock not found; running without host-wide build lock\n' >&2
 fi

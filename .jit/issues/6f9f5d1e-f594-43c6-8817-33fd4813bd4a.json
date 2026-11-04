@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T01:39:36.367095421Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Remove backend tests that re-prove what the shared conformance suite owns.\n\n## Background\n\nBoth `IssueStore` backends run one shared conformance suite. Backend test modules in `crates/jit/src/storage/json.rs`, `storage/memory.rs` and `storage/repository_state_store_tests.rs` predate it and test reader and writer behaviour per backend.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `storage/json.rs`, `storage/memory.rs` or `repository_state_store_tests.rs` re-proves a property the conformance suite owns.\n- [hard] REQ-02: Tests of backend-specific behaviour remain, such as atomic file publication, redo records, locking and the memory interruption view.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:42:11.238639897Z",
+  "first_ready_at": "2026-11-01T01:39:13.364294683Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9b4df729-fbbf-4122-9036-d2e48a161f6c",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:40:29.776812567Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "20edbe80-2366-4250-a9d2-ab77843154b4",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:41:46.543888064Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6f9f5d1e-f594-43c6-8817-33fd4813bd4a",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Backend tests keep only backend-specific behaviour",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:42:11.238639897Z"
 }

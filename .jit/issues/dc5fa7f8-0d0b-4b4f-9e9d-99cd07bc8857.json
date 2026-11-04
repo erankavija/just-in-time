@@ -4,17 +4,32 @@
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "4466395d-342d-46c0-b6c8-27d7fd4ab879",
+    "655273d9-f712-4659-ab68-06bbb17b2d57",
     "ac8f07c2-92cc-464d-b032-3f596a4be776",
-    "ba4c6054-4117-4ab8-8810-d5b74dea0a35",
-    "e0d8af37-e7cf-4cfe-96ea-25b944f18cf6"
+    "b32a720e-856c-43a4-b1cb-0cbd28c9328d"
   ],
-  "description": "The event log, the claims log and gate-run history are append-only records that only history-reporting commands read, with one event-log parser, per-target archive evidence and a search that skips history by default.\n\n## Background\n\nOrdinary commands read the event log whole in captures, validation, archive planning and search, and three event-log parsers disagreed on torn lines and retired tags. This story gives the log one parser and one torn-line rule, moves archive evidence to per-target records, limits mutations to the log's bounded end and enforces that limit in the capture layer, excludes history from default search, documents the history files and their readers, and proves the boundary end to end.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one event-log parser exists, with one torn-line rule and one treatment of retired tags.\n- [hard] REQ-02: Archive preview and execute read a target's evidence record once and never read the event log.\n- [hard] REQ-03: The capture layer and the redo record admit only the end-of-log probe and the positioned append.\n- [hard] REQ-04: An end-to-end test proves ordinary commands succeed over unparseable history files, and the storage references name the history files and their readers.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "The event log, the claims log and gate-run history are append-only records that only history-reporting commands read, with one event-log parser, per-target archive evidence and a search that skips history by default.\n\n## Background\n\nOrdinary commands read the event log whole in captures, validation, archive planning and search, and a second event-log parser lives in the file backend's archive reader. This story gives the log one parser and one torn-line rule, moves archive evidence to per-target records, limits mutations to the log's bounded end and enforces that limit in the capture layer, names whole-repository validation as a history reader with its own read path, excludes history from default search, documents the history files and their readers, moves every repository to format 4, and proves the boundary end to end.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one event-log parser exists, with one torn-line rule, and an unknown tag is an error naming its line.\n- [hard] REQ-02: Archive preview and execute read a target's evidence record once and never read the event log.\n- [hard] REQ-03: The capture layer and the redo record admit only the end-of-log probe and the positioned append.\n- [hard] REQ-04: An end-to-end test proves ordinary commands succeed over unparseable history files, and the storage references name the history files and their readers.\n\n## Decisions\n\n- D-1: User decision (2026-11-04, relayed by just-in-time-6a): the five-repository format 4 cutover is accepted on the steward's independent post-window verification. The installed jit and jit-server are the format 4 build from a05567fde; `jit validate` returned error_count 0 in just-in-time, gf2, mealie-fi, inflected-messages and research; jit-server restarted with identical arguments and /api/health returned 200. Evidence about repositories outside this checkout is accepted on that verification, not on the committed narrative.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:32:49.856287626Z",
+  "first_ready_at": "2026-11-04T09:23:36.060670830Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c790105b-e0dc-4459-a5c8-6f01d753287d",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:28:07.692001483Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "0bbc80d7-ff14-4d61-8b66-04959a200f24",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:32:49.655312699Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dc5fa7f8-0d0b-4b4f-9e9d-99cd07bc8857",
   "labels": [
     "type:story",
@@ -27,7 +42,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Only history-reporting commands read history files",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T11:54:55.561035860Z"
 }

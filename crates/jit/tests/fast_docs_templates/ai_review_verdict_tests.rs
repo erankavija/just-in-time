@@ -5,7 +5,6 @@
 //! packaged wrapper, contrib/gates/ai-review.sh.
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
@@ -36,15 +35,14 @@ fn write_context_file(dir: &TempDir) -> std::path::PathBuf {
     path
 }
 
-/// Creates an executable fake-agent script that emits the given text to stdout,
-/// ignoring whatever is fed to its stdin.
-fn write_fake_agent(dir: &TempDir, output: &str) -> std::path::PathBuf {
+/// A reviewer command running a fake-agent script that emits the given text to
+/// stdout, ignoring whatever is fed to its stdin.
+fn write_fake_agent(dir: &TempDir, output: &str) -> String {
     let path = dir.path().join("fake_agent.sh");
     // Use printf with escaped newlines so the script is a single line.
     let escaped = output.replace('\\', "\\\\").replace('\n', "\\n");
-    fs::write(&path, format!("#!/usr/bin/env bash\nprintf '{escaped}'\n")).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-    path
+    fs::write(&path, format!("printf '{escaped}'\n")).unwrap();
+    format!("bash {}", path.display())
 }
 
 /// Runs the ai-review.sh wrapper and returns its exit code.
@@ -87,7 +85,7 @@ fn test_verdict_pass_with_trailing_prose_records_a_pass() {
     let script = wrapper();
     assert!(script.exists(), "script not found: {}", script.display());
 
-    let exit_code = run_script(&script, &context, agent.to_str().unwrap());
+    let exit_code = run_script(&script, &context, &agent);
     assert_eq!(
         exit_code, 0,
         "expected exit 0 (PASS) but got {exit_code}: \
@@ -102,7 +100,7 @@ fn test_verdict_fail_records_a_failure() {
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "1. Bug found.\nTotal findings: 1\nVERDICT: FAIL\n");
 
-    let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
+    let exit_code = run_script(&wrapper(), &context, &agent);
     assert_eq!(exit_code, 1, "expected exit 1 (FAIL) but got {exit_code}");
 }
 
@@ -115,7 +113,7 @@ fn test_verdict_unparseable_reports_cannot_judge() {
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "Some prose with no verdict line.\n");
 
-    let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
+    let exit_code = run_script(&wrapper(), &context, &agent);
     assert_eq!(exit_code, CANNOT_JUDGE);
 }
 
@@ -144,7 +142,7 @@ fn test_missing_prompt_fails_with_a_diagnostic() {
     fs::write(&context, r#"{"prompt":null}"#).unwrap();
     let agent = write_fake_agent(&temp, "Total findings: 0\nVERDICT: PASS\n");
 
-    let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
+    let output = run_script_output(&wrapper(), &context, &agent);
 
     assert_eq!(
         output.status.code(),
@@ -166,7 +164,7 @@ fn test_classified_advisory_finding_passes() {
         "1. Existing cleanup opportunity.\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"implementation is sound\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"existing cleanup opportunity\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n",
     );
 
-    let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
+    let exit_code = run_script(&wrapper(), &context, &agent);
     assert_eq!(exit_code, 0, "classified advisory output failed");
 }
 
@@ -179,7 +177,7 @@ fn test_classified_referenced_finding_fails_and_keeps_the_reference() {
         "1. Policy defect.\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"policy defect\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"policy defect\",\"references\":[\"@/inv/pid-safety\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n",
     );
 
-    let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
+    let output = run_script_output(&wrapper(), &context, &agent);
 
     assert_eq!(
         output.status.code(),
@@ -228,7 +226,7 @@ fn test_prompt_contract_does_not_execute_markdown_as_shell_commands() {
         "Total findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"clear\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n",
     );
 
-    let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
+    let output = run_script_output(&wrapper(), &context, &agent);
 
     assert!(output.status.success(), "wrapper failed");
     assert!(

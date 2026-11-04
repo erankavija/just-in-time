@@ -4,143 +4,69 @@
 //! committed — validate should pass as long as the file exists in the
 //! working tree.
 
-use assert_cmd::assert::OutputAssertExt;
+use jit::test_cli::JitCli;
 use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-use tempfile::TempDir;
-
-struct TestContext {
-    #[allow(dead_code)]
-    temp_dir: TempDir,
-    repo_path: PathBuf,
-}
-
-impl TestContext {
-    fn new() -> Self {
-        let temp_dir = TempDir::new().expect("create temp dir");
-        let repo_path = temp_dir.path().to_path_buf();
-        Self {
-            temp_dir,
-            repo_path,
-        }
-    }
-
-    fn init_git(&self) {
-        self.git(&["init"]);
-        self.git(&["config", "user.name", "Test User"]);
-        self.git(&["config", "user.email", "test@example.com"]);
-    }
-
-    fn git(&self, args: &[&str]) {
-        Command::new("git")
-            .current_dir(&self.repo_path)
-            .args(args)
-            .status()
-            .expect("git command failed");
-    }
-
-    fn jit(&self, args: &[&str]) -> std::process::Output {
-        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&self.repo_path)
-            .args(args)
-            .output()
-            .expect("jit command failed")
-    }
-
-    fn jit_assert(&self, args: &[&str]) -> assert_cmd::assert::Assert {
-        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&self.repo_path)
-            .args(args)
-            .assert()
-    }
-
-    fn create_issue(&self, title: &str) -> String {
-        let output = self.jit(&["issue", "create", "--title", title, "--json"]);
-        assert!(output.status.success(), "issue create failed");
-        let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("parse JSON");
-        json["id"].as_str().expect("no id").to_string()
-    }
-
-    /// Commit all current files so HEAD exists.
-    fn commit_all(&self, message: &str) {
-        self.git(&["add", "."]);
-        self.git(&["commit", "-m", message]);
-    }
-}
 
 /// A document linked to an issue exists only in the working tree (not yet
 /// committed). `jit validate` should succeed.
 #[test]
 fn test_validate_passes_for_uncommitted_document() {
-    let ctx = TestContext::new();
-    ctx.init_git();
-    ctx.jit_assert(&["init"]).success();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    // An initial commit so HEAD exists.
+    fs::write(cli.root().join("README.md"), "# Repo\n").unwrap();
+    cli.commit("initial commit").unwrap();
 
-    // Make an initial commit so HEAD exists.
-    fs::write(ctx.repo_path.join("README.md"), "# Repo\n").unwrap();
-    ctx.commit_all("initial commit");
-
-    // Create issue and a document file (NOT committed).
-    let issue_id = ctx.create_issue("Task with doc");
+    let issue_id = cli.create_issue(["--title", "Task with doc"]).unwrap();
     let doc_path = "docs/design.md";
-    fs::create_dir_all(ctx.repo_path.join("docs")).unwrap();
-    fs::write(ctx.repo_path.join(doc_path), "# Design\n").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "# Design\n").unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
 
-    // Link the document to the issue (still uncommitted).
-    ctx.jit_assert(&["doc", "add", &issue_id, doc_path])
-        .success();
-
-    // Validate should pass even though the document is not yet committed.
-    ctx.jit_assert(&["validate"]).success();
+    cli.run(["validate"])
+        .expect("validate passes with the document only in the working tree");
 }
 
 /// A filesystem validation may resolve an unpinned document from Git `HEAD`
 /// when it is absent from the working tree.
 #[test]
 fn test_validate_passes_for_document_only_in_head() {
-    let ctx = TestContext::new();
-    ctx.init_git();
-    ctx.jit_assert(&["init"]).success();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
-    let issue_id = ctx.create_issue("Task with tracked doc");
+    let issue_id = cli
+        .create_issue(["--title", "Task with tracked doc"])
+        .unwrap();
     let doc_path = "docs/tracked.md";
-    fs::create_dir_all(ctx.repo_path.join("docs")).unwrap();
-    fs::write(ctx.repo_path.join(doc_path), "# Tracked\n").unwrap();
-    ctx.jit_assert(&["doc", "add", &issue_id, doc_path])
-        .success();
-    ctx.commit_all("tracked document");
-    fs::remove_file(ctx.repo_path.join(doc_path)).unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "# Tracked\n").unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
+    cli.commit("tracked document").unwrap();
+    fs::remove_file(cli.root().join(doc_path)).unwrap();
 
-    ctx.jit_assert(&["validate"]).success();
+    cli.run(["validate"])
+        .expect("validate resolves the document from HEAD");
 }
 
 /// `jit doc add` on an `.html` file stores `format == "html"` in the issue.
 #[test]
 fn test_doc_add_html_stores_format_html() {
-    let ctx = TestContext::new();
-    ctx.init_git();
-    ctx.jit_assert(&["init"]).success();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    fs::write(cli.root().join("README.md"), "# Repo\n").unwrap();
+    cli.commit("initial commit").unwrap();
 
-    fs::write(ctx.repo_path.join("README.md"), "# Repo\n").unwrap();
-    ctx.commit_all("initial commit");
-
-    let issue_id = ctx.create_issue("HTML doc task");
+    let issue_id = cli.create_issue(["--title", "HTML doc task"]).unwrap();
     let doc_path = "docs/index.html";
-    fs::create_dir_all(ctx.repo_path.join("docs")).unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
-        ctx.repo_path.join(doc_path),
+        cli.root().join(doc_path),
         "<!DOCTYPE html><html><body><p>Hello</p></body></html>",
     )
     .unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
 
-    ctx.jit_assert(&["doc", "add", &issue_id, doc_path])
-        .success();
-
-    // Read back the issue as JSON and confirm format == "html"
-    let output = ctx.jit(&["issue", "show", &issue_id, "--json"]);
-    assert!(output.status.success(), "issue show failed");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("parse JSON");
+    let json = cli.run_json(["issue", "show", &issue_id]).unwrap();
     let format = json["documents"][0]["format"]
         .as_str()
         .expect("format field missing");
@@ -151,36 +77,32 @@ fn test_doc_add_html_stores_format_html() {
 /// not in git). `jit validate` should fail.
 #[test]
 fn test_validate_fails_for_missing_document() {
-    let ctx = TestContext::new();
-    ctx.init_git();
-    ctx.jit_assert(&["init"]).success();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    fs::write(cli.root().join("README.md"), "# Repo\n").unwrap();
+    cli.commit("initial commit").unwrap();
 
-    // Make an initial commit so HEAD exists.
-    fs::write(ctx.repo_path.join("README.md"), "# Repo\n").unwrap();
-    ctx.commit_all("initial commit");
-
-    // Manually inject a document reference pointing to a non-existent file.
-    let issue_id = ctx.create_issue("Task with broken doc");
-
-    // Create a temporary doc file to allow `doc add` to succeed, then delete it.
+    let issue_id = cli
+        .create_issue(["--title", "Task with broken doc"])
+        .unwrap();
+    // A temporary file lets `doc add` succeed; removing it leaves neither HEAD
+    // nor the working tree holding the document.
     let doc_path = "docs/ghost.md";
-    fs::create_dir_all(ctx.repo_path.join("docs")).unwrap();
-    fs::write(ctx.repo_path.join(doc_path), "temp").unwrap();
-    ctx.jit_assert(&["doc", "add", &issue_id, doc_path])
-        .success();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "temp").unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
+    fs::remove_file(cli.root().join(doc_path)).unwrap();
 
-    // Remove the file — now neither HEAD nor working tree has it.
-    fs::remove_file(ctx.repo_path.join(doc_path)).unwrap();
-
-    // Validate should fail.
-    let output = ctx.jit(&["validate"]);
+    let output = cli.command(["validate"]).output().unwrap();
     assert!(
         !output.status.success(),
         "validate should fail for missing document"
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let combined = format!("{}{}", stderr, stdout);
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
     assert!(
         combined.contains("not found"),
         "expected 'not found' in output, got: {combined}"

@@ -8,6 +8,8 @@
 //! This module requires `ripgrep` (command `rg`) to be installed on the system.
 //! If not found, search operations return a helpful error message with installation instructions.
 
+use crate::domain::identity::IssueId;
+use crate::repository_state::VirtualPath;
 use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -17,8 +19,10 @@ use std::process::{Command, Stdio};
 /// A failure from the full-text search backend (`ripgrep`).
 ///
 /// Distinguishes "`ripgrep` is not installed" from a search-execution failure so
-/// the CLI can pick the JSON `error_code` (`RIPGREP_NOT_FOUND` vs `SEARCH_FAILED`)
-/// and its suggestion by downcasting to this type rather than scanning the
+/// the CLI can pick the JSON `error_code`
+/// ([`RipgrepNotFound`](crate::output::ErrorCode::RipgrepNotFound) or
+/// [`SearchFailed`](crate::output::ErrorCode::SearchFailed)) and its suggestion
+/// by downcasting to this type rather than scanning the
 /// message text. Each variant's `Display` reproduces the original message
 /// verbatim, so user-facing output is unchanged.
 #[derive(Debug, thiserror::Error)]
@@ -43,7 +47,7 @@ pub enum SearchError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResult {
     /// Issue ID extracted from filename (None for non-issue files like documents)
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
     /// File path relative to search root
     pub path: String,
     /// Line number where match was found
@@ -80,6 +84,8 @@ pub struct SearchOptions {
     pub file_pattern: Option<String>,
     /// Multiple file patterns (e.g., specific document paths)
     /// If provided, overrides file_pattern
+    ///
+    /// With neither selection given, history paths are excluded from the search.
     pub file_patterns: Vec<String>,
 }
 
@@ -131,6 +137,11 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         }
     } else if let Some(pattern) = &options.file_pattern {
         cmd.arg("--glob").arg(pattern);
+    } else {
+        // Anchored, so a same-named path nested elsewhere stays searchable.
+        VirtualPath::history_paths().iter().for_each(|path| {
+            cmd.arg("--glob").arg(format!("!/{path}"));
+        });
     }
 
     // ripgrep matches globs relative to its working directory, so run it in the search root.
@@ -213,7 +224,7 @@ fn parse_ripgrep_json(json: &[u8], max: Option<usize>) -> Result<Vec<SearchResul
 }
 
 /// Extract issue ID from a file path
-pub fn extract_issue_id(path: &str) -> Option<String> {
+pub fn extract_issue_id(path: &str) -> Option<IssueId> {
     let path_obj = Path::new(path);
 
     // Only extract from files in "issues/" directory
@@ -224,7 +235,7 @@ pub fn extract_issue_id(path: &str) -> Option<String> {
     path_obj
         .file_stem()
         .and_then(|s| s.to_str())
-        .map(String::from)
+        .and_then(|id| serde_json::from_value(serde_json::json!(id)).ok())
 }
 
 #[cfg(test)]
@@ -234,12 +245,16 @@ mod tests {
     #[test]
     fn test_extract_issue_id_from_issue_file() {
         assert_eq!(
-            extract_issue_id("issues/abc123.json"),
-            Some("abc123".to_string())
+            extract_issue_id("issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"),
+            Some(crate::test_utils::issue_id(
+                0xffbd5dbd9531bdc92f12bb6bfb90f3d2
+            ))
         );
         assert_eq!(
-            extract_issue_id(".jit/issues/def456.json"),
-            Some("def456".to_string())
+            extract_issue_id(".jit/issues/8fde4411-626f-5466-82f0-605630dfc6ee.json"),
+            Some(crate::test_utils::issue_id(
+                0x626f546682f0605630dfc6ee8fde4411
+            ))
         );
     }
 
@@ -263,8 +278,10 @@ mod tests {
     #[test]
     fn test_search_result_serialization() {
         let result = SearchResult {
-            issue_id: Some("abc123".to_string()),
-            path: "issues/abc123.json".to_string(),
+            issue_id: Some(crate::test_utils::issue_id(
+                0xffbd5dbd9531bdc92f12bb6bfb90f3d2,
+            )),
+            path: "issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json".to_string(),
             line_number: 5,
             line_text: "  \"title\": \"Test Issue\",\n".to_string(),
             matches: vec![SearchMatch {
@@ -281,15 +298,23 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_single_match() {
-        let json = r#"{"type":"match","data":{"path":{"text":"issues/abc123.json"},"lines":{"text":"  \"title\": \"Test\",\n"},"line_number":3,"submatches":[{"match":{"text":"Test"},"start":12,"end":16}]}}
+        let json = r#"{"type":"match","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"},"lines":{"text":"  \"title\": \"Test\",\n"},"line_number":3,"submatches":[{"match":{"text":"Test"},"start":12,"end":16}]}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
         assert_eq!(results.len(), 1);
 
         let result = &results[0];
-        assert_eq!(result.issue_id, Some("abc123".to_string()));
-        assert_eq!(result.path, "issues/abc123.json");
+        assert_eq!(
+            result.issue_id,
+            Some(crate::test_utils::issue_id(
+                0xffbd5dbd9531bdc92f12bb6bfb90f3d2
+            ))
+        );
+        assert_eq!(
+            result.path,
+            format!("issues/{}.json", result.issue_id.as_ref().unwrap())
+        );
         assert_eq!(result.line_number, 3);
         assert!(result.line_text.contains("Test"));
         assert_eq!(result.matches.len(), 1);
@@ -298,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_multiple_matches() {
-        let json = r#"{"type":"match","data":{"path":{"text":"issues/abc123.json"},"lines":{"text":"test test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4},{"match":{"text":"test"},"start":5,"end":9}]}}
+        let json = r#"{"type":"match","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"},"lines":{"text":"test test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4},{"match":{"text":"test"},"start":5,"end":9}]}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
@@ -308,9 +333,9 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_ignores_non_match_events() {
-        let json = r#"{"type":"begin","data":{"path":{"text":"issues/abc123.json"}}}
-{"type":"match","data":{"path":{"text":"issues/abc123.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4}]}}
-{"type":"end","data":{"path":{"text":"issues/abc123.json"}}}
+        let json = r#"{"type":"begin","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
+{"type":"match","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4}]}}
+{"type":"end","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
@@ -319,10 +344,27 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_respects_max_results() {
-        let json = r#"{"type":"match","data":{"path":{"text":"issues/1.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[]}}
-{"type":"match","data":{"path":{"text":"issues/2.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[]}}
-{"type":"match","data":{"path":{"text":"issues/3.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[]}}
-"#;
+        let json = [
+            0x400080000000000000010f0e0d0c,
+            0x400080000000000000020f0e0d0c,
+            0x400080000000000000030f0e0d0c,
+        ]
+        .map(crate::test_utils::issue_id)
+        .iter()
+        .map(|id| {
+            serde_json::json!({
+                "type": "match",
+                "data": {
+                    "path": {"text": format!("issues/{id}.json")},
+                    "lines": {"text": "test\n"},
+                    "line_number": 1,
+                    "submatches": [],
+                },
+            })
+            .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
 
         let results = parse_ripgrep_json(json.as_bytes(), Some(2)).unwrap();
         assert_eq!(results.len(), 2);
@@ -330,8 +372,8 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_no_matches() {
-        let json = r#"{"type":"begin","data":{"path":{"text":"issues/abc123.json"}}}
-{"type":"end","data":{"path":{"text":"issues/abc123.json"}}}
+        let json = r#"{"type":"begin","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
+{"type":"end","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
@@ -351,9 +393,8 @@ mod tests {
         assert_eq!(search_match, deserialized);
     }
 
-    // SearchError exists so the CLI can pick the JSON `error_code`
-    // (RIPGREP_NOT_FOUND vs SEARCH_FAILED) by downcast rather than by scanning the
-    // message. These tests pin both halves of that contract: each variant's
+    // SearchError exists so the CLI can pick the JSON `error_code` by downcast
+    // rather than by scanning the message. These tests pin both halves of that contract: each variant's
     // `Display` reproduces the original `bail!` message verbatim, and the type
     // survives an `anyhow::Error` round trip so the downcast in `main.rs` works.
 
@@ -447,5 +488,60 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_search_default_skips_history_files_and_explicit_glob_reaches_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let write = |rel: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, "needle\n").unwrap();
+        };
+        let history = VirtualPath::history_paths();
+        let [events, runs, scratch] = &history;
+        let run = VirtualPath::gate_run_record(
+            &crate::test_utils::issue_id(1),
+            &crate::test_utils::gate_run_id(1),
+        );
+        let run = run.relative().as_str();
+        write(events);
+        write(run);
+        write(&format!("{scratch}/redo.bin"));
+        write(&format!("nested/{events}"));
+        write(&format!("nested/{scratch}/x.txt"));
+        write("issues/a.json");
+
+        let found = |options: SearchOptions| -> std::collections::BTreeSet<String> {
+            search(root, "needle", options)
+                .unwrap()
+                .into_iter()
+                .map(|r| {
+                    Path::new(&r.path)
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect()
+        };
+
+        assert_eq!(
+            found(SearchOptions::default()),
+            [
+                "issues/a.json".to_string(),
+                format!("nested/{events}"),
+                format!("nested/{scratch}/x.txt"),
+            ]
+            .into()
+        );
+        assert_eq!(
+            found(SearchOptions {
+                file_pattern: Some(format!("{runs}/**")),
+                ..SearchOptions::default()
+            }),
+            [run.to_string()].into()
+        );
     }
 }

@@ -101,7 +101,7 @@ jit worktree list [OPTIONS]
 
 #### Description
 
-Shows all worktrees associated with the repository, including their worktree ID, current branch, path, and count of active claims. Useful for seeing which worktrees exist and what work is happening in each.
+Shows all worktrees associated with the repository, including their worktree ID, current branch, path, and count of active claims. Expired leases and indefinite leases with stale heartbeats do not count as active. Useful for seeing which worktrees exist and what work is happening in each.
 
 #### Options
 
@@ -156,6 +156,39 @@ listed. For the code each failure exits with, see the
 
 ---
 
+### jit worktree exec
+
+Run a command holding the repository write lock.
+
+#### Synopsis
+
+```bash
+jit worktree exec [OPTIONS] -- <COMMAND> [ARGS]...
+```
+
+#### Description
+
+The command waits for the lock up to `JIT_LOCK_TIMEOUT` seconds, refuses a
+pending redo record without applying it, runs `<COMMAND>`, exits with its status,
+and releases the lock. It knows nothing about what the command does.
+
+Every mutation waits for the lock, so what the command reads and writes under
+`.jit/` holds still while it runs. A `jit` mutation run by the command waits on
+the same lock and fails with `LOCK_TIMEOUT`; `jit` reads run normally.
+
+`--json` shapes only this command's own failures, and belongs before `--`.
+
+#### Failure modes
+
+| Failure | Code | Exit |
+|---------|------|------|
+| Lock wait expired; the command did not run | `LOCK_TIMEOUT` | 11 |
+| Pending redo record, or the command could not start | `GENERIC_ERROR` | 1 |
+
+Any other status is the command's own.
+
+---
+
 ### jit worktree store-divergence
 
 Report the records the inspected checkout's store and the primary checkout's
@@ -170,8 +203,7 @@ jit worktree store-divergence [OPTIONS]
 #### Description
 
 Each checkout owns a store under its own `.jit/`. Issue records are read with a
-fallback across the local store, version-control history, and the primary
-checkout, but event history has no such fallback, so a linked checkout's events
+fallback from the local store to the primary checkout, but event history has no such fallback, so a linked checkout's events
 are visible only from inside it. This check compares the two stores as they
 physically sit — no fallback, no aggregation — and names every issue record and
 every event record they hold differently.
@@ -306,38 +338,84 @@ behavior depends on the arguments.
   uniqueness, type-hierarchy, and any project graph rules) and the built-in
   integrity checks — broken dependency references, gate references absent from
   the registry, DAG cycles, issues isolated from the dependency graph, redundant
-  (transitively-reducible) edges, and claims-index consistency. Advisory
-  membership-vs-DAG divergences are reported but do not fail the run.
-- **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
-  issue. The id accepts a full UUID, 8-char short id, or unique prefix.
+  (transitively-reducible) edges, and record fidelity:
+  the index, issue records, gate-run results, verdict records, archive evidence,
+  and event log each decode and reproduce what the writer would publish, and no event id appears on
+  more than one line. An event log that does not parse is one finding naming its
+  line. This mode and the `repository_validation` checker read the whole event
+  log and every gate-run record for fidelity; other validation modes do not
+  read history. See [History Files](storage-format.md#history-files) for all
+  history readers. Advisory membership-vs-DAG divergences are reported but do
+  not fail the run. A built-in `repository_validation` gate runs this same
+  computation and never passes where it fails; see
+  [gate presets](gate-presets.md) for its `failed` and `error` runs.
+- **Per-issue** (`jit validate <id>`): reports the findings concerning that
+  one issue. The id accepts a full UUID, 8-char short id, or unique prefix.
 - **Selected rule** (`jit validate <id> --rule <rule>`): applies exactly one
   configured graph rule with that issue as its sole firing subject. The complete
   repository remains graph and identifier-resolution context only; a missing,
   disabled, non-graph, or non-matching rule is an error rather than a vacuous
   pass.
+- **Explain** (`jit validate <id> --explain`): every configured rule's outcome
+  for that issue; a matched rule fails exactly when the per-issue view holds a
+  finding of it.
+- **Scope** (`jit validate --scope <id>`): the findings of a container's bracket
+  scope, the issues in its transitive dependency closure bounded at its
+  template's breakdown node, excluding the graph rules that need the whole
+  repository at transition time. It is shaped as a deterministic gate checker.
 
-`--fix` additionally repairs the auto-fixable findings (type-hierarchy label
-fixes, transitive-reduction violations, pending state transitions) and owned
-derived-state drift (default rules and schemas, configured projections). Derived
-repairs publish through one redo record
-([Publication and Recovery](storage-format.md#publication-and-recovery)) and
-preserve authored or unmanaged bytes. Ambiguous ownership is reported without
-writes. Coordination state — stale
-locks, the claims index, expired leases — is repaired by
+#### Views
+
+Every mode above except whole-repository validation is a view: a selection of
+the one whole-repository report. Rules evaluate over the whole repository, and
+the view keeps the findings its selection admits, so a coverage child or
+dependency target outside the selected issue or scope still counts. Views skip
+the history reads. Selections differ only in what they admit:
+
+- **Unloadable rule set.** The per-issue, selected-rule, and scope views report
+  it as the `rules-file` finding; `--explain` fails with that finding's message.
+- **Enforcement drift.** `enforcement-drift` findings appear in the scope view
+  and never in the per-issue, explain, or selected-rule views.
+- **Graph-rule configuration errors.** The per-issue and explain views admit
+  one when the rule applies to the issue and the error concerns that issue or
+  no single issue. The selected-rule view admits the selected rule's error under
+  the same condition. The scope view admits one that concerns a scope member, or
+  concerns no single issue and comes from a rule that applies to a member.
+
+Each built-in validation gate checker reports what its view reports; see
+[gate presets](gate-presets.md#portable-checker-types).
+
+#### Repairs
+
+`--fix` repairs the auto-fixable findings (type-hierarchy label
+fixes, transitive-reduction violations, pending state transitions) and
+derived-state drift (default rules and schemas, configured projections). Every
+fix of the run publishes through one mutation and one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery));
+derived repairs preserve authored or unmanaged bytes. An ambiguous target is
+reported without writes. The run then renders the whole-repository report over
+the fixed repository, with that report's exit status, whether or not a fix
+applied; `--dry-run` writes nothing, so its report covers the repository as it
+stands. Human output prints the fix messages and a fix count before the report;
+JSON adds `fixes_applied`, `fix_messages`, and `dry_run` to the report object.
+Coordination state — stale
+locks and expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
+Plain `jit validate` does not check leases; `--leases` checks lease records
+for expiry and references to missing worktrees or issues.
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
+| `[ID]` | Positional. Report this issue's [view](#views) of the whole-repository report; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
-| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and a rule or selection failure exits `1`. Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
-| `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
+| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`; findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)). Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
+| `--scope <ID>` | Report the findings of a container's bracket scope as a deterministic gate checker. Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
-| `--leases` | Report active leases that are inconsistent or stale |
+| `--leases` | Report expired leases and leases referencing missing worktrees or issues |
 | `--json` | Output as JSON |
 
 `--fix`, `--branch-drift`, and `--leases` are repo-wide and cannot be combined
@@ -349,7 +427,7 @@ with a positional `[ID]`.
 # Whole-repository validation
 jit validate
 
-# Validate a single issue's rules
+# The findings concerning one issue (its view of the whole-repository report)
 jit validate a1b2c3d4
 
 # Explain which rules apply to an issue
@@ -361,7 +439,7 @@ jit validate a1b2c3d4 --rule coverage-preview
 # Validate a container's bracket subtree as a gate check
 jit validate --scope <container-id>
 
-# Check git branch drift and lease health
+# Check git branch drift and expired or dangling leases
 jit validate --branch-drift --leases
 
 # Preview, then apply, the auto-fixes
@@ -376,21 +454,21 @@ jit validate --json
 
 Whole-repository, clean:
 ```
-✓ Repository validation passed
+Repository validation passed
 ```
 
 Whole-repository, with an integrity error and a warning-severity finding:
 ```
-❌ Repository integrity error: Invalid dependency: issue 'a1b2c3d4' depends on 'deadbeef' which does not exist
-⚠ [orphan-leaf] issue e5f6g7h8 (type:task) is an orphaned leaf with no parent association label
+error: Repository integrity error: Invalid repository: repository-integrity validation pass: Invalid dependency: issue 'a1b2c3d4' depends on 'deadbeef' which does not exist
+warning [orphan-leaf] issue e5f6g7h8 (type:task) is an orphaned leaf with no parent association label
 
 Warnings: 1
 ```
 
-Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
-`⚠ [<rule>]`.
+Error-severity rule findings print with a leading `error [<rule>]`, warnings with
+`warning [<rule>]`.
 
-If `--fix` cannot prove ownership, human output includes the complete actionable
+If `--fix` cannot repair a target unambiguously, human output includes the complete actionable
 cause chain. With `--json`, the same failure is a standard error object whose
 code is `VALIDATION_FAILED` and whose message retains that chain (for example,
 the target and duplicate delimiter); see
@@ -398,31 +476,34 @@ the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
 ### Failure modes
 
-`jit validate` passes when it finds nothing to report (and, under `--fix`, when
-its repairs complete). It signals findings by exiting non-zero:
+`jit validate` passes when it finds nothing to report (under `--fix`, in the
+repository its repairs leave). It signals findings by exiting non-zero:
 
 - **Declarative-rule errors** — whole-repo or per-issue.
 - **Repository-integrity failures** — a broken dependency, a DAG cycle, an
-  isolated issue, a redundant edge, an unknown gate reference, or a bad claims
-  index. A `--scope` error finding reports the same way.
+  isolated issue, a redundant edge, an unknown gate reference, or a stored record
+  that fails fidelity checks. A `--scope` error finding reports the same way.
 - **Check failures** under `--explain`, `--branch-drift`, or `--leases`.
 
 It fails as a usage error when `--dry-run` is given without `--fix`, and on the
 hidden `--divergence` stub, which errors and redirects to `--branch-drift` or
 `jit query divergence`. It fails as not-found when the positional issue id or the
-`--scope` container does not resolve.
+`--scope` container does not resolve. A rule pass that fails, such as a rule
+reading a planning document that is missing, fails every view with that error
+rather than reporting a clean selection; whole-repository validation reports it
+as a structural failure beside the findings collected before it.
 
 For `--rule`, a missing, disabled, non-graph, or non-matching configured rule is
-a validation finding and exits `1`, just like an uncovered selected application.
-Only invalid flag combinations or a missing required positional issue id are
+a `VALIDATION_FAILED` finding and exits `4`, just like an uncovered selected
+application ([exit-code reference](exit-codes.md#command-specific-mappings)). Only invalid flag combinations or a missing required positional issue id are
 usage errors and exit `2`.
 
 The code each outcome exits with — including the codes that signal findings
 rather than errors — is in the [Exit Codes reference](exit-codes.md).
 
-### Integration with Hooks
+### When to run it
 
-The pre-commit hook runs similar validation automatically. Use `jit validate` for:
+Use `jit validate` for:
 
 - Manual health checks
 - CI/CD pipelines
@@ -449,9 +530,11 @@ its session opens
 then runs, in sequence:
 1. Repair declaration-derived state through the `jit validate --fix` path
 2. In a Git repository, the coordination routines under `.git/jit/`: clear
-   claim locks left by dead processes (checked by PID), rebuild the claims index
-   from its append-only log, and evict expired leases. Without Git they are
-   skipped with a warning.
+   claim locks left by dead processes (checked by PID), evict expired leases,
+   reclaim indefinite leases whose heartbeat is [stale](claim.md#staleness), and remove
+   interrupted lease operations' `*.tmp` stage files under `leases/` older than
+   the [cleanup threshold](runtime-defaults.md). Without Git they are skipped
+   with a warning.
 3. Remove orphaned `*.tmp` files under `.jit/` older than the
    [cleanup threshold](runtime-defaults.md)
 
@@ -480,8 +563,8 @@ jit recover --json
 Recovery complete:
   • Redo records applied: 0
   • Stale locks cleaned: 1
-  • Index rebuilt: true
   • Expired leases evicted: 2
+  • Stale leases reclaimed: 1
   • Temp files removed: 0
   • Derived-state targets repaired: 0
 ```

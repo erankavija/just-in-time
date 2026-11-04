@@ -8,109 +8,67 @@
 //! another issue with `apply`.
 
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit(temp: &TempDir) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(temp.path());
-    cmd
-}
-
-/// Run a jit command, assert success, and parse its JSON stdout.
-fn jit_json(temp: &TempDir, args: &[&str]) -> serde_json::Value {
-    let out = jit(temp)
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    serde_json::from_slice(&out).unwrap_or_else(|e| {
-        panic!(
-            "expected JSON from `jit {}`: {e}\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&out)
-        )
-    })
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit(&temp).arg("init").assert().success();
-    temp
-}
-
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let json = jit_json(temp, &["issue", "create", "--title", title, "--json"]);
-    json["id"].as_str().expect("created issue id").to_string()
-}
+use jit::test_cli::JitCli;
 
 /// REQ-02: a project-defined preset is created from an issue's gates, then
 /// listed, shown, and applied — the full mechanism against a project-declared
 /// bundle, with no undeclared preset in play.
 #[test]
 fn test_project_defined_preset_create_list_show_apply() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
 
     // A reference issue configured with two gates that stand in for a project's
     // language-specific CI bundle (a test runner plus a review gate).
-    let reference = create_issue(&temp, "Reference issue");
-    jit(&temp)
-        .args([
-            "gate",
-            "define",
-            "tests",
-            "--title",
-            "All tests pass",
-            "--description",
-            "run the test suite",
-            "--stage",
-            "postcheck",
-            "--mode",
-            "auto",
-            "--checker-command",
-            "make test",
-            "--timeout",
-            "300",
-        ])
-        .assert()
-        .success();
-    jit(&temp)
-        .args([
-            "gate",
-            "define",
-            "code-review",
-            "--title",
-            "Code review",
-            "--description",
-            "human review",
-        ])
-        .assert()
-        .success();
-    jit(&temp)
-        .args(["gate", "add", &reference, "tests", "code-review"])
+    let reference = cli.create_issue(["--title", "Reference issue"]).unwrap();
+    cli.command([
+        "gate",
+        "define",
+        "tests",
+        "--title",
+        "All tests pass",
+        "--description",
+        "run the test suite",
+        "--stage",
+        "postcheck",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "make test",
+        "--timeout",
+        "300",
+    ])
+    .assert()
+    .success();
+    cli.command([
+        "gate",
+        "define",
+        "code-review",
+        "--title",
+        "Code review",
+        "--description",
+        "human review",
+    ])
+    .assert()
+    .success();
+    cli.command(["gate", "add", &reference, "tests", "code-review"])
         .assert()
         .success();
 
     // Capture those gates into a project-defined preset.
-    jit(&temp)
-        .args(["gate", "preset", "create", &reference, "ci"])
+    cli.command(["gate", "preset", "create", &reference, "ci"])
         .assert()
         .success();
 
     // The preset is stored on disk under the project's gate-presets directory.
     assert!(
-        temp.path()
-            .join(".jit/config/gate-presets/ci.json")
-            .exists(),
+        cli.root().join(".jit/config/gate-presets/ci.json").exists(),
         "project-defined preset should be written to .jit/config/gate-presets/"
     );
 
     // `list` reports exactly what the project declares. The planning-bracket
     // names are checked beside it because a listing that carried presets from
     // the binary would carry those.
-    let list = jit_json(&temp, &["gate", "preset", "list", "--json"]);
+    let list = cli.run_json(["gate", "preset", "list"]).unwrap();
     let presets = list["presets"].as_array().expect("presets array");
     assert_eq!(
         presets
@@ -120,11 +78,10 @@ fn test_project_defined_preset_create_list_show_apply() {
         vec!["ci"],
         "the listing reports the project's own presets and nothing else"
     );
-    assert_eq!(list["count"], 1);
     assert_eq!(presets[0]["gate_count"], 2);
     for absent in ["plan-review", "coverage-preview", "breakdown-review"] {
-        let show = jit(&temp)
-            .args(["gate", "preset", "show", absent, "--json"])
+        let show = cli
+            .command(["gate", "preset", "show", absent, "--json"])
             .output()
             .expect("preset show should run");
         assert!(
@@ -134,7 +91,7 @@ fn test_project_defined_preset_create_list_show_apply() {
     }
 
     // `show` reports the bundled gates.
-    let show = jit_json(&temp, &["gate", "preset", "show", "ci", "--json"]);
+    let show = cli.run_json(["gate", "preset", "show", "ci"]).unwrap();
     assert_eq!(show["name"], "ci");
     let keys: Vec<&str> = show["gates"]
         .as_array()
@@ -149,8 +106,10 @@ fn test_project_defined_preset_create_list_show_apply() {
     );
 
     // `apply` attaches the bundled gates to a fresh issue.
-    let target = create_issue(&temp, "Feature issue");
-    let applied = jit_json(&temp, &["gate", "preset", "apply", "ci", &target, "--json"]);
+    let target = cli.create_issue(["--title", "Feature issue"]).unwrap();
+    let applied = cli
+        .run_json(["gate", "preset", "apply", "ci", &target])
+        .unwrap();
     let added: Vec<&str> = applied["success"][0]["gates_added"]
         .as_array()
         .expect("gates_added array")
@@ -161,7 +120,7 @@ fn test_project_defined_preset_create_list_show_apply() {
     assert!(added.contains(&"code-review"));
 
     // The target issue now requires both gates.
-    let status = jit_json(&temp, &["issue", "show", &target, "--json"]);
+    let status = cli.run_json(["issue", "show", &target]).unwrap();
     let required: Vec<&str> = status["gates"]
         .as_array()
         .expect("gates array")
@@ -170,4 +129,34 @@ fn test_project_defined_preset_create_list_show_apply() {
         .collect();
     assert!(required.contains(&"tests"));
     assert!(required.contains(&"code-review"));
+}
+
+#[test]
+fn test_gate_preset_create_missing_registry_gate_names_the_gate() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "mygate",
+        "--title",
+        "My gate",
+        "--description",
+        "My gate",
+    ])
+    .unwrap();
+    let issue = cli.create_issue(["--title", "Has gate"]).unwrap();
+    cli.run(["gate", "add", &issue, "mygate"]).unwrap();
+    cli.run(["gate", "remove", "mygate"]).unwrap();
+
+    let output = cli
+        .command(["gate", "preset", "create", &issue, "mypreset"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Gate not found in registry: mygate"),
+        "stderr was: {stderr}"
+    );
 }

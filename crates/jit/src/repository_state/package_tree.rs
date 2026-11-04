@@ -1,13 +1,9 @@
-//! Pure finalization of one whole-tree republication at a repository target.
+//! Pure finalization of one package tree's publication at an absent destination.
 //!
 //! A capture hands over the complete content of a tree and the destination it
-//! belongs at; this module turns that into one exact delta. The republication
-//! is whole: every declared file is written, and every file the captured image
-//! shows beneath the destination that the content does not declare is deleted
-//! in the same delta, so content the caller stopped declaring cannot survive
-//! into the next publication. The delta is published through one redo record
-//! like any other, so the destination ends either as it was or wholly
-//! republished, never partly.
+//! belongs at; this module turns that into one exact delta, published through
+//! one redo record like any other, so the destination ends either absent or
+//! holding the whole tree.
 //!
 //! The tree's content is opaque here: this module knows paths, bytes, and
 //! modes. What decides that content — a package manifest and the repository
@@ -15,16 +11,13 @@
 
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayoutError,
-    RepositoryRootClass, RootRelativePath, VirtualPath,
+    MutationContext, RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use crate::domain::relative_path::RootRelativePath;
+use std::collections::BTreeSet;
 
-const CAPTURE_OWNER: &str = "package-capture";
-
-/// One file a whole-tree republication publishes, addressed relative to the
-/// tree root.
+/// One file a tree publication writes, addressed relative to the tree root.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapturedTreeFile {
     /// Tree-relative path of the file.
@@ -35,38 +28,14 @@ pub struct CapturedTreeFile {
     pub mode: FileMode,
 }
 
-/// The complete content one republication publishes at `destination`.
+/// The complete content one publication writes at `destination`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageTreeCapture {
     destination: VirtualPath,
     files: Vec<CapturedTreeFile>,
 }
 
-/// What a republication does to one path beneath its destination.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TreeFileDisposition {
-    /// Already exactly what the tree declares, so nothing is published.
-    Unchanged,
-    /// Absent, so the tree's content is created.
-    Create,
-    /// Present with other content or mode, so it is replaced.
-    Update,
-    /// Present and not declared, so it is removed.
-    Remove,
-}
-
-/// One decision a republication reached about a path beneath its destination.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TreeFileOutcome {
-    /// The path the decision is about.
-    pub path: VirtualPath,
-    /// What the delta does to it.
-    pub disposition: TreeFileDisposition,
-    /// Mode the path carries after publication; a removal keeps the mode it had.
-    pub mode: FileMode,
-}
-
-/// Why a whole-tree republication could not be declared or finalized.
+/// Why a tree publication could not be declared or finalized.
 #[derive(Debug, thiserror::Error)]
 pub enum PackageTreeCaptureError {
     /// Path construction or canonicality failed.
@@ -87,10 +56,9 @@ pub enum PackageTreeCaptureError {
     /// A path the tree needs as a directory is occupied by something else.
     #[error("package tree path '{0}' is occupied by an entry that is not a directory")]
     OccupiedDirectory(String),
-    /// The destination holds an entry a republication may neither publish over
-    /// nor remove.
-    #[error("package tree destination holds '{0}', which is not an ordinary file or directory")]
-    UnsafeOccupant(String),
+    /// Composing the publication's event append failed.
+    #[error(transparent)]
+    Mutation(#[from] super::MutationError),
 }
 
 impl PackageTreeCapture {
@@ -122,14 +90,9 @@ impl PackageTreeCapture {
         Ok(Self { destination, files })
     }
 
-    /// The bounded capture declaration this republication starts from.
-    ///
-    /// It reads the destination, every directory above it, every path the tree
-    /// writes together with the directories those need, and the destination's
-    /// own listing. What already sits deeper inside the destination is
-    /// discovered from that listing by
-    /// [`expand_destination_closure`](Self::expand_destination_closure), which
-    /// is what makes the republication whole rather than additive.
+    /// The bounded capture declaration this publication reads: the destination,
+    /// every directory above it, every path the tree writes together with the
+    /// directories those need, and the event log's tail its record appends to.
     pub fn capture_spec(
         &self,
         budget: CaptureBudget,
@@ -142,55 +105,8 @@ impl PackageTreeCapture {
             paths.insert(path);
         }
         let mut spec = CaptureSpec::new(paths, budget)?;
-        spec.discover_listing(self.destination.clone())?;
+        spec.discover_tail(VirtualPath::EVENTS)?;
         Ok(spec)
-    }
-
-    /// Extend `spec` with everything `image` shows beneath the destination that
-    /// `spec` does not already declare.
-    ///
-    /// A listing names its children; a child the image shows to be a directory
-    /// needs a listing of its own. One pass therefore reaches one level deeper,
-    /// and a capture round repeats it until nothing is added, at which point the
-    /// declaration covers the whole destination subtree.
-    pub fn expand_destination_closure(
-        &self,
-        image: &RepositoryImage,
-        spec: &mut CaptureSpec,
-    ) -> Result<(), PackageTreeCaptureError> {
-        let listed = image
-            .directory_listings()
-            .iter()
-            .filter(|(path, _)| *path == &self.destination || self.contains(path))
-            .flat_map(|(path, listing)| {
-                listing
-                    .names()
-                    .iter()
-                    .map(|name| child_path(path, name))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Result<BTreeSet<_>, _>>()?;
-        let directories = image
-            .entries()
-            .iter()
-            .filter(|(path, entry)| {
-                self.contains(path) && matches!(entry, RepositoryEntry::Directory { .. })
-            })
-            .map(|(path, _)| path.clone())
-            .collect::<Vec<_>>();
-
-        spec.discover_paths(listed)?;
-        Ok(spec.discover_listings(directories)?)
-    }
-
-    /// Whether `path` sits strictly beneath the destination.
-    fn contains(&self, path: &VirtualPath) -> bool {
-        path.root_class() == self.destination.root_class()
-            && path
-                .relative()
-                .as_path()
-                .starts_with(self.destination.relative().as_path())
-            && path != &self.destination
     }
 
     /// The repository identity of one tree-relative path.
@@ -207,55 +123,43 @@ impl PackageTreeCapture {
     }
 }
 
-/// Finalize one whole-tree republication as an exact recoverable plan, with the
-/// decision it reached about every path beneath the destination.
+/// Finalize one tree publication as an exact recoverable plan.
 ///
-/// The delta creates every directory the tree needs and is absent, publishes
-/// every declared file whose content or mode differs from what the image shows,
-/// and deletes every ordinary file the image shows beneath the destination that
-/// the tree does not declare. A file already exactly as declared is reported
-/// [`TreeFileDisposition::Unchanged`] and carries no action, so republishing an
-/// unchanged tree publishes nothing. A directory the tree no longer needs is
-/// left in place: a delta deletes only files, and an empty
-/// directory carries no content the tree declares.
+/// `base` shows the destination absent. The delta creates every directory the
+/// tree needs and writes every declared file.
 ///
 /// # Errors
 ///
-/// [`PackageTreeCaptureError::OccupiedDirectory`] when a path the tree needs as
-/// a directory holds something else; [`PackageTreeCaptureError::UnsafeOccupant`]
-/// when the destination holds an entry that is neither an ordinary file nor a
-/// directory, which a republication may neither publish over nor remove; the
-/// capture and delta failures of the shared plan boundary.
+/// [`PackageTreeCaptureError::OccupiedDirectory`] when a directory above the
+/// destination holds something else; the capture and delta failures of the
+/// shared plan boundary.
 pub fn finalize_package_tree_capture(
     base: &RepositoryImage,
+    context: &MutationContext,
     capture: &PackageTreeCapture,
-) -> Result<(MaterializationPlan, Vec<TreeFileOutcome>), PackageTreeCaptureError> {
-    let published = capture
+) -> Result<MaterializationPlan, PackageTreeCaptureError> {
+    let written = capture
         .files
         .iter()
         .map(|file| Ok((capture.tree_path(&file.relative)?, file)))
-        .collect::<Result<BTreeMap<_, _>, RepositoryLayoutError>>()?;
+        .collect::<Result<Vec<_>, RepositoryLayoutError>>()?;
 
-    // Nearest root first, so each parent is created before its child.
-    let mut directories = capture.destination.ancestor_directories()?;
-    directories.push(capture.destination.clone());
-    directories.extend(
-        published
-            .keys()
-            .map(VirtualPath::ancestor_directories)
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .flatten()
-            .filter(|path| capture.contains(path))
-            .collect::<BTreeSet<_>>(),
-    );
+    let directories = written
+        .iter()
+        .map(|(path, _)| path.ancestor_directories())
+        .chain([capture.destination.ancestor_directories()])
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .chain([capture.destination.clone()])
+        .collect::<BTreeSet<_>>();
 
     let created = directories
         .into_iter()
         .map(|path| match base.entry(&path)? {
             RepositoryEntry::Absent => Ok(Some(RepositoryAction::CreateDirectory {
                 path,
-                owner: CAPTURE_OWNER.to_string(),
+                owner: RepositoryActionOwner::PackageCapture,
                 expected: ExpectedPreimage::Absent,
             })),
             RepositoryEntry::Directory { .. } => Ok(None),
@@ -265,94 +169,21 @@ pub fn finalize_package_tree_capture(
         })
         .collect::<Result<Vec<_>, PackageTreeCaptureError>>()?;
 
-    let writes = published
-        .iter()
-        .map(|(path, file)| {
-            let entry = base.entry(path)?;
-            let disposition = match entry {
-                RepositoryEntry::Absent => TreeFileDisposition::Create,
-                RepositoryEntry::File { content, mode }
-                    if content.bytes() == file.bytes.as_slice() && mode == &file.mode =>
-                {
-                    TreeFileDisposition::Unchanged
-                }
-                RepositoryEntry::File { .. } => TreeFileDisposition::Update,
-                RepositoryEntry::Directory { .. } => {
-                    return Err(PackageTreeCaptureError::OccupiedDirectory(
-                        path.repository_relative(),
-                    ))
-                }
-                _ => {
-                    return Err(PackageTreeCaptureError::UnsafeOccupant(
-                        path.repository_relative(),
-                    ))
-                }
-            };
-            let action = (disposition != TreeFileDisposition::Unchanged).then(|| {
-                RepositoryAction::WriteFile {
-                    path: (*path).clone(),
-                    owner: CAPTURE_OWNER.to_string(),
-                    expected: ExpectedPreimage::of(entry),
-                    bytes: file.bytes.clone(),
-                    mode: file.mode,
-                }
-            });
-            Ok((
-                action,
-                TreeFileOutcome {
-                    path: (*path).clone(),
-                    disposition,
-                    mode: file.mode,
-                },
-            ))
-        })
-        .collect::<Result<Vec<_>, PackageTreeCaptureError>>()?;
-
-    let removals = base
-        .entries()
-        .iter()
-        .filter(|(path, _)| capture.contains(path) && !published.contains_key(*path))
-        .map(|(path, entry)| match entry {
-            RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => Ok(None),
-            RepositoryEntry::File { mode, .. } => Ok(Some((
-                RepositoryAction::DeleteFile {
-                    path: path.clone(),
-                    owner: CAPTURE_OWNER.to_string(),
-                    expected: ExpectedPreimage::of(entry),
-                },
-                TreeFileOutcome {
-                    path: path.clone(),
-                    disposition: TreeFileDisposition::Remove,
-                    mode: *mode,
-                },
-            ))),
-            _ => Err(PackageTreeCaptureError::UnsafeOccupant(
-                path.repository_relative(),
-            )),
-        })
-        .collect::<Result<Vec<_>, PackageTreeCaptureError>>()?;
-
-    let (removal_actions, removal_outcomes): (Vec<_>, Vec<_>) =
-        removals.into_iter().flatten().unzip();
-    let (write_actions, write_outcomes): (Vec<_>, Vec<_>) = writes.into_iter().unzip();
-    let outcomes = write_outcomes
-        .into_iter()
-        .chain(removal_outcomes)
-        .collect::<Vec<_>>();
     let actions = created
         .into_iter()
         .flatten()
-        .chain(write_actions.into_iter().flatten())
-        .chain(removal_actions)
+        .chain(
+            written
+                .into_iter()
+                .map(|(path, file)| RepositoryAction::WriteFile {
+                    path,
+                    owner: RepositoryActionOwner::PackageCapture,
+                    expected: ExpectedPreimage::Absent,
+                    bytes: file.bytes.clone(),
+                    mode: file.mode,
+                }),
+        )
         .collect::<Vec<_>>();
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    Ok((MaterializationPlan::new(base, delta), outcomes))
-}
-
-/// The repository identity of one named child of a captured directory.
-fn child_path(directory: &VirtualPath, name: &str) -> Result<VirtualPath, RepositoryLayoutError> {
-    VirtualPath::from_root(
-        directory.root_class(),
-        RootRelativePath::parse(directory.relative().as_path().join(Path::new(name)))?,
-    )
+    Ok(MaterializationPlan::new(base, delta, context)?)
 }

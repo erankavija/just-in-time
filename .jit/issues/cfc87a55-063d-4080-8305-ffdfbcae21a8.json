@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "1ade3e6f-3608-4bd4-a2ba-16e08cd6e042"
+  ],
+  "description": "Add a storage module that reads the configuration files and returns the assembled configuration, move every caller and integration test that loads configuration from disk onto it, and delete the template and invariant registry file loaders, so file reads for declarations live in the storage layer and the declaration modules only parse bytes.\n\n## Background\n\n- The configuration files are read outside storage: `JitConfig::load` (`crates/jit/src/config.rs:1361-1430`) reads a directory's `config.toml`, `templates.toml` and `invariants.toml`. `EffectiveConfig::load` (`config.rs:1503-1507`) calls it on the repository data root, the only configuration layer; `config validate` calls it on the same data root (`crates/jit/src/main.rs:5609-5615`). Its rustdoc (`config.rs:1501-1502`) and `effective_config_snapshot`'s (`crates/jit/src/commands/config.rs:294-295`) claim config I/O lives in the config layer.\n- The storage precedent is `load_ruleset` (`crates/jit/src/storage/ruleset_store.rs:19`), which reads `rules.toml` and the schema files for a data root.\n- Configuration is assembled from bytes by the public assembler in `crate::declarations` (`configuration-assembly`); repository file names come from the `VirtualPath` constants.\n- Callers:\n  - `effective_config_snapshot` (`crates/jit/src/commands/config.rs:296-298`) and the dotted-key lookup beside it call `EffectiveConfig::load`;\n  - claim acquisition calls `JitConfig::load(&paths.local_jit)?.coordination()` for policy limits (`crates/jit/src/commands/claim.rs:108-109`);\n  - `config validate` probes the repository `config.toml` and calls `JitConfig::load` (`crates/jit/src/main.rs:5609-5615`);\n  - the taxonomy fixture test calls `JitConfig::load` (`crates/jit/src/test_utils.rs:2271`).\n- Five integration test files call `JitConfig::load` on a temporary `.jit` directory: `crates/jit/tests/cli_item_validate/invariant_registry_story_tests.rs` (12 calls), `crates/jit/tests/fast_docs_templates/templates_loader_tests.rs` (7), `crates/jit/tests/fast_rules/config_loading_tests.rs` (3: `:47`, `:71`, `:133`), `crates/jit/tests/cli_repo_workflow/project_config_tests.rs` (`:89`) and `crates/jit/tests/fast_docs_templates/archive_path_layout_tests.rs` (`:86`).\n- `crate::declarations` is documented as filesystem-free (`crates/jit/src/declarations/mod.rs:1`), yet `InvariantRegistry::load` (`crates/jit/src/declarations/invariants.rs:144-160`) reads `invariants.toml` and `TemplateRegistry::load` (`crates/jit/src/templates.rs:432-450`) reads `templates.toml`. Once `JitConfig::load` assembles through the assembler (`configuration-assembly`) neither has a production caller. Their remaining test callers: `invariants.rs` `test_load_absent_file_is_empty_registry` (`:310`), `test_load_reads_present_file` (`:317`), `test_load_malformed_file_is_typed_error` (`:331`); `templates.rs` `test_load_missing_file_is_empty_registry` (`:808`), `test_load_valid_file_from_disk` (`:815`), `test_malformed_toml_errors` (`:824`), `test_repo_plan_template_parses` (`:1114`); and `test_config_load_succeeds_with_valid_templates` (`crates/jit/tests/fast_docs_templates/templates_loader_tests.rs:64`, load at `:70`). Both registries keep `from_toml_str` (`templates.rs:451`, `invariants.rs:162`), whose tests own parsing.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/storage/configuration_store.rs` reads a data root's `config.toml`, `templates.toml` and `invariants.toml` and returns the assembler's result; it is exported from `crate::storage`. Its unit tests cover an absent data root file set (empty configuration), a malformed `config.toml`, a malformed `templates.toml` and an unreadable configuration directory, each mapping to the assembler's or an I/O error that names the file.\n- [hard] REQ-02: `EffectiveConfig` in `config.rs` is built from an already-loaded repository configuration and performs no filesystem I/O; the read happens in the storage loader. The callers in `commands/config.rs`, `commands/claim.rs`, `main.rs` and `test_utils.rs` load configuration through the storage loader, and `config show`, `config get`, `config validate` and claim acquisition report the same values and errors as before; their existing suites pass unchanged.\n- [hard] REQ-03: None of the five integration test files calls `JitConfig::load`; each loads through the storage loader, every test keeps its assertions, and each file passes alone and in parallel.\n- [hard] REQ-04: `TemplateRegistry::load` and `InvariantRegistry::load` no longer exist and neither `crates/jit/src/templates.rs` nor `crates/jit/src/declarations/invariants.rs` touches the filesystem. The registry-loader tests listed in Background are deleted where they only re-prove the absent-file or malformed-file mapping the assembler's tests own, or are rewritten over `from_toml_str`; no parsing case is lost.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T14:35:48.009993154Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "cfc87a55-063d-4080-8305-ffdfbcae21a8",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:configuration",
+    "component:core",
+    "component:storage",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-20"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Storage reads configuration files and the registry file loaders are gone",
+  "updated_at": "2026-11-04T14:35:48.009993154Z"
+}

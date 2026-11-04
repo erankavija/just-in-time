@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5f58a9b6ee81c1446e2cead20819e37e3a60fd79",
+  "completed_at": "2026-11-04T13:36:40.564045154Z",
+  "duration_ms": 311677,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md",
+        "id": "F1",
+        "line": 10,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4a01ccba/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The quiet-host remeasurement predates the final injected-clock refactor, so REQ-01 is unverified for the current test."
+      }
+    ],
+    "summary": "The final injected-clock refactor lacks a quiet-host same-method remeasurement, leaving REQ-01 unverified.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2a14530e-209d-4de4-b433-0a5a58bff2a1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:31:28.886943085Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7763 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a6c1-eb85-7a62-9e68-589a5f172ead\n--------\nuser\n--- 7750 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 32843b6ab, b1ed23165, 46301855, 3fedb755, 7360cf535, 5e3f82d8, 65033128, d76de4e9, ff8a8d1a9, 82745633 (`jit:4a01ccba`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a01ccba/requirement/REQ-01, REQ-02, REQ-03 (issue Markdown); @/invariant/orthogonal-tests, essential-code-prose, no-ignored-tests, architecture-dependency-direction, bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T13:30:01Z); code-review failed (exit 1, prior F1)\nTruncation recovery: Narrowed direct reads of registry records, benchmark history, affected tests, and artifact summaries after a broad registry search truncated.\n\n1. **[blocking, issue-impact] F1:** REQ-01 remains unverified for the current test. The quiet-host benchmark at `dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md:10` was committed before `82745633`, which materially replaced the server-bound test’s real-time deadline with `WatchClock`; no later attributable same-method measurement covers that final version. The passing cargo-ci projection does not provide per-test timing output. References: @/issue/4a01ccba/requirement/REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The final injected-clock refactor lacks a quiet-host same-method remeasurement, leaving REQ-01 unverified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The quiet-host remeasurement predates the final injected-clock refactor, so REQ-01 is unverified for the current test.\",\"file\":\"dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md\",\"line\":10,\"references\":[\"@/issue/4a01ccba/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

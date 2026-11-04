@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "30aa04a9ec0415c47f9bc7db6e1ef0f33d69e97c",
+  "completed_at": "2026-11-01T13:39:14.147763521Z",
+  "duration_ms": 228312,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The dirty-path query meets both issue requirements with focused behavior and one-process coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1f3d6c13-312f-455c-8586-0526fa0e502f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:35:25.835308510Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7716310d (`feat(jit:3a3b86cf)`); 30aa04a9 (co-tagged merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3a3b86cf/requirement/REQ-01 and REQ-02 (issue description); @/charter/D-21, D-8, and D-4 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-10 (issue description); @/invariant/architecture-dependency-direction, essential-code-prose, and orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci: passed (exit code none; 2026-11-01T13:35:21Z)\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The dirty-path query meets both issue requirements with focused behavior and one-process coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

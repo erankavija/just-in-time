@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T02:22:35.490203496Z",
+  "context": {},
+  "created_at": "2026-10-29T02:22:10.612875921Z",
+  "dependencies": [],
+  "description": "`jit doc check-links` captures the full bytes of every referenced document in one repository image, so it fails on a repository whose referenced documents total more than the capture byte budget. 55e3d3fd scoped the mutation, repair and validation captures; the link check was not in its scope.\n\n## Background\n\n- Observed in a downstream repository (gf2, at its 2c1ffe89a) with the installed binary built from e371e3a16, which contains 55e3d3fd: `jit doc check-links` fails after about two minutes with `Error: captured 7403685177 bytes but the maximum is 536870912`. `jit recover` and `jit validate` pass on the same tree. That repository references bench logs and receipts up to 60 MB (see 55e3d3fd's background).\n- `read_documents_at_named_versions` (`crates/jit/src/commands/document.rs:1340`) captures through `capture_discovering` over `link_check_capture_spec` (`:1395`), bounded by `LINK_CHECK_CAPTURE_BUDGET` (`:39`, `max_bytes: CAPTURE_MAX_BYTES`).\n- `link_check_capture_spec` requests, for each reference in scope, its working-tree entry and its pinned evidence. `DocumentReferenceRequests::for_reference` (`crates/jit/src/document/reference.rs:73`) makes an unpinned reference request both the working-tree file and its `HEAD` blob, so every unpinned document is read twice. All requested bytes accumulate in one image before any document is checked.\n- From the image, `read_document` (`crates/jit/src/commands/document.rs:1508`) and `pinned_link_targets` (`:1475`) consume content only to scan a pinned reference for links; an unpinned reference is only resolved through `resolve_document_reference`, and its assets and links are checked against the working tree.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit doc check-links` succeeds on a repository whose referenced documents total more than the capture byte budget, and reports the same errors and warnings as before for every reference: a missing document, a broken link, a missing asset and a dangling pinned target are still reported.\n- [hard] REQ-02: The link check reads a referenced document's content only where it consumes it, and does not read an unpinned reference's bytes twice (working tree and `HEAD`).\n- [hard] REQ-03: One owning test proves that a link check over an issue whose referenced non-scanned document exceeds a small capture budget succeeds without reading that document's bytes.",
+  "documents": [],
+  "done_at": "2026-10-29T07:30:10.554343730Z",
+  "first_ready_at": "2026-10-29T02:22:10.612875921Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6e1097b7-f6a6-4c49-8c3f-32b0e47ba4bf",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:30:01.566016049Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6af15079-958f-483e-b2e5-1be88e4ab367",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:28:48.802534743Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "f71504cd-e282-477c-a609-5f7e1c08a36e",
+  "labels": [
+    "type:bug",
+    "component:core",
+    "component:storage",
+    "milestone:v1.0",
+    "per:@/charter/D-19"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Link checks read only the documents they scan for links",
+  "updated_at": "2026-10-29T07:30:10.554343730Z"
+}

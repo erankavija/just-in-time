@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "da05d38aac3dcb9355fe52a6a4d7ac146a068465",
+  "completed_at": "2026-11-01T14:28:27.999753960Z",
+  "duration_ms": 226908,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria and prior findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f82e09a-2b31-4f51-acf3-7d4c87501ab2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8d7adc5b-f2fc-4fa0-9723-2a9fac1b5aaa",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T14:24:41.091424507Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8de95229a, 64975563e, b0ce9a116, e5b57f3d3, 25f48863b, 53144ac9, da05d38a\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-8, @/charter/D-20, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction, @/invariant/atomic-writes, @/invariant/derived-state-coherence (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T14:23:11Z)\nTruncation recovery: reread per-commit patches by path/range, current profile/storage/test paths, and merge parent diffs; unrelated global Git-call hits excluded from the issue impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria and prior findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

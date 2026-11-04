@@ -1,0 +1,48 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T09:23:07.951844266Z",
+  "context": {},
+  "created_at": "2026-11-01T09:23:07.350049670Z",
+  "dependencies": [],
+  "description": "Make CI run the suite with the same runner as `cargo-ci`.\n\n## Background\n\n`.github/workflows/ci.yml:139-143` installs the pinned nextest and validates its config, then `:158` runs `cargo test --workspace` and `:161-163` runs `cargo test --test '*'` in `crates/jit`, which appears to repeat the integration tests the first step ran. `scripts/cargo-ci.sh` runs nextest, so CI and the gate use different runners, and failures can reach one and not the other. The feature- and test-specific runs at `:285` and `:316` may stay.\n\n## Success Criteria\n\n- [hard] REQ-01: CI's test step uses the same pinned nextest invocation as `scripts/cargo-ci.sh`, from one definition.\n- [hard] REQ-02: The duplicate step is gone, or this issue names what it adds that the first lacks.\n",
+  "documents": [],
+  "done_at": "2026-11-01T09:34:21.650435512Z",
+  "first_ready_at": "2026-11-01T09:23:07.350049670Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "workflow-contract-selftest"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "da894e84-e513-4bd1-9fca-128867c2f702",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:31:13.462877640Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3010c7ba-edb8-46a4-a3cf-155cf06cf122",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:33:56.939560248Z",
+      "updated_by": "auto:executor"
+    },
+    "workflow-contract-selftest": {
+      "run_id": "276cb815-5bf3-49f2-aa40-1f44471cf906",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:31:15.975188363Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "4269f866-4107-429d-ae5b-06dfdfd290de",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "CI runs the suite with the same runner as the gate",
+  "updated_at": "2026-11-01T09:34:21.650435512Z"
+}

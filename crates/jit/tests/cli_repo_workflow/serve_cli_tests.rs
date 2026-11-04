@@ -6,8 +6,7 @@
 //! do start a live `jit-server`, and run only when one was built beside the
 //! `jit` binary under test.
 
-use assert_cmd::prelude::*;
-use predicates::prelude::*;
+use jit::test_cli::{jit_binary, JitCli};
 use serde_json::Value;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
@@ -20,9 +19,6 @@ use tempfile::TempDir;
 
 /// Interval between two evaluations of a polled condition.
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
-
-/// Wall-clock ceiling for the `jit init` that seeds one scratch repository.
-const SETUP_BUDGET: Duration = Duration::from_secs(30);
 
 /// Grace period for a process to die once it has been signalled.
 const REAP_GRACE: Duration = Duration::from_secs(5);
@@ -138,43 +134,8 @@ fn read_capture(path: &Path) -> String {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    // The captures live outside the repository being seeded, so `jit init` sees
-    // the empty directory it expects.
-    let capture = TempDir::new().unwrap();
-    let (out, err) = (capture.path().join("out"), capture.path().join("err"));
-
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command.current_dir(temp.path()).arg("init");
-    let mut child = spawn_capturing(&mut command, &out, &err).expect("spawn jit init");
-
-    if !exited_by(&mut child, Instant::now() + SETUP_BUDGET) {
-        let _ = child.kill();
-        let _ = exited_by(&mut child, Instant::now() + REAP_GRACE);
-        panic!(
-            "`jit init` did not finish within {SETUP_BUDGET:?} in {}",
-            temp.path().display()
-        );
-    }
-    let status = child.try_wait().unwrap().expect("exited above");
-    assert!(
-        status.success(),
-        "`jit init` failed with {status}\n--- stdout ---\n{}\n--- stderr ---\n{}",
-        read_capture(&out),
-        read_capture(&err)
-    );
-    temp
-}
-
-fn jit(dir: &TempDir) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(dir.path());
-    cmd
-}
-
-fn write_stale_pid(dir: &TempDir, pid: u32, port: u16) {
-    let jit_dir = dir.path().join(".jit");
+fn write_stale_pid(cli: &JitCli, pid: u32, port: u16) {
+    let jit_dir = cli.root().join(".jit");
     let pid_json = serde_json::json!({
         "pid": pid,
         "port": port,
@@ -269,26 +230,17 @@ fn test_read_capture_keeps_both_ends_of_a_capture_past_the_cap() {
 
 #[test]
 fn test_serve_status_not_running_human() {
-    let temp = setup_repo();
-    jit(&temp)
-        .args(["serve", "--status"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("not running"));
+    let cli = JitCli::initialised().unwrap();
+    assert!(cli
+        .run(["serve", "--status"])
+        .unwrap()
+        .contains("not running"));
 }
 
 #[test]
 fn test_serve_status_not_running_json() {
-    let temp = setup_repo();
-    let output = jit(&temp)
-        .args(["serve", "--status", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let v: Value = serde_json::from_slice(&output).expect("stdout must be valid JSON");
+    let cli = JitCli::initialised().unwrap();
+    let v = cli.run_json(["serve", "--status"]).unwrap();
     assert_eq!(v["status"], "not_running");
 }
 
@@ -296,48 +248,78 @@ fn test_serve_status_not_running_json() {
 
 #[test]
 fn test_serve_stop_not_running_human() {
-    let temp = setup_repo();
-    jit(&temp)
-        .args(["serve", "--stop"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("not running"));
+    let cli = JitCli::initialised().unwrap();
+    assert!(cli
+        .run(["serve", "--stop"])
+        .unwrap()
+        .contains("not running"));
 }
 
 #[test]
 fn test_serve_stop_not_running_json() {
-    let temp = setup_repo();
-    let output = jit(&temp)
-        .args(["serve", "--stop", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let v: Value = serde_json::from_slice(&output).expect("stdout must be valid JSON");
+    let cli = JitCli::initialised().unwrap();
+    let v = cli.run_json(["serve", "--stop"]).unwrap();
     assert_eq!(v["status"], "not_running");
+}
+
+// ── --status and --stop payloads ──────────────────────────────────────────────
+
+#[test]
+fn test_serve_status_and_stop_not_running_payload_is_the_status_document() {
+    let cli = JitCli::initialised().unwrap();
+    for flag in ["--status", "--stop"] {
+        assert_eq!(
+            cli.run_json(["serve", flag]).unwrap(),
+            serde_json::json!({"status": "not_running"}),
+            "{flag}"
+        );
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn test_serve_status_and_stop_of_a_live_server_state_their_payloads() {
+    let cli = JitCli::initialised().unwrap();
+    let mut server = Command::new("sleep").arg("60").spawn().unwrap();
+    write_stale_pid(&cli, server.id(), 3053);
+    let log_file = cli.root().join(".jit/server.log");
+
+    assert_eq!(
+        cli.run_json(["serve", "--status"]).unwrap(),
+        serde_json::json!({
+            "status": "running",
+            "pid": server.id(),
+            "port": 3053,
+            "url": "http://localhost:3053",
+            "log_file": log_file,
+            "started_at": "2024-01-01T00:00:00Z",
+        })
+    );
+    assert_eq!(
+        cli.run_json(["serve", "--stop"]).unwrap(),
+        serde_json::json!({"status": "stopped", "pid": server.id(), "port": 3053})
+    );
+    assert!(exited_by(&mut server, Instant::now() + REAP_GRACE));
 }
 
 // ── stale PID file cleanup ────────────────────────────────────────────────────
 
 #[test]
 fn test_serve_status_cleans_stale_pid() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
     // PID 999999 is almost certainly dead.
-    write_stale_pid(&temp, 999_999, 3050);
+    write_stale_pid(&cli, 999_999, 3050);
 
-    let pid_file = temp.path().join(".jit").join("server.pid.json");
+    let pid_file = cli.root().join(".jit").join("server.pid.json");
     assert!(
         pid_file.exists(),
         "stale pid file should be present before check"
     );
 
-    jit(&temp)
-        .args(["serve", "--status"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("not running"));
+    assert!(cli
+        .run(["serve", "--status"])
+        .unwrap()
+        .contains("not running"));
 
     assert!(
         !pid_file.exists(),
@@ -347,17 +329,16 @@ fn test_serve_status_cleans_stale_pid() {
 
 #[test]
 fn test_serve_stop_cleans_stale_pid() {
-    let temp = setup_repo();
-    write_stale_pid(&temp, 999_999, 3051);
+    let cli = JitCli::initialised().unwrap();
+    write_stale_pid(&cli, 999_999, 3051);
 
-    let pid_file = temp.path().join(".jit").join("server.pid.json");
+    let pid_file = cli.root().join(".jit").join("server.pid.json");
     assert!(pid_file.exists());
 
-    jit(&temp)
-        .args(["serve", "--stop"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("not running"));
+    assert!(cli
+        .run(["serve", "--stop"])
+        .unwrap()
+        .contains("not running"));
 
     assert!(
         !pid_file.exists(),
@@ -369,16 +350,8 @@ fn test_serve_stop_cleans_stale_pid() {
 
 #[test]
 fn test_serve_status_json_has_required_fields_when_not_running() {
-    let temp = setup_repo();
-    let output = jit(&temp)
-        .args(["serve", "--status", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let v: Value = serde_json::from_slice(&output).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    let v = cli.run_json(["serve", "--status"]).unwrap();
     assert!(v.get("status").is_some(), "must have 'status' field");
 }
 
@@ -386,16 +359,9 @@ fn test_serve_status_json_has_required_fields_when_not_running() {
 
 #[test]
 fn test_serve_not_in_mcp_schema() {
-    let temp = setup_repo();
-    let output = jit(&temp)
-        .arg("--schema")
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let schema: Value = serde_json::from_slice(&output).expect("schema must be valid JSON");
+    let cli = JitCli::initialised().unwrap();
+    let schema: Value =
+        serde_json::from_str(&cli.run(["--schema"]).unwrap()).expect("schema must be valid JSON");
     let commands = schema["commands"]
         .as_object()
         .expect("commands must be an object");
@@ -413,16 +379,15 @@ fn test_serve_not_in_mcp_schema() {
 
 #[test]
 fn test_serve_stop_rejects_pid_zero_gracefully() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
     // A PID of 0 is not alive (is_process_alive returns false), so it should
     // be treated as stale and cleaned up rather than attempting to signal it.
-    write_stale_pid(&temp, 0, 3052);
+    write_stale_pid(&cli, 0, 3052);
 
-    jit(&temp)
-        .args(["serve", "--stop"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("not running"));
+    assert!(cli
+        .run(["serve", "--stop"])
+        .unwrap()
+        .contains("not running"));
 }
 
 // ── serve end-to-end: the parent must release the recovery lock ───────────────
@@ -438,8 +403,7 @@ fn test_serve_stop_rejects_pid_zero_gracefully() {
 /// nothing bounds that wait (jit:76a4bd21).
 #[cfg(unix)]
 fn server_binary_beside_jit(case: &str) -> Option<std::path::PathBuf> {
-    let server_bin: std::path::PathBuf =
-        std::path::PathBuf::from(assert_cmd::cargo::cargo_bin!("jit")).with_file_name("jit-server");
+    let server_bin: std::path::PathBuf = jit_binary().with_file_name("jit-server");
     if !server_bin.exists() {
         eprintln!(
             "SKIP: no jit-server at {}, so {case} has no server to spawn. \
@@ -470,12 +434,11 @@ const DAEMON_STOP_BUDGET: Duration = Duration::from_secs(10);
 
 #[cfg(unix)]
 const _: () = assert!(
-    SETUP_BUDGET.as_secs() + DAEMON_START_BUDGET.as_secs() + DAEMON_STOP_BUDGET.as_secs()
-        <= DAEMON_BUDGET.as_secs(),
+    DAEMON_START_BUDGET.as_secs() + DAEMON_STOP_BUDGET.as_secs() <= DAEMON_BUDGET.as_secs(),
     "the daemonizing-start phase budgets must fit inside DAEMON_BUDGET"
 );
 
-/// Runs `jit` with `args` and `envs` in `dir`, capturing its output under
+/// Runs `jit` with `args` and `envs` in `cli`'s repository, capturing its output under
 /// `capture`, and answers with its exit status and captured output.
 ///
 /// `envs` reaches the spawned process alone, so a case setting one does not
@@ -485,18 +448,14 @@ const _: () = assert!(
 /// case here can hold a continuous-integration job open (jit:76a4bd21).
 #[cfg(unix)]
 fn run_jit_capturing(
-    dir: &TempDir,
+    cli: &JitCli,
     args: &[&str],
     envs: &[(&str, &str)],
     capture: &Path,
     deadline: Instant,
 ) -> (Option<std::process::ExitStatus>, String) {
     let (out, err) = (capture.join("out"), capture.join("err"));
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command
-        .current_dir(dir.path())
-        .args(args)
-        .envs(envs.iter().copied());
+    let mut command = cli.command_with_env(args, envs.iter().copied());
     let mut child = spawn_capturing(&mut command, &out, &err).expect("spawn jit");
     if !exited_by(&mut child, deadline) {
         let _ = child.kill();
@@ -529,7 +488,7 @@ fn test_serve_reports_a_started_server_only_once_it_answers() {
     let overall = Instant::now() + DAEMON_BUDGET;
     let phase = |budget: Duration| (Instant::now() + budget).min(overall);
 
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
     let capture = TempDir::new().unwrap();
     let started_capture = capture.path().join("started");
     let stopped_capture = capture.path().join("stopped");
@@ -537,7 +496,7 @@ fn test_serve_reports_a_started_server_only_once_it_answers() {
     std::fs::create_dir_all(&stopped_capture).unwrap();
 
     let (status, output) = run_jit_capturing(
-        &temp,
+        &cli,
         &["serve", "--port", "0", "--json"],
         &[("JIT_LOCK_TIMEOUT", "3")],
         &started_capture,
@@ -555,16 +514,15 @@ fn test_serve_reports_a_started_server_only_once_it_answers() {
 
     // Stop before asserting, so a failing assertion leaves no server running.
     let (stop_status, stop_output) = run_jit_capturing(
-        &temp,
+        &cli,
         &["serve", "--stop", "--json"],
         &[],
         &stopped_capture,
         phase(DAEMON_STOP_BUDGET),
     );
 
-    assert_eq!(
-        status.and_then(|status| status.code()),
-        Some(0),
+    assert!(
+        status.is_some_and(|status| status.success()),
         "`jit serve` must report a start it can stand behind, got: {output}"
     );
     assert_eq!(
@@ -577,9 +535,8 @@ fn test_serve_reports_a_started_server_only_once_it_answers() {
         "the server `jit serve` reported started must be answering on the port \
          it reported: {output}"
     );
-    assert_eq!(
-        stop_status.and_then(|status| status.code()),
-        Some(0),
+    assert!(
+        stop_status.is_some_and(|status| status.success()),
         "the reported server must be stoppable through its record, got: \
          {stop_output}"
     );
@@ -624,10 +581,7 @@ const FG_TEARDOWN_BUDGET: Duration = Duration::from_secs(15);
 /// bound it claims to be.
 #[cfg(unix)]
 const _: () = assert!(
-    SETUP_BUDGET.as_secs()
-        + FG_PORT_BUDGET.as_secs()
-        + FG_SERVING_BUDGET.as_secs()
-        + FG_TEARDOWN_BUDGET.as_secs()
+    FG_PORT_BUDGET.as_secs() + FG_SERVING_BUDGET.as_secs() + FG_TEARDOWN_BUDGET.as_secs()
         <= FG_BUDGET.as_secs(),
     "the foreground-serve phase budgets must fit inside FG_BUDGET"
 );
@@ -710,7 +664,7 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     // is still blocked on the recovery lock and serving nothing. Only a
     // completed HTTP response proves the child adopted the socket and is
     // serving.
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
     let capture = TempDir::new().unwrap();
     let (out_path, err_path) = (capture.path().join("out"), capture.path().join("err"));
 
@@ -718,15 +672,14 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     // `jit-server` child it blocks on, which shares this group in foreground
     // mode — is reaped together; killing only the parent would orphan a live
     // server.
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command
-        .current_dir(temp.path())
-        .args(["serve", "--fg", "--port", "0"])
-        // Bound the pre-fix failure window: a regressed parent that keeps the
-        // lock makes the child give up after this timeout instead of at the
-        // 5s default, so the assertion below fails fast rather than dragging.
-        .env("JIT_LOCK_TIMEOUT", "3")
-        .process_group(0);
+    // `JIT_LOCK_TIMEOUT` bounds the pre-fix failure window: a regressed parent
+    // that keeps the lock makes the child give up after this timeout instead of
+    // at the 5s default, so the assertion below fails fast rather than dragging.
+    let mut command = cli.command_with_env(
+        ["serve", "--fg", "--port", "0"],
+        [("JIT_LOCK_TIMEOUT", "3")],
+    );
+    command.process_group(0);
     let mut child =
         spawn_capturing(&mut command, &out_path, &err_path).expect("spawn jit serve --fg");
     let pgid = child.id();

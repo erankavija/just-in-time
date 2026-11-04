@@ -1,19 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T01:07:35.782511225Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
-    "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
-    "dbbfcd6c-562a-4691-86e7-feb687c79ce5"
+    "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124"
   ],
-  "description": "In a git repository, applying a profile refuses while a path it would write differs from the committed tree, so writing the new rendering never discards an uncommitted local edit; without git it proceeds.\n\n## Background\n\nCharter decision D-8: applying a newer version or other variable values \"refuses while the files it writes carry uncommitted changes, then writes the new rendering, and the adopter keeps local edits through git\". Core commands work without git (`@/charter/D-4`); there the diff command is the comparison to read before applying, so apply proceeds. Initialization over an absent data root has nothing to protect.\n\nNo production code detects uncommitted files today. The test-only `GitRevisionResolver::changed_worktree_paths` is being deleted elsewhere and stays deleted. Git access goes through one storage-owned module that runs the git CLI (`@/charter/D-21`), so the dirty-path query is an operation of that module.\n\nThe refusal is a read check before the mutation session opens. The redo record's preimage comparison remains the concurrency guard.\n\n## Success Criteria\n\n- [hard] REQ-01: In a git repository, apply refuses before publishing when a path it would write differs from HEAD (modified, staged, or untracked).\n- [hard] REQ-02: The refusal is self-explanatory: its message and JSON details name each uncommitted path and state that committing or discarding those changes lets the apply proceed.\n- [hard] REQ-03: Apply proceeds when its target paths are clean, even while unrelated paths are dirty.\n- [hard] REQ-04: Without git, apply proceeds.\n- [hard] REQ-05: Initialization with an absent data root is never refused.\n- [hard] REQ-06: The dirty-path query is an operation of the storage-owned git module and has no other implementation.\n",
+  "description": "In a git repository, applying a profile refuses while a path it would write differs from the committed tree, so writing the new rendering never discards an uncommitted local edit; without git it proceeds.\n\n## Background\n\nCharter decision D-8: applying a newer version or other variable values \"refuses while the files it writes carry uncommitted changes, then writes the new rendering, and the adopter keeps local edits through git\". Core commands work without git (`@/charter/D-4`); there the diff command is the comparison to read before applying, so apply proceeds. Initialization over an absent data root has nothing to protect.\n\nNo production code detects uncommitted files today. The test-only `GitRevisionResolver::changed_worktree_paths` is being deleted elsewhere and stays deleted. Git access goes through one storage-owned module that runs the git CLI (`@/charter/D-21`), so the dirty-path query is an operation of that module.\n\nThe refusal is a read check before publishing, over the write set of the plan apply publishes; a pre-session plan would be a second computation of that set (`@/charter/D-20`). A refusal leaves the repository byte-identical. The redo record's preimage comparison remains the concurrency guard.\n\n## Success Criteria\n\n- [hard] REQ-01: In a git repository, apply refuses before publishing when a path it would write differs from HEAD (modified, staged, or untracked).\n- [hard] REQ-02: The refusal is self-explanatory: its message and JSON details name each uncommitted path and state that committing or discarding those changes lets the apply proceed.\n- [hard] REQ-03: Apply proceeds when its target paths are clean, even while unrelated paths are dirty.\n- [hard] REQ-04: Without git, apply proceeds.\n- [hard] REQ-05: Initialization with an absent data root is never refused.\n- [hard] REQ-06: The dirty-path query is an operation of the storage-owned git module and has no other implementation.\n\n\n## Notes on relocated data roots\n\nEach written path is judged by the checkout that holds it. `WorktreePaths` records the extra checkout once, in the relocated case. The case of a worktree and a data root in two different checkouts is not judged: no production caller reaches it, because `crates/jit/src/main.rs:1947` is the only production `apply_profiles` caller and its executor's layout comes from the same `WorktreePaths` (`bootstrap.rs:85,126-127`), `commands/claim.rs:716` calls only `repair_derived_state`, and `crates/server/src/main.rs:76` has no profile calls.\n",
   "documents": [],
+  "done_at": "2026-11-01T14:28:59.978842732Z",
+  "first_ready_at": "2026-11-01T14:06:08.388677895Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "69f8bc29-260d-411f-bf2e-3d40f3eddd19",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:24:40.628807704Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8d7adc5b-f2fc-4fa0-9723-2a9fac1b5aaa",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:28:28.282868290Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5f82e09a-2b31-4f51-acf3-7d4c87501ab2",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Refuse a profile apply over uncommitted target changes",
-  "updated_at": "2026-10-21T15:51:08.676092973Z"
+  "updated_at": "2026-11-01T14:28:59.978842732Z"
 }

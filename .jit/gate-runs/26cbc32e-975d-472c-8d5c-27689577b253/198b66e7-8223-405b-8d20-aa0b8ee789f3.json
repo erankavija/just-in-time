@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b0e1c1340db2d0a71f50ce2585d63eba8fa5c198",
+  "completed_at": "2026-10-28T22:56:53.822739213Z",
+  "duration_ms": 272621,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/doc_show_tests.rs",
+        "id": "F1",
+        "line": 183,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/26cbc32e/requirement/REQ-02",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "doc_show_tests and derived_documents_cli_tests call setup_test_repo_with_config, which initializes repositories directly through CommandExecutor rather than the shared CLI process fixture."
+      }
+    ],
+    "summary": "Scoped document tests still use a non-JitCli repository setup helper, violating REQ-02.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "26cbc32e-975d-472c-8d5c-27689577b253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "198b66e7-8223-405b-8d20-aa0b8ee789f3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:52:21.201721225Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15261 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184b6-e5f6-7282-b7c0-a2034dfbe4aa\n--------\nuser\n--- 15248 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 44473693c, ef5080903, b0e1c1340 (`jit:26cbc32e`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml; context issue description\nResolved items: @/issue/26cbc32e/requirement/REQ-01, @/issue/26cbc32e/requirement/REQ-02, @/issue/26cbc32e/requirement/REQ-03, @/issue/26cbc32e/requirement/REQ-04 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: passed, exit 0, 2026-10-28T22:50:56.614981663+00:00\nTruncation recovery: reread attributable patches in bounded per-file ranges; inspected merge-parent diffs and current fixture/helper call sites\n\n1. F1 — **blocking, issue-impact, high**: `doc_show_tests.rs` still calls the external `setup_test_repo_with_config` repository-setup helper at line 183 (and four further call sites); `derived_documents_cli_tests.rs` calls it three more times. That helper directly initializes a repository through `CommandExecutor`, rather than through `JitCli` spawning `jit init`, so wrapping its returned `TempDir` in `JitCli` does not meet REQ-02’s “shared fixture’s” setup requirement. References: `@/issue/26cbc32e/requirement/REQ-02`, `@/invariant/shared-test-contracts`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Scoped document tests still use a non-JitCli repository setup helper, violating REQ-02.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"doc_show_tests and derived_documents_cli_tests call setup_test_repo_with_config, which initializes repositories directly through CommandExecutor rather than the shared CLI process fixture.\",\"file\":\"crates/jit/tests/cli_repo_workflow/doc_show_tests.rs\",\"line\":183,\"references\":[\"@/issue/26cbc32e/requirement/REQ-02\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

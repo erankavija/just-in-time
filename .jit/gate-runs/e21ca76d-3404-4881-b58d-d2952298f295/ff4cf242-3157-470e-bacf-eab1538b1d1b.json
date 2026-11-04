@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cc3344730446e0406ea68f183660b8026e8f6fbe",
+  "completed_at": "2026-10-27T01:13:02.936812461Z",
+  "duration_ms": 266052,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared manifest derivation, custom-kind identification, and removal of shipped-kind copies satisfy all hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e21ca76d-3404-4881-b58d-d2952298f295",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff4cf242-3157-470e-bacf-eab1538b1d1b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T01:08:36.884023851Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 93ae31bd2, 8a105a0fc, 8b3737e92, 3e0e87e1f, 8ea479b54 (`jit:e21ca76d`), individually inspected\nPolicy sources: AGENTS.md\nResolved items: @/issue/e21ca76d/requirement/REQ-01–REQ-03 and @/issue/c780514e/requirement/REQ-07 (issue descriptions); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T01:07:10Z); prior code-review F1 verified addressed\nTruncation recovery: narrowed broad registry/merge reads to manifest, helper, affected test ranges, and per-path merge deltas\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared manifest derivation, custom-kind identification, and removal of shipped-kind copies satisfy all hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

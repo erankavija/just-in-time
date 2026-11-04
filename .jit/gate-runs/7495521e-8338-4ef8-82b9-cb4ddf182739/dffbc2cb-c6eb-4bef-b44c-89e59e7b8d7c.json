@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:15:50.652142247Z",
+  "duration_ms": 50052,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The declared standards-fix self-test gate and its current inputs satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7495521e-8338-4ef8-82b9-cb4ddf182739",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dffbc2cb-c6eb-4bef-b44c-89e59e7b8d7c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:15:00.599697460Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4297c94df97007d5f6cfe538a87aa8cf140122f2 (`jit:7495521e`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/standards-fix-test (.jit/gates.toml); @/charter/D-2, @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-10 (issue description)\nGate evidence: cargo-ci: passed (exit code none, 2026-10-24T23:14:45Z); standards-fix-test: passed (exit code 0, 2026-10-24T23:14:23Z)\nTruncation recovery: targeted tracked-policy lookup plus bounded gate, script dependency, projection, and current-tree reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The declared standards-fix self-test gate and its current inputs satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

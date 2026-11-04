@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0a6e521d411d1912aa1a0693240a27e1e5ff7efa",
+  "completed_at": "2026-10-31T23:48:22.768397919Z",
+  "duration_ms": 83882,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied: both suites and module declarations are absent, the projection suite owns the bindings and dual-form parity, and live source/document citations are removed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "89f517a5-73b0-4fb2-b212-262055f27970",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0a504295-ba0e-4dd5-acf3-63452abc3a2b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:46:58.885435596Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fa0eda173, e7571bc2, 0a6e521d (jit:89f517a5)\nPolicy sources: AGENTS.md\nResolved items: @/issue/89f517a5/requirement/REQ-01, REQ-02, REQ-03 and @/issue/c780514e/requirement/REQ-01 (.jit issue sources); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci — passed, exit 0, 2026-10-31T23:41:56.121139147+00:00\nTruncation recovery: inspected tagged commits by path; re-read deletion, current projection, schema, module, and live-source/document searches separately; merge-only list-envelope changes were outside this issue’s impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied: both suites and module declarations are absent, the projection suite owns the bindings and dual-form parity, and live source/document citations are removed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

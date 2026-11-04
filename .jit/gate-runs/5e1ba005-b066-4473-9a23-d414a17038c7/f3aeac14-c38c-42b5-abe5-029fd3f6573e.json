@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b26136a03e8d70d2144ac085bc6f64b04fd73639",
+  "completed_at": "2026-11-04T02:50:38.034096814Z",
+  "duration_ms": 235660,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change satisfies the archive evidence-read criteria and removes the duplicate archive event-log reader.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5e1ba005-b066-4473-9a23-d414a17038c7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f3aeac14-c38c-42b5-abe5-029fd3f6573e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:46:42.373893469Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 484c664ebe6ecc51c88ded6936377b425f5e8197 (`jit:5e1ba005`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-09, REQ-10 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T02:44:30Z)\nTruncation recovery: Narrow reads recovered all affected patches and governing sources after the broad item-source search truncated.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change satisfies the archive evidence-read criteria and removes the duplicate archive event-log reader.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

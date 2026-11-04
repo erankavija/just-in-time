@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:38:28.163830549Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Decode label-reference assertion configuration into a typed form when rules load.\n\n## Background\n\nGraph assertions `LabelCoverage`, `LabelReference` and `DependencyShape` hold raw `toml::value::Table` payloads (`crates/jit/src/declarations/rules.rs:577-590,923-927`), and evaluation reads their keys on each call, so a malformed rule surfaces only during evaluation. Typed `Raw*` structs lowered at load are the existing pattern (`rules.rs:940-1089`), and `RuleConfigError::InvalidAssertion` names the rule. Rule serialization renders the tables with `render_config_table` (`repository_state/rule_serialize.rs:267-275,366-396`). Label-reference keys are read in `validation/graph.rs`, and `test_label_reference_missing_key_is_config_error` (`graph.rs:3042`) reaches evaluation with a malformed table.\n\n## Success Criteria\n\n- [hard] REQ-01: `LabelReference` holds a typed configuration, with its reference scope as an enum, and no raw table.\n- [hard] REQ-02: A malformed label-reference assertion fails rule loading with an error naming the rule, and the evaluation-time error path is gone.\n- [hard] REQ-03: Rule serialization emits the same keys for a typed label-reference assertion.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:56:06.087739830Z",
+  "first_ready_at": "2026-10-25T04:37:09.887064807Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9a26e9e9-26f0-4b90-9853-62fd1c20721a",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:53:21.528181306Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "40c2c79d-bf85-465c-a173-675c24169da6",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:55:35.852986322Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "af9c277d-a906-460d-9d96-6ae3ae0bf124",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Label-reference assertions are typed at load",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T04:56:06.087739830Z"
 }

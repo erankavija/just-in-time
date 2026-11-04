@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T23:45:24.803257690Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Move the blocked-transition and startup-envelope cases that only the exit-code suite tests into the error-envelope suites.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:312` and `:405`: a transition blocked by gates, human and JSON. They assert the `BLOCKED` details (`requested_state`, `actual_state`, gate blockers) and remediation commands (`gate evaluate`, `gate status-all`, `gate status --all`).\n- `:493` and `:559`: a transition blocked by dependencies, JSON and human remediation text.\n- `:605`: a missing dependency, whose blocker state is `missing`.\n- `:1488`, `:1512` and `:1528`: startup envelopes. Repository-not-found emits `REPOSITORY_NOT_FOUND` under `--json` and empty stdout without it; a format that is too new emits `REPOSITORY_FORMAT_TOO_NEW`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test with the same non-exit assertions. The blocked transitions live in `cli_issue/error_json_tests.rs` and the startup envelopes in `cli_issue/top_level_failure_envelope_tests.rs`.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
   "documents": [],
+  "done_at": "2026-10-29T07:09:43.350673601Z",
+  "first_ready_at": "2026-10-28T23:30:31.177501408Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "babb7797-4c13-46a4-9b0f-196a9935a925",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:05:47.604178141Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fdf2094f-ee00-4aa5-89ab-6edf02c5c39a",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:09:20.999874885Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "55cd1ae4-9957-4724-af8d-1219dfbe477b",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Blocked-transition and startup envelope cases move beside their owners",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-29T07:09:43.350673601Z"
 }

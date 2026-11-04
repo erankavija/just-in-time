@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T16:48:16.951675351Z",
+  "context": {},
+  "created_at": "2026-11-01T16:48:15.717312131Z",
+  "dependencies": [],
+  "description": "`jit issue reject` leaves a dependent in `backlog` when it removes the dependent's last blocker, so the dependent never becomes available and `jit validate` fails on the repository.\n\n## Background\n\nReproduced on a fresh repository with the installed binary and with main's build: create a blocker and a dependent, add the edge, run `jit issue reject <blocker> --reason obsolete`, and the dependent stays `backlog`. `Rejected` is a terminal state, so the dependency is met. It surfaced in this repository: rejecting 627fdcc4 left cc6ef886 in `backlog` and 9c008d2d's validation refused the repository.\n\nClosing an issue promotes its dependents through `check_auto_transitions`; `reject_issue` does not reach it. da12ad66 made `jit issue reject` the only rejection form, so this is now the only path.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit issue reject` publishes the rejection and the promotion of each dependent whose last blocker it removes through one redo record (`@/inv/derived-state-coherence`), and `jit validate` passes afterwards. A test proves an interruption leaves either the prior state or a record the next session completes.\n- [hard] REQ-02: Rejection derives those promotions inside its own plan through the path deletion uses (`derive_issue_deletion`), with no second derivation (`@/charter/D-20`).\n- [hard] REQ-03: A harness test owns REQ-01.\n\n## Notes\n\n- This must land before the format 3 window: its binary carries 9c008d2d's stricter validation, so every rejection would otherwise break `jit validate` in every repository.\n",
+  "documents": [],
+  "done_at": "2026-11-01T17:46:17.328429685Z",
+  "first_ready_at": "2026-11-01T16:48:15.717312131Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6d15c882-a7e3-414a-af02-b9db82ed9714",
+      "status": "passed",
+      "updated_at": "2026-11-01T17:42:45.331814055Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "283640d0-2cda-432f-b6fb-d6cc5ededcc5",
+      "status": "passed",
+      "updated_at": "2026-11-01T17:45:57.559148234Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "cba1bff8-58ec-4102-b56a-96d767ac05a2",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Rejecting an issue does not promote its dependents",
+  "updated_at": "2026-11-01T17:46:17.328429685Z"
+}

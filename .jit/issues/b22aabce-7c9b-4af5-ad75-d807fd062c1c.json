@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T21:44:13.294998553Z",
+  "context": {},
+  "created_at": "2026-11-04T19:09:02.971448978Z",
+  "dependencies": [],
+  "description": "The `jit` crate's integration tests build as one or two cohesive test suites instead of nine, so each build links far fewer copies of the crate and its dependencies (`@/inv/bounded-rust-build-footprint`).\n\n## Background\n\n`crates/jit/tests/` holds nine integration test targets: `cli_gate`, `cli_issue`, `cli_item_validate`, `cli_query_graph`, `cli_repo_workflow`, `fast_docs_templates`, `fast_issue`, `fast_rules` and `scratch_build`. Each target links its own executable of about 115 MB. The build-budget step reported `integration-targets=10/12` for the workspace on 2026-11-04.\n\n## Success Criteria\n\n- [hard] REQ-01: The `jit` crate declares at most two integration test targets, each a cohesive suite with its former targets as modules.\n- [hard] REQ-02: Every test that ran before runs after. The nextest test count for the workspace is unchanged, with any renamed paths listed, and no test is ignored or filtered out.\n- [hard] REQ-03: The integration-target budget in `scripts/rust-build-budget.sh` is lowered to the new workspace count, and the executable-bytes figure before and after is recorded in the build-budget README.\n- [hard] REQ-04: Test isolation is unchanged. Every test still passes alone, in any order and in parallel, and no test depends on running in a separate process from another former target.\n- [hard] REQ-05: `dev/TESTING.md`'s focused test commands name the new targets.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T19:09:02.971448978Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b22aabce-7c9b-4af5-ad75-d807fd062c1c",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "type:task"
+  ],
+  "priority": "critical",
+  "state": "in_progress",
+  "title": "The jit crate's integration tests build as one or two suites",
+  "updated_at": "2026-11-04T21:44:13.294998553Z"
+}

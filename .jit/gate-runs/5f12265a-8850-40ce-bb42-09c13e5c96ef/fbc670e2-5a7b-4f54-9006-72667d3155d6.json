@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "61cdc4ec4973dedaa553b7844deed46714700dae",
+  "completed_at": "2026-11-04T20:48:47.397683275Z",
+  "duration_ms": 141328,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are implemented and the prior WebAssembly-pruning finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f12265a-8850-40ce-bb42-09c13e5c96ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fbc670e2-5a7b-4f54-9006-72667d3155d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T20:46:26.069412350Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 27f5fa4c6, dc6ee8170\nPolicy sources: AGENTS.md\nResolved items: @/issue/5f12265a/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/gate/worktree-cache-test (.jit/gates.toml, registry-first); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml, registry-first)\nGate evidence: worktree-cache-test: passed (exit 0, 2026-11-04T20:46:07Z)\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are implemented and the prior WebAssembly-pruning finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

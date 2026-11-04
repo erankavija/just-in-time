@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -51,7 +51,7 @@
           "short_id": "81664a6a",
           "title": "Storage-owned git module with a one-process probe",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "merged_regate_pending",
           "external_blockers": []
         },
         {
@@ -136,7 +136,7 @@
           "short_id": "4ba18af4",
           "title": "One head lookup in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "reviewed_unmerged_on_branch",
           "external_blockers": []
         },
         {
@@ -497,7 +497,12 @@
     "7aafec83": 1,
     "81664a6a": 1
   },
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "issue": "81664a6a",
+      "note": "Remaining git-spawning sites outside storage/git.rs are not marked as tracked exceptions; only layout detection (until 07663984) is. A reviewer may hold other sites to @/inv/convention-convergence; each is migrated by its own issue in this epic."
+    }
+  ],
   "reconciled_after_breakdown": [
     "5046408a"
   ],
@@ -546,7 +551,20 @@
       "effort": "xhigh",
       "tier": "low",
       "reason": "One test moves from libgit2 onto the fixture."
+    },
+    {
+      "issue": "4ba18af4",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "tier": "low",
+      "reason": "Well-specified module primitive with exact criteria."
     }
   ],
-  "dispatch_policy": "Alternate implementation dispatches between Claude sub-agents and Codex workers (user instruction relayed by just-in-time-05); tier within each family by difficulty. Codex workers cannot commit; the lead reviews and commits."
+  "dispatch_policy": "Alternate implementation dispatches between Claude sub-agents and Codex workers (user instruction relayed by just-in-time-05); tier within each family by difficulty. Codex workers cannot commit; the lead reviews and commits.",
+  "session_end": {
+    "date": "2026-10-24",
+    "reason": "user wind-down",
+    "main_red": "cli_gate test_issue_show_errors_on_corrupt_gate_run since df129d9e 46a747fc2; just-in-time-db fixing"
+  }
 }

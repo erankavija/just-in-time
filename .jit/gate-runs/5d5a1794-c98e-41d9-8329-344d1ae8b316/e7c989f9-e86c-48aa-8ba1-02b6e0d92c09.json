@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9f219fcdf04f2f0a83c7249d3479644651d5ebe0",
+  "completed_at": "2026-11-04T00:46:59.389650629Z",
+  "duration_ms": 223723,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior output-parity finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5d5a1794-c98e-41d9-8329-344d1ae8b316",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e7c989f9-e86c-48aa-8ba1-02b6e0d92c09",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:43:15.666030469Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 93de2cd20, 8c06e8bff, 4b2dd390f, 488364248, 933d03a5f, d5b5aaa48, 8237deeb, dca468d0e, f08485991\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-20, @/charter/D-22 — dev/vision/9db27a3a-charter.md; @/issue/5d5a1794/requirement/REQ-01, @/issue/5d5a1794/requirement/REQ-02, @/issue/5d5a1794/requirement/REQ-03, @/issue/5d5a1794/requirement/REQ-04, @/issue/5d5a1794/decision/D-01 — .jit/issues/5d5a1794-c98e-41d9-8329-344d1ae8b316.json; @/issue/9876a23a/requirement/REQ-13 — .jit/issues/9876a23a-8535-45ad-83f8-ca237f017e70.json; @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests — .jit/invariants.toml\nGate evidence: cargo-ci: passed (exit 0, 2026-11-04T00:42:09.965000451+00:00)\nTruncation recovery: Re-read truncated tagged patches by commit and affected path; used narrow current-source and usage searches for creation output and captured graph evaluation.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior output-parity finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3ff7246e7f6fd7f557dabb5ca86f7aea2e964af3",
+  "completed_at": "2026-11-01T13:54:49.091580870Z",
+  "duration_ms": 196631,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/cli.rs",
+        "id": "F1",
+        "line": 960,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/5f71a48d/requirement/REQ-02",
+          "@/invariant/label-format"
+        ],
+        "severity": "high",
+        "summary": "--remove-label splits comma-containing malformed labels, preventing their removal even when stored."
+      }
+    ],
+    "summary": "One issue-impact defect remains: malformed labels containing commas cannot be removed.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f71a48d-16d4-442d-96e4-1fa10f4aed80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "abf02a55-9036-4eeb-8435-721c71f377e2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:51:32.460454792Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2949 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19761-3515-7e52-a8ba-3600b989acc1\n--------\nuser\n--- 2936 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8ffd504de, aae8ed2b, 3ff7246e (jit:5f71a48d)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/rules.toml; .jit/gates.toml\nResolved items: @/issue/5f71a48d/requirement/REQ-01–REQ-04 (.jit issue description); @/invariant/label-format, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/rule/label-format (.jit/rules.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T13:49:49Z); code-review pending\nTruncation recovery: Re-read 8ffd504de by code, test, and documentation paths after the merge output truncated; the merge’s unrelated second-parent paths are outside this issue’s impact cone.\n\n1. [blocking][issue-impact] `--remove-label` still cannot remove a malformed stored label containing a comma. The CLI declares `value_delimiter = ','` at `crates/jit/src/cli.rs:960`, so an exact label such as `resolution:not needed, see x` is split before removal; the update then fails for the fragments despite the original label being present. The attributable test at `crates/jit/tests/cli_item_validate/type_hierarchy_fix_tests.rs:63` explicitly codifies this failure. This violates REQ-02’s requirement to remove a present malformed label. References: @/issue/5f71a48d/requirement/REQ-02, @/invariant/label-format.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact defect remains: malformed labels containing commas cannot be removed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"--remove-label splits comma-containing malformed labels, preventing their removal even when stored.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":960,\"references\":[\"@/issue/5f71a48d/requirement/REQ-02\",\"@/invariant/label-format\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

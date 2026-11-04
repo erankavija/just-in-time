@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "661c51e71b79177ecc4bebf159be28c3e06fb851",
+  "completed_at": "2026-11-01T15:52:58.300228315Z",
+  "duration_ms": 320169,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "mcp-server/test-integration.js",
+        "id": "F1",
+        "line": 597,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/a5fbec12/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "REQ-05 is materially unverified: mcp-ci is pending with no recorded run, so the MCP integration suite has no passing evidence for the unified apply output."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/profile/application.rs",
+        "id": "F2",
+        "line": 31,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The Publish-mode comment says conflicts publish the rest, but the shared run rejects the selection before SessionStep::Apply; correct the misleading contract."
+      }
+    ],
+    "summary": "MCP integration success remains unverified; one advisory comment contradicts the implementation.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a5fbec12-fa6a-4684-994b-5fd0652471e3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b31bc27e-3e05-43a1-b429-5a2bf1401a4a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:47:38.130302685Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9339 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197cb-7f24-7900-95f1-652499784827\n--------\nuser\n--- 9326 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 861152c75; 661c51e71\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/a5fbec12/requirement/REQ-01..REQ-05 (issue success criteria); @/issue/3d9a0ce3/requirement/REQ-07, REQ-12 (issue success criteria); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-11-01T15:47:35Z; exit code unavailable); code-review pending; mcp-ci pending with no run\nTruncation recovery: reread 861152c75 patches by file/chunk; inspected 661c51e71 first-parent patch hunks and current affected source/test ranges\n\n1. **Blocking, issue-impact:** REQ-05 remains materially unverified. `mcp-ci` has no recorded run, so there is no passing evidence for the MCP integration test covering unified dry-run/apply output at `mcp-server/test-integration.js:597`. Reference: @/issue/a5fbec12/requirement/REQ-05.\n\n2. **Advisory, issue-impact:** `ProfileRunMode::Publish` says it will “publish the rest” after refusing an unpublishable decision, but the shared run errors before `SessionStep::Apply`; correct this misleading contract comment. Reference: @/invariant/essential-code-prose.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"MCP integration success remains unverified; one advisory comment contradicts the implementation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-05 is materially unverified: mcp-ci is pending with no recorded run, so the MCP integration suite has no passing evidence for the unified apply output.\",\"file\":\"mcp-server/test-integration.js\",\"line\":597,\"references\":[\"@/issue/a5fbec12/requirement/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The Publish-mode comment says conflicts publish the rest, but the shared run rejects the selection before SessionStep::Apply; correct the misleading contract.\",\"file\":\"crates/jit/src/profile/application.rs\",\"line\":31,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

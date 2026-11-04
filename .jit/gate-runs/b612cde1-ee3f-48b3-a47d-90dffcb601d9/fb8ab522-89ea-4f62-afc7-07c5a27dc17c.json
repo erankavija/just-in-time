@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dc3d63f6f172cd4916504b23ba61defaad4624f7",
+  "completed_at": "2026-10-27T00:14:56.175448078Z",
+  "duration_ms": 250807,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All affected test fixture bindings now use crate::test_utils::fixture_issue, with assertions otherwise unchanged.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b612cde1-ee3f-48b3-a47d-90dffcb601d9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fb8ab522-89ea-4f62-afc7-07c5a27dc17c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:10:45.367992635Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a12a1dff2, a0b4733ee (clean merge; same six-file patch)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/c780514e/requirement/REQ-06 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-10-27T00:10:23Z (exit code unavailable); code-review pending/unrun\nTruncation recovery: recovered the initially truncated aggregate patch with bounded per-file diffs for all six affected files; merge first-parent patch matched the implementation commit\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All affected test fixture bindings now use crate::test_utils::fixture_issue, with assertions otherwise unchanged.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

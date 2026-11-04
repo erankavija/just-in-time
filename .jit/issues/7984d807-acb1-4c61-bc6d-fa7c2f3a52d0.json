@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T08:33:45.973235503Z",
+  "context": {},
+  "created_at": "2026-11-01T08:30:44.045675451Z",
+  "dependencies": [],
+  "description": "Stop `test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains` depending on the git state of the directory it runs in.\n\n## Background\n\n`enforce_main_only_operations` reads the repository of the process's working directory. The test failed in a clone whose `origin/main` had moved ahead of its checkout, and `cli_gate` passed 139/139 once that remote was removed. `@/inv/orthogonal-tests` requires a test to build the state it reads in storage it owns.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace suite passes whatever the git state of the checkout that runs it, with the evidence of a run from a checkout whose `origin/main` is ahead.\n- [hard] REQ-02: `enforce_main_only_operations`, `check_branch_divergence` and `validate_branch_drift` act on the repository they serve, and so does any other production git spawn in `commands/` found reading the process's cwd instead. A target repository without git still skips the guard (`@/charter/D-4`).\n- [hard] REQ-03: One test over repositories it owns, with no cwd change, proves the wrong-refusal and bypass cases and that `validate_branch_drift` follows the same repository.\n\n\n\n## Evidence\n\nAt `b27d75188`, on a base of `fbb99eb7c`, from a clone whose `origin/main` is ahead: the whole workspace passes `cargo nextest run` 4649/4649 and doctests 25/25.\n\n13 production git spawns in `commands/`: 5 read the cwd and are fixed (`worktree.rs` 3, `validate.rs` 2), and 8 already pass an explicit root. Of those 8, `claim.rs` (3) and `init.rs` (1) use the layout's worktree root, which is the invocation's directory for a store outside git under `JIT_DATA_DIR`. `validate --branch-drift` without git reports an error rather than skipping, since it is an explicit check rather than a guard.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:55:16.107204267Z",
+  "first_ready_at": "2026-11-01T08:30:44.045675451Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d7bc47c3-7c67-47a2-ab2b-b91fd335d83b",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:52:07.405512809Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2c0639cc-249a-4772-b4fd-f8e128e83810",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:54:41.893669766Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "7984d807-acb1-4c61-bc6d-fa7c2f3a52d0",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Git guards act on the repository they serve, not the process's cwd",
+  "updated_at": "2026-11-01T08:55:16.107204267Z"
+}

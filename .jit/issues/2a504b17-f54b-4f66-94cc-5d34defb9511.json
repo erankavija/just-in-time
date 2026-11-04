@@ -1,0 +1,35 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:21:22.199002466Z",
+  "context": {},
+  "created_at": "2026-11-01T15:20:45.314454897Z",
+  "dependencies": [
+    "c47d78c8-f74b-4659-9d48-e5cbb50b1bab"
+  ],
+  "description": "Cross all four repositories to format 3 in one window: this one, mealie-fi, inflected-messages and gf2.\n\n## Background\n\nc47d78c8 makes the binary accept exactly format 3 (`@/inv/canonical-cutover`). An older binary and a newer one each refuse the other's repository, so install and rewrites happen together, with no sessions mid-gate. One script outside the product rewrites `index.json` to `{deleted_ids, schema_version: 3}` and drops event lines with retired tags, committed explicitly in each repository. There is no migration code. Unmerged gf2 branches are refused until they merge main; that refusal is the intended result.\n\n## Success Criteria\n\n- [hard] REQ-01: All four repositories carry the explicit rewrite commit, with `jit validate` passing before (old binary) and after (new binary), and each SHA recorded here.\n- [hard] REQ-02: Before the window, the script runs on a clone at gf2's current main, each of the 20 predicted-conflict branches merged with main using the resolution rule (take main's index, union `deleted_ids`), and `jit validate` on each result with the exact-version binary. The 8 stale branches run for information. Results and script go to the invoker.\n- [hard] REQ-03: gf2's owner approval is recorded before gf2 crosses.\n\n## Notes\n\n- 3d9a0ce3 depends on this issue, so the epic does not close until all four have crossed.\n- `dev/active/9c9ac88e/subsample-repo.py` and `bench.sh` read `all_ids` and break after the rewrite.\n\n\n\n## research\n\n`~/Projects/research` converts after the window, by a one-off script outside the product in a separate commit: reserialize records, map `gates.json` and the config, repair 39 `gates_status.*.updated_by` values and 40 `gate_passed` events holding a bare `lead`. The config and gates mapping goes to the invoker before it is committed. Stage named `.jit` paths only, and leave `dev/active/329a77f0-v0.2-showcase.html` alone. Until then, `jit query all` and `jit issue list` fail there by design (03ce8d2c).\n\n`~/Projects/jit-test-project` and `~/Projects/.jit-bench-probe` were deleted at the user's direction.\n\n\n\n## Result\n\nWindow ran 2026-11-01 20:10-20:13, approved by the user in the running session: just-in-time `5ebfe1d7c`, mealie-fi `4c0c509d5`, inflected-messages `5738b57`, gf2 `8c0da4457`. `jit validate` passed before and after in each, with 0 duplicate event ids and marker 3. gf2 keeps its pre-existing single DAG-label warning. Rollback binaries: `~/.cache/jit-format3-rollback.dQLcTD`.\n\n## Stale gf2 branches\n\nClone test over all 69 unmerged gf2 branches, against a scripted `082a9c27b` with non-index conflicts taking main's side; a rerun against `8c0da4457` follows. 46 of 65 with a `.jit` had zero duplicates and passed validate, and 4 have no `.jit`. Merging these with main adds duplicate event ids from the rewrite (rewritten / unrewritten control): `6dfb1b5e` and `86185f88` 64/0, `7cc591a0` 143/0, `bc6155fa` and `e1d45c20` 48/0, `0a357f94` and `b64dc9c4` 290/38, `85fc5ff4` and `c04dd4ac` 363/111, `9fb40c83` 300/48, `b9302771` 257/5. The last six, plus `formal-verification` (735/735) and `cad241e6` (3045/3045), also fail validate on old event shapes. All are treated as stale: no worktree, last commits between 2026-04-03 and 2026-09-18, ruled by the invoker, and kept, because they are the owner's. If one is ever revived: duplicates appear after a union merge, so re-derive `.jit/events.jsonl` from main plus the branch's own lines, by hand.\n\n## research result\n\n`~/Projects/research` crossed to format 3 at `9c581bd`, using `dev/active/2a504b17/research-format3-rewrite.py`, committed here at `4e326edb5` and `42188bfc2`. On the real repository after the commit: `jit validate` rc 0, `jit query all` lists 76 issues, 0 duplicate event ids in 1080 lines. Decoded records match the originals except for key order, 39 issue and 40 event actors set to `agent:lead`, and 152 issue timestamps respelled with `Z`; 449 gate runs are unchanged and stay gitignored there.\n\n`rules.toml` carries the default rows plus `type-required`, `priority-allowed-values`, `resolution-allowed-values` and `milestone-version-pattern`, each seen firing on a copy. `namespace-registry` is `enforce = true` to keep refusing an undeclared namespace at write time; the shipped row is `enforce = false`. `type:bug`, `spike` and `chore` stay outside the hierarchy, so they fail validate. No gate was run. Stale `jit gate pass` and `jit gate check` text remains in that repository's README, `CONTRIBUTING.md` and `scripts/ai-review.sh`. The default-rule finding is c92f4011.\n\n`research` declares no orphaned-leaf or strategic-consistency warning rule. The invoker ruled them out: `warn_orphaned_leaves` and `warn_strategic_consistency` were advisory and commented out in its config, and the old binary's default was not checked.\n",
+  "documents": [],
+  "done_at": "2026-11-01T19:52:02.935912170Z",
+  "first_ready_at": "2026-11-01T15:20:45.314454897Z",
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "4b3305d1-eb61-4a62-8197-d901836dcad5",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:51:47.065482441Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "2a504b17-f54b-4f66-94cc-5d34defb9511",
+  "labels": [
+    "component:storage",
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Rewrite other repositories' index to format 3",
+  "updated_at": "2026-11-01T19:52:02.935912170Z"
+}

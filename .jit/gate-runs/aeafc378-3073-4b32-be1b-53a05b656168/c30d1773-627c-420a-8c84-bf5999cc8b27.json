@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a492e2d1deb1fcc1e7ad9d02d5b577532a086e53",
+  "completed_at": "2026-11-01T15:42:29.276670285Z",
+  "duration_ms": 125414,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior net-line finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "aeafc378-3073-4b32-be1b-53a05b656168",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c30d1773-627c-420a-8c84-bf5999cc8b27",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:40:23.862118733Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8103e370b, b5b621755, 59f359cfa, 0ea91b1a, 9267b2161, a492e2d1d\nPolicy sources: AGENTS.md\nResolved items: issue REQ-01–04 (.jit issue description); @/charter/D-1 and D-21 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence, orthogonal-tests, essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed (exit 1), and its net-line finding is addressed\nTruncation recovery: path-scoped individual commit patches, current-file ranges, and focused policy/source reads\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior net-line finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

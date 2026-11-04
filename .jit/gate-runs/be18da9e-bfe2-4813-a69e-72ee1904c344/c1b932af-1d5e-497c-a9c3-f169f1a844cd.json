@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-ce2bdbb0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d1189898a5b2ebcecb4d1bb1bec87a10c5d66f87",
+  "completed_at": "2026-11-01T00:59:24.433434683Z",
+  "duration_ms": 150736,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Current web types and all five issue-id displays use server-provided short ids; recorded web validation passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "be18da9e-bfe2-4813-a69e-72ee1904c344",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c1b932af-1d5e-497c-a9c3-f169f1a844cd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T00:56:53.696496671Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 00217791e, d1189898a (workflow records only; web-source implementation attribution unavailable)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-03 — .jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json; @/charter/D-18 — dev/vision/9db27a3a-charter.md; @/invariant/semantic-types — .jit/invariants.toml\nGate evidence: npm-ci passed, exit 0, 2026-11-01T00:56:34Z; code-review pending\nTruncation recovery: Re-read item sources, gate definition, source patches, and current affected files narrowly; historical gate stdout and unrelated issue background were outside the impact cone.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Current web types and all five issue-id displays use server-provided short ids; recorded web validation passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,19 +1,11 @@
-use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
+use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan, BlockerCode, EvidenceCode};
 use jit::output::{render_archive_candidates, render_archive_plan};
+use jit::test_cli::JitCli;
+use jit::test_utils::declaration_dir;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit(repo: &TempDir, args: &[&str]) -> std::process::Output {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo.path())
-        .args(args)
-        .output()
-        .unwrap()
-}
 
 fn snapshot_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
     fn visit(root: &Path, current: &Path, result: &mut BTreeMap<String, Vec<u8>>) {
@@ -81,15 +73,6 @@ fn snapshot_tree(root: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
     result
 }
 
-fn assert_success(output: &std::process::Output) {
-    assert!(
-        output.status.success(),
-        "stdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
 /// The type vocabulary these cases name: a container type carrying a
 /// membership namespace, and the leaf beneath it.
 ///
@@ -118,8 +101,8 @@ unique = false
 /// Only the classification changes, and no rule or schema is derived from it,
 /// so a case whose subject is reclassifying an existing repository rewrites the
 /// table in place.
-fn set_documentation_policy(repo: &TempDir, policy: &str) {
-    let path = repo.path().join(".jit/config.toml");
+fn set_documentation_policy(cli: &JitCli, policy: &str) {
+    let path = cli.root().join(".jit/config.toml");
     let mut config = fs::read_to_string(&path)
         .unwrap()
         .parse::<toml::Table>()
@@ -128,38 +111,39 @@ fn set_documentation_policy(repo: &TempDir, policy: &str) {
     fs::write(&path, config.to_string()).unwrap();
 }
 
-/// Initialize `repo` declaring the shared taxonomy and `policy`.
+/// The configuration declaring the shared taxonomy and `policy`.
 ///
-/// The configuration is written before initialization, which preserves it and
-/// derives the coupled rules and schemas from the registry it declares.
-fn initialize_with_policy(repo: &TempDir, policy: &str) {
-    let jit_dir = repo.path().join(".jit");
-    fs::create_dir_all(&jit_dir).unwrap();
-    fs::write(jit_dir.join("config.toml"), format!("{TAXONOMY}\n{policy}")).unwrap();
-    assert_success(&jit(repo, &["init", "--json"]));
+/// A repository initialized over it keeps it and derives the coupled rules and
+/// schemas from the registry it declares.
+fn declared_config(policy: &str) -> String {
+    format!("{TAXONOMY}\n{policy}")
 }
 
-/// A bundle repository that declares no development-root boundary, so its
+/// A bundle repository declares no development-root boundary, so its
 /// `fixtures` area classifies by the managed/permanent split alone.
 ///
 /// The empty `development_root` is deliberate: an omitted key falls back to the
 /// shipped `dev` root, which would place this whole fixture outside the
 /// boundary and retain every artifact, leaving nothing to archive. The tests
 /// whose subject is that boundary configure a real root of their own.
-fn configured_bundle(repo: &TempDir) {
-    initialize_with_policy(
-        repo,
-        r#"
+const BUNDLE_POLICY: &str = r#"
 [documentation]
 development_root = ""
 managed_paths = ["fixtures"]
 permanent_paths = []
 archive_root = "archive"
-"#,
-    );
-    fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
+"#;
+
+/// A repository whose `fixtures` area is managed, with no development-root
+/// boundary.
+const FIXTURES_POLICY: &str = "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n";
+
+/// Write the bundle content the [`BUNDLE_POLICY`] repository archives.
+fn seed_bundle(cli: &JitCli) {
+    let root = cli.root();
+    fs::create_dir_all(root.join("fixtures/bundle/theme")).unwrap();
     fs::write(
-        repo.path().join("fixtures/root.md"),
+        root.join("fixtures/root.md"),
         concat!(
             "[page](bundle/index.html) ",
             "[data](data.csv) ",
@@ -169,24 +153,24 @@ archive_root = "archive"
     )
     .unwrap();
     fs::write(
-        repo.path().join("fixtures/bundle/index.html"),
+        root.join("fixtures/bundle/index.html"),
         r#"<link href="theme/base.css"><img src="image.svg">"#,
     )
     .unwrap();
     fs::write(
-        repo.path().join("fixtures/bundle/theme/base.css"),
+        root.join("fixtures/bundle/theme/base.css"),
         r#"@import "nested.css"; body { background: url("../image.png") }"#,
     )
     .unwrap();
     fs::write(
-        repo.path().join("fixtures/bundle/theme/nested.css"),
+        root.join("fixtures/bundle/theme/nested.css"),
         "a { color: black }",
     )
     .unwrap();
-    fs::write(repo.path().join("fixtures/data.csv"), "name,value\na,1\n").unwrap();
-    fs::write(repo.path().join("fixtures/bundle/image.png"), b"png-bytes").unwrap();
+    fs::write(root.join("fixtures/data.csv"), "name,value\na,1\n").unwrap();
+    fs::write(root.join("fixtures/bundle/image.png"), b"png-bytes").unwrap();
     fs::write(
-        repo.path().join("fixtures/bundle/image.svg"),
+        root.join("fixtures/bundle/image.svg"),
         "<svg viewBox=\"0 0 1 1\"/>",
     )
     .unwrap();
@@ -251,9 +235,8 @@ fn assert_exact_bundle_plan(plan: &Value, expected_target_kind: &str) {
     assert_eq!(plan["target"]["kind"], expected_target_kind);
     assert_eq!(plan["policy_status"], "configured");
     assert_eq!(plan["eligible"], true);
-    assert_eq!(plan["count"], 7);
     assert_eq!(plan["blockers"], serde_json::json!([]));
-    assert_eq!(plan["warnings"], serde_json::json!([]));
+    assert_eq!(plan["plan_warnings"], serde_json::json!([]));
     let (moves, copies, pending_deletions) = if expected_target_kind == "document" {
         (3, 4, 3)
     } else {
@@ -281,7 +264,7 @@ fn assert_exact_bundle_plan(plan: &Value, expected_target_kind: &str) {
                 artifact["action"].as_str().unwrap(),
                 artifact["provenance"].clone(),
                 artifact["blockers"].clone(),
-                artifact["warnings"].clone(),
+                artifact["plan_warnings"].clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -329,7 +312,7 @@ fn assert_human_parity(plan: &Value, human: &str) {
         for blocker in artifact["blockers"].as_array().unwrap() {
             assert!(human.contains(blocker["code"].as_str().unwrap()));
         }
-        for warning in artifact["warnings"].as_array().unwrap() {
+        for warning in artifact["plan_warnings"].as_array().unwrap() {
             assert!(human.contains(warning["code"].as_str().unwrap()));
         }
     }
@@ -337,19 +320,12 @@ fn assert_human_parity(plan: &Value, human: &str) {
 
 #[test]
 fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_without_mutation() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(&repo, &["init", "--json"]).status.success());
-    fs::write(repo.path().join(".jit/config.toml"), "").unwrap();
-    fs::write(repo.path().join("root.csv"), "name,value\na,1\n").unwrap();
-    let before = snapshot_tree(repo.path());
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), "").unwrap();
+    fs::write(cli.root().join("root.csv"), "name,value\na,1\n").unwrap();
+    let before = snapshot_tree(cli.root());
 
-    let json_output = jit(&repo, &["archive", "document", "root.csv", "--json"]);
-    assert!(
-        json_output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&json_output.stderr)
-    );
-    let plan: Value = serde_json::from_slice(&json_output.stdout).unwrap();
+    let plan = cli.run_json(["archive", "document", "root.csv"]).unwrap();
     assert_eq!(plan["schema_version"], 1);
     assert_eq!(plan["target"]["kind"], "document");
     assert_eq!(plan["target"]["path"], "root.csv");
@@ -371,16 +347,14 @@ fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_w
             "count",
             "destination_root",
             "eligible",
+            "plan_warnings",
             "policy_status",
             "schema_version",
             "target",
-            "warnings",
         ]
     );
 
-    let human_output = jit(&repo, &["archive", "document", "root.csv"]);
-    assert!(human_output.status.success());
-    let human = String::from_utf8(human_output.stdout).unwrap();
+    let human = cli.run(["archive", "document", "root.csv"]).unwrap();
     assert!(human.contains("Archive preview: document root.csv"));
     assert!(human.contains("Policy: unconfigured"));
     assert!(human.contains("policy-unconfigured: target"));
@@ -388,30 +362,20 @@ fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_w
     assert!(human.contains(&format!("[{action}] root.csv @ working-tree")));
     assert!(human.contains("Archival execution is disabled"));
 
-    assert_eq!(snapshot_tree(repo.path()), before);
-    assert!(!repo.path().join("archive").exists());
+    assert_eq!(snapshot_tree(cli.root()), before);
+    assert!(!cli.root().join("archive").exists());
 }
 
 #[test]
 fn test_configured_archive_document_and_container_cli_are_exact_deterministic_and_non_mutating() {
-    let repo = TempDir::new().unwrap();
-    configured_bundle(&repo);
-
-    let create = jit(
-        &repo,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Archived fixture",
-            "--type",
-            "epic",
-            "--json",
-        ],
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(BUNDLE_POLICY))]).unwrap(),
     );
-    assert_success(&create);
-    let created: Value = serde_json::from_slice(&create.stdout).unwrap();
-    let id = created["id"].as_str().unwrap().to_string();
+    cli.run(["init", "--json"]).unwrap();
+    seed_bundle(&cli);
+    let id = cli
+        .create_issue(["--title", "Archived fixture", "--type", "epic"])
+        .unwrap();
     for path in [
         "fixtures/root.md",
         "fixtures/bundle/index.html",
@@ -420,67 +384,42 @@ fn test_configured_archive_document_and_container_cli_are_exact_deterministic_an
         "fixtures/bundle/image.png",
         "fixtures/bundle/image.svg",
     ] {
-        assert_success(&jit(
-            &repo,
-            &["doc", "add", &id, path, "--skip-scan", "--json"],
-        ));
+        cli.run(["doc", "add", &id, path, "--skip-scan", "--json"])
+            .unwrap();
     }
-    assert_success(&jit(
-        &repo,
-        &["issue", "update", &id, "--state", "rejected", "--json"],
-    ));
-    let before = snapshot_files(repo.path());
+    cli.run(["issue", "reject", &id, "--json"]).unwrap();
+    let before = snapshot_files(cli.root());
 
     for (args, target_kind) in [
-        (
-            vec!["archive", "document", "fixtures/root.md", "--json"],
-            "document",
-        ),
-        (
-            vec!["archive", "container", id.as_str(), "--json"],
-            "container",
-        ),
+        (["archive", "document", "fixtures/root.md"], "document"),
+        (["archive", "container", id.as_str()], "container"),
     ] {
-        let first = jit(&repo, &args);
-        let second = jit(&repo, &args);
-        assert_success(&first);
-        assert_success(&second);
-        assert_eq!(
-            first.stdout, second.stdout,
-            "JSON preview must be byte stable"
-        );
-        let plan: Value = serde_json::from_slice(&first.stdout).unwrap();
+        let first = cli.run(args.into_iter().chain(["--json"])).unwrap();
+        let second = cli.run(args.into_iter().chain(["--json"])).unwrap();
+        assert_eq!(first, second, "JSON preview must be byte stable");
+        let plan: Value = serde_json::from_str(&first).unwrap();
         assert_exact_bundle_plan(&plan, target_kind);
 
-        let human_args = &args[..args.len() - 1];
-        let human_output = jit(&repo, human_args);
-        assert_success(&human_output);
-        let human = String::from_utf8(human_output.stdout).unwrap();
+        let human = cli.run(args).unwrap();
         assert_human_parity(&plan, &human);
-        let typed_plan: ArtifactPlan = serde_json::from_slice(&first.stdout).unwrap();
+        let typed_plan: ArtifactPlan = serde_json::from_str(&first).unwrap();
         assert_eq!(human, render_archive_plan(&typed_plan));
     }
 
-    assert_eq!(snapshot_files(repo.path()), before);
-    assert!(!repo.path().join("archive").exists());
+    assert_eq!(snapshot_files(cli.root()), before);
+    assert!(!cli.root().join("archive").exists());
 }
 
 #[test]
 fn test_archive_execute_is_explicit_and_available_for_document_and_container_targets() {
-    let document_repo = TempDir::new().unwrap();
-    configured_bundle(&document_repo);
-    let document = jit(
-        &document_repo,
-        &[
-            "archive",
-            "document",
-            "fixtures/root.md",
-            "--execute",
-            "--json",
-        ],
+    let document_cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(BUNDLE_POLICY))]).unwrap(),
     );
-    assert_success(&document);
-    let result: Value = serde_json::from_slice(&document.stdout).unwrap();
+    document_cli.run(["init", "--json"]).unwrap();
+    seed_bundle(&document_cli);
+    let result = document_cli
+        .run_json(["archive", "document", "fixtures/root.md", "--execute"])
+        .unwrap();
     assert_eq!(result["schema_version"], 1);
     assert_eq!(result["target"]["kind"], "document");
     assert_eq!(result["event_appended"], true);
@@ -489,7 +428,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
     assert!(result["reference_changes"].is_array());
     assert!(result["planned_deletions"].is_array());
     assert!(result["deleted_sources"].is_array());
-    assert!(result["warnings"].is_array());
+    assert!(result["plan_warnings"].is_array());
     assert_eq!(
         result
             .as_object()
@@ -501,80 +440,60 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
             "deleted_sources",
             "destination_root",
             "event_appended",
+            "plan_warnings",
             "planned_deletions",
             "publications",
             "reconciling",
             "reference_changes",
             "schema_version",
             "target",
-            "warnings",
         ]
     );
-    assert!(document_repo
-        .path()
+    assert!(document_cli
+        .root()
         .join("archive/fixtures/root.md")
         .exists());
 
-    let container_repo = TempDir::new().unwrap();
-    initialize_with_policy(
-        &container_repo,
-        "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+    let container_cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(FIXTURES_POLICY))]).unwrap(),
     );
-    fs::create_dir(container_repo.path().join("fixtures")).unwrap();
-    fs::write(container_repo.path().join("fixtures/root.md"), "container").unwrap();
-    let created = jit(
-        &container_repo,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Container",
-            "--type",
-            "epic",
-            "--json",
-        ],
-    );
-    assert_success(&created);
-    let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_success(&jit(
-        &container_repo,
-        &[
+    container_cli.run(["init", "--json"]).unwrap();
+    fs::create_dir(container_cli.root().join("fixtures")).unwrap();
+    fs::write(container_cli.root().join("fixtures/root.md"), "container").unwrap();
+    let id = container_cli
+        .create_issue(["--title", "Container", "--type", "epic"])
+        .unwrap();
+    container_cli
+        .run([
             "doc",
             "add",
             &id,
             "fixtures/root.md",
             "--skip-scan",
             "--json",
-        ],
-    ));
-    assert_success(&jit(
-        &container_repo,
-        &["issue", "update", &id, "--state", "rejected", "--json"],
-    ));
-    let container = jit(
-        &container_repo,
-        &["archive", "container", &id, "--execute", "--json"],
-    );
-    assert_success(&container);
-    let result: Value = serde_json::from_slice(&container.stdout).unwrap();
+        ])
+        .unwrap();
+    container_cli
+        .run(["issue", "reject", &id, "--json"])
+        .unwrap();
+    let result = container_cli
+        .run_json(["archive", "container", &id, "--execute"])
+        .unwrap();
     assert_eq!(result["target"]["kind"], "container");
     assert_eq!(result["event_appended"], true);
     let destination_root = format!("archive/{}", &id[..8]);
     assert_eq!(
         fs::read_to_string(
-            container_repo
-                .path()
+            container_cli
+                .root()
                 .join(&destination_root)
                 .join(".jit-container")
         )
         .unwrap(),
         format!("{id}\n")
     );
-    assert!(container_repo
-        .path()
+    assert!(container_cli
+        .root()
         .join(destination_root)
         .join("fixtures/root.md")
         .exists());
@@ -589,61 +508,42 @@ fn test_archive_execute_leaves_an_out_of_root_source_where_it_is_without_schedul
     // Guard that at both the plan level and the execution level, pinned
     // together so the retention cannot be satisfied by silently dropping the
     // artifact from the plan.
-    let repo = TempDir::new().unwrap();
-    initialize_with_policy(
-        &repo,
-        concat!(
-            "[documentation]\n",
-            "development_root = \"workspace\"\n",
-            "managed_paths = [\"workspace/active\"]\n",
-            "permanent_paths = []\n",
-            "archive_root = \"workspace/archive\"\n",
-        ),
+    let policy = concat!(
+        "[documentation]\n",
+        "development_root = \"workspace\"\n",
+        "managed_paths = [\"workspace/active\"]\n",
+        "permanent_paths = []\n",
+        "archive_root = \"workspace/archive\"\n",
     );
-    fs::create_dir_all(repo.path().join("scripts")).unwrap();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(policy))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    fs::create_dir_all(cli.root().join("scripts")).unwrap();
     let source_bytes = b"#!/bin/sh\necho archived\n".to_vec();
-    fs::write(repo.path().join("scripts/install.sh"), &source_bytes).unwrap();
+    fs::write(cli.root().join("scripts/install.sh"), &source_bytes).unwrap();
 
     // The criterion is scoped to a *linked* artifact, so give the script a
     // terminal owner. Without a document reference the terminal-owner check is
     // vacuously true and the scenario REQ-01 names is never exercised.
-    let owner = jit(
-        &repo,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Owner of the installer script",
-            "--json",
-        ],
-    );
-    assert_success(&owner);
-    let owner_id = serde_json::from_slice::<Value>(&owner.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_success(&jit(
-        &repo,
-        &[
-            "doc",
-            "add",
-            &owner_id,
-            "scripts/install.sh",
-            "--skip-scan",
-            "--json",
-        ],
-    ));
-    assert_success(&jit(
-        &repo,
-        &["issue", "update", &owner_id, "--state", "done", "--json"],
-    ));
+    let owner_id = cli
+        .create_issue(["--title", "Owner of the installer script"])
+        .unwrap();
+    cli.run([
+        "doc",
+        "add",
+        &owner_id,
+        "scripts/install.sh",
+        "--skip-scan",
+        "--json",
+    ])
+    .unwrap();
+    cli.run(["issue", "update", &owner_id, "--state", "done", "--json"])
+        .unwrap();
 
-    let preview = jit(
-        &repo,
-        &["archive", "document", "scripts/install.sh", "--json"],
-    );
-    assert_success(&preview);
-    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    let plan = cli
+        .run_json(["archive", "document", "scripts/install.sh"])
+        .unwrap();
     assert_eq!(plan["eligible"], true);
     let destination_root = plan["destination_root"].as_str().unwrap().to_string();
     let expected_mirror = format!("{destination_root}/scripts/install.sh");
@@ -661,18 +561,9 @@ fn test_archive_execute_leaves_an_out_of_root_source_where_it_is_without_schedul
         "an out-of-root source must not schedule a pending deletion"
     );
 
-    let executed = jit(
-        &repo,
-        &[
-            "archive",
-            "document",
-            "scripts/install.sh",
-            "--execute",
-            "--json",
-        ],
-    );
-    assert_success(&executed);
-    let result: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    let result = cli
+        .run_json(["archive", "document", "scripts/install.sh", "--execute"])
+        .unwrap();
     assert!(result["planned_deletions"].as_array().unwrap().is_empty());
     assert!(result["deleted_sources"].as_array().unwrap().is_empty());
     assert!(
@@ -680,107 +571,88 @@ fn test_archive_execute_leaves_an_out_of_root_source_where_it_is_without_schedul
         "execution must publish nothing for a retained out-of-root source: {result}"
     );
 
-    let source_path = repo.path().join("scripts/install.sh");
+    let source_path = cli.root().join("scripts/install.sh");
     assert!(
         source_path.exists(),
         "source outside the development root must remain at its original path"
     );
     assert_eq!(fs::read(&source_path).unwrap(), source_bytes);
     assert!(
-        !repo.path().join(&expected_mirror).exists(),
+        !cli.root().join(&expected_mirror).exists(),
         "execution must not duplicate a retained out-of-root source into the archive"
     );
 }
 
 #[test]
 fn test_archive_execute_blocked_is_nonzero_nonmutating_and_human_reports_warnings() {
-    let blocked_repo = TempDir::new().unwrap();
-    assert_success(&jit(&blocked_repo, &["init", "--json"]));
-    fs::write(blocked_repo.path().join(".jit/config.toml"), "").unwrap();
-    fs::write(blocked_repo.path().join("root.md"), "blocked").unwrap();
-    let before = snapshot_files(blocked_repo.path());
-    let blocked = jit(
-        &blocked_repo,
-        &["archive", "document", "root.md", "--execute", "--json"],
-    );
+    let blocked_cli = JitCli::initialised().unwrap();
+    fs::write(blocked_cli.root().join(".jit/config.toml"), "").unwrap();
+    fs::write(blocked_cli.root().join("root.md"), "blocked").unwrap();
+    let before = snapshot_files(blocked_cli.root());
+    let blocked = blocked_cli
+        .command(["archive", "document", "root.md", "--execute", "--json"])
+        .output()
+        .unwrap();
     assert!(!blocked.status.success());
-    assert_eq!(snapshot_files(blocked_repo.path()), before);
-    assert!(!blocked_repo.path().join("archive").exists());
+    assert_eq!(snapshot_files(blocked_cli.root()), before);
+    assert!(!blocked_cli.root().join("archive").exists());
 
-    let warning_repo = TempDir::new().unwrap();
-    configured_bundle(&warning_repo);
-    let human = jit(
-        &warning_repo,
-        &["archive", "document", "fixtures/root.md", "--execute"],
+    let warning_cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(BUNDLE_POLICY))]).unwrap(),
     );
-    assert_success(&human);
-    let stdout = String::from_utf8(human.stdout).unwrap();
+    warning_cli.run(["init", "--json"]).unwrap();
+    seed_bundle(&warning_cli);
+    let stdout = warning_cli
+        .run(["archive", "document", "fixtures/root.md", "--execute"])
+        .unwrap();
     assert!(stdout.contains("Archive execution complete:"));
     assert!(stdout.contains("warning: no-owner (fixtures/root.md)"));
 }
 
 #[test]
 fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_parity() {
-    let repo = TempDir::new().unwrap();
-    configured_bundle(&repo);
-    let create = |title: &str, issue_type: &str| {
-        let output = jit(
-            &repo,
-            &[
-                "issue", "create", "--title", title, "--type", issue_type, "--json",
-            ],
-        );
-        assert_success(&output);
-        serde_json::from_slice::<Value>(&output.stdout).unwrap()["id"]
-            .as_str()
-            .unwrap()
-            .to_string()
-    };
-    let evaluated = create("Evaluated container", "epic");
-    assert_success(&jit(
-        &repo,
-        &[
-            "doc",
-            "add",
-            &evaluated,
-            "fixtures/root.md",
-            "--skip-scan",
-            "--json",
-        ],
-    ));
-    assert_success(&jit(
-        &repo,
-        &[
-            "issue", "update", &evaluated, "--state", "rejected", "--json",
-        ],
-    ));
-    let empty = create("Zero-document container", "epic");
-    assert_success(&jit(
-        &repo,
-        &["issue", "update", &empty, "--state", "rejected", "--json"],
-    ));
-    let _active = create("Active container", "epic");
-    let leaf = create("Terminal leaf", "task");
-    assert_success(&jit(
-        &repo,
-        &["issue", "update", &leaf, "--state", "rejected", "--json"],
-    ));
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(BUNDLE_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    seed_bundle(&cli);
+    let evaluated = cli
+        .create_issue(["--title", "Evaluated container", "--type", "epic"])
+        .unwrap();
+    cli.run([
+        "doc",
+        "add",
+        &evaluated,
+        "fixtures/root.md",
+        "--skip-scan",
+        "--json",
+    ])
+    .unwrap();
+    cli.run(["issue", "reject", &evaluated, "--json"]).unwrap();
+    let empty = cli
+        .create_issue(["--title", "Zero-document container", "--type", "epic"])
+        .unwrap();
+    cli.run(["issue", "reject", &empty, "--json"]).unwrap();
+    cli.create_issue(["--title", "Active container", "--type", "epic"])
+        .unwrap();
+    let leaf = cli
+        .create_issue(["--title", "Terminal leaf", "--type", "task"])
+        .unwrap();
+    cli.run(["issue", "reject", &leaf, "--json"]).unwrap();
 
     set_documentation_policy(
-        &repo,
+        &cli,
         "[documentation]\nmanaged_paths = [\"fixtures/root.md\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
     );
-    let occupied = repo.path().join("archive").join(&evaluated[..8]);
+    let occupied = cli.root().join("archive").join(&evaluated[..8]);
     fs::create_dir_all(&occupied).unwrap();
     fs::write(occupied.join("foreign.txt"), "unaccounted").unwrap();
-    let before = snapshot_tree(repo.path());
+    let before = snapshot_tree(cli.root());
 
-    let first = jit(&repo, &["archive", "candidates", "--json"]);
-    let second = jit(&repo, &["archive", "candidates", "--json"]);
-    assert_success(&first);
-    assert_success(&second);
-    assert_eq!(first.stdout, second.stdout);
-    let report: Value = serde_json::from_slice(&first.stdout).unwrap();
+    let first = cli.run(["archive", "candidates", "--json"]).unwrap();
+    let second = cli.run(["archive", "candidates", "--json"]).unwrap();
+    assert_eq!(first, second);
+    let report: Value = serde_json::from_str(&first).unwrap();
     assert_eq!(
         report
             .as_object()
@@ -791,7 +663,7 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
         ["candidates", "count", "schema_version"]
     );
     assert_eq!(report["schema_version"], 1);
-    assert_eq!(report["count"], 2);
+    assert_eq!(report["candidates"].as_array().unwrap().len(), 2);
     let candidates = report["candidates"].as_array().unwrap();
     let ids = candidates
         .iter()
@@ -815,10 +687,10 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
                 "count",
                 "destination_root",
                 "eligible",
+                "plan_warnings",
                 "policy_status",
                 "schema_version",
                 "target",
-                "warnings",
             ]
         );
     }
@@ -841,9 +713,13 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
                 .unwrap()
                 .iter()
                 .any(|evidence| {
-                    evidence == "permanent-path"
-                        || evidence == "outside-development-root"
-                        || evidence == "unmanaged-path"
+                    [
+                        EvidenceCode::PermanentPath,
+                        EvidenceCode::OutsideDevelopmentRoot,
+                        EvidenceCode::UnmanagedPath,
+                    ]
+                    .iter()
+                    .any(|code| evidence == code.as_str())
                 })
         })
         .collect::<Vec<_>>();
@@ -857,10 +733,8 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
         .iter()
         .all(|blocker| blocker["code"] != "unmanaged-selected-root"));
 
-    let human_output = jit(&repo, &["archive", "candidates"]);
-    assert_success(&human_output);
-    let human = String::from_utf8(human_output.stdout).unwrap();
-    let typed: ArchiveCandidates = serde_json::from_slice(&first.stdout).unwrap();
+    let human = cli.run(["archive", "candidates"]).unwrap();
+    let typed: ArchiveCandidates = serde_json::from_str(&first).unwrap();
     assert_eq!(human, render_archive_candidates(&typed));
     for candidate in candidates {
         let id = candidate["target"]["id"].as_str().unwrap();
@@ -869,57 +743,46 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
             assert!(human.contains(blocker["code"].as_str().unwrap()));
         }
     }
-    assert_eq!(snapshot_tree(repo.path()), before);
+    assert_eq!(snapshot_tree(cli.root()), before);
 }
 
 #[test]
 fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_targets() {
-    let repo = TempDir::new().unwrap();
-    initialize_with_policy(
-        &repo,
-        "[documentation]\nmanaged_paths = [\"dev/active\"]\npermanent_paths = []\narchive_root = \"dev/archive\"\n",
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(
+            ".jit/config.toml",
+            &declared_config(
+                "[documentation]\nmanaged_paths = [\"dev/active\"]\npermanent_paths = []\narchive_root = \"dev/archive\"\n",
+            ),
+        )])
+        .unwrap(),
     );
-    fs::create_dir_all(repo.path().join("dev/active")).unwrap();
-    fs::write(repo.path().join("dev/index.md"), "[active](active/)").unwrap();
-    fs::write(repo.path().join("dev/active/regular.md"), "regular").unwrap();
+    cli.run(["init", "--json"]).unwrap();
+    fs::create_dir_all(cli.root().join("dev/active")).unwrap();
+    fs::write(cli.root().join("dev/index.md"), "[active](active/)").unwrap();
+    fs::write(cli.root().join("dev/active/regular.md"), "regular").unwrap();
 
-    let create = |title: &str| {
-        let created = jit(
-            &repo,
-            &[
-                "issue", "create", "--title", title, "--type", "epic", "--json",
-            ],
-        );
-        assert_success(&created);
-        serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-            .as_str()
-            .unwrap()
-            .to_string()
-    };
-    let directory_candidate = create("Directory candidate");
-    let regular_candidate = create("Regular candidate");
+    let directory_candidate = cli
+        .create_issue(["--title", "Directory candidate", "--type", "epic"])
+        .unwrap();
+    let regular_candidate = cli
+        .create_issue(["--title", "Regular candidate", "--type", "epic"])
+        .unwrap();
     for (id, path) in [
         (&directory_candidate, "dev/index.md"),
         (&regular_candidate, "dev/active/regular.md"),
     ] {
-        assert_success(&jit(
-            &repo,
-            &["doc", "add", id, path, "--skip-scan", "--json"],
-        ));
-        assert_success(&jit(
-            &repo,
-            &["issue", "update", id, "--state", "rejected", "--json"],
-        ));
+        cli.run(["doc", "add", id, path, "--skip-scan", "--json"])
+            .unwrap();
+        cli.run(["issue", "reject", id, "--json"]).unwrap();
     }
-    let before = snapshot_tree(repo.path());
+    let before = snapshot_tree(cli.root());
 
-    let first = jit(&repo, &["archive", "candidates", "--json"]);
-    let second = jit(&repo, &["archive", "candidates", "--json"]);
-    assert_success(&first);
-    assert_success(&second);
-    assert_eq!(first.stdout, second.stdout);
-    let report: Value = serde_json::from_slice(&first.stdout).unwrap();
-    assert_eq!(report["count"], 2);
+    let first = cli.run(["archive", "candidates", "--json"]).unwrap();
+    let second = cli.run(["archive", "candidates", "--json"]).unwrap();
+    assert_eq!(first, second);
+    let report: Value = serde_json::from_str(&first).unwrap();
+    assert_eq!(report["candidates"].as_array().unwrap().len(), 2);
     let directory_plan = report["candidates"]
         .as_array()
         .unwrap()
@@ -945,7 +808,7 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
         .iter()
         .find(|artifact| artifact["source"] == "dev/index.md")
         .unwrap();
-    assert!(parent_artifact["warnings"]
+    assert!(parent_artifact["plan_warnings"]
         .as_array()
         .unwrap()
         .iter()
@@ -956,16 +819,11 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
         .iter()
         .all(|edge| edge["target"] != "dev/active"));
 
-    let preview = jit(
-        &repo,
-        &["archive", "container", &directory_candidate, "--json"],
-    );
-    assert_success(&preview);
-    let preview_plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    let preview_plan = cli
+        .run_json(["archive", "container", &directory_candidate])
+        .unwrap();
     assert_eq!(preview_plan, *directory_plan);
-    let document_preview = jit(&repo, &["archive", "document", "dev/active", "--json"]);
-    assert_success(&document_preview);
-    let document_plan: Value = serde_json::from_slice(&document_preview.stdout).unwrap();
+    let document_plan = cli.run_json(["archive", "document", "dev/active"]).unwrap();
     assert!(document_plan["artifacts"]
         .as_array()
         .unwrap()
@@ -978,23 +836,23 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
         .any(|blocker| {
             blocker["code"] == "unsupported-artifact-type" && blocker["path"] == "dev/active"
         }));
-    let execute = jit(
-        &repo,
-        &[
+    let execute = cli
+        .command([
             "archive",
             "container",
             &directory_candidate,
             "--execute",
             "--json",
-        ],
-    );
+        ])
+        .output()
+        .unwrap();
     assert!(!execute.status.success());
-    let document_execute = jit(
-        &repo,
-        &["archive", "document", "dev/active", "--execute", "--json"],
-    );
+    let document_execute = cli
+        .command(["archive", "document", "dev/active", "--execute", "--json"])
+        .output()
+        .unwrap();
     assert!(!document_execute.status.success());
-    assert_eq!(snapshot_tree(repo.path()), before);
+    assert_eq!(snapshot_tree(cli.root()), before);
 }
 
 #[test]
@@ -1007,41 +865,27 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
             "configured",
         ),
     ] {
-        let repo = TempDir::new().unwrap();
-        assert_success(&jit(&repo, &["init", "--json"]));
-        let created = jit(
-            &repo,
-            &[
-                "issue", "create", "--title", "Candidate", "--type", "epic", "--json",
-            ],
-        );
-        assert_success(&created);
-        let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        assert_success(&jit(
-            &repo,
-            &["issue", "update", &id, "--state", "rejected", "--json"],
-        ));
+        let cli = JitCli::initialised().unwrap();
+        let id = cli
+            .create_issue(["--title", "Candidate", "--type", "epic"])
+            .unwrap();
+        cli.run(["issue", "reject", &id, "--json"]).unwrap();
         // Each variant is a complete configuration: the declared hierarchy that
         // makes the rejected epic a container, plus the documentation-policy
         // state under test.
         fs::write(
-            repo.path().join(".jit/config.toml"),
+            cli.root().join(".jit/config.toml"),
             format!("[type_hierarchy]\ntypes = {{ epic = 1, task = 2 }}\n\n{config}"),
         )
         .unwrap();
-        let before = snapshot_tree(repo.path());
+        let before = snapshot_tree(cli.root());
 
-        let output = jit(&repo, &["archive", "candidates", "--json"]);
-        assert_success(&output);
-        let report: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(report["count"], 1);
+        let report = cli.run_json(["archive", "candidates"]).unwrap();
+        assert_eq!(report["candidates"].as_array().unwrap().len(), 1);
         assert_eq!(report["candidates"][0]["policy_status"], expected);
         let blocker = match expected {
-            "unconfigured" => Some("policy-unconfigured"),
-            "incomplete" => Some("policy-incomplete"),
+            "unconfigured" => Some(BlockerCode::PolicyUnconfigured.as_str()),
+            "incomplete" => Some(BlockerCode::PolicyIncomplete.as_str()),
             _ => None,
         };
         if let Some(blocker) = blocker {
@@ -1051,69 +895,40 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
                 .iter()
                 .any(|entry| entry["code"] == blocker));
         }
-        assert_eq!(snapshot_tree(repo.path()), before);
+        assert_eq!(snapshot_tree(cli.root()), before);
     }
 }
 
 #[test]
 fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
-    let repo = TempDir::new().unwrap();
-    initialize_with_policy(
-        &repo,
-        "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(FIXTURES_POLICY))]).unwrap(),
     );
-    fs::create_dir(repo.path().join("fixtures")).unwrap();
-    fs::write(repo.path().join("fixtures/root.md"), "archive me").unwrap();
+    cli.run(["init", "--json"]).unwrap();
+    fs::create_dir(cli.root().join("fixtures")).unwrap();
+    fs::write(cli.root().join("fixtures/root.md"), "archive me").unwrap();
 
-    let created = jit(
-        &repo,
-        &[
-            "issue",
-            "create",
+    let id = cli
+        .create_issue([
             "--title",
             "Mutable title",
             "--type",
             "epic",
             "--label",
             "epic:artifact-archival",
-            "--json",
-        ],
-    );
-    assert_success(&created);
-    let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_success(&jit(
-        &repo,
-        &[
-            "doc",
-            "add",
-            &id,
-            "fixtures/root.md",
-            "--skip-scan",
-            "--json",
-        ],
-    ));
-    assert_success(&jit(
-        &repo,
-        &["issue", "update", &id, "--state", "rejected", "--json"],
-    ));
+        ])
+        .unwrap();
+    cli.run(["doc", "add", &id, "fixtures/root.md", "--skip-scan"])
+        .unwrap();
+    cli.run(["issue", "reject", &id]).unwrap();
 
     let expected_root = format!("archive/{}-artifact-archival", &id[..8]);
-    let before_preview = snapshot_tree(repo.path());
-    let preview = jit(&repo, &["archive", "container", &id, "--json"]);
-    assert_success(&preview);
-    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    let before_preview = snapshot_tree(cli.root());
+    let plan = cli.run_json(["archive", "container", &id]).unwrap();
     assert_eq!(plan["destination_root"], expected_root);
-    let human = jit(&repo, &["archive", "container", &id]);
-    assert_success(&human);
-    assert!(String::from_utf8(human.stdout)
-        .unwrap()
-        .contains(&format!("Destination root: {expected_root}")));
-    let candidates = jit(&repo, &["archive", "candidates", "--json"]);
-    assert_success(&candidates);
-    let report: Value = serde_json::from_slice(&candidates.stdout).unwrap();
+    let human = cli.run(["archive", "container", &id]).unwrap();
+    assert!(human.contains(&format!("Destination root: {expected_root}")));
+    let report = cli.run_json(["archive", "candidates"]).unwrap();
     let candidate = report["candidates"]
         .as_array()
         .unwrap()
@@ -1121,83 +936,57 @@ fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
         .find(|candidate| candidate["target"]["id"] == id)
         .unwrap();
     assert_eq!(candidate["destination_root"], expected_root);
-    assert_eq!(snapshot_tree(repo.path()), before_preview);
+    assert_eq!(snapshot_tree(cli.root()), before_preview);
 
-    let executed = jit(&repo, &["archive", "container", &id, "--execute", "--json"]);
-    assert_success(&executed);
-    let execution: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    let execution = cli
+        .run_json(["archive", "container", &id, "--execute"])
+        .unwrap();
     assert_eq!(execution["destination_root"], expected_root);
     assert_eq!(
-        fs::read_to_string(repo.path().join(&expected_root).join(".jit-container")).unwrap(),
+        fs::read_to_string(cli.root().join(&expected_root).join(".jit-container")).unwrap(),
         format!("{id}\n")
     );
 
-    assert_success(&jit(
-        &repo,
-        &[
-            "issue",
-            "update",
-            &id,
-            "--title",
-            "Entirely renamed",
-            "--remove-label",
-            "epic:artifact-archival",
-            "--label",
-            "epic:new-strategic-slug",
-            "--json",
-        ],
-    ));
-    let frozen = jit(&repo, &["archive", "container", &id, "--json"]);
-    assert_success(&frozen);
-    assert_eq!(
-        serde_json::from_slice::<Value>(&frozen.stdout).unwrap()["destination_root"],
-        expected_root
-    );
-    assert!(!repo
-        .path()
+    cli.run([
+        "issue",
+        "update",
+        &id,
+        "--title",
+        "Entirely renamed",
+        "--remove-label",
+        "epic:artifact-archival",
+        "--label",
+        "epic:new-strategic-slug",
+    ])
+    .unwrap();
+    let frozen = cli.run_json(["archive", "container", &id]).unwrap();
+    assert_eq!(frozen["destination_root"], expected_root);
+    assert!(!cli
+        .root()
         .join(format!("archive/{}-new-strategic-slug", &id[..8]))
         .exists());
 }
 
-/// A minimal configured repository whose citation scan universe is exactly
-/// `notes/`: `fixtures/root.md` is the moving artifact, and `notes/mention.md`
-/// carries `citing_text` verbatim. Archival is a core command (`@/charter/D-4`),
-/// so version control is opt-in here: `vcs` runs `git init` before `jit init`,
-/// mirroring `test_doc_show_with_git`'s setup, while its absence leaves the
-/// directory as bare as every other fixture in this suite.
-fn citation_scan_repo(vcs: bool, citing_text: &str) -> TempDir {
-    let repo = TempDir::new().unwrap();
-    if vcs {
-        for args in [
-            vec!["init"],
-            vec!["config", "user.name", "Test User"],
-            vec!["config", "user.email", "test@example.com"],
-        ] {
-            assert!(Command::new("git")
-                .current_dir(repo.path())
-                .args(&args)
-                .status()
-                .unwrap()
-                .success());
-        }
-    }
-    initialize_with_policy(
-        &repo,
-        concat!(
-            "[documentation]\n",
-            "development_root = \"\"\n",
-            "managed_paths = [\"fixtures\"]\n",
-            "permanent_paths = []\n",
-            "archive_root = \"archive\"\n",
-            "citation_scan_roots = [\"notes\"]\n",
-        ),
-    );
-    fs::create_dir_all(repo.path().join("fixtures")).unwrap();
-    fs::create_dir_all(repo.path().join("notes")).unwrap();
-    fs::write(repo.path().join("fixtures/root.md"), "moving artifact\n").unwrap();
-    fs::write(repo.path().join("notes/mention.md"), citing_text).unwrap();
-    repo
+/// Seed a citation scan universe of exactly `notes/` into a repository
+/// initialized over [`CITATION_SCAN_POLICY`]: `fixtures/root.md` is the moving
+/// artifact, and `notes/mention.md` carries `citing_text` verbatim. Archival is
+/// a core command (`@/charter/D-4`), so a test opts into version control by
+/// running `init_git` before `jit init`.
+fn seed_citation_scan(cli: &JitCli, citing_text: &str) {
+    fs::create_dir_all(cli.root().join("fixtures")).unwrap();
+    fs::create_dir_all(cli.root().join("notes")).unwrap();
+    fs::write(cli.root().join("fixtures/root.md"), "moving artifact\n").unwrap();
+    fs::write(cli.root().join("notes/mention.md"), citing_text).unwrap();
 }
+
+const CITATION_SCAN_POLICY: &str = concat!(
+    "[documentation]\n",
+    "development_root = \"\"\n",
+    "managed_paths = [\"fixtures\"]\n",
+    "permanent_paths = []\n",
+    "archive_root = \"archive\"\n",
+    "citation_scan_roots = [\"notes\"]\n",
+);
 
 /// Every `moving-path-citation` warning path recorded against `source` in `plan`.
 fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
@@ -1206,7 +995,7 @@ fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
         .unwrap()
         .iter()
         .find(|artifact| artifact["source"] == source)
-        .expect("plan carries the moving artifact")["warnings"]
+        .expect("plan carries the moving artifact")["plan_warnings"]
         .as_array()
         .unwrap()
         .iter()
@@ -1219,7 +1008,7 @@ fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
 /// Plans partition warnings between target and artifact records; executions
 /// flatten that same semantic set into their result envelope.
 fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
-    report["warnings"]
+    report["plan_warnings"]
         .as_array()
         .into_iter()
         .flatten()
@@ -1228,7 +1017,7 @@ fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .flat_map(|artifact| artifact["warnings"].as_array().into_iter().flatten()),
+                .flat_map(|artifact| artifact["plan_warnings"].as_array().into_iter().flatten()),
         )
         .map(|warning| {
             (
@@ -1242,9 +1031,9 @@ fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
 /// Blank out every warnings collection in `plan`, in place, leaving actions,
 /// blockers, and eligibility as the only remaining variables.
 fn clear_warnings(plan: &mut Value) {
-    plan["warnings"] = serde_json::json!([]);
+    plan["plan_warnings"] = serde_json::json!([]);
     for artifact in plan["artifacts"].as_array_mut().unwrap() {
-        artifact["warnings"] = serde_json::json!([]);
+        artifact["plan_warnings"] = serde_json::json!([]);
     }
 }
 
@@ -1255,18 +1044,19 @@ fn clear_warnings(plan: &mut Value) {
 #[test]
 fn test_archive_document_preview_reports_moving_path_citation_without_version_control() {
     let citing_text = "See fixtures/root.md for the source of truth.\n";
-    let repo = citation_scan_repo(false, citing_text);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    seed_citation_scan(&cli, citing_text);
     assert!(
-        !repo.path().join(".git").exists(),
+        !cli.root().join(".git").exists(),
         "fixture must genuinely lack version control to exercise REQ-01"
     );
 
-    let preview = jit(
-        &repo,
-        &["archive", "document", "fixtures/root.md", "--json"],
-    );
-    assert_success(&preview);
-    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    let plan = cli
+        .run_json(["archive", "document", "fixtures/root.md"])
+        .unwrap();
 
     let column = citing_text.find("fixtures/root.md").unwrap() + 1;
     assert_eq!(
@@ -1281,25 +1071,28 @@ fn test_archive_document_preview_reports_moving_path_citation_without_version_co
 #[test]
 fn test_archive_document_preview_reports_same_moving_path_citation_inside_version_control() {
     let citing_text = "See fixtures/root.md for the source of truth.\n";
-    let untracked = citation_scan_repo(false, citing_text);
-    let tracked = citation_scan_repo(true, citing_text);
+    let untracked = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    untracked.run(["init", "--json"]).unwrap();
+    seed_citation_scan(&untracked, citing_text);
+    let tracked = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    tracked.init_git().unwrap();
+    tracked.run(["init", "--json"]).unwrap();
+    seed_citation_scan(&tracked, citing_text);
     assert!(
-        tracked.path().join(".git").is_dir(),
+        tracked.root().join(".git").is_dir(),
         "fixture must genuinely sit under version control to exercise REQ-02"
     );
 
-    let untracked_preview = jit(
-        &untracked,
-        &["archive", "document", "fixtures/root.md", "--json"],
-    );
-    let tracked_preview = jit(
-        &tracked,
-        &["archive", "document", "fixtures/root.md", "--json"],
-    );
-    assert_success(&untracked_preview);
-    assert_success(&tracked_preview);
-    let untracked_plan: Value = serde_json::from_slice(&untracked_preview.stdout).unwrap();
-    let tracked_plan: Value = serde_json::from_slice(&tracked_preview.stdout).unwrap();
+    let untracked_plan = untracked
+        .run_json(["archive", "document", "fixtures/root.md"])
+        .unwrap();
+    let tracked_plan = tracked
+        .run_json(["archive", "document", "fixtures/root.md"])
+        .unwrap();
 
     let untracked_citations = citation_warning_paths(&untracked_plan, "fixtures/root.md");
     assert!(
@@ -1319,25 +1112,29 @@ fn test_archive_document_preview_reports_same_moving_path_citation_inside_versio
 /// citing file.
 #[test]
 fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardless_of_citation() {
-    let with_citation =
-        citation_scan_repo(false, "See fixtures/root.md for the source of truth.\n");
-    let without_citation = citation_scan_repo(
-        false,
+    let with_citation = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    with_citation.run(["init", "--json"]).unwrap();
+    seed_citation_scan(
+        &with_citation,
+        "See fixtures/root.md for the source of truth.\n",
+    );
+    let without_citation = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    without_citation.run(["init", "--json"]).unwrap();
+    seed_citation_scan(
+        &without_citation,
         "See fixtures/unrelated.md for the source of truth.\n",
     );
 
-    let with_output = jit(
-        &with_citation,
-        &["archive", "document", "fixtures/root.md", "--json"],
-    );
-    let without_output = jit(
-        &without_citation,
-        &["archive", "document", "fixtures/root.md", "--json"],
-    );
-    assert_success(&with_output);
-    assert_success(&without_output);
-    let mut with_plan: Value = serde_json::from_slice(&with_output.stdout).unwrap();
-    let mut without_plan: Value = serde_json::from_slice(&without_output.stdout).unwrap();
+    let mut with_plan = with_citation
+        .run_json(["archive", "document", "fixtures/root.md"])
+        .unwrap();
+    let mut without_plan = without_citation
+        .run_json(["archive", "document", "fixtures/root.md"])
+        .unwrap();
 
     // Guard: the scan universe genuinely differs in whether it carries a citation.
     assert!(!citation_warning_paths(&with_plan, "fixtures/root.md").is_empty());
@@ -1354,11 +1151,21 @@ fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardle
     );
 }
 
-/// A repository that classifies its development areas explicitly, per
+/// The policy classifying development areas explicitly, per
 /// `@/issue/8e071e18/decision/D-6`, with `dev/presentations` as the one
 /// configured managed area.
+const PRESENTATION_POLICY: &str = concat!(
+    "[documentation]\n",
+    "development_root = \"dev\"\n",
+    "managed_paths = [\"dev/presentations\"]\n",
+    "permanent_paths = []\n",
+    "archive_root = \"dev/archive\"\n",
+);
+
+/// Seed a deck and its owning container into a repository initialized over
+/// [`PRESENTATION_POLICY`], answering the owner's id and the deck's path.
 ///
-/// `managed` selects whether the deck sits inside that configured area or in
+/// `managed` selects whether the deck sits inside the configured area or in
 /// an adjacent development-root directory that no configured entry claims,
 /// reproducing the predecessor deck's actual gap. `terminal` selects whether
 /// the linked owner reaches a terminal state before the preview runs. The
@@ -1366,55 +1173,25 @@ fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardle
 /// terminal-owner check vacuously true (`jit:1f80212b`'s code-review finding
 /// against a sibling test), so every caller here exercises a genuine
 /// ownership edge, not an absent one.
-fn presentation_deck_repo(managed: bool, terminal: bool) -> (TempDir, String, String) {
-    let repo = TempDir::new().unwrap();
-    initialize_with_policy(
-        &repo,
-        concat!(
-            "[documentation]\n",
-            "development_root = \"dev\"\n",
-            "managed_paths = [\"dev/presentations\"]\n",
-            "permanent_paths = []\n",
-            "archive_root = \"dev/archive\"\n",
-        ),
-    );
+fn seed_presentation_deck(cli: &JitCli, managed: bool, terminal: bool) -> (String, String) {
     let area = if managed {
         "dev/presentations"
     } else {
         "dev/unclassified"
     };
     let deck_path = format!("{area}/talk.html");
-    fs::create_dir_all(repo.path().join(area)).unwrap();
-    fs::write(repo.path().join(&deck_path), "<html>deck</html>").unwrap();
+    fs::create_dir_all(cli.root().join(area)).unwrap();
+    fs::write(cli.root().join(&deck_path), "<html>deck</html>").unwrap();
 
-    let created = jit(
-        &repo,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Presentation deck owner",
-            "--type",
-            "epic",
-            "--json",
-        ],
-    );
-    assert_success(&created);
-    let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_success(&jit(
-        &repo,
-        &["doc", "add", &id, &deck_path, "--skip-scan", "--json"],
-    ));
+    let id = cli
+        .create_issue(["--title", "Presentation deck owner", "--type", "epic"])
+        .unwrap();
+    cli.run(["doc", "add", &id, &deck_path, "--skip-scan"])
+        .unwrap();
     if terminal {
-        assert_success(&jit(
-            &repo,
-            &["issue", "update", &id, "--state", "rejected", "--json"],
-        ));
+        cli.run(["issue", "reject", &id]).unwrap();
     }
-    (repo, id, deck_path)
+    (id, deck_path)
 }
 
 /// The plan artifact recorded for `source`, panicking if the fixture never produced one.
@@ -1439,11 +1216,13 @@ fn find_artifact<'a>(plan: &'a Value, source: &str) -> &'a Value {
 /// than an artifact of previewing an unlinked path.
 #[test]
 fn test_archive_document_preview_reports_eligible_plan_for_deck_owned_by_terminal_issue() {
-    let (repo, _owner, deck_path) = presentation_deck_repo(true, true);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(PRESENTATION_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let (_owner, deck_path) = seed_presentation_deck(&cli, true, true);
 
-    let preview = jit(&repo, &["archive", "document", &deck_path, "--json"]);
-    assert_success(&preview);
-    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    let plan = cli.run_json(["archive", "document", &deck_path]).unwrap();
 
     assert_eq!(plan["eligible"], true);
     assert!(plan["blockers"]
@@ -1457,13 +1236,14 @@ fn test_archive_document_preview_reports_eligible_plan_for_deck_owned_by_termina
         "the deck must genuinely be selected for relocation, not vacuously eligible: {plan}"
     );
 
-    let (non_terminal_repo, _owner, deck_path) = presentation_deck_repo(true, false);
-    let blocked = jit(
-        &non_terminal_repo,
-        &["archive", "document", &deck_path, "--json"],
+    let non_terminal_cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(PRESENTATION_POLICY))]).unwrap(),
     );
-    assert_success(&blocked);
-    let blocked_plan: Value = serde_json::from_slice(&blocked.stdout).unwrap();
+    non_terminal_cli.run(["init", "--json"]).unwrap();
+    let (_owner, deck_path) = seed_presentation_deck(&non_terminal_cli, true, false);
+    let blocked_plan = non_terminal_cli
+        .run_json(["archive", "document", &deck_path])
+        .unwrap();
     assert_ne!(
         find_artifact(&blocked_plan, &deck_path)["action"],
         "move",
@@ -1482,11 +1262,13 @@ fn test_archive_document_preview_reports_eligible_plan_for_deck_owned_by_termina
 /// consults the same terminal-owner state rather than defaulting to eligible.
 #[test]
 fn test_archive_container_preview_reports_eligible_plan_for_subtree_deck_owned_by_terminal_issue() {
-    let (repo, owner, deck_path) = presentation_deck_repo(true, true);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(PRESENTATION_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let (owner, deck_path) = seed_presentation_deck(&cli, true, true);
 
-    let preview = jit(&repo, &["archive", "container", &owner, "--json"]);
-    assert_success(&preview);
-    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    let plan = cli.run_json(["archive", "container", &owner]).unwrap();
 
     assert_eq!(plan["eligible"], true);
     assert!(plan["blockers"]
@@ -1500,13 +1282,14 @@ fn test_archive_container_preview_reports_eligible_plan_for_subtree_deck_owned_b
         "the deck must genuinely be selected for relocation, not vacuously eligible: {plan}"
     );
 
-    let (non_terminal_repo, non_terminal_owner, deck_path) = presentation_deck_repo(true, false);
-    let blocked = jit(
-        &non_terminal_repo,
-        &["archive", "container", &non_terminal_owner, "--json"],
+    let non_terminal_cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(PRESENTATION_POLICY))]).unwrap(),
     );
-    assert_success(&blocked);
-    let blocked_plan: Value = serde_json::from_slice(&blocked.stdout).unwrap();
+    non_terminal_cli.run(["init", "--json"]).unwrap();
+    let (non_terminal_owner, deck_path) = seed_presentation_deck(&non_terminal_cli, true, false);
+    let blocked_plan = non_terminal_cli
+        .run_json(["archive", "container", &non_terminal_owner])
+        .unwrap();
     assert_ne!(
         find_artifact(&blocked_plan, &deck_path)["action"],
         "move",
@@ -1522,15 +1305,17 @@ fn test_archive_container_preview_reports_eligible_plan_for_subtree_deck_owned_b
 /// can and do raise the blocker when the area genuinely is unmanaged.
 #[test]
 fn test_archive_preview_reports_unmanaged_selected_root_for_deck_outside_configured_area() {
-    let (repo, owner, deck_path) = presentation_deck_repo(false, true);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(PRESENTATION_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let (owner, deck_path) = seed_presentation_deck(&cli, false, true);
 
     for args in [
-        vec!["archive", "document", deck_path.as_str(), "--json"],
-        vec!["archive", "container", owner.as_str(), "--json"],
+        ["archive", "document", deck_path.as_str()],
+        ["archive", "container", owner.as_str()],
     ] {
-        let preview = jit(&repo, &args);
-        assert_success(&preview);
-        let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+        let plan = cli.run_json(args).unwrap();
         assert_eq!(plan["eligible"], false, "{args:?} plan: {plan}");
         assert!(
             plan["blockers"]
@@ -1644,7 +1429,6 @@ fn planned_destination(plan: &Value, source: &str) -> String {
 /// One executed container archival over the citation-scan fixture, captured
 /// either side of the run.
 struct ArchivedCitation {
-    repo: TempDir,
     container: String,
     destination_root: String,
     preview: Value,
@@ -1653,7 +1437,8 @@ struct ArchivedCitation {
     after: BTreeMap<String, Vec<u8>>,
 }
 
-/// Archive a terminal container holding two managed artifacts, one of which
+/// Archive, in a repository initialized over [`CITATION_SCAN_POLICY`], a
+/// terminal container holding two managed artifacts, one of which
 /// [`CITING_FILE`] names in its text, and capture the document tree either side.
 ///
 /// Every guarantee `jit:3be32cad` locks in is a claim about this single
@@ -1666,24 +1451,26 @@ struct ArchivedCitation {
 /// The citing file sits outside `managed_paths` and is linked to no issue, so
 /// it is not itself an artifact of the plan: it stays put, and the only thing
 /// execution could do to it is rewrite the now-stale path in its text.
-fn archived_citation() -> ArchivedCitation {
-    archived_citation_with_scan_directories(0)
+fn archived_citation(cli: &JitCli) -> ArchivedCitation {
+    archived_citation_with_scan_directories(cli, 0)
 }
 
 /// Add empty scan directories to exercise the archive capture's complete-listing
 /// closure without changing the one citation the fixture reports.
-fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCitation {
-    let repo = citation_scan_repo(false, "See fixtures/root.md for the source of truth.\n");
+fn archived_citation_with_scan_directories(
+    cli: &JitCli,
+    directory_count: usize,
+) -> ArchivedCitation {
+    seed_citation_scan(cli, "See fixtures/root.md for the source of truth.\n");
     (0..directory_count).for_each(|index| {
-        fs::create_dir_all(repo.path().join(format!("notes/fanout-{index:03}"))).unwrap();
+        fs::create_dir_all(cli.root().join(format!("notes/fanout-{index:03}"))).unwrap();
     });
-    fs::write(repo.path().join("fixtures/appendix.md"), "appendix body\n").unwrap();
+    fs::write(cli.root().join("fixtures/appendix.md"), "appendix body\n").unwrap();
 
-    let container = terminal_citation_container(&repo);
+    let container =
+        terminal_container_with_documents(cli, &[CITED_ARTIFACT, "fixtures/appendix.md"]);
 
-    let previewed = jit(&repo, &["archive", "container", &container, "--json"]);
-    assert_success(&previewed);
-    let preview: Value = serde_json::from_slice(&previewed.stdout).unwrap();
+    let preview = cli.run_json(["archive", "container", &container]).unwrap();
     assert_eq!(
         planned_moves(&preview).into_iter().collect::<BTreeSet<_>>(),
         BTreeSet::from([
@@ -1699,18 +1486,14 @@ fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCi
         "the scan must genuinely see the citation, or nothing observes the rewrite it declines to make: {preview}"
     );
 
-    let before = document_contents(repo.path());
-    let executed = jit(
-        &repo,
-        &["archive", "container", &container, "--execute", "--json"],
-    );
-    assert_success(&executed);
-    let execution: Value = serde_json::from_slice(&executed.stdout).unwrap();
-    let after = document_contents(repo.path());
+    let before = document_contents(cli.root());
+    let execution = cli
+        .run_json(["archive", "container", &container, "--execute"])
+        .unwrap();
+    let after = document_contents(cli.root());
     let destination_root = execution["destination_root"].as_str().unwrap().to_string();
 
     ArchivedCitation {
-        repo,
         container,
         destination_root,
         preview,
@@ -1720,41 +1503,15 @@ fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCi
     }
 }
 
-/// Create the terminal container shared by citation preview/execution tests.
-fn terminal_citation_container(repo: &TempDir) -> String {
-    terminal_container_with_documents(repo, &[CITED_ARTIFACT, "fixtures/appendix.md"])
-}
-
-fn terminal_container_with_documents(repo: &TempDir, documents: &[&str]) -> String {
-    let created = jit(
-        repo,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Citing container",
-            "--type",
-            "epic",
-            "--json",
-        ],
-    );
-    assert_success(&created);
-    let container = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+fn terminal_container_with_documents(cli: &JitCli, documents: &[&str]) -> String {
+    let container = cli
+        .create_issue(["--title", "Citing container", "--type", "epic"])
+        .unwrap();
     for path in documents {
-        assert_success(&jit(
-            repo,
-            &["doc", "add", &container, *path, "--skip-scan", "--json"],
-        ));
+        cli.run(["doc", "add", &container, *path, "--skip-scan"])
+            .unwrap();
     }
-    assert_success(&jit(
-        repo,
-        &[
-            "issue", "update", &container, "--state", "rejected", "--json",
-        ],
-    ));
+    cli.run(["issue", "reject", &container]).unwrap();
     container
 }
 
@@ -1767,7 +1524,11 @@ fn terminal_container_with_documents(repo: &TempDir, documents: &[&str]) -> Stri
 /// after publishing, not because the plan quietly dropped them.
 #[test]
 fn test_archive_container_execution_relocates_every_artifact_byte_identically() {
-    let run = archived_citation();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation(&cli);
 
     let moves = planned_moves(&run.preview);
     for source in &moves {
@@ -1805,7 +1566,11 @@ fn test_archive_container_execution_relocates_every_artifact_byte_identically() 
 /// a path the tree no longer holds (`@/issue/8e071e18/decision/D-8`).
 #[test]
 fn test_archive_container_execution_leaves_a_citing_scanned_file_byte_identical() {
-    let run = archived_citation();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation(&cli);
 
     let original = run
         .before
@@ -1833,7 +1598,11 @@ fn test_archive_container_execution_leaves_a_citing_scanned_file_byte_identical(
 /// for the adopter to repair after relocation.
 #[test]
 fn test_archive_container_execution_reports_the_preview_warning_set() {
-    let run = archived_citation();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation(&cli);
 
     assert_eq!(
         archive_warning_set(&run.execution),
@@ -1847,23 +1616,23 @@ fn test_archive_container_execution_reports_the_preview_warning_set() {
 fn test_archive_container_preview_and_execution_preserve_citations_beside_unreadable_subtree() {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let repo = TempDir::new().unwrap();
-    initialize_with_policy(
-        &repo,
-        concat!(
-            "[documentation]\n",
-            "development_root = \"dev\"\n",
-            "managed_paths = [\"dev/active\"]\n",
-            "permanent_paths = []\n",
-            "archive_root = \"dev/archive\"\n",
-            "citation_scan_roots = [\"dev/scan\"]\n",
-        ),
+    let policy = concat!(
+        "[documentation]\n",
+        "development_root = \"dev\"\n",
+        "managed_paths = [\"dev/active\"]\n",
+        "permanent_paths = []\n",
+        "archive_root = \"dev/archive\"\n",
+        "citation_scan_roots = [\"dev/scan\"]\n",
     );
-    fs::create_dir_all(repo.path().join("dev/active")).unwrap();
-    fs::create_dir_all(repo.path().join("dev/scan")).unwrap();
-    fs::write(repo.path().join("dev/active/design.md"), "moving design\n").unwrap();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(policy))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    fs::create_dir_all(cli.root().join("dev/active")).unwrap();
+    fs::create_dir_all(cli.root().join("dev/scan")).unwrap();
+    fs::write(cli.root().join("dev/active/design.md"), "moving design\n").unwrap();
     fs::write(
-        repo.path().join("dev/scan/readable.md"),
+        cli.root().join("dev/scan/readable.md"),
         concat!(
             "First: dev/active/design.md\n",
             "Second: dev/active/design.md\n",
@@ -1871,22 +1640,17 @@ fn test_archive_container_preview_and_execution_preserve_citations_beside_unread
         ),
     )
     .unwrap();
-    let secret = repo.path().join("dev/scan/secret");
+    let secret = cli.root().join("dev/scan/secret");
     fs::create_dir(&secret).unwrap();
     fs::write(secret.join("hidden.md"), "dev/active/design.md\n").unwrap();
     fs::set_permissions(&secret, fs::Permissions::from_mode(0o000)).unwrap();
-    let container = terminal_container_with_documents(&repo, &["dev/active/design.md"]);
+    let container = terminal_container_with_documents(&cli, &["dev/active/design.md"]);
 
-    let previewed = jit(&repo, &["archive", "container", &container, "--json"]);
-    let executed = jit(
-        &repo,
-        &["archive", "container", &container, "--execute", "--json"],
-    );
+    let previewed = cli.run_json(["archive", "container", &container]);
+    let executed = cli.run_json(["archive", "container", &container, "--execute"]);
     fs::set_permissions(&secret, fs::Permissions::from_mode(0o700)).unwrap();
-    assert_success(&previewed);
-    assert_success(&executed);
-    let preview: Value = serde_json::from_slice(&previewed.stdout).unwrap();
-    let execution: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    let preview = previewed.unwrap();
+    let execution = executed.unwrap();
     let expected = BTreeSet::from([
         "dev/scan/readable.md:1:8".to_string(),
         "dev/scan/readable.md:2:9".to_string(),
@@ -1914,7 +1678,11 @@ fn test_archive_container_preview_and_execution_preserve_citations_beside_unread
 /// smaller repository-size cap than its listing budget.
 #[test]
 fn test_archive_container_execution_reports_citations_with_more_than_256_scan_directories() {
-    let run = archived_citation_with_scan_directories(261);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation_with_scan_directories(&cli, 261);
 
     assert_eq!(
         archive_warning_set(&run.execution),
@@ -1929,11 +1697,13 @@ fn test_archive_container_execution_reports_citations_with_more_than_256_scan_di
 /// (`@/invariant/derived-state-coherence`).
 #[test]
 fn test_archive_container_execution_relinks_document_records_to_the_archived_locations() {
-    let run = archived_citation();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation(&cli);
 
-    let shown = jit(&run.repo, &["issue", "show", &run.container, "--json"]);
-    assert_success(&shown);
-    let recorded = serde_json::from_slice::<Value>(&shown.stdout).unwrap()["documents"]
+    let recorded = cli.run_json(["issue", "show", &run.container]).unwrap()["documents"]
         .as_array()
         .unwrap()
         .iter()
@@ -1980,7 +1750,11 @@ fn test_archive_container_execution_relinks_document_records_to_the_archived_loc
 /// where it should be: files relocated, files stayed, and one file is new.
 #[test]
 fn test_archive_container_execution_synthesizes_no_document_bytes_beyond_the_container_marker() {
-    let run = archived_citation();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation(&cli);
     let marker = format!("{}/.jit-container", run.destination_root);
     let effect = classify_execution_effect(&run.before, &run.after);
 

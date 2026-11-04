@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:41:16.588100099Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retire the server's private memory stores, which write a literal index body.\n\n## Background\n\nShared test support builds a memory store from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. The server crate's tests reach `jit` test support through its `test-support` dev-dependency. The two copies of `test_memory_storage` write the scenario value `enforce_leases = \"off\"` directly into the store, together with a literal `{\"schema_version\":2,…}` index body, and the `create_test_server` helpers build an executor over that store.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/server/src/routes.rs`: `test_memory_storage` (`:1082`).\n- `crates/server/tests/server_integration/document_api_tests.rs`: `test_memory_storage` (`:12`), `create_test_server` (`:23`), `create_test_server_with_issue` (`:39`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No server test defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-28T21:48:42.742862277Z",
+  "first_ready_at": "2026-10-27T20:54:26.513420787Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "be7a147f-5581-44ea-888e-df1c604690e0",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:43:12.747245338Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "79609088-33c0-41ba-bffd-017929e45972",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:44:19.217398062Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ca5eb7ee-4e67-4685-b63d-78d7dcb05b3a",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Server tests use the shared memory seeding",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T21:48:42.742862277Z"
 }

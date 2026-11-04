@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d7729e1caddae175adab4a4ac1632bff260a7df4",
+  "completed_at": "2026-11-03T02:31:51.754698097Z",
+  "duration_ms": 251079,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The profiles facade migration meets all issue-scoped success criteria with preserved bounds, updated callers, and passing Rust CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6f49f3b3-aa3b-48ec-870d-ec6d860d2f4b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0cea70aa-e530-4748-81fe-e3e8425c1d9e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T02:27:40.675084848Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cb886d142 (`jit:6f49f3b3`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (issue Markdown); @/charter/D-1 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T02:26:04Z); code-review pending\nTruncation recovery: recovered the tagged patch by individual file; profile.rs in three bounded ranges; narrowed plan and investigation reads to facade design and area 3\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The profiles facade migration meets all issue-scoped success criteria with preserved bounds, updated callers, and passing Rust CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

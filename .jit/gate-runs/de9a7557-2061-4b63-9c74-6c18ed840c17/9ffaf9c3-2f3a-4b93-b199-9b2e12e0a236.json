@@ -1,0 +1,59 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ba6ed02e3e50bf1a801bf1e3ad62c838cff2bd51",
+  "completed_at": "2026-11-03T23:19:56.203636737Z",
+  "duration_ms": 529529,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/ea843d26-492a-44cc-8c10-15f19b8c8ce3.json",
+        "id": "F1",
+        "line": 5,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3"
+        ],
+        "severity": "high",
+        "summary": "Manifest source issue-id-prefix-match lacks the required dependency on breakdown node de9a7557."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/9876a23a-one-validation-report/plan.md",
+        "id": "F2",
+        "line": 254,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The records-loader's stored external prerequisite differs from DEC-01 but preserves the named prerequisite transitively."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/9876a23a-one-validation-report/breakdown.json",
+        "id": "F3",
+        "line": 53,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Twenty-two amended stored descriptions omit only the authoritative manifest's final newline."
+      }
+    ],
+    "summary": "One amended manifest source is missing its required breakdown-node dependency; two additional exact-fidelity mismatches are advisory.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "de9a7557-2061-4b63-9c74-6c18ed840c17",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9ffaf9c3-2f3a-4b93-b199-9b2e12e0a236",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:11:06.674314580Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6012 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a3ae-3aa1-7a72-80f2-ed662d84330c\n--------\nuser\n--- 5999 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Mechanical checks passed: manifest validation with warnings denied, renderer `--check`, native batch dry-run, and `jit validate`. The current manifest contains 37 issues and 63 intra-manifest edges. Contract modes, producer reachability, footprints, content structure, gates, labels, priorities, and `planning` omission passed. The two superseded issues are rejected and have no dependents.\n\n### Finest-tier assignment simulation\n\n| Key / issue | Coherent change | Observable test boundary | Footprint credible | One focused implementation/review cycle | Not a chain link | Result |\n|---|---|---|---|---|---|---|\n| planning-node-lookup-in-templates | Yes | Templates unit tests | Yes | Yes | Yes | Pass |\n| one-plan-document-resolver | Yes | Templates unit tests | Yes | Yes | Yes | Pass |\n| config-default-accessors | Yes | Config unit tests | Yes | Yes | Yes | Pass |\n| built-in-pass-vocabulary | Yes | Validation unit tests | Yes | Yes | Yes | Pass |\n| compiled-local-rules | Yes | Validation unit tests | Yes | Yes | Yes—owns schema-engine reuse | Pass |\n| graph-finding-subject | Yes | Graph unit tests | Yes | Yes | Yes | Pass |\n| issue-id-prefix-match | Yes | Identity property tests | Yes | Yes | Yes | Pass |\n| item-address-index | Yes | Validation unit tests | Yes | Yes | Yes | Pass |\n| records-loader | Yes | Repository-state unit tests | Yes | Yes—one loader cutover | Yes | Pass |\n| pure-validation-report | Yes | Validation unit tests | Yes | Yes—signature cutover compiles together | Yes | Pass |\n| capture-hands-records | Yes | Command harness tests | Yes | Yes | Yes | Pass |\n| image-test-builder | Yes | Fixture tests | Yes | Yes | Yes | Pass |\n| image-builder-copies-converge | Yes | Repository-state tests | Yes | Yes | Yes | Pass |\n| profile-test-images-converge | Yes | Repository-state tests | Yes | Yes | Yes | Pass |\n| report-selection | Yes | Validation unit tests | Yes | Yes | Yes | Pass |\n| dag-strategy-in-test-harness | Yes | Graph unit tests | Yes | Yes | Yes | Pass |\n| selection-contract-proptest | Yes | Validation property tests | Yes | Yes | Yes—independent oracle owner | Pass |\n| issue-views-over-selection | Yes | Command harness tests | Yes | Yes | Yes | Pass |\n| rule-view-over-selection | Yes | Command harness tests | Yes | Yes | Yes—distinct view | Pass |\n| scope-view-over-selection | Yes | Command harness tests | Yes | Yes | Yes—distinct behavior boundary | Pass |\n| invariant-drift-over-declarations | Yes | Command harness tests | Yes | Yes | Yes | Pass |\n| gate-checkers-over-selection | Yes | Command harness tests | Yes | Yes | Yes—checker dispatch owner | Pass |\n| executor-pass-cases-to-report-tests | Yes | Validation unit tests | Yes | Yes | Yes—preserves coverage before removal | Pass |\n| executor-pass-copies-removal | Yes | Existing validation suites | Yes | Yes | Yes—public-copy deletion | Pass |\n| validation-layer-tests-off-commands | Yes | Validation unit tests | Yes | Yes | Yes | Pass |\n| validation-view-docs | Yes | Documentation gates | Yes | Yes | Yes | Pass |\n| capture-spec-incremental | Yes | Repository-state unit tests | Yes | Yes | Yes—owns capture growth | Pass |\n| link-probe-pool | Yes | CLI link-check tests | Yes | Yes | Yes | Pass |\n| create-findings-in-session | Yes | Command harness tests | Yes | Yes | Yes | Pass |\n| create-output-reports-findings | Yes | CLI integration tests | Yes | Yes | Yes | Pass |\n| executor-graph-evaluation-removal | Yes | Existing rule suites | Yes | Yes | Yes | Pass |\n| fix-in-one-mutation | Yes | Command harness tests | Yes | Yes—atomic fix slice | Yes | Pass |\n| side-path-output-docs | Yes | Documentation gates | Yes | Yes | Yes | Pass |\n| validation-cost-measurement | Yes | Scripted benchmark run | Yes | Yes | Yes | Pass |\n\n1. **F1 — High; blocking; issue-impact.** The amendment changed `ea843d26` (`issue-id-prefix-match`) into a manifest source, but its stored dependency list is empty. The other seven sources depend on breakdown node `de9a7557`; this one does not, violating the exact source→B bracket geometry and `@/charter/D-3`. The authoritative manifest needs no correction. Graph reconciliation: add `de9a7557-2061-4b63-9c74-6c18ed840c17` as a dependency of `ea843d26-492a-44cc-8c10-15f19b8c8ce3`. Location: `.jit/issues/ea843d26-492a-44cc-8c10-15f19b8c8ce3.json:5`.\n\n2. **F2 — Low; advisory; issue-impact.** DEC-01 names `e1a6c8c2` as the direct external prerequisite of `records-loader`, but the stored issue instead depends directly on completed `c47d78c8`; that issue transitively reaches `e1a6c8c2`. Reachability and intermediate-state safety are preserved, so this is harmless external-wiring/rationale drift. Reconcile the plan to record the intentional `c47d78c8` edge and transitive reachability, or reconcile the stored direct edge. Locations: `dev/active/9876a23a-one-validation-report/plan.md:254`, `.jit/issues/b3a768b3-5d32-4ebb-ab92-9b9854e5b703.json:6`.\n\n3. **F3 — Low; advisory; issue-impact.** Twenty-two descriptions amended in revision `9a886c0e5` differ from their manifest descriptions only because the stored record omits the manifest’s final newline. Their standalone prose is otherwise byte-identical, so this is a harmless exact-fidelity formatting mismatch. Representative location: `dev/active/9876a23a-one-validation-report/breakdown.json:53`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One amended manifest source is missing its required breakdown-node dependency; two additional exact-fidelity mismatches are advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Manifest source issue-id-prefix-match lacks the required dependency on breakdown node de9a7557.\",\"file\":\".jit/issues/ea843d26-492a-44cc-8c10-15f19b8c8ce3.json\",\"line\":5,\"references\":[\"@/charter/D-3\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The records-loader's stored external prerequisite differs from DEC-01 but preserves the named prerequisite transitively.\",\"file\":\"dev/active/9876a23a-one-validation-report/plan.md\",\"line\":254},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Twenty-two amended stored descriptions omit only the authoritative manifest's final newline.\",\"file\":\"dev/active/9876a23a-one-validation-report/breakdown.json\",\"line\":53}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-18bcafb8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "23ebaef1b1789f4eab34f9fd459edaec2523f0a0",
+  "completed_at": "2026-10-25T06:07:06.824223771Z",
+  "duration_ms": 290097,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied in the attributable current tree; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "18bcafb8-88ca-4d1c-9776-2f14e2138b8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e3d4605d-e457-4380-ad06-f8c7e882d4b4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T06:02:16.726673813Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0b11d643b4899d9035e1414d031961776f5a8a40; 5e50abe882a74af7cc703795f20dda459b1ea58d\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/2195c98f/requirement/REQ-05; @/charter/D-18; @/invariant/semantic-types; @/invariant/canonical-cutover; @/invariant/essential-code-prose; @/invariant/architecture-dependency-direction; @/invariant/orthogonal-tests; @/gate/cargo-ci\nGate evidence: cargo-ci passed, exit 0, 2026-10-25T06:00:54Z; code-review pending with no prior run\nTruncation recovery: Narrowed current reads for test_utils, domain/types.rs, domain/event_catalog.rs, commands/events.rs, and storage reference coverage after a broad search truncated.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied in the attributable current tree; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

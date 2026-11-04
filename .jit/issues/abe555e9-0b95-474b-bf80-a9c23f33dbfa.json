@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T21:28:42.967267081Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "1539da29-f445-430c-a238-8613da6ae904",
     "650e6a56-e3fe-4169-8c2b-58229c9aaeca"
   ],
-  "description": "Command bodies live in the binary's `run()`, where the schema cannot see their response types. This establishes the library-side handler contract every command group migrates onto.\n\n## Background\n\n`run()` in `crates/jit/src/main.rs` matches over every command group, and each arm builds its payload, picks its error code, prints and often calls `std::process::exit`. The extracted helpers `run_item`, `run_invariant`, `run_project` and `run_query_all` are still binary-side. `CommandSchema::generate()` (`crates/jit/src/schema.rs`) lives in the library and takes success schemas from the hand-kept match table in `get_output_schema_for_command`, which falls back to `CommandResponse` for 74 of 120 leaves. Handlers must therefore live in the library so that the schema can reach each handler's response type. The building blocks exist: `OutputMode { json, quiet }`, `jit::output::failure::classify(&anyhow::Error) -> JsonError` and `ListEnvelope<K, T, E>` in the output module.\n\nThe contract: `crates/jit/src/dispatch/` holds one module per command group. A handler takes its parsed arguments and a `CommandContext` carrying the executor and the `OutputMode`, and returns `anyhow::Result<Outcome<R>>` where `R` is its registered response type. `Outcome` is either a success or a findings result carrying an `ErrorCode` and a report: under `--json` findings render as the failure envelope with that code as the exit status and the report as `error.details`; in human mode the report prints and the process exits with the same code. Every response is a type owned by the output module, or built by an output constructor wrapping a command-layer result, and derives `JsonSchema` plus a human rendering. One registration per group generates both its dispatch and the schema's per-leaf response lookup, so they cannot drift. Until every group has migrated, schema generation consults the registry first and the legacy table second.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/dispatch/` defines `CommandContext` (executor and `OutputMode`) and `Outcome<R>` with a success variant and a findings variant carrying an `ErrorCode` and a serializable report.\n- [hard] REQ-02: One per-group registration generates both the group's dispatch function and its per-leaf response-schema lookup from a single list of leaf, handler and response type.\n- [hard] REQ-03: One emitter in the output module renders an `Outcome`: success through the success envelope or the response's human rendering, findings through the failure envelope or the printed report; it returns the exit status and never calls `std::process::exit`.\n- [hard] REQ-04: `CommandSchema::generate()` takes a registered leaf's success schema from the registry and any other leaf's from `get_output_schema_for_command`'s legacy table, which stays reachable from the derivation.\n- [hard] REQ-05: The layer description in `AGENTS.md` names `dispatch/` as part of the CLI layer that owns dispatch, and states that `commands/` does not import it.\n- [hard] REQ-06: Unit tests drive a test-only handler group through registration, dispatch, schema lookup and both outcome renderings, and the generated schema and CLI output of every real command are unchanged.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "Command bodies live in the binary's `run()`, where the schema cannot see their response types. This establishes the library-side handler contract every command group migrates onto.\n\n## Background\n\n`dispatch()` in `crates/jit/src/main.rs`, called from `run()`, matches over every command group, and each arm builds its payload, picks its error code, prints and often calls `std::process::exit`. The extracted helpers `run_item`, `run_invariant`, `run_project` and `run_query_all` are still binary-side. `CommandSchema::generate()` (`crates/jit/src/schema.rs`) lives in the library and takes success schemas from the hand-kept match table in `get_output_schema_for_command`, which falls back to `CommandResponse` for 74 of 120 leaves. Handlers must therefore live in the library so that the schema can reach each handler's response type. The building blocks exist: `OutputMode { json, quiet }`, `jit::output::failure::classify(&anyhow::Error) -> JsonError` and `ListEnvelope<K, T, E>` in the output module.\n\nThe contract: `crates/jit/src/dispatch/` holds one module per command group. A handler takes its parsed arguments and a `CommandContext` carrying the executor and the `OutputMode`, and returns `anyhow::Result<Outcome<R>>` where `R` is its registered response type. `Outcome` is either a success or a findings result carrying an `ErrorCode` and a report: under `--json` findings render as the failure envelope with that code as the exit status and the report as `error.details`; in human mode the report prints and the process exits with the same code. Every response is a type owned by the output module, or built by an output constructor wrapping a command-layer result, and derives `JsonSchema` plus a human rendering. One registration per group generates both its dispatch and the schema's per-leaf response lookup, so they cannot drift. Until every group has migrated, schema generation consults the registry first and the legacy table second.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/dispatch/` defines `CommandContext` (executor and `OutputMode`) and `Outcome<R>` with a success variant and a findings variant carrying an `ErrorCode` and a serializable report.\n- [hard] REQ-02: One per-group registration generates both the group's dispatch function and its per-leaf response-schema lookup from a single list of leaf, handler and response type.\n- [hard] REQ-03: One emitter in the output module renders an `Outcome`: success through the success envelope or the response's human rendering, findings through the failure envelope or the printed report; it returns the exit status and never calls `std::process::exit`.\n- [hard] REQ-04: `CommandSchema::generate()` takes a registered leaf's success schema from the registry and any other leaf's from `get_output_schema_for_command`'s legacy table, which stays reachable from the derivation.\n- [hard] REQ-05: The layer description in `AGENTS.md` names `dispatch/` as part of the CLI layer that owns dispatch, and states that `commands/` does not import it.\n- [hard] REQ-06: Unit tests drive a test-only handler group through registration, dispatch, schema lookup and both outcome renderings, and the generated schema and CLI output of every real command are unchanged.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-03T23:08:00.748684426Z",
+  "first_ready_at": "2026-11-03T21:26:28.075330577Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "acf8606e-2e24-4a48-820e-dac8fc06c1fa",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:04:45.422546294Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cdba1054-6064-4b15-908f-59a86ace3810",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:07:52.536621289Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "satisfies:df129d9e/REQ-05"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Library-side command handler contract",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T23:08:00.748684426Z"
 }

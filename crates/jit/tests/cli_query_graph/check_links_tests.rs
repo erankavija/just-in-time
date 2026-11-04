@@ -1,424 +1,335 @@
-use assert_cmd::assert::OutputAssertExt;
-use predicates::prelude::*;
+//! Integration tests for jit doc check-links command
+//!
+//! Tests follow acceptance criteria from issue fb6e2e31:
+//! 1. Validate all documents in scope
+//! 2. Check asset existence (working tree or git)
+//! 3. Validate internal doc links resolve
+//! 4. Detect broken relative vs root-relative links
+//! 5. Scope filtering (all vs issue:ID)
+//! 6. Exit codes (0=valid or warnings only, 4=broken links)
+//! 7. JSON output support
+
+use jit::test_cli::JitCli;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::path::PathBuf;
-use std::process::Command;
-use tempfile::TempDir;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
-/// Spawn a minimal loopback HTTP server that answers every request with
-/// `200 OK`, returning its base URL (e.g. `http://127.0.0.1:PORT`).
-///
-/// Used instead of a live external service (previously `httpbin.org`) so the
-/// external-URL reachability test is deterministic and works offline: the `jit`
-/// subprocess issues its HEAD request to this in-process loopback listener.
-fn spawn_ok_server() -> String {
+/// Serve and count loopback requests without external network access.
+fn spawn_http_server(status: &'static str) -> (String, Arc<AtomicUsize>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock HTTP server");
     let addr = listener.local_addr().expect("mock server local addr");
+    let requests = Arc::new(AtomicUsize::new(0));
+    let counter = requests.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else { continue };
             // Drain the request head (a HEAD request carries no body), then
-            // reply 200 and close. Path/method are ignored — any request is OK.
+            // reply with the configured status and close.
             let mut buf = [0u8; 1024];
             let _ = stream.read(&mut buf);
-            let _ = stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            counter.fetch_add(1, Ordering::SeqCst);
+            let _ = stream.write_all(
+                format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            );
             let _ = stream.flush();
         }
     });
-    format!("http://{addr}")
-}
-
-/// Integration tests for jit doc check-links command
-///
-/// Tests follow acceptance criteria from issue fb6e2e31:
-/// 1. Validate all documents in scope
-/// 2. Check asset existence (working tree or git)
-/// 3. Validate internal doc links resolve
-/// 4. Detect broken relative vs root-relative links
-/// 5. Scope filtering (all vs issue:ID)
-/// 6. Exit codes (0=valid or warnings only, 1=errors)
-/// 7. JSON output support
-struct TestContext {
-    #[allow(dead_code)]
-    temp_dir: TempDir,
-    repo_path: PathBuf,
-}
-
-impl TestContext {
-    fn new() -> Self {
-        let temp_dir = TempDir::new().expect("create temp dir");
-        let repo_path = temp_dir.path().to_path_buf();
-        Self {
-            temp_dir,
-            repo_path,
-        }
-    }
-
-    fn init_repo(&self) {
-        Self::run_git_static(&self.repo_path, &["init"]);
-        Self::run_git_static(&self.repo_path, &["config", "user.name", "Test User"]);
-        Self::run_git_static(
-            &self.repo_path,
-            &["config", "user.email", "test@example.com"],
-        );
-        Self::run_jit_static(&self.repo_path, &["init"]);
-    }
-
-    fn repo_path(&self) -> &PathBuf {
-        &self.repo_path
-    }
-
-    fn run_git_static(path: &PathBuf, args: &[&str]) {
-        Command::new("git")
-            .current_dir(path)
-            .args(args)
-            .status()
-            .expect("git command failed");
-    }
-
-    /// Prepare a repository that jit manages without Git, so a pinned reference
-    /// has no object database to resolve against.
-    fn init_repo_without_git(&self) {
-        Self::run_jit_static(&self.repo_path, &["init"]);
-    }
-
-    fn run_git(&self, args: &[&str]) -> std::process::ExitStatus {
-        Command::new("git")
-            .current_dir(&self.repo_path)
-            .args(args)
-            .status()
-            .expect("git command failed")
-    }
-
-    fn commit_all(&self, message: &str) {
-        assert!(self.run_git(&["add", "-A"]).success());
-        assert!(self.run_git(&["commit", "-m", message]).success());
-    }
-
-    fn head_commit(&self) -> String {
-        let output = Command::new("git")
-            .current_dir(&self.repo_path)
-            .args(["rev-parse", "HEAD"])
-            .output()
-            .expect("git rev-parse failed");
-        assert!(output.status.success(), "git rev-parse HEAD failed");
-        String::from_utf8(output.stdout)
-            .expect("commit id is UTF-8")
-            .trim()
-            .to_string()
-    }
-
-    /// The JSON link-check report for the whole repository.
-    fn check_links_report(&self) -> serde_json::Value {
-        let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&self.repo_path)
-            .args(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .expect("check-links failed");
-        serde_json::from_slice(&output.stdout).expect("check-links JSON")
-    }
-
-    /// Whether whole-repository validation accepts this repository.
-    fn validate_accepts(&self) -> bool {
-        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&self.repo_path)
-            .args(["validate"])
-            .output()
-            .expect("validate failed")
-            .status
-            .success()
-    }
-
-    fn run_jit_static(path: &PathBuf, args: &[&str]) {
-        Command::new(env!("CARGO_BIN_EXE_jit"))
-            .current_dir(path)
-            .args(args)
-            .status()
-            .expect("jit command failed");
-    }
-
-    fn run_jit(&self, args: &[&str]) -> assert_cmd::assert::Assert {
-        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&self.repo_path)
-            .args(args)
-            .assert()
-    }
-
-    fn create_issue(&self, title: &str, description: &str) -> String {
-        let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&self.repo_path)
-            .args([
-                "issue",
-                "create",
-                "--title",
-                title,
-                "--description",
-                description,
-                "--json",
-            ])
-            .output()
-            .expect("create issue failed");
-
-        if !output.status.success() {
-            eprintln!("Failed to create issue:");
-            eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
-            eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
-            panic!("issue creation failed");
-        }
-
-        let json: serde_json::Value =
-            serde_json::from_slice(&output.stdout).expect("Failed to parse JSON from issue create");
-        json["id"].as_str().expect("No ID in response").to_string()
-    }
+    (format!("http://{addr}"), requests)
 }
 
 #[test]
-fn test_check_all_valid_links_exits_0() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+fn test_check_all_valid_links_succeeds() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
     // Create issue with document that has valid assets
-    let issue_id = ctx.create_issue("Test issue", "Test description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Test description"])
+        .unwrap();
 
     // Create a markdown document with valid local asset
     let doc_path = "docs/test-doc.md";
     let asset_path = "docs/assets/diagram.png";
 
-    fs::create_dir_all(ctx.repo_path().join("docs/assets")).unwrap();
+    fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Test Doc\n\n![Diagram](assets/diagram.png)\n",
     )
     .unwrap();
-    fs::write(ctx.repo_path().join(asset_path), b"fake-png-data").unwrap();
+    fs::write(cli.root().join(asset_path), b"fake-png-data").unwrap();
 
     // Add document with scanned assets
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--label", "Test"])
-        .success();
-
-    // Check links should pass with exit code 0
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .success()
-        .stdout(predicate::str::contains("All documents valid"));
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
+    let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
+    assert!(stdout.contains("All documents valid"));
 }
 
 #[test]
-fn test_missing_assets_exits_1() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+fn test_missing_assets_fails() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Test description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Test description"])
+        .unwrap();
 
     // Create document referencing missing asset
     let doc_path = "docs/broken-doc.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Broken Doc\n\n![Missing](assets/missing.png)\n",
     )
     .unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--label", "Test"])
-        .success();
-
-    // Check links should fail with exit code 1
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(1)
-        .stdout(predicate::str::contains("Errors found"))
-        .stdout(predicate::str::contains("missing"));
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Errors found"));
+    assert!(stdout.contains("missing"));
 }
 
 #[test]
-fn test_broken_internal_doc_links_exits_1() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+fn test_broken_internal_doc_links_fails() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Test description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Test description"])
+        .unwrap();
 
     // Create document with broken link to another doc
     let doc_path = "docs/doc-with-broken-link.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Doc\n\nSee [missing doc](nonexistent.md) for details.\n",
     )
     .unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--label", "Test"])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Errors found"));
+    assert!(stdout.contains("broken"));
+}
 
-    // Check links should fail with exit code 1
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(1)
-        .stdout(predicate::str::contains("Errors found"))
-        .stdout(predicate::str::contains("broken"));
+#[test]
+fn test_check_links_broken_link_json_is_validation_failed_envelope_exit_4_with_report_details() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Test description"])
+        .unwrap();
+    let doc_path = "docs/doc-with-broken-link.md";
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(
+        cli.root().join(doc_path),
+        "# Doc\n\nSee [missing doc](nonexistent.md) for details.\n",
+    )
+    .unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
+
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "VALIDATION_FAILED");
+    let details = &envelope["error"]["details"];
+    assert_eq!(details["valid"], false);
+    assert!(!details["errors"].as_array().unwrap().is_empty());
 }
 
 #[test]
 fn test_risky_relative_links_warns() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Test description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Test description"])
+        .unwrap();
 
     // Create document with risky (but valid) relative path
     let doc_path = "docs/subdir/risky-doc.md";
-    fs::create_dir_all(ctx.repo_path().join("docs/subdir")).unwrap();
-    fs::create_dir_all(ctx.repo_path().join("assets")).unwrap();
+    fs::create_dir_all(cli.root().join("docs/subdir")).unwrap();
+    fs::create_dir_all(cli.root().join("assets")).unwrap();
 
     // Deep relative path that exists but is fragile
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Risky\n\n![Asset](../../assets/image.png)\n",
     )
     .unwrap();
-    fs::write(ctx.repo_path().join("assets/image.png"), b"data").unwrap();
+    fs::write(cli.root().join("assets/image.png"), b"data").unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--label", "Test"])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
 
     // Warnings alone are reported and do not fail the check.
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(0)
-        .stdout(predicate::str::contains("Warnings"))
-        .stdout(predicate::str::contains("risky").or(predicate::str::contains("relative")));
-    let json: serde_json::Value = serde_json::from_slice(
-        &ctx.run_jit(&["doc", "check-links", "--scope", "all", "--json"])
-            .code(0)
-            .get_output()
-            .stdout,
-    )
-    .unwrap();
-    assert!(!json["warnings"].as_array().unwrap().is_empty());
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Warnings"));
+    assert!(stdout.contains("risky") || stdout.contains("relative"));
+    let json = cli
+        .run_json(["doc", "check-links", "--scope", "all"])
+        .unwrap();
+    assert!(!json["link_warnings"].as_array().unwrap().is_empty());
     assert!(json["errors"].as_array().unwrap().is_empty());
 }
 
 #[test]
 fn test_scope_filtering_all() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
     // Create multiple issues with documents
-    let issue1 = ctx.create_issue("Issue 1", "Description");
-    let issue2 = ctx.create_issue("Issue 2", "Description");
+    let issue1 = cli
+        .create_issue(["--title", "Issue 1", "--description", "Description"])
+        .unwrap();
+    let issue2 = cli
+        .create_issue(["--title", "Issue 2", "--description", "Description"])
+        .unwrap();
 
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join("docs/doc1.md"), "# Doc 1").unwrap();
-    fs::write(ctx.repo_path().join("docs/doc2.md"), "# Doc 2").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join("docs/doc1.md"), "# Doc 1").unwrap();
+    fs::write(cli.root().join("docs/doc2.md"), "# Doc 2").unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue1, "docs/doc1.md", "--label", "Doc1"])
-        .success();
-    ctx.run_jit(&["doc", "add", &issue2, "docs/doc2.md", "--label", "Doc2"])
-        .success();
+    cli.run(["doc", "add", &issue1, "docs/doc1.md", "--label", "Doc1"])
+        .unwrap();
+    cli.run(["doc", "add", &issue2, "docs/doc2.md", "--label", "Doc2"])
+        .unwrap();
 
     // Scope all should check both documents
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .success()
-        .stdout(predicate::str::contains("2 document(s)"));
+    let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
+    assert!(stdout.contains("2 document(s)"));
 }
 
 #[test]
 fn test_scope_filtering_issue_id() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue1 = ctx.create_issue("Issue 1", "Description");
-    let issue2 = ctx.create_issue("Issue 2", "Description");
+    let issue1 = cli
+        .create_issue(["--title", "Issue 1", "--description", "Description"])
+        .unwrap();
+    let issue2 = cli
+        .create_issue(["--title", "Issue 2", "--description", "Description"])
+        .unwrap();
 
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join("docs/doc1.md"), "# Doc 1").unwrap();
-    fs::write(ctx.repo_path().join("docs/doc2.md"), "# Doc 2").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join("docs/doc1.md"), "# Doc 1").unwrap();
+    fs::write(cli.root().join("docs/doc2.md"), "# Doc 2").unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue1, "docs/doc1.md", "--label", "Doc1"])
-        .success();
-    ctx.run_jit(&["doc", "add", &issue2, "docs/doc2.md", "--label", "Doc2"])
-        .success();
+    cli.run(["doc", "add", &issue1, "docs/doc1.md", "--label", "Doc1"])
+        .unwrap();
+    cli.run(["doc", "add", &issue2, "docs/doc2.md", "--label", "Doc2"])
+        .unwrap();
 
     // Scope issue:ID should check only that issue's documents
     let scope = format!("issue:{}", &issue1[..8]);
-    ctx.run_jit(&["doc", "check-links", "--scope", &scope])
-        .success()
-        .stdout(predicate::str::contains("1 document(s)"));
+    let stdout = cli.run(["doc", "check-links", "--scope", &scope]).unwrap();
+    assert!(stdout.contains("1 document(s)"));
 }
 
 #[test]
 fn test_json_output_structure() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Description"])
+        .unwrap();
 
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join("docs/test.md"), "# Test").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join("docs/test.md"), "# Test").unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "docs/test.md", "--label", "Test"])
-        .success();
+    cli.run(["doc", "add", &issue_id, "docs/test.md", "--label", "Test"])
+        .unwrap();
 
     // JSON output should have expected structure
-    let output = ctx
-        .run_jit(&["doc", "check-links", "--scope", "all", "--json"])
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let json = cli
+        .run_json(["doc", "check-links", "--scope", "all"])
+        .unwrap();
 
     // Validate JSON structure
     // success field removed
     assert!(json["valid"].is_boolean());
     assert!(json["errors"].is_array());
-    assert!(json["warnings"].is_array());
+    assert!(json["link_warnings"].is_array());
     assert!(json["summary"].is_object());
     assert!(json["summary"]["total_documents"].is_number());
 }
 
 #[test]
 fn test_invalid_scope_format() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
     // Invalid scope should error
-    ctx.run_jit(&["doc", "check-links", "--scope", "invalid"])
-        .failure()
-        .stderr(predicate::str::contains("Invalid scope"));
+    let output = cli
+        .command(["doc", "check-links", "--scope", "invalid"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Invalid scope"));
 }
 
 #[test]
 fn test_empty_repository_no_documents() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
     // No documents should exit cleanly
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .success()
-        .stdout(
-            predicate::str::contains("No documents found")
-                .or(predicate::str::contains("0 document")),
-        );
+    let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
+    assert!(stdout.contains("No documents found") || stdout.contains("0 document"));
 }
 
 #[test]
 fn test_external_urls_are_validated() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Description"])
+        .unwrap();
 
     // Document with a reachable external URL, served by a local loopback mock so
     // the test is deterministic and offline-safe (no dependency on httpbin.org).
-    let base = spawn_ok_server();
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    let (base, _) = spawn_http_server("200 OK");
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
-        ctx.repo_path().join("docs/external.md"),
+        cli.root().join("docs/external.md"),
         format!("# External\n\n![Remote]({base}/status/200)\n"),
     )
     .unwrap();
 
-    ctx.run_jit(&[
+    cli.run([
         "doc",
         "add",
         &issue_id,
@@ -426,89 +337,91 @@ fn test_external_urls_are_validated() {
         "--label",
         "Test",
     ])
-    .success();
+    .unwrap();
 
     // A reachable external URL should validate successfully (no warnings/errors).
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(0)
-        .stdout(predicate::str::contains("valid"));
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("valid"));
 }
 
 #[test]
-fn test_unreachable_external_urls_error() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+fn test_check_document_links_probes_shared_url_once_and_reports_each_document() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Shared URL", "--description", "Description"])
+        .unwrap();
+    let (base, requests) = spawn_http_server("404 Not Found");
+    let url = format!("{base}/missing.png");
+    let documents = ["first.md", "second.md"];
+    for document in documents {
+        fs::write(cli.root().join(document), format!("![Remote]({url})\n")).unwrap();
+        cli.run(["doc", "add", &issue_id, document]).unwrap();
+    }
 
-    let issue_id = ctx.create_issue("Test issue", "Description");
-
-    // Document with unreachable external URL
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(
-        ctx.repo_path().join("docs/bad_url.md"),
-        "# Bad URL\n\n![Remote](https://this-domain-definitely-does-not-exist-12345.com/image.png)\n",
-    )
-    .unwrap();
-
-    ctx.run_jit(&[
-        "doc",
-        "add",
-        &issue_id,
-        "docs/bad_url.md",
-        "--label",
-        "Test",
-    ])
-    .success();
-
-    // Unreachable external URLs should error
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(1)
-        .stdout(predicate::str::contains("Errors found"))
-        .stdout(predicate::str::contains("unreachable"));
+    let report = check_links_report(&cli);
+    assert_eq!(requests.load(Ordering::SeqCst), 1);
+    for document in documents {
+        let errors = errors_for_document(&report, document);
+        assert_eq!(errors.len(), 1, "{report}");
+        assert_eq!(errors[0]["type"], "unreachable_url");
+        assert_eq!(errors[0]["asset"], url);
+    }
 }
 
 #[test]
 fn test_missing_document_file() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Description"])
+        .unwrap();
 
     // Create and add document
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join("docs/temp.md"), "# Temp").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join("docs/temp.md"), "# Temp").unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "docs/temp.md", "--label", "Test"])
-        .success();
+    cli.run(["doc", "add", &issue_id, "docs/temp.md", "--label", "Test"])
+        .unwrap();
 
     // Delete the document file
-    fs::remove_file(ctx.repo_path().join("docs/temp.md")).unwrap();
+    fs::remove_file(cli.root().join("docs/temp.md")).unwrap();
 
     // Check should report missing document
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(1)
-        .stdout(
-            predicate::str::contains("missing_document").or(predicate::str::contains("not found")),
-        );
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("missing_document") || stdout.contains("not found"));
 }
 
 #[test]
 fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Directory link", "Description");
-    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
-    fs::create_dir_all(ctx.repo_path().join("dev/notes")).unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Directory link", "--description", "Description"])
+        .unwrap();
+    fs::create_dir_all(cli.root().join("dev/studies")).unwrap();
+    fs::create_dir_all(cli.root().join("dev/notes")).unwrap();
     fs::write(
-        ctx.repo_path().join("dev/notes/guide.md"),
+        cli.root().join("dev/notes/guide.md"),
         "See [the studies area](../studies).\n",
     )
     .unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "dev/notes/guide.md"])
-        .success();
+    cli.run(["doc", "add", &issue_id, "dev/notes/guide.md"])
+        .unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     assert!(
         errors_for_document(&report, "dev/notes/guide.md")
             .iter()
@@ -516,7 +429,7 @@ fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() 
         "an existing directory is navigation, not a missing asset: {report}"
     );
     assert!(
-        report["warnings"]
+        report["link_warnings"]
             .as_array()
             .expect("warnings array")
             .iter()
@@ -527,56 +440,66 @@ fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() 
 
 #[test]
 fn test_validate_reports_direct_directory_reference_as_unsupported_artifact_type() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Directory reference", "Description");
-    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Directory reference",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
+    fs::create_dir_all(cli.root().join("dev/studies")).unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "dev/studies"])
-        .success();
+    cli.run(["doc", "add", &issue_id, "dev/studies"]).unwrap();
 
-    ctx.run_jit(&["validate"])
-        .failure()
-        .stderr(predicate::str::contains("unsupported artifact type"))
-        .stderr(predicate::str::contains("dev/studies"))
-        .stderr(predicate::str::contains("not found").not());
+    let output = cli.command(["validate"]).output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unsupported artifact type"));
+    assert!(stderr.contains("dev/studies"));
+    assert!(!stderr.contains("not found"));
 }
 
 #[test]
 fn test_pinned_directory_link_target_is_navigation_at_its_commit() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Pinned directory link", "Description");
-    fs::create_dir_all(ctx.repo_path().join("docs/studies")).unwrap();
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Pinned directory link",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
+    fs::create_dir_all(cli.root().join("docs/studies")).unwrap();
+    fs::write(cli.root().join("docs/studies/.keep"), "tracked directory\n").unwrap();
     fs::write(
-        ctx.repo_path().join("docs/studies/.keep"),
-        "tracked directory\n",
-    )
-    .unwrap();
-    fs::write(
-        ctx.repo_path().join("docs/report.md"),
+        cli.root().join("docs/report.md"),
         "See [the studies area](studies).\n",
     )
     .unwrap();
-    ctx.commit_all("add pinned directory navigation");
-    let pin = ctx.head_commit();
+    cli.commit("add pinned directory navigation").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
+        .unwrap();
 
-    fs::remove_dir_all(ctx.repo_path().join("docs/studies")).unwrap();
-    fs::write(ctx.repo_path().join("docs/studies"), "now a file\n").unwrap();
-    ctx.commit_all("replace navigation directory");
+    fs::remove_dir_all(cli.root().join("docs/studies")).unwrap();
+    fs::write(cli.root().join("docs/studies"), "now a file\n").unwrap();
+    cli.commit("replace navigation directory").unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     assert!(
         errors_for_document(&report, "docs/report.md").is_empty(),
         "the pinned directory target must remain navigation: {report}"
     );
     assert!(
-        report["warnings"]
+        report["link_warnings"]
             .as_array()
             .expect("warnings array")
             .iter()
@@ -587,31 +510,35 @@ fn test_pinned_directory_link_target_is_navigation_at_its_commit() {
 
 #[test]
 fn test_pinned_directory_reference_is_unsupported_at_its_commit() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Pinned directory reference", "Description");
-    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
-    fs::write(
-        ctx.repo_path().join("dev/studies/.keep"),
-        "tracked directory\n",
-    )
-    .unwrap();
-    ctx.commit_all("add pinned directory reference");
-    let pin = ctx.head_commit();
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Pinned directory reference",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
+    fs::create_dir_all(cli.root().join("dev/studies")).unwrap();
+    fs::write(cli.root().join("dev/studies/.keep"), "tracked directory\n").unwrap();
+    cli.commit("add pinned directory reference").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "dev/studies", "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, "dev/studies", "--commit", &pin])
+        .unwrap();
 
-    fs::remove_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
-    fs::write(ctx.repo_path().join("dev/studies"), "now a file\n").unwrap();
-    ctx.commit_all("replace pinned directory reference");
+    fs::remove_dir_all(cli.root().join("dev/studies")).unwrap();
+    fs::write(cli.root().join("dev/studies"), "now a file\n").unwrap();
+    cli.commit("replace pinned directory reference").unwrap();
 
-    ctx.run_jit(&["validate"])
-        .failure()
-        .stderr(predicate::str::contains("unsupported artifact type"))
-        .stderr(predicate::str::contains("dev/studies"))
-        .stderr(predicate::str::contains("not found").not());
+    let output = cli.command(["validate"]).output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unsupported artifact type"));
+    assert!(stderr.contains("dev/studies"));
+    assert!(!stderr.contains("not found"));
 }
 
 #[cfg(unix)]
@@ -619,33 +546,40 @@ fn test_pinned_directory_reference_is_unsupported_at_its_commit() {
 fn test_pinned_symlink_target_is_unsupported_at_its_commit() {
     use std::os::unix::fs::symlink;
 
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Pinned symlink target", "Description");
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join("docs/target.md"), "Pinned target\n").unwrap();
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Pinned symlink target",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join("docs/target.md"), "Pinned target\n").unwrap();
     fs::write(
-        ctx.repo_path().join("docs/report.md"),
+        cli.root().join("docs/report.md"),
         "See [the linked target](linked.md).\n",
     )
     .unwrap();
-    symlink("target.md", ctx.repo_path().join("docs/linked.md")).unwrap();
-    ctx.commit_all("add pinned symlink target");
-    let pin = ctx.head_commit();
+    symlink("target.md", cli.root().join("docs/linked.md")).unwrap();
+    cli.commit("add pinned symlink target").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    ctx.run_jit(&["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
+        .unwrap();
 
-    fs::remove_file(ctx.repo_path().join("docs/linked.md")).unwrap();
+    fs::remove_file(cli.root().join("docs/linked.md")).unwrap();
     fs::write(
-        ctx.repo_path().join("docs/linked.md"),
+        cli.root().join("docs/linked.md"),
         "This ordinary working-tree file must not be used.\n",
     )
     .unwrap();
-    ctx.commit_all("replace symlink with regular file");
+    cli.commit("replace symlink with regular file").unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, "docs/report.md");
     assert!(
         errors
@@ -666,40 +600,52 @@ fn test_pinned_symlink_target_is_unsupported_at_its_commit() {
 
 #[test]
 fn test_git_versioned_asset_exists() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Test issue", "Description");
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Description"])
+        .unwrap();
 
     // Create document with asset, commit it
-    fs::create_dir_all(ctx.repo_path().join("docs/assets")).unwrap();
+    fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
     let doc_path = "docs/versioned.md";
     let asset_path = "docs/assets/old.png";
 
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Versioned\n\n![Old](assets/old.png)\n",
     )
     .unwrap();
-    fs::write(ctx.repo_path().join(asset_path), b"old-data").unwrap();
+    fs::write(cli.root().join(asset_path), b"old-data").unwrap();
 
     // Commit to git
-    assert!(ctx.run_git(&["add", "."]).success());
-    assert!(ctx
-        .run_git(&["commit", "-m", "Add document with asset"])
-        .success());
+    cli.commit("Add document with asset").unwrap();
 
     // Add document reference
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--label", "Test"])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
 
     // Remove asset from working tree
-    fs::remove_file(ctx.repo_path().join(asset_path)).unwrap();
+    fs::remove_file(cli.root().join(asset_path)).unwrap();
 
     // Check should pass because asset exists in git
-    ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .success()
-        .stdout(predicate::str::contains("valid"));
+    let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
+    assert!(stdout.contains("valid"));
+}
+
+/// The link report of `doc check-links --json`: the failure envelope's
+/// `error.details` when a link is broken, the success payload otherwise.
+fn check_links_report(cli: &JitCli) -> serde_json::Value {
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all", "--json"])
+        .output()
+        .unwrap();
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    envelope
+        .pointer("/error/details")
+        .cloned()
+        .unwrap_or(envelope)
 }
 
 /// Every error a report attributes to one document, whatever its type.
@@ -717,23 +663,25 @@ fn errors_for_document<'a>(
 
 #[test]
 fn test_check_document_links_resolves_pinned_document_deleted_from_working_tree() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Pinned document", "Description");
+    let issue_id = cli
+        .create_issue(["--title", "Pinned document", "--description", "Description"])
+        .unwrap();
     let doc_path = "docs/pinned.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join(doc_path), "# Pinned\n\nBody.\n").unwrap();
-    ctx.commit_all("add pinned document");
-    let pin = ctx.head_commit();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "# Pinned\n\nBody.\n").unwrap();
+    cli.commit("add pinned document").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .unwrap();
 
-    fs::remove_file(ctx.repo_path().join(doc_path)).unwrap();
-    ctx.commit_all("delete pinned document");
+    fs::remove_file(cli.root().join(doc_path)).unwrap();
+    cli.commit("delete pinned document").unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         errors.is_empty(),
@@ -741,7 +689,7 @@ fn test_check_document_links_resolves_pinned_document_deleted_from_working_tree(
     );
     assert_eq!(
         errors.is_empty(),
-        ctx.validate_accepts(),
+        cli.run(["validate"]).is_ok(),
         "link checking and whole-repository validation must classify the pinned reference alike"
     );
 }
@@ -751,33 +699,40 @@ fn test_check_document_links_resolves_pinned_document_deleted_from_working_tree(
 /// still resolves.
 #[test]
 fn test_check_document_links_resolves_pinned_assets_and_links_at_the_pin() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Pinned document with neighbours", "Description");
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Pinned document with neighbours",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
     let doc_path = "docs/report.md";
     let asset_path = "docs/diagram.png";
     let link_target = "docs/appendix.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Report\n\n![Diagram](diagram.png)\n\nSee [the appendix](appendix.md).\n",
     )
     .unwrap();
-    fs::write(ctx.repo_path().join(asset_path), b"png-bytes").unwrap();
-    fs::write(ctx.repo_path().join(link_target), "# Appendix\n").unwrap();
-    ctx.commit_all("add report with asset and appendix");
-    let pin = ctx.head_commit();
+    fs::write(cli.root().join(asset_path), b"png-bytes").unwrap();
+    fs::write(cli.root().join(link_target), "# Appendix\n").unwrap();
+    cli.commit("add report with asset and appendix").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .unwrap();
 
-    fs::remove_file(ctx.repo_path().join(doc_path)).unwrap();
-    fs::remove_file(ctx.repo_path().join(asset_path)).unwrap();
-    fs::remove_file(ctx.repo_path().join(link_target)).unwrap();
-    ctx.commit_all("delete the report and its neighbours");
+    fs::remove_file(cli.root().join(doc_path)).unwrap();
+    fs::remove_file(cli.root().join(asset_path)).unwrap();
+    fs::remove_file(cli.root().join(link_target)).unwrap();
+    cli.commit("delete the report and its neighbours").unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         errors.is_empty(),
@@ -785,31 +740,39 @@ fn test_check_document_links_resolves_pinned_assets_and_links_at_the_pin() {
     );
     assert_eq!(
         errors.is_empty(),
-        ctx.validate_accepts(),
+        cli.run(["validate"]).is_ok(),
         "link checking and whole-repository validation must classify the pinned reference alike"
     );
 }
 
 #[test]
 fn test_check_document_links_rejects_pinned_document_absent_at_its_commit() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    fs::write(ctx.repo_path().join("README.md"), "# Repo\n").unwrap();
-    ctx.commit_all("initial commit");
-    let pin = ctx.head_commit();
+    fs::write(cli.root().join("README.md"), "# Repo\n").unwrap();
+    cli.commit("initial commit").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    let issue_id = ctx.create_issue("Reference pinned before its file", "Description");
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Reference pinned before its file",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
     let doc_path = "docs/later.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join(doc_path), "# Later\n").unwrap();
-    ctx.commit_all("add the document after the pinned commit");
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "# Later\n").unwrap();
+    cli.commit("add the document after the pinned commit")
+        .unwrap();
 
     // The file is in the working tree, but not at the commit the reference names.
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         !errors.is_empty(),
@@ -817,7 +780,7 @@ fn test_check_document_links_rejects_pinned_document_absent_at_its_commit() {
     );
     assert_eq!(
         errors.is_empty(),
-        ctx.validate_accepts(),
+        cli.run(["validate"]).is_ok(),
         "link checking and whole-repository validation must classify the pinned reference alike"
     );
 }
@@ -826,15 +789,21 @@ fn test_check_document_links_rejects_pinned_document_absent_at_its_commit() {
 /// is reported unresolved — the same answer whole-repository validation gives.
 #[test]
 fn test_check_document_links_reports_pinned_document_without_git() {
-    let ctx = TestContext::new();
-    ctx.init_repo_without_git();
+    let cli = JitCli::initialised().unwrap();
 
-    let issue_id = ctx.create_issue("Pinned without git", "Description");
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Pinned without git",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
     let doc_path = "docs/pinned.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join(doc_path), "# Pinned\n").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "# Pinned\n").unwrap();
 
-    ctx.run_jit(&[
+    cli.run([
         "doc",
         "add",
         &issue_id,
@@ -842,9 +811,9 @@ fn test_check_document_links_reports_pinned_document_without_git() {
         "--commit",
         "0123456789abcdef0123456789abcdef01234567",
     ])
-    .success();
+    .unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         !errors.is_empty(),
@@ -852,7 +821,7 @@ fn test_check_document_links_reports_pinned_document_without_git() {
     );
     assert_eq!(
         errors.is_empty(),
-        ctx.validate_accepts(),
+        cli.run(["validate"]).is_ok(),
         "link checking and whole-repository validation must classify the pinned reference alike"
     );
 }
@@ -861,23 +830,30 @@ fn test_check_document_links_reports_pinned_document_without_git() {
 /// failing the check that would have reported it.
 #[test]
 fn test_check_document_links_reports_pinned_link_target_outside_the_repository() {
-    let ctx = TestContext::new();
-    ctx.init_repo();
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let issue_id = ctx.create_issue("Pinned document linking outward", "Description");
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Pinned document linking outward",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
     let doc_path = "notes.md";
     fs::write(
-        ctx.repo_path().join(doc_path),
+        cli.root().join(doc_path),
         "# Notes\n\nSee [the parent](../) for context.\n",
     )
     .unwrap();
-    ctx.commit_all("add notes");
-    let pin = ctx.head_commit();
+    cli.commit("add notes").unwrap();
+    let pin = cli.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
-        .success();
+    cli.run(["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     assert!(
         report["errors"].is_array(),
         "the check completes and reports, rather than failing"
@@ -894,17 +870,23 @@ fn test_check_document_links_reports_pinned_link_target_outside_the_repository()
 /// absent, so link checking stays usable without Git.
 #[test]
 fn test_check_document_links_resolves_unpinned_document_without_git() {
-    let ctx = TestContext::new();
-    ctx.init_repo_without_git();
+    let cli = JitCli::initialised().unwrap();
 
-    let issue_id = ctx.create_issue("Unpinned without git", "Description");
+    let issue_id = cli
+        .create_issue([
+            "--title",
+            "Unpinned without git",
+            "--description",
+            "Description",
+        ])
+        .unwrap();
     let doc_path = "docs/current.md";
-    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
-    fs::write(ctx.repo_path().join(doc_path), "# Current\n").unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join(doc_path), "# Current\n").unwrap();
 
-    ctx.run_jit(&["doc", "add", &issue_id, doc_path]).success();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
 
-    let report = ctx.check_links_report();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         errors.is_empty(),

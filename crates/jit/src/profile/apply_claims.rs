@@ -2,8 +2,8 @@
 
 use super::{resolve_package, ProfilePackage, ResolvedProfileContent, VariableInputs};
 use crate::repository_state::{
-    FileMode, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim, ProfilePackageId,
-    ProfileRegionClaim, TargetClaim,
+    FileMode, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim, ProfileRegionClaim,
+    TargetClaim,
 };
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -35,6 +35,8 @@ pub fn build_profile_claims_from_resolved(
     package: &ResolvedProfileContent,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
+    #[cfg(test)]
+    super::selection_probe::record(super::selection_probe::SelectionStage::PackageComposition);
     validate_target_overlaps(package)?;
     let contribution_claims = build_resolved_contribution_claims(package);
     let assets = package
@@ -80,7 +82,7 @@ pub fn build_profile_claims_from_resolved(
         })
         .collect::<Result<Vec<_>, ProfileClaimError>>()?;
     Ok(ProfileClaims {
-        package_id: ProfilePackageId::new(package.model().id.to_string()),
+        package_id: package.model().id.clone(),
         contributions: contribution_claims,
         assets,
         regions,
@@ -95,7 +97,7 @@ pub fn build_profile_claims_from_resolved(
 pub fn build_resolved_contribution_claims(
     package: &ResolvedProfileContent,
 ) -> Vec<ProfileContributionClaim> {
-    let package_id = ProfilePackageId::new(package.model().id.to_string());
+    let package_id = package.model().id.clone();
     package
         .model()
         .contributions
@@ -113,7 +115,7 @@ fn validate_target_overlaps(package: &ResolvedProfileContent) -> Result<(), Prof
         .model()
         .contributions
         .iter()
-        .map(|contribution| contribution.registry_path().to_string())
+        .map(|contribution| contribution.registry().path().repository_relative())
         .collect::<BTreeSet<_>>();
     let content = package
         .model()

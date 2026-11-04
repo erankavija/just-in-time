@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:09:04.112878328Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Apply, pack and add read a profile package through one validated in-memory type; the parallel captured-tree type folds into it.\n\n## Background\n\n`ProfilePackage` and `CapturedPackageTree` (`crates/jit/src/profile/package_capture.rs:133`) are parallel validated-package types. Both are built through `ProfilePackage::validate_content` (`compose_captured_tree`, `package_capture.rs:697`). The captured tree serves pack (`pack_profile_package_inner`, `crates/jit/src/commands/profile.rs:883`) and add (`read_package_archive`, `crates/jit/src/profile/package_archive.rs:391`), while apply reads `ProfilePackage::from_directory`. The captured tree carries the package files that pack and add need, so the merged type keeps them. Test helpers build captured trees (`crates/jit/src/test_utils.rs`). Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: One validated in-memory package type serves apply, pack and add, and the captured-tree type is gone.\n- [hard] REQ-02: A package read for apply, read for pack, and extracted by add has the same identity hash on each route.\n- [hard] REQ-03: Pack and add tests pass over the merged type.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:16:01.074187260Z",
+  "first_ready_at": "2026-11-01T19:15:37.419667880Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "997bf6d1-f599-43f2-8764-b5938b8fdd01",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:10:32.931393948Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5a98ed41-7a81-40ff-be8c-d6e16152359e",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:14:12.062743325Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "04ece1e2-656b-456c-b434-5f5200fa1d3b",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Use one validated profile package type",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:16:01.074187260Z"
 }

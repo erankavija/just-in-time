@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c8bd6307340672d955e0bddbb27ff49b5cacd9fd",
+  "completed_at": "2026-10-29T06:59:29.639161382Z",
+  "duration_ms": 206135,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/error_json_tests.rs",
+        "id": "F1",
+        "line": 142,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Repeated rustdoc restates self-describing tests and includes task-history prose."
+      }
+    ],
+    "summary": "Moved tests meet the ownership intent, but recurring redundant rustdoc violates the applicable code-prose invariant.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "55cd1ae4-9957-4724-af8d-1219dfbe477b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "57cd99ac-2df4-43fe-9c30-b18503f61bdf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T06:56:03.503446697Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3961 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a18671-be55-7370-a247-15c6d11f3cc6\n--------\nuser\n--- 3948 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4db750dce, 43e860862 (jit:55cd1ae4)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci failed (exit code unavailable, 2026-10-29T06:56:03Z); code-review pending\nTruncation recovery: reread affected patches and current line ranges separately; merge paths for co-tagged parallel issues excluded from this issue’s impact cone\n\n1. **[blocking][issue-impact]** The newly added rustdoc comments repeatedly restate their self-describing test names and assertions rather than documenting a non-obvious contract. This occurs across both moved-case suites, e.g. [error_json_tests.rs:142](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/error_json_tests.rs:142) and [top_level_failure_envelope_tests.rs:247](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs:247). Remove the redundant comments; the `jit:62f3bebd` note at line 234 also records task history rather than essential code prose. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Moved tests meet the ownership intent, but recurring redundant rustdoc violates the applicable code-prose invariant.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repeated rustdoc restates self-describing tests and includes task-history prose.\",\"file\":\"crates/jit/tests/cli_issue/error_json_tests.rs\",\"line\":142,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

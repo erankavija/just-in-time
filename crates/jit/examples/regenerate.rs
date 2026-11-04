@@ -20,7 +20,10 @@
 //!   1 — the render or the publication failed
 //!   2 — a usage error
 
-use jit::generated_artifacts::{generated_artifact, ArtifactRender, GENERATED_ARTIFACTS};
+use jit::generated_artifacts::{
+    generated_artifact, ArtifactRender, ArtifactTarget, GENERATED_ARTIFACTS,
+};
+use jit::repository_state::RepositoryLayout;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -48,12 +51,24 @@ fn main() -> ExitCode {
         );
     };
 
-    match regenerate(&repository_root(), target, *render) {
+    let root = match repository_root() {
+        Ok(root) => root,
+        Err(error) => return fail(1, &error),
+    };
+    let layout = match repository_layout(&root) {
+        Ok(layout) => layout,
+        Err(error) => return fail(1, &error),
+    };
+    let target_name = target.repository_relative();
+    match regenerate(&layout, target, *render) {
         Ok(true) => report(&format!(
-            "updated: {target}\nOK: {target} rendered from {}",
+            "updated: {target_name}\nOK: {target_name} rendered from {}",
             artifact.holds
         )),
-        Ok(false) => report(&format!("OK: {target} already carries {}", artifact.holds)),
+        Ok(false) => report(&format!(
+            "OK: {target_name} already carries {}",
+            artifact.holds
+        )),
         Err(message) => fail(1, &message),
     }
 }
@@ -79,20 +94,31 @@ fn fail(code: u8, message: &str) -> ExitCode {
 
 /// The checkout these sources were compiled from, which is the repository whose
 /// artifacts the compiled declarations belong to.
-fn repository_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+fn repository_root() -> Result<PathBuf, String> {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve the repository root: {error}"))
+}
+
+fn repository_layout(root: &Path) -> Result<RepositoryLayout, String> {
+    jit::storage::discover_repository_layout(root, root.join(".jit"))
+        .map_err(|error| format!("cannot resolve the repository layout: {error}"))
 }
 
 /// Publish `target`'s rendered bytes, reporting whether they differed from the
 /// committed ones.
 fn regenerate(
-    root: &Path,
-    target: &str,
+    layout: &RepositoryLayout,
+    target: &ArtifactTarget,
     render: fn(&[u8]) -> Result<Vec<u8>, String>,
 ) -> Result<bool, String> {
-    let path = root.join(target);
+    let target_name = target.repository_relative();
+    let path = target
+        .resolve(layout)
+        .map_err(|error| format!("cannot resolve {target_name}: {error}"))?;
     let committed =
-        std::fs::read(&path).map_err(|error| format!("cannot read {target}: {error}"))?;
+        std::fs::read(&path).map_err(|error| format!("cannot read {target_name}: {error}"))?;
     let rendered = render(&committed)?;
     if rendered == committed {
         return Ok(false);
@@ -105,21 +131,23 @@ fn regenerate(
     // artifact unreadable to everyone else.
     let mut staged = tempfile::NamedTempFile::new_in(
         path.parent()
-            .ok_or_else(|| format!("{target} has no parent directory"))?,
+            .ok_or_else(|| format!("{target_name} has no parent directory"))?,
     )
-    .map_err(|error| format!("cannot stage {target}: {error}"))?;
+    .map_err(|error| format!("cannot stage {target_name}: {error}"))?;
     staged
         .write_all(&rendered)
-        .map_err(|error| format!("cannot write the staged {target}: {error}"))?;
+        .map_err(|error| format!("cannot write the staged {target_name}: {error}"))?;
     let permissions = std::fs::metadata(&path)
-        .map_err(|error| format!("cannot read the permissions of {target}: {error}"))?
+        .map_err(|error| format!("cannot read the permissions of {target_name}: {error}"))?
         .permissions();
     staged
         .as_file()
         .set_permissions(permissions)
-        .map_err(|error| format!("cannot set the permissions of the staged {target}: {error}"))?;
+        .map_err(|error| {
+            format!("cannot set the permissions of the staged {target_name}: {error}")
+        })?;
     staged
         .persist(&path)
-        .map_err(|error| format!("cannot publish {target}: {error}"))?;
+        .map_err(|error| format!("cannot publish {target_name}: {error}"))?;
     Ok(true)
 }

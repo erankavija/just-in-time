@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T23:27:21.186390324Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Moves the query, search and event-log read methods onto a `queries()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/query.rs`, `commands/search.rs` and `commands/events.rs`: `query_ready`, `query_blocked`, `query_by_assignee`, `query_by_state`, `query_by_priority`, `query_by_label`, `query_by_labels`, `query_strategic`, `query_closed`, `query_all`, `query_available`, `query_blocked_filtered`, `query_strategic_filtered`, `query_count_by_state`, `query_closed_filtered`, `search_issues`, `search_issues_with_filters`, `tail_events` and `query_events`. Callers: the query, list, issue search and events arms of `crates/jit/src/main.rs` (or their handler modules), `commands/issue.rs`, and the query and search suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::queries()` returns `QueryOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `QueryOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `QueryOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `queries()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T02:55:04.720657264Z",
   "first_ready_at": "2026-10-22T14:01:53.488708993Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7287b359-385f-4e30-b64a-ebaf41c655b6",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:52:11.952317224Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ec670317-68c7-4586-9d25-87d16533146b",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:54:58.990063266Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7a7d0bfe-8f5d-4f04-a9a9-0470d7957b27",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Query, search and event methods behind a queries facade",
-  "updated_at": "2026-10-22T14:01:53.488708993Z"
+  "updated_at": "2026-11-03T02:55:04.720657264Z"
 }

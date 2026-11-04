@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4abae3c9fbf005b976b9d1265f53ba0c1c9c08d8",
+  "completed_at": "2026-10-27T21:57:36.769987444Z",
+  "duration_ms": 187042,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/item.rs",
+        "id": "F1",
+        "line": 1143,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b7078f0d/requirement/REQ-02",
+          "@/issue/c780514e/requirement/REQ-06",
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "Item tests still seed configuration and registry declarations after constructing the shared executor, bypassing shared declaration setup."
+      }
+    ],
+    "summary": "Private post-construction declaration writes remain in item tests, leaving REQ-02 and the prior blocking finding unresolved.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b7078f0d-4725-4fd8-926c-50436c39880c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "60a8de22-cf69-4dcd-b615-6b1b429e8af4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:54:29.727368245Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9372 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17f5b-9188-7990-9961-1a014940b13c\n--------\nuser\n--- 9359 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4abae3c9f, 586696037, 74d338c74, 43cb9fc9d, 4302797b2\nPolicy sources: AGENTS.md\nResolved items: @/issue/b7078f0d/requirement/REQ-01..REQ-03 (issue Markdown); @/issue/c780514e/requirement/REQ-05..REQ-06 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit code unavailable, 2026-10-27T21:54:20Z\nTruncation recovery: partitioned tagged commit patches by path and merge parent; narrowed current fixture and post-construction declaration reads\n\n1. F1 — **blocking, issue-impact, high**: The prior finding remains unresolved. Item tests still construct the shared executor and then mutate declaration files directly, bypassing shared declaration setup—for example, [`item.rs:1143`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:1143) writes `.jit/config.toml` after `memory_executor_declaring`; the same pattern recurs for invariants, rules, and gates. The new comments explain the bypass but do not make these scenario declarations reach the shared constructor as REQ-02 requires. References: `@/issue/b7078f0d/requirement/REQ-02`, `@/issue/c780514e/requirement/REQ-06`, `@/invariant/shared-test-contracts`, `@/charter/D-18`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Private post-construction declaration writes remain in item tests, leaving REQ-02 and the prior blocking finding unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Item tests still seed configuration and registry declarations after constructing the shared executor, bypassing shared declaration setup.\",\"file\":\"crates/jit/src/commands/item.rs\",\"line\":1143,\"references\":[\"@/issue/b7078f0d/requirement/REQ-02\",\"@/issue/c780514e/requirement/REQ-06\",\"@/invariant/shared-test-contracts\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

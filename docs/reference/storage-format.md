@@ -7,17 +7,15 @@ repository root. Machine-local runtime state lives there too, gitignored, and
 multi-agent lease coordination lives under `.git/jit/` (see
 [The `.git/jit/` Control Plane](#the-gitjit-control-plane)).
 
-Three record shapes are defined by the code that writes them and are generated
-from it: the issue identifier, the event-log line, and the gate-run record. They
-live in [Storage Record Layout](storage-records.md), which this page links to
-where each comes up.
+Record fields and serialization are generated from the code that writes them
+in [Storage Record Layout](storage-records.md).
 
 ## Directory Structure
 
 ```
 .jit/
 ├── .gitignore        # Engine-owned ignore entries for the data root
-├── index.json        # Issue index for fast queries; carries the format version
+├── index.json        # Format version and deletion tombstones
 ├── config.toml       # Repository configuration
 ├── gates.toml        # Gate registry definitions
 ├── templates.toml    # Graph template registry
@@ -26,9 +24,13 @@ where each comes up.
 ├── events.jsonl      # Append-only event log
 ├── issues/           # One JSON file per issue
 │   └── <uuid>.json   # Issue data
-├── gate-runs/        # Recorded gate runs, one directory per run
-│   └── <run-id>/
-│       └── result.json  # Run record (see Storage Record Layout)
+├── gate-runs/        # Runs by issue; reusable verdicts by gate and inputs
+│   ├── <issue-id>/
+│   │   └── <run-id>.json
+│   └── verdicts/<gate-key>/<inputs-digest>.json
+├── archive-evidence/
+│   ├── container/<issue-id>.json
+│   └── document/<sha256-of-normalized-path>.json
 ├── schemas/          # JSON Schema files referenced by rules.toml
 └── tmp/              # Machine-local scratch directory
     └── redo.record   # The pending redo record, while a mutation leaves one
@@ -43,21 +45,21 @@ authored into it — the `rule` kind itself only once a `[item_kinds]` declarati
 reaches the repository.
 
 A live repository also carries gitignored, machine-local files directly under
-`.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock
-files, and `tmp/`. The data root's own `.gitignore` is derived state, not
+`.jit/`: `server.log`, `server.pid.json`, a fixed set of lock files, `tmp/`, and,
+for a data root inside a checkout, `worktree.json` (see
+[Worktree Identity](#worktree-identity)). The data root's own `.gitignore` is derived state, not
 authored: the engine composes its delimited engine-owned region, whose single
 entry is the scratch directory `tmp/`, so a repository never commits a pending
 redo record. Initialization writes it and `jit validate --fix` restores it,
 each preserving every line outside that region, and the repository's root
 ignore file is neither read nor written. The store's fixed lock set under
 `.jit/` is
-`.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
+`.repo-write.lock`, `.index.lock` and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
-complete the fixed set. Their paths come from the
-[storage layout](../../crates/jit/src/repository_state/path.rs) and the
-[`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
-implementation. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
+complete the fixed set, and each checkout over a data root outside every
+checkout adds one `worktree.lock` (see [Worktree Identity](#worktree-identity)).
+The `.jit/` storage locks and `.jit-bootstrap.lock` retain
 their inodes for advisory-lock race safety; they are opened with
 create-if-absent semantics and are not unlinked. No lock and no
 `worktree.json` write creates `.jit/`; `jit init` alone creates the data root.
@@ -82,10 +84,15 @@ Lease records live under `.git/jit/`, not `.jit/`. See
 
 ## Publication and Recovery
 
-A mutation publishes through one **redo record**: the directories it creates,
-the new contents of every file it writes, and the paths it removes, except
-that the event log is the one file the record extends rather than replaces, its
-new lines appended at the length the mutation read (`@/charter/D-17`). The mutation fails, before anything durable is written, if
+A repository mutation publishes through one **redo record**: the directories it
+creates, the new contents of every file it writes, and the paths it removes, except
+that the event log is the one file the record extends rather than replaces,
+with new lines positioned at its committed length (`@/charter/D-17`). Every
+redo record over an existing data root appends at least one event, so the log's
+length counts every commit: a write that records no domain event, such as
+`jit config set` or `jit project render`, appends one `files_published` event
+naming the paths it writes, and a record without an append is refused before it
+commits. The mutation fails, before anything durable is written, if
 any path it creates, writes, or removes changed since it read it. The record is
 then written and synced under the scratch directory; that write is the
 mutation's commit point. Application creates the directories, replaces each
@@ -95,14 +102,31 @@ record.
 
 A command that changes the repository, and `jit recover`, opens a mutation
 session, and a session that opens over a leftover record applies it before
-serving the command. A read-only command opens no mutation session: it reads the
-files as they stand, which until the record is applied may be the state before
-the mutation or partly applied. Application is idempotent, so an interrupted application converges on
-the same state when repeated. A leftover record that does not parse, including
-one whose own write was interrupted, is refused: the session open fails with an
-error naming the record. Repository discovery recognizes a pending record as
-well as an initialized `index.json`, so a repository whose index a crash left
-unwritten still reaches that session open.
+serving the command. `jit snapshot export` publishes, so it reads under that
+session's lock. Application is idempotent, so an interrupted application
+converges on the same state when repeated. A leftover record that does not
+parse, including one whose own write was interrupted, is refused: the session
+open fails with an error naming the record. Repository discovery recognizes a
+pending record as well as an initialized `index.json`, so a repository whose
+index a crash left unwritten still reaches that session open.
+
+A read through the read driver takes no lock (`@/charter/D-22`). It counts
+only when no redo record was present and the event log did not grow between its
+open and the end of its reads; otherwise it reads again. After a few such
+attempts it reads once under a mutation session, whose open applies a leftover
+record; a record that open cannot apply fails the read with `recovery_failed`,
+naming `jit recover`. These commands read through the driver:
+
+- `jit validate`, except `--fix` without `--dry-run`, `--branch-drift` and
+  `--leases`
+- `jit doc check-links`
+- `jit invariant check`
+- `jit profile apply --dry-run` and `jit profile diff`
+- `jit profile add --dry-run` and `jit profile pack --dry-run`
+
+Every other read-only command opens no session: it reads the files as they
+stand, which until the record is applied may be the state before the mutation
+or partly applied.
 
 ## Issue JSON Schema
 
@@ -212,8 +236,8 @@ So reading `gates_required` from `jit issue show --json` finds nothing. `jit
 `first_ready_at`, `claimed_at`, and `done_at` record when an issue first passed
 each lifecycle milestone. They are written **once**, at the transition:
 
-- `first_ready_at` — set the first time the issue enters `ready`, including the
-  auto-promotion of a dependency-free issue at creation.
+- `first_ready_at` — set the first time the issue enters `ready`, including
+  creation in `ready`.
 - `claimed_at` — set at the first claim or assignment.
 - `done_at` — set the first time the issue reaches `done`. **Re-opening and
   re-completing does not overwrite it** ("first occurrence" semantics apply to
@@ -270,16 +294,69 @@ tagged record per line, with sample records — is specified in
 vocabulary, each tag's scope, and which tags carry an `issue_id` are the
 generated [Event Log Tags](events.md) catalog.
 
+The log's committed length is the end of its last newline-terminated line. A
+final line without a terminating newline is an uncommitted append: readers ignore
+it and the next event append, positioned at the committed length, overwrites it.
+Blank lines are skipped. An unknown event tag or any other malformed
+newline-terminated line, including a malformed middle line, fails the read
+with an error naming the line.
+
 ## Gate Run Records
 
-A gate execution records its result under `gate-runs/`. The run's path, the
-record's fields, and how an unset field is written are specified in
+A recorded gate run lives at `gate-runs/<issue-id>/<run-id>.json`. The issue's
+gate state names its latest run in `run_id`; latest-run views read that record
+without scanning prior runs. A gate state without `run_id` has no latest run.
+The record's fields and serialization are specified in
 [Storage Record Layout](storage-records.md#gate-run-records).
+
+### Verdict records
+
+`gate-runs/verdicts/<gate-key>/<inputs-digest>.json` names the source issue and
+run for a reusable verdict over the gate's declared inputs. The latest recorded
+run that executed the checker and passed or failed replaces that key's record.
+Reuse reads that record and the run it names. See
+[Gate Verdict Records](storage-records.md#gate-verdict-records) for the fields.
+
+## Archive Evidence Records
+
+`archive-evidence/<target-key>.json` holds a target's ordered archive executions.
+The target key is `container/<issue-id>` or
+`document/<sha256-of-normalized-path>`, with the document digest taken over its
+normalized repository-relative path. Archive preview and execution read this
+record for prior evidence. Each execution records the source and destination
+paths it had at the time, so those paths are historical and may not exist in
+the current tree. See
+[Archive Evidence Records](storage-records.md#archive-evidence-records) for the
+fields.
+
+Gate runs, verdict records, and archive evidence are written in the same redo
+record as the repository change that produces them. Lease records use their
+own commit point under [the control plane](#the-gitjit-control-plane).
+
+## History Files
+
+These paths hold history; the table names their readers.
+
+| Path | Readers |
+|------|---------|
+| `.jit/events.jsonl` | `jit events tail`, `jit events query`; `jit worktree store-divergence` reads the compared stores' logs; whole-repository `jit validate` and the `repository_validation` checker read the whole log for record fidelity |
+| `.jit/gate-runs/` | `jit gate status <id> --all` or `--limit <N>` and the server's gate-run list (`GET /api/issues/:id/gate-runs`) read an issue's run history; whole-repository `jit validate` and `repository_validation` read every gate-run and verdict record for fidelity |
+| `.jit/tmp/` | Can hold appended event bytes in `redo.record`; mutating commands and `jit recover` read a pending record to complete publication |
+| `.git/jit/claims.jsonl` | None; no command reads claim history |
+
+No other command reads history, and no file is derived from a history file.
+Ordinary commands address current records by key, including named gate runs
+and verdict records under `gate-runs/`, rather than scanning history. Issue
+operations read only the event log's length and final line, without parsing a
+record, to locate the committed append position and detect concurrent changes.
+Default `jit search` excludes the data-root history paths above; explicit file
+selection can include them (see [Repository Search](cli-commands.md#repository-search)).
 
 ## Gate Registry
 
 `gates.toml` stores gate definitions as a `[[gates]]` array of tables. Each
-entry carries its own `key`, rather than being indexed as an object field:
+entry carries its own lowercase-kebab `key`, rather than being indexed as an
+object field; a registry holding any other spelling fails to load:
 
 ```toml
 [[gates]]
@@ -362,33 +439,75 @@ Multi-agent coordination state (claim leases and locks) lives under `.git/jit/`,
 the **shared control plane**, not `.jit/`. `.jit/` is per-worktree data;
 `.git/jit/` is shared across every worktree of the same repository (via git's
 common directory), because a lease must be visible to every worktree racing to
-claim the same issue. `jit claim` requires a git repository for this reason:
-outside one, it fails with a typed `ClaimRequiresGitError` (exit code 10) rather
-than falling back to a per-worktree lease store.
+claim the same issue. The repository is the one holding the data root; for a
+data root outside every checkout, it is the one holding the invoking directory.
+`jit claim` requires a git repository for this reason: with neither, it fails
+with exit code 10 rather than falling back to a
+per-worktree lease store.
 
 ```
 .git/jit/
-├── claims.jsonl         # Append-only audit log of claim operations
-├── claims.index.json    # Derived cache of currently active leases
-└── locks/               # Advisory lock files guarding claim-log operations
+├── leases/
+│   └── {issue-id}.json  # The issue's lease; absent when it has none
+├── claims.seq           # The last claim-log sequence number
+├── claims.jsonl         # Append-only history of claim operations
+└── locks/               # Advisory lock files guarding lease changes
     └── claims.lock
 ```
 
-- **`claims.jsonl`**: an append-only, newline-delimited log of claim
+A lease names its holder's `worktree_id`, which
+[Worktree Identity](#worktree-identity) defines. A primary checkout's identity
+files can sit in this directory over a data root outside every checkout, and are
+separate from the claims state.
+
+- **`leases/{issue-id}.json`**: the issue's lease. Each record carries
+  `lease_id`, `issue_id`, `agent_id`, `worktree_id`, `branch`, `ttl_secs`,
+  `acquired_at`, `expires_at`, and `last_beat`. A `ttl_secs` of `0` marks an
+  indefinite lease, kept alive by `jit claim heartbeat` updating `last_beat`.
+  Claim operations change a record under `locks/claims.lock` by writing a
+  synced stage file, renaming it over the record and syncing the directory, or
+  by unlinking it; that rename or unlink commits the change. Other names in
+  `leases/`, such as an interrupted operation's `{issue-id}.json.tmp` stage
+  file, are not leases; `jit recover` removes stale stage files.
+  `jit claim list` and `status` read the records without the lock.
+- **`claims.seq`**: the last sequence number handed to `claims.jsonl`, as a
+  decimal integer, advanced after each committed change.
+- **`claims.jsonl`**: an append-only, newline-delimited history of claim
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
-  `ForceEvict`), each entry carrying a monotonic `seq` for total ordering.
-- **`claims.index.json`**: a cache of active leases derived from
-  `claims.jsonl`, atomically updated from claim operations rather than
-  hand-edited. Each lease record carries `lease_id`, `issue_id`, `agent_id`,
-  `worktree_id`, `branch`, `ttl_secs`, `acquired_at`, `expires_at`,
-  `last_beat`, and `stale`. A `ttl_secs` of `0` marks an indefinite lease,
-  kept alive by a `Heartbeat` log operation that updates `last_beat` in this
-  index; `jit claim heartbeat` does not write a per-agent heartbeat file.
-- **`locks/claims.lock`**: an advisory file lock guarding atomic reads and
-  appends against `claims.jsonl` and `claims.index.json`.
+  `ForceEvict`, and `Reclaim`, recorded when `jit recover` removes a stale
+  indefinite lease), each entry carrying its `seq`. An operation appends its
+  lines in one write after advancing `claims.seq`, so an interruption loses at
+  most that operation's history lines and never a lease. No lease read or
+  change reads it.
+- **`locks/claims.lock`**: an advisory file lock serializing lease changes.
 
 `jit claim` command usage (acquire, release, renew, heartbeat, status, list,
 force-evict) is documented in the [Claim reference](claim.md).
+
+## Worktree Identity
+
+Each checkout has one stable `worktree_id`, recorded in a machine-local
+`worktree.json` with its branch and top-level path. The file's location follows
+the data root:
+
+- **A data root inside a checkout** has one owner and holds the file:
+  `<data root>/worktree.json`. A copy reaching a linked checkout gets a new
+  identity.
+- **A data root outside every checkout**, invoked from inside one, can serve many
+  checkouts, so each keeps its file in its own git directory:
+  `<git dir>/jit/worktree.json`, beside the `worktree.lock` that serializes changes
+  to it. `git rev-parse --absolute-git-dir` names that directory: the common
+  directory for a primary checkout, `<common dir>/worktrees/<name>` for a linked
+  one. Such a data root holds no identity, and ignores a `worktree.json` found in
+  it.
+- **A data root and an invocation both outside every checkout** have no checkout
+  to identify and no claims to attribute; `jit worktree` and `jit claim` report the
+  git requirement.
+
+A checkout found away from its recorded path reports one relocation, keeps its id
+and records the new path. `git worktree move` keeps the linked checkout's git
+directory and so its id; `git worktree remove` discards that directory and its
+identity with it.
 
 ## Versioning
 
@@ -396,23 +515,25 @@ The repository's on-disk **format version** is the `schema_version` field in
 `index.json`:
 
 ```json
-{ "schema_version": 2, "all_ids": [], "deleted_ids": [] }
+{ "schema_version": 4, "deleted_ids": [] }
 ```
 
-This single marker is the authoritative compatibility check, bumped whenever an
-on-disk layout or interpretation changes. On startup every command that opens
-the repository compares it against the format version the running `jit` binary
-supports:
+Issue membership is the `.json` files under `issues/`. `deleted_ids` holds
+tombstones, which let a linked checkout's delete hide the primary checkout's
+file. The first store that mentions an id decides, and within a store a file
+wins over a tombstone.
 
-- Binary support **≥** repository version: operates normally. An older
-  repository is read as-is and keeps its marker; `jit` performs no implicit
-  migration.
-- Binary support **<** repository version: the binary refuses to operate and
-  exits nonzero (exit code 10, external-dependency family) with a single-line
-  error naming both the repository's format version and the version the binary
-  supports. The fix is to upgrade `jit` (from a source checkout,
-  `./scripts/install-jit.sh`)
-  rather than treating it as repository corruption.
+The marker changes whenever an on-disk layout or interpretation changes, and a
+binary accepts exactly one format. On startup every command that opens the
+repository compares the marker against that format. On any other version,
+older or newer, the binary refuses to operate and exits nonzero (exit code 10,
+external-dependency family) with a single-line error naming both versions, so
+an older binary and a newer one each refuse the other's repository. `jit`
+performs no migration; moving a repository between formats is an explicit
+rewrite made alongside installing the matching binary.
+
+An index carrying any other field, such as `all_ids`,
+fails validation.
 
 `config.toml` separately records a `[version] schema` describing the
 configuration-file layout:

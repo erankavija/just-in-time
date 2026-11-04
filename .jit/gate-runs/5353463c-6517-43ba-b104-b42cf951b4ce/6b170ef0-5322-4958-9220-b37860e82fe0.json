@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5f0e15931cc7357fbf463869e032d02daecf122f",
+  "completed_at": "2026-10-25T00:59:50.535412948Z",
+  "duration_ms": 265346,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/gate_update_test.rs",
+        "id": "F1",
+        "line": 242,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "The gate-update test discovers a created issue ID by scanning .jit/issues instead of using JitCli::create_issue's JSON-based ID path."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/main.rs",
+        "id": "F2",
+        "line": 23,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Recurring new rustdoc on simple cli_gate helpers restates code rather than documenting a non-obvious contract."
+      }
+    ],
+    "summary": "Two blocking issue-impact findings: one bypasses shared JSON ID creation and one adds recurring redundant rustdoc.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5353463c-6517-43ba-b104-b42cf951b4ce",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6b170ef0-5322-4958-9220-b37860e82fe0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:55:25.189288400Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15887 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1708e-21ab-7ca0-85c7-2babd4210cd1\n--------\nuser\n--- 15874 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 77b7808ad, 82078a7fd, 5f0e15931 (scoped to this issue’s affected `cli_gate` paths)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-09 (issue description); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T00:53:26Z); code-review pending\nTruncation recovery: re-read affected tagged patches as per-file, zero-context and line-range partitions after aggregate patch output truncated\n\n1. **[blocking, issue-impact]** [gate_update_test.rs:242](<crates/jit/tests/cli_gate/gate_update_test.rs:242>) creates the issue through a raw fixture command, then discovers its ID by scanning `.jit/issues` at line 255. This bypasses `JitCli::create_issue`, which owns JSON ID extraction, leaving migration-scope ID discovery outside the shared fixture. Obtain `issue_id` from `temp.create_issue(...)` and retain the file read only for the later persistence assertions. References: @/issue/c780514e/requirement/REQ-05, @/invariant/shared-test-contracts.\n\n2. **[blocking, issue-impact]** [main.rs:23](<crates/jit/tests/cli_gate/main.rs:23>) introduces repeated rustdoc for straightforward test helpers (also lines 43, 59, 66, and 72) that merely paraphrases each function’s name and direct command sequence. Remove the redundant comments; retain only the non-obvious `run_gate_forced` contract if needed. References: @/invariant/essential-code-prose.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two blocking issue-impact findings: one bypasses shared JSON ID creation and one adds recurring redundant rustdoc.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The gate-update test discovers a created issue ID by scanning .jit/issues instead of using JitCli::create_issue's JSON-based ID path.\",\"file\":\"crates/jit/tests/cli_gate/gate_update_test.rs\",\"line\":242,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recurring new rustdoc on simple cli_gate helpers restates code rather than documenting a non-obvious contract.\",\"file\":\"crates/jit/tests/cli_gate/main.rs\",\"line\":23,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

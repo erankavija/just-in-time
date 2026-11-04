@@ -1,0 +1,49 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T16:24:28.181685154Z",
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
+    "945f9181-1066-4c5b-ac0f-5225bd59a6b0"
+  ],
+  "description": "Make the readiness part of `jit validate --fix` use the shared readiness derivation over every projected issue, so the repair and the mutation paths decide readiness with one function.\n\n## Background\n\n- After the one-mutation `--fix` change, `--fix` derives all fixes from one validation capture and publishes them in one mutation; its readiness step applies `Issue::derive_readiness_correction` to the projected issue set until no correction remains, inside `crates/jit/src/commands/validate.rs`. Before that change the step is `check_pending_transitions` (`validate.rs:2054-2108`), which publishes one session per correction through `auto_transition_to_ready` and `auto_transition_to_backlog` (`validate.rs:2095-2096`).\n- The pure domain readiness derivation returns every correction for a base and projected set under the `All` scope in one pass (a correction never changes another issue's blockedness), and the command helper maps corrections to intents, promoting through graph rules.\n\n## Success Criteria\n\n- [hard] REQ-01: The `--fix` readiness step obtains its corrections from the shared derivation with the `All` scope through the shared command helper; no loop repeating `derive_readiness_correction` until a fixpoint remains in `validate.rs`.\n- [hard] REQ-02: A harness test declares a graph rule that refuses the transition to `Ready` for one issue, seeds that issue `Backlog` while unblocked, and runs `--fix`: the issue stays `Backlog`, a `transition_blocked` event names the rule, and the fix report states the refused repair. It fails before this change: the one-mutation `--fix` applies each correction from `Issue::derive_readiness_correction` directly, so the issue is promoted despite the rule.\n\n## Notes\n\n- Behaviour change: a readiness promotion made by `--fix` now passes graph rules; a refused one is reported, as for every other promotion (REQ-02).\n- That `--fix` publishes all its repairs in one mutation is owned by the one-mutation `--fix` change this task follows; this task adds no second test of it.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+  "documents": [],
+  "done_at": "2026-11-04T17:31:19.221820979Z",
+  "first_ready_at": "2026-11-04T16:23:55.740932688Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "76106f0b-4a28-485a-94d6-203a83baf009",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:28:23.058884382Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b412559b-404e-4660-84a2-820bcdfc2246",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:31:09.136998606Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "b674382e-d60f-405d-a4d5-2650aa590295",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:session-coherence",
+    "per:@/charter/D-20",
+    "per:@/charter/D-17",
+    "component:core",
+    "component:validation",
+    "satisfies:b697a3f7/REQ-01",
+    "satisfies:b697a3f7/REQ-02"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Validate fix derives readiness through the shared helper",
+  "updated_at": "2026-11-04T17:31:19.221820979Z"
+}

@@ -7,12 +7,13 @@
 //! They prove each level produces a DISTINCT block/allow outcome on the SAME
 //! violation set, so no accepted strictness value is silently inert (REQ-03):
 //!
-//! - a `warn` rule's violation blocks under `strict` but not under `loose` /
-//!   `permissive`;
-//! - an `enforce` error rule's violation blocks under `strict` / `loose` but is
-//!   downgraded to advisory under `permissive`;
+//! - a warning rule's violation blocks only under the strictest level;
+//! - an enforced error rule's violation blocks under every level except the
+//!   most permissive, which downgrades it to advisory;
 //! - an unrecognized strictness value is rejected rather than silently ignored.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::{InMemoryStorage, IssueStore};
@@ -36,38 +37,11 @@ enforce = true
 assert = { require-label = { label = "req:*", min = 1 } }
 "#;
 
-/// Build an executor whose `config.toml` sets `[validation].strictness` to
-/// `strictness` (when `Some`) and whose `.jit/rules.toml` holds `rules_toml`.
-/// Leases are disabled so the write path does not require a claim.
-fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    let storage = InMemoryStorage::new();
-    let defaults = jit::repository_state::serialize_ruleset(
-        &jit::repository_state::default_ruleset(&jit::domain::LabelNamespaces::empty(2)),
-    );
-    let validation = match strictness {
-        Some(level) => format!("[validation]\nstrictness = \"{level}\"\n"),
-        None => String::new(),
-    };
-    storage.add_data_file(
-        "config.toml",
-        &format!("[worktree]\nenforce_leases = \"off\"\n{validation}"),
-    );
-    storage.add_data_file(
-        "rules.toml",
-        &format!("{}{rules_toml}", defaults.rules_toml),
-    );
-    for schema in defaults.schema_files {
-        storage.add_data_file(format!("schemas/{}", schema.name), &schema.content);
-    }
-    let layout = storage.repository_layout();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Attempt to create an epic that violates the rule under test (no `req:*`
 /// label). Returns the executor result so the caller asserts block/allow.
 fn create_violating_epic(
     executor: &CommandExecutor<InMemoryStorage>,
-) -> anyhow::Result<(String, Vec<String>)> {
+) -> anyhow::Result<jit::commands::IssueCreation> {
     executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
@@ -84,7 +58,16 @@ fn create_violating_epic(
 
 #[test]
 fn test_warn_violation_blocks_under_strict() {
-    let executor = executor(Some("strict"), EPIC_REQ_WARN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"strict\"\n",
+            ),
+            rules: Some(EPIC_REQ_WARN),
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(
         result.is_err(),
@@ -103,7 +86,16 @@ fn test_warn_violation_blocks_under_strict() {
 
 #[test]
 fn test_warn_violation_allowed_under_loose() {
-    let executor = executor(Some("loose"), EPIC_REQ_WARN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"loose\"\n",
+            ),
+            rules: Some(EPIC_REQ_WARN),
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(result.is_ok(), "loose must allow a warning-only violation");
     assert_eq!(executor.storage().list_issues().unwrap().len(), 1);
@@ -111,7 +103,16 @@ fn test_warn_violation_allowed_under_loose() {
 
 #[test]
 fn test_warn_violation_allowed_under_permissive() {
-    let executor = executor(Some("permissive"), EPIC_REQ_WARN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"permissive\"\n",
+            ),
+            rules: Some(EPIC_REQ_WARN),
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(
         result.is_ok(),
@@ -124,7 +125,16 @@ fn test_warn_violation_allowed_under_permissive() {
 
 #[test]
 fn test_enforced_error_blocks_under_loose() {
-    let executor = executor(Some("loose"), EPIC_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"loose\"\n",
+            ),
+            rules: Some(EPIC_REQ_ENFORCE),
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(result.is_err(), "loose must block an enforced error");
     assert!(executor.storage().list_issues().unwrap().is_empty());
@@ -132,7 +142,16 @@ fn test_enforced_error_blocks_under_loose() {
 
 #[test]
 fn test_enforced_error_blocks_under_strict() {
-    let executor = executor(Some("strict"), EPIC_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"strict\"\n",
+            ),
+            rules: Some(EPIC_REQ_ENFORCE),
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(result.is_err(), "strict must block an enforced error");
     assert!(executor.storage().list_issues().unwrap().is_empty());
@@ -140,7 +159,16 @@ fn test_enforced_error_blocks_under_strict() {
 
 #[test]
 fn test_enforced_error_allowed_under_permissive() {
-    let executor = executor(Some("permissive"), EPIC_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"permissive\"\n",
+            ),
+            rules: Some(EPIC_REQ_ENFORCE),
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(
         result.is_ok(),
@@ -159,13 +187,27 @@ fn test_enforced_error_allowed_under_permissive() {
 fn test_absent_strictness_defaults_to_loose() {
     // No `[validation]` section at all: an enforced error still blocks, a warning
     // still passes — the pre-strictness behavior, so no existing repo changes.
-    let enforce_exec = executor(None, EPIC_REQ_ENFORCE);
+    let enforce_exec = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_REQ_ENFORCE),
+            ..MemoryDeclarations::default()
+        },
+    );
     assert!(
         create_violating_epic(&enforce_exec).is_err(),
         "default (loose) blocks an enforced error"
     );
 
-    let warn_exec = executor(None, EPIC_REQ_WARN);
+    let warn_exec = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_REQ_WARN),
+            ..MemoryDeclarations::default()
+        },
+    );
     assert!(
         create_violating_epic(&warn_exec).is_ok(),
         "default (loose) allows a warning"
@@ -180,7 +222,17 @@ fn test_invalid_strictness_is_rejected_not_ignored() {
     // opposite of a silently-inert value. (That the message names the bad value
     // is proven at the deserialize/`config set` boundaries in the config unit
     // tests, where the error is not re-wrapped by the config-load context.)
-    let executor = executor(Some("banana"), EPIC_REQ_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(
+                "[worktree]\nenforce_leases = \"off\"\n[validation]\nstrictness = \"banana\"\n",
+            ),
+            rules: Some(EPIC_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = create_violating_epic(&executor);
     assert!(result.is_err(), "an invalid strictness must fail the write");
     let chain = format!("{:#}", result.unwrap_err());

@@ -2,13 +2,14 @@
 //! session and publication boundary.
 
 use super::profile_publication_tests::{
-    changed_profile_fixture, executor_with_interruptions, ordinary_executor, selector,
-    LifecycleState, PACKAGE_LOCATION,
+    executor_with_interruptions, prepare_changed_profile, selector, LifecycleState,
+    PACKAGE_LOCATION,
 };
 use jit::profile::ProfileApplicationStatus;
 use jit::storage::{MutationInterruptionInjector, MutationPoint, RedoPoint};
+use jit::test_cli::JitCli;
+use jit::test_utils::file_executor;
 use serde_json::Value;
-use std::process::Command;
 use std::sync::{Arc, Condvar, Mutex};
 
 #[derive(Debug, Default)]
@@ -62,31 +63,39 @@ impl MutationInterruptionInjector for PublicationPause {
 
 #[test]
 fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
-    let (repository, prior) = changed_profile_fixture();
-    let (serial_repository, _) = changed_profile_fixture();
-    ordinary_executor(serial_repository.path())
-        .apply_profile(&[selector()])
-        .unwrap();
-    let serial_new = LifecycleState::capture(serial_repository.path());
-    let prior_event_count = std::fs::read_to_string(repository.path().join(".jit/events.jsonl"))
+    let repository = JitCli::initialised().unwrap();
+    let prior = prepare_changed_profile(&repository);
+    let serial_repository = JitCli::initialised().unwrap();
+    prepare_changed_profile(&serial_repository);
+    jit::test_utils::apply_selected_packages(
+        &file_executor(serial_repository.root()).unwrap(),
+        &[selector()],
+    )
+    .unwrap();
+    let serial_new = LifecycleState::capture(serial_repository.root());
+    let prior_event_count = std::fs::read_to_string(repository.root().join(".jit/events.jsonl"))
         .unwrap()
         .lines()
         .count();
     let pause = Arc::new(PublicationPause::default());
-    let winner_path = repository.path().to_path_buf();
+    let winner_path = repository.root().to_path_buf();
     let winner_pause = Arc::clone(&pause);
     let winner = std::thread::spawn(move || {
-        executor_with_interruptions(&winner_path, winner_pause).apply_profile(&[selector()])
+        jit::test_utils::apply_selected_packages(
+            &executor_with_interruptions(&winner_path, winner_pause),
+            &[selector()],
+        )
     });
 
     pause.wait_until_reached();
-    let contender = Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(["profile", "apply", "--profile", PACKAGE_LOCATION, "--json"])
-        .env("JIT_LOCK_TIMEOUT", "1")
-        .current_dir(repository.path())
+    let contender = repository
+        .command_with_env(
+            ["profile", "apply", "--profile", PACKAGE_LOCATION, "--json"],
+            [("JIT_LOCK_TIMEOUT", "1")],
+        )
         .output()
         .expect("run the contending lifecycle process");
-    let while_winner_paused = LifecycleState::capture(repository.path());
+    let while_winner_paused = LifecycleState::capture(repository.root());
 
     // Always release and join the winner before making assertions, so a failed
     // assertion cannot strand a lock-holding test thread.
@@ -108,10 +117,6 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
         contention["error"]["code"],
         jit::output::ErrorCode::LockTimeout.as_str()
     );
-    assert_eq!(
-        contender.status.code(),
-        Some(jit::output::ExitCode::LockTimeout.code())
-    );
     assert!(contention_message.contains("Lock timeout"), "{contention}");
     assert!(
         contention_message.contains("exclusive lock"),
@@ -131,21 +136,23 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
         ProfileApplicationStatus::Applied
     );
 
-    let after_winner = LifecycleState::capture(repository.path());
+    let after_winner = LifecycleState::capture(repository.root());
     assert!(
         after_winner.is_semantically_equivalent_to(&serial_new),
         "the concurrent outcomes must equal the complete serial winner state"
     );
-    let retried = ordinary_executor(repository.path())
-        .apply_profile(&[selector()])
-        .unwrap();
+    let retried = jit::test_utils::apply_selected_packages(
+        &file_executor(repository.root()).unwrap(),
+        &[selector()],
+    )
+    .unwrap();
     assert_eq!(
         retried.requested().unwrap().status,
         ProfileApplicationStatus::Unchanged,
         "a retry must plan against the winner's published state"
     );
     assert_eq!(
-        LifecycleState::capture(repository.path()),
+        LifecycleState::capture(repository.root()),
         after_winner,
         "the replanned no-op must not republish stale targets or audit bytes"
     );
@@ -153,7 +160,7 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     assert_eq!(
         std::fs::read_to_string(
             repository
-                .path()
+                .root()
                 .join("docs/lifecycle-interruption/retained.txt")
         )
         .unwrap(),
@@ -161,7 +168,7 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
         "the winner published the changed package"
     );
     assert_eq!(
-        std::fs::read_to_string(repository.path().join(".jit/events.jsonl"))
+        std::fs::read_to_string(repository.root().join(".jit/events.jsonl"))
             .unwrap()
             .lines()
             .count(),

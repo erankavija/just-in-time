@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-e98ae5a4",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "4e82ac04fa9875ad3b7ee2ee065f0fdec834b541",
+  "completed_at": "2026-10-25T23:25:05.099219247Z",
+  "duration_ms": 72188,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "1653ef2f6591a6a8ae80fb9ea2f65c6d24bddea17cce7e925544b691b94fe7cb",
+  "issue_id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f1a492e9-fe2b-4314-bae3-8069d8a69a73",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T23:23:52.910531719Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 32888 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 32888 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 18611 ms, warmed 17 executables (1996751936 bytes) in 71 ms.\n  ✓ fmt: ok (1531 ms)\n  ✓ clippy: ok (18871 ms)\n  ✓ suite-build: built in 18611 ms, warmed 17 executables (1996751936 bytes) in 71 ms (18685 ms)\n  ✓ test: 4645 passed, 0 failed, 0 skipped (30208 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2663 ms)\n  ✓ suite-clock: 32888 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (82 ms)\n\ncargo-ci: verdict (exit 1): failing steps (budget) are environment-sensitive but baseline load1=1.43 < threshold 4.08 (0.17 x 24 CPUs); a quiet-host failure is a real regression to investigate\n"
+}

@@ -7,22 +7,17 @@
 //! - Result storage for audit trail
 
 use crate::declarations::{GateChecker, GateStage};
+use crate::domain::identity::{GateKey, GateRunId, IssueId};
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
-    DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
+    Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
-use crate::repository_state::RootRelativePath;
 use anyhow::{Context, Result};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-
-/// Actor stamped on the `by` field of a gate run recorded by the automated
-/// executor (as opposed to a human or agent attestation). A recorded pass whose
-/// `updated_by` equals this value is an auto-era pass with no human attestation
-/// behind it, which matters when a gate is later redefined to manual mode.
-pub(crate) const AUTO_EXECUTOR: &str = "auto:executor";
 
 /// One entry in the `JIT_ISSUE_DOCS` env var: the fields a checker needs to
 /// inline a linked document into a review prompt.
@@ -62,6 +57,16 @@ pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
     serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string())
 }
 
+/// What a gate run records itself as being about.
+#[derive(Debug, Clone, Copy)]
+pub struct GateRunSubject<'a> {
+    /// The run id the mutation publishing this run pre-derived.
+    pub run_id: &'a GateRunId,
+    pub gate_key: &'a GateKey,
+    pub issue_id: &'a IssueId,
+    pub stage: GateStage,
+}
+
 /// Execute a gate checker with optional structured context.
 ///
 /// This function runs the specified checker and captures all execution details
@@ -73,9 +78,12 @@ pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
 /// written containing the structured context and made available via the
 /// `JIT_CONTEXT_FILE` env var.
 pub fn execute_gate_checker_with_context(
-    gate_key: &str,
-    issue_id: &str,
-    stage: GateStage,
+    GateRunSubject {
+        run_id,
+        gate_key,
+        issue_id,
+        stage,
+    }: GateRunSubject<'_>,
     checker: &GateChecker,
     working_dir: &Path,
     context: Option<&GateContext>,
@@ -119,9 +127,7 @@ pub fn execute_gate_checker_with_context(
             env,
             ..
         } => execute_command(command, *timeout_seconds, env, &base_env, working_dir)?,
-        _ => anyhow::bail!(
-            "built-in gate checkers must be executed through CommandExecutor::check_gate"
-        ),
+        _ => anyhow::bail!("built-in gate checkers must be executed through GateOps::check_gate"),
     };
 
     let duration = start_time.elapsed();
@@ -145,11 +151,10 @@ pub fn execute_gate_checker_with_context(
 
     Ok(GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
-        // Repository mutation finalization assigns the durable run identity.
-        run_id: String::new(),
-        gate_key: gate_key.to_string(),
+        run_id: run_id.clone(),
+        gate_key: gate_key.clone(),
         stage,
-        issue_id: issue_id.to_string(),
+        issue_id: issue_id.clone(),
         commit,
         branch,
         status,
@@ -160,7 +165,7 @@ pub fn execute_gate_checker_with_context(
         stdout: execution_result.stdout,
         stderr: execution_result.stderr,
         command: execution_result.command,
-        by: Some(AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR),
         message: None,
         findings,
         // Stamped by the evaluator, which holds the gate declaration the
@@ -570,12 +575,35 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
 mod tests {
     use super::*;
     use crate::repository_state::{
-        gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
-        BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
-        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE, WORKTREE_IDENTITY_FILE,
+        RepositoryLayout, RepositoryRootEvidence, VirtualPath, BOOTSTRAP_LOCK_FILE,
+        EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
     };
     use crate::test_utils::{document_reference, document_reference_typed};
     use std::collections::HashMap;
+
+    /// Execute `checker` as the run of a fixed test id.
+    fn execute_fixture_checker(
+        gate_key: &GateKey,
+        issue_id: &IssueId,
+        stage: GateStage,
+        checker: &GateChecker,
+        working_dir: &Path,
+        context: Option<&GateContext>,
+        documents: &[DocumentReference],
+    ) -> Result<GateRunResult> {
+        execute_gate_checker_with_context(
+            GateRunSubject {
+                run_id: &crate::test_utils::gate_run_id(1),
+                gate_key,
+                issue_id,
+                stage,
+            },
+            checker,
+            working_dir,
+            context,
+            documents,
+        )
+    }
 
     #[test]
     fn test_execute_simple_command_success() {
@@ -590,9 +618,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -620,9 +648,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -649,9 +677,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -688,9 +716,9 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let start = Instant::now();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -722,26 +750,6 @@ mod tests {
         assert!(branch.is_none() || !branch.unwrap().is_empty());
     }
 
-    /// Initialize a git repo at `dir` with one commit; returns nothing but leaves
-    /// a committed `seed.txt`. Panics on any git failure so a broken environment
-    /// surfaces loudly rather than as a misleading assertion.
-    fn init_committed_repo(dir: &Path) {
-        let git = |args: &[&str]| {
-            let status = Command::new("git")
-                .args(args)
-                .current_dir(dir)
-                .status()
-                .expect("git runs");
-            assert!(status.success(), "git {args:?} failed");
-        };
-        git(&["init", "-q"]);
-        git(&["config", "user.name", "Test"]);
-        git(&["config", "user.email", "test@example.com"]);
-        std::fs::write(dir.join("seed.txt"), "seed\n").expect("write seed");
-        git(&["add", "."]);
-        git(&["commit", "-q", "-m", "seed"]);
-    }
-
     /// A worktree with `src/` and `docs/` beneath a git repository, where
     /// `src/generated/` is ignored.
     fn worktree_with_declared_inputs() -> tempfile::TempDir {
@@ -752,9 +760,20 @@ mod tests {
         std::fs::write(root.join(".gitignore"), "src/generated/\n").expect("write ignore");
         std::fs::write(root.join("src/lib.rs"), "fn main() {}\n").expect("write source");
         std::fs::write(root.join("docs/guide.md"), "guide\n").expect("write doc");
-        // Commits everything staged above, so the sources start tracked and the
-        // ignored directory starts absent from git's inventory.
-        init_committed_repo(root);
+        std::fs::write(root.join("seed.txt"), "seed\n").expect("write seed");
+        crate::test_cli::init_git_repository(root).expect("initialize git repository");
+        let added = Command::new("git")
+            .args(["add", "."])
+            .current_dir(root)
+            .status()
+            .expect("git add runs");
+        assert!(added.success(), "git add failed");
+        let committed = Command::new("git")
+            .args(["commit", "-q", "-m", "seed"])
+            .current_dir(root)
+            .status()
+            .expect("git commit runs");
+        assert!(committed.success(), "git commit failed");
         temp
     }
 
@@ -998,36 +1017,39 @@ mod tests {
     /// Append to every path jit writes during a mutation, each named through
     /// the storage layout.
     fn write_tracker_paths(layout: &RepositoryLayout) {
-        let data = layout.data_root();
         let records = [
             VirtualPath::EVENTS,
-            VirtualPath::data(
-                gate_run_result_relative_path("run-1")
-                    .expect("a gate-run record path")
-                    .as_path(),
-            )
-            .expect("a gate-run record path"),
+            VirtualPath::gate_run_record(
+                &crate::test_utils::issue_id(1),
+                &crate::test_utils::gate_run_id(1),
+            ),
+            VirtualPath::archive_evidence_record(
+                &crate::domain::artifact_plan::PlanTarget::Document {
+                    path: "doc.md".into(),
+                },
+            ),
             VirtualPath::INDEX,
         ];
         let written = records
             .iter()
             .map(|path| layout.resolve(path).expect("a resolvable record"))
             .chain(
-                [
-                    REPO_WRITE_LOCK_FILE,
-                    INDEX_LOCK_FILE,
-                    GATES_LOCK_FILE,
-                    EVENTS_LOCK_FILE,
-                    WORKTREE_IDENTITY_FILE,
-                ]
-                .map(|file| data.join(file)),
+                [REPO_WRITE_LOCK_FILE, INDEX_LOCK_FILE, EVENTS_LOCK_FILE]
+                    .map(|file| layout.data_root().join(file)),
             )
+            .chain(std::iter::once(
+                layout
+                    .resolve(&VirtualPath::WORKTREE_IDENTITY)
+                    .expect("the worktree identity path"),
+            ))
             .chain([
                 layout
                     .resolve(&VirtualPath::ISSUES)
                     .expect("the issue directory")
                     .join("0f0e0d0c-0000-4000-8000-000000000000.json"),
-                data.join(RECORD_SCRATCH_DIR)
+                layout
+                    .data_root()
+                    .join(RECORD_SCRATCH_DIR)
                     .join(crate::storage::RECORD_FILE_NAME),
                 layout.worktree_root().join(BOOTSTRAP_LOCK_FILE),
             ]);
@@ -1105,7 +1127,20 @@ mod tests {
     #[test]
     fn test_execute_gate_checker_records_head_commit() {
         let temp = tempfile::TempDir::new().unwrap();
-        init_committed_repo(temp.path());
+        crate::test_cli::init_git_repository(temp.path()).unwrap();
+        std::fs::write(temp.path().join("seed.txt"), "seed\n").expect("write seed");
+        let added = Command::new("git")
+            .args(["add", "."])
+            .current_dir(temp.path())
+            .status()
+            .expect("git add runs");
+        assert!(added.success(), "git add failed");
+        let committed = Command::new("git")
+            .args(["commit", "-q", "-m", "seed"])
+            .current_dir(temp.path())
+            .status()
+            .expect("git commit runs");
+        assert!(committed.success(), "git commit failed");
 
         let checker = GateChecker::Exec {
             command: "true".to_string(),
@@ -1116,9 +1151,9 @@ mod tests {
             prompt: None,
             prompt_file: None,
         };
-        let result = execute_gate_checker_with_context(
-            "g",
-            "issue-1",
+        let result = execute_fixture_checker(
+            &"g".parse().unwrap(),
+            &crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
             GateStage::Postcheck,
             &checker,
             temp.path(),
@@ -1152,9 +1187,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1182,9 +1217,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "my-gate",
-            "issue-123",
+        let result = execute_fixture_checker(
+            &"my-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1194,7 +1229,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
-        assert!(result.stdout.contains("ID=issue-123"));
+        assert!(result.stdout.contains(&format!("ID={}", result.issue_id)));
         assert!(result.stdout.contains("KEY=my-gate"));
         assert!(result.stdout.contains("STAGE=postcheck"));
     }
@@ -1250,9 +1285,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "my-gate",
-            "issue-123",
+        let result = execute_fixture_checker(
+            &"my-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1286,9 +1321,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "my-gate",
-            "issue-123",
+        let result = execute_fixture_checker(
+            &"my-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1305,10 +1340,12 @@ mod tests {
     fn test_context_file_written_when_context_provided() {
         use crate::domain::GateContext;
 
+        let issue_id = crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066);
+
         let context = GateContext {
             schema_version: 1,
             prompt: Some("Review the code".to_string()),
-            issue: serde_json::json!({"id": "issue-123", "title": "Test issue"}),
+            issue: serde_json::json!({"id": issue_id, "title": "Test issue"}),
             gate: serde_json::json!({"key": "review", "title": "Code Review"}),
             run_history: vec![],
         };
@@ -1325,9 +1362,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "review",
-            "issue-123",
+        let result = execute_fixture_checker(
+            &"review".parse().unwrap(),
+            &issue_id,
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1343,7 +1380,7 @@ mod tests {
             serde_json::from_str(&result.stdout).expect("Context file should contain valid JSON");
         assert_eq!(parsed["schema_version"], 1);
         assert_eq!(parsed["prompt"], "Review the code");
-        assert_eq!(parsed["issue"]["id"], "issue-123");
+        assert_eq!(parsed["issue"]["id"], serde_json::json!(issue_id));
         assert_eq!(parsed["gate"]["key"], "review");
         assert!(parsed["run_history"].as_array().unwrap().is_empty());
     }
@@ -1372,9 +1409,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1408,9 +1445,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "test-gate",
-            "test-issue",
+        let result = execute_fixture_checker(
+            &"test-gate".parse().unwrap(),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1427,12 +1464,14 @@ mod tests {
     fn test_context_includes_run_history() {
         use crate::domain::{GateContext, GateRunResult, GateRunStatus as RS};
 
+        let issue_id = crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066);
+
         let previous_run = GateRunResult {
             schema_version: 1,
-            run_id: "prev-run-1".to_string(),
-            gate_key: "review".to_string(),
+            run_id: crate::test_utils::gate_run_id(2),
+            gate_key: "review".parse().unwrap(),
             stage: GateStage::Postcheck,
-            issue_id: "issue-123".to_string(),
+            issue_id: issue_id.clone(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
             status: RS::Failed,
@@ -1443,7 +1482,7 @@ mod tests {
             stdout: "Previous review feedback".to_string(),
             stderr: String::new(),
             command: "review-checker".to_string(),
-            by: Some(AUTO_EXECUTOR.to_string()),
+            by: Some(Assignee::AUTO_EXECUTOR),
             message: None,
             findings: None,
             inputs_digest: None,
@@ -1454,7 +1493,7 @@ mod tests {
         let context = GateContext {
             schema_version: 1,
             prompt: Some("Review again".to_string()),
-            issue: serde_json::json!({"id": "issue-123"}),
+            issue: serde_json::json!({"id": issue_id}),
             gate: serde_json::json!({"key": "review"}),
             run_history: vec![previous_run],
         };
@@ -1470,9 +1509,9 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
-            "review",
-            "issue-123",
+        let result = execute_fixture_checker(
+            &"review".parse().unwrap(),
+            &issue_id,
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1484,7 +1523,10 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
         let history = parsed["run_history"].as_array().unwrap();
         assert_eq!(history.len(), 1);
-        assert_eq!(history[0]["run_id"], "prev-run-1");
+        assert_eq!(
+            history[0]["run_id"],
+            crate::test_utils::gate_run_id(2).as_str()
+        );
         assert_eq!(history[0]["status"], "failed");
         assert_eq!(history[0]["stdout"], "Previous review feedback");
     }

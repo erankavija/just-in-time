@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T20:26:36.519340224Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "7a7d0bfe-8f5d-4f04-a9a9-0470d7957b27"
   ],
-  "description": "Issue filters are declared per command and parsed ad hoc at about 14 sites, with different label semantics in `issue search`. One flattened argument group with one conversion fixes the declarations and the parse in one place.\n\n## Background\n\nFilter fields are plain `String`/`Vec<String>` in `crates/jit/src/cli.rs`: `Commands::List`, bare `Commands::Query`, `IssueCommands::List` and `QueryCommands::All` take state, assignee, priority and label; `QueryCommands::{Available, Blocked, Strategic, Closed}` take priority and label; `QueryCommands::Count` takes label; `IssueCommands::Search` takes state, assignee, priority and `labels` (long `--label`). They are parsed in `crates/jit/src/main.rs` by `run_query_all` (`State::from_str`, `Priority::from_str`), by the `IssueCommands::Search` arm (`labels::validate_label` mapped to `InvalidArgumentError`, then exact matching), and by `Priority::from_str` in the available, blocked, strategic and closed arms; the executor checks label patterns in `validate_label_pattern` (`crates/jit/src/commands/query.rs`, `InvalidLabelPatternError`, accepts `ns:*`). So `issue search --label ns:*` exits 2 with `INVALID_ARGUMENT` while `query all --label ns:*` matches by pattern. `--filter` on `issue update` and `issue claim-next` is a query-language expression, not a field filter.\n\nThe design: `IssueFilterArgs` (`#[derive(Args)]` in `cli.rs`, flattened with `#[command(flatten)]`) holds the raw values and exposes one conversion over the existing `FromStr` types, so a bad value keeps its `INVALID_ARGUMENT` failure envelope rather than becoming a clap diagnostic. Label filters are patterns everywhere, and repeated `--label` stays the only multi-value form.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli.rs` defines `IssueFilterArgs`, and `list`, bare `query`, `issue list`, `issue search` and `query all|available|blocked|strategic|closed|count` take their field filters only through a flattened `IssueFilterArgs`.\n- [hard] REQ-02: One `IssueFilterArgs` method converts the raw values into parsed filters (`Option<State>`, `Option<Priority>`, assignee, validated label patterns), and no other site in `crates/jit/src` outside the executor parses a filter string.\n- [hard] REQ-03: An invalid `--state` or `--priority` still yields `INVALID_ARGUMENT` with exit 2 and a failure envelope under `--json`, and an invalid label pattern yields `INVALID_LABEL_PATTERN` on every filtering command.\n- [hard] REQ-04: `issue search --label ns:*` matches by pattern, and tests state this new contract and the `INVALID_LABEL_PATTERN` code for an invalid search label where it reported `INVALID_ARGUMENT` before.\n- [hard] REQ-05: Commands that accepted only a subset of the filters accept the whole group, each added filter narrowing the result by AND; a test states this for `query available`, and the existing suites pass without weakened assertions.\n\n## Notes\n\nTyped `value_parser`s and new vocabulary types (`Assignee`, a label-pattern type) belong to the semantic-types epic 2195c98f.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "Issue filters are declared per command and parsed ad hoc at about 14 sites. One flattened argument group with one conversion fixes the declarations and the parse in one place.\n\n## Background\n\nFilter fields are plain `String`/`Vec<String>` in `crates/jit/src/cli.rs`: `Commands::List`, bare `Commands::Query`, `IssueCommands::List` and `QueryCommands::All` take state, assignee, priority and label; `QueryCommands::{Available, Blocked, Strategic, Closed}` take priority and label; `QueryCommands::Count` takes label; `IssueCommands::Search` takes state, assignee, priority and `labels` (long `--label`). They are parsed in `crates/jit/src/main.rs` by `run_query_all` (`State::from_str`, `Priority::from_str`), by the `IssueCommands::Search` arm (`State::from_str`, `Priority::from_str`, `Assignee::from_str`; its labels go to `QueryOps::search_issues_with_filters`, which since 86583a988 validates them through `validate_label_pattern`, matches them by pattern and reports `INVALID_LABEL_PATTERN`), and by `Priority::from_str` in the available, blocked, strategic and closed arms; the executor checks label patterns in `validate_label_pattern` (`crates/jit/src/commands/query.rs`, `InvalidLabelPatternError`, accepts `ns:*`). `--filter` on `issue update` and `issue claim-next` is a query-language expression, not a field filter.\n\nThe design: `IssueFilterArgs` (`#[derive(Args)]` in `cli.rs`, flattened with `#[command(flatten)]`) holds the raw values and exposes one conversion over the existing `FromStr` types, so a bad value keeps its `INVALID_ARGUMENT` failure envelope rather than becoming a clap diagnostic. Label filters are patterns everywhere, and repeated `--label` stays the only multi-value form.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli.rs` defines `IssueFilterArgs`, and `list`, bare `query`, `issue list`, `issue search` and `query all|available|blocked|strategic|closed|count` take their field filters only through a flattened `IssueFilterArgs`.\n- [hard] REQ-02: One `IssueFilterArgs` method converts the raw values into parsed filters (`Option<State>`, `Option<Priority>`, assignee, validated label patterns), and no other site in `crates/jit/src` outside the executor parses a filter string.\n- [hard] REQ-03: An invalid `--state` or `--priority` still yields `INVALID_ARGUMENT` with exit 2 and a failure envelope under `--json`, and an invalid label pattern yields `INVALID_LABEL_PATTERN` on every filtering command.\n- [hard] REQ-04: `issue search --label ns:*` matches by pattern, and tests state this new contract and the `INVALID_LABEL_PATTERN` code for an invalid search label where it reported `INVALID_ARGUMENT` before.\n- [hard] REQ-05: Commands that accepted only a subset of the filters accept the whole group, each added filter narrowing the result by AND; a test states this for `query available`, and the existing suites pass without weakened assertions.\n\n## Notes\n\nTyped `value_parser`s and new vocabulary types (`Assignee`, a label-pattern type) belong to the semantic-types epic 2195c98f.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-03T20:54:21.220904124Z",
+  "first_ready_at": "2026-11-03T02:55:04.816394446Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5c225820-0856-4b35-bcf4-7329d7259c28",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:50:25.799750439Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "10903b02-4b9f-4aad-bd0b-17550446eea4",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:54:13.484254690Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a3a99cf8-5c62-4c91-a890-7404d9cfe9c9",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Shared IssueFilterArgs group for issue filters",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T20:54:21.220904124Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "79898c89ae8b252132c027af444b45d7685938d9",
+  "completed_at": "2026-11-03T00:10:19.254616914Z",
+  "duration_ms": 193562,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable changes satisfy the issue’s hard criteria; no findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cc6ef886-17a2-48e6-acff-0c206dcd664b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c58dce5f-5e54-48ad-99dd-1de904922835",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T00:07:05.691777490Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 06a63289edc44d35560a7b929a047156e43e5bd0 (`jit:cc6ef886`)\nPolicy sources: AGENTS.md; dev/TESTING.md\nResolved items: @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-05 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json)\nGate evidence: cargo-ci: passed (exit 0, 2026-11-03T00:06:02Z)\nTruncation recovery: Read individual patches and current affected line ranges; narrowed filename searches confirmed no CLI test contains either raw lease-storage filename outside test_lease_store.\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable changes satisfy the issue’s hard criteria; no findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

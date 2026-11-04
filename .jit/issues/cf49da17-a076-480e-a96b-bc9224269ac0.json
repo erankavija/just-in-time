@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T22:41:07.183165076Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "338d1920-fb66-4950-a81d-cbf657e5af54",
     "6100b960-193f-40e2-9e62-970815412930"
   ],
   "description": "Replace the private image-building helpers in the core repository-state and document test modules with the shared test image builder.\n\n## Background\n\n- `jit::test_harness` offers a builder that closes a `RepositoryImage` over any declared entries, listings and pinned evidence, with a derived or caller-supplied capture spec and layout.\n- Private closers in these test modules:\n  - `crates/jit/src/repository_state/mod.rs`: `layout` (`:1237`), `image_with` (`:1434`) and the inline closes at `:1263,1325`;\n  - `repository_state/mutation.rs`: `layout` (`:1394`), `image_with` (`:1435`) and the close at `:1789`;\n  - `repository_state/archive.rs`: `image_with` (`:631-645`), over directories and pinned evidence;\n  - `repository_state/materialize.rs`: `image` (`:707-727`) and `image_with_ignore` (`:1837`);\n  - `repository_state/overlay.rs`: the test close at `:155-197`;\n  - `document/reference.rs`: `image` (`:320-350`), over pinned evidence.\n- `RepositoryImage`'s own tests in `repository_state/image.rs` test `close` itself, and `apply_overlay` (`overlay.rs:92`) and the storage capture close images in production; neither is a test helper.\n\n## Success Criteria\n\n- [hard] REQ-01: The listed test modules build images through the shared builder, and none of them closes a `RepositoryImage` through a helper or inline call of its own.\n- [hard] REQ-02: Each rewritten test asserts the property it asserted before, and the repository-state and document suites pass.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-03T22:53:25.008034975Z",
+  "first_ready_at": "2026-11-03T22:37:32.174770119Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "81e009af-e644-49bd-b558-c59154a99a19",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:50:37.856987588Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "30b33410-82e4-43a5-8183-e826f39f59cd",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:53:13.674248909Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cf49da17-a076-480e-a96b-bc9224269ac0",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Repository-state and document test images use the shared builder",
-  "updated_at": "2026-10-21T20:31:37.499291232Z"
+  "updated_at": "2026-11-03T22:53:25.008034975Z"
 }

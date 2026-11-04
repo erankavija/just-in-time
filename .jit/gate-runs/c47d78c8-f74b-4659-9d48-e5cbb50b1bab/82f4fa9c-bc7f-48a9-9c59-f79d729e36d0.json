@@ -1,0 +1,57 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7f274ebc827f2da82b6be3d7e3fe2ca4aa7e5563",
+  "completed_at": "2026-11-01T15:22:57.156211685Z",
+  "duration_ms": 354311,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/json.rs",
+        "id": "F1",
+        "line": 1091,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Direct issue reads ignore a local tombstone and fall through to the primary checkout."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "REQ-07's required pre-landing production-line measurement was not reported in attributable evidence."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F3",
+        "line": 889,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Recurring rustdocs still describe index.json as the issue-membership authority."
+      }
+    ],
+    "summary": "Three issue-impact blocking findings: tombstones do not hide direct primary reads, the required pre-landing line measurement is absent, and stale index-membership rustdocs recur.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c47d78c8-f74b-4659-9d48-e5cbb50b1bab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "82f4fa9c-bc7f-48a9-9c59-f79d729e36d0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:17:02.844819968Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10714 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197b0-5b97-7b22-823a-d56cd554c2d2\n--------\nuser\n--- 10701 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b6968e7c8, 3c4db4653, 7f274ebc (merge; overlapping patch deduplicated)\nPolicy sources: /home/vkaskivuo/Projects/just-in-time/AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci=passed (2026-11-01T15:16:59Z, no exit code recorded); code-review=pending (no recorded run)\nTruncation recovery: split tagged patches by commit and path; reread storage, mutation, validation, tests, and docs in bounded ranges; abandoned only historical dev/archive search output outside the impact cone\n\n1. [blocking, issue-impact] `load_issue` ignores local tombstones: after a linked checkout deletes its local record, it falls through to the primary checkout and returns that record. `issue show` calls this method directly, so the documented/required “local delete hides the primary’s file” behavior is bypassed outside enumeration. The new tests cover listing and prefix resolution but not direct loading. (`crates/jit/src/storage/json.rs:1091`, `crates/jit/src/commands/issue.rs:277`)\n\n2. [blocking, issue-impact] REQ-07 lacks an attributable pre-landing production-line measurement report. The tagged commit messages and issue changes contain no measured figure or report, although an independent read-only recomputation confirms the implementation commit is negative (73,987 → 73,791 production lines). The criterion requires that measurement to be reported before landing.\n\n3. [blocking, issue-impact] Several directly affected rustdocs still describe the removed index membership model—for example “Every indexed issue” and “index is the sole discovery authority.” The same stale model remains in validation, dependency capture, materialization, and `VirtualPath` documentation, making this a recurring documentation defect rather than an isolated line. (`crates/jit/src/commands/validate.rs:889`, `crates/jit/src/commands/dependency.rs:227`, `crates/jit/src/repository_state/materialize.rs:190`, `crates/jit/src/repository_state/path.rs:397`) [@/invariant/essential-code-prose]\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three issue-impact blocking findings: tombstones do not hide direct primary reads, the required pre-landing line measurement is absent, and stale index-membership rustdocs recur.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Direct issue reads ignore a local tombstone and fall through to the primary checkout.\",\"file\":\"crates/jit/src/storage/json.rs\",\"line\":1091,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-07's required pre-landing production-line measurement was not reported in attributable evidence.\",\"references\":[]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recurring rustdocs still describe index.json as the issue-membership authority.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":889,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-e2651d77",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4bb08d2fd686c8a52898bc02bda8ba26e4f28003",
+  "completed_at": "2026-11-01T04:43:58.818480969Z",
+  "duration_ms": 130910,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are substantiated by current source, tests, and recorded gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "e2651d77-d171-483a-9a21-90c70885a6ae",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a90d7860-6905-4a4e-a128-484330195534",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T04:41:47.908370195Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are substantiated by current source, tests, and recorded gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

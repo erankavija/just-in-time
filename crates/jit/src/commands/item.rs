@@ -10,67 +10,69 @@
 use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
-    expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
-    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, resolve_kind_alias,
-    AddressableItem, ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
+    index_items, index_project_sources, load_toml_scope_items, parse_kind_segmented_address,
+    resolve_item_kinds, resolve_kind_alias, resolve_sugar_address, AddressableItem,
+    IssueItemAddress, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
 };
+use crate::errors::ItemNotFoundError;
 
-/// Result of a `jit item list` / `search` query.
-#[derive(Debug, Serialize)]
-pub struct ItemListResult {
-    /// The matched addressable items, in (issue, section, item) order.
-    pub items: Vec<AddressableItem>,
-    /// Number of matched items.
-    pub count: usize,
+/// Collection key of [`ItemListResult`].
+pub enum ItemsKey {}
+
+impl CollectionKey for ItemsKey {
+    const KEY: &'static str = "items";
+    const SCHEMA_NAME: Option<&'static str> = Some("ItemListResult");
 }
+
+/// Result of a `jit item list` / `search` query: the matched addressable items,
+/// in (issue, section, item) order.
+pub type ItemListResult = ListEnvelope<ItemsKey, AddressableItem>;
 
 /// Result of a `jit item show` / `resolve` query for one qualified id.
 ///
 /// `issue_full_id` / `issue_title` are populated only for an issue-scoped item;
 /// for a project-scoped item (`@/<kind>/<self-id>`) both are `None`, since no single
 /// issue owns it (REQ-01).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ItemShowResult {
     /// The resolved addressable item.
     pub item: AddressableItem,
     /// Full id of the owning issue, or `None` for a project-scoped item.
-    pub issue_full_id: Option<String>,
+    pub issue_full_id: Option<IssueId>,
     /// Title of the owning issue, or `None` for a project-scoped item.
     pub issue_title: Option<String>,
 }
 
-/// An item address classified into the scope + kind + self-id `show_item` resolves
-/// against, after applying the sugar-expansion and kind-segmented grammars.
-///
-/// A project-scope address always names its kind explicitly (`@/<kind>/<self-id>`),
-/// so [`ResolvedItemAddress::Project`] carries a concrete `kind`. An issue-scope
-/// address's `kind` is `Some` for an explicit `@/issue/<short-id>/<kind>/<self-id>`
-/// or an unambiguously-inferred sugar, and `None` only when a sugar's self-id shape
-/// is pattern-ambiguous or matches no kind (deferring to actual-item matching, per
-/// amendment D3-A).
+/// An address classified for project or issue item lookup.
 enum ResolvedItemAddress {
     /// A project-scope address `@/<kind>/<self-id>` of an explicit kind.
-    Project { kind: String, self_id: String },
-    /// An issue-scope address: an explicit `@/issue/<short-id>/<kind>/<self-id>`
-    /// (kind `Some`), or the `<short-id>/<self-id>` sugar whose kind is `Some` when
-    /// the self-id's shape names exactly one issue-scoped kind and `None` when it is
-    /// pattern-ambiguous or matches no kind (deferring to actual-item matching,
-    /// which still errors on a genuine multi-item collision).
-    Issue {
-        issue_ref: IssueIdPrefix,
-        kind: Option<String>,
+    Project {
+        kind: String,
         self_id: String,
     },
+    Issue(IssueItemAddress),
+}
+
+/// Addressable-item operations of a [`CommandExecutor`].
+pub struct ItemOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The addressable-item family.
+    pub fn items(&self) -> ItemOps<'_, S> {
+        ItemOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> ItemOps<'_, S> {
     /// Resolve the effective item kinds from the cached `[item_kinds]` registry.
     ///
     /// The engine bakes in no kinds: with no `[item_kinds]` table the result is
     /// empty (see [`resolve_item_kinds`]). A profile package or repository-authored
     /// config can supply the table.
     pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
-        let config = self.cached_config()?;
+        let config = self.exec.cached_config()?;
         resolve_item_kinds(config.item_kinds.as_ref()).map_err(|err| {
             crate::errors::InvalidArgumentError::new(format!(
                 "invalid [item_kinds] configuration: {err}"
@@ -132,8 +134,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .filter(|k| filter.is_none_or(|f| k.name() == f))
             .collect();
-        let repo_format = self.repo_content_format()?;
-        let mut issues = self.storage.list_issues()?;
+        let repo_format = self.exec.cached_config()?.content_format();
+        let mut issues = self.exec.storage.list_issues()?;
         // Deterministic output: order by short id, then the index's own order.
         issues.sort_by_key(|a| a.short_id());
 
@@ -158,8 +160,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .with_context(|| format!("indexing items of issue {} failed", issue.short_id()))?;
             items.extend(indexed);
         }
-        let count = items.len();
-        Ok(ItemListResult { items, count })
+        Ok(ItemListResult::new(items))
     }
 
     /// Search addressable items whose self-id or text contains `query`
@@ -181,8 +182,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     || item.qualified_id.to_lowercase().contains(&q)
             })
             .collect();
-        let count = items.len();
-        Ok(ItemListResult { items, count })
+        Ok(ItemListResult::new(items))
     }
 
     /// Index the project-scope (`@`) addressable items, routing each kind by its
@@ -237,16 +237,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                         // An absent file contributes no items (graceful), mirroring
                         // the markdown-first path; a present-but-malformed file is a
                         // typed error.
-                        let toml =
-                            self.storage
-                                .read_repo_file(&descriptor.toml)
-                                .with_context(|| {
-                                    format!(
-                                        "cannot read toml source '{}' for item kind '{}'",
-                                        descriptor.toml,
-                                        kind.name()
-                                    )
-                                })?;
+                        let toml = self
+                            .exec
+                            .storage
+                            .read_repo_file(&descriptor.toml)
+                            .with_context(|| {
+                                format!(
+                                    "cannot read toml source '{}' for item kind '{}'",
+                                    descriptor.toml,
+                                    kind.name()
+                                )
+                            })?;
                         if let Some(toml) = toml {
                             let rows = load_toml_scope_items(kind.name(), descriptor, &toml)
                                 .with_context(|| {
@@ -270,12 +271,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     };
                     // Read via the storage boundary: absent -> None (graceful,
                     // REQ-01), invalid/escaping path or unreadable file -> typed error.
-                    let markdown = self.storage.read_repo_file(source_rel).with_context(|| {
-                        format!(
+                    let markdown =
+                        self.exec
+                            .storage
+                            .read_repo_file(source_rel)
+                            .with_context(|| {
+                                format!(
                             "cannot read project-scope source '{source_rel}' for item kind '{}'",
                             kind.name()
                         )
-                    })?;
+                            })?;
                     let Some(markdown) = markdown else {
                         continue;
                     };
@@ -284,7 +289,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        let repo_format = self.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         // Project-scope source files use the repo's content format (Markdown by
         // default); reuse the same parser selection as issue descriptions.
         let parser = crate::document::content_parser_for(None, repo_format)
@@ -302,13 +307,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   [`AddressScope::bind_local`](crate::domain::item::AddressScope::bind_local):
     ///   it resolves identically to the bare-`@`
     ///   form when `<name>` is the repo's declared `[project] name`, and is an
-    ///   [`ItemError::NotResolvable`] error otherwise (no federation or remote
-    ///   lookup is attempted).
+    ///   [`ItemError::NotResolvable`](crate::domain::item::ItemError::NotResolvable)
+    ///   error otherwise (no federation or remote lookup is attempted).
     /// - `@/issue/<short-id>/<kind>/<self-id>` — an issue-scope item of an explicit
     ///   kind; the issue reference is resolved through the SAME issue-id resolver the
     ///   rest of the CLI uses (full id, short id, or unique prefix).
     /// - `<short-id>/<self-id>` — sugar for an issue-scope item whose kind is
-    ///   inferred from the self-id's shape ([`expand_sugar_address`]).
+    ///   inferred from the self-id's shape and actual items.
     ///
     /// Every minted qualified id (`@/<kind>/<self-id>` for project scope,
     /// `@/issue/<short-id>/<kind>/<self-id>` for issue scope) is itself an explicit
@@ -335,10 +340,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into_iter()
                     .find(|i| i.kind == kind && i.self_id == self_id)
                     .ok_or_else(|| {
-                        anyhow!(
+                        ItemNotFoundError::new(format!(
                             "project scope '@' declares no addressable item of kind '{kind}' \
                              with self-id '{self_id}'"
-                        )
+                        ))
                     })?;
                 Ok(ItemShowResult {
                     item,
@@ -348,21 +353,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             // Issue scope: resolve the issue, index its description, then filter by
             // kind AND self-id (REQ-01, REQ-02).
-            ResolvedItemAddress::Issue {
+            ResolvedItemAddress::Issue(IssueItemAddress {
                 issue_ref,
                 kind,
                 self_id,
-            } => {
-                let full_id = self.storage.resolve_issue_id(&issue_ref).with_context(|| {
-                    format!(
-                        "cannot resolve issue scope '{}' in '{qualified}'",
-                        issue_ref.requested()
-                    )
-                })?;
-                let issue = self.storage.load_issue(&full_id)?;
+            }) => {
+                let full_id = self
+                    .exec
+                    .storage
+                    .resolve_issue_id(&issue_ref)
+                    .with_context(|| {
+                        format!(
+                            "cannot resolve issue scope '{}' in '{qualified}'",
+                            issue_ref.as_str()
+                        )
+                    })?;
+                let issue = self.exec.storage.load_issue(&full_id)?;
 
                 let kinds = self.issue_item_kinds()?;
-                let repo_format = self.repo_content_format()?;
+                let repo_format = self.exec.cached_config()?.content_format();
                 let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                     .map_err(|err| {
                         anyhow!(
@@ -386,17 +395,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let item = match matched.len() {
                     1 => matched.remove(0),
                     0 => {
-                        return Err(match &kind {
-                            Some(k) => anyhow!(
+                        return Err(ItemNotFoundError::new(match &kind {
+                            Some(k) => format!(
                                 "issue {} declares no addressable item of kind '{k}' \
                                  with self-id '{self_id}'",
                                 issue.short_id()
                             ),
-                            None => anyhow!(
+                            None => format!(
                                 "issue {} declares no addressable item with self-id '{self_id}'",
                                 issue.short_id()
                             ),
-                        });
+                        })
+                        .into());
                     }
                     _ => {
                         let kinds_found: Vec<&str> =
@@ -425,37 +435,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// A non-`@` input is the `<short-id>/<self-id>` sugar, whose kind is inferred
     /// from the self-id's shape. An `@`-prefixed input is an explicit kind-segmented
     /// address; a malformed one (including a kindless `@/<self-id>`) is the parser's
-    /// own [`ItemError::InvalidAddress`], never a self-id-only match.
+    /// own [`ItemError::InvalidAddress`](crate::domain::item::ItemError::InvalidAddress),
+    /// never a self-id-only match.
     fn resolve_item_address(&self, qualified: &str) -> Result<ResolvedItemAddress> {
         // Sugar `<short-id>/<self-id>`: infer the kind from the self-id's shape
         // against the issue-scoped kinds (project-scoped kinds have no sugar form).
         if !qualified.starts_with(PROJECT_SCOPE_SENTINEL) {
-            let Some((issue_ref, self_id)) = qualified.split_once('/') else {
-                return Err(anyhow!(
+            if !qualified.contains('/') {
+                return Err(crate::errors::InvalidArgumentError::new(format!(
                     "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
-                ));
-            };
-            let issue_ref = IssueIdPrefix::parse(issue_ref)?;
-            // A self-id whose shape names exactly one issue-scoped kind fixes the
-            // kind (resolution filters by kind AND self-id). A pattern-ambiguous or
-            // unmatched self-id leaves the kind open and defers to actual-item
-            // matching, which still errors on a genuine multi-item collision rather
-            // than silently picking one.
-            let kinds = self.item_kinds()?;
-            let kind = match expand_sugar_address(qualified, &kinds) {
-                Ok(addr) => Some(addr.kind),
-                Err(ItemError::SugarKindNotFound { .. } | ItemError::SugarKindAmbiguous { .. }) => {
-                    None
-                }
-                Err(err) => {
-                    return Err(anyhow!("cannot resolve item address '{qualified}': {err}"))
-                }
-            };
-            return Ok(ResolvedItemAddress::Issue {
-                issue_ref,
-                kind,
-                self_id: self_id.to_string(),
-            });
+                ))
+                .into());
+            }
+            return resolve_sugar_address(qualified, &self.item_kinds()?)
+                .map(ResolvedItemAddress::Issue)
+                .map_err(|err| anyhow!("cannot resolve item address '{qualified}': {err}"));
         }
 
         // An `@`-prefixed input is an explicit kind-segmented address. A malformed
@@ -477,8 +471,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // self-id visible so a caller can confirm the value was
                 // structurally routed, not mis-split, even on the error path.
                 let local_name = self
+                    .exec
                     .config_manager
-                    .project_name_from_config(self.cached_config()?);
+                    .project_name_from_config(self.exec.cached_config()?);
                 let scope = addr.scope.bind_local(local_name.as_deref()).map_err(|err| {
                     anyhow!(
                         "cannot resolve item address '{qualified}' (kind '{kind}', self-id '{}'): {err}",
@@ -490,11 +485,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                         kind,
                         self_id: addr.self_id,
                     }),
-                    Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
-                        issue_ref: IssueIdPrefix::parse(&issue_ref)?,
+                    Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue(IssueItemAddress {
+                        issue_ref,
                         kind: Some(kind),
                         self_id: addr.self_id,
-                    }),
+                    })),
                 }
             }
             // A malformed `@`-address surfaces the parser's own InvalidAddress
@@ -506,155 +501,54 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .context(format!("cannot resolve item address '{qualified}'"))),
         }
     }
-
-    /// Resolve a generic node→item link label of the form
-    /// `<namespace>:<issue>/<self-id>` to its addressed item (REQ-05).
-    ///
-    /// The namespace must be a `link-namespace` of some configured item kind
-    /// (e.g. the `requirement` kind's `satisfies`), so an arbitrary label is not
-    /// mistaken for an item reference. The value after the namespace must be a
-    /// qualified id `<issue>/<self-id>`; it is resolved through the SAME
-    /// [`show_item`](Self::show_item) path, so an unresolvable qualified id is
-    /// reported as an error rather than silently dropped.
-    ///
-    /// Returns `Ok(None)` when the label's namespace is not a registered link
-    /// namespace OR when the value is a bare self-id (`satisfies:REQ-01`), which
-    /// addresses no item; validation reports the latter through
-    /// [`unqualified_link_message`](crate::domain::item::unqualified_link_message).
-    /// A namespace that DOES match but whose qualified id cannot be resolved is
-    /// an `Err`.
-    pub fn resolve_link_label(&self, label: &str) -> Result<Option<ItemShowResult>> {
-        let Some((namespace, value)) = label.split_once(':') else {
-            return Ok(None);
-        };
-
-        // The namespace must belong to some kind's link-namespaces, else this is
-        // not an item reference at all.
-        let is_link_namespace = self
-            .item_kinds()?
-            .iter()
-            .any(|kind| kind.link_namespaces().iter().any(|ns| ns == namespace));
-        if !is_link_namespace {
-            return Ok(None);
-        }
-
-        // A generic qualified reference is any address-grammar form (explicit
-        // kind-segmented or `<short-id>/<self-id>` sugar); a bare self-id has no
-        // `/` and addresses nothing.
-        if !is_qualified_reference(value) {
-            return Ok(None);
-        }
-
-        // A registered link namespace with a qualified value MUST resolve; an
-        // unresolvable qualified id is an error, never a silent drop (REQ-05).
-        let resolved = self.show_item(value).with_context(|| {
-            format!("link label '{label}' references an unresolvable qualified item id")
-        })?;
-        Ok(Some(resolved))
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::{seed_issue, seed_repo_file, MemoryDeclarations};
     use crate::storage::InMemoryStorage;
 
-    /// The five markdown/registry kinds from the package-supplied `[item_kinds]`
-    /// table. The package also declares `gate` (jit:bb7d57a2), omitted here
-    /// because its registry-first source starts empty on a fresh init and these
-    /// synthetic-root tests have no gate registry to index — gate resolution is
-    /// exercised via [`GATE_ITEM_KIND`] below. The engine bakes in no kinds, so
-    /// helpers that exercise the canonical set write this to config (the
-    /// established `InMemoryStorage` pattern: a real `config.toml` at the synthetic
-    /// root, the only on-disk file config loading requires).
-    const CANONICAL_ITEM_KINDS: &str = "\
-[item_kinds.requirement]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = [\"[hard]\"]
-link-namespaces = [\"satisfies\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.decision]
-section = \"decisions\"
-id-pattern = \"D-[0-9]+\"
-markers = []
-link-namespaces = [\"per\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.risk]
-section = \"risks\"
-id-pattern = \"RISK-[0-9]+\"
-markers = []
-link-namespaces = [\"mitigates\", \"resolves\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.invariant]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
-source-of-truth = \"registry-first\"
-
-[item_kinds.rule]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }
-source-of-truth = \"registry-first\"
-";
-
-    fn executor_with(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        CommandExecutor::new(storage)
-    }
-
-    /// Build an [`InMemoryStorage`] executor whose `config.toml` declares
-    /// `[project] name = "<name>"` alongside a single markdown-first,
-    /// project-scope `glossary` kind sourced from `project-items.md` (task
-    /// a1b6b3da: exercises the `@<name>/<kind>/<self-id>` binding against a repo
-    /// with a real declared project identity).
-    fn project_exec_with_name(
-        name: &str,
-        source_md: Option<&str>,
-    ) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config = format!(
-            "[project]\n\
-             name = \"{name}\"\n\
-             \n\
-             [item_kinds.glossary]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"GLOSS-[0-9]+\"\n\
-             markers = []\n\
-             link-namespaces = [\"defines\"]\n\
-             scope = \"project\"\n\
-             source = \"project-items.md\"\n\
-             source-of-truth = \"markdown-first\"\n"
-        );
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        if let Some(md) = source_md {
-            storage.add_worktree_file("project-items.md", md);
-        }
-        CommandExecutor::new(storage)
-    }
-
     fn issue_with_criteria(title: &str, body: &str) -> Issue {
-        crate::domain::fixture_issue(title.to_string(), body.to_string())
+        crate::test_utils::fixture_issue(title.to_string(), body.to_string())
     }
+
+    const GLOSSARY_CONFIG: &str = "[item_kinds.glossary]\n\
+        section = \"success_criteria\"\n\
+        id-pattern = \"GLOSS-[0-9]+\"\n\
+        markers = []\n\
+        link-namespaces = [\"defines\"]\n\
+        scope = \"project\"\n\
+        source = \"project-items.md\"\n\
+        source-of-truth = \"markdown-first\"\n";
+
+    const TWO_PROJECT_KINDS_CONFIG: &str = "[item_kinds.custom-rule]\n\
+        section = \"success_criteria\"\n\
+        id-pattern = \"[a-z][a-z-]*\"\n\
+        markers = []\n\
+        link-namespaces = [\"governs\"]\n\
+        scope = \"project\"\n\
+        source = \"rules.md\"\n\
+        source-of-truth = \"markdown-first\"\n\
+        \n\
+        [item_kinds.custom-gate]\n\
+        section = \"success_criteria\"\n\
+        id-pattern = \"[a-z][a-z-]*\"\n\
+        markers = []\n\
+        link-namespaces = [\"checks\"]\n\
+        scope = \"project\"\n\
+        source = \"gates.md\"\n\
+        source-of-truth = \"markdown-first\"\n";
+
+    const POLICY_CONFIG: &str = "[item_kinds.policy]\n\
+        section = \"success_criteria\"\n\
+        id-pattern = \"POL-[0-9]+\"\n\
+        markers = []\n\
+        link-namespaces = [\"enforces\"]\n\
+        scope = \"project\"\n\
+        source = { toml = \"policies.toml\", table = \"policies\", id-field = \"id\", \
+        text-field = \"statement\", link-fields = { enforces = \"enforced-by\" } }\n\
+        source-of-truth = \"registry-first\"\n";
 
     #[test]
     fn test_list_items_across_repo() {
@@ -663,10 +557,20 @@ source-of-truth = \"registry-first\"
             "## Success Criteria\n\n- [hard] REQ-01: a one\n- [hard] REQ-02: a two\n",
         );
         let b = issue_with_criteria("B", "## Success Criteria\n\n- [hard] REQ-01: b one\n");
-        let exec = executor_with(vec![a, b]);
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        seed_issue(&storage, b);
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let result = exec.list_items(None).unwrap();
-        assert_eq!(result.count, 3);
+        let result = exec.items().list_items(None).unwrap();
+        assert_eq!(result.items.len(), 3);
         // Qualified ids disambiguate the two REQ-01s by their issue scope.
         let qids: Vec<&str> = result
             .items
@@ -679,9 +583,57 @@ source-of-truth = \"registry-first\"
     #[test]
     fn test_list_items_kind_filter_unknown_is_empty() {
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
-        let exec = executor_with(vec![a]);
-        assert_eq!(exec.list_items(Some("nonexistent")).unwrap().count, 0);
-        assert_eq!(exec.list_items(Some("requirement")).unwrap().count, 1);
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        assert_eq!(
+            exec.items()
+                .list_items(Some("nonexistent"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert_eq!(
+            exec.items()
+                .list_items(Some("requirement"))
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_list_items_kind_filter_excludes_items_of_other_shipped_kinds() {
+        let a = issue_with_criteria(
+            "A",
+            "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n",
+        );
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        let config = crate::test_utils::shipped_item_kinds_toml();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                gates: Some(TWO_GATES),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+
+        // Registry-first shipped kinds contribute project items of their own.
+        let all = exec.items().list_items(None).unwrap();
+        assert!(all.items.iter().any(|i| i.kind == "gate"));
+        let requirements = exec.items().list_items(Some("requirement")).unwrap();
+        assert_eq!(requirements.items.len(), 2);
+        assert!(requirements.items.iter().all(|i| i.kind == "requirement"));
     }
 
     #[test]
@@ -690,21 +642,46 @@ source-of-truth = \"registry-first\"
             "A",
             "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n- [hard] REQ-02: cycle check\n",
         );
-        let exec = executor_with(vec![a]);
-        assert_eq!(exec.search_items("atomic", None).unwrap().count, 1);
-        assert_eq!(exec.search_items("REQ-02", None).unwrap().count, 1);
-        assert_eq!(exec.search_items("", None).unwrap().count, 2);
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        assert_eq!(
+            exec.items().search_items("atomic", None).unwrap().count(),
+            1
+        );
+        assert_eq!(
+            exec.items().search_items("REQ-02", None).unwrap().count(),
+            1
+        );
+        assert_eq!(exec.items().search_items("", None).unwrap().count(), 2);
     }
 
     #[test]
     fn test_show_item_resolves_by_qualified_id() {
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a one\n");
         let short = a.short_id();
-        let exec = executor_with(vec![a]);
+        let a_id = a.id.clone();
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // The `<short-id>/<self-id>` sugar still resolves as INPUT (D3-A), but the
         // minted qualified id it resolves to is the canonical kind-segmented form.
-        let shown = exec.show_item(&format!("{short}/REQ-01")).unwrap();
+        let shown = exec.items().show_item(&format!("{short}/REQ-01")).unwrap();
         assert_eq!(shown.item.self_id, "REQ-01");
         assert_eq!(
             shown.item.qualified_id,
@@ -712,56 +689,27 @@ source-of-truth = \"registry-first\"
         );
         assert_eq!(shown.issue_title.as_deref(), Some("A"));
         // The owning issue id is the FULL id, resolved from the short-id scope.
-        assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
-    }
-
-    /// Build an [`InMemoryStorage`] executor that declares a markdown-first
-    /// project-scope `glossary` kind sourced from `project-items.md`, seeding the
-    /// source through the in-memory repo-file map (NO real source file). `config.toml`
-    /// is written to the synthetic root (the established `InMemoryStorage` config
-    /// pattern, the only on-disk file config loading requires). `extra_config` is
-    /// appended to the `[item_kinds]` block; `source_md` (when `Some`) seeds the
-    /// source.
-    ///
-    /// Uses the name `glossary` to exercise the generic markdown-first
-    /// project-scope sourcing path.
-    fn project_exec(
-        source_md: Option<&str>,
-        extra_config: &str,
-        issues: Vec<Issue>,
-    ) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config = format!(
-            "[item_kinds.glossary]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"GLOSS-[0-9]+\"\n\
-             markers = []\n\
-             link-namespaces = [\"defines\"]\n\
-             scope = \"project\"\n\
-             source = \"project-items.md\"\n\
-             source-of-truth = \"markdown-first\"\n{extra_config}"
-        );
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        if let Some(md) = source_md {
-            storage.add_worktree_file("project-items.md", md);
-        }
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        CommandExecutor::new(storage)
+        assert_eq!(shown.issue_full_id.as_ref(), Some(&a_id));
     }
 
     #[test]
     fn test_show_item_resolves_project_scope() {
         // REQ-01: `@/<kind>/<self-id>` resolves through the config-driven path with
         // the source served by the storage boundary (in-memory repo-file map, no fs).
-        let exec = project_exec(
-            Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
-            "",
-            vec![],
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "project-items.md",
+            "## Success Criteria\n\n- GLOSS-01: all writes are atomic\n",
         );
-        let shown = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(GLOSSARY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let shown = exec.items().show_item("@/glossary/GLOSS-01").unwrap();
         assert_eq!(shown.item.self_id, "GLOSS-01");
         assert_eq!(shown.item.qualified_id, "@/glossary/GLOSS-01");
         assert_eq!(shown.item.scope, "@");
@@ -773,8 +721,20 @@ source-of-truth = \"registry-first\"
     #[test]
     fn test_show_item_project_scope_missing_self_id_errors() {
         // An unresolvable project-scope id is reported, never silently dropped.
-        let exec = project_exec(Some("## Success Criteria\n\n- GLOSS-01: x\n"), "", vec![]);
-        let err = exec.show_item("@/glossary/GLOSS-99").unwrap_err();
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "project-items.md",
+            "## Success Criteria\n\n- GLOSS-01: x\n",
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(GLOSSARY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/glossary/GLOSS-99").unwrap_err();
         assert!(err.to_string().contains("project scope"));
         assert!(err.to_string().contains("no addressable item"));
     }
@@ -784,8 +744,14 @@ source-of-truth = \"registry-first\"
         // REQ-01 (degradation): with no source seeded, `read_repo_file` returns
         // None and `@/<kind>/<id>` resolves to a descriptive not-found error (not a
         // panic, not the issue resolver).
-        let exec = project_exec(None, "", vec![]);
-        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(GLOSSARY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"));
         assert!(!msg.contains("resolve issue scope"));
@@ -795,95 +761,91 @@ source-of-truth = \"registry-first\"
     fn test_show_item_same_self_id_distinct_scopes() {
         // REQ-04: the same self-id under an issue scope and the project scope are
         // two distinct items, each resolved by its own qualified id.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] GLOSS-01: issue one\n".to_string(),
         );
         let short = issue.short_id();
-        // The issue-scope `requirement` kind must also see GLOSS-* ids.
-        let exec = project_exec(
-            Some("## Success Criteria\n\n- GLOSS-01: project one\n"),
-            "\n[item_kinds.requirement]\n\
+        // A custom issue-scope kind must also see GLOSS-* ids.
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "project-items.md",
+            "## Success Criteria\n\n- GLOSS-01: project one\n",
+        );
+        seed_issue(&storage, issue);
+        let config = format!(
+            "{GLOSSARY_CONFIG}\n[item_kinds.issue-glossary]\n\
              section = \"success_criteria\"\n\
              id-pattern = \"GLOSS-[0-9]+\"\n\
              markers = [\"[hard]\"]\n\
              link-namespaces = [\"satisfies\"]\n\
              scope = \"issue\"\n\
-             source-of-truth = \"markdown-first\"\n",
-            vec![issue],
+             source-of-truth = \"markdown-first\"\n"
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
         );
 
-        let from_issue = exec.show_item(&format!("{short}/GLOSS-01")).unwrap();
-        let from_project = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        let from_issue = exec
+            .items()
+            .show_item(&format!("{short}/GLOSS-01"))
+            .unwrap();
+        let from_project = exec.items().show_item("@/glossary/GLOSS-01").unwrap();
         assert!(from_issue.item.text.contains("issue one"));
         assert!(from_project.item.text.contains("project one"));
         assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
     }
 
-    /// Build an executor declaring two project-scope markdown-first kinds
-    /// (`rule`, `gate`) that share a permissive id-pattern, each sourced from its
-    /// own markdown file, so both can mint the SAME self-id in the project scope.
-    fn two_project_kinds_exec(
-        rules_md: Option<&str>,
-        gates_md: Option<&str>,
-    ) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            "[item_kinds.rule]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[a-z][a-z-]*\"\n\
-             markers = []\n\
-             link-namespaces = [\"governs\"]\n\
-             scope = \"project\"\n\
-             source = \"rules.md\"\n\
-             source-of-truth = \"markdown-first\"\n\
-             \n\
-             [item_kinds.gate]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[a-z][a-z-]*\"\n\
-             markers = []\n\
-             link-namespaces = [\"checks\"]\n\
-             scope = \"project\"\n\
-             source = \"gates.md\"\n\
-             source-of-truth = \"markdown-first\"\n",
-        )
-        .unwrap();
-        if let Some(md) = rules_md {
-            storage.add_worktree_file("rules.md", md);
-        }
-        if let Some(md) = gates_md {
-            storage.add_worktree_file("gates.md", md);
-        }
-        CommandExecutor::new(storage)
-    }
-
     #[test]
     fn test_show_item_explicit_kind_disambiguates_same_self_id() {
-        // REQ-01: a `rule` and a `gate` both self-id `coverage-preview` in the
+        // REQ-01: a `custom-rule` and a `custom-gate` both self-id `coverage-preview` in the
         // project scope each resolve to their OWN distinct item via the explicit
         // `@/<kind>/<self-id>` address, never a silent first-match.
-        let exec = two_project_kinds_exec(
-            Some("## Success Criteria\n\n- coverage-preview: the rule form\n"),
-            Some("## Success Criteria\n\n- coverage-preview: the gate form\n"),
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "rules.md",
+            "## Success Criteria\n\n- coverage-preview: the rule form\n",
+        );
+        seed_repo_file(
+            &storage,
+            "gates.md",
+            "## Success Criteria\n\n- coverage-preview: the gate form\n",
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(TWO_PROJECT_KINDS_CONFIG),
+                ..MemoryDeclarations::default()
+            },
         );
 
-        let rule = exec.show_item("@/rule/coverage-preview").unwrap();
-        assert_eq!(rule.item.kind, "rule");
+        let rule = exec
+            .items()
+            .show_item("@/custom-rule/coverage-preview")
+            .unwrap();
+        assert_eq!(rule.item.kind, "custom-rule");
         assert_eq!(rule.item.self_id, "coverage-preview");
         assert!(rule.item.text.contains("rule form"));
 
-        let gate = exec.show_item("@/gate/coverage-preview").unwrap();
-        assert_eq!(gate.item.kind, "gate");
+        let gate = exec
+            .items()
+            .show_item("@/custom-gate/coverage-preview")
+            .unwrap();
+        assert_eq!(gate.item.kind, "custom-gate");
         assert_eq!(gate.item.self_id, "coverage-preview");
         assert!(gate.item.text.contains("gate form"));
 
         // Distinct items sharing a scope and self-id: the kind is a segment of the
         // minted id, so they even derive DISTINCT qualified ids.
         assert_ne!(rule.item.text, gate.item.text);
-        assert_eq!(rule.item.qualified_id, "@/rule/coverage-preview");
-        assert_eq!(gate.item.qualified_id, "@/gate/coverage-preview");
+        assert_eq!(rule.item.qualified_id, "@/custom-rule/coverage-preview");
+        assert_eq!(gate.item.qualified_id, "@/custom-gate/coverage-preview");
         assert_ne!(rule.item.qualified_id, gate.item.qualified_id);
     }
 
@@ -892,21 +854,42 @@ source-of-truth = \"registry-first\"
         // REQ-02: asking for a kind that does not own the matched self-id in that
         // scope is a clear not-found error, never a silent fallback to the kind that
         // DOES own it.
-        let exec = two_project_kinds_exec(
-            Some("## Success Criteria\n\n- only-rule: exists only as a rule\n"),
-            Some("## Success Criteria\n\n- other-gate: an unrelated gate\n"),
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "rules.md",
+            "## Success Criteria\n\n- only-rule: exists only as a rule\n",
+        );
+        seed_repo_file(
+            &storage,
+            "gates.md",
+            "## Success Criteria\n\n- other-gate: an unrelated gate\n",
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(TWO_PROJECT_KINDS_CONFIG),
+                ..MemoryDeclarations::default()
+            },
         );
 
-        // The self-id `only-rule` belongs to `rule`, not `gate`.
-        let err = exec.show_item("@/gate/only-rule").unwrap_err();
+        // The self-id `only-rule` belongs to `custom-rule`, not `custom-gate`.
+        let err = exec
+            .items()
+            .show_item("@/custom-gate/only-rule")
+            .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("no addressable item"), "message: {msg}");
         assert!(msg.contains("gate"), "message: {msg}");
 
         // Sanity: the correct kind DOES resolve it.
         assert_eq!(
-            exec.show_item("@/rule/only-rule").unwrap().item.kind,
-            "rule"
+            exec.items()
+                .show_item("@/custom-rule/only-rule")
+                .unwrap()
+                .item
+                .kind,
+            "custom-rule"
         );
     }
 
@@ -915,12 +898,22 @@ source-of-truth = \"registry-first\"
         // REQ-03 (task a1b6b3da): `@<declared-name>/<kind>/<self-id>` routes
         // through `AddressScope::bind_local` and resolves identically to the
         // bare-`@/<kind>/<self-id>` form when the repo declares that name.
-        let exec = project_exec_with_name(
-            "acme",
-            Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "project-items.md",
+            "## Success Criteria\n\n- GLOSS-01: all writes are atomic\n",
         );
-        let named = exec.show_item("@acme/glossary/GLOSS-01").unwrap();
-        let bare = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        let config = format!("[project]\nname = \"acme\"\n\n{GLOSSARY_CONFIG}");
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let named = exec.items().show_item("@acme/glossary/GLOSS-01").unwrap();
+        let bare = exec.items().show_item("@/glossary/GLOSS-01").unwrap();
         assert_eq!(named.item, bare.item);
         assert_eq!(named.item.qualified_id, "@/glossary/GLOSS-01");
     }
@@ -932,11 +925,22 @@ source-of-truth = \"registry-first\"
         // resolvable — the stopgap "not yet supported" error is replaced by
         // `ItemError::NotResolvable`, which names the unresolvable project and
         // states resolution is local-only.
-        let exec = project_exec_with_name(
-            "acme",
-            Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "project-items.md",
+            "## Success Criteria\n\n- GLOSS-01: all writes are atomic\n",
+        );
+        let config = format!("[project]\nname = \"acme\"\n\n{GLOSSARY_CONFIG}");
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
         );
         let err = exec
+            .items()
             .show_item("@other-project/glossary/GLOSS-01")
             .unwrap_err();
         let msg = format!("{err:#}");
@@ -949,8 +953,18 @@ source-of-truth = \"registry-first\"
         // REQ-02/REQ-03: with no `[project] name` declared at all, ANY
         // named-project reference is not resolvable, even one that happens to
         // name an item kind and self-id that do exist locally.
-        let exec = executor_with(vec![]);
-        let err = exec.show_item("@acme/requirement/REQ-01").unwrap_err();
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec
+            .items()
+            .show_item("@acme/requirement/REQ-01")
+            .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("acme"), "got: {msg}");
         assert!(msg.contains("local-only"), "got: {msg}");
@@ -964,90 +978,38 @@ source-of-truth = \"registry-first\"
         // `scope == PROJECT_SCOPE_SENTINEL` exactly ("@"), not "@acme", so the
         // parser's own segment-count `InvalidAddress` surfaces instead of a
         // wrong "no addressable item" not-found.
-        let exec = executor_with(vec![]);
-        let err = exec.show_item("@acme/GLOSS-01").unwrap_err();
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@acme/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("segments"), "got: {msg}");
         assert!(!msg.contains("no addressable item"), "got: {msg}");
     }
 
     #[test]
-    fn test_resolve_link_label_classifies_all_address_forms() {
-        // REQ-03: resolve_link_label treats every address form (explicit project,
-        // explicit issue, and `<short>/<self-id>` sugar) as a qualified reference.
-        let issue = crate::domain::fixture_issue(
-            "A".to_string(),
-            "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n".to_string(),
-        );
-        let short = issue.short_id();
-        let exec = project_exec(
-            Some("## Success Criteria\n\n- GLOSS-01: a glossary entry\n"),
-            "\n[item_kinds.requirement]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"\n\
-             markers = [\"[hard]\"]\n\
-             link-namespaces = [\"satisfies\"]\n\
-             scope = \"issue\"\n\
-             source-of-truth = \"markdown-first\"\n",
-            vec![issue],
-        );
-
-        // Explicit project form `@/<kind>/<self-id>`.
-        let proj = exec
-            .resolve_link_label("defines:@/glossary/GLOSS-01")
-            .unwrap();
-        assert_eq!(proj.unwrap().item.self_id, "GLOSS-01");
-
-        // Explicit issue form `@/issue/<short>/<kind>/<self-id>`.
-        let issue_form = exec
-            .resolve_link_label(&format!("satisfies:@/issue/{short}/requirement/REQ-01"))
-            .unwrap();
-        assert_eq!(issue_form.unwrap().item.self_id, "REQ-01");
-
-        // `<short>/<self-id>` sugar form.
-        let sugar = exec
-            .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
-            .unwrap();
-        assert_eq!(sugar.unwrap().item.self_id, "REQ-01");
-    }
-
-    #[test]
-    fn test_resolve_link_label_named_project_form_routes_without_panic() {
-        // Audit (jit:7a2bbe4f) REQ-02, wired to the a1b6b3da binding: the
-        // named-project form `@<name>/<kind>/<self-id>` is classified as a
-        // qualified reference (it has a `/`) and routes through `show_item`; with
-        // no local project name declared in this repo, the reference is not
-        // resolvable, surfacing that error rather than a silent `None` or a
-        // panic.
-        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
-        let exec = executor_with(vec![a]);
-        let err = exec
-            .resolve_link_label("satisfies:@acme/requirement/REQ-01")
-            .unwrap_err();
-        // The top-level context marks it unresolvable; the wrapped cause (rendered
-        // with the alternate `{:#}` chain) carries the three PARSED components,
-        // proving the named-project value was structurally routed to (project,
-        // kind, self-id) rather than mis-split before it was deemed unresolvable.
-        let chain = format!("{err:#}");
-        assert!(
-            chain.contains("unresolvable qualified item id"),
-            "got: {chain}"
-        );
-        assert!(chain.contains("project 'acme'"), "got: {chain}");
-        assert!(chain.contains("kind 'requirement'"), "got: {chain}");
-        assert!(chain.contains("self-id 'REQ-01'"), "got: {chain}");
-    }
-
-    #[test]
     fn test_list_items_includes_project_scope() {
         // REQ-01: project-scoped items surface in the cross-repo list alongside
         // issue-scoped ones.
-        let exec = project_exec(
-            Some("## Success Criteria\n\n- GLOSS-01: project gloss\n"),
-            "",
-            vec![],
+        let storage = InMemoryStorage::new();
+        seed_repo_file(
+            &storage,
+            "project-items.md",
+            "## Success Criteria\n\n- GLOSS-01: project gloss\n",
         );
-        let result = exec.list_items(None).unwrap();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(GLOSSARY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let result = exec.items().list_items(None).unwrap();
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1061,22 +1023,23 @@ source-of-truth = \"registry-first\"
         // Path-safety: a `..`-traversal source path is rejected by the storage
         // boundary, so `@/<kind>/<id>` resolution surfaces a typed InvalidPath error
         // rather than reading a file outside the repository.
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            "[item_kinds.glossary]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"GLOSS-[0-9]+\"\n\
-             markers = []\n\
-             link-namespaces = [\"defines\"]\n\
-             scope = \"project\"\n\
-             source = \"../escape.md\"\n\
-             source-of-truth = \"markdown-first\"\n",
-        )
-        .unwrap();
-        let exec = CommandExecutor::new(storage);
-        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
+        let config = "[item_kinds.glossary]\n\
+            section = \"success_criteria\"\n\
+            id-pattern = \"GLOSS-[0-9]+\"\n\
+            markers = []\n\
+            link-namespaces = [\"defines\"]\n\
+            scope = \"project\"\n\
+            source = \"../escape.md\"\n\
+            source-of-truth = \"markdown-first\"\n";
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(config),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
         // The typed InvalidPath cause is in the error chain (alternate Display
         // renders the full anyhow context chain).
         let msg = format!("{err:#}");
@@ -1089,54 +1052,28 @@ source-of-truth = \"registry-first\"
     #[test]
     fn test_project_items_rejects_absolute_source() {
         // Path-safety: an absolute source path is rejected by the storage boundary.
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            "[item_kinds.glossary]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"GLOSS-[0-9]+\"\n\
-             markers = []\n\
-             link-namespaces = [\"defines\"]\n\
-             scope = \"project\"\n\
-             source = \"/etc/passwd\"\n\
-             source-of-truth = \"markdown-first\"\n",
-        )
-        .unwrap();
-        let exec = CommandExecutor::new(storage);
-        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
+        let config = "[item_kinds.glossary]\n\
+            section = \"success_criteria\"\n\
+            id-pattern = \"GLOSS-[0-9]+\"\n\
+            markers = []\n\
+            link-namespaces = [\"defines\"]\n\
+            scope = \"project\"\n\
+            source = \"/etc/passwd\"\n\
+            source-of-truth = \"markdown-first\"\n";
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(config),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("absolute paths are not permitted"),
             "expected absolute-path rejection, got: {msg}"
         );
-    }
-
-    /// Build an executor that declares a NON-invariant, registry-first project
-    /// kind `policy` backed by a custom `.toml` through a structured `source`
-    /// descriptor (`toml`/`table`/`id-field`/`text-field`/`link-fields`). The
-    /// descriptor's toml file is served through the in-memory repo-file map (the
-    /// storage boundary, NO real filesystem read); `policies_toml` (when `Some`)
-    /// seeds it. Uses `policy` to exercise the GENERIC toml-descriptor path, the
-    /// same path a descriptor-backed `invariant` kind routes through.
-    fn policy_exec(policies_toml: Option<&str>) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config = "[item_kinds.policy]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"POL-[0-9]+\"\n\
-             markers = []\n\
-             link-namespaces = [\"enforces\"]\n\
-             scope = \"project\"\n\
-             source = { toml = \"policies.toml\", table = \"policies\", \
-             id-field = \"id\", text-field = \"statement\", \
-             link-fields = { enforces = \"enforced-by\" } }\n\
-             source-of-truth = \"registry-first\"\n";
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        if let Some(toml) = policies_toml {
-            storage.add_worktree_file("policies.toml", toml);
-        }
-        CommandExecutor::new(storage)
     }
 
     const TWO_POLICIES: &str = "\
@@ -1156,9 +1093,17 @@ statement = \"Every dependency edge stays acyclic.\"
         // through the declared field mapping indexes `@/<kind>/<self-id>` items, with
         // the toml read going through the storage boundary and link-fields surfacing
         // as namespace-qualified link labels.
-        let exec = policy_exec(Some(TWO_POLICIES));
+        let storage = InMemoryStorage::new();
+        seed_repo_file(&storage, "policies.toml", TWO_POLICIES);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(POLICY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let first = exec.show_item("@/policy/POL-01").unwrap();
+        let first = exec.items().show_item("@/policy/POL-01").unwrap();
         assert_eq!(first.item.self_id, "POL-01");
         assert_eq!(first.item.qualified_id, "@/policy/POL-01");
         assert_eq!(first.item.scope, "@");
@@ -1176,13 +1121,13 @@ statement = \"Every dependency edge stays acyclic.\"
         assert_eq!(first.issue_full_id, None);
 
         // An entry with no link field is graceful: it still indexes, with no labels.
-        let second = exec.show_item("@/policy/POL-02").unwrap();
+        let second = exec.items().show_item("@/policy/POL-02").unwrap();
         assert_eq!(second.item.self_id, "POL-02");
         assert!(second.item.links.is_empty());
 
         // Both surface in the cross-repo list under the `@` project scope.
-        let listed = exec.list_items(Some("policy")).unwrap();
-        assert_eq!(listed.count, 2);
+        let listed = exec.items().list_items(Some("policy")).unwrap();
+        assert_eq!(listed.items.len(), 2);
     }
 
     #[test]
@@ -1190,44 +1135,17 @@ statement = \"Every dependency edge stays acyclic.\"
         // REQ-02 (degradation): with no descriptor toml seeded, the storage read
         // returns None and `@/<kind>/<id>` resolves to a descriptive not-found error,
         // never a panic and never the issue resolver.
-        let exec = policy_exec(None);
-        let err = exec.show_item("@/policy/POL-01").unwrap_err();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(POLICY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/policy/POL-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"), "got: {msg}");
         assert!(!msg.contains("resolve issue scope"), "got: {msg}");
-    }
-
-    /// Build an executor whose synthetic repo carries `.jit/invariants.toml` with
-    /// `invariants_toml` and the canonical `[item_kinds]` table (the package-supplied
-    /// set), exercising the registry-first invariant path.
-    ///
-    /// The registry is served through the storage boundary (the in-memory repo-file
-    /// map) at the `.jit/invariants.toml` path the invariant kind's toml descriptor
-    /// names, mirroring how the shipped CLI reads it through `read_repo_file`.
-    fn registry_exec(
-        invariants_toml: &str,
-        issues: Vec<Issue>,
-    ) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
-        storage.add_data_file("invariants.toml", invariants_toml);
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        CommandExecutor::new(storage)
-    }
-
-    /// Build an executor whose synthetic repo carries `.jit/rules.toml` with
-    /// `rules_toml` and the canonical `[item_kinds]` table (the package-supplied
-    /// set, now including `rule`), exercising the registry-first rule path —
-    /// the same pattern [`registry_exec`] establishes for invariants.
-    fn registry_exec_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
-        storage.add_data_file("rules.toml", rules_toml);
-        CommandExecutor::new(storage)
     }
 
     const TWO_INVARIANTS: &str = "\
@@ -1248,9 +1166,18 @@ kind = \"advisory\"
         // REQ-01: in a repo with the canonical `[item_kinds]` table and a
         // `.jit/invariants.toml`, `jit item list --kind invariant` returns each
         // loaded invariant addressed as `@/<kind>/<self-id>`.
-        let exec = registry_exec(TWO_INVARIANTS, vec![]);
-        let result = exec.list_items(Some("invariant")).unwrap();
-        assert_eq!(result.count, 2);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let result = exec.items().list_items(Some("invariant")).unwrap();
+        assert_eq!(result.items.len(), 2);
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1274,8 +1201,20 @@ kind = \"advisory\"
     fn test_show_item_resolves_invariant_by_qualified_id() {
         // REQ-01: the generic resolver returns an invariant by its
         // `@/<kind>/<self-id>` address.
-        let exec = registry_exec(TWO_INVARIANTS, vec![]);
-        let shown = exec.show_item("@/invariant/second-invariant").unwrap();
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let shown = exec
+            .items()
+            .show_item("@/invariant/second-invariant")
+            .unwrap();
         assert_eq!(shown.item.self_id, "second-invariant");
         assert_eq!(shown.item.qualified_id, "@/invariant/second-invariant");
         assert_eq!(shown.item.kind, "invariant");
@@ -1305,8 +1244,17 @@ enforce = true
         // the kind-segmented `@/rule/<self-id>` address (story 71ebd1e8 REQ-01),
         // mirroring the invariant kind's resolution path above but sourced from
         // `.jit/rules.toml`'s `rules` table.
-        let exec = registry_exec_with_rules(ONE_RULE);
-        let shown = exec.show_item("@/rule/coverage-preview").unwrap();
+        let config = crate::test_utils::shipped_item_kind_tables(&["rule"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let shown = exec.items().show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(shown.item.self_id, "coverage-preview");
         // The minted qualified id carries the kind segment, so it equals the
         // kind-segmented address it resolved from (round-trip).
@@ -1317,36 +1265,6 @@ enforce = true
         // No owning issue for a project-scope item.
         assert_eq!(shown.issue_full_id, None);
         assert_eq!(shown.issue_title, None);
-    }
-
-    /// A standalone `[item_kinds.gate]` declaration sourced from `.jit/gates.toml`
-    /// (jit:42898915), mirroring the live repo's config. `gate` is supplied by the
-    /// package (jit:bb7d57a2), but stays out of [`CANONICAL_ITEM_KINDS`] in these
-    /// tests: a freshly initialized `.jit/gates.toml` starts empty (bare init
-    /// seeds no default gates), so canonical-set
-    /// tests would have nothing to index. This mirrors [`policy_exec`]'s
-    /// standalone-config pattern rather than extending `CANONICAL_ITEM_KINDS`.
-    const GATE_ITEM_KIND: &str = "\
-[item_kinds.gate]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
-source-of-truth = \"registry-first\"
-";
-
-    /// Build an executor whose synthetic repo carries `.jit/gates.toml` with
-    /// `gates_toml` and a standalone `[item_kinds.gate]` declaration, exercising the
-    /// registry-first gate path the same way [`registry_exec_with_rules`] does for
-    /// rules.
-    fn registry_exec_with_gates(gates_toml: &str) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), GATE_ITEM_KIND).unwrap();
-        storage.add_data_file("gates.toml", gates_toml);
-        CommandExecutor::new(storage)
     }
 
     /// Two gate registry entries shaped like real `.jit/gates.toml` rows well
@@ -1372,9 +1290,18 @@ stage = \"postcheck\"
         // REQ-03: `jit item list --kind gate` returns every gate in `.jit/gates.toml`
         // as an addressable item, mirroring the existing invariant/rule behavior for
         // other project-scoped registry-first kinds.
-        let exec = registry_exec_with_gates(TWO_GATES);
-        let result = exec.list_items(Some("gate")).unwrap();
-        assert_eq!(result.count, 2);
+        let config = crate::test_utils::shipped_item_kind_tables(&["gate"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                gates: Some(TWO_GATES),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let result = exec.items().list_items(Some("gate")).unwrap();
+        assert_eq!(result.items.len(), 2);
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1402,8 +1329,17 @@ stage = \"postcheck\"
         // whose text is that gate's description. Uses the kind-segmented address
         // (story 71ebd1e8 REQ-01); the kindless `@/<key>` form is no longer a valid
         // address at all.
-        let exec = registry_exec_with_gates(TWO_GATES);
-        let shown = exec.show_item("@/gate/cargo-ci").unwrap();
+        let config = crate::test_utils::shipped_item_kind_tables(&["gate"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                gates: Some(TWO_GATES),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let shown = exec.items().show_item("@/gate/cargo-ci").unwrap();
         assert_eq!(shown.item.self_id, "cargo-ci");
         // The minted qualified id carries the kind segment, so it round-trips with
         // the kind-segmented address it resolved from.
@@ -1418,24 +1354,6 @@ stage = \"postcheck\"
         // No owning issue for a project-scope item.
         assert_eq!(shown.issue_full_id, None);
         assert_eq!(shown.issue_title, None);
-    }
-
-    /// Build an executor whose synthetic repo declares BOTH the `rule` and `gate`
-    /// item kinds and carries both `.jit/rules.toml` and `.jit/gates.toml`,
-    /// exercising the cross-kind collision the two registries share in the live
-    /// repo: `coverage-preview` is BOTH a rule (`.jit/rules.toml`, origin `bracket`)
-    /// and a gate (`.jit/gates.toml`) (jit:42898915).
-    fn registry_exec_with_rules_and_gates(
-        rules_toml: &str,
-        gates_toml: &str,
-    ) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config = format!("{CANONICAL_ITEM_KINDS}\n{GATE_ITEM_KIND}");
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        storage.add_data_file("rules.toml", rules_toml);
-        storage.add_data_file("gates.toml", gates_toml);
-        CommandExecutor::new(storage)
     }
 
     const COVERAGE_PREVIEW_GATE: &str = "\
@@ -1455,15 +1373,25 @@ stage = \"postcheck\"
         // strings (`@/rule/coverage-preview` vs `@/gate/coverage-preview`). Each
         // kind-segmented address must resolve to its OWN item, never a silent
         // first-match or a spurious `DuplicateSelfId`.
-        let exec = registry_exec_with_rules_and_gates(ONE_RULE, COVERAGE_PREVIEW_GATE);
+        let config = crate::test_utils::shipped_item_kind_tables(&["rule", "gate"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                gates: Some(COVERAGE_PREVIEW_GATE),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let rule = exec.show_item("@/rule/coverage-preview").unwrap();
+        let rule = exec.items().show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(rule.item.kind, "rule");
         assert_eq!(rule.item.self_id, "coverage-preview");
         assert_eq!(rule.item.text, "coverage-preview");
         assert_eq!(rule.item.qualified_id, "@/rule/coverage-preview");
 
-        let gate = exec.show_item("@/gate/coverage-preview").unwrap();
+        let gate = exec.items().show_item("@/gate/coverage-preview").unwrap();
         assert_eq!(gate.item.kind, "gate");
         assert_eq!(gate.item.self_id, "coverage-preview");
         assert_eq!(gate.item.qualified_id, "@/gate/coverage-preview");
@@ -1478,16 +1406,28 @@ stage = \"postcheck\"
 
         // Both coexist in one unfiltered list with no DuplicateSelfId despite the
         // shared self-id (they differ by kind).
-        let all = exec.list_items(None).unwrap();
-        assert_eq!(all.count, 2);
+        let all = exec.items().list_items(None).unwrap();
+        assert_eq!(all.items.len(), 2);
     }
 
     #[test]
     fn test_search_items_finds_invariant_by_statement() {
         // The generic search path reaches registry-first invariants too.
-        let exec = registry_exec(TWO_INVARIANTS, vec![]);
-        let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
-        assert_eq!(hits.count, 1);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let hits = exec
+            .items()
+            .search_items("acyclic", Some("invariant"))
+            .unwrap();
+        assert_eq!(hits.items.len(), 1);
         assert_eq!(hits.items[0].qualified_id, "@/invariant/sample-invariant");
     }
 
@@ -1497,14 +1437,25 @@ stage = \"postcheck\"
         // markdown index is produced for them. An issue description containing an
         // invariant-looking line is NOT projected as an invariant item — invariants
         // come ONLY from `.jit/invariants.toml`.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] missing-invariant: a markdown line that LOOKS like an invariant\n"
                 .to_string(),
         );
-        let exec = registry_exec(TWO_INVARIANTS, vec![issue]);
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, issue);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let invariants = exec.list_items(Some("invariant")).unwrap();
+        let invariants = exec.items().list_items(Some("invariant")).unwrap();
         let qids: Vec<&str> = invariants
             .items
             .iter()
@@ -1512,7 +1463,7 @@ stage = \"postcheck\"
             .collect();
         // Only the two registry entries are invariants; the issue's missing-invariant line is
         // NOT among them (no markdown index for invariants).
-        assert_eq!(invariants.count, 2);
+        assert_eq!(invariants.items.len(), 2);
         assert!(qids.contains(&"@/invariant/sample-invariant"));
         assert!(qids.contains(&"@/invariant/second-invariant"));
         assert!(!qids.iter().any(|q| q.ends_with("/missing-invariant")));
@@ -1524,63 +1475,53 @@ stage = \"postcheck\"
         // Registry-first: with no `.jit/invariants.toml`, the invariant kind yields
         // no items (graceful), and nothing is read from any markdown source.
         let issue = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
-        let exec = executor_with(vec![issue]);
-        assert_eq!(exec.list_items(Some("invariant")).unwrap().count, 0);
-    }
-
-    /// Build an executor whose synthetic repo carries an explicit `config.toml`
-    /// (`config`, written to the real `.jit` root so `cached_config` parses the
-    /// `[item_kinds]` table) and an optional `.jit/invariants.toml` (served through
-    /// the storage boundary at the path the invariant descriptor names), for the
-    /// registry-binding rework tests.
-    fn config_exec(
-        config: &str,
-        invariants_toml: Option<&str>,
-        issues: Vec<Issue>,
-    ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        if let Some(inv) = invariants_toml {
-            storage.add_data_file("invariants.toml", inv);
-        }
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        CommandExecutor::new(storage)
+        seed_issue(&storage, issue);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        assert_eq!(
+            exec.items().list_items(Some("invariant")).unwrap().count(),
+            0
+        );
     }
 
     #[test]
     fn test_invariant_config_resolves_through_its_toml_descriptor() {
         // REQ-03: the `invariant` name carries no special routing — a config-declared
-        // `[item_kinds.invariant]` with a toml `source` descriptor indexes its
+        // `[item_kinds.invariant]` (shipped) with a toml `source` descriptor indexes its
         // registry items exactly like any other registry-first kind. Here the
         // descriptor names `.jit/invariants.toml`, so `item list --kind invariant`
         // returns the registry entries through the GENERIC toml path.
-        let exec = config_exec(
-            "[item_kinds.invariant]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[a-z][a-z0-9-]*\"\n\
-             markers = []\n\
-             link-namespaces = [\"enforces\"]\n\
-             scope = \"project\"\n\
-             source = { toml = \".jit/invariants.toml\", table = \"invariants\", \
-             id-field = \"id\", text-field = \"statement\" }\n\
-             source-of-truth = \"registry-first\"\n",
-            Some(TWO_INVARIANTS),
-            // An issue with an invariant-looking line: it must NEVER become a project invariant.
-            vec![issue_with_criteria(
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_issue(
+            exec.storage(),
+            issue_with_criteria(
                 "A",
                 "## Success Criteria\n\n- [hard] missing-invariant: looks like an invariant\n",
-            )],
+            ),
         );
-        let result = exec.list_items(Some("invariant")).unwrap();
+        let result = exec.items().list_items(Some("invariant")).unwrap();
         let qids: Vec<&str> = result
             .items
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert_eq!(result.count, 2);
+        assert_eq!(result.items.len(), 2);
         assert!(qids.contains(&"@/invariant/sample-invariant"));
         assert!(qids.contains(&"@/invariant/second-invariant"));
         // The issue's missing-invariant line is NOT a project invariant (registry-first reads
@@ -1590,8 +1531,8 @@ stage = \"postcheck\"
 
     #[test]
     fn test_issue_scoped_invariant_config_is_no_longer_reserved() {
-        // REQ-03: an `[item_kinds.invariant]` declared registry-first BUT issue-scoped
-        // was once rejected to keep invariants out of the issue-description parser.
+        // REQ-03: a custom `[item_kinds.tenet]` declared registry-first BUT issue-scoped
+        // (as the shipped `invariant` once was) was once rejected to keep invariants out of the issue-description parser.
         // With the reserved-name branch gone it resolves as an ORDINARY issue-scope
         // kind, indexing its items from issue descriptions like any other.
         let issue = issue_with_criteria(
@@ -1599,23 +1540,29 @@ stage = \"postcheck\"
             "## Success Criteria\n\n- sample-invariant: an issue-scoped invariant line\n",
         );
         let short = issue.short_id();
-        let exec = config_exec(
-            "[item_kinds.invariant]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[a-z][a-z0-9-]*\"\n\
-             markers = []\n\
-             link-namespaces = [\"enforces\"]\n\
-             scope = \"issue\"\n\
-             source-of-truth = \"registry-first\"\n",
-            Some(TWO_INVARIANTS),
-            vec![issue],
+        let config = "[item_kinds.tenet]\n\
+            section = \"success_criteria\"\n\
+            id-pattern = \"[a-z][a-z0-9-]*\"\n\
+            markers = []\n\
+            link-namespaces = [\"enforces\"]\n\
+            scope = \"issue\"\n\
+            source-of-truth = \"registry-first\"\n";
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
         );
+        seed_issue(exec.storage(), issue);
         // No rejection: the kind resolves and indexes from the issue description.
-        let result = exec.list_items(Some("invariant")).unwrap();
-        assert_eq!(result.count, 1);
+        let result = exec.items().list_items(Some("tenet")).unwrap();
+        assert_eq!(result.items.len(), 1);
         assert_eq!(
             result.items[0].qualified_id,
-            format!("@/issue/{short}/invariant/sample-invariant")
+            format!("@/issue/{short}/tenet/sample-invariant")
         );
     }
 
@@ -1625,40 +1572,64 @@ stage = \"postcheck\"
         // descriptor has nothing to project from. It is rejected at kind resolution
         // with a typed MissingProjectSource (symmetric to a markdown-first project
         // kind missing its source) rather than silently producing no items.
-        let exec = config_exec(
-            "[item_kinds.foo]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"FOO-[0-9]+\"\n\
-             markers = []\n\
-             link-namespaces = [\"foos\"]\n\
-             scope = \"project\"\n\
-             source-of-truth = \"registry-first\"\n",
-            Some(TWO_INVARIANTS),
-            vec![],
+        // `foo` is a custom kind.
+        let config = "[item_kinds.foo]\n\
+            section = \"success_criteria\"\n\
+            id-pattern = \"FOO-[0-9]+\"\n\
+            markers = []\n\
+            link-namespaces = [\"foos\"]\n\
+            scope = \"project\"\n\
+            source-of-truth = \"registry-first\"\n";
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(config),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
         );
-        let err = exec.list_items(None).unwrap_err();
+        let err = exec.items().list_items(None).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("declares no 'source'") && msg.contains("foo"),
             "expected MissingProjectSource for 'foo', got: {msg}"
         );
         // The same typed rejection surfaces when the kind is filtered directly.
-        assert!(exec.list_items(Some("foo")).is_err());
+        assert!(exec.items().list_items(Some("foo")).is_err());
     }
 
     #[test]
     fn test_show_item_missing_self_id_errors() {
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
         let short = a.short_id();
-        let exec = executor_with(vec![a]);
-        let err = exec.show_item(&format!("{short}/REQ-99")).unwrap_err();
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec
+            .items()
+            .show_item(&format!("{short}/REQ-99"))
+            .unwrap_err();
         assert!(err.to_string().contains("no addressable item"));
     }
 
     #[test]
     fn test_show_item_not_qualified_errors() {
-        let exec = executor_with(vec![]);
-        let err = exec.show_item("REQ-01").unwrap_err();
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("REQ-01").unwrap_err();
         assert!(err.to_string().contains("not a qualified id"));
     }
 
@@ -1667,8 +1638,15 @@ stage = \"postcheck\"
         // A colon anywhere in an `@`-address surfaces the parser's own
         // InvalidAddress rejection (colon is the label separator, never valid
         // inside an address), not a generic not-found.
-        let exec = executor_with(vec![]);
-        let err = exec.show_item("@/rule/foo:bar").unwrap_err();
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/rule/foo:bar").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("colon"), "got: {msg}");
     }
@@ -1681,8 +1659,17 @@ stage = \"postcheck\"
         // project match. The `.jit/rules.toml`-backed `coverage-preview` rule exists
         // and DOES resolve via the kind-segmented `@/rule/coverage-preview`, proving
         // the kindless form fails on grammar, not on a missing item.
-        let exec = registry_exec_with_rules(ONE_RULE);
-        let err = exec.show_item("@/coverage-preview").unwrap_err();
+        let config = crate::test_utils::shipped_item_kind_tables(&["rule"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("@/coverage-preview").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("cannot resolve item address '@/coverage-preview'"),
@@ -1695,155 +1682,27 @@ stage = \"postcheck\"
         assert!(!msg.contains("no addressable item"), "got: {msg}");
         // The kind-segmented address still resolves the same item.
         assert_eq!(
-            exec.show_item("@/rule/coverage-preview").unwrap().item.kind,
+            exec.items()
+                .show_item("@/rule/coverage-preview")
+                .unwrap()
+                .item
+                .kind,
             "rule"
         );
     }
 
     #[test]
     fn test_show_item_colon_in_sugar_self_id_surfaces_parser_error() {
-        let exec = executor_with(vec![]);
-        let err = exec.show_item("56ab0224/REQ:01").unwrap_err();
+        let config = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let err = exec.items().show_item("56ab0224/REQ:01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("colon"), "got: {msg}");
-    }
-
-    #[test]
-    fn test_resolve_link_label_qualified_satisfies() {
-        // REQ-05: a generic link label `satisfies:<issue>/<self-id>` resolves to
-        // the addressed item via the qualified id.
-        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a one\n");
-        let short = a.short_id();
-        let exec = executor_with(vec![a]);
-
-        let label = format!("satisfies:{short}/REQ-01");
-        let resolved = exec.resolve_link_label(&label).unwrap().expect("resolves");
-        assert_eq!(resolved.item.self_id, "REQ-01");
-        assert_eq!(
-            resolved.item.qualified_id,
-            format!("@/issue/{short}/requirement/REQ-01")
-        );
-    }
-
-    #[test]
-    fn test_resolve_link_label_unresolvable_qualified_is_error() {
-        // A registered link namespace with a qualified-but-unresolvable id must
-        // be reported, not silently dropped.
-        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
-        let short = a.short_id();
-        let exec = executor_with(vec![a]);
-        let err = exec
-            .resolve_link_label(&format!("satisfies:{short}/REQ-99"))
-            .unwrap_err();
-        assert!(err.to_string().contains("unresolvable qualified item id"));
-    }
-
-    #[test]
-    fn test_resolve_link_label_across_all_four_kinds() {
-        // REQ-01/REQ-02: for EACH shipped namespace a `<ns>:<scope>/<self-id>`
-        // label resolves to the addressed item of the corresponding kind, across
-        // all four kinds — requirement/decision/risk (issue-scope, markdown-first)
-        // and invariant (project-scope, registry-first). The canonical `[item_kinds]`
-        // table is declared, and a `.jit/invariants.toml` is loaded.
-        let issue = crate::domain::fixture_issue(
-            "A".to_string(),
-            "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n\n\
-             ## Decisions\n\n- D-01: use json storage\n\n\
-             ## Risks\n\n- RISK-01: lock contention\n"
-                .to_string(),
-        );
-        let short = issue.short_id();
-        let exec = registry_exec(TWO_INVARIANTS, vec![issue]);
-
-        // requirement / `satisfies:` -> the requirement item.
-        let req = exec
-            .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
-            .unwrap()
-            .expect("satisfies resolves");
-        assert_eq!(req.item.kind, "requirement");
-        assert_eq!(
-            req.item.qualified_id,
-            format!("@/issue/{short}/requirement/REQ-01")
-        );
-
-        // decision / `per:` -> the decision item.
-        let dec = exec
-            .resolve_link_label(&format!("per:{short}/D-01"))
-            .unwrap()
-            .expect("per resolves");
-        assert_eq!(dec.item.kind, "decision");
-        assert_eq!(
-            dec.item.qualified_id,
-            format!("@/issue/{short}/decision/D-01")
-        );
-
-        // risk / `mitigates:` and `resolves:` -> the risk item (both namespaces).
-        let mit = exec
-            .resolve_link_label(&format!("mitigates:{short}/RISK-01"))
-            .unwrap()
-            .expect("mitigates resolves");
-        assert_eq!(mit.item.kind, "risk");
-        assert_eq!(
-            mit.item.qualified_id,
-            format!("@/issue/{short}/risk/RISK-01")
-        );
-        let res = exec
-            .resolve_link_label(&format!("resolves:{short}/RISK-01"))
-            .unwrap()
-            .expect("resolves resolves");
-        assert_eq!(res.item.kind, "risk");
-
-        // invariant / `enforces:@/<kind>/<id>` -> the registry-first invariant item.
-        let inv = exec
-            .resolve_link_label("enforces:@/invariant/sample-invariant")
-            .unwrap()
-            .expect("enforces resolves");
-        assert_eq!(inv.item.kind, "invariant");
-        assert_eq!(inv.item.qualified_id, "@/invariant/sample-invariant");
-        assert_eq!(inv.item.scope, "@");
-    }
-
-    #[test]
-    fn test_resolve_link_label_resolves_rule_and_gate_enforces_links() {
-        // REQ-01 (jit:d30695e4): `rule` and `gate` now declare
-        // `link-namespaces = ["enforces"]`, so an `enforces:@/rule/<name>` and an
-        // `enforces:@/gate/<key>` label both resolve through the SAME generic
-        // scan `test_resolve_link_label_across_all_four_kinds` exercises above for
-        // requirement/decision/risk/invariant — no new resolution code, just the
-        // kind-config declaration. Kind-segmented addresses only (the kindless
-        // `@/<self-id>` form is a parse error, never a self-id match).
-        let exec = registry_exec_with_rules_and_gates(ONE_RULE, TWO_GATES);
-
-        let rule = exec
-            .resolve_link_label("enforces:@/rule/coverage-preview")
-            .unwrap()
-            .expect("enforces resolves the rule item");
-        assert_eq!(rule.item.kind, "rule");
-        assert_eq!(rule.item.self_id, "coverage-preview");
-
-        let gate = exec
-            .resolve_link_label("enforces:@/gate/cargo-ci")
-            .unwrap()
-            .expect("enforces resolves the gate item");
-        assert_eq!(gate.item.kind, "gate");
-        assert_eq!(gate.item.self_id, "cargo-ci");
-    }
-
-    #[test]
-    fn test_resolve_link_label_unqualified_and_unknown_ns_are_none() {
-        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
-        let exec = executor_with(vec![a]);
-        // A bare self-id addresses no item.
-        assert!(exec
-            .resolve_link_label("satisfies:REQ-01")
-            .unwrap()
-            .is_none());
-        // A namespace that is not a kind link-namespace is not an item reference.
-        assert!(exec
-            .resolve_link_label("type:epic/REQ-01")
-            .unwrap()
-            .is_none());
-        // A label with no `:` is not a reference.
-        assert!(exec.resolve_link_label("nope").unwrap().is_none());
     }
 }

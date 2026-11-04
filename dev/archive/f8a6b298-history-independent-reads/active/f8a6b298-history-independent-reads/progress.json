@@ -1,0 +1,823 @@
+{
+  "epic_id": "f8a6b298-e6b5-4d62-b73c-3f7b217c1a01",
+  "epic_short_id": "f8a6b298",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "short_id": "77f3db10",
+          "key": "gate-state-last-run",
+          "title": "Gate state names the run that produced it",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "803b107c",
+          "key": "gate-run-load-by-issue",
+          "title": "Gate-run records load by issue and run id",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "becea20a",
+          "key": "lease-test-only-api-removal",
+          "title": "Test-only lease APIs are gone",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "c3e3e2ff",
+          "key": "lease-reader-migration",
+          "title": "Lock-free lease readers use the storage read path",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "cc6ef886",
+          "key": "lease-store-fixtures",
+          "title": "CLI tests reach lease storage through one test helper",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "63de0883",
+          "key": "claim-acquire-event-from-assignee",
+          "title": "Claim acquire emits its event exactly when the assignee changes",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "84e1e27a",
+          "key": "event-log-read-rule",
+          "title": "Event-log readers ignore an unterminated final line that the next append overwrites",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "f9bf70a5",
+          "key": "archive-execution-record-type",
+          "title": "Archive executions are one domain record type",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "7a8773ca",
+          "key": "search-excludes-history",
+          "title": "Default search reads no history file",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "short_id": "2117739f",
+          "key": "gate-latest-run-reads",
+          "title": "Latest-run readers use the gate-state accessor",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "dd53527f",
+          "key": "lease-ops-through-lock",
+          "title": "Lease operations run through the lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "5b0e3d63",
+          "key": "validation-skips-event-log",
+          "title": "Validation captures read only the event log's end",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "b32a720e",
+          "key": "redo-record-refuses-log-rewrite",
+          "title": "Redo records refuse a rewrite of the event log",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "short_id": "93b7f1dd",
+          "key": "gate-verdict-provenance",
+          "title": "Reused verdicts name their source issue and source run",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "15009590",
+          "key": "lease-mutation-guard-through-lock",
+          "title": "The repository-mutation lease check reads through the held lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "a7314585",
+          "key": "lease-recover-through-lock",
+          "title": "Recovery evicts and reclaims leases through the lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "97f5f2b7",
+          "key": "torn-tail-marker-removal",
+          "title": "The profile torn-tail marker is gone",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "5582e39e",
+          "key": "mutation-event-tail-captures",
+          "title": "Mutations capture the event log's end, not the whole log",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "db9bcf12",
+          "key": "archive-evidence-writes",
+          "title": "Archive executions write a per-target evidence record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "short_id": "0bd2c797",
+          "key": "gate-run-latest-captures",
+          "title": "Gate captures hold only the evaluated issue's latest runs",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "2f563673",
+          "key": "lease-per-issue-records",
+          "title": "Each lease is one record under the lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "7fc08dff",
+          "key": "archive-execute-reads-evidence",
+          "title": "Archive execute reads the per-target evidence record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "b33ed7eb",
+          "key": "gate-verdict-record-writes",
+          "title": "Recorded runs write their per-key verdict record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "53d19851",
+          "key": "lease-index-machinery-removal",
+          "title": "Claims-index rebuild machinery is gone",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "5e1ba005",
+          "key": "archive-preview-reads-evidence",
+          "title": "Archive preview reads the per-target evidence record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "short_id": "6c0f8739",
+          "key": "gate-verdict-reuse-lookup",
+          "title": "Gate reuse reads one verdict record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "614a6f97",
+          "key": "lease-issue-addressed-ops",
+          "title": "Renew, heartbeat and force-evict address a lease by issue",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "725af076",
+          "key": "capture-refuses-whole-event-log",
+          "title": "Captures refuse a whole read of the event log",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "09ca911e",
+          "key": "storage-records-per-key-reference",
+          "title": "The storage-record reference describes verdict and archive-evidence records",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "short_id": "0851fae4",
+          "key": "gate-run-shared-reader",
+          "title": "Both storage backends read gate-run records through one reader",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "7244ecb2",
+          "key": "lease-interruption-matrix",
+          "title": "An interrupted lease operation leaves the prior or the next lease",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "short_id": "1630015d",
+          "key": "gate-run-per-issue-layout",
+          "title": "Gate-run records live under their issue",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "f0a5b90a",
+          "key": "lease-operator-docs",
+          "title": "Lease command and recovery docs match per-issue lease records",
+          "classification": "documentation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "short_id": "4466395d",
+          "key": "history-isolation-test",
+          "title": "Ordinary commands succeed over unparseable history",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "ac8f07c2",
+          "key": "storage-format-history-docs",
+          "title": "The storage-format reference describes per-key records and history files",
+          "classification": "documentation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "ba4c6054",
+          "key": "gate-and-search-command-docs",
+          "title": "Gate provenance, gate-run lookup and search docs match per-key reads",
+          "classification": "documentation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "944edb32",
+          "key": "format-rewrite-tooling",
+          "title": "A rewrite script and window driver move a repository to format 4",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "short_id": "655273d9",
+          "key": "format-cutover",
+          "title": "Five repositories move to repository format 4 in one window",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "short_id": "735949ef",
+          "key": "per-key-gate-runs",
+          "title": "Gate runs are addressed per issue, per gate and per inputs digest",
+          "classification": "implementation",
+          "type": "story",
+          "status": "pending"
+        },
+        {
+          "short_id": "5ee85aed",
+          "key": "per-key-leases",
+          "title": "Leases are per-issue records under one lease sequence",
+          "classification": "implementation",
+          "type": "story",
+          "status": "pending"
+        },
+        {
+          "short_id": "dc5fa7f8",
+          "key": "history-boundary",
+          "title": "Only history-reporting commands read history files",
+          "classification": "implementation",
+          "type": "story",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [
+    "944edb32",
+    "655273d9",
+    {
+      "id": "5b37a806",
+      "note": "external issue driven by this lead per user ruling (via 6a)"
+    },
+    {
+      "id": "53d19851",
+      "note": "rejected merged-into-2f563673"
+    }
+  ],
+  "escalations": [
+    {
+      "item": "stale-lease visibility under R2; b697a3f7 d3c94dc5, lease-required-error, c517b88b body",
+      "status": "resolved by the user (relayed by 6a): stale leases listed and marked stale (not-expired filter, lock-free); b697a3f7 amendments d3c94dc5, lease-required-error -> foreign-lease-error, c517b88b body; applied in dd53527f, DEC-02, lease-read-api, f0a5b90a"
+    },
+    {
+      "item": "dd53527f REQ-02 vs satisfies REQ-05 contradiction (code-review x2)",
+      "status": "resolved by the user (relayed by 6a): dd53527f amended (REQ-05 label removed, REQ-02 reworded to the stored lease index, claims.seq note); claims.jsonl sequence scan accepted as dd53527f D-1"
+    },
+    {
+      "item": "b697a3f7 REQ-04 wording: missing-lease to foreign-lease",
+      "status": "resolved by the user (relayed by 6a): b697a3f7 REQ-04 wording '...and the foreign-lease refusal is defined once.'"
+    },
+    {
+      "item": "dd53527f code-review fail 3: next_claim_seq scans claims.jsonl vs per:D-19; options (a) drop label (b) claims.seq now",
+      "status": "resolved: user D-1 accepts scan"
+    },
+    {
+      "item": "b697a3f7 1b7f58ae criteria vs 7dd59ebf amendment (plan-review 0dc73711 blocking)",
+      "status": "resolved: consolidated, plan-review pass"
+    },
+    {
+      "item": "725af076 -> cf49da17 edge reversal (a4)",
+      "status": "resolved: swapped e3f1b7628"
+    },
+    {
+      "item": "dd53527f code-review fail 4: claim list text output lacks STALE marker",
+      "status": "resolved: rework 2 passed, done"
+    },
+    {
+      "item": "format-4 window bracket.sh denied by permission check",
+      "status": "resolved: user approved; window run 10:40 in 52 session"
+    },
+    {
+      "item": "ac8f07c2 REQ-01 says each per-key record (incl. leases) is written in a redo record; lease-record-layout commits by rename/unlink. Recommend (a) restrict to repository records + epic Constraints qualifier",
+      "status": "resolved: steward (a), DEC-25, ac8f07c2 D-1"
+    },
+    {
+      "item": "735949ef holistic-review 2413b19d F1: story REQ-03 \"validation capture no other issue run records\" vs epic REQ-13 whole-repo validate as history reader. Recommend (a) amend story REQ-03",
+      "status": "resolved: steward (a), DEC-27, 735949ef D-1; one rerun over amended story"
+    },
+    {
+      "item": "5ee85aed holistic-review 0dbcc3b2 and f7396783 F1: external-repo cutover evidence is self-attested by construction; options (a) raw bundle, (b) ruling, (c) reviewer with checkouts",
+      "status": "superseded: user decision recorded; rerun 2528dd8f failed again"
+    },
+    {
+      "item": "5ee85aed holistic-review 2528dd8f: F1 story REQ-01 omits epic REQ-05 indefinite-limit exception (recommend amend, DEC-28, full sweep); F2 external evidence despite user decision",
+      "status": "resolved: steward F1 amend (DEC-28), F2 prompt fix 2e2c8ee3; rerun 66ed30c1 passed"
+    }
+  ],
+  "rework_counts": {
+    "becea20a": 1,
+    "f9bf70a5": 1,
+    "dd53527f": 2,
+    "2117739f": 1,
+    "2f563673": 1,
+    "0851fae4": 1,
+    "944edb32": 2,
+    "09ca911e": 1,
+    "f0a5b90a": 1,
+    "5ee85aed": 1
+  },
+  "surfaced_pitfalls": [
+    {
+      "from": "84e1e27a",
+      "note": "97f5f2b7 body lists UncertifiedTornTail and append prose already removed; worker should treat as met"
+    },
+    {
+      "from": "gate reviewer b06cee74",
+      "note": "gate-and-search-command-docs membership label; format-rewrite-tooling borderline large"
+    },
+    {
+      "source": "lead",
+      "text": "An sccache server started inside a flock-held land job inherits the lock fd and holds it indefinitely; queue jobs must use flock -o (queue2.lock)."
+    },
+    {
+      "source": "dd53527f code-review",
+      "text": "LeaseLock replayed claims.jsonl on every operation (regression vs REQ-05 for heartbeat/renew/evict); list/status loaded worktree identity through the locking, writing path."
+    },
+    {
+      "source": "lead",
+      "text": "655273d9 was closed on repo-validate before its REQ-03 run-id resolution check was run; run afterwards (3699 cited, 0 unresolved) and recorded in format4-cutover.md."
+    },
+    {
+      "source": "lead",
+      "text": "Story criteria sweep after DEC-27 checked only the REQ-13 exception; 5ee85aed REQ-01 also omits the epic REQ-05 indefinite-limit exception. Sweep stories against every epic exception."
+    }
+  ],
+  "dispatch_log": [
+    {
+      "id": "84e1e27a",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "sets the shared event-log rule"
+    },
+    {
+      "id": "7a8773ca",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "narrow, fully specified"
+    },
+    {
+      "id": "77f3db10",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "tests only"
+    },
+    {
+      "id": "803b107c",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "mechanical signature change across backends"
+    },
+    {
+      "id": "cc6ef886",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "test fixture consolidation"
+    },
+    {
+      "id": "b32a720e",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "narrow refusal plus branch deletion"
+    },
+    {
+      "id": "63de0883",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "claim event semantics"
+    },
+    {
+      "id": "becea20a",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "test migration; rework run stopped at model capacity"
+    },
+    {
+      "id": "f9bf70a5",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "payload refactor"
+    },
+    {
+      "id": "becea20a-r1",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "Astra at capacity; finishes the partial rework"
+    },
+    {
+      "id": "c3e3e2ff",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "well-specified lease read API"
+    },
+    {
+      "id": "5b0e3d63",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "capture read modes across both session backends"
+    },
+    {
+      "id": "dd53527f",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "concurrency-critical lease lock; implements R2 as approved"
+    },
+    {
+      "id": "dd53527f-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1 identity write in list/status, F2 log replay in lock()"
+    },
+    {
+      "id": "5582e39e",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "capture read-mode sweep across command families"
+    },
+    {
+      "id": "dd53527f-r2",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1: claim list text output lacks STALE marker (6a approved)"
+    },
+    {
+      "id": "15009590",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "concurrency-critical mutation lease guard"
+    },
+    {
+      "id": "2117739f",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "latest-run accessor and format-4 bump; warned 6a, 88, a4"
+    },
+    {
+      "id": "5b37a806",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "external v1-release bug assigned to this lead by user ruling; unblocks a7314585"
+    },
+    {
+      "id": "2117739f-r1",
+      "vendor": "lead",
+      "reason": "code-review F1: accessor must check the loaded run gate_key; one-line filter + test"
+    },
+    {
+      "id": "a7314585",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "recovery onto LeaseLock; concurrency-critical; on 944edb32 path"
+    },
+    {
+      "id": "0bd2c797",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path gate captures"
+    },
+    {
+      "id": "93b7f1dd",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "critical path verdict provenance contract"
+    },
+    {
+      "id": "97f5f2b7",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "well-specified removal"
+    },
+    {
+      "id": "db9bcf12",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "archive evidence record writes"
+    },
+    {
+      "id": "2f563673",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "per-issue lease records + claims.seq; concurrency-critical, format-4 layout"
+    },
+    {
+      "id": "b33ed7eb",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path verdict record writes; Claude pauses cleanly on the host hold"
+    },
+    {
+      "id": "2f563673-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "absorbs 53d19851 (steward ruling): index machinery removal"
+    },
+    {
+      "id": "7fc08dff",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "archive execute reads evidence record"
+    },
+    {
+      "id": "6c0f8739",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path verdict reuse lookup; dispatched 03:19 before quiet window"
+    },
+    {
+      "id": "0851fae4",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path: one gate-run reader for both backends"
+    },
+    {
+      "id": "5e1ba005",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "archive preview reads evidence record; well-specified"
+    },
+    {
+      "id": "0851fae4-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1: unsupported-entry conformance cases"
+    },
+    {
+      "id": "1630015d",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path: gate-run records under their issue (format-4 layout)"
+    },
+    {
+      "id": "944edb32",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "format-4 rewrite tooling; reads five repos read-only, scratch copies"
+    },
+    {
+      "id": "944edb32-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1 install must prove green cargo-ci; F2 test scratch under target/, reproducible five-repo dry run + completion note"
+    },
+    {
+      "id": "944edb32-r2",
+      "vendor": "lead",
+      "reason": "code-review F1: dry-run driver resolves <common-dir>/jit; dry run re-verified on five repos"
+    },
+    {
+      "id": "614a6f97",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "issue-addressed lease ops; removes lease-id-scan-bridge"
+    },
+    {
+      "id": "725af076",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "capture refuses whole event log; shared test builder"
+    },
+    {
+      "id": "09ca911e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "storage-record reference docs"
+    },
+    {
+      "id": "ba4c6054",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "gate/search docs"
+    },
+    {
+      "id": "7244ecb2",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "lease interruption matrix; concurrency-critical"
+    },
+    {
+      "id": "4466395d",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "test-only, fully specified criteria"
+    },
+    {
+      "id": "09ca911e-r1",
+      "vendor": "lead",
+      "reason": "doc-review 11855055 F1 F2: drop two internal reader claims in reference.rs prose, regenerate"
+    },
+    {
+      "id": "f0a5b90a",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "multi-page operator docs derived from current lease code"
+    },
+    {
+      "id": "f0a5b90a-r1",
+      "vendor": "lead",
+      "reason": "doc-review 802cc1ad F1: drop bad-claims-index from validate failure modes"
+    },
+    {
+      "id": "ac8f07c2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "storage-format and concepts docs derived from current code"
+    },
+    {
+      "id": "ac8f07c2-2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "redispatch after REQ-01 amendment (DEC-25)"
+    },
+    {
+      "id": "5ee85aed-r1",
+      "vendor": "lead",
+      "reason": "holistic-review 0dbcc3b2 F1: commit format4-cutover.md evidence record (655273d9 REQ-03 run-id check included), link to 655273d9/5ee85aed/735949ef"
+    }
+  ],
+  "started_at": "2026-11-02T23:48:34.925324+00:00",
+  "freeze": {
+    "format4_bump": "lifted pending 6a release; installed jit is format 4 (a05567fde)"
+  },
+  "notes": [
+    "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze.",
+    "just-in-time-a4 may lead 9876a23a (one validation report): coordinate R1 (validate as history reader, 5b0e3d63 landed read_history_log + record_drift bytes) and merge order with it; warn it, 88 and 6a before 2117739f.",
+    "a4 agreed: keeps DEC-09 bridge, sends field name when 6ba4f623 lands (for 53d19851 brief); warn a4 before 2117739f, its benchmark 5d774061 needs a format-4 copy and a main build after the bump.",
+    "88 2e0f276b: IssueOps assign/claim/unassign/release/reject/update_issue_resolved take &IssueIdPrefix and return IssueMutation{issue,warnings}; create_issue returns IssueCreation{issue,warnings}. Put in briefs.",
+    "User principle (via 6a): refactors and spec changes must make things more consistent and simpler on their own merit, never to pre-empt a reviewer; a wrong review finding goes to 6a.",
+    "Host schedule: from 03:30 EET dispatch nothing new; let running work finish; hold until 6a says gf2 benchmark is done. Warn 6a the moment 2117739f lands.",
+    "User approved format-4 cutover for all five repos (just-in-time, gf2, mealie-fi, inflected-messages, research) without per-repo runtime confirmation. Conditions: inspect research first; stop and report via 6a if any repo is not a format-3 jit tracker; before each rewrite, .jit/ has no uncommitted changes and git tree is clean enough to revert; coordinate with live sessions (gf2-4e in gf2; benchmark 04:00-04:15); reinstall jit only after all five are rewritten, then tell 6a.",
+    "User allows Codex gpt-6-luna and gpt-6.1-sol liberally alongside astra and Claude.",
+    "User ruling: reorder toward 944edb32 (format rewrite tooling); defer tasks off its path.",
+    "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
+    "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a.",
+    "Window bracket (6a): give 6a 15 min warning; 6a stops all tracker writers (88, a4, gf2-4e) and confirms; then rewrite all five, reinstall jit once, verify each with jit validate, report to 6a who releases everyone and lifts the install freeze. Stop and report before reinstalling if any rewrite or validation fails.",
+    "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun.",
+    "Session paused at usage limit 07:35; see handoff.md.",
+    "Lead rotation 08:40: handing to just-in-time-52; see handoff-2.md.",
+    "08:40 lead rotation: just-in-time-52 took over from 3e (handoff-2 a36f603b6). User approved the format-4 cutover directly in 52 session. Order: land 7244ecb2, 725af076, 09ca911e; rebuild green at main HEAD; rerun five-repo dry run; 15-min warning to 6a; bracket.",
+    "10:40 green a05567fde (cargo-ci pass, release binaries target/format4-green-a05567fde2c7). Dry run on five copies with it: all checks ok, rc 0. 15-min warning sent to 6a; bracket earliest 10:55, after ac8f07c2 land settles. Bracket: 52 scratchpad f8a6-lead/bracket.sh (8c script, green path updated).",
+    "10:40-10:42 format-4 window: installed a05567fde (rollback ~/.cache/jit-format4-rollback.8UsGmO); rewrites just-in-time ecdb2e473, gf2 321f632ac, mealie-fi f1572e900, inflected-messages 0652d60, research 7b7e9e9; all validate ok, claim list ok (3/2/0/0/0 leases); jit-server 3361204 -> 3274476, same args, health 200. Reported to 6a."
+  ]
+}

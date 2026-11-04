@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-91081bd3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9ed0f9caf6994b73dfe50b6de7e09e55ca16f5d4",
+  "completed_at": "2026-10-26T22:00:39.430880108Z",
+  "duration_ms": 332956,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/validation/graph.rs",
+        "id": "F1",
+        "line": 3689,
+        "origin": "pre-existing",
+        "references": [
+          "@/invariant/semantic-types"
+        ],
+        "severity": "medium",
+        "summary": "A validation graph test assigns a raw formatted string directly to Issue.id, which will not compile after the IssueId newtype cutover."
+      }
+    ],
+    "summary": "No unresolved issue-impact defects; one pre-existing identity-typing debt remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9d27485e-a927-483c-8179-42479c54fa6b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T21:55:06.474809386Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:91081bd3` commits e003ac083, b546c3dae, d6301e500, eee7fe3f1, 624404474, 4f6fa08a1, 1afad91f6, 499127386, e773ffd12, d3c92dd44, 502341a61, 90439e25, fd654908, c17fa41b, 48741a4d, ca0f412e, 25a58025, 76467cb4, 9ed0f9ca\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/91081bd3/requirement/REQ-01–REQ-14 and @/issue/2195c98f/requirement/REQ-01, REQ-02, REQ-03, REQ-17 (markdown-first issue descriptions); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T16:33:21.536678676Z); prior code-review failed (exit 1; its blocking F1 is fixed)\nTruncation recovery: bounded per-commit/path patch reads, current-source slices, targeted identity searches, and blame; historical gate-record stdout was excluded as past-state evidence\n\n1. [advisory, pre-existing] `crates/jit/src/validation/graph.rs:3689` assigns a formatted raw string directly to `Issue.id`. This unrelated existing test setup will not compile when `IssueId` becomes the validated newtype. `@/invariant/semantic-types`\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects; one pre-existing identity-typing debt remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"A validation graph test assigns a raw formatted string directly to Issue.id, which will not compile after the IssueId newtype cutover.\",\"file\":\"crates/jit/src/validation/graph.rs\",\"line\":3689,\"references\":[\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

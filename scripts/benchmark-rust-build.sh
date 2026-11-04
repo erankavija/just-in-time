@@ -64,6 +64,10 @@ set -euo pipefail
 #                           (default crates/jit/src/lib.rs)
 #   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh
 #                           (default ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock)
+#   CARGO_CI_LOCK_TIMEOUT   seconds to wait for that lock (default 1800);
+#                           the benchmark exits 2 when the wait passes, with
+#                           the sample logs of a run that never held the lock
+#                           unchanged; a later timeout reports the partial set
 #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
 #                           baseline.json directly from the
 #                           raw/{clean,rebuild}-samples.jsonl already present
@@ -100,6 +104,7 @@ INVENTORY_SAMPLE="${BENCH_INVENTORY_SAMPLE:-1}"
 PROBE_FILE="${BENCH_PROBE_FILE:-crates/jit/src/lib.rs}"
 PROBE_COMMENT="// jit-benchmark-rebuild-probe: reversible comment-only source touch (jit:4e22a20d)"
 BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
+LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
 
 # Resolve the real cargo binary. Mirrors scripts/cargo-ci.sh: some local setups
 # place a debugging shim at ~/.cargo/bin/cargo that exits 0 for every
@@ -158,7 +163,8 @@ GIT_REVISION="${BENCH_GIT_REVISION_OVERRIDE:-$(git rev-parse HEAD)}"
 mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 
 # --- host-wide build lock (shared with cargo-ci.sh) ---
-# Acquired around each sample's cargo invocations only (not the whole script),
+# Acquired around replacing the sample logs and each sample's cargo invocations
+# only (not the whole script),
 # so a multi-hour benchmark run does not starve concurrent gate builds between
 # samples. A blocking flock queues our request rather than running concurrently
 # with another lock holder, satisfying "refuses to overlap another repository
@@ -166,7 +172,8 @@ mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 # --- interruption safety for the rebuild probe ---
 # While a rebuild sample holds the probe appended to $PROBE_FILE, an
 # interruption (INT/TERM) or unexpected exit must not leave the tree modified:
-# the EXIT trap restores the captured original whenever a restore is pending.
+# the EXIT trap restores the captured original whenever a restore is pending,
+# and removes the current sample's target directory.
 PROBE_PENDING_BACKUP=""
 restore_probe_if_pending() {
   if [[ -n "$PROBE_PENDING_BACKUP" && -f "$PROBE_PENDING_BACKUP" ]]; then
@@ -175,7 +182,12 @@ restore_probe_if_pending() {
     echo "[benchmark] interrupted: probe file restored from backup" >&2
   fi
 }
-trap restore_probe_if_pending EXIT
+PENDING_TARGET_DIR=""
+clean_up_on_exit() {
+  restore_probe_if_pending
+  [[ -z "$PENDING_TARGET_DIR" ]] || rm -rf "$PENDING_TARGET_DIR"
+}
+trap clean_up_on_exit EXIT
 trap 'restore_probe_if_pending; exit 130' INT
 trap 'restore_probe_if_pending; exit 143' TERM
 
@@ -183,6 +195,7 @@ trap 'restore_probe_if_pending; exit 143' TERM
 # repository Cargo build). There is no opt-out, and a host without flock is a
 # hard environment error rather than a silent unlocked run.
 LOCK_FD=""
+RUN_HELD_LOCK=""
 acquire_lock() {
   command -v flock >/dev/null 2>&1 || {
     echo "ERROR: 'flock' is required (the benchmark must not run unlocked alongside other Cargo builds)." >&2
@@ -190,9 +203,19 @@ acquire_lock() {
   }
   exec {LOCK_FD}>"$BUILD_LOCK"
   if ! flock -n "$LOCK_FD" 2>/dev/null; then
-    echo "[benchmark] waiting for exclusive build lock ($BUILD_LOCK): another Cargo build is in progress" >&2
-    flock "$LOCK_FD"
+    echo "[benchmark] waiting up to ${LOCK_TIMEOUT}s for exclusive build lock ($BUILD_LOCK): another Cargo build is in progress" >&2
+    local lock_status=0
+    flock -w "$LOCK_TIMEOUT" -E 75 "$LOCK_FD" || lock_status=$?
+    if [[ $lock_status -eq 75 ]]; then
+      echo "ERROR: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
+      if [[ -n "$RUN_HELD_LOCK" ]]; then
+        echo "ERROR: this run did not finish; its sample set is partial: $(wc -l <"$CLEAN_JSONL") clean and $(wc -l <"$REBUILD_JSONL") rebuild samples written to $OUT_DIR/raw" >&2
+      fi
+      exit 2
+    fi
+    [[ $lock_status -eq 0 ]] || exit "$lock_status"
   fi
+  RUN_HELD_LOCK=1
 }
 release_lock() {
   [[ -n "$LOCK_FD" ]] || return 0
@@ -573,8 +596,11 @@ append_jsonl_atomic() {
 CLEAN_JSONL="$OUT_DIR/raw/clean-samples.jsonl"
 REBUILD_JSONL="$OUT_DIR/raw/rebuild-samples.jsonl"
 if [[ -z "${BENCH_SKIP_SAMPLING:-}" ]]; then
+  # Only a run that gets the lock replaces the recorded samples.
+  acquire_lock
   init_empty_jsonl "$CLEAN_JSONL"
   init_empty_jsonl "$REBUILD_JSONL"
+  release_lock
 else
   echo "[benchmark] BENCH_SKIP_SAMPLING set: assembling from existing $CLEAN_JSONL / $REBUILD_JSONL, no new sampling" >&2
   [[ -s "$CLEAN_JSONL" ]] || { echo "ERROR: BENCH_SKIP_SAMPLING set but $CLEAN_JSONL is missing or empty." >&2; exit 2; }
@@ -589,6 +615,7 @@ run_clean_sample() {
 
   local target_dir
   target_dir=$(new_isolated_target_dir)
+  PENDING_TARGET_DIR="$target_dir"
   echo "[benchmark] clean sample $idx/$CLEAN_SAMPLES: target dir $target_dir" >&2
 
   acquire_lock
@@ -646,6 +673,7 @@ run_rebuild_sample() {
 
   local target_dir
   target_dir=$(new_isolated_target_dir)
+  PENDING_TARGET_DIR="$target_dir"
   echo "[benchmark] rebuild sample $idx/$REBUILD_SAMPLES: target dir $target_dir (setup clean build)" >&2
 
   acquire_lock

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9361ddd1917b07f35238a6985147d504713f1753",
+  "completed_at": "2026-10-27T22:37:15.232952454Z",
+  "duration_ms": 190475,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The scoped CLI tests use the shared process and taxonomy fixtures without local locators, setup helpers, or human-output ID scraping.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "28373fb7-61ce-4b93-84e3-d74d75b772ab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "82ff9b75-d7d8-4370-b472-f53dd1922b39",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:34:04.757800861Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 053f04103; 9361ddd19 (scoped to this issue’s six files; merge also tags adjacent issues)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-06 (issue descriptions); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit code none; 2026-10-27T22:34:02Z)\nTruncation recovery: re-read initially truncated direct patch per file with zero context; read all scoped current files in bounded ranges\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped CLI tests use the shared process and taxonomy fixtures without local locators, setup helpers, or human-output ID scraping.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T22:59:42.405910847Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "27f0a575-f1ea-49ba-9b91-eca4385c32e7"
   ],
-  "description": "Moves the document methods off `CommandExecutor` onto the `documents()` facade, so a document consumer depends on `DocumentOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The document family lives in `commands/document.rs` (`impl` at about :94): `add_document_reference`, `list_document_references`, `resolve_issue_artifact_directory`, `report_artifact_conformance`, `remove_document_reference`, `show_document_content`, `document_history`, `document_diff`, `read_document_content`, `read_document_bytes`, `get_document_history`, `get_document_diff`, `get_linked_document_paths`, `read_path_bytes`, `list_document_assets` and `check_document_links`. The HTTP server is this family's main consumer: `crates/server/src/routes.rs` calls `get_linked_document_paths`, `read_path_bytes`, `read_document_content`, `read_document_bytes`, `get_document_history` and `get_document_diff`. The CLI's `doc` arms in `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`) and the document test suites are the other consumers.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::documents()` returns `DocumentOps<'_, S>`, and every public method listed in the Background is a method of `DocumentOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `DocumentOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `documents()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "description": "Moves the document methods off `CommandExecutor` onto the `documents()` facade, so a document consumer depends on `DocumentOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The document family lives in `commands/document.rs` (`impl` at about :94): `add_document_reference`, `list_document_references`, `resolve_issue_artifact_directory`, `report_artifact_conformance`, `remove_document_reference`, `show_document_content`, `document_history`, `document_diff`, `read_document_content`, `read_document_bytes`, `get_document_history`, `get_document_diff`, `issue_documents`, `with_reported_documents`, `get_issue_document_paths`, `read_path_bytes`, `list_document_assets` and `check_document_links`. The HTTP server is this family's main consumer: `crates/server/src/routes.rs` calls `get_issue_document_paths`, `with_reported_documents`, `issue_documents`, `read_path_bytes`, `read_document_content`, `read_document_bytes`, `get_document_history` and `get_document_diff`. The CLI's `doc` arms in `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`) and the document test suites are the other consumers.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::documents()` returns `DocumentOps<'_, S>`, and every public method listed in the Background is a method of `DocumentOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `DocumentOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `documents()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T03:08:03.222394616Z",
   "first_ready_at": "2026-10-22T14:01:53.614937831Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "94b9eaf6-517f-4f67-98ea-445e22454894",
+      "status": "passed",
+      "updated_at": "2026-11-03T03:04:30.257538120Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2c937351-2549-41f2-96f7-eaf2df0e5633",
+      "status": "passed",
+      "updated_at": "2026-11-03T03:07:58.108742663Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "985c2b15-b57f-47d5-b21e-6ca6b979667b",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Document methods behind a documents facade",
-  "updated_at": "2026-10-22T14:01:53.614937831Z"
+  "updated_at": "2026-11-03T03:08:03.222394616Z"
 }

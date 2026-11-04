@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:03:19.035493379Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the private git setup in library unit-test modules in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. Eight library test modules hand-roll `git init`: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs` and `commands/archive.rs`.\n\nThis entry covers `gate_execution.rs`, `json.rs`, `repository_state_store_tests.rs`, `repository_package.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/storage/repository_state_store_tests.rs`: `capture_git_fixture` (`:2587`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No library test module defines a git initialisation helper or spawns `git init` itself; each uses the shared function.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T22:46:58.458404530Z",
   "first_ready_at": "2026-10-22T15:46:59.822231991Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b8eb3fc2-a626-4b8d-9219-f6d80b5d2528",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:41:35.857696719Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "20dd17d1-ffdc-4b18-bbbb-85f218978b9d",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:45:52.792289321Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "64f04da6-c24f-49b8-891d-e8c4245cfe03",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Storage and gate-execution tests initialise git through the shared helper",
-  "updated_at": "2026-10-22T15:46:59.822231991Z"
+  "updated_at": "2026-10-27T22:46:58.458404530Z"
 }

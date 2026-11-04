@@ -9,12 +9,26 @@
   ],
   "description": "Key the profiled-repository fixture cache on what the fixture is built from, so test binaries share an entry and a rebuild without a source change costs nothing.\n\n## Background\n\n`profiled_repository_fixture` in `crates/jit/src/test_utils.rs` keys its cache (`profiled_repository_fixture_key`) on SHA-256 hashes of the setup executable (`current_exe`), an optional scenario executable and the captured package closure (`capture_profile_package_closure`: path, bytes and mode). Each test binary therefore gets its own key, and every rebuild invalidates every key. Cold keys after a rebuild cost 5.5-8 s of suite clock and push the profiled-fixture tests past the 20 s per-test bound under host load. Entries are never collected: `target/jit-profiled-repository-fixtures` held 1,341 entries (747 MB). No crate-source digest exists; `crates/jit/build.rs` emits only `JIT_BUILD_PROFILE` and `JIT_BUILD_TARGET`. Callers pass a scenario executable in `cli_item_validate/main.rs` and `cli_item_validate/derived_state_repair_tests.rs`, and `None` elsewhere. The fixture's cross-process build lock already bounds its waits below the per-test timeout and builds each key once.\n\n## Success Criteria\n\n- [hard] REQ-01: The fixture key is a digest of the captured package closure, a digest of the `jit` crate's source and the fixture's setup-contract token, and includes no executable's bytes or path.\n- [hard] REQ-02: Test binaries built from the same source share one entry per profile, and a rebuild without a source or package change reuses it.\n- [hard] REQ-03: The fixture takes no scenario-executable argument, and no caller passes one.\n- [hard] REQ-04: The cache keeps at most one entry per fixture profile: publishing a new entry removes that profile's older entries, without disturbing a concurrent reader of the current one.\n- [hard] REQ-05: The fixture's own tests prove that the key is stable across executables and changes with a package or source byte.\n",
   "documents": [],
+  "done_at": "2026-10-27T20:54:49.574033405Z",
   "first_ready_at": "2026-10-22T15:01:19.326528403Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e54dc4f0-1b63-4029-88e0-0e6c6d25b05b",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:48:09.371618147Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "aacdfb49-4d37-4caa-badf-14be3bb7fce9",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:49:33.055399209Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "07f4b1d4-7dde-47ae-929c-c0d892741b27",
   "labels": [
     "type:task",
@@ -30,7 +44,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Profiled-repository fixture keyed only on its inputs",
-  "updated_at": "2026-10-22T15:59:45.925648812Z"
+  "updated_at": "2026-10-27T20:54:49.574033405Z"
 }

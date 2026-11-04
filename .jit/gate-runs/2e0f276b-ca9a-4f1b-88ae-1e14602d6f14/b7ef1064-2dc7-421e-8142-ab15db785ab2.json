@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "710cae51f26beb2881793e16f8a9d4567a365755",
+  "completed_at": "2026-11-03T22:44:28.826912023Z",
+  "duration_ms": 220354,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied in the current attributable tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2e0f276b-ca9a-4f1b-88ae-1e14602d6f14",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b7ef1064-2dc7-421e-8142-ab15db785ab2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T22:40:48.472037512Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 30ee75cb7, 9b7c7b3fe, b1171117f\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-19 (issue description); @/gate/jit-validate (.jit/gates.toml); @/invariant/architecture-dependency-direction, @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-1 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci: passed, exit 0, 2026-11-03T22:39:11Z\nTruncation recovery: recovered initially truncated aggregate output with per-commit, per-file patches and current-file ranges\n\n1. No findings. The attributable implementation resolves supplied prefixes in `IssueOps`, returns persisted mutation results, removes the specified storage calls from CLI paths, and adds focused return-shape harness coverage.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied in the current attributable tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

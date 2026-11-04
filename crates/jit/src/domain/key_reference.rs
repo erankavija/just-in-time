@@ -7,6 +7,7 @@
 //! resolves the key through the same key → created-id map that wires
 //! `depends_on`.
 
+use crate::domain::identity::IssueId;
 use std::collections::HashSet;
 
 /// The manifest key referenced by a label value of the form
@@ -17,24 +18,30 @@ pub fn referenced_key(value: &str) -> Option<&str> {
     (!key.is_empty() && !self_id.is_empty()).then_some(key)
 }
 
+/// A manifest key that names no created issue.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("unknown manifest key '{0}'")]
+pub struct UnknownManifestKey(pub String);
+
 /// Resolve a manifest-key reference in `label` when its namespace is one of
 /// `credit_namespaces`; any other label is returned unchanged.
 ///
 /// # Errors
 ///
-/// Returns the referenced key when `short_id_of` does not know it.
+/// Returns the referenced key when `issue_id_of` does not know it.
 pub fn resolve_key_reference(
     label: &str,
     credit_namespaces: &HashSet<String>,
-    short_id_of: impl Fn(&str) -> Option<String>,
-) -> Result<String, String> {
+    issue_id_of: impl Fn(&str) -> Option<IssueId>,
+) -> Result<String, UnknownManifestKey> {
     let Some((namespace, value)) = label.split_once(':') else {
         return Ok(label.to_string());
     };
     let Some(key) = referenced_key(value).filter(|_| credit_namespaces.contains(namespace)) else {
         return Ok(label.to_string());
     };
-    let short = short_id_of(key).ok_or_else(|| key.to_string())?;
+    let id = issue_id_of(key).ok_or_else(|| UnknownManifestKey(key.to_string()))?;
+    let short = id.short_id();
     let self_id = &value[value.find('/').map_or(value.len(), |i| i + 1)..];
     Ok(format!("{namespace}:{short}/{self_id}"))
 }
@@ -69,16 +76,22 @@ mod tests {
     fn test_resolve_key_reference_substitutes_known_key_in_credit_namespace() {
         let resolved =
             resolve_key_reference("satisfies:{story.short_id}/REQ-01", &credit(), |key| {
-                (key == "story").then(|| "abc12345".to_string())
+                (key == "story").then(|| crate::test_utils::issue_id(1))
             });
-        assert_eq!(resolved, Ok("satisfies:abc12345/REQ-01".to_string()));
+        assert_eq!(
+            resolved,
+            Ok(format!(
+                "satisfies:{}/REQ-01",
+                crate::test_utils::issue_id(1).short_id()
+            ))
+        );
     }
 
     #[test]
     fn test_resolve_key_reference_reports_unknown_key() {
         let resolved =
             resolve_key_reference("satisfies:{ghost.short_id}/REQ-01", &credit(), |_| None);
-        assert_eq!(resolved, Err("ghost".to_string()));
+        assert_eq!(resolved, Err(UnknownManifestKey("ghost".to_string())));
     }
 
     #[test]
@@ -89,7 +102,7 @@ mod tests {
             "plain",
         ] {
             assert_eq!(
-                resolve_key_reference(label, &credit(), |_| Some("abc12345".to_string())),
+                resolve_key_reference(label, &credit(), |_| Some(crate::test_utils::issue_id(1))),
                 Ok(label.to_string())
             );
         }

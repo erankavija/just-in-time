@@ -1,0 +1,165 @@
+//! Success payloads for dependency edits.
+
+use super::{HumanRender, OutputMode};
+use crate::domain::identity::IssueId;
+use schemars::JsonSchema;
+use serde::Serialize;
+use std::fmt::Write;
+
+fn section(
+    text: &mut String,
+    heading: Option<String>,
+    mut rows: impl ExactSizeIterator<Item = String>,
+) {
+    if rows.len() == 0 {
+        return;
+    }
+    let _ = heading.map(|heading| writeln!(text, "{heading}"));
+    let _ = rows.try_for_each(|row| writeln!(text, "  • {row}"));
+}
+
+fn dependency_count(verb: &str, count: usize) -> String {
+    format!(
+        "{verb} {count} dependenc{}:",
+        if count == 1 { "y" } else { "ies" }
+    )
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DependencyAddResponse {
+    pub from_id: IssueId,
+    pub added: Vec<IssueId>,
+    pub already_exist: Vec<IssueId>,
+    pub skipped: Vec<(IssueId, String)>,
+}
+
+impl HumanRender for DependencyAddResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let mut text = String::new();
+        section(
+            &mut text,
+            (!mode.quiet).then(|| dependency_count("Added", self.added.len())),
+            self.added
+                .iter()
+                .map(|id| format!("{} → {id}", self.from_id)),
+        );
+        section(
+            &mut text,
+            Some(format!("Already exist ({}):", self.already_exist.len())),
+            self.already_exist.iter().map(ToString::to_string),
+        );
+        section(
+            &mut text,
+            Some(format!("Skipped ({}):", self.skipped.len())),
+            self.skipped
+                .iter()
+                .map(|(id, reason)| format!("{id}: {reason}")),
+        );
+        text
+    }
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DependencyRemoveResponse {
+    pub from_id: IssueId,
+    pub removed: Vec<IssueId>,
+    pub not_found: Vec<String>,
+}
+
+impl HumanRender for DependencyRemoveResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let mut text = String::new();
+        section(
+            &mut text,
+            (!mode.quiet).then(|| dependency_count("Removed", self.removed.len())),
+            self.removed.iter().map(ToString::to_string),
+        );
+        section(
+            &mut text,
+            Some(format!("Not found ({}):", self.not_found.len())),
+            self.not_found.iter().map(ToString::to_string),
+        );
+        text
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dependency_add_render_human_preserves_sections_and_quiet_detail_rows() {
+        let from_id = IssueId::from_uuid(uuid::Uuid::new_v4());
+        let target = IssueId::from_uuid(uuid::Uuid::new_v4());
+        let response = DependencyAddResponse {
+            from_id: from_id.clone(),
+            added: vec![target.clone()],
+            already_exist: vec![target.clone()],
+            skipped: vec![(target.clone(), "redundant".to_owned())],
+        };
+        let details = format!(
+            "  • {from_id} → {target}\nAlready exist (1):\n  • {target}\nSkipped (1):\n  • {target}: redundant\n"
+        );
+        assert_eq!(
+            response.render_human(OutputMode::default()),
+            format!("Added 1 dependency:\n{details}")
+        );
+        assert_eq!(
+            response.render_human(OutputMode {
+                quiet: true,
+                json: false
+            }),
+            details
+        );
+        let multiple = DependencyAddResponse {
+            added: vec![target.clone(), target],
+            already_exist: Vec::new(),
+            skipped: Vec::new(),
+            ..response
+        };
+        assert!(multiple
+            .render_human(OutputMode::default())
+            .starts_with("Added 2 dependencies:\n"));
+        let empty = DependencyAddResponse {
+            added: Vec::new(),
+            ..multiple
+        };
+        assert!(empty.render_human(OutputMode::default()).is_empty());
+    }
+
+    #[test]
+    fn test_dependency_remove_render_human_preserves_sections_and_quiet_detail_rows() {
+        let from_id = IssueId::from_uuid(uuid::Uuid::new_v4());
+        let target = IssueId::from_uuid(uuid::Uuid::new_v4());
+        let response = DependencyRemoveResponse {
+            from_id,
+            removed: vec![target.clone()],
+            not_found: vec!["missing".to_owned()],
+        };
+        let details = format!("  • {target}\nNot found (1):\n  • missing\n");
+        assert_eq!(
+            response.render_human(OutputMode::default()),
+            format!("Removed 1 dependency:\n{details}")
+        );
+        assert_eq!(
+            response.render_human(OutputMode {
+                quiet: true,
+                json: false
+            }),
+            details
+        );
+        let multiple = DependencyRemoveResponse {
+            removed: vec![target.clone(), target],
+            not_found: Vec::new(),
+            ..response
+        };
+        assert!(multiple
+            .render_human(OutputMode::default())
+            .starts_with("Removed 2 dependencies:\n"));
+        let empty = DependencyRemoveResponse {
+            removed: Vec::new(),
+            ..multiple
+        };
+        assert!(empty.render_human(OutputMode::default()).is_empty());
+    }
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f3ec4c23fb7b0aeec8cb40aebab3f9a48e0d12b1",
+  "completed_at": "2026-11-01T00:59:35.931889209Z",
+  "duration_ms": 168046,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard criteria are met; redundant list-envelope ownership was removed and the remaining assertion is retained.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7a69fc74-99ac-48bb-aa96-2ae31e5028e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ea66b6a1-e804-498b-a692-7e2021f9d35e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T00:56:47.885686773Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:7a69fc74` commits `6b972acdb` and merge `f0ef0f019`; reviewed parent-specific patches, including `crates/jit/tests/cli_query_graph/search_tests.rs`\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-18` (`dev/vision/9db27a3a-charter.md`); `@/invariant/orthogonal-tests` (`.jit/invariants.toml`); `@/issue/c780514e/requirement/REQ-04` (issue description)\nGate evidence: cargo-ci passed (exit code unavailable); code-review pending\nTruncation recovery: narrowed the merge to parent-specific, per-file patches; inspected the schema-owner test and affected test files\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard criteria are met; redundant list-envelope ownership was removed and the remaining assertion is retained.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

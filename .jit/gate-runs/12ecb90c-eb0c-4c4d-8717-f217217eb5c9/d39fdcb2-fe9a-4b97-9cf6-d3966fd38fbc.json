@@ -1,0 +1,78 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "69d9b86367a2b08c4bdd76f48d5ddf88f91d4da1",
+  "completed_at": "2026-11-03T21:24:29.973108315Z",
+  "duration_ms": 473097,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/b697a3f7-ef84-4452-9b13-c8274f6abe4a.json",
+        "id": "F1",
+        "line": 15,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b697a3f7/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The foreign-lease manifest accepts unleased writes and therefore does not satisfy the container's unchanged missing-lease REQ-04."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/breakdown.json",
+        "id": "F2",
+        "line": 3,
+        "origin": "pre-existing",
+        "references": [
+          "@/inv/convention-convergence"
+        ],
+        "severity": "medium",
+        "summary": "Three stored issue descriptions contain later external amendments absent from the authoritative manifest."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/plan.md",
+        "id": "F3",
+        "line": 327,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The behavior summary still claims strict mode refuses an unleased automated pass, contradicting the foreign-lease contract."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/plan.md",
+        "id": "F4",
+        "line": 299,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Five external dependencies described as direct re-homes are represented transitively without loss of execution ordering."
+      },
+      {
+        "disposition": "advisory",
+        "id": "F5",
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Repository validation passes with 70 pre-existing membership-label divergence warnings."
+      }
+    ],
+    "summary": "The current breakdown fails because its foreign-lease contract contradicts container REQ-04 and the latest plan review is failed; four advisory findings remain.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "12ecb90c-eb0c-4c4d-8717-f217217eb5c9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d39fdcb2-fe9a-4b97-9cf6-d3966fd38fbc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:16:36.875244672Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4655 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a345-675a-7490-8e1e-515232193e56\n--------\nuser\n--- 4642 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "The current breakdown fails because its lease semantics no longer satisfy the container’s unchanged REQ-04, leaving the latest plan review failed.\n\nAudit summary:\n\n- Manifest validation with `--deny-warnings`, renderer `--check`, native batch dry-run, and `jit validate` completed successfully.\n- The manifest contains 45 issues and 60 internal edges. All internal edges, seven source→breakdown edges, and six container→sink edges are exact.\n- Titles, types, priorities, labels, and gates match. Three externally amended descriptions differ from the manifest.\n- `planning` is absent from stored records and batch export.\n- Contract modes, producer reachability, footprints, and blank-workspace root readiness otherwise pass.\n- Coverage preview passes; the latest plan review fails.\n- All 39 finest-tier tasks remain materially worker-sized under DEC-26:\n\n| Key / issue | Coherent change | Observable test boundary | Footprint credible | One focused implementation/review cycle | Not a chain link | Result |\n|---|---|---|---|---|---|---|\n| readiness-derivation / 945f9181 | Yes | Domain/property and harness tests | Yes | Yes, DEC-26 | Yes | PASS |\n| readiness-in-mutation-plans / 635f23c7 | Yes | Harness and session-count tests | Yes | Yes, DEC-26 | Yes | PASS |\n| validate-fix-readiness-convergence / b674382e | Yes | Validate harness tests | Yes | Yes | Yes | PASS |\n| state-derivation-convergence / d2acb105 | Yes | Transition harness tests | Yes | Yes | Yes | PASS |\n| field-derivation-convergence / fe9147fa | Yes | Property and command tests | Yes | Yes, DEC-26 | Yes | PASS |\n| lease-check-in-session / c2b3cefa | Yes | Lease harness tests | Yes | Yes, DEC-26 | Yes | PASS |\n| bulk-apply-one-session / 693a2fdd | Yes | Bulk harness tests | Yes | Yes | Yes | PASS |\n| lease-check-coverage / d3c94dc5 | Yes | Lease harness tests | Yes | Yes | Yes | PASS |\n| event-per-commit / c517b88b | Yes | Plan, storage-contract, and CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| read-session / eaca3f52 | Yes | Storage-contract and contention tests | Yes | Yes, DEC-26 | Yes | PASS |\n| lock-free-read-consumers / 578ed10d | Yes | Command harness tests | Yes | Yes | Yes | PASS |\n| read-concurrency-benchmark / bb596228 | Yes | Benchmark validator | Yes | Yes | Yes | PASS |\n| cost-evidence / 45d0a971 | Yes | Benchmark validator | Yes | Yes, DEC-26 | Yes | PASS |\n| configuration-assembly / 1ade3e6f | Yes | Unit, repository, and command tests | Yes | Yes, DEC-26 | Yes | PASS |\n| configuration-store / cfc87a55 | Yes | Storage and CLI suites | Yes | Yes, DEC-26 | Yes | PASS |\n| captured-declaration-reads / 030df4b1 | Yes | Harness and CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| executor-config-caches-removal / 42046050 | Yes | Harness and configuration suites | Yes | Yes, DEC-26 | Yes | PASS |\n| declarations-on-mutation-base / 850eaad3 | Yes | Command and harness tests | Yes | Yes, DEC-26 | Yes | PASS |\n| gate-preset-catalog / 1a737bb4 | Yes | Catalog, command, and template tests | Yes | Yes, DEC-26 | Yes | PASS |\n| gate-evidence-capture / 700a96dd | Yes | Gate-check harness tests | Yes | Yes | Yes | PASS |\n| image-identity-token / f7a59f5f | Yes | Storage unit tests | Yes | Yes | Yes | PASS |\n| capability-fs-module / d58f80c9 | Yes | Storage unit suites | Yes | Yes, DEC-26 | Yes | PASS |\n| leaf-open-once / 4334df62 | Yes | Capability, profile, and storage tests | Yes | Yes, DEC-26 | Yes | PASS |\n| record-commit-through-capabilities / 01a88d32 | Yes | Redo tests | Yes | Yes | Yes | PASS |\n| redo-apply-parents-once / 4d834432 | Yes | Redo conformance tests | Yes | Yes, DEC-26 | Yes | PASS |\n| atomic-publication-core / 7fefd776 | Yes | Atomic-write tests | Yes | Yes, DEC-26 | Yes | PASS |\n| control-files-publication / 1b7f58ae | Yes | Claim and serve tests | Yes, bounded uncertainty | Yes, DEC-26 | Yes | PASS |\n| archive-reference-resolution-once / f56bad8d | Yes | Domain unit tests | Yes | Yes | Yes | PASS |\n| archive-preview-through-execute-planner / 65aafaba | Yes | Preview/execute harness tests | Yes | Yes, DEC-26 | Yes | PASS |\n| archive-candidates-one-session / c0775a83 | Yes | Command harness tests | Yes | Yes | Yes | PASS |\n| container-destination-once / 4e2bed35 | Yes | Classifier and command tests | Yes | Yes, DEC-26 | Yes | PASS |\n| snapshot-from-one-image / 30334066 | Yes | Snapshot CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| archive-destination-no-legacy-fallback / e73ad8bc | Yes | Classifier tests | Yes | Yes | Yes | PASS |\n| domain-typed-errors / ceaaf0ab | Yes | Domain unit tests | Yes | Yes, DEC-26 | Yes | PASS |\n| root-relative-path-in-domain / 5d09e74b | Yes | Domain and structural tests | Yes | Yes, DEC-26 | Yes | PASS |\n| one-safe-path-validator / b2c28ec1 | Yes | Domain and backend tests | Yes | Yes, DEC-26 | Yes | PASS |\n| issue-scope-type / 9623fe6a | Yes | Domain and CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| process-liveness-primitive / f6477007 | Yes | Process unit tests | Yes | Yes, DEC-26 | Yes | PASS |\n| type-extraction-exact-values / 12064c7b | Yes | Taxonomy unit tests | Yes | Yes | Yes | PASS |\n\n1. **F1 — High; blocking; issue-impact.** Container REQ-04 requires every mutation to check leases and defines a missing-lease message once, while the current plan and `lease-check-in-session`/`lease-check-coverage` entries deliberately allow unleased writes and refuse only another agent’s lease. This leaves the latest plan review failed and the graph unable to claim REQ-04. The settled `17fbcf25` ruling must be preserved: replace C’s REQ-04 with “Every user-requested issue mutation checks inside its publishing session whether another agent holds an active lease on its target, through one captured claims check. No pre-session lease check remains, and `ForeignLeaseError` defines the refusal text once; an unleased write succeeds.” Retain the manifest’s foreign-lease entries and existing edges, then revalidate/render and return the shared contract to plan-review.\n\n2. **F2 — Medium; advisory; pre-existing.** Stored descriptions for `readiness-derivation` (945f9181), `lock-free-read-consumers` (578ed10d), and `control-files-publication` (1b7f58ae) contain later amendments absent from the authoritative manifest. These were introduced by work outside this bracket, so they cannot fail this review, but exact fidelity requires folding the amendments into `breakdown.json` and rerendering—or removing them from the records if superseded. No edge reconciliation is needed.\n\n3. **F3 — Low; advisory; issue-impact.** The behavior summary still says a strict “unleased automated pass” is refused, contradicting the foreign-lease contract. Change it to “an automated pass on another agent’s lease.”\n\n4. **F4 — Low; advisory; issue-impact.** Five external dependencies described as direct re-homes are represented transitively: f8f80eea→`captured-declaration-reads`, c1c86312→`issue-scope-type`, 5fac48b8→`readiness-in-mutation-plans`, c3e3e2ff→`lease-check-in-session`, and 145b4d57→`declarations-on-mutation-base`. Ordering is preserved; clarify the plan wording rather than adding transitively redundant edges. This is unchanged from the previously reviewed revision.\n\n5. **F5 — Low; advisory; pre-existing.** `jit validate` passes but reports 70 repository-wide membership labels not backed by the DAG. The warning is outside this bracket and does not affect its manifest or edge fidelity.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The current breakdown fails because its foreign-lease contract contradicts container REQ-04 and the latest plan review is failed; four advisory findings remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The foreign-lease manifest accepts unleased writes and therefore does not satisfy the container's unchanged missing-lease REQ-04.\",\"file\":\".jit/issues/b697a3f7-ef84-4452-9b13-c8274f6abe4a.json\",\"line\":15,\"references\":[\"@/issue/b697a3f7/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Three stored issue descriptions contain later external amendments absent from the authoritative manifest.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/breakdown.json\",\"line\":3,\"references\":[\"@/inv/convention-convergence\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The behavior summary still claims strict mode refuses an unleased automated pass, contradicting the foreign-lease contract.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/plan.md\",\"line\":327},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Five external dependencies described as direct re-homes are represented transitively without loss of execution ordering.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/plan.md\",\"line\":299},{\"id\":\"F5\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Repository validation passes with 70 pre-existing membership-label divergence warnings.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

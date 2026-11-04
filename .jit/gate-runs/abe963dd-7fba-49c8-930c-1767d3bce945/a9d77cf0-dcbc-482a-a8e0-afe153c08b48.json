@@ -1,0 +1,54 @@
+{
+  "branch": "worktree-agent-abe963dd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e0d06007ea55c8d690620715046c349ca470bd63",
+  "completed_at": "2026-10-22T19:15:06.738757878Z",
+  "duration_ms": 309420,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 477,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/abe963dd/requirement/REQ-03",
+          "@/charter/D-20"
+        ],
+        "severity": "high",
+        "summary": "Unnormalized selector cache keys let dot-segment aliases reload a package and repeat model-reference validation."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/init_tests.rs",
+        "id": "F2",
+        "line": 432,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Two changed test comments retain task-history narration instead of concise test contracts."
+      }
+    ],
+    "summary": "Two issue-impact blocking findings: path-alias selection repeats model validation, and recurring task-history comments remain in the changed tests.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abe963dd-7fba-49c8-930c-1767d3bce945",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a9d77cf0-dcbc-482a-a8e0-afe153c08b48",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T19:09:57.317853367Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9347 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-abe963dd\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16505-215b-7b60-be8d-cb4c6d99c2e1\n--------\nuser\n--- 9334 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: deb013162, e0d06007 (`jit:abe963dd`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/abe963dd/requirement/REQ-01..REQ-05 (.jit/issues/abe963dd-7fba-49c8-930c-1767d3bce945.json); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci pending (no exit code or run output)\nTruncation recovery: re-read truncated commit patches by individual path/range, then inspected current call sites and affected tests\n\n1. **[blocking][issue-impact]** `crates/jit/src/commands/profile.rs:477` keys the read cache by an unnormalized requested path. `vendor/workflow` and `vendor/../vendor/workflow` resolve to the same directory, but become distinct `PathBuf` keys; `supplied_package` canonicalizes only for validation and still constructs both packages from the raw paths. Each construction runs `validate_model_references` (`profile/package.rs:614`), so model-reference validation can exceed once per command. Normalize/cache by the canonical safe directory (or equivalent lexical normalization) and cover this spelling variant. References: @/issue/abe963dd/requirement/REQ-03, @/charter/D-20.\n\n2. **[blocking][issue-impact]** `crates/jit/tests/cli_repo_workflow/init_tests.rs:432` and `:477` retain recurring task-history comments (`jit:49adf23b increment 7`) after this change updates them. Rewrite them as concise present-tense test contracts; history belongs in git/JIT. References: @/invariant/essential-code-prose.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact blocking findings: path-alias selection repeats model validation, and recurring task-history comments remain in the changed tests.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Unnormalized selector cache keys let dot-segment aliases reload a package and repeat model-reference validation.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":477,\"references\":[\"@/issue/abe963dd/requirement/REQ-03\",\"@/charter/D-20\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Two changed test comments retain task-history narration instead of concise test contracts.\",\"file\":\"crates/jit/tests/cli_repo_workflow/init_tests.rs\",\"line\":432,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

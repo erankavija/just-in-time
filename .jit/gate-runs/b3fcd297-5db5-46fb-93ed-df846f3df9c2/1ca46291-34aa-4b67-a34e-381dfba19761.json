@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-b3fcd297",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "016482b0f4ade1ed038384247dea2158d8b212ce",
+  "completed_at": "2026-10-25T00:15:22.154607950Z",
+  "duration_ms": 184488,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/rule_serialize.rs",
+        "id": "F1",
+        "line": 256,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Schema serialization uses expect on VirtualPath::schema, introducing a prohibited library-code panic."
+      }
+    ],
+    "summary": "The tagged change introduces a library-code panic through an expect call.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1ca46291-34aa-4b67-a34e-381dfba19761",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:12:17.665975407Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3807 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b3fcd297\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17066-ae27-7013-8a2d-88c9fdc5b189\n--------\nuser\n--- 3794 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fa4386c73 (`jit:b3fcd297`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-07 (issue description, markdown-first); @/invariant/semantic-types (.jit/invariants.toml, registry-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T00:10:49Z)\nTruncation recovery: re-read each tagged patch by affected path, inspected focused current source ranges, and scanned production schema-path construction\n\n1. **F1 — blocking, issue-impact (high):** [`rule_serialize.rs:256`](crates/jit/src/repository_state/rule_serialize.rs:256) adds `expect(...)` in library code when building the schema path. The repository policy prohibits panics in library code; propagate the constructor failure or encode the invariant without a panic.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The tagged change introduces a library-code panic through an expect call.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Schema serialization uses expect on VirtualPath::schema, introducing a prohibited library-code panic.\",\"file\":\"crates/jit/src/repository_state/rule_serialize.rs\",\"line\":256}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

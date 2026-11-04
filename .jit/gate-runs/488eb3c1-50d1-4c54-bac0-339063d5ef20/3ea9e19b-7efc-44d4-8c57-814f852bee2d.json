@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-488eb3c1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cab9cb7bbbac8c6f963900095251fece51c3b640",
+  "completed_at": "2026-11-01T01:43:47.160273076Z",
+  "duration_ms": 290851,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/event_catalog.rs",
+        "id": "F1",
+        "line": 173,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "EventTag::sample introduces an expect in library code, violating the no-panic policy."
+      }
+    ],
+    "summary": "One issue-impact blocking finding: new production-library panic path.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "488eb3c1-50d1-4c54-bac0-339063d5ef20",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3ea9e19b-7efc-44d4-8c57-814f852bee2d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T01:38:56.308703176Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11081 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-488eb3c1\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a194c2-7d5a-7843-bf52-502e6df73756\n--------\nuser\n--- 11068 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c6458f4e3, cab9cb7bb (`jit:488eb3c1`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic, @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/event-log (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/2195c98f/requirement/REQ-01, REQ-09, REQ-17 (.jit/issues); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T01:37:31Z); code-review pending\nTruncation recovery: recovered initial truncated combined patch reads with bounded commit/path reads for domain, declarations, commands, storage, tests, and documentation\n\n1. **[blocking][issue-impact]** `crates/jit/src/domain/event_catalog.rs:173` introduces `expect` in production library code when constructing the sample gate key. This violates the repository’s no-panics-in-library-code policy; make this path fallible or use a non-panicking construction.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocking finding: new production-library panic path.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"EventTag::sample introduces an expect in library code, violating the no-panic policy.\",\"file\":\"crates/jit/src/domain/event_catalog.rs\",\"line\":173,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

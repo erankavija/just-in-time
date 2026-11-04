@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "92858ba2da31af6dbf8ee6a1d0f8462abdce6d4e",
+  "completed_at": "2026-11-03T20:47:27.932725114Z",
+  "duration_ms": 177323,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Tagged changes meet the issue criteria and preserve the search path behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d05b5639-925e-414d-8abb-a639331d76f1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a91b5943-b7be-4b17-959b-92f6fd1e1ff1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T20:44:30.608925870Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2a82242da (`refactor(jit:d05b5639): route CLI jit search through the executor query family`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/d05b5639/requirement/REQ-01–REQ-03 and @/issue/df129d9e/requirement/REQ-03,REQ-19 (markdown-first issue descriptions); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: narrowed reads of config, plan, investigation, and resolved requirement items\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged changes meet the issue criteria and preserve the search path behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

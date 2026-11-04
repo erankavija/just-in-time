@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T21:28:43.428979093Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Document path-read failures classify to codes that misdescribe them, so a status derived from the classification would be wrong. This gives each `PathReadError` variant its own code.\n\n## Background\n\n`PathReadError` (`crates/jit/src/storage/path_errors.rs`) has the variants `NotFound`, `CommitNotFound`, `InvalidPath`, `OutsideRepoRoot` and `Other`. The library classifier in `crates/jit/src/output/failure.rs` maps `NotFound` and `CommitNotFound` to `REPOSITORY_NOT_FOUND`, labelling a missing document as a missing repository, maps `InvalidPath` to `INVALID_ARGUMENT`, and maps `OutsideRepoRoot` to `GENERIC_ERROR` (exit 1). The HTTP server keeps its own map that answers 404 and 400 for these. For the server to derive its status from the classification, the classification itself must name these failures correctly.\n\n## Success Criteria\n\n- [hard] REQ-01: `OutsideRepoRoot` classifies to `INVALID_ARGUMENT` as `InvalidPath` already does, and `NotFound` and `CommitNotFound` classify to a document-not-found code in the not-found exit class; `Other` classifies by its inner error as today.\n- [hard] REQ-02: The document-not-found code is a member of the error-code vocabulary with a description, and the generated error-code reference lists it.\n- [hard] REQ-03: Library unit tests own each variant's classification, and a CLI test states the new code and exit status of `jit doc show` for a missing document and for a path outside the repository.\n- [hard] REQ-04: No other error's classification changes, and the existing suites pass without weakened assertions.\n\n## Notes\n\nThis is a deliberate, user-visible exit-code change. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
   "documents": [],
+  "done_at": "2026-11-03T21:42:01.489367437Z",
+  "first_ready_at": "2026-11-03T21:26:27.985752834Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "13e1c25b-5286-40d1-861d-181a19cf7aaf",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:39:31.686141473Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cd522655-482f-43e7-b982-9c2d35e98271",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:41:47.561553751Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "22189592-0133-4465-b850-3f6ffff129b7",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Classify document path-read failures by variant",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T21:42:01.489367437Z"
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T01:11:24.955063391Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -11,13 +12,28 @@
     "f8f80eea-1182-4a20-b010-8e1d02d1373f",
     "f968dfe1-64d2-4d37-8bdc-0f04bfca2bb8"
   ],
-  "description": "Replace the two repository-validation entry points and their `Result` pair with one pure function that computes a `ValidationReport` from a captured validation and the inputs its caller supplies.\n\n## Background\n\n- `validate_repository` (`crates/jit/src/validation/repository.rs:152-181`) derives the materialization plan and calls `validate_repository_with_materializations` (`:183-332`); both return `Result<RepositoryValidationReport, RepositoryValidationFailure>` (`:52-130`), where the failure carries the partial report.\n- The function is not pure: `collect_rule_findings` reads the wall clock (`:589`), and `validate_machine_local_claims` (`:536-552`) reads `crate::test_mode` and calls `crate::commands::validate_claims_index_at` (`commands/validate.rs:2453-2459`), which re-detects the worktree layout and reads the machine-local claims index.\n- Callers: `commands/validate.rs` (`validate_silent` `:107-125`, `validate_repository_report` `:523-532`, `validate_repository_report_with_divergences` `:535-545`, `capture_validation_report` `:547-586`, `capture_repair_plan` `:650-703`), `commands/gate_check.rs` (`repository_rule_report` `:440-448`, `gate_findings_from_report` `:639-665`, the repository checker at `:1050-1055`), `commands/init.rs:284-292,498-520,680`, `commands/profile.rs:24,356,1427`, `commands/config.rs:328`, `main.rs` (the whole-repository branch of the `Commands::Validate` arm, which calls `validate_repository_report_with_divergences`), the tests in `validation/repository.rs` and `crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs:183`.\n- The validation layer parses records through the shared records loader.\n\nKept as one change for a build reason: the report type replaces a `Result` pair whose callers only compile together.\n\n## Success Criteria\n\n- [hard] REQ-01: `validation::report(&CapturedValidation, &ReportInputs) -> ValidationReport` is the only function that computes the repository report. `CapturedValidation` pairs a captured image with the records the loader parsed from it, and `CapturedValidation::from_image` parses them. `validate_repository`, `validate_repository_with_materializations`, `RepositoryValidationReport` and `RepositoryValidationFailure` no longer exist.\n- [hard] REQ-02: The report reads only its arguments. The evaluation instant is a field of `ReportInputs`, and while the claims-index check exists, its problems are a `ReportInputs` field computed by the executor from its own worktree paths with today's test-mode skip. `crates/jit/src/validation/` reads no clock, environment or machine-local file and calls no `crate::commands` function.\n- [hard] REQ-03: `ValidationReport` exposes the passes reached, the structural failure if any, and the findings projected to the wire `RuleReport`; a structural failure keeps every finding collected before it.\n- [hard] REQ-04: Every listed caller computes the report through the new function, and `jit validate`, `config set`, `init`, profile apply and the repository-validation gate keep their output and exit status; the existing suites pass, and a unit test shows that an injected instant decides a `gate-recency` finding.\n\n## Notes\n\n- The claims-index field is an interim input: it exists only while the machine-local claims-index check does, and the change that deletes that check deletes the field and its executor computation with it.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Replace the two repository-validation entry points and their `Result` pair with one pure function that computes a `ValidationReport` from a captured validation and the inputs its caller supplies.\n\n## Background\n\n- `validate_repository` (`crates/jit/src/validation/repository.rs:169-202`) derives the materialization plan and calls `validate_repository_with_materializations` (`:204-357`) with both verdict arguments `Ok(())`; both return `Result<RepositoryValidationReport, RepositoryValidationFailure>` (`:52-132`), where the failure carries the partial report.\n- `validate_repository_with_materializations` takes two verdicts computed outside the image as `Result<()>` arguments (`:208-209`): record fidelity, which becomes the structural failure (`:261-265`), and document-reference resolution, which `validate_integrity` raises (`:403-430`). Only `capture_validation_report` (`crates/jit/src/commands/validate.rs:522-583`) computes them: `capture_document_reference_validation` (`:940-964`) captures each reference in its own bounded image, and `capture_record_fidelity_validation` (`:969-994`) captures every gate run and reads the whole event log through `RepositoryMutationSession::read_history_log`, outside `CaptureSpec`. Its two callers are whole `jit validate` and the `repository_validation` gate checker (`crates/jit/src/commands/gate_check.rs:1083-1086`), the history readers f8a6b298 names under its DEC-19.\n- The function is not pure: `collect_rule_findings` reads the wall clock. The machine-local claims-index check that `validate_repository` also ran was deleted by f8a6b298's lease work (merge 96be25331), so validation reads nothing under `.git/jit/`.\n- Callers: `commands/validate.rs` (`validate_silent` `:139`, `validate_repository_report` `:498`, `validate_repository_report_with_divergences` `:510`, `capture_validation_report` `:522`, `capture_repair_plan` `:655`), `commands/gate_check.rs` (`repository_rule_report` `:413`, `gate_findings_from_report` `:598`, the repository checker at `:1083-1086`), `commands/init.rs:164`, `commands/profile.rs:1084`, `commands/config.rs:293`, `main.rs` (the whole-repository branch of the `Commands::Validate` arm), the tests in `validation/repository.rs` and `crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs:175`. Initialization, configuration and profile application judge proposed overlay images without history verdicts and read the report directly.\n- The validation layer parses records through the shared records loader.\n\nKept as one change for a build reason: the report type replaces a `Result` pair whose callers only compile together.\n\n## Success Criteria\n\n- [hard] REQ-01: `validation::report(&CapturedValidation, &ReportInputs) -> ValidationReport` is the only function that computes the repository report. `CapturedValidation` pairs a captured image with the records the loader parsed from it, and `CapturedValidation::from_image` parses them. `validate_repository`, `validate_repository_with_materializations`, `RepositoryValidationReport` and `RepositoryValidationFailure` no longer exist.\n- [hard] REQ-02: The report reads only its arguments. `ReportInputs` carries the evaluation instant; while the claims-index check exists, the claims-index problems the executor computes from its own worktree paths with today's test-mode skip; and an optional history input holding the record-fidelity and document-reference verdicts. `crates/jit/src/validation/` reads no clock, environment, machine-local file or event-log history and calls no `crate::commands` function.\n- [hard] REQ-03: `ValidationReport` exposes the passes reached, the structural failure if any, whether it carries history verdicts, and the findings projected to the wire `RuleReport`; a structural failure keeps every finding collected before it, and a failed history verdict is a structural failure as today.\n- [hard] REQ-04: Every listed caller computes the report through the new function. Whole `jit validate` and the repository-validation gate are the only callers that supply the history input; `jit validate`, `config set`, `init`, profile apply and the repository-validation gate keep their output and exit status; the existing suites pass, and a unit test shows that an injected instant decides a `gate-recency` finding.\n\n## Notes\n\n- The history verdicts stay computed by the executor under its mutation session; this change moves only how they reach the report.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T02:23:40.235283685Z",
+  "first_ready_at": "2026-11-04T01:09:28.612259490Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9f94c8de-c643-43a7-96cc-c9457bdb6691",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:19:03.701968971Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "397e4f65-e20b-4d11-bc07-4893c1c40d59",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:23:23.108173385Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6ba4f623-99fb-420a-9c47-3f3655db3815",
   "labels": [
     "type:task",
@@ -33,7 +49,7 @@
     "satisfies:9876a23a/REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "One pure function computes the validation report",
-  "updated_at": "2026-10-21T20:31:36.165741193Z"
+  "updated_at": "2026-11-04T02:23:40.235283685Z"
 }

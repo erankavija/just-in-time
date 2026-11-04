@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T02:11:18.645660781Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "6c0f8739-f103-4b20-91c4-9990fd0473a0"
   ],
-  "description": "Give the two storage backends one gate-run record reader, with one set of no-follow and clutter rules owned by one conformance test, so the per-issue layout later changes one reader.\n\n## Background\n\nThe JSON and memory backends each enumerate the `gate-runs/` root and parse run records with their own no-follow and clutter logic: `crates/jit/src/storage/json.rs:38,959-1043` (`read_gate_runs`) and `:1395-1490`, against `storage/memory.rs:343-380,766-800,909-946`. A repository-file no-follow read already exists (`read_repository_file_nofollow`, `storage/repository_state_store.rs:1810`). The cross-backend conformance suite is `storage/repository_state_store_tests.rs`. Paired backend tests assert the same clutter, symlink and corruption rules per backend, including that a corrupt run of an unrelated issue fails every lookup (`storage/json.rs:1871-2030`; `storage/memory.rs:1032,1061-1160`, through the memory-private helpers `gate_run_vpath`, `gate_run_directory_vpath` and `gate_run_parent_entry` at `:343-380`).\n\nKept as one change for a build reason: the backend-private enumeration helpers lose their last production caller in this change, and unused crate-private code fails the zero-warning build, so they and the paired tests that call them go here; the paired tests would otherwise re-prove a property the conformance case owns.\n\n## Success Criteria\n\n- [hard] REQ-01: Both backends list and load gate-run records through one shared reader built on `read_repository_file_nofollow`; neither backend keeps its own enumeration or no-follow code.\n- [hard] REQ-02: One conformance case, run against both backends, owns the clutter and symlink rules for run records and plants records through `VirtualPath::gate_run_record`.\n- [hard] REQ-03: The paired per-backend gate-run clutter tests in `json.rs` and `memory.rs` and the memory-private helpers they use no longer exist.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Give the two storage backends one gate-run record reader with one set of clutter and corruption rules, so the per-issue layout changes one reader.\n\n## Background\n\nThe JSON and memory backends each implement `read_gate_runs` and `load_gate_run_result` with their own enumeration and clutter logic (`crates/jit/src/storage/json.rs`, `storage/memory.rs`). `storage/gate_runs.rs` is a test module, so the reader needs its own file. `read_repository_file_nofollow` (`storage/repository_state_store.rs`) takes a filesystem root, so the memory backend cannot sit on it, and no directory-listing primitive spans both backends; `read_path_bytes` resolves against the worktree root and goes through git2.\n\n`test_gate_run_readers_*` in `storage/issue_store_conformance.rs` already owns the clutter, symlink and corruption rules across both backends. Paired per-backend tests re-prove them: the per-backend `test_gate_run_readers_*` in `json.rs` and `memory.rs` and the helper `gate_run_parent_entry` in `memory.rs`. `test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps` in `json.rs` is file-backend behaviour and stays.\n\n## Success Criteria\n\n- [hard] REQ-01: `storage/gate_run_reader.rs` holds the one reader for listing and loading gate-run records, generic over a backend seam with two methods: list the child names of one directory, and read one regular file without following a symlink. The file backend implements the seam on its no-follow primitives and the memory backend over its map. Neither backend keeps its own enumeration, clutter or parse code for run records.\n- [hard] REQ-02: The `test_gate_run_readers_*` cases in `issue_store_conformance.rs` plant records through `VirtualPath::gate_run_record`, pass unchanged in what they assert, and gain any rule only a per-backend test covers.\n- [hard] REQ-03: The per-backend `test_gate_run_readers_*` tests and `gate_run_parent_entry` no longer exist, and `test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps` still passes.\n",
   "documents": [],
+  "done_at": "2026-11-04T02:42:33.388124257Z",
+  "first_ready_at": "2026-11-04T01:44:00.275461088Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f2198c65-11cb-4a05-a386-67064b0e363e",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:38:29.596884813Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d74514ce-130f-42d3-9be0-6232856d201f",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:42:32.915716321Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0851fae4-245b-4e07-bd81-3f61da54dbf2",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "satisfies:f8a6b298/REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Both storage backends read gate-run records through one reader",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T02:42:33.388124257Z"
 }

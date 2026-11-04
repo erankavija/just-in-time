@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T02:24:23.706333567Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e",
     "6ba4f623-99fb-420a-9c47-3f3655db3815"
   ],
-  "description": "Make the validation capture return the records it already parsed, so the report and the divergence view read them instead of parsing the index and every issue again.\n\n## Background\n\n- `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:365-513`) parses every issue during capture to plan the closure (`:478-498`) and returns the image with those issues; `capture_base_reading` (`:211-238`) keeps the issues only for document-reference discovery and returns the image alone.\n- `capture_validation_report` (`:547-586`) then builds `CapturedValidation::from_image`, which parses the records again, and `captured_divergences` (`:706-741`) parses them a third time through the records loader.\n- Capture parses the overlay-effective bytes before the overlay is applied, which equals a parse of the overlaid image.\n\n## Success Criteria\n\n- [hard] REQ-01: The validation capture returns a `CapturedValidation` holding the records it parsed, and the CLI validation path, `--fix` repair planning and the divergence view read those records; on this path the index and each issue record are parsed once.\n- [hard] REQ-02: `captured_divergences` derives divergences from the captured records and parses nothing.\n- [hard] REQ-03: Output is unchanged: the validation, divergence and repair suites pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the validation capture return the records it already parsed, so the report, the divergence view, document-reference discovery and record fidelity read them instead of parsing every issue again.\n\n## Background\n\n- `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:334-486`) parses every issue during capture to plan the closure (`:447-472`) and returns the image with those issues; `capture_proposed_base` (`:216-234`) drops the issues and returns the image alone.\n- `capture_validation_report` (`:522-584`) then parses the issues again three times: `captured_divergences` (`:715-747`) through `captured_active_issues` (`crates/jit/src/commands/mod.rs:2161`), document-reference discovery through `captured_active_issues` (`validate.rs:562`), and the report through its records pass (`load_records`, `crates/jit/src/validation/repository.rs:378`).\n- Record fidelity (`record_drift`, `crates/jit/src/validation/record_fidelity.rs:21-66`) decodes every issue record a fourth time: `issue_drift` (`:74-79`) parses the stored bytes to a JSON value, decodes an `Issue` from it, and compares the writer's serialization with the canonical form of the stored value. `index_drift` (`:68-71`) parses the index a second time after the records pass (`repository.rs:380-384`). Record fidelity runs only for the two history readers, whole `jit validate` and the `repository_validation` gate checker.\n- Capture parses the overlay-effective bytes before the overlay is applied, which equals a parse of the overlaid image.\n\n## Success Criteria\n\n- [hard] REQ-01: The validation capture returns a `CapturedValidation` holding the index and records it parsed, and the CLI validation path, `--fix` repair planning, document-reference discovery and the divergence view read those records; on this path the index and each issue record are decoded once.\n- [hard] REQ-02: `captured_divergences` derives divergences from the captured records and parses nothing.\n- [hard] REQ-03: Record fidelity takes the captured validation's parsed records and index plus the stored bytes it compares, and decodes no issue record or index again; it reports the same records as before.\n- [hard] REQ-04: Output is unchanged: the validation, divergence, repair and record-fidelity suites pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: `--fix` repair planning decodes no issue record, since it consumes none. The hierarchy-fix, transition and reduction steps of `--fix` still decode through their own mutation sessions until the single-capture `--fix` replaces them. `jit recover` no longer depends on issue records; `jit validate` still reports a malformed record. Rejected: restoring a strict record check in recover; restructuring the other `--fix` steps here.\n- **D-02** — Steward ruling 2026-11-04: record decoding keeps the typed decode's behaviour for repeated keys. A repeated issue field is rejected with its line and column; a repeated unknown or map key loads as before. The single value decode only notes a repeated key, and the typed decode then decides. Rejected: rejecting every repeated key, which is stricter than before (REQ-03, REQ-04).\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T05:16:37.035138166Z",
+  "first_ready_at": "2026-11-04T02:23:40.358550090Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "86c3a127-186f-4b73-b151-ac366b8159d4",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:05:52.837929899Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "29af1067-0ff1-4bfb-a66f-05ba8c23f9db",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:09:45.750955158Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "satisfies:9876a23a/REQ-10"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Validation capture hands its parsed records to the report",
-  "updated_at": "2026-10-21T20:31:36.831219070Z"
+  "updated_at": "2026-11-04T05:16:37.035138166Z"
 }

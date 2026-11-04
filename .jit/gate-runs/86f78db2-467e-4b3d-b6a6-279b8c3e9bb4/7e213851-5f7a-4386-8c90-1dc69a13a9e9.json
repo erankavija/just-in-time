@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./.agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh",
+  "commit": "b5420aa83a3ea0c436060c1ea4da3360e927fc61",
+  "completed_at": "2026-11-01T08:31:07.775666527Z",
+  "duration_ms": 502,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "worktree-cache-test",
+  "inputs_digest": "2dff520e1affb7b4e8b921b1870f83d326d45b290ed6d86e04780eb4265a5f06",
+  "issue_id": "86f78db2-467e-4b3d-b6a6-279b8c3e9bb4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7e213851-5f7a-4386-8c90-1dc69a13a9e9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:31:07.273137463Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "PASS: dispatch succeeds over a pool\nPASS: the seed reports hardlink mode\nPASS: the snapshot lands in the given directory\nPASS: build/tool.o shares no inode with the pool\nPASS: build/tool.o keeps its mtime\nPASS: node_modules/pkg/build/addon.node shares no inode with the pool\nPASS: node_modules/pkg/build/addon.node keeps its mtime\nPASS: node_modules/pkg/index.js stays hardlinked to the pool\nPASS: node_modules/pkg/index.js keeps its mtime\nPASS: target/release/.fingerprint/pkg-2/invoked.timestamp shares no inode with the pool\nPASS: target/release/.fingerprint/pkg-2/invoked.timestamp keeps its mtime\nPASS: target/release/build/pkg-2/out/build/generated.rs shares no inode with the pool\nPASS: target/release/build/pkg-2/out/build/generated.rs keeps its mtime\nPASS: target/debug/incremental/pkg/.fingerprint/nested shares no inode with the pool\nPASS: target/debug/incremental/pkg/.fingerprint/nested keeps its mtime\nPASS: target/debug/.fingerprint/pkg-1/dep-lib shares no inode with the pool\nPASS: target/debug/.fingerprint/pkg-1/dep-lib keeps its mtime\nPASS: target/debug/build/pkg-1/output-alias shares no inode with the pool\nPASS: target/debug/build/pkg-1/output-alias keeps its mtime\nPASS: target/debug/build/pkg-1/output shares no inode with the pool\nPASS: target/debug/build/pkg-1/output keeps its mtime\nPASS: target/debug/conf.d/settings stays hardlinked to the pool\nPASS: target/debug/conf.d/settings keeps its mtime\nPASS: target/debug/pkg.d shares no inode with the pool\nPASS: target/debug/pkg.d keeps its mtime\nPASS: target/debug/deps/pkg-1.d shares no inode with the pool\nPASS: target/debug/deps/pkg-1.d keeps its mtime\nPASS: target/debug/deps/build stays hardlinked to the pool\nPASS: target/debug/deps/build keeps its mtime\nPASS: target/debug/deps/libpkg.rlib stays hardlinked to the pool\nPASS: target/debug/deps/libpkg.rlib keeps its mtime\nPASS: target/debug/tmp/.jit/issues/leftover.json shares no inode with the pool\nPASS: target/debug/tmp/.jit/issues/leftover.json keeps its mtime\nPASS: target/debug/.cargo-lock shares no inode with the pool\nPASS: target/debug/.cargo-lock keeps its mtime\nPASS: target/.rustc_info.json shares no inode with the pool\nPASS: target/.rustc_info.json keeps its mtime\nPASS: target/CACHEDIR.TAG stays hardlinked to the pool\nPASS: target/CACHEDIR.TAG keeps its mtime\nPASS: a dot-named symlink shares no inode with the pool\nPASS: the seed matches the pool's content\nPASS: a hardlink inside copied build state survives\nPASS: dispatch succeeds when hardlinking fails\nPASS: the seed reports copy mode\nPASS: the copied seed matches the pool's content\nPASS: a copied seed shares no inode with the pool\nPASS: rsync: reclaim succeeds\nPASS: rsync: a newer file reaches the pool\nPASS: rsync: the harvest leaves a hardlink sibling untouched\nPASS: rsync: the harvest replaces an unshared file's inode\nPASS: rsync: a newer pool file wins\nPASS: cp: reclaim succeeds\nPASS: cp: a newer file reaches the pool\nPASS: cp: the harvest leaves a hardlink sibling untouched\nPASS: cp: the harvest replaces an unshared file's inode\nPASS: cp: a newer pool file wins\npassed: 56, failed: 0\n"
+}

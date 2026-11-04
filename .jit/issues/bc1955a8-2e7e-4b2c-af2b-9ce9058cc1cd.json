@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:17:39.287926904Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Converge item-kind id patterns on the shared compiled pattern type.\n\n## Background\n\n`ItemKind` keeps `id_pattern_src: String` beside `id_pattern: Regex` (`crates/jit/src/domain/item.rs:643-655`), a private pairing of the compiled-pattern type that rule declarations use.\n\n## Success Criteria\n\n- [hard] REQ-01: `ItemKind` holds its id pattern as an `IdPattern`, and the separate source field is gone.\n- [hard] REQ-02: An invalid item-kind id pattern fails configuration loading with an error naming the kind.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:31:26.067049905Z",
+  "first_ready_at": "2026-10-25T04:16:26.261347126Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9fb5b317-3346-4a4f-9717-65505dbb3318",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:29:37.012291044Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "acb8d40f-cc99-4506-97c4-40cfcdfa6e44",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:31:25.138786195Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Item kinds hold their id pattern as IdPattern",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T04:31:26.067049905Z"
 }

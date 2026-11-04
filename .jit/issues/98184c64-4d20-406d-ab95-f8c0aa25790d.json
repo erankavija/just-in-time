@@ -1,14 +1,14 @@
 {
-  "assignee": "agent:planning-lead-f8a6b298",
+  "assignee": null,
   "claimed_at": "2026-10-21T16:58:48.993439019Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "53d19851-f8d2-42ea-8db3-93ddaafdce69",
-    "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e"
+    "53d19851-f8d2-42ea-8db3-93ddaafdce69"
   ],
   "description": "Delete repository validation's checks of `claims.index.json`, a file the tracker no longer writes, together with the index type they read.\n\n## Background\n\nRepository validation checks the machine-local claims index for schema errors and duplicate leases (`crates/jit/src/validation/repository.rs:248,536-550`, through `validate_claims_index_at` and `validate_claims_index_with_paths` at `commands/validate.rs:2726-2770`, re-exported at `commands/mod.rs:98`). Lease state is stored one file per issue, so a duplicate lease cannot exist and a malformed lease record fails at its own read. `ClaimsIndex` (`storage/claim_coordinator.rs:166-262`) has no other reader. `tests/cli_item_validate/validation_lease_tests.rs:180-228` (`test_validate_repository_detects_invalid_claims_index`) asserts the check.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_claims_index_at`, `validate_claims_index_with_paths`, `validate_machine_local_claims` and `ClaimsIndex` no longer exist, and repository validation reads nothing under `.git/jit/`.\n- [hard] REQ-02: `test_validate_repository_detects_invalid_claims_index` no longer exists, and the remaining lease-validation tests pass.\n- [hard] REQ-03: No validation-report input, and no executor code that fills one, carries claims-index problems.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:38.239485230Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,10 +24,11 @@
     "component:storage",
     "per:@/charter/D-18",
     "enforces:@/invariant/canonical-cutover",
-    "satisfies:f8a6b298/REQ-12"
+    "satisfies:f8a6b298/REQ-12",
+    "resolution:merged-into-53d19851"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Repository validation stops checking the claims index",
-  "updated_at": "2026-10-21T16:58:49.095112098Z"
+  "updated_at": "2026-11-02T23:41:50.653451650Z"
 }

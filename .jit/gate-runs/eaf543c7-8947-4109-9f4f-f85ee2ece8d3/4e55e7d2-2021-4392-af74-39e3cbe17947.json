@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "215f72444dc868b7276e9187d4ef5e4b29de1478",
+  "completed_at": "2026-10-26T22:05:43.472520521Z",
+  "duration_ms": 217500,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The gate CLI migration uses the shared JitCli fixture, preserves covered assertions, and resolves the prior rustdoc finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eaf543c7-8947-4109-9f4f-f85ee2ece8d3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4e55e7d2-2021-4392-af74-39e3cbe17947",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:02:05.971743151Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e4e69f2ae, 78a9d3856, edc86d121, and merge 5f0e15931 (relevant parent-specific portions)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 and REQ-09 (issue source); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-10-25T00:54:58Z; exit code unavailable)\nTruncation recovery: partitioned e4e69f2ae by affected file and diff range; inspected edc86d121 helper migrations and 5f0e15931 parent-specific patches\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The gate CLI migration uses the shared JitCli fixture, preserves covered assertions, and resolves the prior rustdoc finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

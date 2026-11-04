@@ -4,8 +4,8 @@
 //! hand-written create+dependency loops with one declarative array of issue
 //! definitions that reference each other by symbolic `key`. The whole file is
 //! FULLY pre-validated (duplicate/unknown keys, unknown `depends_on` references,
-//! cycle detection over the symbolic graph, type/label/gate validity, priority
-//! parse) BEFORE any write, so a malformed batch never leaves partially-created
+//! cycle detection over the symbolic graph, type/label/gate validity)
+//! BEFORE any write, so a malformed batch never leaves partially-created
 //! issues behind.
 //!
 //! ## Atomicity
@@ -13,14 +13,14 @@
 //! - **Pre-validation** is atomic: on ANY validation failure ZERO issues are
 //!   created and a [`BatchValidationError`] enumerating every offending entry is
 //!   returned (mapped to exit code 2, `InvalidArgument`).
-//! - **Publication is atomic.** The finalizer allocates all ids, resolves every
-//!   symbolic edge, and publishes issues, index membership, and audit events in
-//!   one recoverable repository delta.
+//! - **Publication is atomic.** Each draft carries the id the mutation context
+//!   derived for its entry, its dependencies resolved to those ids, and its
+//!   derived readiness; the finalizer publishes issues and audit events in one
+//!   recoverable repository delta.
 
 use super::*;
-use crate::domain::SHORT_ID_LENGTH;
+use crate::domain::identity::GateKey;
 use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 use thiserror::Error;
 
 /// One issue definition in a batch-create file.
@@ -78,16 +78,15 @@ pub struct BatchIssueDef {
     /// configured default type when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    /// Priority string (e.g. `low`, `normal`, `high`, `critical`). Defaults to
-    /// `normal`.
+    /// Priority. Defaults to `normal`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub priority: Option<String>,
+    pub priority: Option<Priority>,
     /// Additional labels in `namespace:value` format.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
     /// Quality gate keys to require; each must exist in the gate registry.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
     /// Symbolic `key`s of other entries in the same file this issue depends on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub depends_on: Vec<String>,
@@ -116,12 +115,10 @@ pub enum BatchValidationProblem {
     },
     /// The symbolic `depends_on` graph contains a cycle (the keys forming it).
     Cycle { keys: Vec<String> },
-    /// An entry's priority string does not parse.
-    InvalidPriority { key: String, value: String },
     /// An entry's type is not a known type in the project's type hierarchy.
     UnknownType { key: String, value: String },
     /// An entry requires a gate key absent from the gate registry.
-    UnknownGate { key: String, gate: String },
+    UnknownGate { key: String, gate: GateKey },
     /// An entry's FINAL issue shape would be rejected by the same write-time
     /// validation [`create_issue`](crate::commands::IssueOps::create_issue)
     /// runs (label format, namespace-uniqueness such as a single `type:*`, and
@@ -149,9 +146,6 @@ impl std::fmt::Display for BatchValidationProblem {
             ),
             Self::Cycle { keys } => {
                 write!(f, "dependency cycle among keys: {}", keys.join(" -> "))
-            }
-            Self::InvalidPriority { key, value } => {
-                write!(f, "entry '{key}' has invalid priority '{value}'")
             }
             Self::UnknownType { key, value } => {
                 write!(f, "entry '{key}' has unknown type '{value}'")
@@ -196,11 +190,11 @@ impl std::fmt::Display for BatchValidationError {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct BatchCreateOutcome {
     /// `{key: full_id}` pairs in the order the entries appeared in the file.
-    pub key_to_id: Vec<(String, String)>,
+    pub key_to_id: Vec<(String, IssueId)>,
 }
 
 /// Successful validation-only result for `batch-create --dry-run`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct BatchDryRunOutcome {
     /// Always true for a successful validation result.
     pub valid: bool,
@@ -216,12 +210,12 @@ pub struct BatchDryRunOutcome {
 
 impl BatchCreateOutcome {
     /// Materialize the `{key: id}` pairs as a map for `--json` output and lookup.
-    pub fn as_map(&self) -> HashMap<String, String> {
+    pub fn as_map(&self) -> HashMap<String, IssueId> {
         self.key_to_id.iter().cloned().collect()
     }
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> IssueOps<'_, S> {
     /// Run native batch pre-validation without allocating ids or writing state.
     pub fn validate_batch_from_json(&self, defs: &[BatchIssueDef]) -> Result<BatchDryRunOutcome>
     where
@@ -245,7 +239,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Runs FULL pre-validation (duplicate/unknown keys, unknown `depends_on`
     /// references, cycle detection over the symbolic graph, type/label/gate
-    /// validity, priority parse) BEFORE any write. On any validation failure it
+    /// validity) BEFORE any write. On any validation failure it
     /// returns a [`BatchValidationError`] enumerating every offender and creates
     /// ZERO issues. On success it finalizes every issue and dependency edge into
     /// one recoverable delta, returning the `{key: id}` map.
@@ -281,7 +275,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         planning: None,
     ///     },
     /// ];
-    /// let outcome = executor.batch_create_from_json(defs).unwrap();
+    /// let outcome = executor.issues().batch_create_from_json(defs).unwrap();
     /// println!("spec -> {}", outcome.as_map()["spec"]);
     /// ```
     pub fn batch_create_from_json(&self, defs: Vec<BatchIssueDef>) -> Result<BatchCreateOutcome>
@@ -292,99 +286,70 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         self.validate_batch_from_json(&defs)?;
 
-        let positions = defs
-            .iter()
-            .enumerate()
-            .map(|(index, def)| (def.key.as_str(), index))
-            .collect::<HashMap<_, _>>();
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
-        let created_issue_ids = (0..defs.len())
-            .map(|index| context.identifier_at(index as u64))
-            .collect::<Vec<_>>();
+        let created_issue_ids = batch_issue_ids(&context, defs.len());
         let mut issue_paths = created_issue_ids
             .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+            .map(VirtualPath::issue_record)
+            .collect::<Vec<_>>();
         issue_paths.push(VirtualPath::ISSUES);
 
-        with_mutation_session(&self.storage, &layout, "batch issue creation", |session| {
-            let Some(crate::commands::validate::MutationBase { image, .. }) =
-                self.capture_mutation_base(session, &issue_paths, None)?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let problems = Self::collect_batch_problems_from_declarations(&defs, &declarations)?;
-            if !problems.is_empty() {
-                return Err(BatchValidationError { problems }.into());
-            }
-            let dependencies =
-                defs.iter()
-                    .enumerate()
-                    .try_fold(Vec::new(), |mut edges, (dependent, def)| {
-                        for dependency in &def.depends_on {
-                            let dependency =
-                                positions.get(dependency.as_str()).copied().ok_or_else(|| {
-                                    anyhow!("validated batch contains an unresolved dependency")
-                                })?;
-                            edges.push((dependent, dependency));
-                        }
-                        Ok::<_, anyhow::Error>(edges)
-                    })?;
-            let credit = Self::batch_credit_namespaces(&declarations)?;
-            let short_id_of = |key: &str| {
-                positions
-                    .get(key)
-                    .map(|&index| created_issue_ids[index][..SHORT_ID_LENGTH].to_string())
-            };
-            let drafts = defs
-                .iter()
-                .map(|def| {
-                    let def = &BatchIssueDef {
-                        labels: resolve_labels(def, &credit, short_id_of).map_err(|_| {
+        with_mutation_session(
+            &self.exec.storage,
+            &layout,
+            "batch issue creation",
+            |session| {
+                let Some(crate::commands::validate::MutationBase { image, issues }) = self
+                    .exec
+                    .capture_mutation_base(session, &issue_paths, None)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let declarations = crate::repository_state::declarations_from_image(&image)?;
+                let problems = Self::collect_batch_problems_from_declarations(
+                    &defs,
+                    &created_issue_ids,
+                    &declarations,
+                    &issues,
+                )?;
+                if !problems.is_empty() {
+                    return Err(BatchValidationError { problems }.into());
+                }
+                let drafts = Self::batch_drafts(&defs, &created_issue_ids, &declarations, &issues)?
+                    .into_iter()
+                    .map(|draft| {
+                        draft.map_err(|_| {
                             anyhow!("validated batch contains an unresolved label key")
-                        })?,
-                        ..def.clone()
-                    };
-                    let priority = def
-                        .priority
-                        .as_deref()
-                        .map(Priority::from_str)
-                        .transpose()?
-                        .unwrap_or(Priority::Normal);
-                    Ok(Self::batch_candidate_issue(
-                        def,
-                        priority,
-                        declarations.config(),
-                    ))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let intents = [MutationIntent::CreateIssueBatch {
-                drafts,
-                dependencies,
-            }];
-            let plan = finalize(&layout, &image, &context, &intents)?;
-            Ok(SessionStep::Apply(
-                plan,
-                BatchCreateOutcome {
-                    key_to_id: defs
-                        .iter()
-                        .map(|def| def.key.clone())
-                        .zip(created_issue_ids.iter().cloned())
-                        .collect(),
-                },
-            ))
-        })
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let intents = [MutationIntent::CreateIssueBatch { drafts }];
+                let plan = finalize(&layout, &image, &context, &intents, None)?;
+                Ok(SessionStep::Apply(
+                    plan,
+                    BatchCreateOutcome {
+                        key_to_id: defs
+                            .iter()
+                            .map(|def| def.key.clone())
+                            .zip(created_issue_ids.iter().cloned())
+                            .collect(),
+                    },
+                ))
+            },
+        )
     }
 
     /// Collect EVERY pre-validation problem for a batch (does not stop at the
     /// first). Returns an empty vec when the whole batch is valid.
     ///
     /// Reads the gate registry and config (type hierarchy) once for the batch.
+    /// Each entry is validated as the issue with its position's id in `ids`.
     fn collect_batch_problems_from_declarations(
         defs: &[BatchIssueDef],
+        ids: &[IssueId],
         declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+        issues: &[Issue],
     ) -> Result<Vec<BatchValidationProblem>> {
         let mut problems = Vec::new();
 
@@ -403,26 +368,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
 
         // 2a. Unknown keys referenced by coverage-credit labels. Each known key
-        //     resolves to a shape-valid placeholder here: ids are allocated only
-        //     at creation, and write validation below needs the final label shape.
-        let credit = Self::batch_credit_namespaces(declarations)?;
-        let placeholder = "0".repeat(SHORT_ID_LENGTH);
-        let resolved_labels: Vec<Option<Vec<String>>> = defs
-            .iter()
-            .map(|def| {
-                resolve_labels(def, &credit, |key| {
-                    defined.contains(key).then(|| placeholder.clone())
-                })
-                .map_err(|unknown| {
-                    problems.extend(unknown.into_iter().map(|(label, missing)| {
-                        BatchValidationProblem::UnknownLabelKey {
-                            key: def.key.clone(),
-                            label,
-                            missing,
-                        }
-                    }))
-                })
-                .ok()
+        //     resolves to its entry's short id, so write validation below sees the
+        //     final label shape.
+        let drafts: Vec<Option<Issue>> = Self::batch_drafts(defs, ids, declarations, issues)?
+            .into_iter()
+            .zip(defs)
+            .map(|(draft, def)| {
+                draft
+                    .map_err(|unknown| {
+                        problems.extend(unknown.into_iter().map(|(label, missing)| {
+                            BatchValidationProblem::UnknownLabelKey {
+                                key: def.key.clone(),
+                                label,
+                                missing,
+                            }
+                        }))
+                    })
+                    .ok()
             })
             .collect();
 
@@ -445,7 +407,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             problems.push(BatchValidationProblem::Cycle { keys: cycle });
         }
 
-        // 4-7. Per-entry field validity: priority parse, type, gates, and the
+        // 4-7. Per-entry field validity: type, gates, and the
         //       FULL write-time validation against each entry's final issue shape.
         let known_types = declarations
             .config()
@@ -460,24 +422,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             });
         let gate_registry = declarations.gates();
 
-        for (def, labels) in defs.iter().zip(resolved_labels) {
-            // Priority must parse before we can build the candidate issue; a parse
-            // failure is reported and we skip write-time validation for this entry
-            // (there is no valid shape to validate).
-            let priority = match &def.priority {
-                Some(p) => match Priority::from_str(p) {
-                    Ok(priority) => priority,
-                    Err(_) => {
-                        problems.push(BatchValidationProblem::InvalidPriority {
-                            key: def.key.clone(),
-                            value: p.clone(),
-                        });
-                        continue;
-                    }
-                },
-                None => Priority::Normal,
-            };
-
+        for (def, draft) in defs.iter().zip(drafts) {
             // Type validity: only enforced when the project configures a type
             // hierarchy; an empty set means any type is accepted. (The write-time
             // `type-hierarchy-known` rule (origin = "default") only WARNS, so this
@@ -508,17 +453,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             // publication, so all entry-attributed problems are reported together.
             // This derivation does not save; a blocking finding is returned as an
             // error whose message we attribute to this entry's key.
-            let Some(labels) = labels else {
+            let Some(candidate) = draft else {
                 continue;
             };
-            let resolved = BatchIssueDef {
-                labels,
-                ..def.clone()
-            };
-            let candidate = Self::batch_candidate_issue(&resolved, priority, declarations.config());
-            if let Err(err) =
-                derive_write_validation(&candidate, declarations, declarations.config(), false)
-            {
+            if let Err(err) = derive_write_validation(&candidate, declarations, false) {
                 problems.push(BatchValidationProblem::WriteValidation {
                     key: def.key.clone(),
                     message: err.to_string(),
@@ -529,13 +467,64 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(problems)
     }
 
-    /// Build the candidate [`Issue`] for an entry EXACTLY as
-    /// [`create_issue`](crate::commands::IssueOps::create_issue) assembles it before validating, so
-    /// pre-validation sees the shape that would actually be persisted: the config
-    /// default `type:<t>` label applied when the entry carries no `type:` label,
-    /// the requested priority / gates / labels / content format, and the state
-    /// implied by its declared dependencies.
-    fn batch_candidate_issue(def: &BatchIssueDef, priority: Priority, config: &JitConfig) -> Issue {
+    /// Each entry's draft at its position's id in `ids`, or the label key
+    /// references it leaves unresolved. Readiness is derived over `issues` plus
+    /// the drafts, so write validation sees the persisted shape.
+    fn batch_drafts(
+        defs: &[BatchIssueDef],
+        ids: &[IssueId],
+        declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+        issues: &[Issue],
+    ) -> Result<Vec<BatchDraft>> {
+        let credit = Self::batch_credit_namespaces(declarations)?;
+        let issue_ids = defs
+            .iter()
+            .zip(ids)
+            .map(|(def, id)| (def.key.as_str(), id))
+            .collect::<HashMap<_, _>>();
+        let mut drafts = defs
+            .iter()
+            .zip(ids)
+            .map(|(def, id)| {
+                let labels =
+                    resolve_labels(def, &credit, |key| issue_ids.get(key).copied().cloned())?;
+                let mut draft = Self::batch_candidate_issue(
+                    &BatchIssueDef {
+                        labels,
+                        ..def.clone()
+                    },
+                    id.clone(),
+                    declarations.config(),
+                );
+                draft.dependencies = def
+                    .depends_on
+                    .iter()
+                    .filter_map(|key| issue_ids.get(key.as_str()).copied().cloned())
+                    .collect();
+                draft.dependencies.sort();
+                draft.dependencies.dedup();
+                Ok(draft)
+            })
+            .collect::<Vec<_>>();
+        let projected = issues
+            .iter()
+            .cloned()
+            .chain(drafts.iter().flatten().cloned())
+            .collect::<Vec<_>>();
+        let promoted = super::derive_draft_promotions(issues, &projected);
+        drafts
+            .iter_mut()
+            .flatten()
+            .filter(|draft| promoted.contains(&draft.id))
+            .for_each(|draft| draft.state = State::Ready);
+        Ok(drafts)
+    }
+
+    /// Build the `Backlog` candidate [`Issue`] for an entry as
+    /// [`create_issue`](crate::commands::IssueOps::create_issue) assembles it:
+    /// the config default `type:<t>` label applied when the entry carries no
+    /// `type:` label, and the requested priority / gates / labels.
+    fn batch_candidate_issue(def: &BatchIssueDef, id: IssueId, config: &JitConfig) -> Issue {
         // Assemble labels as the write path does: the `type` field becomes a
         // `type:<t>` label, followed by the entry's explicit labels.
         let mut labels: Vec<String> = def
@@ -559,18 +548,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        let mut issue = Issue::draft(def.title.clone(), def.description.clone());
-        issue.priority = priority;
+        let mut issue = Issue::draft(id, def.title.clone(), def.description.clone());
+        issue.priority = def.priority.unwrap_or(Priority::Normal);
         issue.gates_required = def.gates.clone();
         issue.labels = labels;
-        issue.content_format = None;
-        // The finalizer publishes this same dependency-derived state while wiring
-        // all symbolic edges in the aggregate delta.
-        issue.state = if def.depends_on.is_empty() {
-            State::Ready
-        } else {
-            State::Backlog
-        };
         issue
     }
 
@@ -591,30 +572,52 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let mut session = self.storage.open_mutation_session(self.require_layout()?)?;
-        let image = self
+        let mut session = self
+            .exec
+            .storage
+            .open_mutation_session(self.exec.require_layout()?)?;
+        let crate::commands::validate::MutationBase { image, issues } = self
+            .exec
             .capture_mutation_base(session.as_mut(), &[], None)?
-            .ok_or_else(|| anyhow!("batch validation capture conflicted"))?
-            .image;
+            .ok_or_else(|| anyhow!("batch validation capture conflicted"))?;
         let declarations = crate::repository_state::declarations_from_image(&image)?;
-        Self::collect_batch_problems_from_declarations(defs, &declarations)
+        let ids = batch_issue_ids(
+            &crate::repository_state::MutationContext::preview(),
+            defs.len(),
+        );
+        Self::collect_batch_problems_from_declarations(defs, &ids, &declarations, &issues)
     }
 }
 
+/// An entry's draft, or the `(label, missing key)` references it leaves
+/// unresolved.
+type BatchDraft = std::result::Result<Issue, Vec<(String, String)>>;
+
+/// The ids `context` derives for a batch of `count` created issues, in entry
+/// order.
+fn batch_issue_ids(
+    context: &crate::repository_state::MutationContext,
+    count: usize,
+) -> Vec<IssueId> {
+    (0..count as u64)
+        .map(|index| context.issue_id_at(index))
+        .collect()
+}
+
 /// `def`'s labels with every manifest-key reference in a `credit` namespace
-/// resolved through `short_id_of`, or every `(label, missing key)` that does not
+/// resolved through `issue_id_of`, or every `(label, missing key)` that does not
 /// resolve.
 fn resolve_labels(
     def: &BatchIssueDef,
     credit: &HashSet<String>,
-    short_id_of: impl Fn(&str) -> Option<String>,
+    issue_id_of: impl Fn(&str) -> Option<IssueId>,
 ) -> std::result::Result<Vec<String>, Vec<(String, String)>> {
     let (resolved, unknown): (Vec<_>, Vec<_>) = def
         .labels
         .iter()
         .map(|label| {
-            crate::domain::key_reference::resolve_key_reference(label, credit, &short_id_of)
-                .map_err(|missing| (label.clone(), missing))
+            crate::domain::key_reference::resolve_key_reference(label, credit, &issue_id_of)
+                .map_err(|missing| (label.clone(), missing.0))
         })
         .partition(std::result::Result::is_ok);
     if unknown.is_empty() {
@@ -669,52 +672,21 @@ mod tests {
         }
     }
 
-    fn executor() -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        storage.add_data_file(
-            "config.toml",
-            &format!(
-                "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                crate::test_taxonomy::test_taxonomy().config_fragment()
-            ),
-        );
-        crate::commands::test_helpers::memory_executor(storage)
-    }
-
-    #[test]
-    fn test_detect_cycle_finds_simple_cycle() {
-        let defs = vec![def("a", &["b"]), def("b", &["a"])];
-        let cycle = detect_cycle(&defs).expect("cycle expected");
-        assert!(cycle.contains(&"a".to_string()));
-        assert!(cycle.contains(&"b".to_string()));
-    }
-
-    #[test]
-    fn test_detect_cycle_self_loop() {
-        let defs = vec![def("a", &["a"])];
-        let cycle = detect_cycle(&defs).expect("self-loop is a cycle");
-        assert_eq!(cycle.first().map(String::as_str), Some("a"));
-    }
-
-    #[test]
-    fn test_detect_cycle_acyclic_returns_none() {
-        let defs = vec![def("a", &["b"]), def("b", &["c"]), def("c", &[])];
-        assert!(detect_cycle(&defs).is_none());
-    }
-
-    #[test]
-    fn test_detect_cycle_ignores_undefined_edges() {
-        // b is undefined; that is an unknown-ref problem, not a cycle.
-        let defs = vec![def("a", &["b"])];
-        assert!(detect_cycle(&defs).is_none());
-    }
-
     #[test]
     fn test_collect_problems_duplicate_key() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &[]), def("a", &[])];
-        let problems = exec.collect_batch_problems(&defs).unwrap();
+        let problems = exec.issues().collect_batch_problems(&defs).unwrap();
         assert!(problems
             .iter()
             .any(|p| matches!(p, BatchValidationProblem::DuplicateKey { key } if key == "a")));
@@ -722,9 +694,19 @@ mod tests {
 
     #[test]
     fn test_collect_problems_unknown_dependency() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &["ghost"])];
-        let problems = exec.collect_batch_problems(&defs).unwrap();
+        let problems = exec.issues().collect_batch_problems(&defs).unwrap();
         assert!(problems.iter().any(|p| matches!(
             p,
             BatchValidationProblem::UnknownDependency { key, missing }
@@ -737,10 +719,20 @@ mod tests {
         // A malformed label is now caught by the full write-time validation
         // (`label-format`, origin = "default"), surfaced as a WriteValidation
         // problem.
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let mut d = def("a", &[]);
         d.labels = vec!["NoColon".to_string()];
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "a")
         ));
@@ -753,36 +745,45 @@ mod tests {
         // (`namespace-unique-type`, origin = "default"). This is the
         // write-time-only violation that previously slipped past the batch's
         // validation report.
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         // Two distinct kinds the fixture repository declares, read from the
         // declaration it was configured from.
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let mut d = def("bad", &[]);
         d.r#type = Some(taxonomy.type_at_level(4).to_string());
         d.labels = vec![format!("type:{}", taxonomy.type_at_level(3))];
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "bad")
         ));
     }
 
     #[test]
-    fn test_collect_problems_invalid_priority() {
-        let exec = executor();
-        let mut d = def("a", &[]);
-        d.priority = Some("urgentish".to_string());
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
-        assert!(problems
-            .iter()
-            .any(|p| matches!(p, BatchValidationProblem::InvalidPriority { .. })));
-    }
-
-    #[test]
     fn test_collect_problems_unknown_gate() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let mut d = def("a", &[]);
-        d.gates = vec!["nonexistent-gate".to_string()];
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        d.gates = vec!["nonexistent-gate".parse().unwrap()];
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems
             .iter()
             .any(|p| matches!(p, BatchValidationProblem::UnknownGate { .. })));
@@ -792,10 +793,20 @@ mod tests {
     fn test_collect_problems_unknown_type_with_hierarchy() {
         // The fixture repository declares a type hierarchy, so type validity
         // is enforced against it.
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let mut d = def("a", &[]);
         d.r#type = Some("widget".to_string());
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::UnknownType { value, .. } if value == "widget")
         ));
@@ -803,16 +814,40 @@ mod tests {
 
     #[test]
     fn test_collect_problems_valid_batch_is_empty() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &["b"]), def("b", &[])];
-        assert!(exec.collect_batch_problems(&defs).unwrap().is_empty());
+        assert!(exec
+            .issues()
+            .collect_batch_problems(&defs)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
     fn test_batch_create_valid_creates_issues_and_edges() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("spec", &[]), def("impl", &["spec"])];
-        let outcome = exec.batch_create_from_json(defs).unwrap();
+        let outcome = exec.issues().batch_create_from_json(defs).unwrap();
         let map = outcome.as_map();
         assert_eq!(map.len(), 2);
 
@@ -826,10 +861,20 @@ mod tests {
 
     #[test]
     fn test_validate_batch_from_json_has_no_issue_or_event_side_effects() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("spec", &[]), def("impl", &["spec"])];
         let before_events = exec.storage().read_events().unwrap();
-        let outcome = exec.validate_batch_from_json(&defs).unwrap();
+        let outcome = exec.issues().validate_batch_from_json(&defs).unwrap();
 
         assert_eq!(
             outcome,
@@ -847,7 +892,20 @@ mod tests {
 
     #[test]
     fn test_validate_batch_from_json_empty_batch_returns_zero_counts() {
-        let outcome = executor().validate_batch_from_json(&[]).unwrap();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let outcome = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        )
+        .issues()
+        .validate_batch_from_json(&[])
+        .unwrap();
         assert_eq!(outcome.issue_count, 0);
         assert_eq!(outcome.dependency_count, 0);
         assert!(outcome.keys.is_empty());
@@ -880,27 +938,48 @@ mod tests {
         ))
         .unwrap();
         for case in suite.cases {
-            let actual = executor()
-                .collect_batch_problems(&case.issues)
-                .unwrap()
-                .into_iter()
-                .filter_map(|problem| match problem {
-                    BatchValidationProblem::DuplicateKey { .. } => Some("duplicate-key"),
-                    BatchValidationProblem::UnknownDependency { .. } => Some("unknown-dependency"),
-                    BatchValidationProblem::Cycle { .. } => Some("cycle"),
-                    _ => None,
-                })
-                .map(str::to_string)
-                .collect::<Vec<_>>();
+            let config = format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                crate::test_taxonomy::test_taxonomy().config_fragment()
+            );
+            let actual = crate::commands::test_helpers::memory_executor_declaring(
+                InMemoryStorage::new(),
+                crate::commands::test_helpers::MemoryDeclarations {
+                    config: Some(&config),
+                    ..Default::default()
+                },
+            )
+            .issues()
+            .collect_batch_problems(&case.issues)
+            .unwrap()
+            .into_iter()
+            .filter_map(|problem| match problem {
+                BatchValidationProblem::DuplicateKey { .. } => Some("duplicate-key"),
+                BatchValidationProblem::UnknownDependency { .. } => Some("unknown-dependency"),
+                BatchValidationProblem::Cycle { .. } => Some("cycle"),
+                _ => None,
+            })
+            .map(str::to_string)
+            .collect::<Vec<_>>();
             assert_eq!(actual, case.expected, "shared case '{}'", case.name);
         }
     }
 
     #[test]
     fn test_batch_create_validation_failure_creates_nothing() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &[]), def("a", &[])]; // duplicate key
-        let err = exec.batch_create_from_json(defs).unwrap_err();
+        let err = exec.issues().batch_create_from_json(defs).unwrap_err();
         assert!(err.downcast_ref::<BatchValidationError>().is_some());
         // Zero issues created.
         assert_eq!(exec.storage().list_issues().unwrap().len(), 0);
@@ -908,8 +987,19 @@ mod tests {
 
     #[test]
     fn test_batch_create_unknown_dependency_returns_typed_error_without_writes() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let err = exec
+            .issues()
             .batch_create_from_json(vec![def("a", &["ghost"])])
             .unwrap_err();
         let validation = err.downcast_ref::<BatchValidationError>().unwrap();
@@ -919,20 +1009,6 @@ mod tests {
                 if key == "a" && missing == "ghost"
         )));
         assert!(exec.storage().list_issues().unwrap().is_empty());
-    }
-
-    /// An executor whose rules credit a story-level container's criteria through
-    /// `satisfies` labels on its dependency closure.
-    fn coverage_executor() -> CommandExecutor<InMemoryStorage> {
-        let exec = executor();
-        let rules = format!(
-            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
-             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
-            crate::test_taxonomy::test_taxonomy().type_at_level(3)
-        );
-        std::fs::write(exec.storage().root().join("rules.toml"), &rules).unwrap();
-        exec.storage().add_data_file("rules.toml", &rules);
-        exec
     }
 
     fn typed_def(key: &str, level: u8, deps: &[&str]) -> BatchIssueDef {
@@ -948,23 +1024,43 @@ mod tests {
 
     #[test]
     fn test_batch_create_key_reference_credits_container_created_in_same_manifest() {
-        let exec = coverage_executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let rules = format!(
+            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
+            crate::test_taxonomy::test_taxonomy().type_at_level(3)
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(&rules),
+                ..Default::default()
+            },
+        );
         let mut story = typed_def("story", 3, &["task"]);
         story.description = "## Success Criteria\n\n- [hard] REQ-01: works\n".to_string();
         let mut task = typed_def("task", 4, &[]);
         task.labels = vec!["satisfies:{story.short_id}/REQ-01".to_string()];
 
         let map = exec
+            .issues()
             .batch_create_from_json(vec![story, task])
             .unwrap()
             .as_map();
 
         let task = exec.storage().load_issue(&map["task"]).unwrap();
-        assert!(task.labels.contains(&format!(
-            "satisfies:{}/REQ-01",
-            &map["story"][..SHORT_ID_LENGTH]
-        )));
-        let report = exec.run_rules(None).unwrap();
+        assert!(task
+            .labels
+            .contains(&format!("satisfies:{}/REQ-01", map["story"].short_id())));
+        let report = exec
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .rule_report();
         assert!(
             !report.findings.iter().any(|f| f.rule == "story-coverage"),
             "{:?}",
@@ -974,10 +1070,29 @@ mod tests {
 
     #[test]
     fn test_batch_create_unknown_label_key_returns_typed_error_without_writes() {
-        let exec = coverage_executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let rules = format!(
+            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
+            crate::test_taxonomy::test_taxonomy().type_at_level(3)
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(&rules),
+                ..Default::default()
+            },
+        );
         let mut task = def("task", &[]);
         task.labels = vec!["satisfies:{ghost.short_id}/REQ-01".to_string()];
-        let err = exec.batch_create_from_json(vec![task]).unwrap_err();
+        let err = exec
+            .issues()
+            .batch_create_from_json(vec![task])
+            .unwrap_err();
         let validation = err.downcast_ref::<BatchValidationError>().unwrap();
         assert!(validation.problems.iter().any(|problem| matches!(
             problem,
@@ -989,14 +1104,27 @@ mod tests {
 
     #[test]
     fn test_batch_create_cycle_creates_nothing() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &["b"]), def("b", &["a"])];
-        let err = exec.batch_create_from_json(defs).unwrap_err();
+        let err = exec.issues().batch_create_from_json(defs).unwrap_err();
         let verr = err.downcast_ref::<BatchValidationError>().unwrap();
-        assert!(verr
+        let cycle = verr
             .problems
             .iter()
-            .any(|p| matches!(p, BatchValidationProblem::Cycle { .. })));
+            .find(|p| matches!(p, BatchValidationProblem::Cycle { .. }))
+            .unwrap()
+            .to_string();
+        assert!(cycle.contains("cycle") && cycle.contains('a') && cycle.contains('b'));
         assert_eq!(exec.storage().list_issues().unwrap().len(), 0);
     }
 }

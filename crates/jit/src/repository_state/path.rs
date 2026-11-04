@@ -1,6 +1,7 @@
 //! Canonical repository-root and virtual-path identities.
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::domain::relative_path::{enters, RootRelativePath, RootRelativePathError};
+use serde::{Deserialize, Serialize, Serializer};
 use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
@@ -21,14 +22,8 @@ pub const REPO_WRITE_LOCK_FILE: &str = ".repo-write.lock";
 /// The data root's index lock.
 pub const INDEX_LOCK_FILE: &str = ".index.lock";
 
-/// The data root's gate-registry lock.
-pub const GATES_LOCK_FILE: &str = ".gates.lock";
-
 /// The data root's event-log lock.
 pub const EVENTS_LOCK_FILE: &str = ".events.lock";
-
-/// The data root's machine-local worktree identity record.
-pub const WORKTREE_IDENTITY_FILE: &str = "worktree.json";
 
 /// Whether `path` names the worktree bootstrap lock, or something below it.
 ///
@@ -43,142 +38,6 @@ pub const WORKTREE_IDENTITY_FILE: &str = "worktree.json";
 pub(crate) fn is_bootstrap_lock(path: &VirtualPath) -> bool {
     matches!(path.root_class(), RepositoryRootClass::Worktree)
         && enters(path.relative().as_str(), BOOTSTRAP_LOCK_FILE)
-}
-
-/// Whether `path` is `reserved` itself or sits below it, by whole components.
-fn enters(path: &str, reserved: &str) -> bool {
-    path.strip_prefix(reserved)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
-}
-
-/// A normalized path relative to one selected repository root.
-///
-/// [`Root`](RootRelativePath::Root) denotes the selected root itself;
-/// [`Descendant`](RootRelativePath::Descendant) holds a normalized, non-empty
-/// path strictly below it (no parent, prefix, control, or alternate-separator
-/// component). The root is a distinct variant, never an empty-string sentinel,
-/// so root-vs-descendant is a type-level distinction rather than a value test.
-///
-/// The descendant payload is [`Cow<'static, str>`] so well-known paths can be
-/// `Cow::Borrowed` const associated items of [`VirtualPath`], while parsing and
-/// deserialization mint `Cow::Owned`. `Cow`'s `Eq`/`Ord`/`Hash` compare and
-/// hash by `str` content, so a borrowed const and an owned parse of the same
-/// path unify as one map key.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum RootRelativePath {
-    /// The selected repository root itself.
-    Root,
-    /// A normalized, non-empty path strictly below the selected root.
-    Descendant(Cow<'static, str>),
-}
-
-impl RootRelativePath {
-    /// Parse a root-relative path without consulting the filesystem.
-    ///
-    /// Empty input denotes the root and yields [`RootRelativePath::Root`] through
-    /// its own branch; any other input is validated as a normalized
-    /// [`Descendant`](RootRelativePath::Descendant). The root is never minted as
-    /// an empty descendant.
-    pub fn parse(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
-        let path = path.as_ref();
-        if path.as_os_str().is_empty() {
-            return Ok(Self::Root);
-        }
-        let text = path
-            .to_str()
-            .ok_or_else(|| RepositoryLayoutError::LexicalEscape(path.to_string_lossy().into()))?;
-        if path.is_absolute()
-            || text.contains('\\')
-            || text.contains(':')
-            || text.chars().any(char::is_control)
-            || text
-                .split('/')
-                .any(|segment| segment.is_empty() || segment == "." || segment == "..")
-            || !path
-                .components()
-                .all(|component| matches!(component, Component::Normal(_)))
-        {
-            return Err(RepositoryLayoutError::LexicalEscape(text.to_owned()));
-        }
-        Ok(Self::Descendant(Cow::Owned(text.to_owned())))
-    }
-
-    /// Return this identity as a relative filesystem path (empty for the root).
-    pub fn as_path(&self) -> &Path {
-        Path::new(self.as_str())
-    }
-
-    /// This identity as a string. The root is the empty string, which is also
-    /// its stable serialized wire form.
-    pub(crate) fn as_str(&self) -> &str {
-        match self {
-            Self::Root => "",
-            Self::Descendant(text) => text,
-        }
-    }
-
-    /// Number of path components below the selected root (0 for the root).
-    pub fn depth(&self) -> usize {
-        self.as_path().components().count()
-    }
-
-    /// Whether this identity denotes the selected root itself.
-    pub fn is_root(&self) -> bool {
-        matches!(self, Self::Root)
-    }
-
-    /// Whether `path`, relative to the same root, is this path or lies beneath
-    /// it by whole components.
-    pub(crate) fn contains(&self, path: &str) -> bool {
-        match self {
-            Self::Root => true,
-            Self::Descendant(prefix) => enters(path, prefix),
-        }
-    }
-
-    /// This path extended by `child`, a canonical relative path.
-    fn join(&self, child: &str) -> Self {
-        Self::Descendant(Cow::Owned(match self {
-            Self::Root => child.to_owned(),
-            Self::Descendant(prefix) => format!("{prefix}/{child}"),
-        }))
-    }
-}
-
-impl Serialize for RootRelativePath {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for RootRelativePath {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let path = String::deserialize(deserializer)?;
-        Self::parse(path).map_err(serde::de::Error::custom)
-    }
-}
-
-/// The published shape matches the wire form the hand-written [`Serialize`] and
-/// [`Deserialize`] pair above produce and accept: a string. It is inlined
-/// rather than referenced so a schema carrying one reads as the string it is.
-impl schemars::JsonSchema for RootRelativePath {
-    fn schema_name() -> String {
-        "RootRelativePath".to_string()
-    }
-
-    fn is_referenceable() -> bool {
-        false
-    }
-
-    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        String::json_schema(generator)
-    }
 }
 
 /// Selected repository root class for a canonical virtual path.
@@ -209,22 +68,30 @@ pub use self::identity::VirtualPath;
 /// const paths.
 ///
 /// The struct's fields are declared here and nowhere else, so a `Cow::Borrowed`
-/// const identity — the one shape that reaches a `VirtualPath` without the
-/// fallible guard — cannot be spelled outside this module: everywhere else in the
+/// const identity cannot be spelled outside this module: everywhere else in the
 /// crate, including the rest of this file, a struct literal is a privacy error.
-/// What the module hands its parent is [`from_parts`](VirtualPath::from_parts)
-/// and the two field accessors. `from_parts` returns a `Result`, so it cannot
-/// serve a const initializer, and every identity minted elsewhere has passed
-/// `checked`.
+/// What the module hands its parent is [`from_parts`](VirtualPath::from_parts),
+/// the record constructors, and the two field accessors. `from_parts` returns a
+/// `Result`; [`issue_record`](VirtualPath::issue_record),
+/// [`gate_run_issue_directory`](VirtualPath::gate_run_issue_directory), and
+/// [`gate_run_record`](VirtualPath::gate_run_record) are the infallible derived
+/// paths, whose canonical UUID components make their descendants safe by
+/// construction. [`archive_evidence_record`](VirtualPath::archive_evidence_record)
+/// uses a canonical UUID or a hexadecimal digest, and the gate-verdict paths a
+/// lowercase-kebab gate key and a lowercase-hex digest.
 ///
-/// One route survives by construction: a raw struct literal written inside this
-/// module, which no Rust construct can deny a type's own defining scope. The
-/// module is therefore kept to the identity's accessors, its fallible
-/// constructor, the reserved-namespace guard, the const-construction primitive,
-/// and the declaration list that emits every const together with its inventory.
+/// Only this module can write the raw struct literal needed for const identities
+/// and the well-formed record descendants. It is therefore kept to the
+/// identity's accessors, these constructors, the reserved-namespace guard, the
+/// const-construction primitive, and the declaration list that emits every const
+/// together with its inventory.
 mod identity {
     use super::{RepositoryLayoutError, RepositoryRootClass, RootRelativePath};
+    use crate::domain::artifact_plan::{normalize_artifact_path, PlanTarget};
+    use crate::domain::identity::{GateKey, GateRunId, IssueId};
+    use crate::domain::repository_inputs::InputsDigest;
     use serde::Serialize;
+    use sha2::{Digest, Sha256};
     use std::borrow::Cow;
 
     /// A canonical semantic path qualified by its selected root.
@@ -235,12 +102,72 @@ mod identity {
     }
 
     impl VirtualPath {
-        /// Construct a guarded identity from its parts.
-        ///
-        /// The only route out of this module to a `VirtualPath`, and fallible by
-        /// design: a `Result` cannot initialize a const, so no caller can mint an
-        /// unguarded identity and no well-known const can be declared outside the
-        /// declaration list below.
+        /// Address evidence by container id or the digest of a normalized document path.
+        pub fn archive_evidence_record(target: &PlanTarget) -> Self {
+            let key = match target {
+                PlanTarget::Container { id } => format!("container/{id}"),
+                PlanTarget::Document { path } => format!(
+                    "document/{:x}",
+                    Sha256::digest(normalize_artifact_path(path).as_bytes())
+                ),
+            };
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::ARCHIVE_EVIDENCE
+                    .relative()
+                    .join(&format!("{key}.json")),
+            }
+        }
+
+        /// Construct the data-root directory holding one issue's gate runs.
+        pub fn gate_run_issue_directory(issue: &IssueId) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::GATE_RUNS.relative().join(issue.as_str()),
+            }
+        }
+
+        /// Construct the data-root path of the record of `issue`'s run `run`.
+        pub fn gate_run_record(issue: &IssueId, run: &GateRunId) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::gate_run_issue_directory(issue)
+                    .relative
+                    .join(&[run.as_str(), ".json"].concat()),
+            }
+        }
+
+        /// Construct the data-root directory holding one gate's verdict records.
+        pub fn gate_verdict_directory(gate_key: &GateKey) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::GATE_VERDICTS.relative().join(gate_key.as_str()),
+            }
+        }
+
+        /// Construct the data-root path of the verdict record for `gate_key`
+        /// over inputs digesting to `digest`.
+        pub fn gate_verdict_record(gate_key: &GateKey, digest: &InputsDigest) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::gate_verdict_directory(gate_key)
+                    .relative
+                    .join(&[digest.as_str(), ".json"].concat()),
+            }
+        }
+
+        /// Construct the data-root record path from one canonical UUID component.
+        pub fn issue_record(id: &IssueId) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::ISSUES
+                    .relative()
+                    .clone()
+                    .join(&[id.as_str(), ".json"].concat()),
+            }
+        }
+
+        /// Route caller-supplied parts through canonical and reserved-path checks.
         pub(super) fn from_parts(
             root: RepositoryRootClass,
             relative: RootRelativePath,
@@ -256,6 +183,11 @@ mod identity {
         /// Root-relative portion of this identity.
         pub fn relative(&self) -> &RootRelativePath {
             &self.relative
+        }
+
+        /// Final path component, when this identity is below its selected root.
+        pub fn file_name(&self) -> Option<&str> {
+            self.relative().as_path().file_name()?.to_str()
         }
 
         /// The data root's scratch directory is the one namespace no semantic
@@ -315,8 +247,10 @@ mod identity {
     }
 
     declare_well_known_paths! {
-        /// The issue index under the data root (`.jit/index.json`).
+        /// The format marker and tombstones under the data root (`.jit/index.json`).
         INDEX: Data = "index.json";
+        /// Per-target archive execution evidence.
+        ARCHIVE_EVIDENCE: Data = "archive-evidence";
         /// Repository configuration under the data root (`.jit/config.toml`).
         CONFIG: Data = "config.toml";
         /// Gate registry definitions under the data root (`.jit/gates.toml`).
@@ -329,10 +263,20 @@ mod identity {
         INVARIANTS: Data = "invariants.toml";
         /// Append-only event log under the data root (`.jit/events.jsonl`).
         EVENTS: Data = "events.jsonl";
+        /// Machine-local worktree identity record of a data root inside a checkout;
+        /// a data root outside every checkout holds none.
+        WORKTREE_IDENTITY: Data = "worktree.json";
+        /// Server process record under the data root.
+        SERVER_PID: Data = "server.pid.json";
+        /// Server output log under the data root.
+        SERVER_LOG: Data = "server.log";
         /// Per-issue record directory under the data root (`.jit/issues`).
         ISSUES: Data = "issues";
         /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
         GATE_RUNS: Data = "gate-runs";
+        /// Per-key gate verdict records under the data root
+        /// (`.jit/gate-runs/verdicts`).
+        GATE_VERDICTS: Data = "gate-runs/verdicts";
         /// JSON Schema directory under the data root (`.jit/schemas`).
         SCHEMAS: Data = "schemas";
         /// Nested configuration directory under the data root (`.jit/config`).
@@ -352,8 +296,35 @@ mod identity {
 /// access so the defining module above stays the only const-capable scope.
 impl VirtualPath {
     /// The data root's records: issue records, the event log, gate-run
-    /// records, and the index listing the issues.
-    pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
+    /// records, archive evidence, and the index holding the tombstones.
+    pub const RECORDS: [Self; 5] = [
+        Self::ISSUES,
+        Self::EVENTS,
+        Self::GATE_RUNS,
+        Self::ARCHIVE_EVIDENCE,
+        Self::INDEX,
+    ];
+
+    /// Data-root paths holding history: the event log, the gate-run records, and
+    /// the redo scratch directory, which can hold appended event bytes.
+    pub fn history_paths() -> [String; 3] {
+        [
+            Self::EVENTS.relative().as_str().to_owned(),
+            Self::GATE_RUNS.relative().as_str().to_owned(),
+            RECORD_SCRATCH_DIR.to_owned(),
+        ]
+    }
+
+    /// Whether profile application must refuse this target as application-owned state.
+    pub(crate) fn is_reserved_application_target(&self) -> bool {
+        self == &Self::EVENTS
+            || (self.root_class() == RepositoryRootClass::Worktree
+                && self
+                    .relative()
+                    .as_str()
+                    .split('/')
+                    .any(|component| component == ".git"))
+    }
 
     /// Construct a worktree-relative semantic identity.
     pub fn worktree(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
@@ -366,6 +337,37 @@ impl VirtualPath {
     /// Construct a data-root-relative semantic identity.
     pub fn data(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
         Self::from_parts(RepositoryRootClass::Data, RootRelativePath::parse(path)?)
+    }
+
+    /// Construct a schema file path from one validated file-name component.
+    pub fn schema(name: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
+        let name = name.as_ref();
+        let parsed = RootRelativePath::parse(name)?;
+        if parsed.depth() != 1 {
+            return Err(RepositoryLayoutError::LexicalEscape(
+                name.to_string_lossy().into_owned(),
+            ));
+        }
+        Self::from_parts(
+            RepositoryRootClass::Data,
+            Self::SCHEMAS.relative().clone().join(parsed.as_str()),
+        )
+    }
+
+    /// Parse a rule schema reference into its validated data-root path.
+    pub fn schema_reference(reference: &str) -> Result<Self, RepositoryLayoutError> {
+        let reference_path = RootRelativePath::parse(reference)?;
+        let Some(name) = reference_path
+            .as_str()
+            .strip_prefix(Self::SCHEMAS.relative().as_str())
+            .and_then(|suffix| suffix.strip_prefix('/'))
+        else {
+            return Err(RepositoryLayoutError::LexicalEscape(reference.to_owned()));
+        };
+        if !name.ends_with(".json") {
+            return Err(RepositoryLayoutError::LexicalEscape(reference.to_owned()));
+        }
+        Self::schema(name)
     }
 
     /// Construct a virtual identity from an explicit selected-root class.
@@ -409,11 +411,18 @@ impl VirtualPath {
     /// a data-root identity renders under the logical `.jit/` prefix and every
     /// other identity renders worktree-relative. Both directions live beside the
     /// identity they convert so no consumer maintains its own `.jit` prefix
-    /// adapter — profile packages address targets, applied-profile claim
-    /// identities persist targets, and messages name paths in exactly this
-    /// spelling.
+    /// adapter — profile packages address targets and messages name paths in
+    /// exactly this spelling.
     pub fn repository_relative(&self) -> String {
         repository_relative_path(self.root_class(), self.relative())
+    }
+
+    /// Field serializer naming this identity by its repository-relative spelling.
+    pub(crate) fn serialize_repository_relative<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.repository_relative())
     }
 }
 
@@ -421,9 +430,8 @@ impl VirtualPath {
 ///
 /// [`VirtualPath::repository_relative`] is this rule applied to a canonical
 /// identity. A persisted target carries the same two components without having
-/// been re-guarded as an identity, so a consumer naming one — an applied-profile
-/// claim naming what it owns — spells it through this function rather than
-/// through a second `.jit/` prefix adapter.
+/// been re-guarded as an identity, so a consumer naming one spells it through
+/// this function rather than through a second `.jit/` prefix adapter.
 pub fn repository_relative_path(root: RepositoryRootClass, relative: &RootRelativePath) -> String {
     let relative = relative.as_str();
     match root {
@@ -538,16 +546,16 @@ impl RepositoryLayout {
     /// the data root is not in the set, so its edits reach a digest.
     pub(crate) fn tracker_written_paths(&self) -> Vec<RootRelativePath> {
         let records = VirtualPath::RECORDS;
+        let worktree_identity = VirtualPath::WORKTREE_IDENTITY;
         let data_entries = records
             .iter()
             .map(|record| record.relative().as_str())
             .chain([
                 REPO_WRITE_LOCK_FILE,
                 INDEX_LOCK_FILE,
-                GATES_LOCK_FILE,
                 EVENTS_LOCK_FILE,
                 RECORD_SCRATCH_DIR,
-                WORKTREE_IDENTITY_FILE,
+                worktree_identity.relative().as_str(),
             ]);
         std::iter::once(RootRelativePath::Descendant(Cow::Borrowed(
             BOOTSTRAP_LOCK_FILE,
@@ -568,28 +576,6 @@ impl RepositoryLayout {
     /// Boundary identity captured for the selected data root.
     pub(crate) fn data_identity(&self) -> &str {
         self.data.identity()
-    }
-
-    /// Deserialize a virtual path through this layout's canonicality check.
-    ///
-    /// `VirtualPath` deliberately has no ambient `Deserialize` implementation:
-    /// Worktree-under-Data alias rejection requires the selected layout.
-    pub fn deserialize_virtual_path<'de, D>(&self, deserializer: D) -> Result<VirtualPath, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct SerializedVirtualPath {
-            root: RepositoryRootClass,
-            relative: RootRelativePath,
-        }
-
-        let path = SerializedVirtualPath::deserialize(deserializer)?;
-        let path =
-            VirtualPath::from_root(path.root, path.relative).map_err(serde::de::Error::custom)?;
-        self.ensure_canonical(&path)
-            .map_err(serde::de::Error::custom)?;
-        Ok(path)
     }
 
     /// Resolve an already-canonical virtual identity.
@@ -713,6 +699,12 @@ pub enum RepositoryLayoutError {
     InvalidRootIdentity(PathBuf),
 }
 
+impl From<RootRelativePathError> for RepositoryLayoutError {
+    fn from(error: RootRelativePathError) -> Self {
+        Self::LexicalEscape(error.0)
+    }
+}
+
 fn validate_root(root: &RepositoryRootEvidence) -> Result<(), RepositoryLayoutError> {
     if root.identity.is_empty() || root.identity.chars().any(char::is_control) {
         return Err(RepositoryLayoutError::InvalidRootIdentity(
@@ -754,15 +746,6 @@ mod tests {
 
     fn root(path: &str) -> RepositoryRootEvidence {
         RepositoryRootEvidence::new(path, format!("id:{path}"), true)
-    }
-
-    fn deserialize_path(
-        layout: &RepositoryLayout,
-        value: serde_json::Value,
-    ) -> Result<VirtualPath, serde_json::Error> {
-        let encoded = serde_json::to_string(&value).unwrap();
-        let mut deserializer = serde_json::Deserializer::from_str(&encoded);
-        layout.deserialize_virtual_path(&mut deserializer)
     }
 
     #[test]
@@ -810,6 +793,112 @@ mod tests {
                 && data == Path::new("/external/data")
                 && identity == "same-object"
         ));
+    }
+
+    #[test]
+    fn test_virtual_path_archive_evidence_record_addresses_normalized_targets() {
+        use crate::domain::artifact_plan::PlanTarget;
+        use sha2::{Digest, Sha256};
+        let id = crate::test_utils::issue_id(1);
+        assert_eq!(
+            VirtualPath::archive_evidence_record(&PlanTarget::Container { id: id.clone() }),
+            VirtualPath::data(format!("archive-evidence/container/{id}.json")).unwrap()
+        );
+        let canonical = "docs/plan.md";
+        let expected = VirtualPath::data(format!(
+            "archive-evidence/document/{:x}.json",
+            Sha256::digest(canonical.as_bytes())
+        ))
+        .unwrap();
+        for path in [
+            canonical,
+            "./docs/plan.md",
+            "docs/sub/../plan.md",
+            r"docs\plan.md",
+        ] {
+            assert_eq!(
+                VirtualPath::archive_evidence_record(&PlanTarget::Document { path: path.into() }),
+                expected
+            );
+        }
+        assert_ne!(
+            VirtualPath::archive_evidence_record(&PlanTarget::Document {
+                path: "other/plan.md".into()
+            }),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_virtual_path_gate_run_record_names_the_run_under_its_issue_directory() {
+        let issue = crate::test_utils::issue_id(7);
+        let run = crate::test_utils::gate_run_id(1);
+        let path = VirtualPath::gate_run_record(&issue, &run);
+
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(
+            path.relative().as_str(),
+            format!("gate-runs/{issue}/{run}.json")
+        );
+        assert_eq!(
+            path.relative().as_path().parent(),
+            Some(
+                VirtualPath::gate_run_issue_directory(&issue)
+                    .relative()
+                    .as_path()
+            )
+        );
+        assert_eq!(
+            VirtualPath::data(path.relative().as_path()).unwrap(),
+            path,
+            "the derived path is the path parsing yields"
+        );
+    }
+
+    #[test]
+    fn test_virtual_path_gate_verdict_record_nests_under_its_gate_in_the_verdicts_directory() {
+        let gate_key: crate::domain::identity::GateKey = "cargo-ci".parse().unwrap();
+        let digest =
+            crate::domain::repository_inputs::InputsDigest::try_from("a".repeat(64)).unwrap();
+        let path = VirtualPath::gate_verdict_record(&gate_key, &digest);
+
+        assert_eq!(
+            path.ancestor_directories().unwrap(),
+            vec![
+                VirtualPath::GATE_RUNS,
+                VirtualPath::GATE_VERDICTS,
+                VirtualPath::gate_verdict_directory(&gate_key),
+            ]
+        );
+        assert_eq!(
+            VirtualPath::gate_verdict_directory(&gate_key).file_name(),
+            Some(gate_key.as_str())
+        );
+        assert_eq!(
+            path.file_name().and_then(|name| name.strip_suffix(".json")),
+            Some(digest.as_str())
+        );
+        assert_eq!(
+            VirtualPath::data(path.relative().as_path()).unwrap(),
+            path,
+            "the derived path is the path parsing yields"
+        );
+    }
+
+    #[test]
+    fn test_virtual_path_issue_record_uses_data_root_and_canonical_id_leaf() {
+        let id = crate::test_utils::issue_id(1);
+        let path = VirtualPath::issue_record(&id);
+
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(
+            path.relative().as_path().parent(),
+            Some(Path::new("issues"))
+        );
+        assert_eq!(
+            path.file_name().and_then(|name| name.strip_suffix(".json")),
+            Some(id.as_str())
+        );
     }
 
     #[test]
@@ -861,6 +950,9 @@ mod tests {
             .iter()
             .all(|path| path.as_str().starts_with("state/data/")));
         assert!(relocated.contains(&RootRelativePath::parse("state/data/tmp").unwrap()));
+        assert!(
+            relocated.contains(&RootRelativePath::parse("state/data/archive-evidence").unwrap())
+        );
         assert!(entries_under("/external/data").is_empty());
     }
 
@@ -914,8 +1006,7 @@ mod tests {
     }
 
     #[test]
-    fn test_path_constructors_and_serde_reject_noncanonical_spellings() {
-        let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
+    fn test_virtual_path_constructors_reject_noncanonical_spellings() {
         let control = format!("a{}b", '\u{0007}');
         let invalid = [
             "../outside",
@@ -927,67 +1018,82 @@ mod tests {
             control.as_str(),
         ];
         for spelling in invalid {
-            assert!(RootRelativePath::parse(spelling).is_err(), "{spelling:?}");
-            let encoded = serde_json::to_string(spelling).unwrap();
-            assert!(
-                serde_json::from_str::<RootRelativePath>(&encoded).is_err(),
-                "{spelling:?}"
-            );
             assert!(VirtualPath::worktree(spelling).is_err(), "{spelling:?}");
-            let encoded = serde_json::json!({
-                "root": "worktree",
-                "relative": spelling,
-            });
-            assert!(deserialize_path(&layout, encoded).is_err(), "{spelling:?}");
+            assert!(VirtualPath::data(spelling).is_err(), "{spelling:?}");
         }
     }
 
     #[test]
-    fn test_virtual_path_serde_rejects_the_reserved_namespace() {
-        let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
-        let encoded = serde_json::json!({
-            "root": "data",
-            "relative": format!("{RECORD_SCRATCH_DIR}/record.json"),
-        });
-        assert!(deserialize_path(&layout, encoded).is_err());
+    fn test_schema_path_constructor_validates_one_file_name_component() {
+        let path = VirtualPath::schema("body.json").unwrap();
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(path.relative().as_str(), "schemas/body.json");
+
+        for invalid in ["", "..", "a/b", "a\\b", "/absolute.json"] {
+            assert!(VirtualPath::schema(invalid).is_err(), "{invalid:?}");
+        }
     }
 
     #[test]
-    fn test_layout_rejects_deserialized_worktree_under_data_alias() {
+    fn test_schema_reference_constructor_validates_rule_reference() {
+        let path = VirtualPath::schema_reference("schemas/body.json").unwrap();
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(path.relative().as_str(), "schemas/body.json");
+
+        for invalid in [
+            "body.json",
+            "schemas/nested/body.json",
+            "schemas//body.json",
+            "schemas/../body.json",
+            "/schemas/body.json",
+        ] {
+            assert!(
+                VirtualPath::schema_reference(invalid).is_err(),
+                "{invalid:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_virtual_path_reserved_application_target_matches_owned_paths_by_component() {
+        let reserved = [
+            VirtualPath::data("events.jsonl").unwrap(),
+            VirtualPath::worktree(".git").unwrap(),
+            VirtualPath::worktree("vendor/.git/config").unwrap(),
+        ];
+        assert!(reserved
+            .iter()
+            .all(VirtualPath::is_reserved_application_target));
+
+        let ordinary = [
+            VirtualPath::data("events.jsonl.old").unwrap(),
+            VirtualPath::data("profiles").unwrap(),
+            VirtualPath::data("profiles/installed/package.json").unwrap(),
+            VirtualPath::data("events.jsonl/child").unwrap(),
+            VirtualPath::worktree(".gitignore").unwrap(),
+            VirtualPath::worktree("vendor/git/config").unwrap(),
+            VirtualPath::data(".git/config").unwrap(),
+        ];
+        assert!(ordinary
+            .iter()
+            .all(|path| !path.is_reserved_application_target()));
+    }
+
+    #[test]
+    fn test_virtual_path_from_root_rejects_the_reserved_namespace() {
+        let relative =
+            RootRelativePath::parse(format!("{RECORD_SCRATCH_DIR}/record.json")).unwrap();
+        assert!(VirtualPath::from_root(RepositoryRootClass::Data, relative).is_err());
+    }
+
+    #[test]
+    fn test_layout_ensure_canonical_rejects_worktree_under_data_alias() {
         let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
-        let encoded = serde_json::json!({
-            "root": "worktree",
-            "relative": ".jit/issues/one.json",
-        });
-        let error = deserialize_path(&layout, encoded).unwrap_err();
+        let issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        let path =
+            VirtualPath::worktree(format!(".jit/{}", issue_path.relative().as_str())).unwrap();
+        let error = layout.ensure_canonical(&path).unwrap_err();
         assert!(error.to_string().contains("aliases the selected data root"));
-    }
-
-    #[test]
-    fn test_root_relative_path_uses_variant_not_empty_string_sentinel() {
-        // Empty input is the root, built as the distinct `Root` variant, not an
-        // empty descendant string; a non-empty path is a `Descendant`.
-        assert_eq!(RootRelativePath::parse("").unwrap(), RootRelativePath::Root);
-        assert!(RootRelativePath::parse("").unwrap().is_root());
-        match RootRelativePath::parse("issues/one.json").unwrap() {
-            RootRelativePath::Descendant(text) => assert_eq!(&*text, "issues/one.json"),
-            RootRelativePath::Root => panic!("a non-empty path must be a descendant"),
-        }
-        assert!(!RootRelativePath::parse("issues/one.json")
-            .unwrap()
-            .is_root());
-        // Depth is 0 for the root and the component count for a descendant.
-        assert_eq!(RootRelativePath::Root.depth(), 0);
-        assert_eq!(RootRelativePath::parse("a/b").unwrap().depth(), 2);
-        // The root's stable serialized wire form remains the empty string.
-        assert_eq!(
-            serde_json::to_string(&RootRelativePath::Root).unwrap(),
-            "\"\""
-        );
-        assert_eq!(
-            serde_json::from_str::<RootRelativePath>("\"\"").unwrap(),
-            RootRelativePath::Root
-        );
     }
 
     fn hash_of<T: std::hash::Hash>(value: &T) -> u64 {
@@ -1043,6 +1149,16 @@ mod tests {
             VirtualPath::ALL_KNOWN.len(),
             "the well-known declaration names one repository path twice"
         );
+    }
+
+    #[test]
+    fn test_virtual_path_file_name_returns_the_final_component() {
+        assert_eq!(VirtualPath::SERVER_LOG.file_name(), Some("server.log"));
+        assert_eq!(
+            VirtualPath::data("nested/file").unwrap().file_name(),
+            Some("file")
+        );
+        assert_eq!(VirtualPath::worktree("").unwrap().file_name(), None);
     }
 
     #[test]

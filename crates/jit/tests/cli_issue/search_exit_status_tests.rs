@@ -1,29 +1,13 @@
-//! Search JSON failures exit with the status assigned to their reported code.
+//! Search JSON failures report their registered error code.
 
 use jit::output::ErrorCode;
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::fs;
-use std::os::unix::fs::PermissionsExt;
-use std::process::{Command, Output};
+use std::process::Output;
 use std::str::FromStr;
 use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().expect("temporary repository should be created");
-    let status = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .arg("init")
-        .status()
-        .expect("jit init should run");
-    assert!(status.success(), "jit init should succeed");
-    temp
-}
-
-fn assert_json_error_status_matches_code(output: Output, expected_code: ErrorCode) {
+fn assert_json_error_reports_code(output: Output, expected_code: ErrorCode) {
     assert!(!output.status.success(), "search invocation should fail");
     let json: Value = serde_json::from_slice(&output.stdout)
         .expect("failed JSON search should emit an error envelope");
@@ -35,38 +19,61 @@ fn assert_json_error_status_matches_code(output: Output, expected_code: ErrorCod
     .expect("error envelope should carry a registered code");
 
     assert_eq!(code, expected_code);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
 }
 
 #[test]
-fn test_search_json_missing_ripgrep_exits_with_reported_code_status() {
-    let repo = setup_test_repo();
+fn test_search_missing_ripgrep_reports_same_exit_on_json_and_human_paths() {
+    let repo = JitCli::initialised().unwrap();
     let empty_path = TempDir::new().expect("empty PATH directory should be created");
-    let output = Command::new(jit_binary())
-        .current_dir(repo.path())
-        .env("PATH", empty_path.path())
-        .args(["search", "needle", "--json"])
+    let run = |extra: &[&str]| {
+        repo.command_with_env(
+            ["search", "needle"]
+                .into_iter()
+                .chain(extra.iter().copied()),
+            [("PATH", empty_path.path().as_os_str())],
+        )
+        .output()
+        .expect("search should run")
+    };
+
+    let json = run(&["--json"]);
+    let human = run(&[]);
+
+    let expected = ErrorCode::RipgrepNotFound.exit_code().code();
+    assert_eq!(json.status.code(), Some(expected));
+    assert_eq!(human.status.code(), Some(expected));
+}
+
+#[test]
+fn test_search_json_missing_ripgrep_reports_ripgrep_not_found() {
+    let repo = JitCli::initialised().unwrap();
+    let empty_path = TempDir::new().expect("empty PATH directory should be created");
+    let output = repo
+        .command_with_env(
+            ["search", "needle", "--json"],
+            [("PATH", empty_path.path().as_os_str())],
+        )
         .output()
         .expect("search should run");
 
-    assert_json_error_status_matches_code(output, ErrorCode::RipgrepNotFound);
+    assert_json_error_reports_code(output, ErrorCode::RipgrepNotFound);
 }
 
 #[test]
-fn test_search_json_backend_failure_exits_with_reported_code_status() {
-    let repo = setup_test_repo();
+fn test_search_json_backend_failure_reports_search_failed() {
+    let repo = JitCli::initialised().unwrap();
     let tools = TempDir::new().expect("fake tool directory should be created");
     let ripgrep = tools.path().join("rg");
-    fs::write(&ripgrep, "#!/bin/sh\nexit 2\n").expect("fake ripgrep should be written");
-    fs::set_permissions(&ripgrep, fs::Permissions::from_mode(0o755))
-        .expect("fake ripgrep should be executable");
+    jit::test_utils::write_executable(&ripgrep, "#!/bin/sh\nexit 2\n")
+        .expect("fake ripgrep should be written");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repo.path())
-        .env("PATH", tools.path())
-        .args(["search", "needle", "--json"])
+    let output = repo
+        .command_with_env(
+            ["search", "needle", "--json"],
+            [("PATH", tools.path().as_os_str())],
+        )
         .output()
         .expect("search should run");
 
-    assert_json_error_status_matches_code(output, ErrorCode::SearchFailed);
+    assert_json_error_reports_code(output, ErrorCode::SearchFailed);
 }

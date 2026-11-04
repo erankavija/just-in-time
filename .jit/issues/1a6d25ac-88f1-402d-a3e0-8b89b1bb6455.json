@@ -1,0 +1,24 @@
+{
+  "assignee": "agent:gf2-record-repair",
+  "claimed_at": "2026-11-01T14:08:21.757246106Z",
+  "context": {},
+  "created_at": "2026-11-01T13:24:02.039097168Z",
+  "dependencies": [],
+  "description": "Bring gf2's stored records to canonical writer form so whole-repository `jit validate` passes there under the current binary. This repository owns the verified procedure; the rewrite itself runs in gf2 with its owner's approval.\n\n## Background\n\nRecord-fidelity validation rejects gf2's records written by older writers: event lines with an earlier key order, issue timestamps spelled `+00:00`, and one empty gate-run directory. Events are merged with `merge=union`, and merge tests on real gf2 branches show that running a rewrite or the gate-key rename on a branch multiplies duplicated events, while merging an unmodified branch adds none on 60 of 68 branches.\n\n## Success Criteria\n\n- [hard] REQ-01: A test on a clone with a real unmerged gf2 branch shows what merging produces after the rewrite, and the outcome is reported.\n- [hard] REQ-02: One main-only script canonicalizes records, covers gate-run records, and a second run changes nothing; branches merge main unmodified.\n- [hard] REQ-03: Whole-repository `jit validate` passes on gf2 main under the installed binary.\n\n## Notes\n\nThe rewrite and removal of the empty gate-run directory need approval from gf2's owner. No product repair path is added: records from older writers are repaired per repository.\n\nThe gate-key rename and this rewrite stay separate scripts. Eight stale branches do not merge cleanly: `formal-verification` and `worktree-agent-{0a357f94,85fc5ff4,9fb40c83,b64dc9c4,b9302771,c04dd4ac}` need `--dedupe-events` before committing a merge into main, with main checked out. `worktree-agent-cad241e6` is not repaired by that in either direction and holds 2 events main lacks. Those branches belong to gf2's owner and stay untouched.\n\nThis issue closes on the rewrite's commit on gf2 main plus `jit validate` rc 0 there.\n\n\n\n## Correction from the format 3 cutover\n\nAn earlier statement here that merging main unmodified holds for 60 of 68 gf2 branches came from a smaller rewrite than the cutover ran. On real `8c0da4457`, across all 69 unmerged branches: 51 merged with no duplicate event ids and passed `jit validate`, 13 hold duplicates (6010 total), 8 of them fail validate on old event shapes, and 4 have no `.jit`. Details are on 2a504b17 and in 3d9a0ce3's completion report.\n",
+  "documents": [],
+  "done_at": "2026-11-01T15:20:11.156693054Z",
+  "first_ready_at": "2026-11-01T13:24:02.039097168Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "1a6d25ac-88f1-402d-a3e0-8b89b1bb6455",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Repair gf2's stored records to canonical writer form",
+  "updated_at": "2026-11-01T20:35:40.693535869Z"
+}

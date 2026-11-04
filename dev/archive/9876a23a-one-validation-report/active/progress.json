@@ -1,0 +1,526 @@
+{
+  "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
+  "epic_short_id": "9876a23a",
+  "current_wave": 9,
+  "waves": [
+    {
+      "wave_number": 1,
+      "base": "a860614ac",
+      "issues": [
+        {
+          "id": "d40d6f74-8486-409a-9a43-8dfd2ad6016b",
+          "short_id": "d40d6f74",
+          "title": "Planning-node lookup lives in the template module",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "pure move, exact criteria"
+        },
+        {
+          "id": "7eb443b2-3788-45ee-b65e-4d88b5c3c8de",
+          "short_id": "7eb443b2",
+          "title": "Graph findings record their firing subject",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "claude opus",
+          "worker_reason": "contract field consumed by selection"
+        },
+        {
+          "id": "bd2534bd-d638-439b-a677-a08218893ea7",
+          "short_id": "bd2534bd",
+          "title": "The acyclic-graph proptest strategy lives in the test harness",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "small move"
+        },
+        {
+          "id": "6100b960-193f-40e2-9e62-970815412930",
+          "short_id": "6100b960",
+          "title": "Shared test fixture for repository images",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "claude opus",
+          "worker_reason": "shared fixture design"
+        }
+      ],
+      "merges": {
+        "7eb443b2": "06c42b2ee",
+        "6100b960": "9b74a37cb",
+        "bd2534bd": "8f0ca65e5",
+        "d40d6f74": "73595f9ca"
+      },
+      "gates": "cargo-ci and code-review passed first round on all four"
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "70ac98fc-0fa7-4d4b-b3c0-f67dbe1df2a1",
+          "short_id": "70ac98fc",
+          "title": "Export, initialization and profile test images use the shared builder",
+          "classification": "implementation",
+          "status": "done (code-review passed on the user-authorised rerun with evidence note)",
+          "worker": "codex gpt-6-astra xhigh",
+          "merge": "b38318255"
+        },
+        {
+          "id": "cf49da17-a076-480e-a96b-bc9224269ac0",
+          "short_id": "cf49da17",
+          "title": "Repository-state and document test images use the shared builder",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "claude opus",
+          "merge": "2a55def17"
+        },
+        {
+          "id": "c92f4011-1850-4998-a555-ca899ec45552",
+          "short_id": "c92f4011",
+          "title": "Keep default rules in force when rules.toml holds only custom rules",
+          "classification": "implementation",
+          "status": "done (merges bdc0fd571, 108f53d99; rework 2: CI fixtures, then custom/default name collision)",
+          "worker": "codex gpt-6-astra xhigh"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "base": "b14656acf",
+      "issues": [
+        {
+          "short_id": "977d01d8",
+          "status": "done 5e0ca8825",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "small residue + tests"
+        },
+        {
+          "short_id": "ea843d26",
+          "status": "done b1017884c, 976e3b932 (rework 1: trailing-hyphen property)",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "local allocation-free match"
+        },
+        {
+          "short_id": "b3a768b3",
+          "status": "done 9b6397f43",
+          "worker": "claude opus",
+          "worker_reason": "produces parsed-records contract"
+        },
+        {
+          "short_id": "f968dfe1",
+          "status": "done 107ee1810 (rework 1: best-effort image_plan_content; merge conflict resolved)",
+          "worker": "claude opus",
+          "worker_reason": "produces plan-document-resolver contract"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "base": "2edf9e3de",
+      "issues": [
+        {
+          "short_id": "5d5a1794",
+          "status": "done 308aa9485, 7487595a9, 9f219fcdf (rework 2; REQ-02 amended; .gates.lock removed with f8a6b298 agreement; --orphan removed per steward D-01)",
+          "worker": "claude opus",
+          "worker_reason": "produces creation-findings; shared helper over five copies"
+        },
+        {
+          "short_id": "8b56c215",
+          "status": "done 3e5bfcbe7",
+          "worker": "codex gpt-6-luna xhigh",
+          "worker_reason": "mechanical vocabulary"
+        },
+        {
+          "short_id": "ccd6e1fb",
+          "status": "done 9da1c873a",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "multi-file evaluation change"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "001a9c46",
+          "status": "done 07baa8b46",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "address index over existing set"
+        },
+        {
+          "short_id": "03c59566",
+          "status": "done 70f80ae6f (criteria amended by steward)",
+          "worker": "codex gpt-6-luna xhigh"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "base": "995afbd3a",
+      "issues": [
+        {
+          "short_id": "6ba4f623",
+          "status": "done 92aa09e0c (rework 1; merge fix for a main test)",
+          "worker": "claude opus",
+          "worker_reason": "central contract validation-report"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "base": "3e20f87bc",
+      "issues": [
+        {
+          "short_id": "612ee9d4",
+          "status": "done 9cd3c9138 (rework 1; code-review 0 findings)",
+          "worker": "claude opus",
+          "worker_reason": "report-selection contract"
+        },
+        {
+          "short_id": "2b5f452c",
+          "status": "done (merges d712d8b17, 6d4a8b704, 88ce303a1, c6c3cceb8; reworks 3 + steward D-01, D-02)",
+          "worker": "claude opus",
+          "worker_reason": "fidelity on parsed records (REQ-10)"
+        },
+        {
+          "short_id": "3acaa5a3",
+          "status": "done (merges 7b2cfcdef, 1077419b1, f70dcdf40; reworks 2)",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "drift through report function"
+        },
+        {
+          "short_id": "c1af05ac",
+          "status": "done",
+          "worker": "codex gpt-6-luna xhigh",
+          "worker_reason": "test relocation"
+        },
+        {
+          "short_id": "e2082ba9",
+          "status": "done b67342fec",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "bug found by c1af05ac; regression from 001a9c46"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "short_id": "2c8c13b2",
+          "classification": "implementation",
+          "status": "done 87b38351c (-166)",
+          "worker": "claude opus",
+          "worker_reason": "adds the shared capture-and-report function; DEC-19"
+        },
+        {
+          "short_id": "728ecfb0",
+          "classification": "implementation",
+          "status": "done d95ef1858 (0)",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "property test with independent oracle"
+        },
+        {
+          "short_id": "1f24e3e9",
+          "classification": "implementation",
+          "status": "done 9af61dd1f (-61; reworks 2)",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "multi-file fix derivation over one capture"
+        },
+        {
+          "short_id": "86f7e6eb",
+          "status": "done 6c94d48c4 (-5)",
+          "worker": "codex gpt-6-luna xhigh"
+        },
+        {
+          "short_id": "208edf4c",
+          "status": "done 7fedf7f93 (-100)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "a106d1be",
+          "status": "done 77e9b4337, e3f047ea6 (-195; rework 1: same-image parity)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "2f12d920",
+          "status": "done abc9b6d89 (+17)",
+          "worker": "codex gpt-6-luna xhigh"
+        },
+        {
+          "short_id": "5d774061",
+          "status": "done b65a4c5c1 (REQ-08 met)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "78d897a2",
+          "status": "landed 4742a3fd9; doc-review F1 fixed d72af2908; main-red fix 96dfde725",
+          "worker": "claude opus"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "short_id": "6ac41880",
+          "status": "done 662a9252a (-245)",
+          "worker": "codex gpt-6-luna xhigh"
+        },
+        {
+          "short_id": "78d897a2",
+          "status": "done 4742a3fd9, d72af2908, 34625178a, 96dfde725 (doc-review 3 rounds)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "5d774061",
+          "status": "done b65a4c5c1 (REQ-08 met)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "03bf6983",
+          "status": "done 170f5859c (0)",
+          "worker": "codex gpt-6.1-sol high"
+        },
+        {
+          "short_id": "f22147ec",
+          "status": "done 42373fb82 (-124; rework 1: shared test fixtures)",
+          "worker": "codex gpt-6.1-sol high"
+        },
+        {
+          "short_id": "7516ed50",
+          "status": "done d1c20647a (-2)"
+        },
+        {
+          "short_id": "ce221384",
+          "status": "done 2575accc8, 708aee592 (doc-review 2 rounds)"
+        },
+        {
+          "short_id": "4b66bc6b",
+          "status": "done 73490b18a (epic review F1 remediation)"
+        }
+      ]
+    }
+  ],
+  "held": {},
+  "line_target": {
+    "goal": "net production-line reduction",
+    "baseline_rev": "120402067",
+    "baseline_default": 73858,
+    "counter": "scripts/production-lines.py",
+    "wave_merge_deltas": [
+      {
+        "wave": 1,
+        "test_support_as_test": 3,
+        "by_issue": {
+          "7eb443b2": 8,
+          "6100b960": "110 (test-support; 0 flagged)",
+          "bd2534bd": 0,
+          "d40d6f74": -5
+        }
+      },
+      {
+        "wave": 2,
+        "test_support_as_test": -1,
+        "by_issue": {
+          "70ac98fc": 0,
+          "cf49da17": 0,
+          "c92f4011": -1
+        }
+      },
+      {
+        "wave": 3,
+        "test_support_as_test": -42,
+        "by_issue": {
+          "977d01d8": -7,
+          "b3a768b3": 7,
+          "f968dfe1": -46,
+          "ea843d26": 4
+        }
+      },
+      {
+        "wave": 4,
+        "test_support_as_test": 35,
+        "by_issue": {
+          "ccd6e1fb": 12,
+          "5d5a1794": 5,
+          "8b56c215": 18
+        }
+      },
+      {
+        "wave": 5,
+        "test_support_as_test": 55,
+        "by_issue": {
+          "03c59566": -24,
+          "001a9c46": 79
+        }
+      },
+      {
+        "wave": 6,
+        "test_support_as_test": -32,
+        "by_issue": {
+          "6ba4f623": -32
+        }
+      },
+      {
+        "wave": 7,
+        "test_support_as_test": 464,
+        "by_issue": {
+          "2b5f452c": 149,
+          "3acaa5a3": 9,
+          "e2082ba9": 20,
+          "612ee9d4": 286,
+          "c1af05ac": 0
+        }
+      },
+      {
+        "wave": 8,
+        "test_support_as_test": -510,
+        "by_issue": {
+          "2c8c13b2": -166,
+          "728ecfb0": 0,
+          "1f24e3e9": -61,
+          "86f7e6eb": -5,
+          "208edf4c": -100,
+          "2f12d920": 17,
+          "a106d1be": -195
+        }
+      },
+      {
+        "wave": 9,
+        "test_support_as_test": -369,
+        "by_issue": {
+          "6ac41880": -245,
+          "03bf6983": 0,
+          "f22147ec": -124,
+          "78d897a2": 0,
+          "5d774061": 0
+        }
+      }
+    ],
+    "running_total": -399,
+    "reestimate_2026_11_04": {
+      "remaining": -950,
+      "epic_end": -470,
+      "range": [
+        -560,
+        -380
+      ],
+      "steward": "accepted by just-in-time-6a"
+    }
+  },
+  "created_during_execution": [
+    {
+      "short_id": "2a10917d",
+      "note": "standalone, user-approved: code-review context states commit ancestry; under milestone 9db27a3a; not part of this epic"
+    },
+    {
+      "short_id": "14f49a28",
+      "note": "standalone, user ruling: M8 package-content check assembles outside the repo (docs-mechanical was broken by the target/ symlink); landed 7f255bf7a, docs-mechanical passed"
+    },
+    {
+      "short_id": "f368ce3d",
+      "note": "cross-epic: REQ-03 (--orphan) and its Background bullet removed per steward ruling"
+    },
+    {
+      "short_id": "e2082ba9",
+      "note": "bug: report item-link pass rejects sugar addresses several kinds admit (from 001a9c46); c1af05ac depends on it"
+    }
+  ],
+  "escalations": [
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-03",
+      "subject": "audit decisions 1-5 (audit.md)",
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-03",
+      "subject": "cf49da17/725af076 edge swap (3e agrees)",
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-03",
+      "subject": "c92f4011 default-row semantics",
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "70ac98fc code-review F1 ancestry misread",
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "docs-mechanical M8 fails: jit profile pack refuses symlinked target/",
+      "status": "resolved: 14f49a28 (a2) landed 7f255bf7a"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "2b5f452c duplicate-key side effect",
+      "status": "resolved: steward requires fix in 2b5f452c"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "3acaa5a3 REQ-01 vs D-22",
+      "status": "resolved: lock-free loads; 578ed10d REQ-08 retires them"
+    }
+  ],
+  "rework_counts": {
+    "c92f4011": 2,
+    "ea843d26": 1,
+    "f968dfe1": 1,
+    "5d5a1794": 2,
+    "6ba4f623": 1,
+    "2b5f452c": 3,
+    "3acaa5a3": 2,
+    "612ee9d4": 1,
+    "1f24e3e9": 2,
+    "a106d1be": 1,
+    "f22147ec": 1
+  },
+  "surfaced_pitfalls": [
+    "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
+    "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
+    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
+    "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
+    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording.",
+    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward.",
+    "728ecfb0 selection proptest: per the 208edf4c worker, about 23 of 24 random images fail the integrity pass first, so the oracle rarely sees a structurally clean report; check against story b3ef68b5 REQ-04 before its gate."
+  ],
+  "started_at": "2026-11-03T23:40:00+02:00",
+  "rejected": [
+    "145b4d57 (superseded, merged into 977d01d8)",
+    "e16493fc (superseded, REQ-02 folded into 2f12d920)"
+  ],
+  "traps": [
+    "Workers verify only --lib and named suites; a behaviour change needs the whole-workspace nextest run with --no-fail-fast (c92f4011 r1).",
+    "Never wrap land.sh in `jit worktree exec`: it takes the repository lock itself, so nesting waits on its own parent.",
+    "Plan and manifest edits in main's checkout block other leads' land.sh; edit in scratch, then copy and commit in one command.",
+    "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review.",
+    "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief).",
+    "dispatch-worker-worktree.sh refuses whenever main's checkout has any tracked change, including other leads' tracker files: commit a tracker sync immediately before dispatching, and check the [ok] line before writing briefs (03c59566, wave 7).",
+    "Pipelines wait at most 30 min for load<4, then run CI (user ruling); exit 75 suite-budget faults are known environment faults until 88's f487aeef. Never launch a pipeline with & inside a foreground Bash call; use run_in_background.",
+    "A nextest TIMEOUT on a normally millisecond test is a host artifact (cargo-pool-run waits for a jobserver token inside nextest's timer): rerun, never rework. Host measures: TMPDIR=/mnt/nvme/jit/tmp/9876-lead, CARGO_INCREMENTAL=0; reclaim worktrees as issues land; never touch the cache pool.",
+    "Codex workers never merge main or run any git write (read-only metadata leaves half-merges or copies main's uncommitted .jit lines); the lead merges main into Codex branches and commits their diffs with git add -A crates.",
+    "A cargo-ci gate run that fails instantly with exit_code null and empty output was REUSED from a prior failed run with the same inputs digest (origin.derivation=reused). After an environment-faulted failure, re-evaluate with `jit gate evaluate <id> cargo-ci --force`.",
+    "Do not set TMPDIR to /mnt/nvme for tests: ext4 directory order breaks a drift test (3e's bug, fix with 944edb32) and fsync-heavy tests time out. ENOSPC under /tmp is a host fault: rerun.",
+    "/tmp ENOSPC was inode exhaustion (1.0M inodes; ~473K in leaked /tmp/.tmp* test dirs). Authoritative runs (branch CI, cargo-ci gates) use TMPDIR=/dev/shm/jit-ci/9876a23a under the full-CI lock, created before and removed after each run; workers use /mnt/nvme/jit/tmp/9876-workers (steward rule).",
+    "Edits to land-pipeline.zsh only while no pipeline runs it: zsh reads the script while it executes.",
+    "Wave ordering that reuses another task's code must be a dependency edge, not sub-wave order (steward, 2026-11-04).",
+    "No advisory test suite of this lead (worker or integrator) runs while an authoritative CI run holds the full-CI lock (steward rule, 2026-11-04). Advisory: `flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock cargo nextest ...`; authoritative: the same turnstile then `-x` (land-pipeline.zsh). The turnstile prevents shared-lock starvation. Overlap pushed 1f24e3e9 cargo-ci to 42 s against the 30 s budget.",
+    "Format 4 stores gate runs at .jit/gate-runs/<issue-uuid>/<run-uuid>.json (land-pipeline ENOSPC check updated).",
+    "Never land a docs change without branch CI: generated references (docs/reference/gate-presets.md and others) have conformance tests; 62f836117 hand-edited one and turned main red for every lead. Edit the source render and regenerate."
+  ],
+  "plan_reviews": {
+    "plan-review 2df01664": "passed after amendment (0 findings)",
+    "breakdown-review de9a7557": "passed on rerun after restoring ea843d26 -> de9a7557 (2 advisory findings, no change)"
+  },
+  "worker_policy": "User 2026-11-04: Codex gpt-6-luna, gpt-6.1-sol and gpt-6-astra plus Claude, liberally. Host quiet window: no new dispatch from 03:30 EET, no builds from 03:55 until just-in-time-6a releases; workers wait on 88's cargo-hold file.",
+  "lead": "just-in-time-b9 (from a4, 2026-11-04)",
+  "status": "complete",
+  "completed_at": "2026-11-04"
+}

@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
 use jit::domain::{ContentFormat, Issue, State};
+use jit::test_utils::issue_id;
 use jit::validation::graph::{evaluate_graph, GraphFinding};
 
 /// Absolute path to a `docs/examples/<name>` directory, resolved from the crate
@@ -45,7 +46,7 @@ fn example_dir(name: &str) -> PathBuf {
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
     jit::storage::ruleset_store::load_ruleset(
-        &dir,
+        &jit::test_utils::repository_layout_for_data_root(&dir),
         &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     )
     .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
@@ -97,6 +98,7 @@ fn sdd_spec_body() -> String {
 /// The breakable container `C` (an SDD epic) declaring `req:REQ-01`.
 fn breakable_container() -> Issue {
     let mut epic = crate::fixture_issue("Validation engine".to_string(), sdd_spec_body());
+    epic.id = issue_id(1);
     epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
     epic
 }
@@ -175,12 +177,19 @@ fn test_sdd_example_declares_planning_template() {
     );
     assert_eq!(
         plan.planning_node(&reg.roles).map(|n| n.gates.as_slice()),
-        Some(["plan-review".to_string()].as_slice()),
+        Some(
+            ["plan-review"
+                .parse::<jit::domain::identity::GateKey>()
+                .unwrap()]
+            .as_slice()
+        ),
         "plan-review wired on the planning node",
     );
     assert!(
-        plan.breakdown_node(&reg.roles)
-            .is_some_and(|n| n.gates.iter().any(|g| g == "coverage-preview")),
+        plan.breakdown_node(&reg.roles).is_some_and(|n| n
+            .gates
+            .iter()
+            .any(|g| g == &"coverage-preview".parse().unwrap())),
         "coverage-preview wired on the breakdown node",
     );
 
@@ -218,9 +227,11 @@ fn test_sdd_uncovered_hard_criterion_blocked_at_breakdown_gate() {
 
     let mut container = breakable_container();
     let mut impl_node = crate::fixture_issue("draft impl".to_string(), String::new());
+    impl_node.id = issue_id(2);
     impl_node.labels = vec!["type:task".to_string()]; // does NOT satisfy REQ-01
     impl_node.state = State::Backlog;
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -256,8 +267,10 @@ fn test_sdd_preview_silent_while_breakdown_node_in_backlog() {
 
     let mut container = breakable_container();
     let mut impl_node = crate::fixture_issue("draft impl".to_string(), String::new());
+    impl_node.id = issue_id(2);
     impl_node.labels = vec!["type:task".to_string()]; // does NOT satisfy REQ-01
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -288,12 +301,14 @@ fn test_sdd_preview_passes_when_backlog_child_carries_mapping() {
 
     let mut container = breakable_container();
     let mut impl_node = crate::fixture_issue("draft impl".to_string(), String::new());
+    impl_node.id = issue_id(2);
     impl_node.labels = vec![
         "type:task".to_string(),
         format!("satisfies:{}/REQ-01", container.short_id()),
     ];
     impl_node.state = State::Backlog; // NOT done
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -325,8 +340,10 @@ fn test_sdd_preview_excludes_bracket_types_and_halts_walk() {
 
     let mut container = breakable_container();
     let mut impl_node = crate::fixture_issue("draft impl".to_string(), String::new());
+    impl_node.id = issue_id(2);
     impl_node.labels = vec!["type:task".to_string()]; // no satisfies here
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -336,6 +353,7 @@ fn test_sdd_preview_excludes_bracket_types_and_halts_walk() {
     breakdown.state = State::InProgress;
     // P, beyond the boundary, is the only carrier of satisfies:<C>/REQ-01.
     let mut plan = crate::fixture_issue("plan".to_string(), String::new());
+    plan.id = issue_id(4);
     plan.labels = vec![
         "type:planning".to_string(),
         format!("satisfies:{}/REQ-01", container.short_id()),
@@ -366,13 +384,16 @@ fn test_sdd_preview_credits_non_sink_impl_interior() {
 
     let mut container = breakable_container();
     let mut impl_a = crate::fixture_issue("impl a (sink)".to_string(), String::new());
+    impl_a.id = issue_id(2);
     impl_a.labels = vec!["type:task".to_string()];
     let mut impl_b = crate::fixture_issue("impl b (interior)".to_string(), String::new());
+    impl_b.id = issue_id(3);
     impl_b.labels = vec![
         "type:task".to_string(),
         format!("satisfies:{}/REQ-01", container.short_id()),
     ];
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(4);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -412,6 +433,7 @@ fn test_sdd_closure_rule_still_requires_done_child() {
     epic.state = State::Done;
     // A child satisfying REQ-01 but still in Backlog (not done).
     let mut child = crate::fixture_issue("impl".to_string(), String::new());
+    child.id = issue_id(2);
     child.labels = vec![
         "type:task".to_string(),
         format!("satisfies:{}/REQ-01", epic.short_id()),

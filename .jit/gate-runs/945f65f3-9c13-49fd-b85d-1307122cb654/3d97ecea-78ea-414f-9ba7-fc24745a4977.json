@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-945f65f3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d7fc7defe14a7fd7bf0524e2d2348bee577c7b49",
+  "completed_at": "2026-10-25T04:07:47.804647593Z",
+  "duration_ms": 74709,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable changes satisfy the issue criteria; the prior init-path finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "945f65f3-9c13-49fd-b85d-1307122cb654",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3d97ecea-78ea-414f-9ba7-fc24745a4977",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T04:06:33.095219765Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `3caf81a50`, `296b73425`, `75529e4df` (`jit:945f65f3`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; issue records; `.jit/invariants.toml`; `dev/vision/9db27a3a-charter.md`; `.jit/gates.toml`\nResolved items: `@/issue/945f65f3/requirement/REQ-01`, `REQ-02`; `@/issue/2195c98f/requirement/REQ-07`; `@/invariant/semantic-types`; `@/charter/D-18`; `@/gate/cargo-ci`; `@/gate/jit-validate`\nGate evidence: cargo-ci passed (exit 0); code-review previously failed (exit 1), with its F1 verified resolved by `75529e4df`\nTruncation recovery: per-file patches for all tagged changes; isolated final-fix patch; focused final-tree literal-path and coverage reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable changes satisfy the issue criteria; the prior init-path finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

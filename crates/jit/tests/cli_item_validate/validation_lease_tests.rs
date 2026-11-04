@@ -3,325 +3,118 @@
 //! Tests `jit validate --leases` command with real git worktrees and claims.
 
 use chrono::{Duration, Utc};
+use jit::storage::claim_coordinator::Lease;
+use jit::storage::worktree_paths::WorktreePaths;
+use jit::test_cli::JitCli;
+use jit::test_lease_store::plant_lease;
 use serde_json::Value;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use tempfile::TempDir;
-use ulid::Ulid;
 
-/// Get path to jit binary
-fn jit_binary() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_jit"))
-}
-
-/// Setup a git repository with jit initialized
-fn setup_git_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    // Initialize git
-    Command::new("git")
-        .args(["init"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-
-    // Configure git (required for commits)
-    Command::new("git")
-        .args(["config", "user.name", "Test User"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-
-    Command::new("git")
-        .args(["config", "user.email", "test@example.com"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-
-    // Initialize jit
-    Command::new(jit_binary())
-        .args(["init"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-
-    // Create initial commit (needed for worktrees)
-    Command::new("git")
-        .args(["add", "."])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Initial commit"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-
-    temp
-}
-
-/// Create a git worktree with jit initialized
-fn create_worktree(base_repo: &Path, worktree_name: &str) -> PathBuf {
-    // Create worktree inside the temp directory (as sibling to base repo)
-    let parent_dir = base_repo.parent().unwrap();
-    let worktree_path = parent_dir.join(worktree_name);
-
-    // Clean up if it already exists (from failed test run)
-    if worktree_path.exists() {
-        let _ = std::fs::remove_dir_all(&worktree_path);
-    }
-
-    // Create worktree
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            worktree_path.to_str().unwrap(),
-            "-b",
-            worktree_name,
-        ])
-        .current_dir(base_repo)
-        .status()
-        .unwrap();
-
-    // Initialize jit in worktree (creates .jit/worktree.json)
-    Command::new(jit_binary())
-        .args(["worktree", "info"])
-        .current_dir(&worktree_path)
-        .output()
-        .unwrap();
-
-    worktree_path
-}
-
-/// Get worktree ID from a worktree directory
-fn get_worktree_id(worktree_path: &Path) -> String {
-    let output = Command::new(jit_binary())
-        .args(["worktree", "info", "--json"])
-        .current_dir(worktree_path)
-        .output()
-        .unwrap();
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["worktree_id"].as_str().unwrap().to_string()
-}
-
-/// Write a claims index file
-fn write_claims_index(repo_path: &Path, leases: Vec<Value>) {
-    let git_jit_dir = repo_path.join(".git/jit");
-    fs::create_dir_all(&git_jit_dir).unwrap();
-
-    let claims_index = serde_json::json!({
-        "schema_version": 1,
-        "generated_at": Utc::now(),
-        "last_seq": leases.len(),
-        "leases": leases
-    });
-
-    let claims_path = git_jit_dir.join("claims.index.json");
-    fs::write(
-        claims_path,
-        serde_json::to_string_pretty(&claims_index).unwrap(),
-    )
-    .unwrap();
-}
-
-/// Create a test lease JSON object
+/// Create a lease with an explicit acquisition time.
 fn create_test_lease(
     lease_id: &str,
     issue_id: &str,
     worktree_id: &str,
     ttl_secs: i64,
     acquired_at: chrono::DateTime<Utc>,
-) -> Value {
+) -> Lease {
     let expires_at = if ttl_secs > 0 {
         Some(acquired_at + Duration::seconds(ttl_secs))
     } else {
         None
     };
 
-    serde_json::json!({
-        "lease_id": lease_id,
-        "issue_id": issue_id,
-        "agent_id": "agent:test",
-        "worktree_id": worktree_id,
-        "branch": Some("test-branch"),
-        "ttl_secs": ttl_secs,
-        "acquired_at": acquired_at,
-        "expires_at": expires_at,
-        "last_beat": acquired_at
-    })
+    Lease {
+        lease_id: lease_id.parse().unwrap(),
+        issue_id: issue_id.parse().unwrap(),
+        agent_id: "agent:test".parse().unwrap(),
+        worktree_id: worktree_id.parse().unwrap(),
+        branch: Some("test-branch".into()),
+        ttl_secs: ttl_secs.try_into().unwrap(),
+        acquired_at,
+        expires_at,
+        last_beat: acquired_at,
+    }
 }
 
 #[test]
-fn test_validate_leases_no_claims_index() {
-    let repo = setup_git_repo();
+fn test_validate_leases_without_lease_records_is_valid() {
+    let (primary, _linked) = JitCli::linked_checkouts().unwrap();
 
-    // Run validation without claims index
-    let output = Command::new(jit_binary())
-        .args(["validate", "--leases", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
+    let json = primary.run_json(["validate", "--leases"]).unwrap();
 
-    assert!(
-        output.status.success(),
-        "Should succeed with no claims index"
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    // success field removed
     assert_eq!(json["valid"], true);
 }
 
 #[test]
-fn test_validate_repository_detects_invalid_claims_index() {
-    let repo = setup_git_repo();
-    let claims_dir = repo.path().join(".git/jit");
-    fs::create_dir_all(&claims_dir).unwrap();
-    fs::write(
-        claims_dir.join("claims.index.json"),
-        serde_json::json!({
-            "schema_version": 2,
-            "generated_at": Utc::now(),
-            "last_seq": 0,
-            "leases": []
-        })
-        .to_string(),
-    )
-    .unwrap();
-
-    let output = Command::new(jit_binary())
-        .args(["validate"])
-        .env_remove("JIT_TEST_MODE")
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert_eq!(output.status.code(), Some(4));
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stderr),
-        String::from_utf8_lossy(&output.stdout)
-    );
-    assert!(
-        combined.contains("Claims index validation failed"),
-        "{combined}"
-    );
-    assert!(combined.contains("Invalid schema version"), "{combined}");
-
-    let skipped = Command::new(jit_binary())
-        .args(["validate"])
-        .env("JIT_TEST_MODE", "1")
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-    assert!(
-        skipped.status.success(),
-        "JIT_TEST_MODE must preserve the established claims-check bypass: {}",
-        String::from_utf8_lossy(&skipped.stderr)
-    );
-}
-
-#[test]
 fn test_validate_leases_detects_expired_lease() {
-    let repo = setup_git_repo();
-    let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
-    let worktree_path = create_worktree(repo.path(), &worktree_name);
-    let worktree_id = get_worktree_id(&worktree_path);
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let issue_id = primary.create_issue(["-t", "Test Issue"]).unwrap();
 
-    // Create an issue
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test Issue", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["id"].as_str().unwrap();
-
-    // Create expired lease (acquired 2 days ago, 1 hour TTL)
-    let acquired_at = Utc::now() - Duration::days(2);
+    // Acquired 2 days ago with a 1 hour TTL.
     let expired_lease = create_test_lease(
-        "lease-expired-123",
-        issue_id,
+        "00000000-0000-4000-8000-000000000001",
+        &issue_id,
         &worktree_id,
-        3600, // 1 hour TTL
-        acquired_at,
+        3600,
+        Utc::now() - Duration::days(2),
     );
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &expired_lease).unwrap();
 
-    write_claims_index(repo.path(), vec![expired_lease]);
-
-    // Run validation
-    let output = Command::new(jit_binary())
-        .args(["validate", "--leases"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
+    let output = primary.command(["validate", "--leases"]).output().unwrap();
 
     assert!(!output.status.success(), "Should fail with expired lease");
-
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Expired"),
         "Error should mention expiration"
     );
     assert!(
-        stderr.contains("lease-expired-123") || stderr.contains(&issue_id[..8]),
+        stderr.contains("00000000-0000-4000-8000-000000000001") || stderr.contains(&issue_id[..8]),
         "Error should reference the lease or issue"
     );
 }
 
 #[test]
 fn test_validate_leases_detects_missing_worktree() {
-    let repo = setup_git_repo();
-
-    // Create worktree, get its ID, then remove it
-    let worktree_path = create_worktree(repo.path(), "doomed-wt");
-    let worktree_id = get_worktree_id(&worktree_path);
-
-    // Create an issue
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test Issue", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["id"].as_str().unwrap();
-
-    // Create valid lease for the worktree
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let issue_id = primary.create_issue(["-t", "Test Issue"]).unwrap();
     let lease = create_test_lease(
-        "lease-valid-123",
-        issue_id,
+        "00000000-0000-4000-8000-000000000002",
+        &issue_id,
         &worktree_id,
-        7200, // 2 hours TTL
+        7200,
         Utc::now(),
     );
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &lease).unwrap();
 
-    write_claims_index(repo.path(), vec![lease]);
-
-    // Remove the worktree (use --force since it has .jit directory)
-    Command::new("git")
-        .args(["worktree", "remove", "--force", "doomed-wt"])
-        .current_dir(repo.path())
-        .status()
+    // `--force`: the linked checkout carries untracked `.jit` state.
+    primary
+        .git([
+            "worktree",
+            "remove",
+            "--force",
+            linked.root().to_str().unwrap(),
+        ])
         .unwrap();
 
-    // Run validation
-    let output = Command::new(jit_binary())
-        .args(["validate", "--leases"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
+    let output = primary.command(["validate", "--leases"]).output().unwrap();
 
     assert!(
         !output.status.success(),
         "Should fail with missing worktree"
     );
-
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Worktree") && stderr.contains("no longer exists"),
@@ -331,36 +124,34 @@ fn test_validate_leases_detects_missing_worktree() {
         stderr.contains(&worktree_id),
         "Error should reference worktree ID"
     );
+    assert!(
+        stderr.contains(&format!("jit claim force-evict {}", &issue_id[..8])),
+        "Remedy should force-evict by issue: {stderr}"
+    );
 }
 
 #[test]
 fn test_validate_leases_detects_missing_issue() {
-    let repo = setup_git_repo();
-    let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
-    let worktree_path = create_worktree(repo.path(), &worktree_name);
-    let worktree_id = get_worktree_id(&worktree_path);
-
-    // Create lease for non-existent issue
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let fake_issue_id = "00000000-0000-0000-0000-000000000000";
     let lease = create_test_lease(
-        "lease-orphan-123",
+        "00000000-0000-4000-8000-000000000003",
         fake_issue_id,
         &worktree_id,
         7200,
         Utc::now(),
     );
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &lease).unwrap();
 
-    write_claims_index(repo.path(), vec![lease]);
-
-    // Run validation
-    let output = Command::new(jit_binary())
-        .args(["validate", "--leases"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
+    let output = primary.command(["validate", "--leases"]).output().unwrap();
 
     assert!(!output.status.success(), "Should fail with missing issue");
-
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Issue") && stderr.contains("no longer exists"),
@@ -370,85 +161,58 @@ fn test_validate_leases_detects_missing_issue() {
         stderr.contains(&fake_issue_id[..8]),
         "Error should reference issue ID"
     );
+    assert!(
+        stderr.contains(&format!("jit claim force-evict {}", &fake_issue_id[..8])),
+        "Remedy should force-evict by issue: {stderr}"
+    );
 }
 
 #[test]
 fn test_validate_leases_all_valid_succeeds() {
-    let repo = setup_git_repo();
-    let worktree_path = create_worktree(repo.path(), "valid-wt");
-    let worktree_id = get_worktree_id(&worktree_path);
-
-    // Create an issue
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Valid Issue", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["id"].as_str().unwrap();
-
-    // Create valid lease (not expired, worktree exists, issue exists)
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let issue_id = primary.create_issue(["-t", "Valid Issue"]).unwrap();
+    // Not expired, worktree exists, issue exists.
     let lease = create_test_lease(
-        "lease-valid-456",
-        issue_id,
+        "00000000-0000-4000-8000-000000000004",
+        &issue_id,
         &worktree_id,
-        7200, // 2 hours TTL
+        7200,
         Utc::now(),
     );
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &lease).unwrap();
 
-    write_claims_index(repo.path(), vec![lease]);
+    let json = primary.run_json(["validate", "--leases"]).unwrap();
 
-    // Run validation
-    let output = Command::new(jit_binary())
-        .args(["validate", "--leases", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "Should succeed with all valid leases"
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    // success field removed
     assert_eq!(json["valid"], true);
 }
 
 #[test]
 fn test_validate_leases_json_output_on_failure() {
-    let repo = setup_git_repo();
-    let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
-    let worktree_path = create_worktree(repo.path(), &worktree_name);
-    let worktree_id = get_worktree_id(&worktree_path);
-
-    // Create an issue
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test Issue", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let issue_id = create_json["id"].as_str().unwrap();
-
-    // Create expired lease
-    let acquired_at = Utc::now() - Duration::days(1);
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let issue_id = primary.create_issue(["-t", "Test Issue"]).unwrap();
     let expired_lease = create_test_lease(
-        "lease-json-test",
-        issue_id,
+        "00000000-0000-4000-8000-000000000005",
+        &issue_id,
         &worktree_id,
-        3600, // 1 hour TTL
-        acquired_at,
+        3600,
+        Utc::now() - Duration::days(1),
     );
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &expired_lease).unwrap();
 
-    write_claims_index(repo.path(), vec![expired_lease]);
-
-    // Run validation with JSON output
-    let output = Command::new(jit_binary())
-        .args(["validate", "--leases", "--json"])
-        .current_dir(repo.path())
+    let output = primary
+        .command(["validate", "--leases", "--json"])
         .output()
         .unwrap();
 
@@ -459,12 +223,12 @@ fn test_validate_leases_json_output_on_failure() {
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json.as_object().map(|object| object.len()), Some(1));
-    assert_eq!(json["error"]["code"], "GENERIC_ERROR");
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(output.status.code(), Some(4));
     assert!(output.stderr.is_empty(), "JSON failure stays stream-pure");
     let details = &json["error"]["details"];
     assert_eq!(details["valid"], false, "Validation should report invalid");
 
-    // Check that validations array contains lease validation result
     let validations = details["validations"].as_array().unwrap();
     assert!(!validations.is_empty());
 

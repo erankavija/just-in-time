@@ -30,6 +30,7 @@ use crate::config::DocumentationConfig;
 use crate::domain::artifact_classifier::contains_path;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
 use crate::domain::artifact_plan::normalize_artifact_path;
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, SHORT_ID_LENGTH};
 use std::collections::{BTreeMap, BTreeSet};
@@ -41,7 +42,7 @@ pub enum ArtifactDisposition {
     /// that issue owns in this area.
     Nonconforming {
         /// Full id of the owning issue.
-        issue_id: String,
+        issue_id: IssueId,
         /// Repository-relative directory the owner owns in this area.
         canonical_directory: String,
     },
@@ -148,7 +149,7 @@ fn first_reported_occurrence(
     path: &str,
     owners: &BTreeMap<String, Vec<&Issue>>,
     references: &BTreeMap<String, Vec<&Issue>>,
-    canonical_directories: &BTreeMap<String, String>,
+    canonical_directories: &BTreeMap<IssueId, String>,
 ) -> Option<ReportedArtifact> {
     let path = normalize_artifact_path(path);
     let relative = path
@@ -279,8 +280,7 @@ fn owners_by_referenced_path(issues: &[Issue]) -> BTreeMap<String, Vec<&Issue>> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::fixture_issue;
-    use crate::test_utils::document_reference;
+    use crate::test_utils::{document_reference, fixture_issue};
     use proptest::prelude::*;
     use std::collections::HashMap;
 
@@ -458,11 +458,12 @@ mod tests {
 
     #[test]
     fn test_report_area_artifacts_reports_an_unresolvable_prefix_as_unattributed() {
-        let owner = issue("artifact-layout");
+        let mut owner = issue("artifact-layout");
+        owner.id = crate::test_utils::issue_id(1);
         let twin = {
             // Two issues sharing a short id: the prefix answers to no single one.
             let mut twin = issue("other-initiative");
-            twin.id = format!("{}{}", owner.short_id(), &twin.id[SHORT_ID_LENGTH..]);
+            twin.id = crate::test_utils::issue_id((1 << 32) | 1);
             twin
         };
         let unknown = format!("{AREA}/deadbeef-plan.md");
@@ -606,7 +607,7 @@ mod tests {
             // The leading run is not delimited from what follows it.
             format!("{AREA}/{short_id}notes.md"),
             // Hexadecimal, but not the printed width.
-            format!("{AREA}/{}-plan.md", &short_id[..SHORT_ID_LENGTH - 1]),
+            format!("{AREA}/deadbee-plan.md"),
             // The printed width, but outside the printed alphabet.
             format!("{AREA}/DEADBEEF-plan.md"),
             format!("{AREA}/deadbeefs-plan.md"),

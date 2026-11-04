@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:01:19.044915190Z",
+  "context": {},
+  "created_at": "2026-11-01T14:00:40.108248147Z",
+  "dependencies": [],
+  "description": "After a clean merge a dependent can stay `backlog` with nothing unmet and nothing reporting it, so it never becomes available until someone runs `jit validate --fix`.\n\n## Background\n\nFound while testing `aeafc378` on a scratch clone. Two linked checkouts each close one of a dependent's two blockers. Each checkout sees one blocker still open, so neither promotes the dependent. The branches merge with no conflict, and on the merged state the dependent is `backlog`, has no unmet dependencies, and is absent from `jit query available`. The worker reported `jit validate` passing on that state, and `jit validate --fix` repairing it.\n\n945f9181 (one readiness derivation) adds the pure correction function and carries it into deletion, dependency edits and template edges. It does not cover a state produced by a merge or what validation reports, so this bug links to it rather than duplicating it.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate` on a repository whose stored readiness disagrees with the dependency graph reports each such issue and fails, rather than passing silently.\n- [hard] REQ-02: `jit validate --fix` still repairs it, and `jit validate` then passes.\n- [hard] REQ-03: A test reproduces the two-blocker merged state and owns REQ-01 and REQ-02.\n- [hard] REQ-04: The readiness comparison uses `Issue::derive_readiness_correction`, with no second derivation.\n\n## Notes\n\n- Reproduce on the merged state first and record the result here before changing code.\n- Related: 945f9181.\n\n\n## Reproduction result\n\nBefore the fix, `jit validate` returned success on the state with both blockers `Done` and the dependent `Backlog`, reproduced in memory by the worker. An earlier scratch-clone run of the real two-checkout merge reported the same pass. The check reported only `ReadinessCorrection::Demote`; it now reports every correction from `derive_readiness_correction`, the same function `--fix` uses.\n",
+  "documents": [],
+  "done_at": "2026-11-01T14:39:22.753599571Z",
+  "first_ready_at": "2026-11-01T14:00:40.108248147Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ef06aea7-2353-4f8a-a9fe-d5a3356bcee4",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:35:57.724671912Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f25f3228-22e2-4859-b628-be3bef79e48d",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:38:52.674470011Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "9c008d2d-decc-4845-b309-e01a42e98eda",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:validation",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Validation reports a promotion the graph demands",
+  "updated_at": "2026-11-01T14:39:22.753599571Z"
+}

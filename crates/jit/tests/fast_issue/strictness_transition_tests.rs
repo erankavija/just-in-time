@@ -10,7 +10,10 @@
 //! - an `enforce` error graph rule's violation blocks under `loose` but is
 //!   downgraded to advisory under `permissive`.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
+use jit::domain::identity::IssueId;
 use jit::domain::State;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -35,24 +38,9 @@ enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
 
-/// Build an executor whose `config.toml` sets `[validation].strictness` and whose
-/// `.jit/rules.toml` holds `rules_toml`. `JIT_TEST_MODE` keeps lease checks from
-/// requiring a real worktree claim.
-fn executor(strictness: &str, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    storage.add_data_file(
-        "config.toml",
-        &format!("[validation]\nstrictness = \"{strictness}\"\n"),
-    );
-    storage.add_data_file("rules.toml", rules_toml);
-    let layout = storage.repository_layout();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Seed an in-progress epic with NO design dependency (so the rule under test is
 /// violated at a `done` transition) and return its id.
-fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> String {
+fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> IssueId {
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
@@ -62,7 +50,7 @@ fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> String {
 }
 
 /// The persisted state of `id`.
-fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> State {
+fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> State {
     executor.storage().load_issue(id).unwrap().state
 }
 
@@ -70,9 +58,16 @@ fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> State {
 
 #[test]
 fn test_warn_graph_rule_blocks_transition_under_strict() {
-    let executor = executor("strict", DONE_WANTS_DESIGN_WARN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[validation]\nstrictness = \"strict\"\n"),
+            rules: Some(DONE_WANTS_DESIGN_WARN),
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_err(),
         "strict must block the done transition on a warning-only graph violation"
@@ -86,9 +81,16 @@ fn test_warn_graph_rule_blocks_transition_under_strict() {
 
 #[test]
 fn test_warn_graph_rule_does_not_block_transition_under_loose() {
-    let executor = executor("loose", DONE_WANTS_DESIGN_WARN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[validation]\nstrictness = \"loose\"\n"),
+            rules: Some(DONE_WANTS_DESIGN_WARN),
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_ok(),
         "loose must allow the transition; a warning does not block: {result:?}"
@@ -100,9 +102,16 @@ fn test_warn_graph_rule_does_not_block_transition_under_loose() {
 
 #[test]
 fn test_enforced_graph_rule_blocks_transition_under_loose() {
-    let executor = executor("loose", DONE_NEEDS_DESIGN_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[validation]\nstrictness = \"loose\"\n"),
+            rules: Some(DONE_NEEDS_DESIGN_ENFORCE),
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_err(),
         "loose must block the done transition on an enforced-error graph violation"
@@ -112,9 +121,16 @@ fn test_enforced_graph_rule_blocks_transition_under_loose() {
 
 #[test]
 fn test_enforced_graph_rule_allowed_under_permissive() {
-    let executor = executor("permissive", DONE_NEEDS_DESIGN_ENFORCE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[validation]\nstrictness = \"permissive\"\n"),
+            rules: Some(DONE_NEEDS_DESIGN_ENFORCE),
+            ..MemoryDeclarations::default()
+        },
+    );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_ok(),
         "permissive must downgrade even an enforced-error graph violation: {result:?}"

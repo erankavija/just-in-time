@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "612befc782aa1ed0f7583559dd779179a9c9bf88",
+  "completed_at": "2026-10-28T23:05:36.939911282Z",
+  "duration_ms": 231985,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All scoped migration criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "26cbc32e-975d-472c-8d5c-27689577b253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "05470da4-ed81-4092-a027-a4aa1dc07fd2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:01:44.954631258Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 44473693, ef508090, b0e1c134 (merge; no scoped diff against second parent), 2e12ac4\nPolicy sources: AGENTS.md\nResolved items: @/issue/26cbc32e/requirement/REQ-01–REQ-04 (issue description); @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:00:16Z); prior code-review F1 is resolved by 2e12ac4\nTruncation recovery: recovered the initially truncated broad item/search output with bounded per-commit patches, scoped searches, and current-file reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All scoped migration criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

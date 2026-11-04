@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:09:04.477264909Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,12 +8,33 @@
   ],
   "description": "`ProfileOrigin` is replaced by the worktree-relative directory path it wraps, and a package origin serializes as that path in results, events and schemas.\n\n## Background\n\n`ProfileOrigin` (`crates/jit/src/domain/types.rs:1130`) has one variant, `Directory(RootRelativePath)`, and serializes as a tagged object (`{\"source\": \"directory\", \"location\": ...}`). It is destructured irrefutably at `crates/jit/src/main.rs:1176` and read across the composition, application, difference, package-capture, initialization, materialization, init and validate modules, and in the derived-state repair and cutover tests. Profile results that carry an origin reach the published schemas, human-readable output and the MCP integration tests (`mcp-server/test-integration.js`). Line numbers are at the investigation baseline. The wire change needs no migration: no released format exists (`@/inv/canonical-cutover`).\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfileOrigin` enum remains; each former use holds the worktree-relative directory path.\n- [hard] REQ-02: A package origin serializes as its worktree-relative directory path, and the published schemas say so.\n- [hard] REQ-03: Human-readable output names the origin directory as before.\n- [hard] REQ-04: The MCP integration tests and the profile publication tests pass over the new origin shape.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:19:29.535947630Z",
+  "first_ready_at": "2026-11-01T19:16:49.469843201Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a6acc780-79a4-43f6-b760-1b18417afcb7",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:10:37.429124168Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2408fe54-e354-48d8-b31b-c8eb4819b259",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:13:37.500327669Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "f3a4cc66-69ad-44d8-9323-89672d671bfa",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:19:06.810610914Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "024b98b1-8afe-47f0-b7e3-6cbf904367db",
   "labels": [
     "type:task",
@@ -23,7 +45,7 @@
     "satisfies:3d9a0ce3/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Serialize a profile origin as its directory path",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:19:29.535947630Z"
 }

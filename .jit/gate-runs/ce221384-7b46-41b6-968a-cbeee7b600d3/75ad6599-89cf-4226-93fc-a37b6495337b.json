@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2575accc8fda77bc900af8a7cb6e551b1fc32abc",
+  "completed_at": "2026-11-04T12:55:31.722255842Z",
+  "duration_ms": 179589,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 927,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The --force documentation contradicts the shipped findings contract."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/guarantees.md",
+        "id": "F2",
+        "line": 640,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The network-error example incorrectly presents an unreachable external URL as a warning."
+      }
+    ],
+    "summary": "Two issue-impact documentation inaccuracies remain for forced creation findings and unreachable external URLs.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ce221384-7b46-41b6-968a-cbeee7b600d3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "75ad6599-89cf-4226-93fc-a37b6495337b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:52:32.132633203Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 47591 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a69e-43c4-7f02-8ce6-2999b6f9d6e0\n--------\nuser\n--- 47578 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `ce221384` is a leaf task with one reachable tagged commit (`1a863107`); I inspected that patch individually and verified the current implementation. Uncommitted `.jit/` state was not attributed.\n\nDocumentation does not yet accurately cover all changed behavior.\n\n1. **F1 — blocking, issue-impact, high:** The `issue create --force` table says findings are identical with or without `--force`, but bypassed blocking local-rule failures are omitted from `findings` and logged as events. The nearby “Findings never block creation” wording is also misleading without limiting it to reported findings. Replace both statements with the actual distinction between non-blocking findings and forced bypass events. [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:927)\n\n2. **F2 — blocking, issue-impact, high:** The external-assets concept example still says a network failure produces a warning that the URL was not validated. The current `doc check-links` behavior reports this as an `unreachable_url` error and exits 4. Update the example and outcome accordingly. [docs/concepts/guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:640)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact documentation inaccuracies remain for forced creation findings and unreachable external URLs.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The --force documentation contradicts the shipped findings contract.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":927},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The network-error example incorrectly presents an unreachable external URL as a warning.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":640}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

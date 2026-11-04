@@ -1,0 +1,578 @@
+{
+  "epic_id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
+  "epic_short_id": "3d9a0ce3",
+  "current_wave": 9,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "ae2e3739-f5f7-42be-8ae4-8ae3e1866800",
+          "short_id": "ae2e3739",
+          "title": "Accept the worktree root as a gate input root",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        },
+        {
+          "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
+          "short_id": "fd9bfab8",
+          "title": "Record a checker infrastructure fault as an error",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
+          "short_id": "66986f88",
+          "title": "Derive an issue's documents from its artifact directory",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        },
+        {
+          "id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
+          "short_id": "d6bbe05f",
+          "title": "Remove profile checks from repository validation",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "done"
+        },
+        {
+          "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
+          "short_id": "d1ff2273",
+          "title": "Produce the shipped workflow package by packing its directory",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ],
+      "note": "1a: disk-bounded (51G free) sub-wave"
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "72d89161-39e7-4858-9f16-31deb4ff7505",
+          "short_id": "72d89161",
+          "title": "Reuse gate verdicts only by declared-input digest",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        },
+        {
+          "id": "f37d228e-f3dd-412f-87c7-364f64da2f07",
+          "short_id": "f37d228e",
+          "title": "Exit successfully from link checking on warnings alone",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ],
+      "note": "1b: 72d89161 after ae2e3739 (gate_execution.rs); f37d228e after 66986f88 (link checker)"
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "5a3a886f-96cb-420d-9070-5f8e6dcedb1d",
+          "short_id": "5a3a886f",
+          "title": "Declare this repository's tree-wide gate inputs as the worktree root",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "39710b3b-2b92-4fc1-bbc2-4c230577e350",
+          "short_id": "39710b3b",
+          "title": "Record built-in checker faults as error runs",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
+          "short_id": "d5966ba2",
+          "title": "Archive derived documents with their issue",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "f9ab44aa-1df9-49f7-a335-2a3c2880ac06",
+          "short_id": "f9ab44aa",
+          "title": "Remove redundant explicit links inside artifact directories",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "done"
+        },
+        {
+          "id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+          "short_id": "8673dc5e",
+          "title": "Gate status reports a manual attestation as never run",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        },
+        {
+          "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
+          "short_id": "24268b05",
+          "title": "Remove the record-reading profile subcommands",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
+          "short_id": "494f1d4b",
+          "title": "Report load-only cargo-ci failures as infrastructure faults",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "856f0520-7af9-4c2d-9297-5abbd9eae365",
+          "short_id": "856f0520",
+          "title": "Classify cargo-ci load from a pre-run baseline",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ],
+      "note": "24268b05 waits on 756ec5ec (842b0ac6)"
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "2dd6b833-8f5d-484a-b412-158b74e3d7f5",
+          "short_id": "2dd6b833",
+          "title": "Remove profile capture",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "done"
+        },
+        {
+          "id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
+          "short_id": "3754095f",
+          "title": "Replace emoji status markers in CLI output with words",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "da12ad66-7451-4700-9731-74a36c895bb9",
+          "short_id": "da12ad66",
+          "title": "Give issue rejection one command form",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ],
+      "note": "da12ad66 waits on 5f71a48d"
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "1a989754-d48c-409a-a796-dee1671f800a",
+          "short_id": "1a989754",
+          "title": "Remove the profile selector tags",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
+          "short_id": "7f9268ed",
+          "title": "Show word status markers in documented command output",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "f866d9d8-384e-4b5e-9616-78bfa5e1b440",
+          "short_id": "f866d9d8",
+          "title": "Remove three-way profile publication",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "5179374d-220a-4f45-b52c-bb81a4ac9a9f",
+          "short_id": "5179374d",
+          "title": "Remove applied-profile records",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "3f217dd2-4d04-41b5-b60e-fa8251bfe797",
+          "short_id": "3f217dd2",
+          "title": "Record what was applied in the profile lifecycle event",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "5c0bd3ad-1d1b-4eae-a003-08e08a7a3206",
+          "short_id": "5c0bd3ad",
+          "title": "Write the package value over an existing registry entry",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "abe963dd-7fba-49c8-930c-1767d3bce945",
+          "short_id": "abe963dd",
+          "title": "Build one profile selection per invocation",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "0dcabcca-d6f5-415f-90f2-12dc29f97313",
+          "short_id": "0dcabcca",
+          "title": "Let the dependent package win a key both packages declare",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "id": "56b89d9a-c2c9-4250-bd8f-e4bf059921d5",
+          "short_id": "56b89d9a",
+          "title": "Prune dead and test-only profile executor entry points",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 12,
+      "issues": [
+        {
+          "id": "a5fbec12-fa6a-4684-994b-5fd0652471e3",
+          "short_id": "a5fbec12",
+          "title": "Report profile plans through the apply result type",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 13,
+      "issues": [
+        {
+          "id": "9e703435-4257-45f1-8c19-d1478d4b77b7",
+          "short_id": "9e703435",
+          "title": "Derive profile conflict serialization",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 14,
+      "issues": [
+        {
+          "id": "d721ab14-a559-4435-90c1-4d342b2507a6",
+          "short_id": "d721ab14",
+          "title": "Name profile conflict parties by package only",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 15,
+      "issues": [
+        {
+          "id": "665bb4e1-093c-4589-9228-8d694701d2bf",
+          "short_id": "665bb4e1",
+          "title": "Derive registry target paths from one registry declaration",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        },
+        {
+          "id": "ae85c6ce-ede6-4869-b96f-72a6a8acc7a3",
+          "short_id": "ae85c6ce",
+          "title": "Rewrite the profiles reference around apply-once",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 16,
+      "issues": [
+        {
+          "id": "0f648627-a6e7-4380-b224-813c43a7bccf",
+          "short_id": "0f648627",
+          "title": "Fold the profile dependency error into the graph error",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 17,
+      "issues": [
+        {
+          "id": "04ece1e2-656b-456c-b434-5f5200fa1d3b",
+          "short_id": "04ece1e2",
+          "title": "Use one validated profile package type",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 18,
+      "issues": [
+        {
+          "id": "376afd01-749f-4644-bf3d-7164cafdeac7",
+          "short_id": "376afd01",
+          "title": "Unwrap the single-variant package source enum",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 19,
+      "issues": [
+        {
+          "id": "1eab392b-8008-4245-82f8-24ce07fa2781",
+          "short_id": "1eab392b",
+          "title": "Make the profile selector a package path",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 20,
+      "issues": [
+        {
+          "id": "024b98b1-8afe-47f0-b7e3-6cbf904367db",
+          "short_id": "024b98b1",
+          "title": "Serialize a profile origin as its directory path",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 21,
+      "issues": [
+        {
+          "id": "536a48ef-97bc-4f34-a813-54f70572b91e",
+          "short_id": "536a48ef",
+          "title": "Show a package's target set without value hashes",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 22,
+      "issues": [
+        {
+          "id": "6e65a501-cffe-4c86-9029-4934f619d057",
+          "short_id": "6e65a501",
+          "title": "Keep one canonical JSON function",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        },
+        {
+          "id": "79dc28d7-b552-4227-bb4c-24894863874c",
+          "short_id": "79dc28d7",
+          "title": "Rewrite the profile command reference",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 23,
+      "issues": [
+        {
+          "id": "216f70b4-e98f-4fe1-b2e2-4371258694f0",
+          "short_id": "216f70b4",
+          "title": "Type profile versions as semver values",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 24,
+      "issues": [
+        {
+          "id": "dbbfcd6c-562a-4691-86e7-feb687c79ce5",
+          "short_id": "dbbfcd6c",
+          "title": "Identify profile packages by the domain profile id",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ],
+      "note": "waits on 2195c98f (steward re-home pending)"
+    },
+    {
+      "wave_number": 25,
+      "issues": [
+        {
+          "id": "5f82e09a-2b31-4f51-acf3-7d4c87501ab2",
+          "short_id": "5f82e09a",
+          "title": "Refuse a profile apply over uncommitted target changes",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ],
+      "note": "waits on f4d9502a (steward re-home pending)"
+    },
+    {
+      "wave_number": 26,
+      "issues": [
+        {
+          "id": "619697bd-a702-4252-9b07-fec7305c4ad7",
+          "short_id": "619697bd",
+          "title": "Describe the uncommitted-target refusal in the profile references",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [
+    {
+      "short_id": "494f1d4b",
+      "reason": "steward-approved option A: load-only cargo-ci failures reused by digest as verdicts",
+      "approved_by": "milestone steward"
+    },
+    {
+      "short_id": "856f0520",
+      "reason": "494f1d4b load threshold measured the run's own build; steward approved 0.17 x nproc pre-run baseline",
+      "approved_by": "milestone steward"
+    }
+  ],
+  "escalations": [
+    {
+      "topic": "load-induced cargo-ci failures reused by digest",
+      "resolution": "steward approved new task 494f1d4b (option A)"
+    },
+    {
+      "topic": "df129d9e run-status renderer task requires removed '(already passed at HEAD)' output",
+      "resolution": "reported to steward; pending"
+    },
+    {
+      "topic": "dogfood binary reinstall for 5a3a886f",
+      "resolution": "steward reinstalled from 582b1cc92"
+    },
+    {
+      "topic": "mcp-ci judges installed jit binary, not the tree",
+      "resolution": "pending steward (options: reinstall per CLI change, or build+PATH in checker)"
+    },
+    {
+      "topic": "8673dc5e rework limit: legacy gates_status without run_id",
+      "resolution": "steward ruled option A; conversion tool run (2405+2+3 pointed, 210 attested runs published); committed e2f2693d8"
+    },
+    {
+      "topic": "mcp-ci red on main from another epic (jit_migrate_lifecycle-timestamps uncurated)",
+      "resolution": "reported to steward; pending"
+    },
+    {
+      "topic": "fixture contention TIMEOUT/lock-wait signature in cargo-ci",
+      "resolution": "steward: force allowed for that exact signature until c780514e's cold-key fix lands"
+    },
+    {
+      "topic": "abe963dd rework limit: code-review assumed parent-traversal aliases were admitted",
+      "resolution": "2026-10-22 parent approved one additional focused attempt: preserve existing parent-traversal rejection, prove rejected inputs never reach model validation, deduplicate admitted aliases, rerun full gates and review. Failed code-review a9d77cf0 and cargo-ci 00bccea4 preserved. Existing repository_state/path.rs lexical_absolute rejects ParentDir via non-Normal component; no path-acceptance expansion authorized."
+    },
+    {
+      "topic": "Automatic approval review rejected direct main merge",
+      "resolution": "User explicitly approved: \"I approve the merge\", coordinating thread 01a164c8-d7ba-7812-a630-db8dddcee05b, user message 01a1656c-cc39-72b2-a487-871d742b823a. Read directly on resume; parent authorized reconciliation, required checks, main merge and gate/closure records."
+    }
+  ],
+  "surfaced_pitfalls": [
+    "66986f88: JIT_ISSUE_DOCS for gates, `issue show`, and the issue JSON the web UI reads still list explicit links only; derived documents are invisible there. Reconcile against epic REQ-03 before the epic gate.",
+    "ae2e3739: server.log and server.pid.json are not in the tracker-written set (the issue list omits them); a running server changes a `.` gate's digest. Relevant to 5a3a886f.",
+    "d6bbe05f: docs/reference/profiles.md 'Derived state and managed regions' still describes validation over profile-owned targets; ae85c6ce rewrites it.",
+    "ae2e3739 renamed gate_check real_repo_root -> real_repo_layout; a df129d9e task inventory names real_repo_root.",
+    "materialize.rs: MaterializationRequest::RepairDerivedState.profiles, the derive_repair profile loop and AmbiguousOwnershipError::MultipleProfileClaims are dead after d6bbe05f; delete with records in 5179374d.",
+    "cli_warnings_integration_tests take ~6.3 s each alone and time out (20 s) under concurrency; recurring 'load' failures.",
+    "24268b05: ProfileResolution::RestoreRecordedPackage is dead; remove with remedies in f866d9d8 (noted in its lead notes).",
+    "8673dc5e: manual passes recorded before the change have no run record (accepted, greenfield); removing and re-adding a gate leaves old run records visible in latest-run (pre-existing, outside REQ-03 per lead).",
+    "1a989754: PROFILE_NOT_FOUND error code has no reachable route; an absent package dir returns PROFILE_ERROR exit 1. Candidate for 0f648627 (graph error merge) or a follow-up.",
+    "2dd6b833: repository_state/package_tree.rs republication machinery (TreeFileDisposition::Remove, expand_destination_closure) is unreachable now that add publishes only to an absent destination; candidate for 56b89d9a entrypoint pruning.",
+    "f866d9d8 took parts of d721ab14 (Occupied variant deleted) and 9e703435 (ProfileTargetConflict derives Serialize); those workers must start from main and only finish what remains."
+  ],
+  "rework_counts": {
+    "d6bbe05f": 2,
+    "fd9bfab8": 2,
+    "ae2e3739": 1,
+    "66986f88": 1,
+    "24268b05": 1,
+    "8673dc5e": 2,
+    "f866d9d8": 1,
+    "39710b3b": 1,
+    "abe963dd": 3
+  },
+  "started_at": "2026-10-21T04:21:37+03:00",
+  "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock",
+  "notes": [
+    "2026-10-22 Codex resumed existing abe963dd deb013162; no recorded gates. Preliminary review found equivalent relative/absolute selectors repeat model validation; focused regression/fix underway in existing worktree. Waiting for 63c11d08 import cutover before main integration and full gates. Earlier ready d5966ba2, 7f9268ed and 5c0bd3ad remain unfinished and must be reconciled before successor dispatch. Preserve unrelated worktrees and failed gate evidence.",
+    "2026-10-23 paused for user handoff. See handoff-4.md. Owning branch checkpoint 01f148ba4 includes main through ba02afa0d. Timeout d3a0da67 preserved in e00b10914; subsequent compile-only check passed in 34.19s, final cargo-ci not launched. No active workers/builds/locks; main/build window released. Explicit merge approval retained, no merge performed. Future bounded workers Luna xhigh; no new worktrees/caches; all builds incremental=0.",
+    "2026-11-01 session aa resumed under invoker just-in-time-c9 (user chose the epic; all open issues in scope). Closed: 7f9268ed, abe963dd, d5966ba2, ddca5431, 81664a6a, 07663984, 3a3b86cf, 5f71a48d, 5f82e09a, 9c008d2d, da12ad66. Added: 9c008d2d, c47d78c8, 17fbcf25, d7cce445 (from f4d9502a). In flight: profile-a batch (5c0bd3ad, 1b0c2b75, ab797eed) in agent-profile-a; aeafc378 option D plus 17fbcf25 in agent-aeafc378-d (fallback branch worktree-agent-aeafc378 dropped once D lands); d7cce445 and c47d78c8 step 1 in agent-c47d78c8. Landing helpers in this session's scratchpad; lease as agent:worker and run gates as JIT_AGENT_ID=agent:worker.",
+    "2026-11-01 complete: see completion-report.md. All waves landed; child states are in the tracker."
+  ],
+  "latest_handoff": "handoff-4.md"
+}

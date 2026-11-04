@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "88e7e8dfb173923faf24e29bdbd2c4d285220a59",
+  "completed_at": "2026-10-28T23:42:36.876172416Z",
+  "duration_ms": 220149,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/linked_checkout_write_policy_tests.rs",
+        "id": "F1",
+        "line": 29,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c5c933f2/requirement/REQ-02",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "An in-scope test still calls a separate repository-setup helper rather than the shared CLI process fixture."
+      }
+    ],
+    "summary": "One hard migration criterion remains unmet: an in-scope test still uses a separate repository fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c5c933f2-01da-4cb8-9711-4f1dd7b4e410",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "19646106-8e61-465e-83a7-9d7bdaf9eca0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:38:56.726591380Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12615 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184e1-8dfd-7730-814f-aad97424d678\n--------\nuser\n--- 12602 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 42bdf5aea, 1d583ebf9, 88e7e8dfb (jit:c5c933f2)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/c5c933f2/requirement/REQ-01–REQ-04 (issue description); @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:38:32Z); code-review pending\nTruncation recovery: recovered the initially truncated broad read with per-commit, per-file patch reads; claim and worktree patches were read in line-range partitions.\n\n1. [blocking][issue-impact] `linked_checkout_write_policy_tests.rs:29` still calls `jit::test_utils::setup_test_repo_with_taxonomy()` to construct its repository and storage, instead of using `JitCli`. Thus an in-scope file retains a separate repository-setup helper and its test does not spawn through the shared CLI process fixture, leaving hard REQ-02 unmet. References: @/issue/c5c933f2/requirement/REQ-02, @/invariant/shared-test-contracts.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One hard migration criterion remains unmet: an in-scope test still uses a separate repository fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An in-scope test still calls a separate repository-setup helper rather than the shared CLI process fixture.\",\"file\":\"crates/jit/tests/cli_repo_workflow/linked_checkout_write_policy_tests.rs\",\"line\":29,\"references\":[\"@/issue/c5c933f2/requirement/REQ-02\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

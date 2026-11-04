@@ -89,7 +89,7 @@ an unbounded tree. The image holds, per canonical path, a `RepositoryEntry` —
 `DirectoryListing`s, which hold child names only, and pinned-document evidence.
 
 A mutation reads the repository in one pass. What it reads first names what it
-reads next (the index names the issue files, the issues name the plan documents
+reads next (the issues listing names the issue files, the issues name the plan documents
 their transition rules read), so the session grows the image with
 `RepositoryMutationSession::extend`, which reads only the requests the image does
 not already hold. Nothing is read twice, so no read is compared with an earlier
@@ -101,9 +101,10 @@ issue-linked documents and pinned evidence are validation's reads
 
 The event log is the one path a mutation reads as a tail: an `EventLogTail`
 (`EventLogTail::read_tail`) holds the log's exact length and its last bytes,
-reaching back to the start of the final line, so the read is bounded by that line
-and never by the log's history (`@/issue/c88822a5/decision/D-1`). Validation,
-which parses the log, reads it whole.
+reaching back to the start of the final line. That tail determines the committed
+length where event appends are positioned and is bounded by the final line,
+never by the log's history (`@/issue/c88822a5/decision/D-1`). Validation, which
+parses the log, reads it whole.
 
 The budgets bound the one place a capture grows beyond what a caller declared:
 expanding a complete listing names children nobody asked for, and `max_listings`
@@ -142,7 +143,8 @@ Planning converts semantic intent into a `MaterializationPlan`: an exact
 `RepositoryDelta` of normalized `RepositoryAction`s (`CreateDirectory`,
 `WriteFile`, `SetMode`, `DeleteFile`, `AppendEvents`), and the captured image.
 Each action carries an `ExpectedPreimage` of its target as captured; apply refuses
-a plan whose preimages disagree with the session's image.
+a plan whose preimages disagree with the session's image or whose image
+carries another session's token.
 
 ### One typed request enum, one shared tail
 
@@ -150,10 +152,10 @@ a plan whose preimages disagree with the session's image.
 graph. It matches on a `MaterializationRequest`, whose variants are the only ways
 to enter planning:
 
-- `SemanticMutation` — rebuild all declaration-owned state after a record change.
+- `SemanticMutation` — rebuild all state derived from declarations after a record change.
 - `RenderConfiguredProjections` — render the selected configured projections
   (`None` selects all).
-- `RepairDerivedState` — repair all declaration-owned derived state.
+- `RepairDerivedState` — repair all derived state.
 - `Initialize` — derive a fresh or missing-file repository scaffold.
 - `ApplyProfileSelection` — derive one complete profile-selection application
   over an existing repository.
@@ -181,7 +183,7 @@ flowchart TD
 
 ### The complete producer set
 
-`compose_complete` is the complete owned-materialization producer set: default
+`compose_complete` is the complete derived-materialization producer set: default
 rules and their schemas plus every configured projection, each derived from
 declared authority (`@/inv/single-source-prose`). A caller cannot invoke a subset
 — the intent selects the whole set. This is where the three intents differ in
@@ -192,9 +194,7 @@ scope while sharing the producer code:
 - `derive_project_render` scopes *which declared projections* participate; an
   out-of-scope projection contributes no action, leaving its target untouched. The
   scope is declaration scope, never a choice of producer family.
-- `derive_repair` runs `compose_complete` and then layers ownership-safe
-  composition of any profile claims its caller supplies; `jit validate --fix`
-  supplies none.
+- `derive_repair` is `derive_semantic_mutation` under the repair intent.
 
 Shared projection targets compose through the one `managed_document` primitive
 (`compose_managed_documents`), never last-writer-wins, so two projections into one
@@ -203,14 +203,13 @@ default-family spans, preserving authored content unconditionally. The engine
 reads type names, gate keys, projection targets, and templates from captured
 declarations, never from hardcoded domain assumptions (`@/inv/domain-agnostic`).
 
-### Repair derivation and ownership refusal
+### Repair derivation
 
-`derive_repair` is complete *and* ownership-safe per target: `rules.toml` splices
-only generated default spans, region projections splice only their managed region,
-and full-file projections replace only a target the declaration proves. When
-ownership cannot be proven — a duplicate rule name — repair refuses before publication with a typed
-`AmbiguousOwnershipError` rather than rewriting an authored boundary it cannot
-prove it owns.
+`derive_repair` composes each target without touching authored bytes: `rules.toml`
+splices only generated default spans, region projections splice only their managed
+region, and full-file projections replace only a target the declaration proves.
+When a target is ambiguous — a duplicate rule name — repair refuses before
+publication with a typed error rather than rewriting an authored boundary.
 
 `compare_materializations` is the read-only counterpart: it diffs a plan's
 expected actions against the same closed image and reports each
@@ -252,9 +251,10 @@ reflect the proposed state before anything is published:
 
 Record-level mutations (issue create/update/claim/delete, gate runs, events, index
 membership) are driven by the typed-to-byte finalizer in
-`repository_state/mutation.rs`. Commands submit timestamp-free, identifier-free
-semantic `MutationIntent`s; the finalizer assigns identity and time and emits one
-exact plan.
+`repository_state/mutation.rs`. Commands submit timestamp-free semantic
+`MutationIntent`s; a created issue carries the id its command derived through
+`MutationContext::issue_id_at`, and the finalizer assigns every other identity and
+the time and emits one exact plan.
 
 - `MutationIntent` is a closed enum of repository-owned mutations. A new record
   class extends this enum.
@@ -264,14 +264,15 @@ exact plan.
   the first identifier allocation, the timestamp on the first transition — so a
   no-op mutation samples neither, and a retry reuses identical record identities
   and times.
-- `finalize` (built on `finalize_delta`) allocates identifiers in a frozen order —
-  new issue ids first, gate-run/record ids next, event ids last after canonical
-  event ordering — stamps the one timestamp on every transition, emits the new
-  event lines as one `AppendEvents` action at the captured log length
-  (`@/inv/event-log`), and derives `index.json` membership from the captured
-  preimage. The captured tail is the finalizer's torn-tail evidence: it refuses to
-  append after an uncertified torn final line. `finalize_audit_append` reuses the
-  same torn-tail authority for init/profile deltas that carry their own asset
+- `finalize` (built on `finalize_delta`) follows a frozen identifier order — the
+  indices of new issue ids first, reserved for the ids their commands derived,
+  gate-run/record ids next, event ids last after canonical event ordering —
+  stamps the one timestamp on every transition and emits event lines as one
+  `AppendEvents` action positioned at the log's committed length, the end of its
+  last newline-terminated line (`@/inv/event-log`). It derives `index.json`
+  tombstones from the captured preimage. The captured tail determines that length,
+  so an unterminated final line is overwritten. `finalize_audit_append` positions
+  its append the same way for init/profile deltas that carry their own asset
   actions.
 
 The finalizer serializes every record canonically (`serialize_issue`,
@@ -310,7 +311,8 @@ plan is published through:
   untouched repository. The repository write lock stays held for the session.
 - `capture` and `extend` revalidate the root capabilities and return the bounded
   `RepositoryImage`.
-- `apply` checks that the plan's image is the session's captured image and that
+- `apply` checks that the plan's image carries the token of the session's latest
+  capture (clones share the captured data and the token) and that
   every action's expected preimage matches it, then revalidates the root
   capabilities. It derives the redo record from the delta (`redo_record_for`) and
   runs `ensure_write_set_unchanged`: every path the record makes a directory at,
@@ -349,15 +351,17 @@ sequenceDiagram
 
 A `RedoRecord` (`storage/redo_record.rs`) is one mutation's file changes: the
 directories it makes, the complete new bytes and mode of every file it puts, the
-paths it deletes, and one event append (bytes at the offset the capture read as
-the log's length). A mode change is a put of the captured bytes under the new
-mode. Operation paths are pairwise disjoint — no two operations name one path and
+paths it deletes, and one event append positioned at the log's committed length,
+the end of its last newline-terminated line. A mode change is a put of the
+captured bytes under the new mode. Operation paths are pairwise disjoint — no two operations name one path and
 none is an ancestor of another, the event append's implicit target included —
 checked identically by `RedoRecord::new` and `RedoRecord::parse`, so only a
 directory no other operation lies beneath is carried as a make-directory.
 
-`RedoRecord::commit` writes the record in place under the scratch directory,
-syncs it and the directory, and refuses an occupied record path. The synced write
+`commit_redo_record` (`storage/redo_apply.rs`) writes the record in place under
+the scratch directory of the data-root handle it is given, syncs it and the
+directory, and refuses an occupied record path; the session commits through the
+handle it verified, so a root rebound by path never receives the record. The synced write
 is the mutation's commit point: before it the repository is unchanged; after it
 the record is the mutation.
 

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d2f7663797d3a10bd28bf4ebdc4c8c5615c038a8",
+  "completed_at": "2026-10-25T16:22:14.803652322Z",
+  "duration_ms": 408026,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact defects found in the canonical event-log rewrite.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b01208cb-b85f-4705-bd2f-311129e01b56",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "300233c7-05a9-4e33-9b87-5bfa25a4e7c3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T16:15:26.777487073Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: de772cef, 1552333a, 4935b6f7\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 (dev/vision/9db27a3a-charter.md), @/invariant/atomic-writes (.jit/invariants.toml), @/invariant/derived-state-coherence (.jit/invariants.toml), @/invariant/event-log (.jit/invariants.toml), @/issue/2195c98f/requirement/REQ-05 (issue description), @/gate/cargo-ci (.jit/gates.toml), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-25T16:12:54Z); no gate stdout was supplied\nTruncation recovery: recovered the 8,602-line patch with bounded hunk reads, writer/parser ranges, and a full positional JSON comparison of parent and rewritten logs\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found in the canonical event-log rewrite.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

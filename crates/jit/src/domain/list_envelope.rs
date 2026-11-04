@@ -21,6 +21,11 @@ const COUNT_KEY: &str = "count";
 pub trait CollectionKey {
     /// The collection's serialized key.
     const KEY: &'static str;
+
+    /// The schema name of an envelope owned by one response, which replaces
+    /// the generic `ListEnvelope_..` name. Keys shared by several responses
+    /// keep `None`.
+    const SCHEMA_NAME: Option<&'static str> = None;
 }
 
 /// A collection under `K::KEY`, its derived `count`, and the flattened fields
@@ -184,11 +189,16 @@ impl<'de, K: CollectionKey, T: Deserialize<'de>, E: Deserialize<'de>> Deserializ
 
 impl<K: CollectionKey, T: JsonSchema, E: JsonSchema> JsonSchema for ListEnvelope<K, T, E> {
     fn schema_name() -> String {
-        format!(
-            "ListEnvelope_{}_of_{}_with_{}",
-            K::KEY,
-            T::schema_name(),
-            E::schema_name()
+        K::SCHEMA_NAME.map_or_else(
+            || {
+                format!(
+                    "ListEnvelope_{}_of_{}_with_{}",
+                    K::KEY,
+                    T::schema_name(),
+                    E::schema_name()
+                )
+            },
+            str::to_owned,
         )
     }
 
@@ -258,12 +268,11 @@ mod tests {
     }
 
     #[test]
-    fn test_list_envelope_serializes_count_as_the_collection_length() {
+    fn test_list_envelope_serializes_items_under_the_collection_key() {
         let envelope = ListEnvelope::<Entries, u8>::new(vec![1, 2, 3]);
 
         let value = serde_json::to_value(&envelope).expect("an envelope serializes");
 
-        assert_eq!(value["count"], envelope.items.len());
         assert_eq!(value[Entries::KEY], serde_json::json!(envelope.items));
     }
 
@@ -310,6 +319,21 @@ mod tests {
         let parsed = serde_json::from_value::<ListEnvelope<Entries, u8>>(value);
 
         assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_list_envelope_schema_name_key_declared_name_replaces_generic_name() {
+        enum Named {}
+        impl CollectionKey for Named {
+            const KEY: &'static str = "entries";
+            const SCHEMA_NAME: Option<&'static str> = Some("NamedResult");
+        }
+
+        assert_eq!(ListEnvelope::<Named, u8>::schema_name(), "NamedResult");
+        assert_eq!(
+            serialized_keys(ListEnvelope::<Named, u8>::new(vec![1])),
+            serialized_keys(ListEnvelope::<Entries, u8>::new(vec![1]))
+        );
     }
 
     #[test]

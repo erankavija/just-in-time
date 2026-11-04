@@ -1,0 +1,45 @@
+{
+  "branch": "worktree-agent-91081bd3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7a372b6e5a52959e69463e4a4d21f5cc22fa58fe",
+  "completed_at": "2026-10-25T10:57:39.843222473Z",
+  "duration_ms": 99123,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 3144,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91081bd3/requirement/REQ-01",
+          "@/issue/91081bd3/requirement/REQ-02",
+          "@/issue/91081bd3/requirement/REQ-06",
+          "@/invariant/semantic-types",
+          "@/gate/jit-validate"
+        ],
+        "severity": "high",
+        "summary": "Dependency removal and validation paths still parse or resolve CLI issue IDs after the CLI boundary."
+      }
+    ],
+    "summary": "Dependency removal and validation paths still parse or resolve CLI issue IDs after the CLI boundary.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e165a5fd-c35f-4a7d-b758-5c579bb0e853",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T10:56:00.719303367Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 19854 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a172b3-fd70-7ba3-8584-b9ace48a6726\n--------\nuser\n--- 19841 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e003ac083, b546c3dae, d6301e500, eee7fe3f1, 624404474 (`jit:91081bd3`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/91081bd3/requirement/REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06; @/issue/2195c98f/requirement/REQ-02, REQ-03, REQ-17; @/charter/D-18; @/invariant/semantic-types; @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T10:54:36Z); prior code-review failed (exit 1, rechecked)\nTruncation recovery: reread each attributed patch separately and narrowed current-source reads to CLI dispatch, dependency, validation, tests, and item sources\n\n1. **[blocking, issue-impact]** `dep rm` target arguments are parsed in `main.rs:3144-3148` but passed as `IssueIdPrefix` values rather than resolved `IssueId`s; `remove_dependencies` consequently performs its target matching later (`crates/jit/src/commands/dependency.rs:433-448`). Additionally, `validate` resolves its positional ID at `main.rs:6090`, then `validate_rule`, `explain_rules`, and `run_rules` parse and resolve that same ID again in `crates/jit/src/commands/validate.rs:1573-1575`, `:1933-1938`. These paths violate the required single CLI-boundary parse/resolve behavior. The CLI short-prefix test only checks rejection and successful behavior, so it does not detect the repeated command-layer parsing.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Dependency removal and validation paths still parse or resolve CLI issue IDs after the CLI boundary.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Dependency removal and validation paths still parse or resolve CLI issue IDs after the CLI boundary.\",\"file\":\"crates/jit/src/main.rs\",\"line\":3144,\"references\":[\"@/issue/91081bd3/requirement/REQ-01\",\"@/issue/91081bd3/requirement/REQ-02\",\"@/issue/91081bd3/requirement/REQ-06\",\"@/invariant/semantic-types\",\"@/gate/jit-validate\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

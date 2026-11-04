@@ -40,7 +40,6 @@ pub(crate) struct FailureLeverInvocation {
     pub(crate) setup_notes: Option<String>,
     pub(crate) expected_failure: String,
     pub(crate) expected_code: ErrorCode,
-    pub(crate) expected_exit: i32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -58,7 +57,6 @@ struct RawFailureLever {
     setup_notes: Option<String>,
     expected_failure: Option<String>,
     expected_code: Option<String>,
-    expected_exit: Option<i32>,
     exemption_reason: Option<String>,
     confirmation: Confirmation,
 }
@@ -84,7 +82,6 @@ impl<'de> Deserialize<'de> for FailureLever {
                 setup_notes,
                 expected_failure: Some(expected_failure),
                 expected_code: Some(expected_code),
-                expected_exit: Some(expected_exit),
                 exemption_reason: None,
                 confirmation: Confirmation::Invoked,
             } => Ok(Self::Invocation(FailureLeverInvocation {
@@ -94,7 +91,6 @@ impl<'de> Deserialize<'de> for FailureLever {
                 setup_notes,
                 expected_failure,
                 expected_code: ErrorCode::from_str(&expected_code).map_err(D::Error::custom)?,
-                expected_exit,
             })),
             RawFailureLever {
                 path,
@@ -103,7 +99,6 @@ impl<'de> Deserialize<'de> for FailureLever {
                 setup_notes: None,
                 expected_failure: None,
                 expected_code: None,
-                expected_exit: None,
                 exemption_reason: Some(exemption_reason),
                 confirmation: Confirmation::SourceOnly,
             } => Ok(Self::Exemption(FailureLeverExemption {
@@ -111,7 +106,7 @@ impl<'de> Deserialize<'de> for FailureLever {
                 exemption_reason,
             })),
             _ => Err(D::Error::custom(
-                "a failure lever must be either an invoked arm with argv, setup, expected_failure, expected_code, expected_exit, and confirmation = 'invoked', or an exemption with only exemption_reason and confirmation = 'source-only'",
+                "a failure lever must be either an invoked arm with argv, setup, expected_failure, expected_code, and confirmation = 'invoked', or an exemption with only exemption_reason and confirmation = 'source-only'",
             )),
         }
     }
@@ -163,7 +158,6 @@ fn test_failure_lever_registry_deserializes_typed_committed_input() {
             assert!(lever.argv.iter().any(|arg| arg == "--json"));
             assert!(!lever.setup.is_empty());
             assert!(!lever.expected_failure.is_empty());
-            assert_eq!(lever.expected_exit, lever.expected_code.exit_code().code());
             assert!(invocations.insert(lever.argv.clone()));
         }
         FailureLever::Exemption(lever) => {
@@ -196,7 +190,6 @@ fn test_failure_lever_registry_rejects_entries_missing_required_fields() {
         path = "status"
         argv = ["status", "--json"]
         expected_failure = "failure"
-        expected_exit = 1
         confirmation = "invoked"
     "#;
     let incomplete_exemption = r#"
@@ -220,7 +213,6 @@ fn test_failure_lever_registry_rejects_duplicate_paths_across_registration_kinds
         setup = ["init"]
         expected_failure = "failure"
         expected_code = "PARSE_ERROR"
-        expected_exit = 1
         confirmation = "invoked"
 
         [[arms]]

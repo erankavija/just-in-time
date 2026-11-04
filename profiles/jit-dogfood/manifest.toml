@@ -280,8 +280,8 @@ role = "planning"
 
 # The workflow's repository invariants are contributions to the registry that
 # initialization creates. The package never publishes that registry file.
-# The checkout-only `cargo-ci` gate is not package content, so its generic
-# enforcement claims bind to the package's portable `repo-validate` gate.
+# These entries are the authority for the generated region of this repository's
+# own `.jit/invariants.toml` (./scripts/generate-invariant-region.sh).
 [[contribution]]
 kind = "keyed-array"
 target = "invariants"
@@ -318,17 +318,6 @@ enforced-by = "@/gate/repo-validate"
 [[contribution]]
 kind = "keyed-array"
 target = "invariants"
-identity = "gate-semantics"
-
-[contribution.value]
-id = "gate-semantics"
-statement = "An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated."
-kind = "enforced"
-enforced-by = "@/gate/repo-validate"
-
-[[contribution]]
-kind = "keyed-array"
-target = "invariants"
 identity = "event-log"
 
 [contribution.value]
@@ -343,7 +332,7 @@ identity = "atomic-writes"
 
 [contribution.value]
 id = "atomic-writes"
-statement = "File replacements use the temp-file and atomic-rename pattern, and the event log grows by a positioned append at the length the mutation read. A mutation commits when its redo record is synced, and a session opening over a leftover record applies it idempotently. No-replace publication covers repository content: initialization publishes an absent data root from a synced stage directory by a no-replace rename, refusing an occupied destination."
+statement = "File replacements use the temp-file and atomic-rename pattern, and the event log grows by a positioned append at the committed length the mutation read. A mutation commits when its redo record is synced, and a session opening over a leftover record applies it idempotently. No-replace publication covers repository content: initialization publishes an absent data root from a synced stage directory by a no-replace rename, refusing an occupied destination."
 kind = "advisory"
 
 [[contribution]]
@@ -389,17 +378,6 @@ kind = "advisory"
 [[contribution]]
 kind = "keyed-array"
 target = "invariants"
-identity = "single-source-prose"
-
-[contribution.value]
-id = "single-source-prose"
-statement = "Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect."
-kind = "enforced"
-enforced-by = "@/gate/code-review"
-
-[[contribution]]
-kind = "keyed-array"
-target = "invariants"
 identity = "semantic-test-assertions"
 
 [contribution.value]
@@ -416,17 +394,6 @@ identity = "shared-test-contracts"
 id = "shared-test-contracts"
 statement = "Frequently repeated setup and interface behavior use shared fixtures and conformance suites; every implementation of an interface runs the same behavioral contract, while implementation-specific tests cover only implementation-specific behavior."
 kind = "advisory"
-
-[[contribution]]
-kind = "keyed-array"
-target = "invariants"
-identity = "bounded-rust-build-footprint"
-
-[contribution.value]
-id = "bounded-rust-build-footprint"
-statement = "Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets."
-kind = "enforced"
-enforced-by = "@/gate/repo-validate"
 
 [[contribution]]
 kind = "keyed-array"
@@ -486,7 +453,7 @@ identity = "orthogonal-tests"
 
 [contribution.value]
 id = "orthogonal-tests"
-statement = "Each property has one owning test, at the cheapest layer that can observe it, and each test owns one property. A mechanism's behavior matrix (failure points, backends, edge cases) is proven once against the mechanism; each consumer proves only that it goes through the mechanism, and a higher layer tests only what it adds: wiring, composition, and its own boundary. A test that re-proves a property owned elsewhere is a duplication defect. Every test passes alone, in any order, and in parallel with the rest: it builds the state it reads in storage it owns, and reaches process-wide state (working directory, environment, fixed ports or paths) only through a scoped guard that serializes and restores it."
+statement = "Each property has one owning test, at the cheapest layer that can observe it, and each test owns one property. A mechanism's behavior matrix (failure points, backends, edge cases) is proven once against the mechanism; each consumer proves only that it goes through the mechanism, and a higher layer tests only what it adds: wiring, composition, and its own boundary. A test that re-proves a property owned elsewhere is a duplication defect. Every test passes alone, in any order, and in parallel with the rest: it builds the state it reads in storage it owns, never changes process-wide state (working directory, environment) or claims a fixed port or path, and passes any value it varies explicitly."
 kind = "enforced"
 enforced-by = "@/gate/code-review"
 
@@ -622,6 +589,11 @@ executable = true
 [[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh"
 target = ".agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/scripts/land.sh"
+target = ".agents/skills/jit-execution-lead/scripts/land.sh"
 executable = true
 
 [[asset]]

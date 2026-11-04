@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "201fbaca23b7024da418f47abd7f8433a896e8c1",
+  "completed_at": "2026-10-29T07:42:10.764692438Z",
+  "duration_ms": 227693,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs",
+        "id": "F1",
+        "line": 461,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/168a9c16/requirement/REQ-03"
+        ],
+        "severity": "medium",
+        "summary": "The hierarchy-warning condition is computed but never asserted."
+      }
+    ],
+    "summary": "The CLI suite now retains one wiring case per list form, while domain tests own label-selection semantics; one pre-existing advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "168a9c16-f930-47ef-b139-984360e70c84",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0e5d87ef-e0d4-4c91-bdef-7e8501310a4d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:38:23.071342794Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 31db51d6b, 261a71c8e, dbc3a716b\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/168a9c16/requirement/REQ-01, REQ-02, REQ-03 (issue description)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed (run 2778ed99; blocking F1 is addressed)\nTruncation recovery: partitioned merge patches by path; narrowed AGENTS discovery; reread current affected test and domain ranges\n\n1. [advisory, pre-existing] `crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs:461` computes the expected hierarchy warning/error condition but never asserts it. This predates the attributable hunk and does not block this issue.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The CLI suite now retains one wiring case per list form, while domain tests own label-selection semantics; one pre-existing advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The hierarchy-warning condition is computed but never asserted.\",\"file\":\"crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs\",\"line\":461,\"references\":[\"@/issue/168a9c16/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

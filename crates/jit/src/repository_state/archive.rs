@@ -3,35 +3,37 @@
 use super::mutation::finalize_delta;
 use super::{
     ExpectedPreimage, FileMode, MaterializationPlan, MutationContext, MutationError,
-    MutationIntent, ProducerError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryStateError, VirtualPath,
+    MutationIntent, ProducerError, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryLayoutError, RepositoryStateError, VirtualPath,
 };
-use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
+use crate::domain::artifact_execution::{
+    ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult, ArchivePublication,
+};
 use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ContentIdentity, PlanError, PlanTarget, PlanWarning,
     ReferenceChange, WarningCode,
 };
-use crate::domain::event_log::EventLogError;
-use crate::domain::{Event, Issue, State};
+use crate::domain::identity::IssueId;
+use crate::domain::relative_path::RootRelativePath;
+use crate::domain::{EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
-const OWNER: &str = "archive-execution";
-
 /// Close a captured archive plan into one materialization plan, which
-/// publishes as one redo record.
+/// publishes as one redo record. `evidence` is the target record decoded by
+/// the planner from the same image.
 pub fn finalize_archive_execution(
     image: &RepositoryImage,
     context: &MutationContext,
     plan: &ArtifactPlan,
+    mut evidence: ArchiveEvidenceRecord,
 ) -> Result<(MaterializationPlan, ArchiveExecutionResult), RepositoryStateError> {
     let artifacts = plan
         .executable_artifacts()
         .map_err(ArchiveExecutionError::Plan)?;
     crate::domain::artifact_classifier::validate_proposed_layout(plan)
-        .map_err(ArchiveExecutionError::Producer)?;
-    let prior = captured_archive_events(image)?;
+        .map_err(|violation| ArchiveExecutionError::Producer(violation.into()))?;
     let (covered_publications, covered_changes) =
-        archive_coverage(&prior, plan.target(), plan.destination_root());
+        archive_coverage(&evidence.executions, plan.target(), plan.destination_root());
     let mut actions = Vec::new();
     let mut publications = Vec::new();
     let mut created_directories = BTreeSet::new();
@@ -84,7 +86,7 @@ pub fn finalize_archive_execution(
                 )?;
                 actions.push(RepositoryAction::WriteFile {
                     path: destination_path,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: source_mode,
@@ -130,7 +132,7 @@ pub fn finalize_archive_execution(
                 create_ancestors(image, &path, &mut created_directories, &mut actions)?;
                 actions.push(RepositoryAction::WriteFile {
                     path,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: FileMode::Regular,
@@ -166,7 +168,7 @@ pub fn finalize_archive_execution(
         }
     }
 
-    let mut issues = BTreeMap::<String, Issue>::new();
+    let mut issues = BTreeMap::<IssueId, Issue>::new();
     let mut event_changes = Vec::new();
     let mut observed_uncovered = false;
     for change in artifacts
@@ -210,7 +212,7 @@ pub fn finalize_archive_execution(
             let from = issue.state;
             issue.archived_from = Some(from);
             issue.state = State::Archived;
-            state_event = Some(Event::draft_issue_state_changed(
+            state_event = Some(EventBody::draft_issue_state_changed(
                 id.clone(),
                 from,
                 State::Archived,
@@ -219,11 +221,11 @@ pub fn finalize_archive_execution(
     }
     let mut changed_issue_ids = Vec::new();
     for (id, issue) in &issues {
-        let path = issue_path(id)?;
+        let path = VirtualPath::issue_record(id);
         let RepositoryEntry::File { content, .. } = captured_entry(image, &path)? else {
             return Err(ArchiveExecutionError::NonFileSource {
                 role: "captured issue",
-                path: id.clone(),
+                path: path.relative().as_str().to_string(),
             }
             .into());
         };
@@ -259,7 +261,7 @@ pub fn finalize_archive_execution(
                 if ContentIdentity::from_bytes(content.bytes()) == deletion.content_identity {
                     actions.push(RepositoryAction::DeleteFile {
                         path,
-                        owner: OWNER.into(),
+                        owner: RepositoryActionOwner::ArchiveExecution,
                         expected: ExpectedPreimage::of(captured_entry(
                             image,
                             &archive_path(image, &deletion.source)?,
@@ -301,16 +303,30 @@ pub fn finalize_archive_execution(
         })
         .collect::<Result<Vec<_>, ArchiveExecutionError>>()?;
     if event_needed {
+        let execution = ArchiveExecution {
+            target: plan.target().clone(),
+            destination_root: plan.destination_root().into(),
+            publications: publications.clone(),
+            reference_changes: event_changes.clone(),
+            planned_deletions: planned_deletions.clone(),
+            reconciling,
+        };
+        let path = VirtualPath::archive_evidence_record(plan.target());
+        let entry = captured_entry(image, &path)?;
+        evidence.executions.push(execution.clone());
+        create_ancestors(image, &path, &mut created_directories, &mut actions)?;
+        actions.push(RepositoryAction::WriteFile {
+            path,
+            owner: RepositoryActionOwner::ArchiveExecution,
+            expected: ExpectedPreimage::of(entry),
+            bytes: super::canonical_json(&evidence, true)
+                .map_err(MutationError::from)
+                .map_err(ArchiveExecutionError::Mutation)?,
+            mode: FileMode::Regular,
+        });
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(Event::draft_artifact_archive_executed(
-                plan.target().clone(),
-                plan.destination_root().into(),
-                publications.clone(),
-                event_changes.clone(),
-                planned_deletions.clone(),
-                reconciling,
-            )),
+            event: Box::new(EventBody::draft_artifact_archive_executed(execution)),
         });
     }
     if let Some(event) = state_event {
@@ -319,19 +335,24 @@ pub fn finalize_archive_execution(
             event: Box::new(event),
         });
     }
-    let record_actions = finalize_delta(image.layout(), image, context, &intents)
+    let record_actions = finalize_delta(image.layout(), image, context, &intents, None)
         .map_err(ArchiveExecutionError::Mutation)?
         .actions()
         .to_vec();
     let mut all_actions = actions;
     all_actions.extend(record_actions);
     let delta = RepositoryDelta::new(image.layout(), all_actions)?;
-    let materialization = MaterializationPlan::new(image, delta);
+    let materialization =
+        MaterializationPlan::new(image, delta, context).map_err(ArchiveExecutionError::Mutation)?;
     let mut warnings = plan
-        .warnings()
+        .plan_warnings()
         .iter()
         .cloned()
-        .chain(artifacts.iter().flat_map(|a| a.warnings().iter().cloned()))
+        .chain(
+            artifacts
+                .iter()
+                .flat_map(|a| a.plan_warnings().iter().cloned()),
+        )
         .chain(execution_warnings)
         .collect::<Vec<_>>();
     warnings.sort_by(|left, right| {
@@ -347,7 +368,7 @@ pub fn finalize_archive_execution(
         reference_changes: event_changes,
         planned_deletions,
         deleted_sources: deletions.into_iter().map(|d| d.source).collect(),
-        warnings,
+        plan_warnings: warnings,
         event_appended: event_needed,
         reconciling,
     };
@@ -379,7 +400,9 @@ fn create_ancestors(
         if parent.as_os_str().is_empty() {
             break;
         }
-        let relative_path = super::RootRelativePath::parse(parent).map_err(ProducerError::from)?;
+        let relative_path = RootRelativePath::parse(parent)
+            .map_err(RepositoryLayoutError::from)
+            .map_err(ProducerError::from)?;
         ancestors.push(
             VirtualPath::from_root(path.root_class(), relative_path)
                 .map_err(ProducerError::from)?,
@@ -391,7 +414,7 @@ fn create_ancestors(
             RepositoryEntry::Absent if created.insert(ancestor.clone()) => {
                 actions.push(RepositoryAction::CreateDirectory {
                     path: ancestor,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                 })
             }
@@ -423,53 +446,35 @@ fn captured_entry<'a>(
     Ok(image.entry(path).map_err(ProducerError::from)?)
 }
 
-/// Canonical data-root-relative path for one captured issue record.
-fn issue_path(id: &str) -> Result<VirtualPath, ArchiveExecutionError> {
-    Ok(VirtualPath::data(format!("issues/{id}.json")).map_err(ProducerError::from)?)
-}
-
 fn captured_issue<'a>(
     image: &RepositoryImage,
-    id: &str,
-    issues: &'a mut BTreeMap<String, Issue>,
+    id: &IssueId,
+    issues: &'a mut BTreeMap<IssueId, Issue>,
 ) -> Result<&'a mut Issue, ArchiveExecutionError> {
     if !issues.contains_key(id) {
-        let path = issue_path(id)?;
+        let path = VirtualPath::issue_record(id);
         let bytes = image
             .file_bytes(&path)
             .map_err(ProducerError::from)?
-            .ok_or_else(|| ArchiveExecutionError::MissingCapturedIssue(id.to_string()))?;
-        let issue: Issue =
-            serde_json::from_slice(bytes).map_err(ArchiveExecutionError::MalformedIssueJson)?;
-        if issue.id != id {
+            .ok_or_else(|| ArchiveExecutionError::MissingCapturedIssue(id.clone()))?;
+        let issue = super::decode_issue_record(&path, bytes)?;
+        if &issue.id != id {
             return Err(ArchiveExecutionError::IssueIdMismatch {
-                expected: id.to_string(),
+                expected: id.clone(),
                 found: issue.id,
             });
         }
-        issues.insert(id.into(), issue);
+        issues.insert(id.clone(), issue);
     }
     issues
         .get_mut(id)
-        .ok_or_else(|| ArchiveExecutionError::CapturedIssueCacheLost(id.to_string()))
-}
-
-pub(crate) fn captured_archive_events(
-    image: &RepositoryImage,
-) -> Result<Vec<Event>, ArchiveExecutionError> {
-    let path = VirtualPath::EVENTS;
-    let bytes = image
-        .file_bytes(&path)
-        .map_err(ProducerError::from)?
-        .unwrap_or_default();
-    let text = String::from_utf8(bytes.to_vec()).map_err(ProducerError::from)?;
-    crate::domain::event_log::parse_known_events(&text).map_err(ArchiveExecutionError::EventLog)
+        .ok_or_else(|| ArchiveExecutionError::CapturedIssueCacheLost(id.clone()))
 }
 
 /// A typed failure raised while finalizing one archive execution.
 ///
-/// Composed into [`RepositoryStateError::ArchiveExecution`]. `String`-typed
-/// fields hold raw path or issue identifiers, never a pre-rendered message;
+/// Composed into [`RepositoryStateError::ArchiveExecution`]. Fields hold paths
+/// or typed issue identifiers, never a pre-rendered message;
 /// rendering lives in this type's `Display` impl. `role` distinguishes the
 /// several captured-entry roles [`Self::NonFileSource`] and
 /// [`Self::UnsafeOccupant`] classify across the finalizer (source, an
@@ -491,7 +496,7 @@ pub enum ArchiveExecutionError {
     NonFileSource {
         /// Which captured-entry role failed the ordinary-file check.
         role: &'static str,
-        /// Raw path or issue identifier.
+        /// Raw path identifier.
         path: String,
     },
     /// A captured entry occupying a publication or ancestor target was not
@@ -507,48 +512,45 @@ pub enum ArchiveExecutionError {
     #[error("planned document index {document_index} is absent on issue {issue}")]
     MissingPlannedDocument {
         /// Full durable issue id.
-        issue: String,
+        issue: IssueId,
         /// Planned document index.
         document_index: usize,
     },
     /// A planned relink targeted a commit-pinned issue document.
     #[error("planned relink points at pinned issue document: {0}")]
-    RelinkTargetsPinned(String),
+    RelinkTargetsPinned(IssueId),
     /// A planned relink no longer matches its issue document's captured path.
     #[error("planned relink no longer matches issue {issue} document {document_index}")]
     RelinkStale {
         /// Full durable issue id.
-        issue: String,
+        issue: IssueId,
         /// Planned document index.
         document_index: usize,
     },
     /// A referenced issue record was absent from the captured image.
     #[error("captured issue is absent: {0}")]
-    MissingCapturedIssue(String),
-    /// A captured issue record was not valid JSON.
-    #[error("invalid captured issue json: {0}")]
-    MalformedIssueJson(#[source] serde_json::Error),
+    MissingCapturedIssue(IssueId),
+    /// A captured issue record did not decode.
+    #[error(transparent)]
+    MalformedIssueRecord(#[from] super::MalformedIssueRecordError),
     /// A captured issue's embedded id did not match its requested id.
     #[error("captured issue {expected} contains mismatched embedded id {found}")]
     IssueIdMismatch {
         /// Id the issue was looked up by.
-        expected: String,
+        expected: IssueId,
         /// Id embedded in the captured issue record.
-        found: String,
+        found: IssueId,
     },
     /// A captured issue vanished from the in-memory cache immediately after
     /// insertion.
     #[error("captured issue cache lost {0}")]
-    CapturedIssueCacheLost(String),
+    CapturedIssueCacheLost(IssueId),
     /// An issue serialized as changed was absent from the captured intent set.
     #[error("changed archive issue {0} was not captured")]
-    MissingChangedIssue(String),
+    MissingChangedIssue(IssueId),
     /// The archive plan's artifacts were not eligible for execution.
     #[error(transparent)]
     Plan(#[from] PlanError),
-    /// The captured event log could not be parsed.
-    #[error(transparent)]
-    EventLog(#[from] EventLogError),
     /// A materialization producer failed reading captured evidence or
     /// canonicalizing a path, including the proposed-layout edge check.
     #[error(transparent)]
@@ -559,33 +561,23 @@ pub enum ArchiveExecutionError {
 }
 
 fn archive_coverage(
-    events: &[Event],
+    executions: &[ArchiveExecution],
     target: &PlanTarget,
     root: &str,
 ) -> (Vec<(String, ContentIdentity)>, Vec<ReferenceChange>) {
-    events
+    executions
         .iter()
-        .filter_map(|event| match event {
-            Event::ArtifactArchiveExecuted {
-                target: found,
-                destination_root,
-                publications,
-                reference_changes,
-                ..
-            } if found == target && destination_root == root => {
-                Some((publications, reference_changes))
-            }
-            _ => None,
-        })
+        .filter(|execution| &execution.target == target && execution.destination_root == root)
         .fold(
             (Vec::new(), Vec::new()),
-            |(mut publications, mut changes), (found_publications, found_changes)| {
+            |(mut publications, mut changes), execution| {
                 publications.extend(
-                    found_publications
+                    execution
+                        .publications
                         .iter()
                         .map(|p| (p.destination.clone(), p.content_identity.clone())),
                 );
-                changes.extend(found_changes.iter().cloned());
+                changes.extend(execution.reference_changes.iter().cloned());
                 (publications, changes)
             },
         )
@@ -593,57 +585,45 @@ fn archive_coverage(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_archive_coverage_collects_matching_target_and_root_only() {
+        let target = PlanTarget::Document {
+            path: "a.md".into(),
+        };
+        let executions = [
+            crate::test_utils::archive_execution(target.clone(), "arc", &[("s/1", "arc/1")]),
+            crate::test_utils::archive_execution(target.clone(), "other", &[("s/2", "other/2")]),
+            crate::test_utils::archive_execution(
+                PlanTarget::Document {
+                    path: "b.md".into(),
+                },
+                "arc",
+                &[("s/3", "arc/3")],
+            ),
+            crate::test_utils::archive_execution(target.clone(), "arc", &[("s/4", "arc/4")]),
+        ];
+        let (publications, changes) = archive_coverage(&executions, &target, "arc");
+        let destinations = publications
+            .iter()
+            .map(|(destination, _)| destination.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(destinations, ["arc/1", "arc/4"]);
+        assert!(changes.is_empty());
+    }
+
     use super::*;
+    use crate::domain::artifact_execution::archive_executions;
     use crate::domain::artifact_plan::{
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
     };
-    use crate::domain::fixture_issue;
-    use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
-        RepositoryLayout, RepositoryRootEvidence,
-    };
+    use crate::repository_state::{CapturedBytes, EntryIdentity, RepositoryImage};
+    use crate::test_harness::image::ImageBuilder;
+    use crate::test_utils::fixture_issue;
     use crate::test_utils::{document_reference, document_reference_at};
-    use std::collections::BTreeMap;
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
-
-    fn budget() -> CaptureBudget {
-        CaptureBudget {
-            max_listings: 4,
-            max_bytes: 1 << 20,
-            max_depth: 8,
-        }
-    }
 
     fn context() -> MutationContext {
         MutationContext::preview()
-    }
-
-    /// Close an image over the given entries. Every finalization reads the
-    /// archive-coverage event tail first, so an absent `events.jsonl` entry is
-    /// captured by default unless the caller supplies its own.
-    fn image_with(mut entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
-        let events_path = VirtualPath::data("events.jsonl").unwrap();
-        if !entries.iter().any(|(path, _)| path == &events_path) {
-            entries.push((events_path, RepositoryEntry::Absent));
-        }
-        let spec =
-            CaptureSpec::new(entries.iter().map(|(path, _)| path.clone()), budget()).unwrap();
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
     }
 
     fn file_entry(bytes: &[u8]) -> RepositoryEntry {
@@ -702,31 +682,139 @@ mod tests {
         .unwrap()
     }
 
-    fn captured_issue_entry(id: &str, issue: &Issue) -> (VirtualPath, RepositoryEntry) {
-        (
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
-            file_entry(&crate::repository_state::serialize_issue(issue).unwrap()),
-        )
+    fn captured_issue_entry(issue: &Issue) -> RepositoryEntry {
+        file_entry(&crate::repository_state::serialize_issue(issue).unwrap())
     }
 
     fn archive_execution_error(
         image: &RepositoryImage,
         plan: &ArtifactPlan,
     ) -> ArchiveExecutionError {
-        match finalize_archive_execution(image, &context(), plan).unwrap_err() {
+        match finalize_archive_execution(
+            image,
+            &context(),
+            plan,
+            ArchiveEvidenceRecord {
+                target: plan.target().clone(),
+                executions: Vec::new(),
+            },
+        )
+        .unwrap_err()
+        {
             RepositoryStateError::ArchiveExecution(error) => error,
             other => panic!("expected a typed archive-execution error, got {other:?}"),
         }
+    }
+
+    fn evidence_write(
+        prior: Option<serde_json::Value>,
+    ) -> (serde_json::Value, Vec<ArchiveExecution>) {
+        let path = VirtualPath::archive_evidence_record(&PlanTarget::Document {
+            path: "doc.md".into(),
+        });
+        let directory = if prior.is_some() {
+            directory_entry()
+        } else {
+            RepositoryEntry::Absent
+        };
+        let plan = move_artifact(
+            "doc.md",
+            "archived.md",
+            ContentIdentity::from_bytes(b"content"),
+        );
+        let evidence = prior.clone().map_or_else(
+            || ArchiveEvidenceRecord {
+                target: plan.target().clone(),
+                executions: Vec::new(),
+            },
+            |value| serde_json::from_value(value).unwrap(),
+        );
+        let entry = prior.map_or(RepositoryEntry::Absent, |value| {
+            file_entry(&serde_json::to_vec(&value).unwrap())
+        });
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::ARCHIVE_EVIDENCE, directory.clone())
+            .entry(
+                path.ancestor_directories().unwrap().pop().unwrap(),
+                directory,
+            )
+            .entry(path.clone(), entry.clone())
+            .file("doc.md", b"content")
+            .entry("archived.md", RepositoryEntry::Absent)
+            .build();
+        let (materialization, _) =
+            finalize_archive_execution(&image, &context(), &plan, evidence).unwrap();
+        let actions = materialization.delta().actions();
+        let written = actions
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile {
+                    path: found,
+                    bytes,
+                    expected,
+                    ..
+                } if found == &path => {
+                    assert_eq!(expected, &ExpectedPreimage::of(&entry));
+                    Some(serde_json::from_slice(bytes).unwrap())
+                }
+                _ => None,
+            })
+            .expect("the event's delta must also write the target evidence");
+        let events = actions
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::AppendEvents { bytes, .. } => {
+                    Some(crate::domain::event_log::parse_known_events(bytes).unwrap())
+                }
+                _ => None,
+            })
+            .unwrap();
+        (written, archive_executions(&events))
+    }
+
+    #[test]
+    fn test_finalize_archive_execution_creates_evidence_with_its_event() {
+        let (written, executions) = evidence_write(None);
+        assert_eq!(
+            written,
+            serde_json::json!({
+                "target": executions[0].target,
+                "executions": executions,
+            })
+        );
+    }
+
+    #[test]
+    fn test_finalize_archive_execution_appends_to_captured_evidence_in_order() {
+        let prior = crate::test_utils::archive_execution(
+            PlanTarget::Document {
+                path: "doc.md".into(),
+            },
+            "earlier",
+            &[],
+        );
+        let (written, executions) = evidence_write(Some(serde_json::json!({
+            "target": prior.target,
+            "executions": [prior.clone()],
+        })));
+        assert_eq!(
+            written["executions"],
+            serde_json::json!([prior, executions[0]])
+        );
     }
 
     #[test]
     fn test_finalize_archive_execution_content_identity_changed_after_planning() {
         let planned_identity = ContentIdentity::from_bytes(b"planned content");
         let plan = move_artifact("doc.md", "archived.md", planned_identity);
-        let image = image_with(vec![(
-            VirtualPath::worktree("doc.md").unwrap(),
-            file_entry(b"different content on disk"),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::worktree("doc.md").unwrap(),
+                file_entry(b"different content on disk"),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -741,10 +829,10 @@ mod tests {
             "archived.md",
             ContentIdentity::from_bytes(b"anything"),
         );
-        let image = image_with(vec![(
-            VirtualPath::worktree("doc.md").unwrap(),
-            directory_entry(),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::worktree("doc.md").unwrap(), directory_entry())
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -761,16 +849,17 @@ mod tests {
             "archived.md",
             ContentIdentity::from_bytes(content),
         );
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
                 VirtualPath::worktree("doc.md").unwrap(),
                 file_entry(content),
-            ),
-            (
+            )
+            .entry(
                 VirtualPath::worktree("archived.md").unwrap(),
                 directory_entry(),
-            ),
-        ]);
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -788,7 +877,7 @@ mod tests {
         );
         let plan = ArtifactPlan::new(
             PlanTarget::Container {
-                id: "container-1".into(),
+                id: crate::test_utils::issue_id(165),
             },
             "archive",
             PolicyStatus::Configured,
@@ -797,10 +886,13 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(vec![(
-            VirtualPath::worktree("archive/.jit-container").unwrap(),
-            directory_entry(),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::worktree("archive/.jit-container").unwrap(),
+                directory_entry(),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -832,10 +924,13 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(vec![(
-            VirtualPath::worktree("stale.md").unwrap(),
-            directory_entry(),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::worktree("stale.md").unwrap(),
+                directory_entry(),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -847,7 +942,7 @@ mod tests {
     #[test]
     fn test_finalize_archive_execution_missing_planned_document() {
         let mut issue = fixture_issue("Owner".into(), String::new());
-        issue.id = "owner-1".into();
+        issue.id = crate::test_utils::issue_id(77);
         issue.documents = Vec::new();
         let change = ReferenceChange {
             issue: issue.id.clone(),
@@ -856,19 +951,25 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![captured_issue_entry(&issue.id, &issue)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                captured_issue_entry(&issue),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
             ArchiveExecutionError::MissingPlannedDocument { issue: id, document_index: 0 }
-                if id == "owner-1"
+                if id == crate::test_utils::issue_id(77)
         ));
     }
 
     #[test]
     fn test_finalize_archive_execution_relink_targets_pinned_document() {
         let mut issue = fixture_issue("Owner".into(), String::new());
-        issue.id = "owner-1".into();
+        issue.id = crate::test_utils::issue_id(77);
         issue.documents = vec![document_reference_at("doc.md", "a".repeat(40))];
         let change = ReferenceChange {
             issue: issue.id.clone(),
@@ -877,18 +978,24 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![captured_issue_entry(&issue.id, &issue)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                captured_issue_entry(&issue),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
-            ArchiveExecutionError::RelinkTargetsPinned(id) if id == "owner-1"
+            ArchiveExecutionError::RelinkTargetsPinned(id) if id == crate::test_utils::issue_id(77)
         ));
     }
 
     #[test]
     fn test_finalize_archive_execution_relink_stale() {
         let mut issue = fixture_issue("Owner".into(), String::new());
-        issue.id = "owner-1".into();
+        issue.id = crate::test_utils::issue_id(77);
         issue.documents = vec![document_reference("other.md")];
         let change = ReferenceChange {
             issue: issue.id.clone(),
@@ -897,75 +1004,90 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![captured_issue_entry(&issue.id, &issue)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                captured_issue_entry(&issue),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
             ArchiveExecutionError::RelinkStale { issue: id, document_index: 0 }
-                if id == "owner-1"
+                if id == crate::test_utils::issue_id(77)
         ));
     }
 
     #[test]
     fn test_finalize_archive_execution_missing_captured_issue() {
         let change = ReferenceChange {
-            issue: "absent-issue".into(),
+            issue: crate::test_utils::issue_id(166),
             document_index: 0,
             from_path: "doc.md".into(),
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![(
-            VirtualPath::data("issues/absent-issue.json").unwrap(),
-            RepositoryEntry::Absent,
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(166)),
+                RepositoryEntry::Absent,
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
-            ArchiveExecutionError::MissingCapturedIssue(id) if id == "absent-issue"
+            ArchiveExecutionError::MissingCapturedIssue(id) if id == crate::test_utils::issue_id(166)
         ));
     }
 
     #[test]
     fn test_finalize_archive_execution_malformed_issue_json() {
         let change = ReferenceChange {
-            issue: "broken-issue".into(),
+            issue: crate::test_utils::issue_id(167),
             document_index: 0,
             from_path: "doc.md".into(),
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![(
-            VirtualPath::data("issues/broken-issue.json").unwrap(),
-            file_entry(b"not json"),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(167)),
+                file_entry(b"not json"),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
-            ArchiveExecutionError::MalformedIssueJson(_)
+            ArchiveExecutionError::MalformedIssueRecord(_)
         ));
     }
 
     #[test]
     fn test_finalize_archive_execution_issue_id_mismatch() {
         let mut issue = fixture_issue("Owner".into(), String::new());
-        issue.id = "embedded-id".into();
+        issue.id = crate::test_utils::issue_id(78);
         let change = ReferenceChange {
-            issue: "requested-id".into(),
+            issue: crate::test_utils::issue_id(168),
             document_index: 0,
             from_path: "doc.md".into(),
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![(
-            VirtualPath::data("issues/requested-id.json").unwrap(),
-            file_entry(&crate::repository_state::serialize_issue(&issue).unwrap()),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(168)),
+                file_entry(&crate::repository_state::serialize_issue(&issue).unwrap()),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
             ArchiveExecutionError::IssueIdMismatch { expected, found }
-                if expected == "requested-id" && found == "embedded-id"
+                if expected == crate::test_utils::issue_id(168) && found == crate::test_utils::issue_id(78)
         ));
     }
 
@@ -982,7 +1104,9 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(Vec::new());
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -1013,11 +1137,15 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(Vec::new());
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
-            ArchiveExecutionError::Producer(ProducerError::ProposedLayoutTargetAbsent { target })
+            ArchiveExecutionError::Producer(ProducerError::ProposedLayout(
+                crate::domain::artifact_classifier::ProposedLayoutViolation::TargetAbsent { target },
+            ))
                 if target == "missing.png"
         ));
     }
@@ -1042,12 +1170,19 @@ mod tests {
             "archive publication has no content identity: doc.md"
         );
         assert_eq!(
-            ArchiveExecutionError::CapturedIssueCacheLost("owner-1".into()).to_string(),
-            "captured issue cache lost owner-1"
+            ArchiveExecutionError::CapturedIssueCacheLost(crate::test_utils::issue_id(77))
+                .to_string(),
+            format!(
+                "captured issue cache lost {}",
+                crate::test_utils::issue_id(77)
+            )
         );
         assert_eq!(
-            ArchiveExecutionError::MissingChangedIssue("owner-1".into()).to_string(),
-            "changed archive issue owner-1 was not captured"
+            ArchiveExecutionError::MissingChangedIssue(crate::test_utils::issue_id(77)).to_string(),
+            format!(
+                "changed archive issue {} was not captured",
+                crate::test_utils::issue_id(77)
+            )
         );
     }
 }

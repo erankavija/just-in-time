@@ -1,0 +1,43 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:08:13.293984788Z",
+  "context": {},
+  "created_at": "2026-11-01T14:00:39.829609081Z",
+  "dependencies": [
+    "d7cce445-436d-43d7-9ac9-7c21251b19fa"
+  ],
+  "description": "Derive issue membership from the files under `.jit/issues/`, so `index.json` stops holding a copy of it and concurrent creates on two branches stop conflicting.\n\n## Background\n\n`index.json` holds `all_ids`, a list of what `.jit/issues/` already states. Two branches that each create an issue conflict on that list, and the conflict blocks a landing. Testing `aeafc378` reproduced this in 4 of 4 runs. Validation carries a step reconciling the index against the listing, and every mutation that adds or removes an issue writes `all_ids`.\n\n`deleted_ids` exists for the source layering in `load_aggregated_index` (`crates/jit/src/storage/json.rs:760-810`), where a local delete must override HEAD and the main worktree.\n\n## Success Criteria\n\n- [hard] REQ-01: `all_ids` is removed, and membership comes from listing the issue files, excluding `*.lock`. That listing is the only membership source for local and primary-checkout reads.\n- [hard] REQ-02: `index.json` keeps only `schema_version` and whatever the tombstone design needs.\n- [hard] REQ-03: Concurrent creates on two branches merge with no `index.json` conflict.\n- [hard] REQ-04: The validation step reconciling the index against the listing is removed, along with mutation writes of `all_ids`.\n- [hard] REQ-05: Net production lines are negative.\n- [hard] REQ-06: The binary accepts exactly format 3. Any other version is refused loudly with exit 10, naming both versions, and a format 3 index carrying `all_ids` fails validation. No format 2 test remains. `docs/reference/storage-format.md`'s versioning section states this, including that an older binary and a newer one each refuse the other's repository. Tests cover a missing `.jit/issues` listing as empty, a linked checkout's delete hiding the primary's file, and, when a file and a tombstone name one id, the file winning, with the source precedence stated in the test name.\n- [hard] REQ-08: `RETIRED_EVENT_TAGS` and any reader skip for those tags are removed with the format check; the rewrite script drops those event lines in the cutover (`@/inv/canonical-cutover`).\n- [hard] REQ-07: The measured net production lines are reported before the change lands; it is implemented only if negative.\n\n## Notes\n\n- Start with a short design check. If net production lines would not be negative, stop and report before implementing.\n- Keep `deleted_ids` at first: deletions are rare, so conflicts on it are too. Remove it only if the layering turns out not to need it.\n- b3a768b3 (one index loader, 9876a23a) gets simpler after this; coordinate with it. b4ca051c corrects the pages describing read sources.\n- `aeafc378` does not wait on this task.\n- Cutover is one window over all four repositories (this one, mealie-fi, inflected-messages, gf2), tracked by 2a504b17: both binaries refuse the other format, so install and rewrites happen together, by one script outside the product, with no migration code. An earlier ruling of format 2 tolerance was withdrawn under `@/inv/canonical-cutover`.\n- Depends on d7cce445, which removes the `HEAD` read tier so no `HEAD` listing is built.\n\n\n\n## Measured net production lines\n\nBefore landing, excluding `#[cfg(test)]` modules and test-only files: `3c4db4653` is -171 (-369/+198). d7cce445's `1e0dd2572` is -112 (-125/+13). Re-measured after the exact-format rework.\n",
+  "documents": [],
+  "done_at": "2026-11-01T16:15:49.392246346Z",
+  "first_ready_at": "2026-11-01T14:00:39.829609081Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "514fee52-0985-4319-ae8a-21ca43cb7c48",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:13:23.573473354Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cc8cc205-c741-4bd8-92b3-f234b76b5eed",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:15:28.711346618Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "c47d78c8-f74b-4659-9d48-e5cbb50b1bab",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:storage",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Derive issue membership from the issue files",
+  "updated_at": "2026-11-01T16:15:49.392246346Z"
+}

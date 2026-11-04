@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T00:58:20.688986123Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Build the recorded-failure corpus inside the suite through the input-keyed fixture cache, so the default suite runs no nested cargo test and the runner configuration names no test.\n\n## Background\n\n`.config/nextest.toml` runs `scripts/setup-recorded-failure-corpus.sh` as the `recorded-failure-corpus` setup script for three named `cli_issue` tests: `failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope`, `failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes` and `payload_stream_purity_tests::test_machine_readable_failures_emit_one_json_document_on_payload_stream`. Inside the suite run, the script runs a nested `cargo test --workspace --test cli_issue` of `failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step` to publish a receipt. `crates/jit/tests/cli_issue/failure_probe_fixture.rs:1060-1075` runs the script's `--self-test` and parses the nextest configuration, and `scripts/cargo-ci.sh` pins the nextest version the script checks. The failure-lever registry is `crates/jit/tests/cli_issue/failure_lever_registry.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: The three corpus consumers obtain the recorded-failure corpus through the input-keyed fixture cache. It is built in-process on first use and keyed on the failure-lever registry bytes and the crate source digest.\n- [hard] REQ-02: `scripts/setup-recorded-failure-corpus.sh`, its setup-script declaration and its test-name filter no longer exist, and no test runs the script.\n- [hard] REQ-03: The default suite runs no nested cargo invocation for the corpus.\n- [hard] REQ-04: The registered `cargo-ci-selftest` gate no longer lists `scripts/setup-recorded-failure-corpus.sh` among its inputs; the path is dropped in the same change that deletes the script.\n- [hard] REQ-05: The three consumers assert what they asserted before.\n",
   "documents": [],
+  "done_at": "2026-11-01T04:43:19.095973518Z",
+  "first_ready_at": "2026-10-27T22:25:44.324772686Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8d76b004-3f1f-4d4d-a57c-86b2f41176a7",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:34:21.065692606Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "18268699-6a2b-4f86-9d87-15c1e88d01af",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:35:49.235734541Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f63adec-7602-4d65-961a-3dd3b5daa54d",
   "labels": [
     "type:task",
@@ -28,7 +44,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Recorded-failure corpus built in the suite under an input key",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T04:43:19.095973518Z"
 }

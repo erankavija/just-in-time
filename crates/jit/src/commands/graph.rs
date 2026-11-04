@@ -1,8 +1,9 @@
 //! Graph visualization and traversal
 
 use super::*;
+use crate::domain::identity::IssueId;
 use crate::graph::Direction;
-use crate::output::DependencyTreeNode;
+use crate::output::{DependencyTreeNode, GraphExportOutput, GraphExportText};
 use std::collections::{HashMap, HashSet};
 
 /// Serialization format for `jit graph export`.
@@ -20,8 +21,8 @@ pub enum GraphExportFormat {
     Json,
     /// `batch-create` input schema: a JSON array of issue definitions, the
     /// structural inverse of `jit issue batch-create`. Handled on a separate
-    /// path ([`export_graph_batch`](CommandExecutor::export_graph_batch)); the
-    /// graph-rendering [`export_graph`](CommandExecutor::export_graph) never
+    /// path ([`export_graph_batch`](GraphOps::export_graph_batch)); the
+    /// graph-rendering [`export_graph`](GraphOps::export_graph) never
     /// receives it.
     Batch,
 }
@@ -58,20 +59,19 @@ fn keep_generic_label(label: &str, stripped_ns: &HashSet<String>) -> bool {
     namespace != crate::labels::TYPE_NAMESPACE && !stripped_ns.contains(namespace)
 }
 
-/// The `batch-create` priority string for `priority` (the value
-/// [`Priority::from_str`](std::str::FromStr) round-trips), so an exported def
-/// re-imports at the same priority.
-fn priority_str(priority: crate::domain::Priority) -> &'static str {
-    use crate::domain::Priority;
-    match priority {
-        Priority::Low => "low",
-        Priority::Normal => "normal",
-        Priority::High => "high",
-        Priority::Critical => "critical",
-    }
+/// Graph and dependency operations of a [`CommandExecutor`].
+pub struct GraphOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The graph family.
+    pub fn graph(&self) -> GraphOps<'_, S> {
+        GraphOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> GraphOps<'_, S> {
     /// Publish rendered graph bytes to an explicitly selected filesystem path.
     ///
     /// Repository-contained destinations use one captured recoverable delta;
@@ -91,7 +91,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             RepositoryExportIntent,
         };
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         match classify_repository_export(&layout, invocation_dir, requested)? {
             RepositoryExportDestination::External(path) => {
                 crate::storage::external_publish::write_external_export_atomic(&path, bytes)
@@ -103,7 +103,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     max_bytes: super::CAPTURE_MAX_BYTES,
                     max_depth: 128,
                 };
-                self.publish_repository_export(&layout, &intent, budget)
+                self.exec
+                    .publish_repository_export(&layout, &intent, budget)
             }
         }
     }
@@ -117,16 +118,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ([`expand`](DependencyGraph::expand)) runs in memory over the graph.
     pub fn build_dependency_tree(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         depth: u32,
     ) -> Result<Vec<DependencyTreeNode>> {
         use crate::domain::MinimalIssue;
         use crate::graph::Expansion;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issues = self.storage.list_issues()?;
+        let full_id = issue_id.clone();
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
@@ -134,7 +133,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // An issue unfolded along several paths is a diamond in the DAG.
         let occurrences = Expansion::occurrences(&forest);
         let to_tree_node = |issue: &Issue, level: u32, children: Vec<DependencyTreeNode>| {
-            let shared = occurrences.get(issue.id.as_str()).is_some_and(|&n| n > 1);
+            let shared = occurrences.get(&issue.id).is_some_and(|&n| n > 1);
             DependencyTreeNode {
                 shared: shared.then_some(true),
                 children,
@@ -154,7 +153,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// * `issue_id` - Issue ID to show dependencies for
     /// * `depth` - Maximum depth to traverse (1 = immediate, 0 = unlimited)
-    pub fn show_dependencies_with_depth(&self, issue_id: &str, depth: u32) -> Result<Vec<Issue>> {
+    pub fn show_dependencies_with_depth(
+        &self,
+        issue_id: &IssueId,
+        depth: u32,
+    ) -> Result<Vec<Issue>> {
         self.traverse_dependency_edges(issue_id, Direction::Dependencies, depth)
     }
 
@@ -164,7 +167,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// * `issue_id` - Issue ID to show dependents for
     /// * `depth` - Maximum depth to traverse (1 = immediate, 0 = unlimited)
-    pub fn show_rdeps_with_depth(&self, issue_id: &str, depth: u32) -> Result<Vec<Issue>> {
+    pub fn show_rdeps_with_depth(&self, issue_id: &IssueId, depth: u32) -> Result<Vec<Issue>> {
         self.traverse_dependency_edges(issue_id, Direction::Dependents, depth)
     }
 
@@ -172,14 +175,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `direction` up to `depth` (0 = unlimited), and return the issues reached.
     fn traverse_dependency_edges(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         direction: Direction,
         depth: u32,
     ) -> Result<Vec<Issue>> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issues = self.storage.list_issues()?;
+        let full_id = issue_id.clone();
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
@@ -191,7 +192,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn show_roots(&self) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
@@ -222,17 +223,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         format: GraphExportFormat,
         full: bool,
-        scope: Option<&str>,
-    ) -> Result<String> {
-        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
-        let issues = self.storage.list_issues()?;
+        scope: Option<&IssueId>,
+    ) -> Result<GraphExportOutput> {
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
         // Resolve the hierarchy once when it is needed — for scoping and/or the
         // full JSON node shape. Resolution is always repository-wide.
         let needs_full_json = matches!((format, full), (GraphExportFormat::Json, true));
         let resolution = if scope.is_some() || needs_full_json {
-            let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+            let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
             Some(crate::graph::hierarchy::resolve_hierarchy(
                 &issue_refs,
                 &config,
@@ -243,12 +243,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let member_ids = match &scope {
             Some(container) => {
-                let container_id = self.storage.resolve_issue_id(container)?;
+                let container_id = *container;
                 Some(
                     resolution
                         .as_ref()
-                        .expect("resolution is built whenever scope is Some")
-                        .membership_closure(&container_id),
+                        .ok_or_else(|| anyhow::anyhow!("Missing hierarchy resolution for scope"))?
+                        .membership_closure(container_id)
+                        .into_iter()
+                        .map(|node| &node.id)
+                        .collect::<HashSet<_>>(),
                 )
             }
             None => None,
@@ -261,15 +264,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph = DependencyGraph::new(&selected);
 
         Ok(match format {
-            GraphExportFormat::Dot => crate::visualization::export_dot(&graph),
-            GraphExportFormat::Mermaid => crate::visualization::export_mermaid(&graph),
-            GraphExportFormat::Json if full => crate::visualization::export_json_full(
-                &graph,
-                resolution
-                    .as_ref()
-                    .expect("resolution is built for the full JSON shape"),
-            ),
-            GraphExportFormat::Json => crate::visualization::export_json(&graph),
+            GraphExportFormat::Dot => {
+                GraphExportOutput::Text(GraphExportText(crate::visualization::export_dot(&graph)))
+            }
+            GraphExportFormat::Mermaid => GraphExportOutput::Text(GraphExportText(
+                crate::visualization::export_mermaid(&graph),
+            )),
+            GraphExportFormat::Json if full => {
+                GraphExportOutput::Full(crate::visualization::full_document(
+                    &graph,
+                    resolution.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!("Missing hierarchy resolution for full JSON")
+                    })?,
+                ))
+            }
+            GraphExportFormat::Json => {
+                GraphExportOutput::Summary(crate::visualization::summary_document(&graph))
+            }
             GraphExportFormat::Batch => {
                 return Err(anyhow::anyhow!(
                     "batch format is handled by export_graph_batch, not export_graph"
@@ -279,7 +290,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Export the graph in the `batch-create` input schema — the structural
-    /// inverse of [`batch_create_from_json`](Self::batch_create_from_json).
+    /// inverse of [`batch_create_from_json`](crate::commands::IssueOps::batch_create_from_json).
     ///
     /// `scope = Some(container)` captures that container's containment subtree;
     /// `scope = None` captures the whole graph. Each in-scope, non-bracket node
@@ -304,22 +315,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
     /// `batch-create` consumes.
-    pub fn export_graph_batch(&self, scope: Option<&str>) -> Result<BatchExport> {
-        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
-        let issues = self.storage.list_issues()?;
+    pub fn export_graph_batch(&self, scope: Option<&IssueId>) -> Result<BatchExport> {
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
         // Membership scope (the whole graph when unscoped).
-        let member_ids: Option<HashSet<String>> = match &scope {
+        let member_ids: Option<HashSet<&IssueId>> = match &scope {
             Some(container) => {
-                let container_id = self.storage.resolve_issue_id(container)?;
-                let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+                let container_id = *container;
+                let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
                 let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
-                Some(resolution.membership_closure(&container_id))
+                Some(
+                    resolution
+                        .membership_closure(container_id)
+                        .into_iter()
+                        .map(|node| &node.id)
+                        .collect(),
+                )
             }
             None => None,
         };
-        let in_scope = |id: &str| member_ids.as_ref().is_none_or(|m| m.contains(id));
+        let in_scope = |id: &IssueId| member_ids.as_ref().is_none_or(|m| m.contains(id));
 
         // Config-derived projection inputs.
         let stripped_ns = self.identity_bound_namespaces()?;
@@ -328,8 +344,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::labels::type_label_value(&issue.labels)
                 .is_some_and(|t| bracket_types.contains(t))
         };
-        let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
-        let short_of = |id: &str| -> String { id.chars().take(8).collect() };
+        let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
+        let short_of = |id: &IssueId| -> String { id.short_id().to_string() };
 
         // Batch node set: in-scope, non-bracket nodes, ordered by short id.
         let mut nodes: Vec<&Issue> = issue_refs
@@ -338,7 +354,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|i| in_scope(&i.id) && !is_bracket(i))
             .collect();
         nodes.sort_by_key(|i| i.short_id());
-        let node_ids: HashSet<&str> = nodes.iter().map(|i| i.id.as_str()).collect();
+        let node_ids: HashSet<&IssueId> = nodes.iter().map(|i| &i.id).collect();
 
         let mut boundary_edges: Vec<BoundaryEdge> = Vec::new();
         let defs: Vec<BatchIssueDef> = nodes
@@ -346,12 +362,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|issue| {
                 let mut depends_on: Vec<String> = Vec::new();
                 for dep in &issue.dependencies {
-                    if node_ids.contains(dep.as_str()) {
+                    if node_ids.contains(dep) {
                         // Internal edge: reference the dependency by its key.
                         depends_on.push(short_of(dep));
-                    } else if by_id.get(dep.as_str()).is_some_and(|d| is_bracket(d)) {
+                    } else if by_id.get(dep).is_some_and(|d| is_bracket(d)) {
                         // Edge to a bracket node: dropped with the bracket (REQ-05).
-                    } else if by_id.contains_key(dep.as_str()) {
+                    } else if by_id.contains_key(dep) {
                         // A real issue outside the membership scope: a boundary
                         // edge — excluded but reported, never dropped silently.
                         boundary_edges.push(BoundaryEdge {
@@ -375,7 +391,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     title: issue.title.clone(),
                     description: issue.description.clone(),
                     r#type: crate::labels::type_label_value(&issue.labels).map(str::to_string),
-                    priority: Some(priority_str(issue.priority).to_string()),
+                    priority: Some(issue.priority),
                     labels,
                     gates: issue.gates_required.clone(),
                     depends_on,
@@ -401,18 +417,22 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut namespaces: HashSet<String> = HashSet::new();
 
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         for (_type_name, namespace) in hierarchy.membership_namespaces() {
             namespaces.insert(namespace.clone());
         }
 
-        for rule in &self.effective_rules()?.rules {
+        for rule in &self.exec.effective_rules()?.rules {
             if let Assertion::LabelCoverage { config } = &rule.assert {
-                for key in ["satisfies-namespace", "container-from-label"] {
-                    if let Some(ns) = config.get(key).and_then(|v| v.as_str()) {
-                        namespaces.insert(ns.to_string());
-                    }
-                }
+                namespaces.extend(
+                    [
+                        &config.authored_satisfies_namespace,
+                        &config.container_from_label,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .cloned(),
+                );
             }
         }
 
@@ -428,7 +448,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`breakdown_type`]: crate::templates::GraphTemplate::breakdown_type
     /// [`RoleBindings`]: crate::templates::RoleBindings
     fn bracket_node_types(&self) -> Result<HashSet<String>> {
-        let registry = &self.cached_config()?.templates;
+        let registry = &self.exec.cached_config()?.templates;
         Ok(registry
             .templates
             .iter()
@@ -472,49 +492,52 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], labels, None, None, false)
     ///         .unwrap()
-    ///         .0
+    ///         .issue.id
     /// };
     ///
     /// let epic = new("Epic", vec![format!("type:{}", taxonomy.type_at_level(2))]);
     /// let task = new("Task", vec![format!("type:{}", taxonomy.type_at_level(4))]);
-    /// executor.add_dependency(&epic, &task).unwrap();
+    /// executor
+    ///     .graph()
+    ///     .add_dependencies_with_policy(
+    ///         &epic,
+    ///         std::slice::from_ref(&task),
+    ///         jit::commands::RedundancyPolicy::Reduce,
+    ///     )
+    ///     .unwrap();
     ///
-    /// let response = executor.resolve_hierarchy_tree(None).unwrap();
-    /// assert_eq!(response.count(), 2);
+    /// let response = executor.graph().resolve_hierarchy_tree(None).unwrap();
+    /// assert_eq!(response.items.len(), 2);
     /// let epic_view = response.items.iter().find(|n| n.id == epic).unwrap();
     /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
     /// assert_eq!(epic_view.hierarchy.parent, None);
     /// ```
     pub fn resolve_hierarchy_tree(
         &self,
-        root: Option<&str>,
+        root: Option<&IssueId>,
     ) -> Result<crate::output::GraphTreeResponse> {
         use crate::output::{GraphTreeResponse, HierarchyNodeView};
 
-        let root = root.map(IssueIdPrefix::parse).transpose()?;
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
         // When scoped to a root, keep the root plus its transitive dependency
         // closure (the DAG subtree it contains). Resolution itself stays
         // repository-wide; only the listed node set is filtered.
-        let root_id = match &root {
-            Some(r) => Some(self.storage.resolve_issue_id(r)?),
-            None => None,
-        };
-        let scope: Option<std::collections::HashSet<String>> = root_id.as_deref().map(|root_id| {
+        let root_id = root.cloned();
+        let scope: Option<std::collections::HashSet<IssueId>> = root_id.as_ref().map(|root_id| {
             let graph = DependencyGraph::new(&issue_refs);
-            let mut set: std::collections::HashSet<String> = graph
+            let mut set: std::collections::HashSet<IssueId> = graph
                 .get_transitive_dependencies(root_id)
                 .into_iter()
                 .map(|i| i.id.clone())
                 .collect();
-            set.insert(root_id.to_string());
+            set.insert(root_id.clone());
             set
         });
-        let in_scope = |id: &str| -> bool { scope.as_ref().is_none_or(|set| set.contains(id)) };
+        let in_scope = |id: &IssueId| -> bool { scope.as_ref().is_none_or(|set| set.contains(id)) };
 
         let mut nodes: Vec<HierarchyNodeView> = issues
             .iter()
@@ -572,26 +595,26 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         vec![format!("type:{leaf_type}"), membership.clone()], None, None, false)
     ///     .unwrap();
     ///
-    /// let report = executor.detect_divergences().unwrap();
-    /// assert_eq!(report.count(), 1);
+    /// let report = executor.graph().detect_divergences().unwrap();
+    /// assert_eq!(report.items.len(), 1);
     /// assert_eq!(report.items[0].label, membership);
     /// ```
     pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {
         use crate::output::{DivergenceResponse, DivergenceView};
 
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let divergences =
             crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &config);
 
-        let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+        let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
         let views = divergences
             .into_iter()
             .map(|d| {
-                let issue = by_id.get(d.issue_id.as_str());
+                let issue = by_id.get(&d.issue_id);
                 DivergenceView {
-                    short_id: d.issue_id.chars().take(8).collect(),
+                    short_id: d.issue_id.short_id().to_string(),
                     title: issue.map(|i| i.title.clone()).unwrap_or_default(),
                     id: d.issue_id,
                     label: d.label,
@@ -621,7 +644,7 @@ pub fn compute_dependency_summary(tree: &[DependencyTreeNode]) -> crate::output:
 /// Collect statistics from dependency tree recursively
 fn collect_stats(
     tree: &[DependencyTreeNode],
-    unique_ids: &mut HashSet<String>,
+    unique_ids: &mut HashSet<IssueId>,
     by_state: &mut HashMap<crate::domain::State, usize>,
 ) {
     for node in tree {
@@ -639,10 +662,28 @@ mod tests {
     use crate::domain::{Priority, State};
     use crate::output::DependencyTreeNode;
 
-    fn make_node(id: &str, state: State) -> DependencyTreeNode {
+    #[test]
+    fn test_resolve_hierarchy_tree_propagates_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .graph()
+            .resolve_hierarchy_tree(None)
+            .expect_err("invalid hierarchy must fail graph resolution");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
+
+    fn make_node(id: &IssueId, state: State) -> DependencyTreeNode {
         DependencyTreeNode {
-            id: id.to_string(),
-            short_id: id[..8.min(id.len())].to_string(),
+            id: id.clone(),
+            short_id: id.short_id().to_string(),
             title: format!("Node {}", id),
             state,
             priority: Priority::Normal,
@@ -656,9 +697,18 @@ mod tests {
     #[test]
     fn test_compute_dependency_summary_keys_by_state_enum() {
         let tree = vec![
-            make_node("id-done-1", State::Done),
-            make_node("id-done-2", State::Done),
-            make_node("id-in-progress", State::InProgress),
+            make_node(
+                &crate::test_utils::issue_id(0x9e53_59a5_8c6f_d2b0_438f_8263_9a3b_eda4),
+                State::Done,
+            ),
+            make_node(
+                &crate::test_utils::issue_id(0x1a8b_5963_9831_82d7_1ca2_a3a0_89c1_f9f1),
+                State::Done,
+            ),
+            make_node(
+                &crate::test_utils::issue_id(0xdaac_5d84_92d4_d5f9_ba87_32e3_b23c_207c),
+                State::InProgress,
+            ),
         ];
 
         let summary = compute_dependency_summary(&tree);
@@ -672,11 +722,23 @@ mod tests {
     #[test]
     fn test_compute_dependency_summary_deduplicates_shared_ids() {
         // Same ID appearing as both a direct and nested dep should count once.
-        let mut child = make_node("shared-id", State::Done);
+        let mut child = make_node(
+            &crate::test_utils::issue_id(0x315a_50d0_9915_3228_5331_aff3_5bd5_5d8a),
+            State::Done,
+        );
         child.level = 2;
-        let mut parent = make_node("parent-id", State::InProgress);
+        let mut parent = make_node(
+            &crate::test_utils::issue_id(0x3ce2_5e38_8dd9_a1a8_fe34_cc5c_fa69_be22),
+            State::InProgress,
+        );
         parent.children = vec![child];
-        let tree = vec![make_node("shared-id", State::Done), parent];
+        let tree = vec![
+            make_node(
+                &crate::test_utils::issue_id(0x315a_50d0_9915_3228_5331_aff3_5bd5_5d8a),
+                State::Done,
+            ),
+            parent,
+        ];
 
         let summary = compute_dependency_summary(&tree);
 
@@ -688,8 +750,14 @@ mod tests {
     fn test_dependency_summary_json_uses_snake_case_state_keys() {
         // Regression guard: keys must be "in_progress" not "inprogress".
         let tree = vec![
-            make_node("a", State::Done),
-            make_node("b", State::InProgress),
+            make_node(
+                &crate::test_utils::issue_id(0x54d5_5acd_bd26_cc73_4e22_92e3_f6b2_86c5),
+                State::Done,
+            ),
+            make_node(
+                &crate::test_utils::issue_id(0x907e_5586_9d02_2c3d_23d4_d8ae_3ba0_9e56),
+                State::InProgress,
+            ),
         ];
         let summary = compute_dependency_summary(&tree);
         let json = serde_json::to_string(&summary).expect("summary serializes");

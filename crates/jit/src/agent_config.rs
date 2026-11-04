@@ -11,6 +11,7 @@
 //! - `human:alice` - Human user Alice
 //! - `ci:github-actions` - CI/CD pipeline
 
+use crate::domain::{Assignee, AssigneeParseError};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -91,7 +92,7 @@ impl AgentConfig {
 /// # Errors
 ///
 /// Returns an error if no agent identity is configured or if the format is invalid.
-pub fn resolve_agent_id(cli_flag: Option<String>) -> Result<String> {
+pub fn resolve_agent_id(cli_flag: Option<String>) -> Result<Assignee> {
     resolve_agent_id_with(cli_flag, |key| env::var(key).ok(), AgentConfig::load)
 }
 
@@ -100,14 +101,13 @@ pub fn resolve_agent_id_with(
     cli_flag: Option<String>,
     env_lookup: impl Fn(&str) -> Option<String>,
     load_config: impl FnOnce() -> Result<Option<AgentConfig>>,
-) -> Result<String> {
+) -> Result<Assignee> {
     if let Some(id) = cli_flag.or_else(|| env_lookup("JIT_AGENT_ID")) {
-        validate_agent_id(&id)?;
-        return Ok(id);
+        return validate_agent_id(&id);
     }
 
     if let Some(config) = load_config()? {
-        return Ok(config.agent.id);
+        return validate_agent_id(&config.agent.id);
     }
 
     bail!(
@@ -128,9 +128,7 @@ pub fn resolve_agent_id_with(
 /// # Errors
 ///
 /// Returns an error if the format is invalid.
-fn validate_agent_id(id: &str) -> Result<()> {
-    use crate::domain::{Assignee, AssigneeParseError};
-
+fn validate_agent_id(id: &str) -> Result<Assignee> {
     // Reuse the single `{type}:{identifier}` parse path, mapping its errors onto
     // the agent-identity wording. Agent IDs are stricter than a bare assignee:
     // whitespace is rejected on top of the shared structural validation.
@@ -154,7 +152,7 @@ fn validate_agent_id(id: &str) -> Result<()> {
         bail!("Agent ID cannot contain whitespace: '{}'", id);
     }
 
-    Ok(())
+    Ok(assignee)
 }
 
 #[cfg(test)]
@@ -278,7 +276,7 @@ description = "GitHub Copilot Workspace Session 1"
             config_with_id("file:should-not-use")
         })
         .unwrap();
-        assert_eq!(result, "agent:cli");
+        assert_eq!(result.to_string(), "agent:cli");
     }
 
     #[test]
@@ -286,13 +284,13 @@ description = "GitHub Copilot Workspace Session 1"
         let env = |key: &str| (key == "JIT_AGENT_ID").then(|| "agent:from-env".to_string());
         let result =
             resolve_agent_id_with(None, env, || config_with_id("file:should-not-use")).unwrap();
-        assert_eq!(result, "agent:from-env");
+        assert_eq!(result.to_string(), "agent:from-env");
     }
 
     #[test]
     fn test_resolve_agent_id_config_used_without_flag_or_env() {
         let result = resolve_agent_id_with(None, no_env, || config_with_id("agent:from-file"));
-        assert_eq!(result.unwrap(), "agent:from-file");
+        assert_eq!(result.unwrap().to_string(), "agent:from-file");
     }
 
     #[test]

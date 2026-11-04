@@ -1,11 +1,11 @@
 //! Config accessor and mutation commands (`jit config get` / `jit config set`).
 //!
-//! `jit config set` (see [`CommandExecutor::set_config`]): key parsing,
+//! `jit config set` (see [`ConfigOps::set_config`]): key parsing,
 //! per-type value dispatch, and parsing the edited document as configuration,
 //! so an edit that would not load never reaches the file. Edits publish through
 //! a repository-state mutation session.
 //!
-//! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key
+//! `jit config get` (see [`ConfigOps::get_config`]): a dotted-key
 //! accessor covering the WHOLE configuration surface (jit:043ae624), built by
 //! walking [`EffectiveConfig::full_snapshot`]'s generic JSON snapshot with
 //! [`resolve_dotted_key`] rather than hand-mapping each recognised key —
@@ -16,31 +16,43 @@
 //! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::EffectiveConfig;
+use crate::config::{EffectiveConfig, JitConfig};
 use crate::errors::InvalidArgumentError;
+use schemars::JsonSchema;
 use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
-/// Returned by [`CommandExecutor::set_config`]. `file` is the config file that
+/// Returned by [`ConfigOps::set_config`]. `file` is the config file that
 /// was written.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigSetOutcome {
     /// The `section.field` key that was set.
     pub key: String,
     /// The value as written (the raw string the user supplied).
     pub value: String,
-    /// The config file that was written.
+    /// The config file that was written, rendered as its display text so a
+    /// non-UTF-8 path serializes as the same lossy string the human output prints.
+    #[serde(serialize_with = "serialize_path_display")]
+    #[schemars(with = "String")]
     pub file: PathBuf,
+}
+
+/// Serialize a path as its [`Path::display`](std::path::Path::display) text.
+fn serialize_path_display<S: serde::Serializer>(
+    path: &std::path::Path,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.collect_str(&path.display())
 }
 
 /// Result of a `jit config get` lookup, carrying what the CLI needs to print.
 ///
-/// Returned by [`CommandExecutor::get_config`]. `value` is the raw
+/// Returned by [`ConfigOps::get_config`]. `value` is the raw
 /// [`serde_json::Value`] resolved at `key` — a scalar for a leaf, or an
 /// object/array for an intermediate key (`jit config get documentation`
 /// returns the whole section).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigGetOutcome {
     /// The dotted key that was resolved.
     pub key: String,
@@ -48,11 +60,31 @@ pub struct ConfigGetOutcome {
     pub value: serde_json::Value,
 }
 
+/// Result of `jit config validate`: one message per invalid configuration
+/// source. Valid when no source failed.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ConfigValidationReport {
+    /// Whether every configuration source loaded with valid values.
+    pub valid: bool,
+    /// One message per failing source, in check order.
+    pub errors: Vec<String>,
+}
+
+impl ConfigValidationReport {
+    /// Build the report from the failing sources' messages.
+    pub fn new(errors: Vec<String>) -> Self {
+        Self {
+            valid: errors.is_empty(),
+            errors,
+        }
+    }
+}
+
 /// Error resolving a dotted `jit config get` key against an assembled
 /// configuration JSON snapshot ([`resolve_dotted_key`]).
 ///
 /// Kept independent of IO and of [`anyhow::Error`] so [`resolve_dotted_key`]
-/// stays a pure, directly unit-tested function. [`CommandExecutor::get_config`]
+/// stays a pure, directly unit-tested function. [`ConfigOps::get_config`]
 /// converts either variant's message into the shared
 /// [`InvalidArgumentError`] (exit 2) — the same family every other CLI usage
 /// error in this codebase uses — rather than introducing a parallel
@@ -155,11 +187,11 @@ pub fn resolve_dotted_key(
 }
 
 /// Apply one `section.field = value` edit to a config `DocumentMut`, typing the
-/// value and rejecting a post-edit document that does not parse as configuration
+/// value and rejecting a post-edit document that fails configuration assembly
 /// as an invalid argument.
 ///
 /// The edit is preservation-safe (toml_edit keeps every unrelated byte, comment,
-/// and ordering). Parsing the POST-mutation document makes a valid replacement
+/// and ordering). Assembling the POST-mutation document makes a valid replacement
 /// the repair path, while any edit over a document already holding an invalid
 /// value or unknown key is rejected; nothing is mutated on disk until the caller
 /// persists the returned document.
@@ -188,25 +220,57 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
 
     doc[section][field] = parsed_value;
 
-    crate::declarations::parse_configuration(doc.to_string().as_bytes())
+    crate::declarations::assemble_configuration(Some(doc.to_string().as_bytes()), None, None)
         .map_err(|e| InvalidArgumentError::new(e.to_string()))?;
     Ok(())
 }
 
+/// Configuration operations of a [`CommandExecutor`].
+pub struct ConfigOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The configuration family.
+    pub fn config(&self) -> ConfigOps<'_, S> {
+        ConfigOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> ConfigOps<'_, S> {
+    /// The repository's declared hierarchy and label associations.
+    pub fn get_hierarchy_config(&self) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
+        crate::config_manager::get_hierarchy_config(self.exec.storage())
+    }
+
+    /// The repository's label namespace declarations.
+    pub fn get_namespaces(&self) -> Result<LabelNamespaces> {
+        self.exec.config_manager.get_namespaces()
+    }
+
+    /// Icons resolved from the repository's hierarchy and icon configuration.
+    pub fn get_hierarchy_icons(&self) -> Result<std::collections::HashMap<String, String>> {
+        self.exec.config_manager.get_hierarchy_icons()
+    }
+
+    /// The explicit layout selected when the executor was constructed.
+    pub fn repository_layout(&self) -> Result<&crate::repository_state::RepositoryLayout> {
+        self.exec.repository_layout()
+    }
+
     /// Set a `section.field` key in the repository `config.toml`, returning
     /// what the CLI needs to print.
     ///
     /// Edits a formatting-preserving TOML document and publishes it through the
-    /// mutation session. The edited document is parsed as configuration BEFORE
-    /// the write, so an edit that would not load is rejected and the file is
+    /// mutation session. The edited document is assembled as configuration
+    /// BEFORE the write, so an edit that would not load is rejected and the file is
     /// left untouched. Numeric (`*_secs`/`*_pct`/`max_*`) keys are parsed into
     /// TOML integers; any other key is stored as a string.
     pub fn set_config(&self, key: &str, value: &str) -> Result<ConfigSetOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let config_path = layout.resolve(&crate::repository_state::VirtualPath::CONFIG)?;
         self.set_repo_config(key, value)?;
         Ok(ConfigSetOutcome {
@@ -234,9 +298,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{
             apply_overlay, finalize_config_edit, CaptureSpec, VirtualPath,
         };
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let config_vpath = VirtualPath::CONFIG;
-        with_mutation_session(self.storage(), &layout, "config set", |session| {
+        let context = super::production_mutation_context();
+        with_mutation_session(self.exec.storage(), &layout, "config set", |session| {
             // Read the current config for a preservation-safe edit from the closed
             // image, so a concurrent edit is caught by the apply-time preimage check.
             let Some(config_image) = capture_or_retry(session.capture(CaptureSpec::new(
@@ -246,8 +311,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let current =
-                super::image_repo_bytes(&config_image, ".jit/config.toml")?.unwrap_or_default();
+            let current = super::image_virtual_bytes(&config_image, &VirtualPath::CONFIG)?
+                .unwrap_or_default();
             let mut doc = String::from_utf8(current)
                 .context("existing .jit/config.toml is not UTF-8")?
                 .parse::<toml_edit::DocumentMut>()
@@ -262,7 +327,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
             let Some(base) =
-                self.capture_proposed_base(session, &overrides, &[], Some(config_image))?
+                self.exec
+                    .capture_proposed_base(session, &overrides, &[], Some(config_image))?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -275,13 +341,27 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .collect::<std::collections::BTreeMap<_, _>>(),
             )?;
             let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
-            let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed())?;
-            let proposed = apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
-            let validation = crate::validation::repository::validate_repository(&proposed)?;
-            if validation.rule_report.has_errors() {
+            let plan =
+                finalize_config_edit(&base, &context, &edited_bytes, declarations.borrowed())?;
+            let proposed = apply_overlay(
+                &base,
+                crate::repository_state::action_overrides(plan.delta().actions()),
+            )?;
+            let validation = crate::validation::report(
+                &crate::validation::CapturedValidation::from_image(&proposed),
+                &crate::validation::ReportInputs {
+                    now: chrono::Utc::now(),
+                    history: None,
+                },
+            );
+            let (failure, rule_report) = validation.into_parts();
+            if let Some(error) = failure {
+                return Err(error);
+            }
+            if rule_report.has_errors() {
                 anyhow::bail!(
                     "config set would leave {} validation error finding(s)",
-                    validation.rule_report.error_count()
+                    rule_report.error_count()
                 );
             }
             Ok(SessionStep::Apply(plan, ()))
@@ -294,7 +374,36 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in
     /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
-        EffectiveConfig::load(self.storage.root())?.full_snapshot()
+        EffectiveConfig::load(self.exec.repository_layout()?)?.full_snapshot()
+    }
+
+    /// Check the repository `config.toml` (when present) and the invocation write
+    /// override, reporting every failing source.
+    ///
+    /// Invalid enforcement and write-policy tokens fail at TOML parse time, so a
+    /// successful load implies valid values.
+    pub fn validate(&self) -> Result<ConfigValidationReport> {
+        let mut errors = Vec::new();
+        let layout = self.exec.storage().repository_layout()?;
+        if layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)?
+            .exists()
+        {
+            if let Err(e) = JitConfig::load(&layout) {
+                errors.push(format!("repo config: {e}"));
+            }
+        }
+        if let Err(e) = crate::config_manager::ConfigManager::invocation_write_override() {
+            errors.push(e.to_string());
+        }
+        Ok(ConfigValidationReport::new(errors))
+    }
+
+    /// The type hierarchy declared by the repository's namespace configuration.
+    pub fn declared_type_hierarchy(&self) -> Result<std::collections::HashMap<String, u8>> {
+        let layout = self.exec.storage().repository_layout()?;
+        let namespaces = crate::config_manager::ConfigManager::new(layout).get_namespaces()?;
+        Ok(namespaces.declared_type_hierarchy())
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
@@ -418,7 +527,9 @@ mod tests {
     fn test_get_config_covers_whole_surface_on_fresh_repo() {
         let dir = tempfile::TempDir::new().unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(
+            crate::test_utils::repository_layout_for_data_root(dir.path()),
+        );
 
         // No config.toml at all: every top-level section still resolves
         // (empty object), it's just not an unknown key.
@@ -434,7 +545,7 @@ mod tests {
             "worktree",
             "coordination",
         ] {
-            let outcome = executor.get_config(section).unwrap();
+            let outcome = executor.config().get_config(section).unwrap();
             assert!(
                 outcome.value.is_object(),
                 "section {section} did not resolve to an object: {:?}",
@@ -444,6 +555,7 @@ mod tests {
 
         // A defaulted coordination leaf still resolves without any config.toml.
         let cap = executor
+            .config()
             .get_config("coordination.max_indefinite_leases_per_agent")
             .unwrap();
         assert_eq!(
@@ -456,7 +568,11 @@ mod tests {
     fn test_get_config_reads_whole_surface_from_repo_config_toml() {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::write(
-            dir.path().join("config.toml"),
+            dir.path().join(
+                crate::repository_state::VirtualPath::CONFIG
+                    .relative()
+                    .as_path(),
+            ),
             r#"
 [type_hierarchy]
 types = { milestone = 1, epic = 2, story = 3, task = 4 }
@@ -483,10 +599,13 @@ schema = 1
         )
         .unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(
+            crate::test_utils::repository_layout_for_data_root(dir.path()),
+        );
 
         assert_eq!(
             executor
+                .config()
                 .get_config("type_hierarchy.strategic_types")
                 .unwrap()
                 .value,
@@ -494,6 +613,7 @@ schema = 1
         );
         assert_eq!(
             executor
+                .config()
                 .get_config("type_hierarchy.types.epic")
                 .unwrap()
                 .value,
@@ -501,21 +621,34 @@ schema = 1
         );
         assert_eq!(
             executor
+                .config()
                 .get_config("documentation.development_root")
                 .unwrap()
                 .value,
             serde_json::json!("dev")
         );
         assert_eq!(
-            executor.get_config("namespaces.type.unique").unwrap().value,
+            executor
+                .config()
+                .get_config("namespaces.type.unique")
+                .unwrap()
+                .value,
             serde_json::json!(true)
         );
         assert_eq!(
-            executor.get_config("validation.strictness").unwrap().value,
+            executor
+                .config()
+                .get_config("validation.strictness")
+                .unwrap()
+                .value,
             serde_json::json!("loose")
         );
         assert_eq!(
-            executor.get_config("version.schema").unwrap().value,
+            executor
+                .config()
+                .get_config("version.schema")
+                .unwrap()
+                .value,
             serde_json::json!(1)
         );
     }
@@ -535,27 +668,38 @@ schema = 1
                 .unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
+            .profiles()
             .initialize_fresh_repository(dir.path().parent().unwrap(), None)
             .unwrap();
 
         // A recognized level is accepted and persisted.
         executor
+            .config()
             .set_config("validation.strictness", "strict")
             .unwrap();
         assert_eq!(
-            executor.get_config("validation.strictness").unwrap().value,
+            executor
+                .config()
+                .get_config("validation.strictness")
+                .unwrap()
+                .value,
             serde_json::json!("strict")
         );
 
         // An unrecognized level is rejected with a message naming the bad value.
         let err = executor
+            .config()
             .set_config("validation.strictness", "banana")
             .unwrap_err();
         assert!(err.to_string().contains("banana"), "{err}");
 
         // The rejected set persisted nothing: the good value survives on disk.
         assert_eq!(
-            executor.get_config("validation.strictness").unwrap().value,
+            executor
+                .config()
+                .get_config("validation.strictness")
+                .unwrap()
+                .value,
             serde_json::json!("strict")
         );
     }
@@ -564,10 +708,28 @@ schema = 1
     fn test_get_config_unknown_top_level_key_is_invalid_argument() {
         let dir = tempfile::TempDir::new().unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(
+            crate::test_utils::repository_layout_for_data_root(dir.path()),
+        );
 
-        let err = executor.get_config("bogus_section").unwrap_err();
+        let err = executor.config().get_config("bogus_section").unwrap_err();
         assert!(err.downcast_ref::<InvalidArgumentError>().is_some());
         assert!(err.to_string().contains("valid top-level sections"));
+    }
+
+    #[test]
+    fn test_config_set_outcome_serializes_file_as_display_text_for_non_utf8_path() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(std::ffi::OsString::from_vec(b"config-\xff.toml".to_vec()));
+        let outcome = ConfigSetOutcome {
+            key: "project.name".to_string(),
+            value: "demo".to_string(),
+            file: path.clone(),
+        };
+
+        let serialized = serde_json::to_value(&outcome).unwrap();
+
+        assert_eq!(serialized["file"], path.display().to_string());
     }
 }

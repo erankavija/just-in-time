@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "226db21ccde32a4cdca4c82c836d4543b2e53f55",
+  "completed_at": "2026-11-03T03:44:35.627500520Z",
+  "duration_ms": 254913,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Graph facade meets the issue's hard criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "93aaba24-09a4-40b4-993a-de08baf9b4e9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "476cf034-9fae-4a6c-84e4-9b5b74e734bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T03:40:20.714459024Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2d3482a0e (`jit:93aaba24`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (issue Markdown); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T03:38:44Z)\nTruncation recovery: split commit patches by affected source/test paths; resolved the truncated requirement search directly; narrowed current-tree and post-commit comparisons to the graph impact cone.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Graph facade meets the issue's hard criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

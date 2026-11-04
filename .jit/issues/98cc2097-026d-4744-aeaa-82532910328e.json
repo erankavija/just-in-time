@@ -1,19 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:56.801538719Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
+    "12c0f3fb-fde6-4504-aac0-773b435f0a83",
     "d05b5639-925e-414d-8abb-a639331d76f1"
   ],
-  "description": "`jit search` calls the search library directly, reloads titles from storage and classifies its error only on the JSON path. This moves it to a library handler over the executor.\n\n## Background\n\n`Commands::Search` in `crates/jit/src/main.rs` calls `jit::search::search(&jit_dir, ..)`, then `storage.load_issue` per hit to attach titles, builds `SearchResponse` inline, and under `--json` maps `SearchError::RipgrepNotInstalled` to `RIPGREP_NOT_FOUND` and every other failure to `SEARCH_FAILED` (exit 1), while the human path uses the classifier (an IO failure exits 10). The executor now provides a search entry point whose results carry issue titles.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `jit search` to a handler in `crates/jit/src/dispatch/search.rs` that calls the executor search, and `main.rs` makes no `jit::search` or `storage` call for it.\n- [hard] REQ-02: The handler returns a `ListEnvelope` of results with `query` as a declared extra, and the schema names that type for `search`.\n- [hard] REQ-03: Search failures are returned as errors classified once, and a test asserts that a missing ripgrep reports `RIPGREP_NOT_FOUND` with the same exit on the JSON and human paths.\n- [hard] REQ-04: The handler contains no `std::process::exit` and no substituted code.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n34999aad changes the ripgrep invocation; 0f8efc37 later revises what the search entry point computes.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "`jit search` calls the search library directly, reloads titles from storage and classifies its error only on the JSON path. This moves it to a library handler over the executor.\n\n## Background\n\n`Commands::Search` in `crates/jit/src/main.rs` calls `jit::search::search(&jit_dir, ..)`, then `storage.load_issue` per hit to attach titles, builds `SearchResponse` inline, and under `--json` maps `SearchError::RipgrepNotInstalled` to `RIPGREP_NOT_FOUND` and every other failure to `SEARCH_FAILED` (exit 1), while the human path uses the classifier (an IO failure exits 10). The executor now provides a search entry point whose results carry issue titles.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `jit search` to a handler in `crates/jit/src/dispatch/search.rs` that calls the executor search, and `main.rs` makes no `jit::search` or `storage` call for it.\n- [hard] REQ-02: The handler returns a `ListEnvelope` of results with `query` as a declared extra, and the schema names that type for `search`.\n- [hard] REQ-03: Search failures are returned as errors classified once, and a test asserts that a missing ripgrep reports `RIPGREP_NOT_FOUND` with the same exit on the JSON and human paths.\n- [hard] REQ-04: The handler contains no `std::process::exit` and no substituted code.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n34999aad changes the ripgrep invocation; 0f8efc37 later revises what the search entry point computes.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:38:19.929424251Z",
+  "first_ready_at": "2026-11-03T23:08:01.964132250Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f0b7fe8a-9974-4c57-9efa-a4c6bce8fdb1",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.177025867Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3f51a227-b22f-4f05-8d3e-198743015157",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:26:14.563354886Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "6044728d-9e87-4735-9151-c6f6ec017b6d",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.318662360Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "98cc2097-026d-4744-aeaa-82532910328e",
   "labels": [
     "type:task",
@@ -30,7 +52,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Top-level search command moves to a library handler",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T09:38:19.929424251Z"
 }

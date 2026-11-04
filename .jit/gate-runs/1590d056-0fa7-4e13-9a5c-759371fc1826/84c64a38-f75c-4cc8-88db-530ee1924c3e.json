@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dc3d63f6f172cd4916504b23ba61defaad4624f7",
+  "completed_at": "2026-10-27T00:15:00.210399568Z",
+  "duration_ms": 254522,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current fixture and its owning tests satisfy the issue-scoped hard requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1590d056-0fa7-4e13-9a5c-759371fc1826",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "84c64a38-f75c-4cc8-88db-530ee1924c3e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:10:45.687855933Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1aa4aa9a2, a0b4733ee\nPolicy sources: AGENTS.md\nResolved items: @/issue/1590d056/requirement/REQ-01–REQ-05 (issue Markdown); @/issue/c780514e/requirement/REQ-05 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current fixture and its owning tests satisfy the issue-scoped hard requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

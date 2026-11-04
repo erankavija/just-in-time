@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-7abcc22d",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c947e791186041df3b4c7f48d2f1b6d4ce55c1d2",
+  "completed_at": "2026-10-31T23:09:49.583528320Z",
+  "duration_ms": 202470,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed IssueId cutover meets the issue-scoped hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7abcc22d-c931-4da8-94b0-c9c894333540",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "71ad9216-e854-4585-a432-fd15164544b1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:06:27.113006919Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c1f57fe82, 2d11f0295, d1f404619, c829bcf9e, c947e7911\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-01, @/issue/2195c98f/requirement/REQ-17 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json)\nGate evidence: cargo-ci passed (exit 0, 2026-10-31T23:05:17Z); code-review pending (current gate)\nTruncation recovery: partitioned commit patches and source/test reads by affected path and line range; no relevant omissions\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed IssueId cutover meets the issue-scoped hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

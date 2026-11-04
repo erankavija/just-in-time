@@ -1,0 +1,46 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T15:45:38.155876087Z",
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "d58f80c9-e6e8-4c14-9d3c-c5792f6ad086"
+  ],
+  "description": "Commit the redo record through the directory handle the session already verified, instead of through ambient path I/O, and leave the record module defining only the record's format.\n\n## Background\n\n- `RedoRecord::commit(&self, data_root: &Path)` (`crates/jit/src/storage/redo_record.rs:208-217`) joins paths and calls `create_scratch` (`:346-353`, `std::fs::create_dir`), `adopt_mode` (`:357-371`, `std::fs::metadata` and `set_permissions`), then `create_file_synced` and the path-based `sync_directory` from `crates/jit/src/storage/atomic_write.rs:48,70` (imported at `redo_record.rs:14`).\n- Callers pass paths: `JsonMutationSession::publish_through_record` commits into `self.layout.data_root()` (`crates/jit/src/storage/repository_state_store.rs:627-629`), after `revalidate_layout_capabilities` (`:580`) checked the held handles, so a root replaced by path between the check and the commit receives the record. `publish_absent_data_root` commits into `init_publish::stage_path(..)` (`:673`), a path to the stage that `init_publish::stage_new_data_root` (`crates/jit/src/storage/init_publish.rs:50-87`) opened as a `Dir` and dropped.\n- The session holds the data-root handle in `CapabilityRoots` (`crates/jit/src/storage/capability_fs.rs`).\n- Test callers of `commit`: `redo_record.rs:705-815` (the commit tests), `crates/jit/src/storage/redo_apply.rs:691,737`, `crates/jit/src/storage/redo_conformance.rs:96`, `crates/jit/src/storage/repository_state_store_tests.rs:3279`. Outside the crate, the server's startup tests (`crates/server/src/lib.rs:103` and `:200`) and `test_recover_reports_the_leftover_redo_record_its_session_applied` (`crates/jit/tests/cli_issue/recover_command_tests.rs:144`, `RedoRecord::new(..).commit(..)` at `:149-161`) commit leftover records by path. The server crate depends on `jit` but not on `cap-std` (`crates/server/Cargo.toml`), and `jit` re-exports no `cap_std` type, so a public commit taking a `cap_std::fs::Dir` would be unusable there. The rustdoc of the memory commit point links `RedoRecord::commit` (`crates/jit/src/storage/memory.rs:491`). `crates/jit/src/storage/mod.rs:74-79` re-exports the redo types to other crates. `create_file_synced` has no other production caller; its tests are at `atomic_write.rs:155-172`. The path-based `sync_directory` keeps a caller in `crates/jit/src/storage/worktree_identity.rs:250`.\n- `dev/architecture/repository-state-materialization.md:359-362` describes `RedoRecord::commit`.\n- The cutover scan admits repository-state publishers by the definition each owns (`REPOSITORY_STATE_PUBLISHERS`, `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:582-599`); the record's entry is `\"pub struct RedoRecord {\"` (`:584`), and the scan asserts that every admitted publisher writes.\n\n## Success Criteria\n\n- [hard] REQ-01: The record is committed by one function in `redo_apply.rs` that takes the data-root (or stage) directory handle, creates the scratch directory with the root's mode, and writes and syncs the record through handles; `redo_record.rs` imports nothing from `atomic_write` and performs no filesystem I/O. The `REPOSITORY_STATE_PUBLISHERS` entry for the record names the new commit function's definition instead of `pub struct RedoRecord {`, and the cutover scan passes.\n- [hard] REQ-02: Both session publication paths commit through the handle they hold: `stage_new_data_root` returns the stage directory handle it opened, and `create_file_synced` is deleted with its tests.\n- [hard] REQ-03: A test holds a data-root handle, renames that directory away and puts a new directory at its path, then commits: the record lands in the held directory and none in the replacement. Today's path-based commit writes into the replacement, so the assertion that the replacement holds no record fails before the fix.\n- [hard] REQ-04: `jit::storage` exposes a jit-owned data-root handle type, opened from a path with the no-follow root opener, and a public commit over it whose signature names no `cap_std` type; the server startup tests and the recover CLI test commit their leftover records through it with no new dependency in `crates/server/Cargo.toml`.\n\n## Notes\n\n- Behaviour change: a data root replaced by path after the session revalidated its handles no longer receives the record; the record is committed into the root the session verified.\n- The commit tests move from `redo_record.rs` to `redo_apply.rs` with the function; the architecture note's commit paragraph and the memory rustdoc link name the new function.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "done_at": "2026-11-04T16:02:10.518124938Z",
+  "first_ready_at": "2026-11-04T15:45:23.732843223Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d4996b0a-a256-4963-bcf1-9b2e2e4a9879",
+      "status": "passed",
+      "updated_at": "2026-11-04T15:58:37.183623314Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3667c415-a51f-4637-8c06-53dadb15d8bb",
+      "status": "passed",
+      "updated_at": "2026-11-04T16:01:48.789353041Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "01a88d32-e6f5-4b54-bd02-0b1e74bfa286",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:storage-primitives",
+    "component:storage",
+    "per:@/charter/D-20",
+    "per:@/charter/D-17",
+    "satisfies:b697a3f7/REQ-16"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Redo record commit goes through capability handles",
+  "updated_at": "2026-11-04T16:02:10.518124938Z"
+}

@@ -93,7 +93,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Temp-file cleanup threshold",
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
-            "Minimum age at which `jit recover` removes an orphaned `*.tmp` file under `.jit/`. A pending redo record is not swept: the next mutation session applies it (see [Publication and Recovery](storage-format.md#publication-and-recovery)).",
+            "Minimum age at which `jit recover` removes an orphaned `*.tmp` file under `.jit/` or `.git/jit/leases/`. A pending redo record is not swept: the next mutation session applies it (see [Publication and Recovery](storage-format.md#publication-and-recovery)).",
         ),
         (
             "Claim lease TTL",
@@ -103,7 +103,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Claim stale threshold",
             format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
-            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer counts as active for lease enforcement and is not evicted automatically.",
+            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes, and `jit recover` reclaims it.",
         ),
         (
             "Indefinite leases per agent",
@@ -118,7 +118,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Lease enforcement mode",
             EnforcementMode::DEFAULT.to_string(),
-            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. A repository with no `[worktree]` section enforces no leases.",
+            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. In `strict` a write is refused only when another agent holds an active lease on the issue. A repository with no `[worktree]` section enforces no leases.",
         ),
         (
             "Linked-checkout write policy",

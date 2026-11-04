@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:51:33.588736588Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "db9bcf12-6308-430f-ad01-9cf5904aea98"
   ],
-  "description": "Make archive execute read prior executions from the target's evidence record, once, instead of parsing the event log twice.\n\n## Background\n\nExecute captures the whole event log (`capture_archive_base`, `crates/jit/src/commands/validate.rs:343`) and parses it twice from the image: in the planner (`commands/archive.rs:713`) and in the finalizer (`repository_state/archive.rs:31`), both through `captured_archive_events` (`repository_state/archive.rs:456-466`, `pub(crate)`, re-exported at `repository_state/mod.rs:27`), which fails as `ArchiveExecutionError::EventLog`. Each target's executions are now in `archive-evidence/<target-key>.json`, which execute captures.\n\nKept as one change for a build reason: the planner and the finalizer are the only callers of `captured_archive_events`, and unused crate-private code fails the zero-warning build, so the function, its re-export and the error variant it alone produces go with them.\n\n## Success Criteria\n\n- [hard] REQ-01: Execute reads the target's evidence record once from its image, the finalizer receives it from the planner, and the archive base captures the event log as a tail.\n- [hard] REQ-02: `captured_archive_events`, its re-export and `ArchiveExecutionError::EventLog` no longer exist.\n- [hard] REQ-03: A test shows that execute of a re-archived target succeeds with an unparseable event log and produces the same coverage and residue identities as before.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make archive execute read prior executions from the target's evidence record, once, instead of parsing the event log twice.\n\n## Background\n\nExecute captures the whole event log (`capture_archive_base`, `crates/jit/src/commands/validate.rs`) and parses it twice from the image: in the planner (`commands/archive.rs`) and in the finalizer (`finalize_archive_execution`, `repository_state/archive.rs`), both through `captured_archive_events` (`pub(crate)`, re-exported from `repository_state/mod.rs`), which fails as `ArchiveExecutionError::EventLog`. Each target's executions are in `archive-evidence/<target-key>.json`, which execute captures.\n\nKept as one change for a build reason: the planner and the finalizer are the only callers of `captured_archive_events`, and unused crate-private code fails the zero-warning build, so the function, its re-export and the error variant it alone produces go with them.\n\n## Success Criteria\n\n- [hard] REQ-01: Execute reads the target's evidence record once from its image, the finalizer receives it from the planner, and `BaseCapturePurpose::Archive` captures the event log as a tail, so `capture_proposed_base_inner` has no whole-log arm and `capture_archive_base`'s doc comment says so.\n- [hard] REQ-02: `captured_archive_events`, its re-export and `ArchiveExecutionError::EventLog` no longer exist.\n- [hard] REQ-03: A test shows that execute of a re-archived target succeeds with an unparseable event log and produces the same coverage and residue identities as before.\n",
   "documents": [],
+  "done_at": "2026-11-04T01:32:26.028216181Z",
+  "first_ready_at": "2026-11-04T00:51:02.902186808Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9f93bd2e-83d4-4998-8d37-cec1196e3f2b",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:26:21.667443600Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c16e1e1e-16a7-48ab-a5b5-8cf9da8f02b2",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:32:25.575341133Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7fc08dff-8c4a-4f50-bbe4-abf3358554b2",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "satisfies:f8a6b298/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Archive execute reads the per-target evidence record",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T01:32:26.028216181Z"
 }

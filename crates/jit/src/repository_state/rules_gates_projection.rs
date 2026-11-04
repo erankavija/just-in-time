@@ -115,11 +115,16 @@ fn rule_display_text(rule: &crate::declarations::rules::Rule) -> &str {
 /// `enforced` (blocks writes) or `advisory` (never blocks).
 fn rule_metadata_suffix(rule: &crate::declarations::rules::Rule) -> String {
     let enforcement = if rule.enforce { "enforced" } else { "advisory" };
-    format!("({}, {})", rule.severity.token(), enforcement)
+    format!("({}, {})", rule.severity.as_str(), enforcement)
 }
 
 /// Gate `(key, gate)` pairs in ascending key order (deterministic).
-fn gates_sorted(gates: &GateRegistry) -> Vec<(&String, &crate::declarations::GateDefinition)> {
+fn gates_sorted(
+    gates: &GateRegistry,
+) -> Vec<(
+    &crate::domain::identity::GateKey,
+    &crate::declarations::GateDefinition,
+)> {
     let mut pairs: Vec<_> = gates.gates.iter().collect();
     pairs.sort_by_key(|(key, _)| *key);
     pairs
@@ -164,7 +169,7 @@ fn render_full(rules: &RuleSet, gates: &GateRegistry) -> String {
             };
             out.push_str(&format!(
                 "- **{address}** — {title}{description}\n",
-                address = gate_address(key),
+                address = gate_address(key.as_str()),
                 title = gate.title,
             ));
         }
@@ -193,7 +198,7 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
     for (key, gate) in sorted {
         out.push_str(&format!(
             "- **{address}** — {text}\n",
-            address = gate_address(key),
+            address = gate_address(key.as_str()),
             text = gate_display_text(gate),
         ));
     }
@@ -203,6 +208,7 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::Severity;
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use std::collections::HashMap;
@@ -211,20 +217,24 @@ mod tests {
         // `label-format` carries a description (rendered verbatim); `orphan-leaf`
         // has none (exercises the name fallback), so one fixture covers both.
         RuleSet::parse(
-            r#"
+            &format!(
+                r#"
 [[rules]]
 name = "label-format"
 description = "Every label is namespace:value."
-severity = "error"
+severity = "{error}"
 enforce = true
-assert = { require-label = { label = "type:*" } }
+assert = {{ require-label = {{ label = "type:*" }} }}
 
 [[rules]]
 name = "orphan-leaf"
-severity = "warn"
+severity = "{warn}"
 enforce = false
-assert = { require-section = { heading = "Goal" } }
+assert = {{ require-section = {{ heading = "Goal" }} }}
 "#,
+                error = Severity::Error,
+                warn = Severity::Warn,
+            ),
             None,
             [],
         )
@@ -234,7 +244,7 @@ assert = { require-section = { heading = "Goal" } }
     fn gate(key: &str, title: &str, description: &str) -> GateDefinition {
         GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: title.to_string(),
             description: description.to_string(),
             stage: GateStage::Postcheck,
@@ -250,11 +260,11 @@ assert = { require-section = { heading = "Goal" } }
         let mut registry = GateRegistry::default();
         // Inserted out of key order to prove the render sorts by key.
         registry.gates.insert(
-            "cargo-ci".to_string(),
+            "cargo-ci".parse().unwrap(),
             gate("cargo-ci", "Cargo CI", "fmt + clippy + tests"),
         );
         registry.gates.insert(
-            "breakdown-review".to_string(),
+            "breakdown-review".parse().unwrap(),
             gate(
                 "breakdown-review",
                 "AI Breakdown Review",
@@ -294,22 +304,26 @@ assert = { require-section = { heading = "Goal" } }
     fn test_render_full_rule_prose_suffix_and_description_fallback() {
         // REQ-04: a described rule renders its description then the prose suffix;
         // a description-less rule falls back to its name. The suffix is prose
-        // (`error, enforced` / `warn, advisory`), never `severity: …, enforce: …`.
+        // (severity, then enforced or advisory), never `severity: …, enforce: …`.
         let rules = RuleSet::parse(
-            r#"
+            &format!(
+                r#"
 [[rules]]
 name = "described"
 description = "A hand-authored explanation."
-severity = "error"
+severity = "{error}"
 enforce = true
-assert = { require-label = { label = "type:*" } }
+assert = {{ require-label = {{ label = "type:*" }} }}
 
 [[rules]]
 name = "bare"
-severity = "warn"
+severity = "{warn}"
 enforce = false
-assert = { require-section = { heading = "Goal" } }
+assert = {{ require-section = {{ heading = "Goal" }} }}
 "#,
+                error = Severity::Error,
+                warn = Severity::Warn,
+            ),
             None,
             [],
         )
@@ -346,7 +360,7 @@ assert = { require-section = { heading = "Goal" } }
         let mut registry = GateRegistry::default();
         registry
             .gates
-            .insert("bare".to_string(), gate("bare", "Bare Gate", ""));
+            .insert("bare".parse().unwrap(), gate("bare", "Bare Gate", ""));
         let md =
             render_rules_and_gates_markdown(&RuleSet::empty(), &registry, ProjectionStyle::Full);
         // No trailing "`: `" when the description is empty.
@@ -389,7 +403,7 @@ assert = { require-section = { heading = "Goal" } }
         let mut registry = GateRegistry::default();
         registry
             .gates
-            .insert("bare".to_string(), gate("bare", "Bare Gate", ""));
+            .insert("bare".parse().unwrap(), gate("bare", "Bare Gate", ""));
         let md = render_rules_and_gates_markdown(
             &RuleSet::empty(),
             &registry,

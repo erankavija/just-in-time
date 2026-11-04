@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-80fe846e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "155094f10a16c2b62e44acc2389a5b47dd06ae85",
+  "completed_at": "2026-10-25T00:27:59.593937659Z",
+  "duration_ms": 62351,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three artifact-plan code enums derive their wire tokens, ALL, and as_str from the integrated vocabulary macro; unchanged wire-contract coverage is supported by the passing cargo-ci projection.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "07b7b7f5-273d-471a-a127-bc69f210f8ec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:26:57.242437619Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4b19de352 `refactor(jit:80fe846e): declare artifact-plan codes through the vocabulary macro`\nPolicy sources: AGENTS.md\nResolved items: @/issue/80fe846e/requirement/REQ-01..REQ-03 and @/issue/2195c98f/requirement/REQ-13 — issue JSON, markdown-first; @/charter/D-18 — dev/vision/9db27a3a-charter.md, markdown-first; @/invariant/semantic-types — .jit/invariants.toml, registry-first\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T00:25:29Z); code-review pending with no prior run\nTruncation recovery: re-read the remaining attributable patch plus bounded current macro, enum, caller, ordering, and wire-contract-test ranges\n\n1. No findings. The one-file patch replaces all three declarations with `wire_vocabulary!` calls; the integrated macro derives serde spellings, `ALL`, and `as_str` from each entry. The unchanged contract assertions remain at `crates/jit/tests/fast_docs_templates/artifact_plan_model_tests.rs:343`, `:355`, and `:373`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three artifact-plan code enums derive their wire tokens, ALL, and as_str from the integrated vocabulary macro; unchanged wire-contract coverage is supported by the passing cargo-ci projection.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

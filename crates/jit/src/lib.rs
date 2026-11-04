@@ -9,7 +9,10 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod config_manager;
+#[cfg(test)]
+mod crate_source_digest;
 pub mod declarations;
+pub mod dispatch;
 pub mod document;
 pub mod domain;
 pub mod errors;
@@ -36,7 +39,8 @@ pub mod templates;
 pub mod test_cli;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_harness;
-pub mod test_mode;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_lease_store;
 pub mod test_taxonomy;
 pub mod test_utils;
 pub mod type_icons;

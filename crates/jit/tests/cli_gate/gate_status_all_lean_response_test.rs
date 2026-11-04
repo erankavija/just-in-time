@@ -1,81 +1,21 @@
 //! Verify `jit gate status-all --json` omits stdout/stderr for passing runs
 //! by default, retains them for failing runs, and restores them under --full.
 
+use crate::add_auto_gate_issue;
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-    temp
-}
-
-fn create_issue_with_gate(temp: &TempDir, gate_key: &str, checker_command: &str) -> String {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            gate_key,
-            "--title",
-            gate_key,
-            "--description",
-            "Test",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "10",
-        ])
-        .assert()
-        .success();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Test issue",
-            "--gate",
-            gate_key,
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let output_str = String::from_utf8_lossy(&output);
-    output_str
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_status_all_omits_stdout_for_passing_runs_by_default() {
-    let temp = setup_repo();
-    let issue_id = create_issue_with_gate(&temp, "noisy-pass", "printf SECRET_OUTPUT && exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "noisy-pass", "printf SECRET_OUTPUT && exit 0");
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id, "noisy-pass"])
+    temp.command(["gate", "evaluate", &issue_id, "noisy-pass"])
         .assert()
         .success();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status-all", &issue_id, "--json"])
+    let output = temp
+        .command(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .success()
         .get_output()
@@ -99,31 +39,29 @@ fn test_status_all_omits_stdout_for_passing_runs_by_default() {
 
 #[test]
 fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
-    let temp = setup_repo();
-    let issue_id = create_issue_with_gate(&temp, "noisy-fail", "printf FAILURE_DETAIL && exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "noisy-fail", "printf FAILURE_DETAIL && exit 1");
 
     // Run the gate so a failed result is recorded. `gate evaluate` for an auto
     // gate executes the checker and records the run regardless of status.
-    let _ = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id, "noisy-fail"])
+    let _ = temp
+        .command(["gate", "evaluate", &issue_id, "noisy-fail"])
         .output()
         .unwrap();
 
-    // A failed required gate makes `status-all` exit 4.
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status-all", &issue_id, "--json"])
+    // A failed required gate makes `status-all` fail.
+    let output = temp
+        .command(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let result = &json["results"][0];
+    let result = &json["error"]["details"]["results"][0];
     assert_ne!(result["status"].as_str(), Some("passed"));
+    assert_eq!(result["status"].as_str(), Some("failed"));
     let serialized = serde_json::to_string(&json).unwrap();
     assert!(
         serialized.contains("FAILURE_DETAIL"),
@@ -134,18 +72,15 @@ fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
 
 #[test]
 fn test_status_all_full_flag_restores_stdout_for_passing_runs() {
-    let temp = setup_repo();
-    let issue_id = create_issue_with_gate(&temp, "noisy-pass2", "printf RESTORED && exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "noisy-pass2", "printf RESTORED && exit 0");
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id, "noisy-pass2"])
+    temp.command(["gate", "evaluate", &issue_id, "noisy-pass2"])
         .assert()
         .success();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status-all", &issue_id, "--json", "--full"])
+    let output = temp
+        .command(["gate", "status-all", &issue_id, "--json", "--full"])
         .assert()
         .success()
         .get_output()

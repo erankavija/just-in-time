@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use jit::repository_state::VirtualPath;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::broadcast;
 
@@ -59,61 +60,56 @@ impl ChangeTracker {
 const DEBOUNCE_MS: u64 = 200;
 
 /// Returns `true` if the notify event affects files that are displayed in the
-/// graph — issue records, the index, gate registry, and gate run results.
+/// graph: issue records ([`VirtualPath::ISSUES`]), the index, the gate registry,
+/// and gate-run results ([`VirtualPath::GATE_RUNS`] and everything below it).
 ///
-/// High-frequency noise files that never affect the rendered graph are
-/// explicitly excluded:
-///
-/// * `events.jsonl` — append-only audit log, written on every command
-/// * `claims.jsonl` / `claims/` — lease coordination heartbeats
-/// * `server.pid.json`, `server.log` — server lifecycle metadata
-/// * `*.tmp` — atomic-write intermediaries (written then immediately renamed)
-///
-/// Paths that *do* trigger a refresh:
-/// * `issues/*.json` — issue state, labels, gates, dependencies
-/// * `index.json` — issue added or removed
-/// * `gates.toml` — gate registry changed
-/// * `gate-runs/**` — automated gate execution results
+/// Atomic-write temp files and the high-frequency [`VirtualPath::EVENTS`],
+/// [`VirtualPath::SERVER_PID`] and [`VirtualPath::SERVER_LOG`] files never
+/// refresh the graph.
 pub fn is_graph_relevant(event: &notify::Event) -> bool {
     event.paths.iter().any(|path| {
-        let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
+        let filename = path.file_name().and_then(|f| f.to_str());
 
         // Skip atomic-write temp files.
-        if filename.ends_with(".tmp") {
+        if filename.is_some_and(|f| f.ends_with(".tmp")) {
             return false;
         }
+
+        let names = |known: &VirtualPath| filename.is_some() && known.file_name() == filename;
 
         // Ignore known high-frequency noise files.
-        if matches!(
-            filename,
-            "events.jsonl" | "claims.jsonl" | "server.pid.json" | "server.log"
-        ) {
+        if [
+            VirtualPath::EVENTS,
+            VirtualPath::SERVER_PID,
+            VirtualPath::SERVER_LOG,
+        ]
+        .iter()
+        .any(names)
+        {
             return false;
         }
 
-        // Ignore the claims/ lease directory.
-        if path.components().any(|c| c.as_os_str() == "claims") {
-            return false;
-        }
-
-        // Gate run results (any file under gate-runs/) are graph-relevant —
-        // they update gate status shown on issue nodes.
-        if path.components().any(|c| c.as_os_str() == "gate-runs") {
+        // Gate run results (any file under the gate-runs directory) update the
+        // gate status shown on issue nodes.
+        let in_directory = |dir: &VirtualPath| {
+            path.components()
+                .any(|c| dir.file_name().is_some_and(|n| c.as_os_str() == n))
+        };
+        if in_directory(&VirtualPath::GATE_RUNS) {
             return true;
         }
 
         // Issue records.
-        let parent_name = path
+        let in_issues = path
             .parent()
             .and_then(|p| p.file_name())
-            .and_then(|f| f.to_str())
-            .unwrap_or("");
-        if parent_name == "issues" && filename.ends_with(".json") {
+            .is_some_and(|n| VirtualPath::ISSUES.file_name().is_some_and(|i| n == i));
+        if in_issues && filename.is_some_and(|f| f.ends_with(".json")) {
             return true;
         }
 
         // Top-level registry files.
-        matches!(filename, "index.json" | "gates.toml")
+        [VirtualPath::INDEX, VirtualPath::GATES].iter().any(names)
     })
 }
 
@@ -214,7 +210,8 @@ mod tests {
         let mut rx = tracker.subscribe();
 
         // Write a file into the watched directory
-        std::fs::write(tmp.path().join("index.json"), "{}").unwrap();
+        let layout = jit::test_utils::repository_layout_for_data_root(tmp.path());
+        std::fs::write(layout.resolve(&VirtualPath::INDEX).unwrap(), "{}").unwrap();
 
         // Wait for debounced notification (200ms debounce + margin)
         let version = tokio::time::timeout(Duration::from_secs(2), rx.recv())
@@ -228,19 +225,20 @@ mod tests {
     #[tokio::test]
     async fn test_start_watching_ignores_events_jsonl() {
         let tmp = tempfile::tempdir().unwrap();
-        let data_dir = tmp.path().to_str().unwrap();
+        let data_dir = tmp.path();
+        let layout = jit::test_utils::repository_layout_for_data_root(data_dir);
 
         let (tracker, _watcher) = start_watching(data_dir).unwrap();
 
-        // Write an events.jsonl entry (should NOT trigger a version bump)
-        std::fs::write(tmp.path().join("events.jsonl"), "{}\n").unwrap();
+        // Write an audit-log entry (should NOT trigger a version bump).
+        std::fs::write(layout.resolve(&VirtualPath::EVENTS).unwrap(), "{}\n").unwrap();
 
         // Wait longer than the debounce window
         tokio::time::sleep(Duration::from_millis(500)).await;
         assert_eq!(
             tracker.current_version(),
             0,
-            "events.jsonl write must not trigger a version bump"
+            "audit-log writes must not trigger a version bump"
         );
     }
 
@@ -251,7 +249,8 @@ mod tests {
         // recursive inotify registration covers it. Creating it after has
         // proven racy under parallel test load (the first file writes can
         // land before inotify sees the new subdir).
-        let issues_dir = tmp.path().join("issues");
+        let layout = jit::test_utils::repository_layout_for_data_root(tmp.path());
+        let issues_dir = layout.resolve(&VirtualPath::ISSUES).unwrap();
         std::fs::create_dir_all(&issues_dir).unwrap();
         let data_dir = tmp.path().to_str().unwrap();
 
@@ -281,74 +280,81 @@ mod tests {
 
     // --- is_graph_relevant unit tests ---
 
-    fn make_event(paths: &[&str]) -> notify::Event {
-        use std::path::PathBuf;
+    fn make_event(paths: &[impl AsRef<Path>]) -> notify::Event {
         notify::Event {
             kind: notify::EventKind::Modify(notify::event::ModifyKind::Data(
                 notify::event::DataChange::Any,
             )),
-            paths: paths.iter().map(|p| PathBuf::from(*p)).collect(),
+            paths: paths
+                .iter()
+                .map(|path| path.as_ref().to_path_buf())
+                .collect(),
             attrs: Default::default(),
         }
     }
 
+    fn data_path(path: &VirtualPath) -> std::path::PathBuf {
+        let temp = tempfile::tempdir().unwrap();
+        let layout = jit::test_utils::repository_layout_for_data_root(temp.path());
+        layout.resolve(path).unwrap()
+    }
+
+    fn make_data_event(path: &VirtualPath) -> notify::Event {
+        make_event(&[data_path(path)])
+    }
+
     #[test]
     fn test_relevant_issue_json() {
-        let e = make_event(&["/repo/.jit/issues/abc123.json"]);
+        let e = make_event(&[data_path(&VirtualPath::ISSUES).join("abc123.json")]);
         assert!(is_graph_relevant(&e));
     }
 
     #[test]
     fn test_relevant_index_json() {
-        let e = make_event(&["/repo/.jit/index.json"]);
-        assert!(is_graph_relevant(&e));
+        assert!(is_graph_relevant(&make_data_event(&VirtualPath::INDEX)));
     }
 
     #[test]
     fn test_relevant_gates_toml() {
-        let e = make_event(&["/repo/.jit/gates.toml"]);
-        assert!(is_graph_relevant(&e));
+        assert!(is_graph_relevant(&make_data_event(&VirtualPath::GATES)));
     }
 
     #[test]
     fn test_relevant_gate_run_result() {
-        let e = make_event(&["/repo/.jit/gate-runs/run-123/result.json"]);
+        let e = make_data_event(&VirtualPath::gate_run_record(
+            &jit::test_utils::issue_id(1),
+            &jit::test_utils::gate_run_id(1),
+        ));
         assert!(is_graph_relevant(&e));
     }
 
     #[test]
     fn test_irrelevant_events_jsonl() {
-        let e = make_event(&["/repo/.jit/events.jsonl"]);
-        assert!(!is_graph_relevant(&e));
+        assert!(!is_graph_relevant(&make_data_event(&VirtualPath::EVENTS)));
     }
 
     #[test]
-    fn test_irrelevant_claims_jsonl() {
-        let e = make_event(&["/repo/.jit/claims.jsonl"]);
-        assert!(!is_graph_relevant(&e));
-    }
-
-    #[test]
-    fn test_irrelevant_claims_dir() {
-        let e = make_event(&["/repo/.jit/claims/lease-abc.json"]);
-        assert!(!is_graph_relevant(&e));
+    fn test_irrelevant_unlisted_data_file() {
+        assert!(!is_graph_relevant(&make_data_event(&VirtualPath::CONFIG)));
     }
 
     #[test]
     fn test_irrelevant_server_pid() {
-        let e = make_event(&["/repo/.jit/server.pid.json"]);
-        assert!(!is_graph_relevant(&e));
+        assert!(!is_graph_relevant(&make_data_event(
+            &VirtualPath::SERVER_PID
+        )));
     }
 
     #[test]
     fn test_irrelevant_server_log() {
-        let e = make_event(&["/repo/.jit/server.log"]);
-        assert!(!is_graph_relevant(&e));
+        assert!(!is_graph_relevant(&make_data_event(
+            &VirtualPath::SERVER_LOG
+        )));
     }
 
     #[test]
     fn test_irrelevant_tmp_file() {
-        let e = make_event(&["/repo/.jit/issues/abc123.tmp"]);
+        let e = make_event(&[data_path(&VirtualPath::ISSUES).join("abc123.tmp")]);
         assert!(!is_graph_relevant(&e));
     }
 }

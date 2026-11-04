@@ -1,34 +1,35 @@
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::setup_test_repo_with_taxonomy;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
+/// Create an issue depending on each of `deps`.
+fn create_issue_with_deps(cli: &JitCli, title: &str, desc: &str, deps: &[&str]) -> String {
+    let id = cli.create_issue(["-t", title, "-d", desc]).unwrap();
+    for dep in deps {
+        cli.run(["dep", "add", &id, dep]).unwrap();
+    }
+    id
 }
 
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
+fn collect_ids(nodes: &[serde_json::Value], ids: &mut Vec<String>) {
+    for node in nodes {
+        ids.push(node["id"].as_str().unwrap().to_string());
+        if let Some(children) = node["children"].as_array() {
+            collect_ids(children, ids);
+        }
+    }
 }
 
 #[test]
 fn test_graph_deps_depth_default() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create a 3-level dependency chain: A -> B -> C
-    let c = create_issue(jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+    let c = create_issue_with_deps(&cli, "Task C", "Leaf", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Middle", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b]);
 
     // Default behavior (no --depth flag) should show immediate deps only (depth 1)
-    let output = Command::new(jit)
-        .args(["graph", "deps", &a, "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let json = cli.run_json(["graph", "deps", &a]).unwrap();
 
     let tree = json["nodes"].as_array().unwrap();
     assert_eq!(tree.len(), 1); // Only B (immediate dependency)
@@ -40,39 +41,19 @@ fn test_graph_deps_depth_default() {
 
 #[test]
 fn test_graph_deps_depth_2() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create: A -> B -> C
-    let c = create_issue(jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+    let c = create_issue_with_deps(&cli, "Task C", "Leaf", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Middle", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b]);
 
     // --depth 2 should show B and C
-    let output = Command::new(jit)
-        .args(["graph", "deps", &a, "--depth", "2", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Now uses tree structure
-    let tree = json["nodes"].as_array().unwrap();
+    let json = cli.run_json(["graph", "deps", &a, "--depth", "2"]).unwrap();
 
     // Collect all issue IDs from tree (including children)
     let mut all_ids = Vec::new();
-    fn collect_ids(nodes: &[serde_json::Value], ids: &mut Vec<String>) {
-        for node in nodes {
-            ids.push(node["id"].as_str().unwrap().to_string());
-            if let Some(children) = node["children"].as_array() {
-                collect_ids(children, ids);
-            }
-        }
-    }
-    collect_ids(tree, &mut all_ids);
+    collect_ids(json["nodes"].as_array().unwrap(), &mut all_ids);
 
     assert_eq!(all_ids.len(), 2); // B and C
     assert!(all_ids.contains(&b));
@@ -83,114 +64,37 @@ fn test_graph_deps_depth_2() {
 
 #[test]
 fn test_graph_deps_depth_unlimited() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create: A -> B -> C -> D
-    let d = create_issue(jit, &temp, "Task D", "Deep");
-    let c = create_issue_with_dep(jit, &temp, "Task C", "Level 3", &d);
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Level 2", &c);
-    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+    let d = create_issue_with_deps(&cli, "Task D", "Deep", &[]);
+    let c = create_issue_with_deps(&cli, "Task C", "Level 3", &[&d]);
+    let b = create_issue_with_deps(&cli, "Task B", "Level 2", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b]);
 
     // --depth 0 should show all transitive dependencies
-    let output = Command::new(jit)
-        .args(["graph", "deps", &a, "--depth", "0", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let json = cli.run_json(["graph", "deps", &a, "--depth", "0"]).unwrap();
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Collect all IDs from tree
-    let tree = json["nodes"].as_array().unwrap();
     let mut all_ids = Vec::new();
-    fn collect_ids(nodes: &[serde_json::Value], ids: &mut Vec<String>) {
-        for node in nodes {
-            ids.push(node["id"].as_str().unwrap().to_string());
-            if let Some(children) = node["children"].as_array() {
-                collect_ids(children, ids);
-            }
-        }
-    }
-    collect_ids(tree, &mut all_ids);
+    collect_ids(json["nodes"].as_array().unwrap(), &mut all_ids);
 
     assert_eq!(all_ids.len(), 3); // B, C, D
 
     assert_eq!(json["depth"], 0); // 0 = unlimited
 }
 
-// Helper functions
-fn create_issue(jit: &str, temp: &TempDir, title: &str, desc: &str) -> String {
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", title, "-d", desc])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-fn create_issue_with_dep(
-    jit: &str,
-    temp: &TempDir,
-    title: &str,
-    desc: &str,
-    dep_id: &str,
-) -> String {
-    let id = create_issue(jit, temp, title, desc);
-    Command::new(jit)
-        .args(["dep", "add", &id, dep_id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    id
-}
-
-fn create_issue_with_deps(
-    jit: &str,
-    temp: &TempDir,
-    title: &str,
-    desc: &str,
-    deps: &[&str],
-) -> String {
-    let id = create_issue(jit, temp, title, desc);
-    for dep in deps {
-        Command::new(jit)
-            .args(["dep", "add", &id, dep])
-            .current_dir(temp.path())
-            .output()
-            .unwrap();
-    }
-    id
-}
-
 #[test]
 fn test_graph_deps_tree_structure() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create tree: A -> B -> C
     //                -> D
-    let c = create_issue(jit, &temp, "Task C", "Leaf");
-    let d = create_issue(jit, &temp, "Task D", "Another leaf");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_deps(jit, &temp, "Task A", "Root", &[&b, &d]);
+    let c = create_issue_with_deps(&cli, "Task C", "Leaf", &[]);
+    let d = create_issue_with_deps(&cli, "Task D", "Another leaf", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Middle", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b, &d]);
 
-    // Test tree output with depth 2
-    let output = Command::new(jit)
-        .args(["graph", "deps", &a, "--depth", "2", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let json = cli.run_json(["graph", "deps", &a, "--depth", "2"]).unwrap();
 
     // Should have tree structure
     let tree = &json["nodes"];
@@ -214,25 +118,16 @@ fn test_graph_deps_tree_structure() {
 
 #[test]
 fn test_graph_deps_diamond_detection() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create diamond: A -> B -> D
     //                   -> C -> D
-    let d = create_issue(jit, &temp, "Task D", "Shared");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Path 1", &d);
-    let c = create_issue_with_dep(jit, &temp, "Task C", "Path 2", &d);
-    let a = create_issue_with_deps(jit, &temp, "Task A", "Root", &[&b, &c]);
+    let d = create_issue_with_deps(&cli, "Task D", "Shared", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Path 1", &[&d]);
+    let c = create_issue_with_deps(&cli, "Task C", "Path 2", &[&d]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b, &c]);
 
-    let output = Command::new(jit)
-        .args(["graph", "deps", &a, "--depth", "2", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let json = cli.run_json(["graph", "deps", &a, "--depth", "2"]).unwrap();
 
     let tree = json["nodes"].as_array().unwrap();
 
@@ -250,36 +145,19 @@ fn test_graph_deps_diamond_detection() {
 
 #[test]
 fn test_graph_deps_summary_stats() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
-    // Create issues with different states
-    let done1 = create_issue(jit, &temp, "Done 1", "Complete");
-    Command::new(jit)
-        .args(["issue", "update", &done1, "--state", "done"])
-        .current_dir(temp.path())
-        .output()
+    let done1 = create_issue_with_deps(&cli, "Done 1", "Complete", &[]);
+    cli.run(["issue", "update", &done1, "--state", "done"])
         .unwrap();
-
-    let done2 = create_issue(jit, &temp, "Done 2", "Also complete");
-    Command::new(jit)
-        .args(["issue", "update", &done2, "--state", "done"])
-        .current_dir(temp.path())
-        .output()
+    let done2 = create_issue_with_deps(&cli, "Done 2", "Also complete", &[]);
+    cli.run(["issue", "update", &done2, "--state", "done"])
         .unwrap();
+    let ready = create_issue_with_deps(&cli, "Ready", "To do", &[]);
 
-    let ready = create_issue(jit, &temp, "Ready", "To do");
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&done1, &done2, &ready]);
 
-    let a = create_issue_with_deps(jit, &temp, "Task A", "Root", &[&done1, &done2, &ready]);
-
-    let output = Command::new(jit)
-        .args(["graph", "deps", &a, "--depth", "1", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let json = cli.run_json(["graph", "deps", &a, "--depth", "1"]).unwrap();
 
     let summary = &json["summary"];
     assert_eq!(summary["total"], 3);
@@ -293,24 +171,15 @@ fn test_graph_deps_summary_stats() {
 /// dependents only), consistent with `graph deps` defaulting to depth 1.
 #[test]
 fn test_graph_rdeps_depth_default_is_bounded() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create a 3-level chain: C <- B <- A  (A depends on B, B depends on C)
-    let c = create_issue(jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+    let c = create_issue_with_deps(&cli, "Task C", "Leaf", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Middle", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b]);
 
     // Default (no --depth): rdeps of C should return B only, not A
-    let output = Command::new(jit)
-        .args(["graph", "rdeps", &c, "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let json = cli.run_json(["graph", "rdeps", &c]).unwrap();
 
     let dependents = json["dependents"].as_array().unwrap();
     // Only immediate dependent B, not transitive A
@@ -329,24 +198,17 @@ fn test_graph_rdeps_depth_default_is_bounded() {
 /// `graph rdeps --depth 0` must traverse all transitive dependents (opt-in unbounded).
 #[test]
 fn test_graph_rdeps_depth_zero_is_unbounded() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Create chain: C <- B <- A
-    let c = create_issue(jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
-    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+    let c = create_issue_with_deps(&cli, "Task C", "Leaf", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Middle", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b]);
 
     // --depth 0 = unlimited: rdeps of C should include both B and A
-    let output = Command::new(jit)
-        .args(["graph", "rdeps", &c, "--depth", "0", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["graph", "rdeps", &c, "--depth", "0"])
         .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     let dependents = json["dependents"].as_array().unwrap();
     let ids: Vec<&str> = dependents
@@ -365,37 +227,22 @@ fn test_graph_rdeps_depth_zero_is_unbounded() {
 /// Both `graph deps` and `graph rdeps` default to depth 1 (symmetric behaviour).
 #[test]
 fn test_graph_rdeps_and_deps_both_default_to_depth_1() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Chain: C <- B <- A
-    let c = create_issue(jit, &temp, "Task C", "Leaf");
-    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
-    let _a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+    let c = create_issue_with_deps(&cli, "Task C", "Leaf", &[]);
+    let b = create_issue_with_deps(&cli, "Task B", "Middle", &[&c]);
+    let a = create_issue_with_deps(&cli, "Task A", "Root", &[&b]);
 
     // deps default: A's immediate dep is B only
-    let deps_out = Command::new(jit)
-        .args(["graph", "deps", &_a, "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(deps_out.status.success());
-    let deps_json: serde_json::Value =
-        serde_json::from_str(&String::from_utf8_lossy(&deps_out.stdout)).unwrap();
+    let deps_json = cli.run_json(["graph", "deps", &a]).unwrap();
     assert_eq!(
         deps_json["depth"], 1,
         "graph deps must report depth 1 by default"
     );
 
     // rdeps default: C's immediate dependent is B only
-    let rdeps_out = Command::new(jit)
-        .args(["graph", "rdeps", &c, "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(rdeps_out.status.success());
-    let rdeps_json: serde_json::Value =
-        serde_json::from_str(&String::from_utf8_lossy(&rdeps_out.stdout)).unwrap();
+    let rdeps_json = cli.run_json(["graph", "rdeps", &c]).unwrap();
     let dependents = rdeps_json["dependents"].as_array().unwrap();
     // Exactly 1 immediate dependent
     assert_eq!(

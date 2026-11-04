@@ -2,12 +2,9 @@
 //!
 //! REQ-01/02: the workspace manifest bounds `[profile.dev]`/`[profile.test]`
 //! debug info to `line-tables-only` and states the incremental-compilation
-//! intent explicitly, rather than relying on Cargo's undocumented default, so
-//! builds keep line-number backtraces without embedding a full debugger payload
-//! in every test executable. That manifest setting governs gate runs too: the
-//! gate's separate ban on incremental compilation is retired, because a gate
-//! run against a warm target directory does have a later rebuild to amortize
-//! against — every agent worktree run and every local re-check is one.
+//! intent explicitly: development builds remain incremental, while test builds
+//! avoid accumulating disk-heavy state. The manifest policy applies to gate and
+//! local test runs without an environment override.
 //!
 //! jit:6d10e5d4 added the
 //! dependency-package override `[profile.dev.package."*"].opt-level = 1`:
@@ -67,17 +64,42 @@ fn test_dev_and_test_profiles_bound_debug_info_to_line_tables_only() {
 }
 
 #[test]
-fn test_dev_and_test_profiles_state_incremental_intent_explicitly() {
+fn test_dev_and_test_profiles_keep_debug_info_outside_the_executable() {
     let manifest = workspace_manifest();
 
     for profile in ["dev", "test"] {
-        let table = profile_table(&manifest, profile);
         assert_eq!(
-            table.get("incremental").and_then(|v| v.as_bool()),
-            Some(true),
-            "[profile.{profile}].incremental must explicitly state the \
-             interactive default (true) rather than leaving Cargo's default \
-             undocumented"
+            profile_table(&manifest, profile)
+                .get("split-debuginfo")
+                .and_then(toml::Value::as_str),
+            Some("unpacked"),
+            "[profile.{profile}].split-debuginfo must keep debug sections outside the executable"
+        );
+    }
+}
+
+#[test]
+fn test_dev_profile_enables_incremental_but_test_profile_disables_it() {
+    let manifest = workspace_manifest();
+
+    for (profile, incremental, reason) in [
+        (
+            "dev",
+            true,
+            "interactive development builds remain incremental",
+        ),
+        (
+            "test",
+            false,
+            "test builds must not accumulate disk-heavy state",
+        ),
+    ] {
+        assert_eq!(
+            profile_table(&manifest, profile)
+                .get("incremental")
+                .and_then(toml::Value::as_bool),
+            Some(incremental),
+            "[profile.{profile}].incremental must match policy: {reason}"
         );
     }
 }
@@ -198,73 +220,20 @@ fn test_cargo_ci_enforces_the_measured_suite_clock_through_the_budget_checker() 
     );
 }
 
-/// jit:0708d692: nothing the measured suite runs may compile, because the suite
-/// clock the `budget` step judges is defined over an already-built target.
-/// cargo-nextest runs its setup scripts inside that clock, and Cargo unifies
-/// features over the packages one invocation selects — so a setup script
-/// selecting a single package resolves a second variant of the whole dependency
-/// graph and builds it mid-suite. Measured on a target freshly built by
-/// `cargo test --workspace --no-run`, the one setup script that invokes Cargo
-/// compiled 60 crates in 24,677 ms under `-p jit --test cli_issue` and was
-/// fresh in 131 ms under `--workspace --test cli_issue`.
+/// A setup script runs inside the measured suite clock, where a nested Cargo
+/// invocation can compile (jit:0708d692); fixtures are built in the suite instead.
 #[test]
-fn test_nextest_setup_scripts_reuse_the_workspace_build_resolution() {
-    const BUILDING_SUBCOMMANDS: [&str; 5] = ["test", "build", "check", "run", "nextest"];
-
-    let root = workspace_root();
-    let config: toml::Value = fs::read_to_string(root.join(".config/nextest.toml"))
+fn test_nextest_configuration_declares_no_setup_script() {
+    let config: toml::Value = fs::read_to_string(workspace_root().join(".config/nextest.toml"))
         .expect("read .config/nextest.toml")
         .parse()
         .expect("nextest configuration must be valid TOML");
-    let declared = config
-        .get("scripts")
-        .and_then(|scripts| scripts.get("setup"))
-        .and_then(toml::Value::as_table)
-        .expect(".config/nextest.toml must declare its setup scripts under [scripts.setup]");
 
-    let repository_scripts = declared.iter().filter_map(|(name, declaration)| {
-        let command = declaration.get("command")?;
-        // Only a script stored in the repository can be read here; a
-        // target-relative command names a built binary, not a source file.
-        if command.get("relative-to").and_then(toml::Value::as_str) != Some("workspace-root") {
-            return None;
-        }
-        Some((name, command.get("command-line")?.as_str()?.to_string()))
-    });
-
-    let mut checked = 0usize;
-    for (name, command_line) in repository_scripts {
-        let path = root.join(command_line.split_whitespace().next().expect("script path"));
-        let text = fs::read_to_string(&path)
-            .unwrap_or_else(|error| panic!("read setup script {}: {error}", path.display()));
-
-        for line in text.lines() {
-            let tokens: Vec<&str> = line.split_whitespace().collect();
-            let Some(cargo) = tokens.iter().position(|token| token.contains("cargo")) else {
-                continue;
-            };
-            if !tokens[cargo + 1..]
-                .iter()
-                .any(|token| BUILDING_SUBCOMMANDS.contains(token))
-            {
-                continue;
-            }
-            checked += 1;
-            assert!(
-                line.contains("--workspace"),
-                "setup script `{name}` invokes Cargo with a package selection \
-                 that is not the workspace, so its unit graph is resolved \
-                 independently of the build the gate already paid for and it \
-                 compiles inside the measured suite clock: {line}"
-            );
-        }
-    }
-
-    assert!(
-        checked > 0,
-        "no Cargo invocation was found in the repository setup scripts \
-         `.config/nextest.toml` declares, so this policy checked nothing"
-    );
+    assert!(config.get("scripts").is_none());
+    assert!(config
+        .get("profile")
+        .and_then(|profile| profile.get("default"))
+        .is_some_and(|default| default.get("scripts").is_none()));
 }
 
 #[test]
@@ -281,12 +250,21 @@ fn test_cargo_build_scripts_share_the_host_lock_and_enable_available_sccache() {
         gate.contains("CARGO_CI_NO_SCCACHE")
             && gate.contains("[ -z \"${RUSTC_WRAPPER:-}\" ]")
             && gate.contains("command -v sccache")
-            && gate.contains("export RUSTC_WRAPPER=sccache"),
-        "the gate must use host sccache when available while preserving an explicit wrapper and an opt-out"
+            && gate.contains("caller-tmpdir-wrapper.sh\"")
+            && gate.contains("export CARGO_CI_CALLER_RUSTC_WRAPPER=\"$RUSTC_WRAPPER\"")
+            && gate.contains("export RUSTC_WRAPPER"),
+        "the gate must route host sccache or an explicit wrapper through the caller-TMPDIR wrapper while preserving the explicit wrapper and an opt-out"
+    );
+    assert!(
+        root.join("scripts/caller-tmpdir-wrapper.sh").is_file()
+            && fs::read_to_string(root.join("scripts/caller-tmpdir-wrapper.sh"))
+                .expect("read scripts/caller-tmpdir-wrapper.sh")
+                .contains("exec \"${CARGO_CI_CALLER_RUSTC_WRAPPER:-sccache}\" \"$@\""),
+        "the wrapper must exist and hand every invocation to the caller's wrapper, or sccache"
     );
     assert!(
         gate.contains("[ \"${1:-}\" = \"--cargo\" ]")
-            && gate.contains("exec cargo \"$@\""),
+            && gate.contains("cargo \"$@\" || cargo_status=$?"),
         "focused Cargo checks must be able to reuse the gate's host lock and cache setup without running the full gate"
     );
 

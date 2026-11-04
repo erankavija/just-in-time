@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bc6e2c00b71af63f77f7c20f3aba41e306a46541",
+  "completed_at": "2026-11-04T02:29:25.331279149Z",
+  "duration_ms": 301976,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/issue_store_conformance.rs",
+        "id": "F1",
+        "line": 833,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/0851fae4/requirement/REQ-02",
+          "@/invariant/shared-test-contracts",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "Shared conformance tests omit the former unsupported root and run-directory cases."
+      }
+    ],
+    "summary": "Shared conformance coverage dropped the former unsupported-entry gate-run reader cases.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0851fae4-245b-4e07-bd81-3f61da54dbf2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d508c5bb-c3b7-4f3e-95c7-a69a360822f5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:24:23.354784439Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4904 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a45f-2de5-7b13-be2b-c07d90dbf29c\n--------\nuser\n--- 4891 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e0e278181 (`jit:0851fae4`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence, @/invariant/shared-test-contracts, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/issue/0851fae4/requirement/REQ-02, @/issue/0851fae4/requirement/REQ-03, @/issue/f8a6b298/requirement/REQ-01 (issue descriptions); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T02:23:15Z); code-review pending\nTruncation recovery: Re-read the no-follow primitives and both backend seam implementations in bounded ranges after one combined inspection truncated.\n\n1. **[blocking][issue-impact] F1:** The shared conformance tests do not carry forward the deleted memory-backend coverage for `RepositoryEntry::Unsupported` at the gate-run root and a named run directory. The new cases at `crates/jit/src/storage/issue_store_conformance.rs:833` cover symlinks, but no shared case exercises the special-object branch formerly asserted by the removed `gate_run_parent_entry` tests. This leaves a rule previously owned by backend-specific tests unrepresented, contrary to hard REQ-02.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Shared conformance coverage dropped the former unsupported-entry gate-run reader cases.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Shared conformance tests omit the former unsupported root and run-directory cases.\",\"file\":\"crates/jit/src/storage/issue_store_conformance.rs\",\"line\":833,\"references\":[\"@/issue/0851fae4/requirement/REQ-02\",\"@/invariant/shared-test-contracts\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:33:10.406526306Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the graph, validation and declaration unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `rules.rs`, `desugar.rs`, `mod.rs`, `hierarchy.rs`, `graph.rs`, `local.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:20:53.884604080Z",
   "first_ready_at": "2026-10-22T15:28:23.850131331Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3a253e9f-6220-4a4b-a369-d0f0396f7298",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:10:23.921315979Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0c69e591-ed9c-40ed-b589-2d2ec43bde4a",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:13:38.114484197Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7995aa5c-7d47-43f0-91c4-5924c1ae67a8",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Graph, validation and declaration unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:23.850131331Z"
+  "updated_at": "2026-10-27T00:20:53.884604080Z"
 }

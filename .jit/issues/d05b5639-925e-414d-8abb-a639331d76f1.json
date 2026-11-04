@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T20:28:37.578709885Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Gives the CLI's `jit search` one executor entry point that returns matches with their issue titles, so the command path stops calling the search module and storage directly.\n\n## Background\n\nThe `Commands::Search` arm of `crates/jit/src/main.rs` (or its handler under `crates/jit/src/dispatch/`) builds `jit::search::SearchOptions` and calls `jit::search::search(&jit_dir, ..)` itself, then calls `storage.load_issue(issue_id)` for each result file to print `Issue <id> | <title>` headers. The executor's query family (`QueryOps<'_, S>` via `CommandExecutor::queries()`, in `crates/jit/src/commands/search.rs`) already holds `search_issues` and `search_issues_with_filters`, but nothing covers the ripgrep content search the CLI exposes.\n\n## Success Criteria\n\n- [hard] REQ-01: A `QueryOps` method takes the query and search options and returns the content matches, each carrying the title of the issue its file belongs to when it belongs to one.\n- [hard] REQ-02: The CLI's `jit search` path calls that method only: it makes no call into `jit::search::search` and no storage call.\n- [hard] REQ-03: A harness-level test (`test_search_content_attaches_issue_titles`) shows a match in an issue file carries that issue's title, and `jit search` human and JSON output and its `RipgrepNotInstalled` failure mapping are unchanged with existing suites passing unweakened.\n\n## Notes\n\n- 0f8efc37 later replaces what this entry point computes (one search shared with the server); this work fixes only where the CLI reaches it. 34999aad fixes the ripgrep argv inside `crates/jit/src/search.rs`.\n- The JSON `SearchResponse` keeps its shape; whether the title appears in it is not changed here.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T20:47:33.799474081Z",
+  "first_ready_at": "2026-11-03T02:55:04.888505736Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f208578b-8866-430f-ab92-394d3829ad6e",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:44:30.184905335Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a91b5943-b7be-4b17-959b-92f6fd1e1ff1",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:47:28.213124290Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d05b5639-925e-414d-8abb-a639331d76f1",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "CLI search runs through the executor",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T20:47:33.799474081Z"
 }

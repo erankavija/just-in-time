@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:57:07.314385736Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Make the exit-code projection suite fail for any projected row that no binding test covers, so it can be the only owner of command exit codes.\n\n## Background\n\n`crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs` binds projected command rows in both invocation forms through `assert_projected_exit_status_in_both_forms` (`:156-187`), which asserts the plain status, the JSON status and their equality. Its completeness check `test_command_exit_codes_every_row_is_verified` (`:1128-1185`) compares the generated projection (`CommandSchema::generate().command_exit_codes`, rows in `crates/jit/src/schema.rs`) with a hand-maintained `verified` set, so a row can be listed with no test behind it. `invocation_exit_status_parity_tests.rs` holds two parity cases with no projection row: an id unresolved across namespaces (`:65`) and a malformed stored record (`:133`).\n\n## Success Criteria\n\n- [hard] REQ-01: The completeness check derives the set of verified rows from the binding cases themselves, so a row passes only when a case binds it in both invocation forms.\n- [hard] REQ-02: The two parity cases with no projection row, an id unresolved across namespaces and a malformed stored record, are bound by the projection suite in both forms.\n- [hard] REQ-03: Each row of the generated projection has exactly one binding case.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:30:30.875451153Z",
+  "first_ready_at": "2026-10-27T01:05:13.124813186Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5e6c43b5-3547-4212-af49-6e6439448f63",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:26:36.263330231Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3faa6a63-fdfb-491a-8a03-d9be1173485b",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:30:08.356814951Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f1c1acc8-4440-409d-9a8b-e2fa070befc2",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Exit-code projection suite proves a binding behind each row",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:30:30.875451153Z"
 }

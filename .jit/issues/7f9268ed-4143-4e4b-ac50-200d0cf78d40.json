@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T01:07:35.033844263Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
@@ -8,12 +8,26 @@
   ],
   "description": "Documentation examples of command output show the word status markers the CLI prints, with no emoji or pictographic marker.\n\n## Background\n\nHuman-readable CLI status output uses words (`error`, `warning`, `ok`) in place of emoji and pictographic markers. Several pages still quote the old output (line numbers at the investigation baseline):\n\n- `docs/how-to/dependency-management.md:134-141,216-220,420-426`\n- `docs/reference/worktree-validate.md:378-390`\n- `docs/how-to/troubleshooting.md:139,313,344`\n- `docs/reference/claim.md:363`\n- `docs/tutorials/parallel-work-worktrees.md:127`\n- `docs/concepts/core-model.md:638-645`, which shows output the code never prints\n- `docs/concepts/design-philosophy.md:344-346`\n- `docs/concepts/guarantees.md:541`\n- `docs/how-to/custom-gates.md:53`\n- `dev/authoring-conventions.md:323,342,364`\n\nProse do/don't lists are not output examples, and the type-icon example configuration stays.\n\n## Success Criteria\n\n- [hard] REQ-01: Each output example on these pages matches the text the command prints, with word status markers.\n- [hard] REQ-02: No output example in the documentation contains an emoji or pictographic status marker.\n- [hard] REQ-03: Type-icon examples are unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-01T13:22:05.003920197Z",
   "first_ready_at": "2026-10-21T01:06:58.361882571Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "790bc7ba-c2ab-4c94-add6-7f2be5d2b693",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:21:26.172921012Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "bef7cd80-a8bc-4b4a-a583-759def5d9729",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:20:32.040726448Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
   "labels": [
     "type:task",
@@ -23,7 +37,7 @@
     "satisfies:3d9a0ce3/REQ-05"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Show word status markers in documented command output",
-  "updated_at": "2026-10-21T20:31:40.601700697Z"
+  "updated_at": "2026-11-01T13:22:05.003920197Z"
 }

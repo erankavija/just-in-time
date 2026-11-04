@@ -1,18 +1,40 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T23:14:58.474445249Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
   ],
-  "description": "`invariant check` renders drift through its own JSON error and exit. This moves it to a library handler.\n\n## Background\n\n`run_invariant`/`run_invariant_inner` in `crates/jit/src/main.rs` substitute `INVARIANT_COMMAND_FAILED` for failures, serialize `InvariantCheckResult` (`crates/jit/src/commands/invariant.rs`, which stores its own `count`), and on drift print an inline `JsonError` and exit, or exit `VALIDATION_FAILED` on the human path. `invariant check` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `invariant check` to a handler in `crates/jit/src/dispatch/invariant.rs`, and `main.rs` keeps neither `run_invariant` nor `run_invariant_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, findings are a `ListEnvelope` instantiation, `InvariantCheckResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: Drift returns a findings outcome with `VALIDATION_FAILED` and exit 4, asserted by a test; other failures carry their classified code instead of `INVARIANT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "`invariant check` renders drift through its own JSON error and exit. This moves it to a library handler.\n\n## Background\n\n`run_invariant`/`run_invariant_inner` in `crates/jit/src/main.rs` substitute `INVARIANT_COMMAND_FAILED` for failures, serialize `InvariantCheckResult` (`crates/jit/src/commands/invariant.rs`, which stores its own `count`), and on drift print an inline `JsonError` and exit, or exit `VALIDATION_FAILED` on the human path. `invariant check` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `invariant check` to a handler in `crates/jit/src/dispatch/invariant.rs`, and `main.rs` keeps neither `run_invariant` nor `run_invariant_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, findings are a `ListEnvelope` instantiation, `InvariantCheckResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: Drift returns a findings outcome with `VALIDATION_FAILED` and exit 4, asserted by a test; other failures carry their classified code instead of `INVARIANT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T02:40:32.033724144Z",
+  "first_ready_at": "2026-11-03T23:08:02.036048989Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ce2510fd-07e0-474b-9fa1-43072708b5c8",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:35:09.184406652Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c1f405fa-7231-4c74-a1d6-a4620f85c874",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:40:23.098108574Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "b4814968-087b-4794-98a1-fb7bbf7039a3",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:38:50.808443701Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b23faa59-8451-4fc4-97b8-a139d1b210e6",
   "labels": [
     "type:task",
@@ -28,7 +50,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Invariant command moves to a library handler",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T02:40:32.033724144Z"
 }

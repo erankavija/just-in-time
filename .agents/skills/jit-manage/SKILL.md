@@ -170,7 +170,7 @@ Full lifecycle from claim through completion.
    **Assignment vs. advisory lease.** `jit issue claim` creates an *assignment*: it sets
    the `assignee` field on the issue and transitions its state to `in_progress`. It does
    not create a lease. `jit claim acquire` creates an *advisory lease* — a time-bounded
-   record in `.git/jit/claims.index.json` that prevents two agents from double-claiming
+   record in `.git/jit/leases/<issue-id>.json` that prevents two agents from double-claiming
    the same issue in multi-agent / worktree mode; it also sets the assignee as a side
    effect. A single-agent session needs only the assignment.
 
@@ -456,7 +456,8 @@ Gate enforcement, success criteria verification, state transition, commit.
    ```bash
    jit issue update <id> --state done
    ```
-   If exit code 4 (gated — pending gates), show which gates remain and
+   A `gated` issue is already `done` once its last gate passes; this request then
+   succeeds without change. If exit code 4 (gated — pending gates), show which gates remain and
    loop to step 4.
 
 8. Commit JIT state:

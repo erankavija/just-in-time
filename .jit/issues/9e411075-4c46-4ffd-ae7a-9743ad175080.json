@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:41:16.113341925Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the `fast_rules` suite's own memory executor in favour of the shared one.\n\n## Background\n\n`memory_executor` in `crates/jit/tests/fast_rules/main.rs` seeds an empty configuration and a literal index body carrying `\"schema_version\": 2`, then delegates to the shared executor, which product initialisation now sets up. Its callers are `fast_rules/{example_rulesets,label_query,label_strategic,validate_rule_runner,validation}_tests.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/fast_rules/main.rs`: `memory_executor` (`:21`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: `fast_rules/main.rs` defines no executor fixture, and no file in the suite writes a literal schema version or index body.\n- [hard] REQ-03: Each former caller uses the shared executor and asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-28T21:48:19.660688518Z",
   "first_ready_at": "2026-10-22T20:06:17.454204575Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "50680f16-3157-4b87-8ef8-2c699966d309",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:43:12.544585779Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f9457225-1909-498b-8539-6e96855aaf85",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:45:53.309092605Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9e411075-4c46-4ffd-ae7a-9743ad175080",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "fast_rules uses the shared memory executor",
-  "updated_at": "2026-10-22T20:06:17.454204575Z"
+  "updated_at": "2026-10-28T21:48:19.660688518Z"
 }

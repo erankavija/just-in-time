@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cfd89412834483e99e97f0643d6e6c5e134056a6",
+  "completed_at": "2026-11-04T11:30:10.620236135Z",
+  "duration_ms": 255850,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met and the prior obsolete fallback finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f3fac367-401f-4ca0-9fdb-c919e463075f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T11:25:54.769702716Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: baaac42c, f8fe1b52, 16c49d52, 1bea4f8e, defce1739, 0aec5609 (`jit:1a4f2ebd`); uncommitted state not attributed  \nPolicy sources: AGENTS.md  \nResolved items: REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, D-01 (issue markdown); canonical-cutover, architecture-dependency-direction, orthogonal-tests, essential-code-prose, single-source-prose (.jit/invariants.toml); jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed/0 (2026-11-04T11:23:58Z); mcp-ci passed/0 (2026-11-04T11:25:37Z); prior code-review F1 is resolved by 0aec5609  \nTruncation recovery: reread patches by commit/path, inspected current handler/schema/output sources, and queried generated schema; excluded historical records and unrelated batch paths  \n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met and the prior obsolete fallback finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

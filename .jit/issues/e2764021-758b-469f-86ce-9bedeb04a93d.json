@@ -1,9 +1,11 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T09:55:57.401941253Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
     "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
+    "28a7bde1-84c4-4984-94c2-91728612f2d5",
     "28e6703c-2fa3-41c9-8fc0-ebdf79440a0b",
     "2c453337-7604-4320-8c24-2d1b0b3d49f6",
     "2f63adec-7602-4d65-961a-3dd3b5daa54d",
@@ -13,8 +15,10 @@
     "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
     "7495521e-8338-4ef8-82b9-cb4ddf182739",
     "7a412cb0-1969-4c46-b106-703bcdb502fe",
+    "86f78db2-467e-4b3d-b6a6-279b8c3e9bb4",
     "871df4b0-6d6d-4408-8054-a574cb9eafe9",
     "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+    "8ac93475-f327-4665-afc3-fb740fc4601a",
     "8d64ffae-719b-4631-9660-1317ba7b59cf",
     "9bb30f15-a995-4b63-924a-13c27e9fa61c",
     "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -25,11 +29,26 @@
   ],
   "description": "Measure and report the build footprint after the test-topology changes against the figures before them.\n\n## Background\n\n`scripts/rust-build-budget.sh` enforces at most 12 integration targets, 2 GiB of active test executables and a 30 s suite duration (`dev/benchmarks/rust-build-budgets/README.md`). Before this work, the last passing gate run (`8e22dd96`, at commit `0896fc29b`) reported 10 of 12 integration targets and 14 active executables totalling 1,723,670,208 of 2,147,483,648 bytes.\n\n## Success Criteria\n\n- [hard] REQ-01: The build-footprint budget checker passes on the tree with these changes.\n- [hard] REQ-02: `dev/benchmarks/test-topology-c780514e/README.md` reports the integration-target count and the active test-executable count and bytes, before and after, with the commit and command of each measurement.\n",
   "documents": [],
+  "done_at": "2026-11-01T09:59:08.811295200Z",
+  "first_ready_at": "2026-11-01T09:55:29.344160589Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8f0a79c1-c823-4ef7-9bee-ee687c5ab63f",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:56:21.370468888Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "983adaff-0ad5-4782-8059-36c0d8e94c26",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:58:56.826687728Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e2764021-758b-469f-86ce-9bedeb04a93d",
   "labels": [
     "type:task",
@@ -43,7 +62,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Build-footprint figures before and after the epic are reported",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T09:59:08.811295200Z"
 }

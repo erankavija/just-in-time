@@ -54,15 +54,17 @@
       "path": "dev/active/b697a3f7-one-mutation-path/breakdown.json"
     }
   ],
+  "done_at": "2026-10-24T21:22:04.478017444Z",
   "first_ready_at": "2026-10-21T20:37:15.830690573Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-10-21T20:36:56.502609569Z",
-      "updated_by": null
+      "run_id": "0a0d7cfd-b860-4071-a618-f6b2749e9d86",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:45:48.491118118Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "0dc73711-07fb-49c3-8eda-996516b19bd1",
@@ -77,7 +79,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "planning: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-10-24T18:06:12.018949006Z"
+  "updated_at": "2026-11-03T22:45:48.491118118Z"
 }

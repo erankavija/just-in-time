@@ -1,0 +1,48 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T07:53:07.268111991Z",
+  "context": {},
+  "created_at": "2026-11-01T07:53:06.539650104Z",
+  "dependencies": [],
+  "description": "Stop worktrees sharing Cargo build state through hardlinks from the cache pool.\n\n## Background\n\n`.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh:97` seeds a worktree's target with `cp -al`, so a build script's `output` file is one inode across sibling worktrees and the pool. Cargo rewrites that file in place. A sibling's build then writes its digest into another worktree's build state (`f61ad6362` records the two-checkout reproduction). The fallback `cp -au` in `reclaim-worker-worktree.sh` can write through a shared inode the same way, unlike its `rsync` branch. Slots seeded the old way keep the shared inodes until reseeded.\n\n## Success Criteria\n\n- [hard] REQ-01: After seeding, no file under a directory named `build`, no `*.d` file, and no file or directory entry whose name starts with `.`, at any depth, shares an inode with the pool. The remaining entries stay hardlinked.\n- [hard] REQ-02: Both harvest branches of `reclaim-worker-worktree.sh` replace destination files instead of writing through them.\n- [hard] REQ-03: A test over the dispatch script fails on the old `cp -al` seed and passes on the new one.\n- [hard] REQ-04: The issue records that the two-checkout reproduction no longer reproduces on the new seed, whether anything under `deps/` is written in place, and that a worktree seeded from the current pool builds correctly.\n\n\n\n\n\n## Evidence\n\nFinal seed at `2d09f45d3`, on two fresh dispatches. Scope: `cargo build -p jit` plus `cargo test -p jit --test cli_gate --no-run`, with `CARGO_INCREMENTAL=0`; narrowed from the workspace because of disk.\n\n- Reproduction does not reproduce: Y built digest `ea234764`, sibling X then built `27a8c7d8`, and Y's `output` kept its digest, inode and mtime, matched a recomputation from Y's source, and stayed Fresh.\n- Concurrent edit-and-build: 29.9 s and 30.4 s, against about 28.6 s alone, so not serialized.\n- In-place writes: on an earlier new-style seed (`689e329de`), with `CARGO_INCREMENTAL=0`, a `-p jit` build and a test build changed 0 hardlinked files in place. On a throwaway crate with incremental on, 0 of 152 hardlinked files changed in place, 139 of them under `incremental/`; plain `cp -al` as the control gave 19.\n- A seed from the current pool builds correctly: only `jit` recompiled, and its digest matched a recomputation. The pool's `deps/jit-69ec36a944bfff87.d` names a deleted scratch path and did not affect these builds; it stays in place.\n- Seed cost: about 1355 MiB per seed, 0 inodes in the rule classes shared with the pool.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:34:52.041444434Z",
+  "first_ready_at": "2026-11-01T07:53:06.539650104Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "worktree-cache-test"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "797adca0-4f52-4cb3-9b94-08250b02f40a",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:31:07.056160479Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "38c6aa27-2d23-408c-9bc6-8117a8b8c256",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:33:53.110451844Z",
+      "updated_by": "auto:executor"
+    },
+    "worktree-cache-test": {
+      "run_id": "7e213851-5f7a-4386-8c90-1dc69a13a9e9",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:31:07.782689236Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "86f78db2-467e-4b3d-b6a6-279b8c3e9bb4",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Worktrees seeded from the cache pool share no Cargo build state",
+  "updated_at": "2026-11-01T08:34:52.041444434Z"
+}

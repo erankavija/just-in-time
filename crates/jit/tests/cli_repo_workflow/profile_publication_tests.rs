@@ -6,19 +6,20 @@
 //! `storage::redo_conformance` (`@/inv/orthogonal-tests`). The lifecycle
 //! fixture below is shared with the concurrency suite beside it.
 
-use jit::commands::{CommandExecutor, ProfileSelector};
+use jit::commands::CommandExecutor;
 use jit::profile::ProfileApplicationStatus;
 use jit::storage::{
     discover_repository_layout, JsonFileStorage, MutationInterruptionInjector, MutationPoint,
     RedoPoint,
 };
+use jit::test_cli::JitCli;
+use jit::test_utils::file_executor;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tempfile::TempDir;
 
 const PROFILE_ID: &str = "lifecycle-interruption";
 pub(super) const PACKAGE_LOCATION: &str = "packages/lifecycle-interruption";
@@ -90,8 +91,8 @@ impl MutationInterruptionInjector for PublicationCounter {
     }
 }
 
-pub(super) fn selector() -> ProfileSelector {
-    ProfileSelector::path(PathBuf::from(PACKAGE_LOCATION))
+pub(super) fn selector() -> PathBuf {
+    PathBuf::from(PACKAGE_LOCATION)
 }
 
 pub(super) fn executor_with_interruptions(
@@ -100,13 +101,6 @@ pub(super) fn executor_with_interruptions(
 ) -> CommandExecutor<JsonFileStorage> {
     let data = repository.join(".jit");
     let storage = JsonFileStorage::with_mutation_interruptions(&data, interruptions);
-    let layout = discover_repository_layout(repository, &data).unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
-pub(super) fn ordinary_executor(repository: &Path) -> CommandExecutor<JsonFileStorage> {
-    let data = repository.join(".jit");
-    let storage = JsonFileStorage::new(&data);
     let layout = discover_repository_layout(repository, &data).unwrap();
     CommandExecutor::new(storage).with_layout(layout)
 }
@@ -138,25 +132,28 @@ fn write_package(repository: &Path, version: &str) {
     }
 }
 
-pub(super) fn changed_profile_fixture() -> (TempDir, LifecycleState) {
-    let (repository, _storage) = jit::test_utils::setup_test_repo().unwrap();
-    write_package(repository.path(), "1.0.0");
-    let initial = ordinary_executor(repository.path())
-        .apply_profile(&[selector()])
-        .unwrap();
+/// Apply version 1.0.0 of the lifecycle package to `repository`, stage 2.0.0
+/// beside it, and answer the state before 2.0.0 is applied.
+pub(super) fn prepare_changed_profile(repository: &JitCli) -> LifecycleState {
+    write_package(repository.root(), "1.0.0");
+    let initial = jit::test_utils::apply_selected_packages(
+        &file_executor(repository.root()).unwrap(),
+        &[selector()],
+    )
+    .unwrap();
     assert_eq!(
         initial.requested().unwrap().status,
         ProfileApplicationStatus::Applied
     );
-    write_package(repository.path(), "2.0.0");
-    let prior = LifecycleState::capture(repository.path());
+    write_package(repository.root(), "2.0.0");
+    let prior = LifecycleState::capture(repository.root());
     assert_eq!(prior.audit.len(), 1);
     assert_eq!(
         prior.worktree_bytes["docs/lifecycle-interruption/retained.txt"],
         Some(b"retained content from 1.0.0\n".to_vec())
     );
     assert!(prior.worktree_bytes["docs/lifecycle-interruption/added.txt"].is_none());
-    (repository, prior)
+    prior
 }
 
 /// One `profile apply` publishes its change through the shared mutation
@@ -164,11 +161,12 @@ pub(super) fn changed_profile_fixture() -> (TempDir, LifecycleState) {
 /// own.
 #[test]
 fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session() {
-    let (repository, prior) = changed_profile_fixture();
+    let repository = JitCli::initialised().unwrap();
+    let prior = prepare_changed_profile(&repository);
     let publications = Arc::new(PublicationCounter::default());
-    let executor = executor_with_interruptions(repository.path(), publications.clone());
+    let executor = executor_with_interruptions(repository.root(), publications.clone());
 
-    let applied = executor.apply_profile(&[selector()]).unwrap();
+    let applied = jit::test_utils::apply_selected_packages(&executor, &[selector()]).unwrap();
 
     assert_eq!(
         applied.requested().unwrap().status,
@@ -179,7 +177,7 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
         1,
         "the applied change must reach the repository through one shared publication"
     );
-    let published = LifecycleState::capture(repository.path());
+    let published = LifecycleState::capture(repository.root());
     assert_eq!(
         published.audit.len(),
         prior.audit.len() + 1,
@@ -194,7 +192,7 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
         Some(b"newly added content\n".to_vec())
     );
 
-    let repeated = executor.apply_profile(&[selector()]).unwrap();
+    let repeated = jit::test_utils::apply_selected_packages(&executor, &[selector()]).unwrap();
 
     assert_eq!(
         repeated.requested().unwrap().status,
@@ -207,7 +205,7 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
         "an unchanged application must not enter publication again"
     );
     assert_eq!(
-        LifecycleState::capture(repository.path()),
+        LifecycleState::capture(repository.root()),
         published,
         "an unchanged application must not rewrite targets or audit bytes"
     );

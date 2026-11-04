@@ -127,7 +127,7 @@ For work that takes longer than the default TTL:
 jit claim acquire <issue-id> --ttl 3600  # 1 hour
 
 # Or renew during work
-jit claim renew <lease-id> --extension 600  # Add 10 minutes
+jit claim renew <issue-id> --extension 600  # Expire 10 minutes from now
 ```
 
 ### Pattern 5: Indefinite Leases for Manual Oversight
@@ -139,7 +139,7 @@ For tasks requiring human oversight or unpredictable duration:
 jit claim acquire <issue-id> --ttl 0 --reason "Manual review needed"
 
 # Send periodic heartbeats to prevent staleness
-jit claim heartbeat <lease-id>
+jit claim heartbeat <issue-id>
 
 # Check status (shows time since last heartbeat)
 jit claim status
@@ -152,9 +152,9 @@ jit claim status
 
 Indefinite leases are marked **stale** after the built-in claim stale
 threshold ([Runtime Defaults](../reference/runtime-defaults.md))
-without a heartbeat. Staleness is only a marker: a stale indefinite lease is not
-evicted automatically — it remains until a heartbeat, a `jit claim release`, or
-a `jit claim force-evict`. The threshold is not configurable.
+without a heartbeat. A stale indefinite lease remains until a heartbeat, a
+`jit claim release`, a `jit claim force-evict`, or the next `jit recover`, which
+reclaims it. The threshold is not configurable.
 
 ## Handling Conflicts
 
@@ -170,7 +170,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 2. **Coordinate** — Contact the other agent to release
 3. **Force evict** — Admin operation for crashed agents:
    ```bash
-   jit claim force-evict <lease-id> --reason "agent crashed"
+   jit claim force-evict <issue-id> --reason "agent crashed"
    ```
 
 ### Conflict: Merge Conflicts in .jit/
@@ -181,7 +181,8 @@ When merging branches with overlapping issue edits:
 git merge main
 
 # Resolve the conflicts in the files themselves: git marks the .jit/issues/*.json
-# both branches edited, and .jit/index.json whenever both added issues.
+# both branches edited, and .jit/index.json when both deleted issues; keep every
+# id either side lists under deleted_ids.
 # `jit validate --fix` is not a resolver — it parses no file still holding
 # conflict markers.
 git add .jit/issues/ .jit/events.jsonl .jit/index.json
@@ -201,8 +202,7 @@ Stores](#divergent-checkout-stores) below for that starting point.
 
 ```mermaid
 flowchart TD
-    local["1. Local .jit/<br/>Issues modified in this worktree"] --> head["2. Git HEAD<br/>Committed issues (canonical)"]
-    head --> main["3. Main .jit/<br/>Uncommitted issues from the main worktree"]
+    local["1. This checkout's .jit/<br/>Everything this checkout holds"] --> main["2. Primary checkout's .jit/<br/>Issues only the primary holds"]
 ```
 
 ### Reading Issues
@@ -243,7 +243,8 @@ max_indefinite_leases_per_agent = 3
 max_indefinite_leases_per_repo = 12
 ```
 
-`enforce_leases` is the active repository policy for structural issue writes.
+`enforce_leases` is the active repository policy for what another agent's lease
+does to a write: `strict` refuses it, and a write to an unleased issue succeeds.
 `write_policy` is the active repository policy for whether a linked
 (non-primary) checkout may run state-mutating commands at all — every
 worktree example in this guide relies on the repository declaring `allow`
@@ -252,7 +253,7 @@ here, or an invocation supplying `JIT_WORKTREE_WRITE_POLICY=allow`. See
 Configuration Reference for its default, precedence, and the override.
 The two coordination limits apply to `jit claim acquire --ttl 0`. Choose a
 finite lease duration on each claim with `--ttl`; for an indefinite lease, run
-`jit claim heartbeat <lease-id>` explicitly while it is active. An omitted
+`jit claim heartbeat <issue-id>` explicitly while it is active. An omitted
 `--ttl` falls back to the built-in claim lease TTL listed in
 [Runtime Defaults](../reference/runtime-defaults.md).
 
@@ -315,19 +316,19 @@ jit claim status --agent agent:worker-1
 jit claim list
 
 # Force evict
-jit claim force-evict <lease-id> --reason "agent crashed"
+jit claim force-evict <issue-id> --reason "agent crashed"
 
 # Validate repository state
 jit validate --fix
 ```
 
-### Corrupted Control Plane
+### Stale Coordination State
 
 ```bash
-# Rebuild claims index from log
+# Clear dead locks, evict expired leases, reclaim stale indefinite ones
 jit recover
 
-# Validate everything
+# Validate repository data
 jit validate
 ```
 
@@ -403,39 +404,25 @@ do the actual merging; this procedure only sequences them safely.
    retained branch is what survives a later `git branch -D` of the
    checkout's own branch, which committing alone (step 2) did not.
 
-   Expect a conflict in `.jit/index.json` even when no record conflicts: each
-   side inserted its own ids into the same list over one common base, so git
-   leaves the decision to you every time. Resolve it to the union of the ids
-   present under `.jit/issues/` after the merge — keep every id from both
-   sides of the conflict, minding the commas the markers hid — which is what
-   step 3's one-sided rows already decided: keep both records. Conflict
-   markers inside a record under `.jit/issues/` mean the same id was edited on
-   both sides; resolve those files with the decision from step 3. Then stage
-   every file you resolved — the same record paths step 2 stages, for the same
-   reason — and commit the merge:
+   Records only one side holds merge without a decision: each is its own file,
+   and membership is the files themselves. `.jit/index.json` conflicts only when
+   both sides deleted issues; keep every id either side lists under
+   `deleted_ids`, minding the commas the markers hid. Conflict markers inside a
+   record under `.jit/issues/` mean the same id was edited on both sides;
+   resolve those files with the decision from step 3. Then stage every file you
+   resolved — the same record paths step 2 stages, for the same reason — and
+   commit the merge:
    ```bash
    git merge <linked-branch>
-   # Edit .jit/index.json: keep every id both sides list.
    # Edit any .jit/issues/<id>.json git marked, per step 3.
+   # Edit .jit/index.json if marked: keep every id under deleted_ids.
    git add .jit/issues/ .jit/events.jsonl .jit/index.json && git commit --no-edit
    ```
 
-   Verify with plain `jit validate`, not `jit validate --fix`: `--fix` parses
-   no file that still holds conflict markers, and where it applies no fix it
-   reports `No fixes needed` and exits 0 without re-checking the repository,
-   so an index resolved to one side alone passes it while the store is still
-   inconsistent. Plain `jit validate` names that disagreement —
-   `issue files disagree with .jit/index.json`, listing the ids it expected
-   against the record files it found — and the absence of *that* failure is
-   the confirmation, not a zero exit code: other rules fail the same run for
-   reasons this recovery did not cause, such as issues reported as isolated
-   in a repository whose graph has no edges yet. Where the repository has no
-   such finding of its own, the union-resolved store validates as it stands.
-
-   Until the index agrees with the record files, the records you just
-   preserved are invisible to everything that reads through it: `jit list`
-   omits them and `jit issue show <id>` answers that the id is not found,
-   with the record file sitting right there.
+   Verify with `jit validate`; `--fix` repairs no file that still holds
+   conflict markers. Other rules can fail the same run for reasons this
+   recovery did not cause, such as issues reported as isolated in a repository
+   whose graph has no edges yet; read the findings rather than the exit code.
 
    A `conflicting` finding that merges silently — the two edits touched
    different lines, so git needed no markers — still needs the decision from

@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "d3c94dc5-9364-4c1a-a217-ede910393b9c"
+  ],
+  "description": "Aggregate the work that makes each issue mutation derive its coupled state inside its own plan: dependent readiness, field changes, lease checks and bulk application.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function derives dependent Ready and Backlog corrections, and every mutation that changes a state or a dependency carries them in its own redo record.\n- [hard] REQ-02: No command publishes a follow-up mutation to correct readiness after its primary mutation commits.\n- [hard] REQ-03: The dedicated assign, unassign, gate-add and gate-remove commands, single-issue update and bulk update produce the same issue state and events for the same change, through one state derivation.\n- [hard] REQ-04: User-requested writes to existing issues check leases inside their publishing session through one check with one message definition.\n- [hard] REQ-05: Bulk update has no separate preview, processes every matched issue in one session and publishes one redo record.",
+  "documents": [],
+  "gates_required": [],
+  "gates_status": {},
+  "id": "93e3f1ad-a392-4bf5-95d0-c58352296a33",
+  "labels": [
+    "type:story",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:session-coherence",
+    "component:cli",
+    "component:core",
+    "component:docs",
+    "component:gates",
+    "component:validation",
+    "per:@/charter/D-20",
+    "per:@/charter/D-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Mutations derive their coupled readiness, field, lease and bulk state in one session",
+  "updated_at": "2026-10-24T21:22:37.717854234Z"
+}

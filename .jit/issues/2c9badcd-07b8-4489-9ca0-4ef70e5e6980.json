@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T21:55:23.547756991Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Give the storage trait one conformance suite that each backend runs unchanged.\n\n## Background\n\n`IssueStore` (`crates/jit/src/storage/mod.rs`, 21 methods) has two implementations: `JsonFileStorage` (`storage/json.rs:1042`) and `InMemoryStorage` (`storage/memory.rs:814`). No shared conformance suite exists. Three ad-hoc cross-backend reader tests live in `storage/repository_state_store_tests.rs`: load, list and resolve (`:220`), id resolution (`:278`) and the event log (`:691`), under a matrix header at `:644`.\n\n## Success Criteria\n\n- [hard] REQ-01: One conformance suite, written once against the `IssueStore` trait, covers its reader and writer methods and runs against both backends through one backend-construction seam.\n- [hard] REQ-02: The three ad-hoc cross-backend tests are cases of the suite, and no copy remains beside it.\n- [hard] REQ-03: Adding a backend to the suite takes one constructor; no case is written per backend.\n- [hard] REQ-04: Both backends pass each case in the suite.\n\n## Notes\n\nCommit-pinned path reads join the suite once the in-memory backend serves them from its own state; today it reads the real disk for them (`storage/memory.rs:943-990`).\n",
   "documents": [],
+  "done_at": "2026-10-28T22:29:09.709214476Z",
+  "first_ready_at": "2026-10-28T21:55:12.823267979Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d5cce438-4504-4703-9b54-69a8d8083eb4",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:29:04.201876051Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "952ac609-62f1-418c-83d8-248f3f34f191",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:28:37.123132868Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2c9badcd-07b8-4489-9ca0-4ef70e5e6980",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Shared IssueStore conformance suite runs against both backends",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T22:29:09.709214476Z"
 }

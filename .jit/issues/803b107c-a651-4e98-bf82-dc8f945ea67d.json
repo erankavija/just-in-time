@@ -1,19 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-02T23:48:35.466828676Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
     "b06cee74-7635-49c0-bc13-448bcfa28324"
   ],
-  "description": "Address a single gate-run record by its issue and its run id, so loading one run never needs to know where other issues' runs live.\n\n## Background\n\n`IssueStore::load_gate_run_result` (`crates/jit/src/storage/mod.rs:262`) takes a run id alone. The JSON backend implements it at `storage/json.rs:1395` and the memory backend at `storage/memory.rs:909`. The test-only callers are in `storage/gate_runs.rs`. Two integration-test wrappers implement the trait by forwarding: `tests/fast_docs_templates/template_apply_atomicity_tests.rs:157-168` and `tests/fast_rules/local_rule_enforcement_tests.rs:869-885`.\n\nThe executor's `get_gate_run_result` (`commands/gate.rs:1461-1463`) is the production caller. The server route `GET /issues/:id/gate-runs/:run_id` (`crates/server/src/routes.rs:909-920`) discards its `:id` segment and loads by run id alone.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueStore::load_gate_run_result` takes `(&IssueId, &GateRunId)`. A record whose `issue_id` differs from the requested issue is reported as not found.\n- [hard] REQ-02: The executor's `get_gate_run_result` takes the issue and the run id, and the server's single-run route passes its issue path segment.\n- [hard] REQ-03: One storage conformance test, run against both backends, proves that loading a run under the wrong issue is not found and loading it under its own issue returns it.\n- [hard] REQ-04: A server test shows that requesting a run under another issue's path returns 404.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Address a single gate-run record by its issue and its run id, so loading one run never needs to know where other issues' runs live.\n\n## Background\n\n`IssueStore::load_gate_run_result` (`crates/jit/src/storage/mod.rs`) takes a run id alone, implemented in `storage/json.rs` and `storage/memory.rs`; the test-only callers are in `storage/gate_runs.rs`, and two integration-test wrappers forward it (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\nTwo production paths call it. `get_gate_run_result` (`commands/gate.rs`) backs the server route `GET /issues/:id/gate-runs/:run_id` (`crates/server/src/routes.rs`), which discards its `:id` segment. `projected_gate_run` (`commands/gate_check.rs`) already has the issue at hand.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueStore::load_gate_run_result` takes `(&IssueId, &GateRunId)`. A record whose `issue_id` differs from the requested issue is reported as not found.\n- [hard] REQ-02: The executor's `get_gate_run_result` takes the issue and the run id, the server's single-run route passes its issue path segment, and `projected_gate_run` passes its issue.\n- [hard] REQ-03: One case in `storage/issue_store_conformance.rs`, run against both backends, proves that loading a run under the wrong issue is not found and loading it under its own issue returns it.\n- [hard] REQ-04: A server test shows that requesting a run under another issue's path returns 404.\n",
   "documents": [],
+  "done_at": "2026-11-03T00:15:36.463080588Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "57fc0d8e-d9cc-44af-9101-3b187ff93010",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:13:09.934828038Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0320b85e-5af2-4980-836f-2d0d02b317da",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:15:35.997504327Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "803b107c-a651-4e98-bf82-dc8f945ea67d",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "satisfies:f8a6b298/REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate-run records load by issue and run id",
-  "updated_at": "2026-10-21T10:40:05.759528164Z"
+  "updated_at": "2026-11-03T00:15:36.463080588Z"
 }

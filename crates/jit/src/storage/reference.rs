@@ -1,27 +1,31 @@
 //! Projection of the on-disk record layout into a committed markdown reference.
 //!
-//! Three storage facts an adopter has to know are defined in code, not in prose:
-//! the shape of an issue identifier, the serialization of the event log, and the
-//! layout of a recorded gate run. [`render_reference_markdown`] projects them
-//! into that page, so it is generated from the same definitions the binary
-//! writes with (`@/inv/single-source-prose`).
+//! Storage facts an adopter has to know are defined in code, not in prose:
+//! identifier shapes, the event log, and the issue, gate-run, verdict, and
+//! archive-evidence records. [`render_reference_markdown`] projects them into
+//! that page, so it is generated from the definitions the binary writes with
+//! (`@/inv/single-source-prose`).
 //!
 //! Every claim on the page is derived rather than restated:
 //!
 //! - The identifier widths come from the constants that enforce them:
 //!   [`SHORT_ID_LENGTH`], the width [`Issue::short_id`](crate::domain::Issue::short_id)
-//!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
-//!   [`IssueIdPrefix`](crate::domain::issue_id::IssueIdPrefix) accepts.
+//!   truncates to, and [`IssueIdPrefix::MIN_ID_PREFIX_LENGTH`], the minimum
+//!   [`IssueIdPrefix`] accepts.
 //! - The event-log sample lines are [`EventTag::sample`] records encoded by
 //!   [`serialize_event`] with the newline terminator the finalizer's positioned
 //!   append adds to each line (`compose_events`). The tag vocabulary is NOT restated here: it is the event
 //!   catalog's own projection ([`crate::domain::event_catalog::event_catalog`]), which this page
 //!   links to.
 //! - The gate-run path comes from
-//!   [`gate_run_result_relative_path`](crate::repository_state::gate_run_result_relative_path),
+//!   [`VirtualPath::gate_run_record`](crate::repository_state::VirtualPath::gate_run_record),
 //!   shared by the repository-state finalizer and storage readers; the record's
 //!   example is a [`GateRunResult`] encoded by [`serialize_gate_run`]; each field's presence when unset is
 //!   read off that encoding.
+//! - Verdict and archive-evidence paths come from their `VirtualPath`
+//!   constructors, and their examples use the same serializers as their
+//!   finalizers. Their field rows are checked against schemas derived from their
+//!   record types and their serialized keys.
 //! - [`GateRunField`] names the record's fields. Conformance tests hold it against
 //!   the property list schemars derives from [`GateRunResult`] itself and against
 //!   the serialized record, so a field added to the record fails the suite until
@@ -29,11 +33,18 @@
 //!   the projection.
 
 use crate::declarations::GateStage;
+use crate::domain::artifact_execution::ArchiveEvidenceRecord;
+use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
-use crate::domain::issue_id::MIN_ID_PREFIX_LENGTH;
-use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
-use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
+use crate::domain::identity::{GateKey, GateRunId, IssueId, IssueIdPrefix};
+use crate::domain::repository_inputs::InputsDigest;
+use crate::domain::{
+    GateRunResult, GateRunStatus, GateVerdictRecord, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH,
+};
+use crate::repository_state::{
+    canonical_json, serialize_event, serialize_gate_run, serialize_gate_verdict, VirtualPath,
+};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::path::Path;
@@ -51,7 +62,7 @@ pub(crate) mod test_support {
 /// prefix. That holds only while the short id is at least as wide as the
 /// resolvable minimum, so the claim is checked at compile time against the two
 /// constants it is drawn from.
-const _: () = assert!(SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH);
+const _: () = assert!(SHORT_ID_LENGTH >= IssueIdPrefix::MIN_ID_PREFIX_LENGTH);
 
 /// The fields of a recorded gate run: one variant per [`GateRunResult`] field.
 ///
@@ -102,6 +113,21 @@ pub enum GateRunField {
     Origin,
     /// `evaluation_stability`
     EvaluationStability,
+}
+
+/// `tokens` as code spans joined into an English alternative: `a` or `b`, or
+/// `a`, `b`, or `c`.
+fn code_alternatives(tokens: &[&str]) -> String {
+    let spans = tokens
+        .iter()
+        .map(|token| format!("`{token}`"))
+        .collect::<Vec<_>>();
+    match spans.as_slice() {
+        [] => String::new(),
+        [only] => only.clone(),
+        [first, second] => format!("{first} or {second}"),
+        [leading @ .., last] => format!("{}, or {last}", leading.join(", ")),
+    }
 }
 
 impl GateRunField {
@@ -166,19 +192,21 @@ impl GateRunField {
                  of the repository format version in `index.json`."
             ),
             GateRunField::RunId => {
-                "The run's identifier, and the name of its directory under `gate-runs/`. Each \
-                 execution mints a fresh UUID v4, so a rerun records a new directory instead of \
-                 overwriting the previous run."
+                "The run's identifier, and the stem of its record's file name. Each execution \
+                 mints a fresh UUID v4, so a rerun records a new file instead of overwriting the \
+                 previous run."
                     .to_string()
             }
             GateRunField::GateKey => {
                 "Key of the gate that ran, as registered in `.jit/gates.toml`.".to_string()
             }
-            GateRunField::Stage => "Stage the gate ran at: `precheck` or `postcheck`.".to_string(),
+            GateRunField::Stage => format!(
+                "Stage the gate ran at: {}.",
+                code_alternatives(&GateStage::ALL.map(GateStage::as_str))
+            ),
             GateRunField::IssueId => {
-                "Full id of the issue the run is about. An issue's runs are selected by matching \
-                 this field across the run directories, so `gate-runs/` is flat rather than \
-                 nested per issue."
+                "Full id of the issue the run is about, and the name of the directory under \
+                 `gate-runs/` that holds the record."
                     .to_string()
             }
             GateRunField::Commit => {
@@ -193,12 +221,11 @@ impl GateRunField {
                  `commit`."
                     .to_string()
             }
-            GateRunField::Status => {
-                "The run's verdict: `passed`, `failed`, `error`, or `pending`. For an \
-                 executed checker the exit status decides it, as \
-                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines."
-                    .to_string()
-            }
+            GateRunField::Status => format!(
+                "The run's verdict: {}. For an executed checker the exit status decides it, as \
+                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines.",
+                code_alternatives(&GateRunStatus::ALL.map(GateRunStatus::as_str))
+            ),
             GateRunField::StartedAt => {
                 "RFC 3339 timestamp taken before the checker is launched.".to_string()
             }
@@ -242,10 +269,12 @@ impl GateRunField {
             }
             GateRunField::Origin => {
                 "Where the verdict came from. `{\"derivation\": \"executed\"}` means this run \
-                 ran the checker; `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}` \
+                 ran the checker; `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \
+                 \"source_run\": \"<run-id>\"}` \
                  means it carries the named earlier run's verdict, whose `inputs_digest` \
                  matched, without the checker running again. The report text behind a reused \
-                 verdict lives at the named run. `{\"derivation\": \"attested\"}` means the \
+                 verdict lives at the run addressed by `source_issue` and `source_run`. \
+                 `{\"derivation\": \"attested\"}` means the \
                  run records a manual gate's attestation: `by` names the attestor and \
                  `started_at` the time."
                     .to_string()
@@ -260,6 +289,42 @@ impl GateRunField {
             }
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RecordField {
+    name: &'static str,
+    meaning: &'static str,
+}
+
+const GATE_VERDICT_FIELDS: [RecordField; 2] = [
+    RecordField {
+        name: "issue_id",
+        meaning: "Full id of the issue whose gate-run record holds the reusable verdict.",
+    },
+    RecordField {
+        name: "run_id",
+        meaning: "Id of the run record holding the verdict; the reader loads it with `issue_id`.",
+    },
+];
+
+const ARCHIVE_EVIDENCE_FIELDS: [RecordField; 2] = [
+    RecordField {
+        name: "target",
+        meaning: "Container issue id or normalized repository-relative document path this evidence belongs to.",
+    },
+    RecordField {
+        name: "executions",
+        meaning: "Archive execution payloads for this target in order, shared with their archive events.",
+    },
+];
+
+fn record_field_rows(fields: &[RecordField]) -> String {
+    fields
+        .iter()
+        .map(|field| format!("| `{}` | always | {} |", field.name, cell(field.meaning)))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// How a field appears in the stored JSON when it carries no value.
@@ -289,7 +354,95 @@ impl Presence {
 
 /// Run id used in the reference's example record, chosen so the example's path
 /// and its `run_id` field are visibly the same string.
-const SAMPLE_RUN_ID: &str = "7b2b0a4c-2f5a-4d3e-9b1a-6c8f0d5e4a21";
+fn sample_run_id() -> GateRunId {
+    GateRunId::from_uuid(uuid::Uuid::from_u128(
+        0x7b2b0a4c_2f5a_4d3e_9b1a_6c8f0d5e4a21,
+    ))
+}
+
+/// Issue id used in the reference's example record, which its path names too.
+fn sample_issue_id() -> IssueId {
+    IssueId::from_uuid(uuid::Uuid::from_u128(
+        0x9d1f6c02_4a77_4f2b_8f3d_5e0b7a1c8e64,
+    ))
+}
+
+fn sample_inputs_digest() -> InputsDigest {
+    let mut builder =
+        crate::domain::repository_inputs::InputsDigestBuilder::new(b"gate declaration");
+    builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
+    builder.finish()
+}
+
+fn sample_gate_verdict() -> GateVerdictRecord {
+    GateVerdictRecord {
+        issue_id: sample_issue_id(),
+        run_id: sample_run_id(),
+    }
+}
+
+fn sample_archive_evidence() -> ArchiveEvidenceRecord {
+    ArchiveEvidenceRecord {
+        target: PlanTarget::Document {
+            path: "docs/reference/storage-records.md".to_string(),
+        },
+        executions: Vec::new(),
+    }
+}
+
+/// The run record's path as the reference prints it, with the ids as placeholders.
+fn documented_result_path() -> String {
+    let (issue, run) = (sample_issue_id(), sample_run_id());
+    Path::new(".jit")
+        .join(
+            VirtualPath::gate_run_record(&issue, &run)
+                .relative()
+                .as_path(),
+        )
+        .display()
+        .to_string()
+        .replace(issue.as_str(), "<issue-id>")
+        .replace(run.as_str(), "<run-id>")
+}
+
+fn data_path(path: &VirtualPath) -> String {
+    Path::new(".jit")
+        .join(path.relative().as_path())
+        .display()
+        .to_string()
+}
+
+fn documented_gate_verdict_path() -> String {
+    let gate_key: GateKey = "tests".parse().expect("sample gate key is valid");
+    let digest = sample_inputs_digest();
+    data_path(&VirtualPath::gate_verdict_record(&gate_key, &digest))
+        .replace(gate_key.as_str(), "<gate-key>")
+        .replace(digest.as_str(), "<inputs-digest>")
+}
+
+fn documented_archive_evidence_paths() -> [String; 2] {
+    let issue_id = sample_issue_id();
+    let container_path = data_path(&VirtualPath::archive_evidence_record(
+        &PlanTarget::Container {
+            id: issue_id.clone(),
+        },
+    ));
+    let container_path = container_path.replace(issue_id.as_str(), "<issue-id>");
+
+    let document_path = data_path(&VirtualPath::archive_evidence_record(
+        &PlanTarget::Document {
+            path: "docs/reference/storage-records.md".to_string(),
+        },
+    ));
+    let digest = document_path
+        .rsplit('/')
+        .next()
+        .and_then(|filename| filename.strip_suffix(".json"))
+        .expect("the document target path ends in a digest filename");
+    let document_path = document_path.replace(digest, "<sha256-of-normalized-path>");
+
+    [container_path, document_path]
+}
 
 /// Fixed timestamp for the reference's sample records, so the projection is
 /// deterministic.
@@ -305,10 +458,10 @@ fn sample_timestamp() -> DateTime<Utc> {
 fn sample_gate_run() -> GateRunResult {
     GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
-        run_id: SAMPLE_RUN_ID.to_string(),
-        gate_key: "tests".to_string(),
+        run_id: sample_run_id(),
+        gate_key: "tests".parse().unwrap(),
         stage: GateStage::Postcheck,
-        issue_id: "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64".to_string(),
+        issue_id: sample_issue_id(),
         commit: Some("9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910".to_string()),
         branch: Some("main".to_string()),
         status: GateRunStatus::Passed,
@@ -319,7 +472,7 @@ fn sample_gate_run() -> GateRunResult {
         stdout: "test result: ok. 812 passed; 0 failed".to_string(),
         stderr: String::new(),
         command: "cargo test --workspace".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: Some("all suites green".to_string()),
         findings: Some(GateFindings {
             verdict: "pass".to_string(),
@@ -335,17 +488,17 @@ fn sample_gate_run() -> GateRunResult {
                 references: vec!["@/inv/atomic-writes".to_string()],
             }],
         }),
-        inputs_digest: Some({
-            // Produced by the same builder the evaluator digests with, so the
-            // sample cannot show a value the encoding could not have written.
-            let mut builder =
-                crate::domain::repository_inputs::InputsDigestBuilder::new(b"gate declaration");
-            builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
-            builder.finish()
-        }),
-        origin: crate::domain::GateVerdictOrigin::Reused(
-            "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34".to_string(),
-        ),
+        // Produced by the same builder the evaluator digests with, so the
+        // sample cannot show a value the encoding could not have written.
+        inputs_digest: Some(sample_inputs_digest()),
+        origin: crate::domain::GateVerdictOrigin::Reused {
+            source_issue: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
+                0x6a2b8c40_9d15_4f37_8e62_0b3c7d5e1f90,
+            )),
+            source_run: GateRunId::from_uuid(uuid::Uuid::from_u128(
+                0x1c4e8a90_3d2b_4f61_9a07_5b8c2d1e6f34,
+            )),
+        },
         evaluation_stability: crate::domain::GateEvaluationStability::InputsMoved,
     }
 }
@@ -427,8 +580,8 @@ fn cell(text: &str) -> String {
 /// The returned string is the page's full contents. The identifier widths come
 /// from the constants that enforce them, the event-log block from
 /// [`EventTag::sample`] records encoded the way the log is written, and the
-/// gate-run path, example record, and field table from
-/// [`gate_run_result_relative_path`] and [`GateRunResult`] — so the page cannot
+/// gate-run, verdict, and archive-evidence paths, example records, and field
+/// tables from their path constructors and record types — so the page cannot
 /// drift from the code that writes and reads the files. The conformance test in
 /// this module asserts the committed file equals this output.
 ///
@@ -437,24 +590,29 @@ fn cell(text: &str) -> String {
 /// Propagates a `serde_json` failure while encoding one of the sample records.
 pub fn render_reference_markdown() -> Result<String> {
     let example_run = String::from_utf8(serialize_gate_run(&sample_gate_run())?)?;
+    let example_verdict = String::from_utf8(serialize_gate_verdict(&sample_gate_verdict())?)?;
+    let example_archive_evidence =
+        String::from_utf8(canonical_json(&sample_archive_evidence(), true)?)?;
     let events = event_log_sample()?;
 
-    // The run's path, straight from the pure helper finalization and readers
+    // The run's path, straight from the constructor finalization and readers
     // share, so the page names the live layout rather than a prose copy of it.
-    let result_path = Path::new(".jit").join(gate_run_result_relative_path("<run-id>")?.as_path());
-    let result_path = result_path.display();
+    let result_path = documented_result_path();
+    let verdict_path = documented_gate_verdict_path();
+    let [container_evidence_path, document_evidence_path] = documented_archive_evidence_paths();
 
+    let min_prefix_length = IssueIdPrefix::MIN_ID_PREFIX_LENGTH;
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
     let prefix_rules = [
         format!(
-            "- the normalized input must be at least {MIN_ID_PREFIX_LENGTH} characters; below the \
+            "- the normalized input must be at least {min_prefix_length} characters; below the \
              minimum it is refused as an argument error (exit code 2, see \
              [Exit Codes](exit-codes.md)) before any issue record is read;"
         ),
         "- it names every id whose normalized form it prefixes, so a full id resolves in any \
          case or hyphenation;"
             .to_string(),
-        "- it must name exactly one id in the repository index. Several matches are refused as \
+        "- it must name exactly one id among the repository's issues. Several matches are refused as \
          ambiguous, and the error lists the candidates."
             .to_string(),
     ]
@@ -472,6 +630,8 @@ pub fn render_reference_markdown() -> Result<String> {
         })
         .collect::<Vec<_>>()
         .join("\n");
+    let verdict_fields = record_field_rows(&GATE_VERDICT_FIELDS);
+    let archive_evidence_fields = record_field_rows(&ARCHIVE_EVIDENCE_FIELDS);
 
     Ok(format!(
         "<!-- Generated from `crate::storage::reference` — do not edit by hand. -->\n\
@@ -480,8 +640,9 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          > **Diátaxis Type:** Reference\n\
          \n\
-         The shape of an issue identifier, of a line in the event log, and of a recorded\n\
-         gate run. This page is generated from the definitions the binary writes with —\n\
+         The shape of an issue identifier, of a line in the event log, and of the issue,\n\
+         gate-run, verdict, and archive-evidence records.\n\
+         This page is generated from the definitions the binary writes with —\n\
          `crates/jit/src/domain/types.rs` and `crates/jit/src/storage/` — so its widths,\n\
          paths, and field lists are the ones in force. For the `.jit/` directory as a\n\
          whole, its configuration and registry files, and the issue record's own field\n\
@@ -505,14 +666,15 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          {prefix_rules}\n\
          \n\
-         A short id is {SHORT_ID_LENGTH} characters and the minimum is {MIN_ID_PREFIX_LENGTH},\n\
+         A short id is {SHORT_ID_LENGTH} characters and the minimum is {min_prefix_length},\n\
          so a short id printed by one command is always long enough to hand back to the next.\n\
          \n\
          ## Event Log Records\n\
          \n\
          `.jit/events.jsonl` is the event log, in JSON Lines: one JSON object per line,\n\
          each terminated by a newline. A record is serialized to a single line with its\n\
-         object keys sorted, and a mutation appends its lines at the log length it read;\n\
+         object keys sorted, and a mutation positions its append at the log's committed\n\
+         length, the end of its last newline-terminated line;\n\
          records are never rewritten in place. The publication contract is\n\
          [Publication and Recovery](storage-format.md#publication-and-recovery). Reading\n\
          parses the file line by line, skipping blank lines. Every record carries a\n\
@@ -531,10 +693,10 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          Running a gate records its result at `{result_path}`.\n\
          The `<run-id>` is a UUID v4 minted per execution, so runs accumulate: a rerun\n\
-         writes a new directory beside the old one, and the history of a gate on an issue\n\
-         is the set of run directories whose record names that issue. The record is\n\
-         written as pretty-printed JSON in the same redo record as\n\
-         its coupled issue and event updates.\n\
+         writes a new record beside the old one in its issue's directory, and an issue's\n\
+         run history is one listing of that directory. The record is written as\n\
+         pretty-printed JSON in the same redo record as its coupled issue and event\n\
+         updates.\n\
          \n\
          ```json\n\
          {example_run}\n\
@@ -548,7 +710,45 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          | Field | Presence | Meaning |\n\
          | --- | --- | --- |\n\
-         {fields}\n"
+         {fields}\n\
+         \n\
+         ## Gate Verdict Records\n\
+         \n\
+         A reusable verdict is addressed by gate key and the digest of the gate's declared\n\
+         inputs at `{verdict_path}`. The digest identifies the content of those declared\n\
+         inputs. The repository-state `finalize` mutation writes\n\
+         or replaces this record in the same redo record as its gate run, when that run\n\
+         executed its checker and passed or failed. A rerun over the same key replaces the\n\
+         prior pointer; other verdict keys are independent.\n\
+         \n\
+         ```json\n\
+         {example_verdict}\n\
+         ```\n\
+         \n\
+         `captured_reusable_gate_run` in `commands/gate_check.rs` reads this record by\n\
+         `(gate_key, inputs_digest)`, then loads the run addressed by `issue_id` and `run_id`.\n\
+         \n\
+         | Field | Presence | Meaning |\n\
+         | --- | --- | --- |\n\
+         {verdict_fields}\n\
+         \n\
+         ## Archive Evidence Records\n\
+         \n\
+         Archive evidence is addressed by its target. A container record is written at\n\
+         `{container_evidence_path}`; a document record is written at\n\
+         `{document_evidence_path}`, where the digest is SHA-256 over the normalized\n\
+         repository-relative document path. The archive execution finalizer\n\
+         (`finalize_archive_execution`) appends the execution to this record in the same\n\
+         redo record as the archive event. The archive preview reader,\n\
+         `IssueStore::read_archive_evidence_record(target)`, loads it by target.\n\
+         \n\
+         ```json\n\
+         {example_archive_evidence}\n\
+         ```\n\
+         \n\
+         | Field | Presence | Meaning |\n\
+         | --- | --- | --- |\n\
+         {archive_evidence_fields}\n"
     ))
 }
 
@@ -635,6 +835,118 @@ mod tests {
                 field.as_str()
             );
         }
+        for field in GATE_VERDICT_FIELDS.iter().chain(&ARCHIVE_EVIDENCE_FIELDS) {
+            assert!(!field.meaning.is_empty());
+            assert!(
+                page.contains(&format!("| `{}` | always |", field.name)),
+                "the rendered table is missing the row for `{}`",
+                field.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_gate_verdict_fields_match_derived_schema() {
+        let schema = serde_json::to_value(schema_for!(GateVerdictRecord))
+            .expect("GateVerdictRecord schema is JSON");
+        let derived: BTreeSet<String> = schema["properties"]
+            .as_object()
+            .expect("a struct derives an object schema with properties")
+            .keys()
+            .cloned()
+            .collect();
+        let projected: BTreeSet<String> = GATE_VERDICT_FIELDS
+            .iter()
+            .map(|field| field.name.to_string())
+            .collect();
+
+        assert_eq!(projected, derived);
+    }
+
+    #[test]
+    fn test_gate_verdict_fields_match_serialized_record() {
+        let record =
+            serde_json::to_value(sample_gate_verdict()).expect("a gate verdict record serializes");
+        let written: BTreeSet<String> = record
+            .as_object()
+            .expect("a gate verdict record is a JSON object")
+            .keys()
+            .cloned()
+            .collect();
+        let projected: BTreeSet<String> = GATE_VERDICT_FIELDS
+            .iter()
+            .map(|field| field.name.to_string())
+            .collect();
+
+        assert_eq!(projected, written);
+    }
+
+    #[test]
+    fn test_archive_evidence_fields_match_derived_schema() {
+        let schema = serde_json::to_value(schema_for!(ArchiveEvidenceRecord))
+            .expect("ArchiveEvidenceRecord schema is JSON");
+        let derived: BTreeSet<String> = schema["properties"]
+            .as_object()
+            .expect("a struct derives an object schema with properties")
+            .keys()
+            .cloned()
+            .collect();
+        let projected: BTreeSet<String> = ARCHIVE_EVIDENCE_FIELDS
+            .iter()
+            .map(|field| field.name.to_string())
+            .collect();
+
+        assert_eq!(projected, derived);
+    }
+
+    #[test]
+    fn test_archive_evidence_fields_match_serialized_record() {
+        let record = serde_json::to_value(sample_archive_evidence())
+            .expect("an archive evidence record serializes");
+        let written: BTreeSet<String> = record
+            .as_object()
+            .expect("an archive evidence record is a JSON object")
+            .keys()
+            .cloned()
+            .collect();
+        let projected: BTreeSet<String> = ARCHIVE_EVIDENCE_FIELDS
+            .iter()
+            .map(|field| field.name.to_string())
+            .collect();
+
+        assert_eq!(projected, written);
+    }
+
+    #[test]
+    fn test_reference_documents_verdict_and_archive_evidence_records() {
+        let page = render_reference_markdown().expect("the reference renders");
+
+        for required in [
+            "## Gate Verdict Records",
+            "gate-runs/verdicts/",
+            "## Archive Evidence Records",
+            "archive-evidence/",
+            "`issue_id`",
+            "`run_id`",
+            "`target`",
+            "`executions`",
+            "captured_reusable_gate_run",
+            "read_archive_evidence_record",
+            "finalize_archive_execution",
+        ] {
+            assert!(page.contains(required), "reference is missing `{required}`");
+        }
+        let [container_path, document_path] = documented_archive_evidence_paths();
+        for path in [
+            documented_gate_verdict_path(),
+            container_path,
+            document_path,
+        ] {
+            assert!(
+                page.contains(&format!("`{path}`")),
+                "reference is missing `{path}`"
+            );
+        }
     }
 
     /// The presence column reports what the encoding does, not what the table
@@ -660,18 +972,20 @@ mod tests {
         assert!(cleared[GateRunField::Commit.as_str()].is_null());
     }
 
-    /// REQ-01: an issue's stored id is a UUID v4, and the short id is the first
-    /// `SHORT_ID_LENGTH` characters of it — derived on read, never a stored field.
+    /// REQ-01: a mutation derives each new issue's id as a UUID v4, and the short
+    /// id is the first `SHORT_ID_LENGTH` characters of an id — derived on read,
+    /// never a stored field.
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
-        let issue = crate::domain::fixture_issue("Probe".to_string(), String::new());
-
-        let parsed = Uuid::parse_str(&issue.id).expect("an issue id is a UUID");
+        let id = crate::repository_state::MutationContext::preview().issue_id_at(0);
+        let parsed = Uuid::parse_str(id.as_str()).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));
-        assert_eq!(parsed.hyphenated().to_string(), issue.id);
+        assert_eq!(parsed.hyphenated().to_string(), id.as_str());
+
+        let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
 
         assert_eq!(issue.short_id().len(), SHORT_ID_LENGTH);
-        assert!(issue.id.starts_with(&issue.short_id()));
+        assert!(issue.id.as_str().starts_with(&issue.short_id()));
 
         // The record stores no short id: the encoded issue carries the full `id`
         // and no key holding its truncation.
@@ -686,13 +1000,11 @@ mod tests {
     }
 
     /// REQ-03: the page names the path shared by finalization and readers, taken
-    /// from the canonical relative-path helper rather than reconstructed.
+    /// from the canonical path constructor rather than reconstructed.
     #[test]
     fn test_render_projects_the_storage_result_path() {
         let page = render_reference_markdown().expect("the reference renders");
-        let path =
-            Path::new(".jit").join(gate_run_result_relative_path("<run-id>").unwrap().as_path());
-        assert!(page.contains(&format!("`{}`", path.display())));
+        assert!(page.contains(&format!("`{}`", documented_result_path())));
     }
 
     /// REQ-02: the page states the event-log serialization and links the tag

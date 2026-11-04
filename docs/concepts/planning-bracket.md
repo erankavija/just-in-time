@@ -245,8 +245,9 @@ Two mechanics make the preview rule fire on `B` yet evaluate `C`'s criteria:
   `C` and `B`. A satisfies label on `P` (beyond the boundary) does not count.
 
 One subtlety worth naming: `B` is simultaneously **in scope** for `jit validate
---scope <C>` (so its preview rule fires) *and* an **excluded coverage candidate**
-(so it never counts as a coverer). Scope membership (whose rules are evaluated) and
+--scope <C>` (so its preview rule's findings are reported) *and* an **excluded
+coverage candidate** (so it never counts as a coverer). Scope membership (whose
+findings are reported; rules evaluate over the whole repository) and
 coverage-candidate exclusion (what the coverage walk tallies) are two distinct
 traversals; the bracket relies on both.
 

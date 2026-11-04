@@ -3,202 +3,23 @@
 //! Tests the full CLI experience for worktree and validate commands.
 
 use assert_cmd::prelude::*;
-use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
-use jit::domain::LinkedCheckoutWriteStance;
+use jit::domain::store_divergence::{DivergenceClass, DivergentRecord};
+use jit::test_cli::JitCli;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
 
-/// Setup a test repository with git and jit initialized
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    // Initialize git (required for worktree detection)
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["init"])
-        .status()
-        .unwrap();
-
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "user.email", "test@example.com"])
-        .status()
-        .unwrap();
-
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "user.name", "Test User"])
-        .status()
-        .unwrap();
-
-    // Initialize jit
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-
-    // Initialize control plane (for claims)
-    let git_dir = temp.path().join(".git");
-    fs::create_dir_all(git_dir.join("jit/locks")).unwrap();
-    fs::write(git_dir.join("jit/claims.jsonl"), "").unwrap();
-
-    // Create initial commit (required for worktrees)
-    fs::write(temp.path().join("README.md"), "# Test\n").unwrap();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["add", "."])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["commit", "-m", "Initial commit"])
-        .status()
-        .unwrap();
-
-    temp
-}
-
-/// Attach a local bare repository as `origin` and publish the current `HEAD`.
-fn attach_origin_remote(repo: &Path) -> TempDir {
-    let remote = TempDir::new().unwrap();
-
-    Command::new("git")
-        .current_dir(remote.path())
-        .args(["init", "--bare"])
-        .assert()
-        .success();
-
-    let remote_path = remote.path().to_str().unwrap();
-    Command::new("git")
-        .current_dir(repo)
-        .args(["remote", "add", "origin", remote_path])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(repo)
-        .args(["push", "origin", "HEAD:refs/heads/main"])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(repo)
-        .args(["fetch", "origin"])
-        .assert()
-        .success();
-
-    remote
-}
-
-/// Create a git worktree with a unique name
-fn create_worktree(base_repo: &Path, worktree_name: &str) -> std::path::PathBuf {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    // Use timestamp to ensure unique worktree names across test runs
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let unique_name = format!("{}-{}", worktree_name, timestamp);
-
-    let parent_dir = base_repo.parent().unwrap();
-    let worktree_path = parent_dir.join(&unique_name);
-
-    // Clean up if exists
-    if worktree_path.exists() {
-        let _ = fs::remove_dir_all(&worktree_path);
-    }
-
-    let status = Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            worktree_path.to_str().unwrap(),
-            "-b",
-            &unique_name,
-        ])
-        .current_dir(base_repo)
-        .status()
-        .unwrap();
-
-    assert!(status.success(), "Failed to create worktree");
-
-    worktree_path
-}
-
-/// Initialize jit inside `checkout`, a linked non-primary checkout.
-///
-/// The invocation declares the allowing linked-checkout write stance rather than
-/// inheriting a default (jit:f52567ed REQ-05): these tests are about worktree
-/// identity, not about the write policy.
-fn init_linked_checkout(checkout: &Path) {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(checkout)
-        .env(
-            LINKED_CHECKOUT_WRITE_STANCE_ENV,
-            LinkedCheckoutWriteStance::Allow.as_token(),
-        )
-        .arg("init")
-        .assert()
-        .success();
-}
-
-/// Create an issue in `repo` and return its full id.
-fn create_issue(repo: &Path, title: &str) -> String {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo)
-        .args(["issue", "create", "--title", title, "--json"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["id"].as_str().unwrap().to_string()
-}
-
-/// Sum of `active_claims` across all worktrees from `jit worktree list --json`.
-fn worktree_active_claims_total(repo: &Path) -> u64 {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo)
-        .args(["worktree", "list", "--json"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["worktrees"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|w| w["active_claims"].as_u64().unwrap())
-        .sum()
-}
-
-/// Number of active leases from `jit claim list --json`.
-fn claim_list_count(repo: &Path) -> u64 {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo)
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["count"].as_u64().unwrap()
-}
-
+/// Declared by every invocation writing a linked checkout's store: these tests
+/// are about worktree identity, not about the write policy (jit:f52567ed REQ-05).
 // === jit worktree info tests ===
 
 #[test]
 fn test_worktree_info_success() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // Run worktree info
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info"])
+    cli.command(["worktree", "info"])
         .assert()
         .success()
         .stdout(predicate::str::contains("wt:"))
@@ -207,11 +28,11 @@ fn test_worktree_info_success() {
 
 #[test]
 fn test_worktree_info_json_output() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info", "--json"])
+    let output = cli
+        .command(["worktree", "info", "--json"])
         .output()
         .unwrap();
 
@@ -229,13 +50,14 @@ fn test_worktree_info_json_output() {
 
 #[test]
 fn test_worktree_info_follows_overridden_data_root_checkout() {
-    let temp = setup_repo();
-    let worktree_path = create_worktree(temp.path(), "override-selected-worktree");
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_path = linked.root();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_DATA_DIR", worktree_path.join(".jit"))
-        .args(["worktree", "info", "--json"])
+    let output = cli
+        .command_with_env(
+            ["worktree", "info", "--json"],
+            [("JIT_DATA_DIR", worktree_path.join(".jit").to_str().unwrap())],
+        )
         .output()
         .unwrap();
 
@@ -254,13 +76,14 @@ fn test_worktree_info_follows_overridden_data_root_checkout() {
 
 #[test]
 fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() {
-    let temp = setup_repo();
-    let worktree_path = create_worktree(temp.path(), "override-init-worktree");
-    let primary_identity_path = temp.path().join(".jit/worktree.json");
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_path = linked.root();
+    let primary_identity_path = cli.root().join(".jit/worktree.json");
     let linked_identity_path = worktree_path.join(".jit/worktree.json");
     let primary_before = fs::read(&primary_identity_path).unwrap();
     let primary_identity: Value = serde_json::from_slice(&primary_before).unwrap();
-    let linked_branch = worktree_path.file_name().unwrap().to_str().unwrap();
+    let linked_branch = linked.git(["branch", "--show-current"]).unwrap();
+    let linked_branch = linked_branch.trim();
 
     // Reproduce a linked checkout copied from a primary store that carried its
     // machine-local identity. Init must classify the selected linked store,
@@ -269,14 +92,13 @@ fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() 
 
     // The selected data root is the linked checkout's store, so the invocation
     // declares the stance that permits it to write there (jit:f52567ed REQ-05).
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_DATA_DIR", worktree_path.join(".jit"))
-        .env(
-            LINKED_CHECKOUT_WRITE_STANCE_ENV,
-            LinkedCheckoutWriteStance::Allow.as_token(),
+    let output = cli
+        .command_with_env(
+            ["init", "--json"],
+            [("JIT_DATA_DIR", worktree_path.join(".jit").to_str().unwrap())]
+                .into_iter()
+                .chain([crate::ALLOW_LINKED_WRITES]),
         )
-        .args(["init", "--json"])
         .output()
         .unwrap();
 
@@ -309,17 +131,14 @@ fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() 
 
 #[test]
 fn test_worktree_info_creates_identity_file() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // Run worktree info to create identity
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info"])
-        .assert()
-        .success();
+    cli.command(["worktree", "info"]).assert().success();
 
     // Verify worktree.json was created
-    let wt_file = temp.path().join(".jit/worktree.json");
+    let wt_file = cli.root().join(".jit/worktree.json");
     assert!(wt_file.exists(), "worktree.json should be created");
 
     // Verify it's valid JSON
@@ -329,12 +148,12 @@ fn test_worktree_info_creates_identity_file() {
 
 #[test]
 fn test_worktree_info_stable_across_invocations() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // First invocation
-    let output1 = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info", "--json"])
+    let output1 = cli
+        .command(["worktree", "info", "--json"])
         .output()
         .unwrap();
 
@@ -342,9 +161,8 @@ fn test_worktree_info_stable_across_invocations() {
     let id1 = json1["worktree_id"].as_str().unwrap();
 
     // Second invocation
-    let output2 = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info", "--json"])
+    let output2 = cli
+        .command(["worktree", "info", "--json"])
         .output()
         .unwrap();
 
@@ -354,45 +172,43 @@ fn test_worktree_info_stable_across_invocations() {
     assert_eq!(id1, id2, "Worktree ID should be stable");
 }
 
-/// Relocation must surface as a typed warning on the `worktree info` command
+/// Relocation must surface as a shared success warning on the `worktree info` command
 /// path (regression guard: storage no longer prints it, the output layer does).
 /// Previously this condition was an `eprintln!` from storage on every command;
 /// it must still surface here, not only via `recover`.
 #[test]
 fn test_worktree_info_surfaces_relocation_warning() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // First run creates worktree.json with root == this repo.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info"])
-        .assert()
-        .success();
+    cli.command(["worktree", "info"]).assert().success();
 
     // Rewrite the recorded root to a non-existent path. On the next run the
     // worktree is detected at a different (current) path, which is a relocation.
-    let wt_file = temp.path().join(".jit/worktree.json");
+    let wt_file = cli.root().join(".jit/worktree.json");
     let mut identity: Value = serde_json::from_str(&fs::read_to_string(&wt_file).unwrap()).unwrap();
     identity["root"] = Value::String("/nonexistent/old/worktree/path".to_string());
     fs::write(&wt_file, serde_json::to_string_pretty(&identity).unwrap()).unwrap();
 
     // --json: the relocation must appear in the structured warnings payload,
     // and nothing must leak onto stderr.
-    let json_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info", "--json"])
+    let json_output = cli
+        .command(["worktree", "info", "--json"])
         .output()
         .unwrap();
     assert!(json_output.status.success());
     let json: Value = serde_json::from_slice(&json_output.stdout).unwrap();
     let warnings = json["warnings"].as_array().expect("warnings array present");
     assert!(
-        warnings.iter().any(|w| w["kind"] == "worktree_relocated"),
+        warnings.iter().any(|w| w
+            .as_str()
+            .is_some_and(|text| text.contains("Worktree relocated"))),
         "worktree info --json must include the relocation warning, got {warnings:?}"
     );
     let json_stderr = String::from_utf8_lossy(&json_output.stderr);
     assert!(
-        !json_stderr.contains("relocated"),
+        json_stderr.is_empty(),
         "relocation diagnostic must not leak to stderr under --json, got: {json_stderr}"
     );
 
@@ -401,62 +217,21 @@ fn test_worktree_info_surfaces_relocation_warning() {
     identity["root"] = Value::String("/nonexistent/old/worktree/path".to_string());
     fs::write(&wt_file, serde_json::to_string_pretty(&identity).unwrap()).unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "info"])
+    cli.command(["worktree", "info"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Worktree relocated"));
-}
-
-/// Second command-path guard: `jit claim list` must also surface a relocation
-/// as a typed warning (storage previously printed it from every identity load).
-#[test]
-fn test_claim_list_surfaces_relocation_warning() {
-    let temp = setup_repo();
-
-    // First run creates worktree.json with root == this repo.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list"])
-        .assert()
-        .success();
-
-    // Point the recorded root at a non-existent path to force a relocation.
-    let wt_file = temp.path().join(".jit/worktree.json");
-    let mut identity: Value = serde_json::from_str(&fs::read_to_string(&wt_file).unwrap()).unwrap();
-    identity["root"] = Value::String("/nonexistent/old/worktree/path".to_string());
-    fs::write(&wt_file, serde_json::to_string_pretty(&identity).unwrap()).unwrap();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let warnings = json["warnings"].as_array().expect("warnings array present");
-    assert!(
-        warnings.iter().any(|w| w["kind"] == "worktree_relocated"),
-        "claim list --json must include the relocation warning, got {warnings:?}"
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !stderr.contains("relocated"),
-        "relocation diagnostic must not leak to stderr under --json, got: {stderr}"
-    );
 }
 
 // === jit worktree list tests ===
 
 #[test]
 fn test_worktree_list_single_worktree() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // List worktrees (only main worktree)
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "list"])
+    cli.command(["worktree", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("main").or(predicate::str::contains("master")));
@@ -464,51 +239,27 @@ fn test_worktree_list_single_worktree() {
 
 #[test]
 fn test_worktree_list_multiple_worktrees() {
-    let temp = setup_repo();
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    let linked_branch = linked.git(["branch", "--show-current"]).unwrap();
 
-    // Create additional worktree within temp directory scope
-    let wt_path = create_worktree(temp.path(), "feature-branch");
-
-    // Initialize jit in new worktree - need to run this inline
-    let status = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&wt_path)
-        .args(["worktree", "info"])
-        .status()
-        .unwrap();
-    assert!(status.success());
+    linked.command(["worktree", "info"]).assert().success();
 
     // List from main repo - should see the worktree
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "list"])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // The worktree name starts with "feature-branch-"
+    let stdout = cli.run(["worktree", "list"]).unwrap();
     assert!(
-        stdout.contains("feature-branch"),
+        stdout.contains(linked_branch.trim()),
         "Should list the new worktree: {}",
         stdout
     );
-
-    // Cleanup worktree before temp dir is dropped
-    let wt_name = wt_path.file_name().unwrap().to_str().unwrap();
-    let _ = Command::new("git")
-        .current_dir(temp.path())
-        .args(["worktree", "remove", "--force", wt_name])
-        .status();
 }
 
 #[test]
 fn test_worktree_list_from_linked_checkout_identifies_primary() {
-    let temp = setup_repo();
-    let worktree_path = create_worktree(temp.path(), "list-from-linked");
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_path = linked.root();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree_path)
-        .args(["worktree", "list", "--json"])
+    let output = linked
+        .command(["worktree", "list", "--json"])
         .output()
         .unwrap();
 
@@ -520,7 +271,7 @@ fn test_worktree_list_from_linked_checkout_identifies_primary() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     let worktrees = json["worktrees"].as_array().unwrap();
     assert!(worktrees.iter().any(|entry| {
-        entry["path"].as_str() == Some(temp.path().to_str().unwrap()) && entry["is_main"] == true
+        entry["path"].as_str() == Some(cli.root().to_str().unwrap()) && entry["is_main"] == true
     }));
     assert!(worktrees.iter().any(|entry| {
         entry["path"].as_str() == Some(worktree_path.to_str().unwrap()) && entry["is_main"] == false
@@ -529,11 +280,11 @@ fn test_worktree_list_from_linked_checkout_identifies_primary() {
 
 #[test]
 fn test_worktree_list_json_output() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "list", "--json"])
+    let output = cli
+        .command(["worktree", "list", "--json"])
         .output()
         .unwrap();
 
@@ -543,7 +294,6 @@ fn test_worktree_list_json_output() {
     assert!(json["worktrees"].is_array());
 
     let worktrees = json["worktrees"].as_array().unwrap();
-    assert_eq!(json["count"].as_u64(), Some(worktrees.len() as u64));
     assert!(!worktrees.is_empty(), "Should have at least one worktree");
 
     // Check first worktree has expected fields
@@ -564,42 +314,47 @@ fn test_worktree_list_json_output() {
 /// the real CLI wiring for the common case.
 #[test]
 fn test_worktree_list_agrees_with_claim_list_for_live_leases() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    let short_id = create_issue(temp.path(), "short-lived");
-    let long_id = create_issue(temp.path(), "long-lived");
+    let short_id = cli.create_issue(["--title", "short-lived"]).unwrap();
+    let long_id = cli.create_issue(["--title", "long-lived"]).unwrap();
 
     // Acquire two live leases from the main worktree.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &short_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test",
-        ])
-        .assert()
-        .success();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &long_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &short_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test",
+    ])
+    .assert()
+    .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &long_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test",
+    ])
+    .assert()
+    .success();
 
     // Both leases are live, so `worktree list` and `claim list` must agree.
-    let active = worktree_active_claims_total(temp.path());
-    let claims = claim_list_count(temp.path());
+    let active: u64 = cli.run_json(["worktree", "list"]).unwrap()["worktrees"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["active_claims"].as_u64().unwrap())
+        .sum();
+    let claims = cli.run_json(["claim", "list"]).unwrap()["leases"]
+        .as_array()
+        .unwrap()
+        .len() as u64;
     assert_eq!(active, 2, "both live leases should be counted");
     assert_eq!(
         active, claims,
@@ -611,24 +366,18 @@ fn test_worktree_list_agrees_with_claim_list_for_live_leases() {
 
 #[test]
 fn test_validate_success() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["validate"])
-        .assert()
-        .success();
+    cli.command(["validate"]).assert().success();
 }
 
 #[test]
 fn test_validate_json_output() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["validate", "--json"])
-        .output()
-        .unwrap();
+    let output = cli.command(["validate", "--json"]).output().unwrap();
 
     assert!(output.status.success());
 
@@ -636,65 +385,117 @@ fn test_validate_json_output() {
     assert_eq!(json["valid"], true);
 }
 
+fn seed_origin_main(cli: &JitCli, commit: &str) -> String {
+    cli.git(["update-ref", "refs/remotes/origin/main", commit])
+        .unwrap();
+    cli.git(["rev-parse", "origin/main"])
+        .unwrap()
+        .trim()
+        .to_string()
+}
+
+#[test]
+fn test_git_guards_act_on_the_repository_they_serve_rather_than_the_working_directory() {
+    let up_to_date = JitCli::initialised().unwrap();
+    up_to_date.init_git().unwrap().commit("base").unwrap();
+    seed_origin_main(&up_to_date, "HEAD");
+
+    let diverged = JitCli::initialised().unwrap();
+    diverged.init_git().unwrap().commit("base").unwrap();
+    let ahead = diverged
+        .git(["commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead"])
+        .unwrap();
+    let ahead = seed_origin_main(&diverged, ahead.trim());
+
+    let without_git = JitCli::initialised().unwrap();
+    let outside_git = JitCli::uninitialised().unwrap();
+
+    let data_root = |target: &JitCli| [("JIT_DATA_DIR", target.root().join(".jit"))];
+    let define = |key: &'static str| {
+        [
+            "gate",
+            "define",
+            key,
+            "--title",
+            "t",
+            "--description",
+            "d",
+            "--mode",
+            "manual",
+        ]
+    };
+
+    // A diverged working directory must not refuse a repository that is up to date.
+    diverged
+        .command_with_env(define("wrong-refusal"), data_root(&up_to_date))
+        .assert()
+        .success();
+    // A working directory outside git must not bypass the guard of a diverged repository.
+    outside_git
+        .command_with_env(define("bypass"), data_root(&diverged))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("origin/main"));
+    // A repository without git has no history to guard (`@/charter/D-4`), and a
+    // diverged working directory does not lend it one.
+    diverged
+        .command_with_env(define("git-absent"), data_root(&without_git))
+        .assert()
+        .success();
+
+    diverged
+        .command_with_env(["validate", "--branch-drift"], data_root(&up_to_date))
+        .assert()
+        .success();
+    outside_git
+        .command_with_env(["validate", "--branch-drift"], data_root(&diverged))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(ahead));
+}
+
 #[test]
 fn test_validate_branch_drift_accepts_a_branch_that_matches_origin_main() {
-    let temp = setup_repo();
-    let _remote = attach_origin_remote(temp.path());
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let remote = JitCli::uninitialised().unwrap();
+    remote.git(["init", "--bare"]).unwrap();
+    cli.git(["remote", "add", "origin", remote.root().to_str().unwrap()])
+        .unwrap();
+    cli.git(["push", "origin", "HEAD:refs/heads/main"]).unwrap();
+    cli.git(["fetch", "origin"]).unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["validate", "--branch-drift"])
+    cli.command(["validate", "--branch-drift"])
         .assert()
         .success();
 }
 
 #[test]
 fn test_validate_branch_drift_detects_drifted_branch() {
-    let temp = setup_repo();
-    let _remote = attach_origin_remote(temp.path());
-
-    let initial_commit = Command::new("git")
-        .current_dir(temp.path())
-        .args(["rev-parse", "HEAD"])
-        .output()
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let remote = JitCli::uninitialised().unwrap();
+    remote.git(["init", "--bare"]).unwrap();
+    cli.git(["remote", "add", "origin", remote.root().to_str().unwrap()])
         .unwrap();
-    assert!(initial_commit.status.success());
-    let initial_commit = String::from_utf8(initial_commit.stdout).unwrap();
+    cli.git(["push", "origin", "HEAD:refs/heads/main"]).unwrap();
+    cli.git(["fetch", "origin"]).unwrap();
+
+    let initial_commit = cli.git(["rev-parse", "HEAD"]).unwrap();
     let initial_commit = initial_commit.trim();
 
-    fs::write(temp.path().join("README.md"), "# Test\nUpdated\n").unwrap();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["add", "README.md"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["commit", "-m", "Advance main"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["push", "origin", "HEAD:refs/heads/main"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["fetch", "origin"])
-        .assert()
-        .success();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["checkout", "-b", "stale", initial_commit])
-        .assert()
-        .success();
+    fs::write(cli.root().join("README.md"), "# Test\nUpdated\n").unwrap();
+    cli.commit("Advance main").unwrap();
+    cli.git(["push", "origin", "HEAD:refs/heads/main"]).unwrap();
+    cli.git(["fetch", "origin"]).unwrap();
+    cli.git(["checkout", "-b", "stale", initial_commit])
+        .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["validate", "--branch-drift"])
+    let output = cli
+        .command(["validate", "--branch-drift"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Branch has diverged from origin/main"),
@@ -704,17 +505,25 @@ fn test_validate_branch_drift_detects_drifted_branch() {
         stderr.contains("Fix: git rebase origin/main"),
         "branch-drift failure gives the rebase remedy: {stderr}"
     );
+
+    let json_output = cli
+        .command(["validate", "--branch-drift", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(json_output.status.code(), Some(4));
+    assert!(json_output.stderr.is_empty(), "JSON stays stream-pure");
+    let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
 }
 
 #[test]
 fn test_validate_divergence_spelling_hints_branch_drift() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // `--divergence` names the membership-vs-DAG report, so `jit validate`
     // rejects it with a hint rather than a bare clap error.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["validate", "--divergence"])
+    cli.command(["validate", "--divergence"])
         .assert()
         .failure()
         .stderr(predicates::str::contains("jit validate --branch-drift"))
@@ -723,25 +532,21 @@ fn test_validate_divergence_spelling_hints_branch_drift() {
 
 #[test]
 fn test_validate_leases_success() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // Validate leases (should pass with no leases)
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["validate", "--leases"])
-        .assert()
-        .success();
+    cli.command(["validate", "--leases"]).assert().success();
 }
 
 // === jit recover tests ===
 
 #[test]
 fn test_recover_success() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["recover"])
+    cli.command(["recover"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Recovery"));
@@ -749,13 +554,10 @@ fn test_recover_success() {
 
 #[test]
 fn test_recover_json_output() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["recover", "--json"])
-        .output()
-        .unwrap();
+    let output = cli.command(["recover", "--json"]).output().unwrap();
 
     assert!(output.status.success());
 
@@ -767,16 +569,18 @@ fn test_recover_json_output() {
 
 #[test]
 fn test_init_in_new_worktree_generates_unique_id() {
-    let temp = setup_repo();
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
 
-    // Create a worktree
-    let worktree_path = create_worktree(temp.path(), "test-worktree");
+    let worktree_path = linked.root();
 
     // Run jit init in the worktree
-    init_linked_checkout(&worktree_path);
+    linked
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .assert()
+        .success();
 
     // Get worktree IDs from both locations
-    let main_wt_file = temp.path().join(".jit/worktree.json");
+    let main_wt_file = cli.root().join(".jit/worktree.json");
     let worktree_wt_file = worktree_path.join(".jit/worktree.json");
 
     let main_content = fs::read_to_string(&main_wt_file).unwrap();
@@ -800,13 +604,15 @@ fn test_init_in_new_worktree_generates_unique_id() {
 
 #[test]
 fn test_init_is_idempotent_in_worktree() {
-    let temp = setup_repo();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
 
-    // Create a worktree
-    let worktree_path = create_worktree(temp.path(), "test-worktree-idempotent");
+    let worktree_path = linked.root();
 
     // Run jit init first time
-    init_linked_checkout(&worktree_path);
+    linked
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .assert()
+        .success();
 
     let worktree_wt_file = worktree_path.join(".jit/worktree.json");
     let first_content = fs::read_to_string(&worktree_wt_file).unwrap();
@@ -814,7 +620,10 @@ fn test_init_is_idempotent_in_worktree() {
     let first_id = first_identity["worktree_id"].as_str().unwrap();
 
     // Run jit init second time
-    init_linked_checkout(&worktree_path);
+    linked
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .assert()
+        .success();
 
     let second_content = fs::read_to_string(&worktree_wt_file).unwrap();
     let second_identity: Value = serde_json::from_str(&second_content).unwrap();
@@ -826,20 +635,28 @@ fn test_init_is_idempotent_in_worktree() {
 
 #[test]
 fn test_worktree_list_shows_distinct_ids() {
-    let temp = setup_repo();
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    let second = JitCli::uninitialised().unwrap();
+    cli.git([
+        "worktree",
+        "add",
+        "-q",
+        "-b",
+        "second",
+        second.root().to_str().unwrap(),
+    ])
+    .unwrap();
 
-    // Create two worktrees
-    let worktree1_path = create_worktree(temp.path(), "test-worktree-1");
-    let worktree2_path = create_worktree(temp.path(), "test-worktree-2");
-
-    // Init both worktrees
-    init_linked_checkout(&worktree1_path);
-    init_linked_checkout(&worktree2_path);
+    [&linked, &second].iter().for_each(|checkout| {
+        checkout
+            .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+            .assert()
+            .success();
+    });
 
     // List worktrees from main repo
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["worktree", "list", "--json"])
+    let output = cli
+        .command(["worktree", "list", "--json"])
         .output()
         .unwrap();
 
@@ -865,184 +682,67 @@ fn test_worktree_list_shows_distinct_ids() {
 
 #[test]
 fn test_git_worktree_move_preserves_id() {
-    let temp = tempfile::tempdir().unwrap();
-    let main_path = temp.path();
-
-    // Initialize a git repo
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["init"])
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    linked
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .assert()
         .success();
+    let id_before = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"].clone();
 
-    // Configure git user identity (required for commits)
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["config", "user.email", "test@example.com"])
-        .assert()
-        .success();
+    let moved_path = linked.root().with_file_name("feature-moved");
+    cli.git([
+        "worktree",
+        "move",
+        linked.root().to_str().unwrap(),
+        moved_path.to_str().unwrap(),
+    ])
+    .unwrap();
 
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["config", "user.name", "Test User"])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["commit", "--allow-empty", "-m", "initial"])
-        .assert()
-        .success();
-
-    // Initialize jit in main worktree and commit the .jit directory
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(main_path)
-        .arg("init")
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["add", ".jit"])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["commit", "-m", "Add jit tracking"])
-        .assert()
-        .success();
-
-    // Create a new worktree (this will copy .jit/worktree.json)
-    let worktree_path = temp.path().join("feature");
-    Command::new("git")
-        .current_dir(main_path)
-        .args(["worktree", "add", worktree_path.to_str().unwrap()])
-        .assert()
-        .success();
-
-    // Initialize jit in the worktree (should get unique ID)
-    init_linked_checkout(&worktree_path);
-
-    // Get the worktree ID before move
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree_path)
-        .args(["worktree", "info", "--json"])
-        .output()
-        .unwrap();
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id_before = json["worktree_id"].as_str().unwrap().to_string();
-
-    // Move the worktree using git worktree move
-    let moved_path = temp.path().join("feature-moved");
-    Command::new("git")
-        .current_dir(main_path)
-        .args([
-            "worktree",
-            "move",
-            worktree_path.to_str().unwrap(),
-            moved_path.to_str().unwrap(),
-        ])
-        .assert()
-        .success();
-
-    // Get the worktree ID after move
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+    let output = linked
+        .command(["worktree", "info", "--json"])
         .current_dir(&moved_path)
-        .args(["worktree", "info", "--json"])
         .output()
         .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let id_after = serde_json::from_slice::<Value>(&output.stdout).unwrap()["worktree_id"].clone();
 
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let id_after = json["worktree_id"].as_str().unwrap().to_string();
-
-    // The ID should be preserved after git worktree move
+    assert!(id_before.is_string());
     assert_eq!(
         id_before, id_after,
         "Worktree ID should be preserved after git worktree move"
     );
 }
 
-/// Create an issue in `checkout`, declaring the linked-checkout write stance so
-/// a linked checkout writes to its own store rather than refusing.
-///
-/// Answers the created issue's full id.
-fn create_issue_in_own_store(checkout: &Path, title: &str) -> String {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(checkout)
-        .env("JIT_WORKTREE_WRITE_POLICY", "allow")
-        .args(["issue", "create", "--title", title, "--json"])
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue create failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["id"].as_str().unwrap().to_string()
-}
-
-/// Run `jit worktree store-divergence` from `working_directory`, answering its
-/// stdout.
-///
-/// `selected_store` is the data root the invocation selects through
-/// `JIT_DATA_DIR`; `None` leaves the working directory's own store selected.
-/// The selected root is the authority for which checkout is inspected, so
-/// naming a linked checkout's store while the working directory is the primary
-/// checkout is how an adopter runs the check from the primary: the linked store
-/// is the one inspected and the primary's becomes its reference.
-pub(crate) fn store_divergence_output(
-    working_directory: &Path,
-    selected_store: Option<&Path>,
-    json: bool,
-) -> String {
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command
-        .current_dir(working_directory)
-        .args(["worktree", "store-divergence"]);
-    match selected_store {
-        Some(store) => command.env("JIT_DATA_DIR", store),
-        None => command.env_remove("JIT_DATA_DIR"),
-    };
-    if json {
-        command.arg("--json");
-    }
-    let output = command.output().unwrap();
-    assert!(
-        output.status.success(),
-        "worktree store-divergence failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8(output.stdout).unwrap()
-}
-
 #[test]
 fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_findings() {
-    let temp = setup_repo();
-    let linked = create_worktree(temp.path(), "store-divergence");
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
 
     // Diverge the two stores in both directions: one record each store holds
     // alone, each carrying its own creation event into that store's log.
-    create_issue(temp.path(), "Held by the primary checkout alone");
-    create_issue_in_own_store(&linked, "Held by the linked checkout alone");
+    cli.create_issue(["--title", "Held by the primary checkout alone"])
+        .unwrap();
+    linked
+        .command_with_env(
+            [
+                "issue",
+                "create",
+                "--title",
+                "Held by the linked checkout alone",
+            ],
+            [crate::ALLOW_LINKED_WRITES],
+        )
+        .assert()
+        .success();
 
-    let machine: Value =
-        serde_json::from_str(&store_divergence_output(&linked, None, true)).unwrap();
+    let machine = linked.run_json(["worktree", "store-divergence"]).unwrap();
     let divergences = machine["divergences"].as_array().unwrap();
 
-    assert_eq!(
-        machine["count"].as_u64().unwrap() as usize,
-        divergences.len(),
-        "the list envelope's count is the length of its collection: {machine}"
-    );
     assert!(
         !divergences.is_empty(),
         "the two diverged stores report findings: {machine}"
     );
 
-    let rendered = store_divergence_output(&linked, None, false);
+    let rendered = linked.run(["worktree", "store-divergence"]).unwrap();
     for divergence in divergences {
         let record = divergence["record"].as_str().unwrap();
         let class = divergence["class"].as_str().unwrap();
@@ -1067,21 +767,39 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
     };
     let classes = tokens("class");
     assert!(
-        classes.iter().any(|class| class == "local_only")
-            && classes.iter().any(|class| class == "reference_only"),
+        [DivergenceClass::LocalOnly, DivergenceClass::ReferenceOnly]
+            .iter()
+            .all(|direction| classes.iter().any(|class| class == direction.as_str())),
         "a store divergence is reported in both directions: {machine}"
     );
     let records = tokens("record");
     assert!(
-        records.iter().any(|record| record == "issue")
-            && records.iter().any(|record| record == "event"),
+        DivergentRecord::ALL
+            .iter()
+            .all(|kind| records.iter().any(|record| record == kind.as_str())),
         "both issue records and event records are compared: {machine}"
     );
+}
 
-    // Cleanup worktree before temp dir is dropped
-    let name = linked.file_name().unwrap().to_str().unwrap();
-    let _ = Command::new("git")
-        .current_dir(temp.path())
-        .args(["worktree", "remove", "--force", name])
-        .status();
+#[test]
+fn test_worktree_info_failure_uses_shared_classifier_in_both_modes() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.command(["worktree", "info"]).assert().success();
+    fs::write(cli.root().join(".jit/worktree.json"), "{").unwrap();
+    let human = cli.command(["worktree", "info"]).output().unwrap();
+    let json = cli
+        .command(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+    let failure: Value = serde_json::from_slice(&json.stdout).unwrap();
+    let expected = jit::output::failure::classify(&anyhow::Error::new(
+        serde_json::from_str::<Value>("{").unwrap_err(),
+    ));
+    assert_eq!(failure["error"]["code"], expected.error.code.as_str());
+    assert_eq!(human.status.code(), Some(expected.exit_code().code()));
+    assert_eq!(human.status.code(), json.status.code());
+    assert!(String::from_utf8_lossy(&human.stderr)
+        .contains(failure["error"]["message"].as_str().unwrap()));
+    assert!(json.stderr.is_empty());
 }

@@ -1,95 +1,17 @@
-use std::process::Command;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
-}
-
-#[test]
-fn test_query_ready_json_output() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    // Create a ready issue
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Ready Task", "-d", "Test"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    // Query ready with --json
-    let output = Command::new(jit)
-        .args(["query", "available", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Verify structure
-    // success field removed
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
-}
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::setup_test_repo_with_taxonomy;
 
 #[test]
 fn test_query_blocked_json_output() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let id1 = cli.create_issue(["-t", "Task A", "-d", "First"]).unwrap();
+    let id2 = cli.create_issue(["-t", "Task B", "-d", "Second"]).unwrap();
+    // id2 depends on id1
+    cli.run(["dep", "add", &id2, &id1]).unwrap();
 
-    // Create two issues with dependency
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
+    let json = cli.run_json(["query", "blocked"]).unwrap();
 
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task B", "-d", "Second"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id2 = String::from_utf8_lossy(&output2.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
-
-    // Add dependency: id2 depends on id1
-    Command::new(jit)
-        .args(["dep", "add", &id2, &id1])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    // Query blocked with --json
-    let output = Command::new(jit)
-        .args(["query", "blocked", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Verify structure
-    // success field removed
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
-    assert!(json["issues"][0]["blocked_reasons"].is_array());
-
-    // blocked_reasons is now an array of strings, not objects
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
     let blocked_reasons = json["issues"][0]["blocked_reasons"].as_array().unwrap();
     assert_eq!(blocked_reasons.len(), 1);
     let reason_str = blocked_reasons[0].as_str().unwrap();
@@ -97,101 +19,80 @@ fn test_query_blocked_json_output() {
 }
 
 #[test]
-fn test_query_assignee_json_output() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+fn test_query_assignee_filter_rejects_malformed_value() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
 
-    // Create and assign an issue
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id = String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
-
-    Command::new(jit)
-        .args(["issue", "assign", &id, "copilot:test"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["query", "all", "--assignee", "malformed", "--json"])
         .output()
         .unwrap();
 
-    // Query by assignee with --json
-    let output = Command::new(jit)
-        .args(["query", "all", "--assignee", "copilot:test", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Verify structure (filters field removed)
-    // success field removed
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("type:identifier")));
 }
 
 #[test]
-fn test_query_state_json_output() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+fn test_issue_assign_rejects_malformed_assignee() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let id = cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
 
-    // Create an issue (will be in ready state since no dependencies)
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "assign", &id, "malformed", "--json"])
         .output()
         .unwrap();
 
-    // Query by state with --json (issues default to ready when unblocked)
-    let output = Command::new(jit)
-        .args(["query", "all", "--state", "ready", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Verify structure (filters field removed)
-    // success field removed
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("type:identifier")));
 }
 
 #[test]
-fn test_query_priority_json_output() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+fn test_issue_update_filter_rejects_malformed_assignee() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
 
-    // Create an issue with high priority
-    Command::new(jit)
-        .args([
-            "issue", "create", "-t", "Urgent", "-d", "Test", "-p", "high",
+    let output = cli
+        .command([
+            "issue",
+            "update",
+            "--filter",
+            "assignee:malformed",
+            "--priority",
+            "high",
+            "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
-    // Query by priority with --json
-    let output = Command::new(jit)
-        .args(["query", "all", "--priority", "high", "--json"])
-        .current_dir(temp.path())
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("Invalid assignee")));
+}
+
+#[test]
+fn test_query_parent_filter_before_subcommand_is_an_invalid_argument_envelope() {
+    let cli = JitCli::initialised().unwrap();
+
+    let machine = cli
+        .command(["query", "--state", "ready", "--json", "available"])
         .output()
         .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Verify structure (filters field removed)
-    // success field removed
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert!(!machine.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&machine.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("were given before"));
 }

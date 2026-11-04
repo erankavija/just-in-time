@@ -5,22 +5,26 @@
 //! a signalled server closes its sockets, releases its port, and exits `0`
 //! within a bounded time even when a connection refuses to finish on its own.
 
+use std::collections::HashSet;
 use std::fs::File;
-use std::io::{ErrorKind, Read, Write};
-use std::net::TcpStream;
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::net::{SocketAddr, TcpStream};
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStderr, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
-use jit::storage::{IssueStore, JsonFileStorage};
+use jit::storage::JsonFileStorage;
+use jit::test_utils::{file_executor, setup_test_repo};
+use jit_server::first_read::{FIRST_READ_EVENT, FIRST_READ_REPORT_ENV};
 use jit_server::shutdown::{DRAIN_DEADLINE_MS_ENV, GRACEFUL_DRAIN_TIMEOUT};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
-use tempfile::TempDir;
 
 /// Longest the fixture waits for a freshly spawned server to report its port.
 ///
@@ -76,26 +80,10 @@ const CONFIGURED_DRAIN_DEADLINE: Duration = Duration::from_secs(1);
 /// well inside the observation's own [`EXCHANGE_BUDGET`].
 const STOPPED_OBSERVATION_WINDOW: Duration = Duration::from_secs(1);
 
-// ── Repository fixture ──────────────────────────────────────────────────────
-
-/// Builds the valid repository the server requires at startup.
-fn initialize_repository(worktree_root: &Path) {
-    executor_for(worktree_root)
-        .initialize_fresh_repository(worktree_root, None)
-        .expect("initialize the fixture repository");
-}
-
-fn executor_for(worktree_root: &Path) -> CommandExecutor<JsonFileStorage> {
-    let storage = JsonFileStorage::new(worktree_root.join(".jit"));
-    let layout = jit::storage::discover_repository_layout(worktree_root, storage.root())
-        .expect("discover the fixture repository layout");
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Writes a graph-relevant change into the watched repository, which the
 /// server's file watcher turns into an SSE `change` event.
-fn record_repository_change(worktree_root: &Path) {
-    executor_for(worktree_root)
+fn record_repository_change(executor: &CommandExecutor<JsonFileStorage>) {
+    executor
         .issues()
         .create_issue(
             "Live change".to_string(),
@@ -112,11 +100,61 @@ fn record_repository_change(worktree_root: &Path) {
 
 // ── Server process fixture ──────────────────────────────────────────────────
 
-/// A spawned `jit-server` process, its bound port, and its captured log.
+/// A spawned `jit-server` process, its bound port, its captured log, and the
+/// connections it has reported reading from.
 struct RunningServer {
     child: Child,
     port: u16,
     log_path: PathBuf,
+    first_reads: Arc<FirstReads>,
+    /// Copies the server's stderr into the log; finished once the log is whole.
+    collector: Option<JoinHandle<()>>,
+}
+
+/// An exited server's exit code and its complete log.
+struct ExitedServer {
+    code: i32,
+    log: String,
+}
+
+/// The peers whose first bytes the server reported reading, filled from its
+/// stderr as the reports arrive.
+#[derive(Default)]
+struct FirstReads {
+    peers: Mutex<HashSet<SocketAddr>>,
+    reported: Condvar,
+}
+
+impl FirstReads {
+    /// Blocks until the server reports reading from `peer`. `budget` bounds a
+    /// server that never reads rather than stating a property.
+    fn wait_for(&self, peer: SocketAddr, budget: Duration) {
+        let peers = self.peers.lock().expect("first-read set lock");
+        let (peers, _) = self
+            .reported
+            .wait_timeout_while(peers, budget, |peers| !peers.contains(&peer))
+            .expect("first-read set lock");
+        assert!(
+            peers.contains(&peer),
+            "the server never reported reading from {peer} within {budget:?}"
+        );
+    }
+
+    /// Records first-read reports from `stderr` and appends every other line
+    /// to `log`, until the server closes its stderr.
+    fn collect(&self, stderr: ChildStderr, mut log: File) {
+        let prefix = format!("{FIRST_READ_EVENT} ");
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            match line.strip_prefix(&prefix) {
+                Some(peer) => {
+                    let peer = peer.parse().expect("a first-read report names a peer");
+                    self.peers.lock().expect("first-read set lock").insert(peer);
+                    self.reported.notify_all();
+                }
+                None => writeln!(log, "{line}").expect("append server stderr to the log"),
+            }
+        }
+    }
 }
 
 impl RunningServer {
@@ -124,25 +162,28 @@ impl RunningServer {
         self.child.id()
     }
 
-    /// The server's captured log, with terminal styling removed so assertions
+    /// The log captured so far, with terminal styling removed so assertions
     /// read the field names and values rather than the escapes around them.
-    fn log(&self) -> String {
+    /// While the server runs, stderr lines may still be in the collector, so
+    /// assertions about shutdown read [`ExitedServer::log`] instead.
+    fn log_so_far(&self) -> String {
         strip_ansi(&std::fs::read_to_string(&self.log_path).unwrap_or_default())
     }
 
-    /// Waits for the process to exit and returns its exit code, holding
+    /// Waits for the process to exit and returns its exit code with its
+    /// complete log, read after the stderr collector reached EOF. Holds
     /// `budget` as the sole statement of how long after `signalled_at` the
     /// process may still exist — on the iteration that finds it running and on
     /// the one that finds it gone. Panics rather than killing the process: a
     /// test-side kill would hide exactly the defect this suite exists to catch.
-    fn wait_for_exit(&mut self, signalled_at: Instant, budget: Duration) -> i32 {
+    fn wait_for_exit(&mut self, signalled_at: Instant, budget: Duration) -> ExitedServer {
         loop {
             let outcome = self.child.try_wait().expect("poll the server process");
             assert!(
                 signalled_at.elapsed() < budget,
                 "the server was still running {:?} after the signal; log:\n{}",
                 signalled_at.elapsed(),
-                self.log()
+                self.log_so_far()
             );
             match outcome {
                 Some(status) => {
@@ -150,11 +191,18 @@ impl RunningServer {
                         status.signal(),
                         None,
                         "the server died from a signal instead of exiting on its own; log:\n{}",
-                        self.log()
+                        self.log_so_far()
                     );
-                    return status
+                    let code = status
                         .code()
                         .expect("a process that was not signalled has an exit code");
+                    if let Some(collector) = self.collector.take() {
+                        collector.join().expect("the stderr collector finishes");
+                    }
+                    return ExitedServer {
+                        code,
+                        log: self.log_so_far(),
+                    };
                 }
                 None => std::thread::sleep(READ_POLL),
             }
@@ -210,18 +258,25 @@ fn spawn_server(
         .current_dir(worktree_root)
         .args(["--data-dir", ".jit", "--bind", bind])
         .stdin(Stdio::null())
+        .env(FIRST_READ_REPORT_ENV, "1")
         .stdout(Stdio::from(log.try_clone().expect("clone the log handle")))
-        .stderr(Stdio::from(log));
+        .stderr(Stdio::piped());
     match drain_deadline {
         Some(deadline) => command.env(DRAIN_DEADLINE_MS_ENV, deadline.as_millis().to_string()),
         None => command.env_remove(DRAIN_DEADLINE_MS_ENV),
     };
-    let child = command.spawn().expect("spawn jit-server");
+    let mut child = command.spawn().expect("spawn jit-server");
+    let stderr = child.stderr.take().expect("the server's stderr is piped");
+    let first_reads = Arc::new(FirstReads::default());
+    let collector = Arc::clone(&first_reads);
+    let collector = std::thread::spawn(move || collector.collect(stderr, log));
 
     let mut server = RunningServer {
         child,
         port: 0,
         log_path,
+        first_reads,
+        collector: Some(collector),
     };
     server.port = wait_for_listening_port(&mut server);
     probe_health(server.port);
@@ -236,16 +291,16 @@ fn wait_for_listening_port(server: &mut RunningServer) -> u16 {
         if let Some(status) = server.child.try_wait().expect("poll the server process") {
             panic!(
                 "jit-server exited with {status} during startup; log:\n{}",
-                server.log()
+                server.log_so_far()
             );
         }
-        if let Some(port) = parse_listening_port(&server.log()) {
+        if let Some(port) = parse_listening_port(&server.log_so_far()) {
             return port;
         }
         assert!(
             started.elapsed() < STARTUP_BUDGET,
             "jit-server never reported a listening address; log:\n{}",
-            server.log()
+            server.log_so_far()
         );
         std::thread::sleep(READ_POLL);
     }
@@ -447,37 +502,24 @@ fn open_completed_connection(port: u16) -> TcpStream {
 }
 
 /// Opens a connection whose request never completes, and returns only once the
-/// server has accepted and registered it.
+/// server has registered it and begun reading it.
 ///
 /// The request line and a header are sent, the terminating blank line never is,
 /// so the server stays mid message and nothing but the drain deadline can retire
-/// the connection. That construction is also why the socket can never answer:
-/// the registration has to be established off it.
-///
-/// It is established on the listener's queue instead, and the probe connection
-/// is what establishes it:
-///
-/// 1. This socket's handshake completes before the probe connects, so the probe
-///    is queued behind it, and `accept` takes the first pending connection off
-///    that queue.
-/// 2. The probe's exchange only produces a response once the accept loop has
-///    spawned a serving task for the probe's socket.
-/// 3. axum-server's accept loop is one sequential loop that registers each
-///    accepted connection with its handle — the increment
-///    `Handle::connection_count` reports, and the count the drain deadline
-///    samples — before it accepts the next one.
-///
-/// So the probe answering is not merely evidence that the accept loop ran: it is
-/// evidence that the loop moved past this socket, which it cannot do without
-/// registering it. `shutdown::tests::wait_for_connection_count` states the same
-/// precondition in process, where the count is reachable directly.
-fn open_registered_stalled_connection(port: u16) -> TcpStream {
+/// the connection. Registration alone is not enough: until the serving task
+/// reads those bytes the connection is still in hyper-util's protocol
+/// detection, and a graceful shutdown cancels it there instead of leaving it
+/// for the deadline. The server's first-read report for this socket is what
+/// establishes both, since axum-server registers a connection with its handle
+/// before spawning the task that reads it.
+fn open_registered_stalled_connection(port: u16, first_reads: &FirstReads) -> TcpStream {
     let mut stalled = connect(port);
     send(
         &mut stalled,
         "GET /api/health HTTP/1.1\r\nHost: localhost\r\n",
     );
-    probe_health(port);
+    let peer = stalled.local_addr().expect("the stalled socket's address");
+    first_reads.wait_for(peer, EXCHANGE_BUDGET);
     stalled
 }
 
@@ -546,8 +588,8 @@ fn assert_survivor_drained_to_the_deadline(log: &str, deadline: Duration) {
 
 #[test]
 fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
+    let executor = file_executor(repository.path()).expect("open the fixture repository");
     let mut server = start_server_draining_for(
         repository.path(),
         "127.0.0.1:0",
@@ -556,14 +598,11 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     );
 
     // The four connections the shutdown logs must account for: one that cannot
-    // finish, two live event streams, and one that completes. The one that
-    // cannot finish is opened first because establishing its registration spends
-    // a probe connection, and the three opened after it separate that probe's
-    // retirement from the count the signal samples.
-    let mut stalled = open_registered_stalled_connection(server.port);
+    // finish, two live event streams, and one that completes.
+    let mut stalled = open_registered_stalled_connection(server.port, &server.first_reads);
     let mut first_stream = open_event_stream(server.port);
     let mut second_stream = open_event_stream(server.port);
-    record_repository_change(repository.path());
+    record_repository_change(&executor);
     read_until(&mut first_stream, "event: change", EXCHANGE_BUDGET);
     read_until(&mut second_stream, "event: change", EXCHANGE_BUDGET);
     let mut completed = open_completed_connection(server.port);
@@ -589,10 +628,10 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
         wait_for_close(stream, signalled_at, EXIT_BUDGET);
     }
 
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 
-    let log = server.log();
+    let log = exited.log;
     assert_eq!(log_field(&log, SIGNAL_RECEIVED, "signal"), "SIGTERM");
     assert_eq!(
         log_field(&log, SIGNAL_RECEIVED, "drain_deadline_secs"),
@@ -640,23 +679,22 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
 /// close having happened.
 #[test]
 fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut server = start_server_draining_for(
         repository.path(),
         "127.0.0.1:0",
         "early-close.log",
         SEEDED_EARLY_CLOSE_DEADLINE,
     );
-    let mut stalled = open_registered_stalled_connection(server.port);
+    let mut stalled = open_registered_stalled_connection(server.port, &server.first_reads);
 
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
     wait_for_close(&mut stalled, signalled_at, EXIT_BUDGET);
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 
-    let log = server.log();
+    let log = exited.log;
     let seeded_drain = reported_drain(&log, FORCE_CLOSING);
     // The panic this catches carries its own message to stderr; the run is
     // healthy despite it.
@@ -677,17 +715,16 @@ fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
 /// the timeout out.
 #[test]
 fn test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_configured() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut server = start_server(repository.path(), "127.0.0.1:0", "default.log");
 
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 
     assert_eq!(
-        log_field(&server.log(), SIGNAL_RECEIVED, "drain_deadline_secs"),
+        log_field(&exited.log, SIGNAL_RECEIVED, "drain_deadline_secs"),
         GRACEFUL_DRAIN_TIMEOUT.as_secs().to_string()
     );
 }
@@ -704,15 +741,15 @@ fn test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_confi
 /// test fails. Resuming the process is what lets the observation complete.
 #[test]
 fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut server = start_server(repository.path(), "127.0.0.1:0", "stopped.log");
 
     send_signal(server.pid(), Signal::SIGSTOP);
     let port = server.port;
+    let first_reads = Arc::clone(&server.first_reads);
     let (registered, observed) = mpsc::channel();
     let opener = std::thread::spawn(move || {
-        let stalled = open_registered_stalled_connection(port);
+        let stalled = open_registered_stalled_connection(port, &first_reads);
         registered.send(()).expect("report the registration");
         stalled
     });
@@ -737,26 +774,25 @@ fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
     drop(stalled);
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 }
 
 #[test]
 fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut first = start_server(repository.path(), "127.0.0.1:0", "first.log");
     let port = first.port;
 
     let signalled_at = Instant::now();
     send_signal(first.pid(), Signal::SIGTERM);
-    let exit_code = first.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", first.log());
+    let exited = first.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
     // A server with nothing to drain stops at once rather than sitting out the
     // deadline, and the drain it reports for itself is what says so: the count
     // it samples first is already zero. Taking the duration from the server
     // keeps a busy host from making a prompt shutdown look like a slow one.
-    let drained_for = reported_drain(&first.log(), DRAINED);
+    let drained_for = reported_drain(&exited.log, DRAINED);
     assert!(
         drained_for < GRACEFUL_DRAIN_TIMEOUT,
         "a server with nothing to drain spent {drained_for:?} draining \
@@ -773,6 +809,6 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
 
     let restart_signalled_at = Instant::now();
     send_signal(second.pid(), Signal::SIGTERM);
-    let restart_exit_code = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
-    assert_eq!(restart_exit_code, 0, "server log:\n{}", second.log());
+    let restarted = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
+    assert_eq!(restarted.code, 0, "server log:\n{}", restarted.log);
 }

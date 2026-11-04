@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:52:46.649383124Z",
+  "context": {},
+  "created_at": "2026-11-01T19:52:46.012160930Z",
+  "dependencies": [],
+  "description": "Every surface that reports an issue's documents shows its derived documents, so an artifact under an issue's directory counts as linked everywhere, with no tracker write.\n\n## Background\n\n66986f88 made `jit doc list` derive an issue's documents from its artifact directories, through `derive_issue_documents` in `crates/jit/src/domain/artifact_directory.rs`. `jit issue show`, the `JIT_ISSUE_DOCS` value gates receive and the issue JSON the web UI reads still list explicit links only. On epic 3d9a0ce3 today, `doc list` shows 11 documents and `issue show` shows 1. Epic REQ-03 says such an artifact is linked to the issue after merge with no further tracker write; a reader of `issue show` or a gate cannot see that link.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit issue show`, the `JIT_ISSUE_DOCS` value and the server's issue reads report the same document set as `jit doc list`, explicit and derived, through `derive_issue_documents` with no second derivation (`@/charter/D-20`).\n- [hard] REQ-02: A derived document carries no type and no label, and stored issue records are unchanged: nothing derived is written.\n- [hard] REQ-03: A repository that declares no documentation areas reports explicit links only.\n- [hard] REQ-04: One test owns the agreement between those surfaces; the web UI is updated if its type declares a required field that a derived document lacks.\n",
+  "documents": [],
+  "done_at": "2026-11-01T20:17:27.713163217Z",
+  "first_ready_at": "2026-11-01T19:52:46.012160930Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "39412dda-06ed-4e09-9fed-3475cb4ad700",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:13:52.308481837Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6589f4b4-6bd7-49cc-a2c6-87632917066d",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:17:15.537479839Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "edc8544d-5f5e-497e-9706-c7b4e7235036",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "satisfies:3d9a0ce3/REQ-03",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Report derived documents on every issue surface",
+  "updated_at": "2026-11-01T20:17:27.713163217Z"
+}

@@ -94,38 +94,45 @@ pub fn apply_overlay(
     )?)
 }
 
-/// The overrides `actions` project to over `base`: written bytes, deletions'
-/// absence, and the event log as its append leaves it.
-pub fn action_overrides<'a>(
+/// The issue ids `base`'s listing states with `overrides` applied over it.
+pub(crate) fn overlaid_issue_ids(
     base: &RepositoryImage,
+    overrides: &BTreeMap<VirtualPath, Option<Vec<u8>>>,
+) -> Result<Vec<crate::domain::identity::IssueId>, super::RepositoryIndexError> {
+    let mut names = base
+        .directory_listings()
+        .get(&VirtualPath::ISSUES)
+        .ok_or(super::RepositoryIndexError::IssuesListingNotCaptured)?
+        .names()
+        .clone();
+    for (path, value) in overrides {
+        match parent_and_name(path) {
+            Some((parent, name)) if parent == VirtualPath::ISSUES => {
+                match value {
+                    Some(_) => names.insert(name),
+                    None => names.remove(&name),
+                };
+            }
+            _ => {}
+        }
+    }
+    super::listed_issue_ids(&names)
+}
+
+/// Written bytes and deletions from `actions`; appends retain the captured log tail.
+pub fn action_overrides<'a>(
     actions: impl IntoIterator<Item = &'a RepositoryAction>,
-) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, CaptureError> {
+) -> BTreeMap<VirtualPath, Option<Vec<u8>>> {
     actions
         .into_iter()
         .filter_map(|action| match action {
             RepositoryAction::WriteFile { path, bytes, .. } => {
-                Some(Ok((path.clone(), Some(bytes.clone()))))
+                Some((path.clone(), Some(bytes.clone())))
             }
-            RepositoryAction::DeleteFile { path, .. } => Some(Ok((path.clone(), None))),
-            // A log read as its tail keeps that tail: nothing over the
-            // overlay can read the bytes before it.
+            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
             RepositoryAction::AppendEvents { .. }
-                if matches!(
-                    base.entry(action.path()),
-                    Ok(crate::repository_state::RepositoryEntry::FileTail { .. })
-                ) =>
-            {
-                None
-            }
-            RepositoryAction::AppendEvents { offset, bytes, .. } => {
-                Some(base.file_bytes(action.path()).map(|log| {
-                    let mut log = log.unwrap_or_default().to_vec();
-                    log.truncate(usize::try_from(*offset).unwrap_or(usize::MAX));
-                    log.extend_from_slice(bytes);
-                    (action.path().clone(), Some(log))
-                }))
-            }
-            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
+            | RepositoryAction::CreateDirectory { .. }
+            | RepositoryAction::SetMode { .. } => None,
         })
         .collect()
 }
@@ -147,121 +154,76 @@ fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::{
-        CaptureBudget, CaptureSpec, ExpectedPreimage, RepositoryLayout, RepositoryRootEvidence,
-    };
-    use std::collections::BTreeMap;
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
-
-    fn vpath(repo_rel: &str) -> VirtualPath {
-        layout().classify_repository_relative(repo_rel).unwrap()
-    }
-
-    fn file_entry(text: &str) -> RepositoryEntry {
-        RepositoryEntry::File {
-            content: CapturedBytes::new("base", text.as_bytes().to_vec()).unwrap(),
-            mode: FileMode::Regular,
-        }
-    }
-
-    /// Build a base image with the given data files plus an optional captured
-    /// listing for `.jit/issues` over the supplied issue file names.
-    fn base_image(files: &[(&str, &str)], issues_listing: Option<&[&str]>) -> RepositoryImage {
-        let budget = CaptureBudget {
-            max_listings: 8,
-            max_bytes: 1 << 20,
-            max_depth: 8,
-        };
-        let mut entries = BTreeMap::new();
-        let mut paths = Vec::new();
-        for (repo_rel, text) in files {
-            let path = vpath(repo_rel);
-            paths.push(path.clone());
-            entries.insert(path, file_entry(text));
-        }
-        let mut spec = CaptureSpec::new(paths, budget).unwrap();
-        let mut listings = BTreeMap::new();
-        if let Some(names) = issues_listing {
-            let dir = VirtualPath::data("issues").unwrap();
-            spec.discover_listing(dir.clone()).unwrap();
-            let names = names.iter().map(|name| (*name).to_string());
-            listings.insert(dir, DirectoryListing::new(names).unwrap());
-        }
-        RepositoryImage::close(layout(), spec, entries, listings, BTreeMap::new()).unwrap()
-    }
+    use crate::repository_state::{ExpectedPreimage, RepositoryActionOwner};
+    use crate::test_harness::image::ImageBuilder;
 
     #[test]
     fn test_apply_overlay_replaces_captured_file_bytes() {
-        let base = base_image(&[(".jit/config.toml", "old")], None);
+        let base = ImageBuilder::new().file(VirtualPath::CONFIG, "old").build();
         let overlaid =
-            apply_overlay(&base, [(vpath(".jit/config.toml"), Some(b"new".to_vec()))]).unwrap();
+            apply_overlay(&base, [(VirtualPath::CONFIG, Some(b"new".to_vec()))]).unwrap();
         assert_eq!(
-            overlaid.file_bytes(&vpath(".jit/config.toml")).unwrap(),
+            overlaid.file_bytes(&VirtualPath::CONFIG).unwrap(),
             Some(&b"new"[..])
         );
     }
 
     #[test]
-    fn test_action_overrides_extend_the_captured_log_by_its_append() {
-        let base = base_image(&[(".jit/events.jsonl", "prior")], None);
+    fn test_action_overrides_event_append_produces_no_byte_override() {
+        let base = ImageBuilder::new()
+            .file(VirtualPath::EVENTS, "prior\nuncommitted")
+            .build();
         let append = RepositoryAction::append_events(
-            "append",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(base.entry(&VirtualPath::EVENTS).unwrap()),
-            5,
-            b"\nnext\n".to_vec(),
+            6,
+            b"next\n".to_vec(),
         );
-        assert_eq!(
-            action_overrides(&base, [&append]).unwrap(),
-            BTreeMap::from([(VirtualPath::EVENTS, Some(b"prior\nnext\n".to_vec()))])
-        );
+        assert!(!action_overrides([&append]).contains_key(&VirtualPath::EVENTS));
     }
 
     #[test]
     fn test_apply_overlay_tombstone_reads_absent() {
-        let base = base_image(&[(".jit/config.toml", "old")], None);
-        let overlaid = apply_overlay(&base, [(vpath(".jit/config.toml"), None)]).unwrap();
-        assert_eq!(
-            overlaid.file_bytes(&vpath(".jit/config.toml")).unwrap(),
-            None
-        );
+        let base = ImageBuilder::new().file(VirtualPath::CONFIG, "old").build();
+        let overlaid = apply_overlay(&base, [(VirtualPath::CONFIG, None)]).unwrap();
+        assert_eq!(overlaid.file_bytes(&VirtualPath::CONFIG).unwrap(), None);
     }
 
     #[test]
     fn test_apply_overlay_adds_new_path_and_preserves_closed_read() {
-        let base = base_image(&[(".jit/config.toml", "cfg")], None);
+        let base = ImageBuilder::new().file(VirtualPath::CONFIG, "cfg").build();
         let overlaid =
-            apply_overlay(&base, [(vpath(".jit/gates.toml"), Some(b"gates".to_vec()))]).unwrap();
+            apply_overlay(&base, [(VirtualPath::GATES, Some(b"gates".to_vec()))]).unwrap();
         assert_eq!(
-            overlaid.file_bytes(&vpath(".jit/gates.toml")).unwrap(),
+            overlaid.file_bytes(&VirtualPath::GATES).unwrap(),
             Some(&b"gates"[..])
         );
         // A path outside base ∪ overrides is still an undiscovered read, never a
         // silent absence.
-        let err = overlaid.entry(&vpath(".jit/rules.toml")).unwrap_err();
+        let err = overlaid.entry(&VirtualPath::RULES).unwrap_err();
         assert!(matches!(err, CaptureError::UndiscoveredRepositoryPath(_)));
     }
 
     #[test]
     fn test_apply_overlay_updates_captured_issue_listing() {
-        let base = base_image(&[(".jit/issues/a.json", "{}")], Some(&["a.json"]));
+        let first_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        let second_path = VirtualPath::issue_record(&crate::test_utils::issue_id(2));
+        let first_name = first_path.file_name().unwrap().to_owned();
+        let second_name = second_path.file_name().unwrap().to_owned();
+        let base = ImageBuilder::new()
+            .file(first_path.clone(), "{}")
+            .listing(
+                VirtualPath::ISSUES,
+                DirectoryListing::new([first_name.clone()]).unwrap(),
+            )
+            .build();
         let overlaid = apply_overlay(
             &base,
-            [
-                (vpath(".jit/issues/b.json"), Some(b"{}".to_vec())),
-                (vpath(".jit/issues/a.json"), None),
-            ],
+            [(second_path, Some(b"{}".to_vec())), (first_path, None)],
         )
         .unwrap();
-        let dir = VirtualPath::data("issues").unwrap();
-        let names = overlaid.directory_listings()[&dir].names();
-        assert!(names.contains("b.json"));
-        assert!(!names.contains("a.json"));
+        let names = overlaid.directory_listings()[&VirtualPath::ISSUES].names();
+        assert!(names.contains(&second_name));
+        assert!(!names.contains(&first_name));
     }
 }

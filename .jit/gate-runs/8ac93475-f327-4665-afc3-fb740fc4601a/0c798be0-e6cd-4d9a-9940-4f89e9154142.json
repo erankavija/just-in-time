@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "842d5a3a1dce4c8b70fa0a9dc150210b4dfa03d3",
+  "completed_at": "2026-11-01T07:41:56.773100653Z",
+  "duration_ms": 102748,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci-selftest.sh",
+        "id": "F1",
+        "line": 879,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8ac93475/requirement/REQ-03",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "REQ-03 is unmet: the missing wrapper-test function is invoked but not defined, and the non-errexit harness can still exit successfully."
+      }
+    ],
+    "summary": "The self-test no longer covers an unrunnable compiler wrapper and can pass despite its missing test function.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8ac93475-f327-4665-afc3-fb740fc4601a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0c798be0-e6cd-4d9a-9940-4f89e9154142",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:40:14.024941667Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5226 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1960d-5256-7963-8874-78e9f052862a\n--------\nuser\n--- 5213 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4dd509da, a61918d8, 9f1a8256, 73b28fb9, 842d5a3a\nPolicy sources: AGENTS.md\nResolved items: @/issue/8ac93475/requirement/REQ-01, REQ-02, REQ-03 (issue description, markdown-first); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T07:37:43Z); cargo-ci-selftest passed (exit 0, 2026-11-01T07:26:34Z); code-review failed (exit 1, 2026-11-01T07:24:32Z)\nTruncation recovery: reread the 842d5a3a script diffs and bounded current cargo-ci/selftest ranges after the broad merge patch truncated\n\n1. **[blocking][issue-impact] F1 — REQ-03 is unmet:** [scripts/cargo-ci-selftest.sh:879](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci-selftest.sh:879) invokes `test_unrunnable_compiler_wrapper`, but the function no longer exists. Since the harness deliberately omits `set -e` and exits only with its `fail` accumulator, the resulting command-not-found error does not fail the self-test; no wrapper-failure behavior is covered. The recorded passing self-test predates the final wrapper changes. References: @/issue/8ac93475/requirement/REQ-03, @/invariant/orthogonal-tests.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The self-test no longer covers an unrunnable compiler wrapper and can pass despite its missing test function.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-03 is unmet: the missing wrapper-test function is invoked but not defined, and the non-errexit harness can still exit successfully.\",\"file\":\"scripts/cargo-ci-selftest.sh\",\"line\":879,\"references\":[\"@/issue/8ac93475/requirement/REQ-03\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

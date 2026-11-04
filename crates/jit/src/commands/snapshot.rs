@@ -1,6 +1,6 @@
 //! Snapshot export command implementation
 
-use crate::commands::{CommandExecutor, SnapshotExportResult};
+use crate::commands::{ArchiveOps, SnapshotExportResult};
 use crate::document::{AdapterRegistry, AssetScanner};
 use crate::domain::{DocumentReference, Issue, State};
 use crate::snapshot::{
@@ -12,8 +12,8 @@ use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
-type SnapshotDirectories = BTreeSet<crate::repository_state::RootRelativePath>;
-type SnapshotFiles = BTreeMap<crate::repository_state::RootRelativePath, Vec<u8>>;
+type SnapshotDirectories = BTreeSet<crate::domain::relative_path::RootRelativePath>;
+type SnapshotFiles = BTreeMap<crate::domain::relative_path::RootRelativePath, Vec<u8>>;
 const MAX_REPOSITORY_SNAPSHOT_BYTES: u64 = 128 * 1024 * 1024;
 
 fn origin_remote_url(repo: &git2::Repository) -> Option<String> {
@@ -42,7 +42,7 @@ struct CapturedFile {
     size_bytes: usize,
 }
 
-impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     /// Determine source mode based on options and git availability
     pub fn determine_snapshot_source_mode(
         &self,
@@ -50,7 +50,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         working_tree: bool,
         committed_only: bool,
     ) -> Result<SourceMode> {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let open_repo = || {
             git2::Repository::open(layout.worktree_root())
                 .map_err(|_| anyhow!("snapshot source requires git repository"))
@@ -173,8 +173,8 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
 
     /// Read file content from working tree filesystem
     fn read_from_filesystem(&self, path: &str) -> Result<(Vec<u8>, SourceInfo)> {
-        let relative = crate::repository_state::RootRelativePath::parse(path)?;
-        let content = crate::storage::repository_state_store::read_repository_file_nofollow(
+        let relative = crate::domain::relative_path::RootRelativePath::parse(path)?;
+        let content = crate::storage::capability_fs::read_repository_file_nofollow(
             &self.worktree_root,
             &relative,
         )?
@@ -210,7 +210,7 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         base: &Path,
         captured: &mut HashMap<String, CapturedFile>,
     ) -> Result<(Vec<u8>, CapturedFile)> {
-        let relative = crate::repository_state::RootRelativePath::parse(path)?;
+        let relative = crate::domain::relative_path::RootRelativePath::parse(path)?;
         let destination = base.join(relative.as_path());
         if let Some(existing) = captured.get(path) {
             return Ok((std::fs::read(destination)?, existing.clone()));
@@ -302,19 +302,21 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         // Build issue file paths
         let issue_files: Vec<String> = issues
             .iter()
-            .map(|i| format!(".jit/issues/{}.json", i.id))
+            .map(|issue| {
+                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative()
+            })
             .collect();
 
         let issues_info = IssuesInfo {
-            count: issues.len(),
-            states,
-            files: issue_files,
+            files: crate::domain::list_envelope::ListEnvelope::with_extras(
+                issue_files,
+                crate::snapshot::IssueStates { states },
+            ),
         };
 
         // Build documents info
         let documents_info = crate::snapshot::DocumentsInfo {
-            count: docs.len(),
-            items: docs.to_vec(),
+            items: crate::domain::list_envelope::ListEnvelope::new(docs.to_vec()),
         };
 
         // Calculate total size
@@ -438,36 +440,38 @@ This is a read-only export. Future versions may support:
             repo_path = manifest.repo.path,
             commit = manifest.repo.commit.as_deref().unwrap_or("working-tree"),
             scope = manifest.scope,
-            issue_count = manifest.issues.count,
-            doc_count = manifest.documents.count,
+            issue_count = manifest.issues.files.count(),
+            doc_count = manifest.documents.items.count(),
         )
     }
 
     /// Copy .jit state files to snapshot
     fn copy_jit_state(&self, base: &Path, issues: &[Issue]) -> Result<()> {
         let jit_dir = base.join(".jit");
-        std::fs::create_dir_all(jit_dir.join("issues"))?;
+        std::fs::create_dir_all(
+            base.join(crate::repository_state::VirtualPath::ISSUES.repository_relative()),
+        )?;
 
         // Copy issue files
         for issue in issues {
             let issue_json = serde_json::to_string_pretty(issue)?;
-            let relative = crate::repository_state::RootRelativePath::parse(format!(
-                ".jit/issues/{}.json",
-                issue.id
-            ))?;
+            let relative = crate::domain::relative_path::RootRelativePath::parse(
+                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative(),
+            )?;
             let issue_path = base.join(relative.as_path());
             std::fs::write(issue_path, issue_json)?;
         }
 
-        for name in ["config.toml", "gates.toml"] {
-            let relative = crate::repository_state::RootRelativePath::parse(name)?;
-            if let Some(bytes) =
-                crate::storage::repository_state_store::read_repository_file_nofollow(
-                    &self.data_root,
-                    &relative,
-                )?
-            {
-                std::fs::write(jit_dir.join(name), bytes)?;
+        for path in [
+            crate::repository_state::VirtualPath::CONFIG,
+            crate::repository_state::VirtualPath::GATES,
+        ] {
+            let relative = path.relative();
+            if let Some(bytes) = crate::storage::capability_fs::read_repository_file_nofollow(
+                &self.data_root,
+                relative,
+            )? {
+                std::fs::write(jit_dir.join(relative.as_path()), bytes)?;
             }
         }
 
@@ -590,14 +594,14 @@ impl SnapshotTree {
         let directories = self
             .directories
             .iter()
-            .map(crate::repository_state::RootRelativePath::parse)
+            .map(crate::domain::relative_path::RootRelativePath::parse)
             .collect::<std::result::Result<BTreeSet<_>, _>>()?;
         let files = self
             .files
             .iter()
             .map(|relative| {
                 Ok((
-                    crate::repository_state::RootRelativePath::parse(relative)?,
+                    crate::domain::relative_path::RootRelativePath::parse(relative)?,
                     std::fs::read(root.join(relative))?,
                 ))
             })
@@ -664,7 +668,7 @@ fn build_snapshot_tar(
     Ok(staged)
 }
 
-impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     /// Assemble and publish one snapshot through its classified destination.
     pub fn export_snapshot(
         &self,
@@ -679,9 +683,9 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             RepositoryExportIntent,
         };
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let exporter = SnapshotExporter::new(
-            &self.storage,
+            &self.exec.storage,
             layout.worktree_root().to_path_buf(),
             layout.data_root().to_path_buf(),
             chrono::Utc::now(),
@@ -704,7 +708,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         let (directories, files) = tree.repository_payload(staging.path())?;
                         let intent = RepositoryExportIntent::new_tree(target, directories, files);
                         super::map_occupied_export_error(
-                            self.publish_repository_export(&layout, &intent, budget),
+                            self.exec
+                                .publish_repository_export(&layout, &intent, budget),
                             &output_path,
                         )?;
                     }
@@ -730,7 +735,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         let bytes = std::fs::read(tar.path())?;
                         let intent = RepositoryExportIntent::new_absent_file(target, bytes);
                         super::map_occupied_export_error(
-                            self.publish_repository_export(&layout, &intent, budget),
+                            self.exec
+                                .publish_repository_export(&layout, &intent, budget),
                             &output_path,
                         )?;
                     }
@@ -750,8 +756,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         Ok((
             SnapshotExportResult {
                 path: output_path.to_string_lossy().into_owned(),
-                issue_count: manifest.issues.count,
-                document_count: manifest.documents.count,
+                issue_count: manifest.issues.files.count(),
+                document_count: manifest.documents.items.count(),
                 format: match format {
                     SnapshotFormat::Directory => "directory",
                     SnapshotFormat::Tar => "tar",
@@ -767,7 +773,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::snapshot::{IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, VerificationInfo};
+    use crate::snapshot::{
+        DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, SourceInfo,
+        VerificationInfo,
+    };
     use crate::storage::InMemoryStorage;
     use crate::test_utils::document_reference;
     use std::collections::HashMap;
@@ -786,8 +795,8 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create a couple of issues
-        let issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
-        let issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
+        let issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
@@ -801,7 +810,7 @@ mod tests {
     fn test_enumerate_issues_single() {
         let storage = InMemoryStorage::new();
 
-        let issue = crate::domain::fixture_issue("Test Issue".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -819,21 +828,21 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create issues with epic labels
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         // Create issue with different epic
-        let mut issue3 = crate::domain::fixture_issue("Issue 3".to_string(), String::new());
+        let mut issue3 = crate::test_utils::fixture_issue("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue3.clone());
 
         // Create unrelated issue
-        let issue4 = crate::domain::fixture_issue("Issue 4".to_string(), String::new());
+        let issue4 = crate::test_utils::fixture_issue("Issue 4".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue4.clone());
 
         let exporter = exporter(&storage);
@@ -854,11 +863,11 @@ mod tests {
     fn test_enumerate_issues_label_milestone() {
         let storage = InMemoryStorage::new();
 
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
@@ -878,7 +887,7 @@ mod tests {
     fn test_enumerate_issues_label_no_matches() {
         let storage = InMemoryStorage::new();
 
-        let issue = crate::domain::fixture_issue("Issue".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Issue".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let exporter = exporter(&storage);
@@ -896,11 +905,11 @@ mod tests {
     fn test_extract_documents() {
         let storage = InMemoryStorage::new();
 
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.documents.push(document_reference("docs/design.md"));
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.documents.push(document_reference("docs/impl.md"));
         // Duplicate document reference
         issue2.documents.push(document_reference("docs/design.md"));
@@ -946,13 +955,32 @@ mod tests {
             },
             scope: "all".to_string(),
             issues: IssuesInfo {
-                count: 5,
-                states: HashMap::new(),
-                files: vec![],
+                files: crate::domain::list_envelope::ListEnvelope::with_extras(
+                    (0..5)
+                        .map(|index| format!(".jit/issues/{index}.json"))
+                        .collect(),
+                    crate::snapshot::IssueStates {
+                        states: HashMap::new(),
+                    },
+                ),
             },
             documents: crate::snapshot::DocumentsInfo {
-                count: 10,
-                items: vec![],
+                items: crate::domain::list_envelope::ListEnvelope::new(
+                    (0..10)
+                        .map(|index| DocumentSnapshot {
+                            path: format!("docs/{index}.md"),
+                            format: "markdown".to_owned(),
+                            size_bytes: 0,
+                            source: SourceInfo {
+                                type_: "filesystem".to_owned(),
+                                commit: None,
+                                blob_sha: None,
+                            },
+                            hash_sha256: String::new(),
+                            assets: vec![],
+                        })
+                        .collect(),
+                ),
             },
             metadata: MetadataInfo {
                 link_policy: "preserve".to_string(),
@@ -1036,18 +1064,6 @@ mod tests {
             .downcast_ref::<crate::errors::InvalidArgumentError>()
             .is_some());
         assert!(error.to_string().contains("Export outside the repository"));
-    }
-
-    #[test]
-    fn test_copy_jit_state_rejects_malformed_issue_id_without_escape() {
-        let storage = InMemoryStorage::new();
-        let exporter = exporter(&storage);
-        let staging = tempfile::tempdir().unwrap();
-        let mut issue = crate::domain::fixture_issue("Issue".into(), String::new());
-        issue.id = "../../../escaped".into();
-
-        assert!(exporter.copy_jit_state(staging.path(), &[issue]).is_err());
-        assert!(!staging.path().join("escaped.json").exists());
     }
 
     #[test]

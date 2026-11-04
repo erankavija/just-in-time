@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "db15b3915c14a823fd8592c265236ced87b45188",
+  "completed_at": "2026-11-04T12:58:55.139260929Z",
+  "duration_ms": 209561,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/serve.rs",
+        "id": "F1",
+        "line": 1506,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4a01ccba/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The refactored server-bound test still waits on a 50 ms wall-clock deadline after FIFO readiness, violating REQ-02."
+      }
+    ],
+    "summary": "The server-bound test still waits for a real-time 50 ms deadline, violating REQ-02.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "13b970de-e0b7-4e13-93e1-a6dd6280c110",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:55:25.578177033Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11656 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a6a0-e91f-7b10-92f2-4a8bd1b9fbee\n--------\nuser\n--- 11643 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 32843b6ab, b1ed23165, 46301855, 3fedb755a, 7360cf535, 5e3f82d8b, 65033128f, d76de4e9b, ff8a8d1a9\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a01ccba/requirement/REQ-01, @/issue/4a01ccba/requirement/REQ-02, @/issue/4a01ccba/requirement/REQ-03 (issue description, markdown-first); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T12:55:01.802050739Z)\nTruncation recovery: narrowed the truncated artifact patch to the remeasurement README, quiet load/JUnit/distribution files, and the quiet-host README patch\n\n1. [blocking][issue-impact][high] The refactored server-bound test still waits on wall-clock time: it sets a 50 ms real-time bound at `crates/jit/src/commands/serve.rs:1506`, after which `watch_startup` repeatedly sleeps until the deadline (`crates/jit/src/commands/serve.rs:497-503`). The FIFO makes child readiness deterministic but does not eliminate the timeout wait, so REQ-02 remains unmet. [`@/issue/4a01ccba/requirement/REQ-02`]\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The server-bound test still waits for a real-time 50 ms deadline, violating REQ-02.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The refactored server-bound test still waits on a 50 ms wall-clock deadline after FIFO readiness, violating REQ-02.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":1506,\"references\":[\"@/issue/4a01ccba/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

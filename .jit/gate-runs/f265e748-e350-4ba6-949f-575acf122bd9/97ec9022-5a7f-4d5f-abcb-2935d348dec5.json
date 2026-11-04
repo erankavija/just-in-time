@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-f265e748",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0b9770767d5fc0e838c492493eb7eea1b82a4265",
+  "completed_at": "2026-10-26T21:56:20.671470117Z",
+  "duration_ms": 74272,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/types.rs",
+        "id": "F1",
+        "line": 1265,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f265e748/requirement/REQ-04",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "EventBody issue IDs and their constructors remain raw Strings, violating REQ-04 once IssueId becomes ValidatedIssueId."
+      }
+    ],
+    "summary": "EventBody retains raw String issue IDs, so the accessor change will not compile after the IssueId newtype cutover.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f265e748-e350-4ba6-949f-575acf122bd9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "97ec9022-5a7f-4d5f-abcb-2935d348dec5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T21:55:06.398740838Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3852 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a35-c4c8-7b11-9340-9cfd375f94ca\n--------\nuser\n--- 3839 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f1aaadc, 5d83ac6, 6140054, fb3e6f3, 42a9d33, 0b97707 (`jit:f265e748`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f265e748/requirement/REQ-01..REQ-04 (.jit/issues/f265e748-e350-4ba6-949f-575acf122bd9.json); @/issue/2195c98f/requirement/REQ-04 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: pending, no exit code; prior code-review R2: failed, exit 1, with its `as_deref` finding resolved by 0b97707\nTruncation recovery: narrower per-commit patches, focused event code/test reads, and Rust-only symbol searches after broad historical-artifact output\n\n1. [blocking, issue-impact] `EventBody` still stores every issue-scoped `issue_id` as `String` (for example [types.rs:1265](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/domain/types.rs:1265)) and its event constructors accept `String` (for example [types.rs:1571](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/domain/types.rs:1571)). The new accessor’s `Option<&IssueId>` signature only compiles while `IssueId` aliases `String`; it will fail once `IssueId` becomes `ValidatedIssueId`. This leaves hard REQ-04 unmet and retains raw semantic identity in the domain model. References: @/issue/f265e748/requirement/REQ-04, @/invariant/semantic-types.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"EventBody retains raw String issue IDs, so the accessor change will not compile after the IssueId newtype cutover.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"EventBody issue IDs and their constructors remain raw Strings, violating REQ-04 once IssueId becomes ValidatedIssueId.\",\"file\":\"crates/jit/src/domain/types.rs\",\"line\":1265,\"references\":[\"@/issue/f265e748/requirement/REQ-04\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,0 +1,43 @@
+{
+  "branch": "worktree-agent-10ae7776",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "af3b6cd9c70603101d3e7951d31f493eae55def8",
+  "completed_at": "2026-10-27T21:28:45.312831214Z",
+  "duration_ms": 303565,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/declarations/rules.rs",
+        "id": "F1",
+        "line": 338,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/10ae7776/requirement/REQ-01",
+          "@/invariant/semantic-types",
+          "@/issue/2195c98f/requirement/REQ-10"
+        ],
+        "severity": "high",
+        "summary": "Handwritten multi-token State lists remain in rustdoc and test fixtures instead of using typed State values and canonical tokens."
+      }
+    ],
+    "summary": "Handwritten multi-token State lists remain under crates/, so hard REQ-01 is unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "10ae7776-7840-4fbc-937b-ce2cc371e07b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "29f1303f-dfcf-4013-82b4-947d44afd3e7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:23:41.747175693Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9358 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17f3f-5ed5-7fc0-adb1-cb5f228dfcc2\n--------\nuser\n--- 9345 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f3901c6b5, 6acb8ff99, 586b6903a (`jit:10ae7776`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/10ae7776/requirement/REQ-01 (.jit/issues/10ae7776-7840-4fbc-937b-ce2cc371e07b.json); @/issue/2195c98f/requirement/REQ-10 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: pending, exit code none, never run\nTruncation recovery: reread the truncated refactor patch separately by source and test path; inspected current render, vocabulary, and remaining literal-list locations\n\n1. **F1 — blocking, issue-impact:** REQ-01 remains unmet. Handwritten multi-token `State` lists still occur in the `StatePredicate` rustdoc and test fixtures at [crates/jit/src/declarations/rules.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776/crates/jit/src/declarations/rules.rs:338), [crates/jit/src/declarations/rules.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776/crates/jit/src/declarations/rules.rs:1783), and [crates/jit/src/declarations/rules.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776/crates/jit/src/declarations/rules.rs:1802); in rule-serialization fixtures and expectations at [crates/jit/src/repository_state/rule_serialize.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776/crates/jit/src/repository_state/rule_serialize.rs:818) and [crates/jit/src/repository_state/rule_serialize.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776/crates/jit/src/repository_state/rule_serialize.rs:879); and in [crates/jit/tests/fast_docs_templates/batch_export_tests.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-10ae7776/crates/jit/tests/fast_docs_templates/batch_export_tests.rs:50). These bypass the typed `State` vocabulary instead of deriving rendered tokens from typed values. References: @/issue/10ae7776/requirement/REQ-01, @/invariant/semantic-types, @/issue/2195c98f/requirement/REQ-10.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Handwritten multi-token State lists remain under crates/, so hard REQ-01 is unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Handwritten multi-token State lists remain in rustdoc and test fixtures instead of using typed State values and canonical tokens.\",\"file\":\"crates/jit/src/declarations/rules.rs\",\"line\":338,\"references\":[\"@/issue/10ae7776/requirement/REQ-01\",\"@/invariant/semantic-types\",\"@/issue/2195c98f/requirement/REQ-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

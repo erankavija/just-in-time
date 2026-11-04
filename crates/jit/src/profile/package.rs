@@ -6,16 +6,13 @@ use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry};
-use semver::{Version, VersionReq};
-use serde::Serialize;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-const TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-target-v1\0";
 const PACKAGE_HASH_DOMAIN: &[u8] = b"jit-profile-package-v1\0";
 
 /// Maximum number of files, including the manifest, in one profile package.
@@ -27,40 +24,21 @@ pub const MAX_PROFILE_PACKAGE_BYTES: usize = 4 * 1024 * 1024;
 /// A lowercase hexadecimal SHA-256 digest.
 pub type PackageHash = String;
 
-/// Canonical package and per-repository-target hashes.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProfilePackageHashes {
-    /// Hash of the canonical manifest plus every declared package source.
-    pub package: PackageHash,
-    /// Hash of ordered operations and source bytes grouped by repository target.
-    pub targets: BTreeMap<String, PackageHash>,
-}
-
-/// Where a validated package's bytes came from.
-///
-/// Minted only by the constructor of [`ProfilePackage`], from the route it
-/// took, so the source a package reports is the source its own bytes were read
-/// through rather than a claim made about them.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProfilePackageSource {
-    /// Bytes read from this absolute, symlink-resolved directory.
-    Directory(PathBuf),
-}
-
 /// A validated immutable package owning the bytes it validated.
 ///
-/// A package comes from a directory tree on disk
-/// ([`from_directory`](Self::from_directory)), owns the bytes it read, and runs
-/// one validation over one path-to-bytes map, so packages built from identical
-/// content are indistinguishable in manifest, package hash, and target digests.
-/// They differ in exactly one observable: the [`source`](Self::source) each
-/// records for the bytes it admitted.
+/// Reading a directory ([`from_directory`](Self::from_directory)), capturing
+/// from repository files ([`capture_package_tree`](super::capture_package_tree))
+/// and extracting an archive ([`read_package_archive`](super::read_package_archive))
+/// run one validation over one path-to-bytes map, so packages built from
+/// identical content are indistinguishable in manifest and package hash. They
+/// differ in exactly one observable: the
+/// [`directory`](Self::directory) a directory read records.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
     model: ProfilePackageModel,
     files: BTreeMap<String, Vec<u8>>,
-    hashes: ProfilePackageHashes,
-    source: ProfilePackageSource,
+    package_hash: PackageHash,
+    directory: Option<PathBuf>,
 }
 
 impl ProfilePackage {
@@ -76,11 +54,21 @@ impl ProfilePackage {
     /// [`UnreadableDirectory`](ProfilePackageError::UnreadableDirectory), which
     /// no invalid package produces.
     ///
-    /// The recorded [`source`](Self::source) is the resolved root the walk
+    /// The recorded [`directory`](Self::directory) is the resolved root the walk
     /// anchored its handle chain at, not the argument: `directory` may be
     /// relative and may use ordinary path normalization, but the package root
     /// itself and every entry beneath it must not be a symbolic link.
     pub fn from_directory(directory: &Path) -> Result<Self, ProfilePackageError> {
+        let contents = read_package_directory(directory)?;
+        Self::from_files_with_modes(
+            contents.files,
+            contents.executable_sources,
+            Some(contents.root),
+        )
+    }
+
+    /// Resolve a package root without admitting a symbolic-link selector.
+    pub(crate) fn resolve_directory(directory: &Path) -> Result<PathBuf, ProfilePackageError> {
         let metadata =
             fs::symlink_metadata(directory).map_err(|source| unreadable(directory, source))?;
         if metadata.file_type().is_symlink() {
@@ -88,12 +76,7 @@ impl ProfilePackage {
                 path: directory.display().to_string(),
             });
         }
-        let contents = read_package_directory(directory)?;
-        Self::from_files_with_modes(
-            contents.files,
-            contents.executable_sources,
-            ProfilePackageSource::Directory(contents.root),
-        )
+        fs::canonicalize(directory).map_err(|source| unreadable(directory, source))
     }
 
     /// Parse manifest bytes and validate everything they declare about
@@ -110,41 +93,11 @@ impl ProfilePackage {
     /// roots. A returned manifest therefore declares only safe relative paths,
     /// which is what lets a caller join one onto a directory. The cross-check
     /// against the files a package actually holds needs those files and stays
-    /// with [`validate_content`](Self::validate_content).
+    /// with [`from_files_with_modes`](Self::from_files_with_modes).
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
     ) -> Result<ProfilePackageModel, ProfilePackageError> {
         Self::read_manifest(manifest_bytes)
-    }
-
-    /// Validate one package's complete content and derive its identity.
-    ///
-    /// The single validation every route to a package runs: reading a
-    /// directory, and capturing a tree from the repository files a manifest
-    /// declares. `executable_sources` names the sources whose bytes came from a
-    /// file carrying executable permission, so a source whose declaration did
-    /// not is refused here rather than by each caller.
-    ///
-    /// # Errors
-    ///
-    /// Every [`ProfilePackageError`] a package's own content can produce:
-    /// bounds, an absent or invalid manifest, a declared source the content
-    /// lacks, content the manifest does not declare, an undeclared executable,
-    /// and an unresolvable variable reference.
-    pub(crate) fn validate_content(
-        files: &BTreeMap<String, Vec<u8>>,
-        executable_sources: &BTreeSet<String>,
-    ) -> Result<(ProfilePackageModel, ProfilePackageHashes), ProfilePackageError> {
-        validate_package_bounds(files)?;
-        let manifest_bytes = files
-            .get(MANIFEST_FILE_NAME)
-            .ok_or(ProfilePackageError::MissingManifest)?;
-        let model = Self::read_manifest(manifest_bytes)?;
-
-        validate_declared_content(&model, files, executable_sources)?;
-        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
-        let hashes = compute_hashes(&model, files, manifest_bytes)?;
-        Ok((model, hashes))
     }
 
     fn read_manifest(manifest_bytes: &[u8]) -> Result<ProfilePackageModel, ProfilePackageError> {
@@ -164,24 +117,42 @@ impl ProfilePackage {
     }
 
     #[cfg(test)]
-    fn from_files(
-        files: BTreeMap<String, Vec<u8>>,
-        source: ProfilePackageSource,
-    ) -> Result<Self, ProfilePackageError> {
-        Self::from_files_with_modes(files, BTreeSet::new(), source)
+    fn from_files(files: BTreeMap<String, Vec<u8>>) -> Result<Self, ProfilePackageError> {
+        Self::from_files_with_modes(files, BTreeSet::new(), None)
     }
 
-    fn from_files_with_modes(
+    /// Validate one package's complete content and derive its identity.
+    ///
+    /// The single validation every route to a package runs. `executable_sources`
+    /// names the sources whose bytes came from a file carrying executable
+    /// permission, so a source whose declaration did not is refused here rather
+    /// than by each caller.
+    ///
+    /// # Errors
+    ///
+    /// Every [`ProfilePackageError`] a package's own content can produce:
+    /// bounds, an absent or invalid manifest, a declared source the content
+    /// lacks, content the manifest does not declare, an undeclared executable,
+    /// and an unresolvable variable reference.
+    pub(super) fn from_files_with_modes(
         files: BTreeMap<String, Vec<u8>>,
         executable_sources: BTreeSet<String>,
-        source: ProfilePackageSource,
+        directory: Option<PathBuf>,
     ) -> Result<Self, ProfilePackageError> {
-        let (model, hashes) = Self::validate_content(&files, &executable_sources)?;
+        validate_package_bounds(&files)?;
+        let manifest_bytes = files
+            .get(MANIFEST_FILE_NAME)
+            .ok_or(ProfilePackageError::MissingManifest)?;
+        let model = Self::read_manifest(manifest_bytes)?;
+
+        validate_declared_content(&model, &files, &executable_sources)?;
+        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
+        let package_hash = compute_package_hash(&files, manifest_bytes);
         Ok(Self {
             model,
             files,
-            hashes,
-            source,
+            package_hash,
+            directory,
         })
     }
 
@@ -190,9 +161,10 @@ impl ProfilePackage {
         &self.model
     }
 
-    /// Where this package's validated bytes were read from.
-    pub fn source(&self) -> &ProfilePackageSource {
-        &self.source
+    /// The directory this package's validated bytes were read from. A package
+    /// captured from repository files or extracted from an archive has none.
+    pub fn directory(&self) -> Option<&Path> {
+        self.directory.as_deref()
     }
 
     /// Owned bytes for a declared package-relative source.
@@ -210,9 +182,9 @@ impl ProfilePackage {
         &self.files
     }
 
-    /// Canonical package and target hashes.
-    pub fn hashes(&self) -> &ProfilePackageHashes {
-        &self.hashes
+    /// Package identity: the hash of the authored manifest plus every package file.
+    pub fn package_hash(&self) -> &PackageHash {
+        &self.package_hash
     }
 
     /// Package file count, including `manifest.toml`.
@@ -230,7 +202,10 @@ impl ProfilePackage {
 #[derive(Debug, thiserror::Error)]
 pub enum ProfilePackageError {
     /// The package directory is absent or cannot be read.
-    #[error("cannot read profile package directory '{path}': {source}")]
+    #[error(
+        "cannot read profile package directory '{path}': {source}; \
+         a package is a directory holding {MANIFEST_FILE_NAME}"
+    )]
     UnreadableDirectory {
         /// Path whose read failed.
         path: String,
@@ -292,42 +267,6 @@ pub enum ProfilePackageError {
         /// Offending dependency entry.
         dependency: String,
     },
-    /// Invalid semantic package version.
-    #[error("invalid profile version '{value}': {source}")]
-    InvalidVersion {
-        /// Authored value.
-        value: String,
-        /// Semver parser error.
-        source: semver::Error,
-    },
-    /// Invalid compatible JIT version requirement.
-    #[error("invalid compatible JIT requirement '{value}': {source}")]
-    InvalidCompatibility {
-        /// Authored value.
-        value: String,
-        /// Semver parser error.
-        source: semver::Error,
-    },
-    /// Invalid semantic dependency requirement.
-    #[error("invalid dependency requirement for '{dependency}' '{value}': {source}")]
-    InvalidDependencyRequirement {
-        /// Dependency identity.
-        dependency: String,
-        /// Authored requirement.
-        value: String,
-        /// Underlying semver failure.
-        source: semver::Error,
-    },
-    /// Invalid semantic incompatibility requirement.
-    #[error("invalid incompatibility requirement for '{package}' '{value}': {source}")]
-    InvalidIncompatibilityRequirement {
-        /// Incompatible package identity.
-        package: String,
-        /// Authored requirement.
-        value: String,
-        /// Underlying semver failure.
-        source: semver::Error,
-    },
     /// Unsafe absolute, traversal, platform-prefix, or empty path.
     #[error("unsafe {field} path '{path}'")]
     UnsafePath {
@@ -380,9 +319,6 @@ pub enum ProfilePackageError {
         /// Root declared beneath it.
         inner: String,
     },
-    /// Canonical serialization unexpectedly failed.
-    #[error("failed to serialize canonical profile data: {0}")]
-    CanonicalSerialization(#[source] serde_json::Error),
     /// A variable declaration or bounded reference violates the package
     /// contract.
     #[error(transparent)]
@@ -432,7 +368,7 @@ struct PackageDirectoryContents {
 }
 
 fn read_package_directory(root: &Path) -> Result<PackageDirectoryContents, ProfilePackageError> {
-    let root = fs::canonicalize(root).map_err(|source| unreadable(root, source))?;
+    let root = ProfilePackage::resolve_directory(root)?;
     let handle = CapDir::open_ambient_dir(&root, ambient_authority())
         .map_err(|source| unreadable(&root, source))?;
     let mut pending = vec![(handle, String::new())];
@@ -622,35 +558,6 @@ fn validate_manifest_declarations(
             dependency: dependency.id.to_string(),
         });
     }
-    Version::parse(&manifest.version).map_err(|source| ProfilePackageError::InvalidVersion {
-        value: manifest.version.clone(),
-        source,
-    })?;
-    VersionReq::parse(&manifest.compatible_jit).map_err(|source| {
-        ProfilePackageError::InvalidCompatibility {
-            value: manifest.compatible_jit.clone(),
-            source,
-        }
-    })?;
-    for dependency in &manifest.dependencies {
-        VersionReq::parse(&dependency.version).map_err(|source| {
-            ProfilePackageError::InvalidDependencyRequirement {
-                dependency: dependency.id.to_string(),
-                value: dependency.version.clone(),
-                source,
-            }
-        })?;
-    }
-    for incompatibility in &manifest.incompatibilities {
-        VersionReq::parse(&incompatibility.version).map_err(|source| {
-            ProfilePackageError::InvalidIncompatibilityRequirement {
-                package: incompatibility.id.to_string(),
-                value: incompatibility.version.clone(),
-                source,
-            }
-        })?;
-    }
-
     let mut contribution_ids = BTreeSet::new();
     for (index, contribution) in manifest.contributions.iter().enumerate() {
         validate_contribution(index, contribution)?;
@@ -895,62 +802,14 @@ fn contribution_identity(contribution: &Contribution) -> String {
             format!("projection:{name}")
         }
     };
-    format!("{}:{semantic}", contribution.registry_path())
+    format!(
+        "{}:{semantic}",
+        contribution.registry().path().repository_relative()
+    )
 }
 
-fn compute_hashes(
-    manifest: &ProfilePackageModel,
-    files: &BTreeMap<String, Vec<u8>>,
-    manifest_bytes: &[u8],
-) -> Result<ProfilePackageHashes, ProfilePackageError> {
-    let mut target_frames: BTreeMap<String, Vec<Vec<u8>>> = BTreeMap::new();
-
-    for contribution in &manifest.contributions {
-        target_frames
-            .entry(contribution.registry_path().to_string())
-            .or_default()
-            .push(canonical_bytes(contribution)?);
-    }
-    for asset in &manifest.assets {
-        let mut frame = canonical_bytes(asset)?;
-        append_frame(
-            &mut frame,
-            files
-                .get(&asset.source)
-                .ok_or_else(|| ProfilePackageError::MissingContent(asset.source.clone()))?,
-        );
-        target_frames
-            .entry(asset.target.clone())
-            .or_default()
-            .push(frame);
-    }
-    for region in &manifest.regions {
-        let mut frame = canonical_bytes(region)?;
-        append_frame(
-            &mut frame,
-            files
-                .get(&region.source)
-                .ok_or_else(|| ProfilePackageError::MissingContent(region.source.clone()))?,
-        );
-        target_frames
-            .entry(region.target.clone())
-            .or_default()
-            .push(frame);
-    }
-
-    let targets = target_frames
-        .into_iter()
-        .map(|(target, frames)| {
-            let mut hasher = Sha256::new();
-            hasher.update(TARGET_HASH_DOMAIN);
-            hash_frame(&mut hasher, target.as_bytes());
-            frames
-                .iter()
-                .for_each(|frame| hash_frame(&mut hasher, frame));
-            (target, format!("{:x}", hasher.finalize()))
-        })
-        .collect();
-
+/// Hash the authored manifest bytes plus every other package file.
+fn compute_package_hash(files: &BTreeMap<String, Vec<u8>>, manifest_bytes: &[u8]) -> PackageHash {
     let mut package = Sha256::new();
     package.update(PACKAGE_HASH_DOMAIN);
     hash_frame(&mut package, manifest_bytes);
@@ -961,42 +820,7 @@ fn compute_hashes(
         hash_frame(&mut package, path.as_bytes());
         hash_frame(&mut package, contents);
     }
-
-    Ok(ProfilePackageHashes {
-        package: format!("{:x}", package.finalize()),
-        targets,
-    })
-}
-
-fn canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, ProfilePackageError> {
-    let canonical = canonical_json(value)?;
-    serde_json::to_vec(&canonical).map_err(ProfilePackageError::CanonicalSerialization)
-}
-
-fn canonical_json<T: Serialize>(value: &T) -> Result<Value, ProfilePackageError> {
-    serde_json::to_value(value)
-        .map(canonicalize_value)
-        .map_err(ProfilePackageError::CanonicalSerialization)
-}
-
-fn canonicalize_value(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_value).collect()),
-        Value::Object(values) => Value::Object(
-            values
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_value(value)))
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .collect::<Map<_, _>>(),
-        ),
-        scalar => scalar,
-    }
-}
-
-fn append_frame(destination: &mut Vec<u8>, frame: &[u8]) {
-    destination.extend_from_slice(&(frame.len() as u64).to_be_bytes());
-    destination.extend_from_slice(frame);
+    format!("{:x}", package.finalize())
 }
 
 fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
@@ -1007,10 +831,11 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::ProfileId;
     use crate::profile::variables::{
         resolve_package, ProfileVariableAssignment, VariableError, VariableInputs,
     };
-    use crate::profile::{profile_package_model_schema, ProfileDependencyRequirement, ProfileId};
+    use crate::profile::{profile_package_model_schema, ProfileDependencyRequirement};
     use crate::repository_state::{
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };
@@ -1028,15 +853,10 @@ mod tests {
     }
 
     /// Run the shared package validation over a synthetic path-to-bytes map.
-    ///
-    /// The map is authored here rather than read from anywhere; the recorded
-    /// source names the fixture the authored bytes were mutated from, which no
-    /// caller asserts about. Every caller asserts about validation outcomes,
-    /// which are decided by the map alone.
     fn validated_package(
         files: BTreeMap<String, Vec<u8>>,
     ) -> Result<ProfilePackage, ProfilePackageError> {
-        ProfilePackage::from_files(files, ProfilePackageSource::Directory(fixture_tree()))
+        ProfilePackage::from_files(files)
     }
 
     /// A writable copy of the fixture tree, rooted inside `temp`.
@@ -1157,7 +977,7 @@ mod tests {
             package.model().dependencies,
             vec![ProfileDependencyRequirement {
                 id: ProfileId::try_from("jit-default").unwrap(),
-                version: "*".to_string(),
+                version: semver::VersionReq::STAR,
             }]
         );
 
@@ -1340,19 +1160,9 @@ value = "workspace/active"
     }
 
     #[test]
-    fn test_hashes_are_stable_grouped_by_target_and_cover_source_drift() {
+    fn test_package_hash_is_stable_and_covers_source_drift() {
         let first = package();
-        let second = package();
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        assert_eq!(first.hashes(), second.hashes());
-        assert_eq!(first.hashes().targets.len(), 7);
-        assert_eq!(
-            first.hashes().targets[".jit/config.toml"],
-            "0b22a166dff17fbf500cd9682ba0348b3219aac7582736f9df8371f592de4694"
-        );
-        assert!(first.hashes().targets.contains_key(".jit/gates.toml"));
-        assert!(first.hashes().targets.contains_key("AGENTS.md"));
-        assert!(first.hashes().targets.contains_key("bin/check.sh"));
+        assert_eq!(first.package_hash(), package().package_hash());
 
         let mut changed = first.files.clone();
         changed.insert(
@@ -1360,35 +1170,20 @@ value = "workspace/active"
             b"#!/bin/sh\nexit 1\n".to_vec(),
         );
         let changed = validated_package(changed).unwrap();
-        assert_ne!(first.hashes().package, changed.hashes().package);
-        assert_ne!(
-            first.hashes().targets["bin/check.sh"],
-            changed.hashes().targets["bin/check.sh"]
-        );
-        assert_eq!(
-            first.hashes().targets["docs/workflow.txt"],
-            changed.hashes().targets["docs/workflow.txt"]
-        );
-
-        let contribution = format!(
-            "[[contribution]]\nkind = \"map-entry\"\ntarget = \"type-hierarchy-types\"\nidentity = \"{}\"\nvalue = 1\n\n",
-            taxonomy.type_at_level(2)
-        );
-        let reordered_manifest = manifest_text().replacen(&contribution, "", 1) + &contribution;
-        let mut reordered = first.files.clone();
-        reordered.insert(
-            MANIFEST_FILE_NAME.to_string(),
-            reordered_manifest.into_bytes(),
-        );
-        let reordered = validated_package(reordered).unwrap();
-        assert_ne!(
-            first.hashes().targets[".jit/config.toml"],
-            reordered.hashes().targets[".jit/config.toml"]
-        );
+        assert_ne!(first.package_hash(), changed.package_hash());
     }
 
     #[test]
-    fn test_package_hash_covers_manifest_source_bytes_that_targets_ignore() {
+    fn test_model_targets_collect_contribution_registries_assets_and_regions() {
+        let targets = package().model().targets();
+
+        assert!(targets.contains(".jit/config.toml"));
+        assert!(targets.contains("bin/check.sh"));
+        assert!(targets.contains("AGENTS.md"));
+    }
+
+    #[test]
+    fn test_package_hash_covers_manifest_source_bytes_the_model_ignores() {
         let first = package();
         let mut reformatted = first.files.clone();
         reformatted.insert(
@@ -1398,8 +1193,7 @@ value = "workspace/active"
         let reformatted = validated_package(reformatted).unwrap();
 
         assert_eq!(first.model(), reformatted.model());
-        assert_ne!(first.hashes().package, reformatted.hashes().package);
-        assert_eq!(first.hashes().targets, reformatted.hashes().targets);
+        assert_ne!(first.package_hash(), reformatted.package_hash());
     }
 
     #[test]
@@ -1426,18 +1220,15 @@ source = "assets/profile.txt"
 target = "docs/profile.txt"
 template = true
 "#;
-        let package = ProfilePackage::from_files(
-            BTreeMap::from([
-                (MANIFEST_FILE_NAME.to_string(), manifest.to_vec()),
-                (
-                    "assets/profile.txt".to_string(),
-                    b"profile={{jit:var:NAME}}\n".to_vec(),
-                ),
-            ]),
-            ProfilePackageSource::Directory(fixture_tree()),
-        )
+        let package = ProfilePackage::from_files(BTreeMap::from([
+            (MANIFEST_FILE_NAME.to_string(), manifest.to_vec()),
+            (
+                "assets/profile.txt".to_string(),
+                b"profile={{jit:var:NAME}}\n".to_vec(),
+            ),
+        ]))
         .expect("the variable package is valid");
-        let package_hash = package.hashes().package.clone();
+        let package_hash = package.package_hash().clone();
         let first = resolve_package(
             &package,
             &VariableInputs {
@@ -1472,7 +1263,7 @@ template = true
         )
         .expect("the second value resolves");
 
-        assert_eq!(package.hashes().package, package_hash);
+        assert_eq!(package.package_hash(), &package_hash);
         assert_eq!(first, first_again);
         assert_eq!(
             first.variables().values()[&"NAME".try_into().unwrap()],
@@ -1491,11 +1282,6 @@ template = true
             Some(b"profile=second\n".as_slice())
         );
         assert_ne!(first.model(), second.model());
-        assert_ne!(
-            first.target_hashes().unwrap(),
-            second.target_hashes().unwrap(),
-            "resolved target fingerprints must change with resolved content"
-        );
     }
 
     #[test]
@@ -1513,10 +1299,10 @@ name = "NAME"
 [[variable]]
 name = "NAME"
 "#;
-        let error = ProfilePackage::from_files(
-            BTreeMap::from([(MANIFEST_FILE_NAME.to_string(), manifest.to_vec())]),
-            ProfilePackageSource::Directory(fixture_tree()),
-        )
+        let error = ProfilePackage::from_files(BTreeMap::from([(
+            MANIFEST_FILE_NAME.to_string(),
+            manifest.to_vec(),
+        )]))
         .expect_err("duplicate declarations must fail at package read");
 
         assert!(matches!(
@@ -1617,23 +1403,13 @@ name = "NAME"
     }
 
     #[test]
-    fn test_validation_rejects_invalid_identity_version_and_compatibility() {
+    fn test_validation_rejects_invalid_identity_and_manifest_version() {
         let package = package();
         let cases = [
             (
                 "id = \"synthetic-workflow\"",
                 "id = \"Synthetic Workflow\"",
                 "invalid profile id",
-            ),
-            (
-                "version = \"1.2.3\"",
-                "version = \"01.2.3\"",
-                "invalid profile version",
-            ),
-            (
-                "compatible-jit = \">=0.2.0, <2.0.0\"",
-                "compatible-jit = \"not a requirement\"",
-                "invalid compatible JIT requirement",
             ),
             (
                 "manifest-version = 2",
@@ -1769,7 +1545,7 @@ name = "NAME"
     #[test]
     fn test_from_directory_reads_one_package_from_every_copy_of_one_authored_tree() {
         // A copy of the authored tree elsewhere on disk is the same package:
-        // the manifest, both hashes, the inventory, and every declared source's
+        // the manifest, the package hash, the inventory, and every declared source's
         // bytes agree with the package read from the checked-in tree.
         let authored = package();
         let temp = TempDir::new().unwrap();
@@ -1777,8 +1553,7 @@ name = "NAME"
             .expect("valid package tree");
 
         assert_eq!(copy.model(), authored.model());
-        assert_eq!(copy.hashes().package, authored.hashes().package);
-        assert_eq!(copy.hashes().targets, authored.hashes().targets);
+        assert_eq!(copy.package_hash(), authored.package_hash());
         assert_eq!(copy.file_count(), authored.file_count());
         assert_eq!(copy.byte_size(), authored.byte_size());
         assert!(copy
@@ -1795,7 +1570,7 @@ name = "NAME"
             let root = writable_package_tree(&temp);
             ProfilePackage::from_directory(&root).expect("valid package tree")
         };
-        assert_eq!(owned.hashes(), authored.hashes());
+        assert_eq!(owned.package_hash(), authored.package_hash());
         assert!(
             owned
                 .model()
@@ -1809,7 +1584,7 @@ name = "NAME"
     #[test]
     fn test_from_directory_records_the_resolved_root_its_bytes_were_read_from() {
         // Two copies of one authored tree differ only in where they sit, so the
-        // recorded source follows the directory each package was read through
+        // recorded directory follows the directory each package was read through
         // rather than anything about the bytes, which are identical.
         let temp = TempDir::new().unwrap();
         let first = writable_package_tree(&temp);
@@ -1818,21 +1593,21 @@ name = "NAME"
         let first_package = ProfilePackage::from_directory(&first).expect("valid package tree");
         let second_package = ProfilePackage::from_directory(&second).expect("valid package tree");
 
-        assert_eq!(first_package.hashes(), second_package.hashes());
+        assert_eq!(first_package.package_hash(), second_package.package_hash());
         assert_eq!(
-            first_package.source(),
-            &ProfilePackageSource::Directory(fs::canonicalize(&first).unwrap())
+            first_package.directory(),
+            Some(fs::canonicalize(&first).unwrap().as_path())
         );
         assert_eq!(
-            second_package.source(),
-            &ProfilePackageSource::Directory(fs::canonicalize(&second).unwrap())
+            second_package.directory(),
+            Some(fs::canonicalize(&second).unwrap().as_path())
         );
-        assert_ne!(first_package.source(), second_package.source());
+        assert_ne!(first_package.directory(), second_package.directory());
     }
 
     #[test]
     fn test_from_directory_records_the_root_a_relative_argument_resolves_to() {
-        // The recorded source has to name the directory the walk anchored at,
+        // The recorded directory has to name the directory the walk anchored at,
         // so a package read through a relative or link-traversing argument
         // still reports where its bytes came from.
         let temp = TempDir::new().unwrap();
@@ -1843,8 +1618,8 @@ name = "NAME"
         assert_eq!(
             ProfilePackage::from_directory(&indirect)
                 .expect("valid package tree")
-                .source(),
-            &ProfilePackageSource::Directory(resolved)
+                .directory(),
+            Some(resolved.as_path())
         );
     }
 

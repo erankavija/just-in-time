@@ -11,10 +11,10 @@
 //! The profile's asset/region/registry claims arrive as a
 //! [`ProfileApplicationInput`]; this module alone derives and compares their final
 //! bytes.
-//! Finalization derives the coupled default-rule/schema closure and composes the
-//! aggregate profile lifecycle line appended at the captured `events.jsonl` length (id,
-//! timestamp, and torn-tail handling are never command-owned). Every byte flows through
-//! `session.apply` here.
+//! Finalization derives the coupled default-rule/schema closure and positions the
+//! aggregate profile lifecycle append at the captured `events.jsonl` committed
+//! length (id, timestamp, and position are never command-owned). Every byte flows
+//! through `session.apply` here.
 
 use std::collections::BTreeMap;
 
@@ -22,17 +22,19 @@ use crate::config::ProjectName;
 use crate::config_manager::namespaces_from_config;
 use crate::declarations::invariants::{serialize_invariant_registry, InvariantRegistry};
 use crate::declarations::{serialize_gate_registry, GateRegistry};
+use crate::domain::identity::ProfileId;
 use crate::domain::{
-    Event, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
+    EventBody, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
 };
 
 use super::default_rules::default_ruleset;
 use super::image::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta,
-    RepositoryEntry, RepositoryImage,
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryActionOwner,
+    RepositoryDelta, RepositoryEntry, RepositoryImage,
 };
 use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
-use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
+use super::path::{RepositoryLayoutError, VirtualPath};
+use super::profile_apply::ProfileTargetDecision;
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
 use super::RepositoryStateError;
@@ -40,13 +42,7 @@ use super::{
     ProfileApplicationInput, ProfileContributionMaterialization, ProfileTargetDisposition,
     ProfileTargetMaterialization,
 };
-
-/// Stable ownership identity for the neutral scaffold materialization.
-const SCAFFOLD_OWNER: &str = "repository-init";
-/// Stable ownership identity for profile-applied targets.
-const PROFILE_OWNER: &str = "profile-application";
-/// Stable ownership identity for the worktree `.gitattributes` line-set claim.
-const GITATTRIBUTES_OWNER: &str = "gitattributes-merge-driver";
+use crate::domain::relative_path::RootRelativePath;
 
 /// The configuration schema version a fresh repository declares.
 pub const FRESH_CONFIG_SCHEMA_VERSION: u32 = 2;
@@ -166,7 +162,7 @@ struct DesiredFile {
     bytes: Vec<u8>,
     mode: FileMode,
     policy: WritePolicy,
-    owner: &'static str,
+    owner: RepositoryActionOwner,
 }
 
 /// A fully-rendered fresh (or missing-file) repository scaffold.
@@ -215,11 +211,11 @@ impl InitializationScaffold {
         project_name: ProjectName,
         profile: Option<ProfileApplicationInput>,
     ) -> Result<Self, InitializationError> {
-        let parsed = crate::declarations::parse_configuration(config.as_bytes())
-            .map_err(|error| InitializationError::Config(error.to_string()))?;
-        let parsed = parsed.materialization_config(InvariantRegistry::empty());
+        let parsed =
+            crate::declarations::assemble_configuration(Some(config.as_bytes()), None, None)
+                .map_err(|error| InitializationError::Config(error.to_string()))?;
         let namespaces = namespaces_from_config(&parsed);
-        let serialized = serialize_ruleset(&default_ruleset(&namespaces));
+        let serialized = serialize_ruleset(&default_ruleset(&namespaces))?;
         let schemas = serialized
             .schema_files
             .into_iter()
@@ -325,49 +321,49 @@ impl InitializationScaffold {
                 bytes: self.config.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::INDEX,
                 bytes: self.index.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::GATES,
                 bytes: self.gates.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::INVARIANTS,
                 bytes: self.invariants.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::RULES,
                 bytes: self.rules.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
         ];
         for (name, bytes) in &self.schemas {
             files.push(DesiredFile {
-                path: VirtualPath::data(format!("schemas/{name}"))?,
+                path: VirtualPath::schema(name)?,
                 bytes: bytes.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::Always,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             });
         }
-        // The audit log is not a neutral scaffold file: the finalizer composes it
-        // (an empty log for a plain init, an aggregate lifecycle append for a profiled
-        // one) at the captured length. See `derive_initialization`.
+        // The audit log is not a neutral scaffold file: the finalizer positions an
+        // aggregate lifecycle append for a profiled init at its captured committed
+        // length. A plain init creates an absent log empty. See `derive_initialization`.
         Ok(files)
     }
 
@@ -388,11 +384,12 @@ impl InitializationScaffold {
             .into_iter()
             .map(|file| file.path)
             .collect();
-        // The finalizer appends to `events.jsonl` at its captured length, so its
-        // path must be captured for that length and the action preimage.
+        // The finalizer positions its append at `events.jsonl`'s committed length;
+        // the tail probe captures enough to derive that offset without reading the
+        // whole log.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
-            paths.extend(profile.claims.target_paths()?);
+            paths.extend(profile.claims.target_paths());
             if profile.owns_default_rule_authority() {
                 paths.push(VirtualPath::SCHEMAS);
             }
@@ -524,7 +521,12 @@ fn coupled_default_repair_profile<'a>(
 ) -> Option<&'a ProfileApplicationInput> {
     actions
         .iter()
-        .any(|action| matches!(action.owner(), "default-rule-membership" | "default-schema"))
+        .any(|action| {
+            matches!(
+                action.owner(),
+                RepositoryActionOwner::DefaultRuleMembership | RepositoryActionOwner::DefaultSchema
+            )
+        })
         .then(|| {
             profiles
                 .iter()
@@ -560,7 +562,7 @@ pub(super) fn derive_initialization(
     let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
         .schemas
         .iter()
-        .map(|(name, _)| VirtualPath::data(format!("schemas/{name}")))
+        .map(|(name, _)| VirtualPath::schema(name))
         .collect::<Result<_, _>>()?;
     let desired = dedup_last_wins(scaffold.desired_files()?);
     let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
@@ -671,9 +673,7 @@ fn apply_action_overlay(
     base: &RepositoryImage,
     actions: &[RepositoryAction],
 ) -> Result<RepositoryImage, InitializationError> {
-    super::action_overrides(base, actions)
-        .map_err(super::OverlayError::from)
-        .and_then(|overrides| super::apply_overlay(base, overrides))
+    super::apply_overlay(base, super::action_overrides(actions))
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
 }
 
@@ -707,7 +707,7 @@ fn fold_rebased_action(
             path.clone(),
             RepositoryAction::WriteFile {
                 path: path.clone(),
-                owner: owner.clone(),
+                owner: *owner,
                 expected: expected.clone(),
                 bytes: bytes.clone(),
                 mode: *mode,
@@ -728,12 +728,12 @@ fn events_action(base: &RepositoryImage) -> Result<Option<RepositoryAction>, Ini
     let path = VirtualPath::EVENTS;
     match base.entry(&path)? {
         RepositoryEntry::Absent => Ok(Some(RepositoryAction::AppendEvents {
-            owner: SCAFFOLD_OWNER.to_string(),
+            owner: RepositoryActionOwner::RepositoryInit,
             expected: ExpectedPreimage::Absent,
             offset: 0,
             bytes: Vec::new(),
         })),
-        RepositoryEntry::File { .. } => Ok(None),
+        RepositoryEntry::File { .. } | RepositoryEntry::FileTail { .. } => Ok(None),
         _ => Err(InitializationError::UnexpectedOccupant { path }),
     }
 }
@@ -753,7 +753,7 @@ fn push_gitattributes_action(
     if let (_status, Some(bytes)) = resolve_gitattributes(entry, line)? {
         actions.push(RepositoryAction::WriteFile {
             path,
-            owner: GITATTRIBUTES_OWNER.to_string(),
+            owner: RepositoryActionOwner::GitattributesMergeDriver,
             expected: ExpectedPreimage::of(entry),
             bytes,
             mode: FileMode::Regular,
@@ -823,28 +823,15 @@ fn resolve_gitattributes(
 fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
-    contested_assets: &BTreeMap<VirtualPath, Vec<super::ContributionConflictOwner>>,
+    contested_files: &BTreeMap<VirtualPath, Vec<ProfileId>>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let composed = super::profile_apply::compose_profile_targets_with_context(
         base,
         profile.claims.clone(),
         profile.contribution_context.clone(),
-        contested_assets,
+        contested_files,
     )
     .map_err(rule_materialization_error)?;
-    // The composition already decided every target this profile participates in.
-    // Publication reads those decisions rather than re-deriving them, so what a
-    // difference report states and what this candidate writes are one answer.
-    let targets = composed
-        .decisions
-        .iter()
-        .map(|(path, decision)| ProfileTargetMaterialization {
-            owner: profile.id.clone(),
-            path: path.clone(),
-            disposition: decision.disposition.clone(),
-            mode: decision.mode,
-        })
-        .collect::<Vec<_>>();
     let contributions = composed
         .contribution_decisions
         .iter()
@@ -876,25 +863,70 @@ fn derive_profile_application_candidate(
             bytes,
             mode,
             policy: WritePolicy::Always,
-            owner: PROFILE_OWNER,
+            owner: RepositoryActionOwner::ProfileApplication,
         })
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
-    if profile.target_hashes.contains_key(".jit/config.toml")
-        || profile.target_hashes.contains_key(".jit/rules.toml")
-    {
+    if profile.owns_default_rule_authority() {
         let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
         compose_existing_default_rules(base, authority, &mut actions)?;
     }
     let mut all = directory_actions(base, &actions, &[])?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
+    // The delta decides every file this candidate writes, the derived ones
+    // included, so what a report states and what is written are one answer. What
+    // the delta leaves out keeps the composition's decision.
+    let mut decisions = composed.decisions;
+    for action in delta.file_writes() {
+        let path = action.path();
+        let conflicted = matches!(
+            decisions.get(path),
+            Some(decision) if matches!(decision.disposition, ProfileTargetDisposition::Conflict(_))
+        );
+        if !conflicted {
+            decisions.insert(path.clone(), written_file_decision(base, action)?);
+        }
+    }
+    let targets = decisions
+        .into_iter()
+        .map(|(path, decision)| ProfileTargetMaterialization {
+            owner: profile.id.clone(),
+            path,
+            disposition: decision.disposition,
+            mode: decision.mode,
+        })
+        .collect();
     Ok(MaterializationDerivation::new(delta)
         .with_profile_targets(targets)
         .with_profile_contributions(contributions))
+}
+
+/// What one of [`RepositoryDelta::file_writes`] does to its file.
+fn written_file_decision(
+    base: &RepositoryImage,
+    action: &RepositoryAction,
+) -> Result<ProfileTargetDecision, InitializationError> {
+    let held = !matches!(base.entry(action.path())?, RepositoryEntry::Absent);
+    Ok(match action {
+        RepositoryAction::WriteFile { mode, .. } | RepositoryAction::SetMode { mode, .. } => {
+            ProfileTargetDecision {
+                disposition: if held {
+                    ProfileTargetDisposition::Update
+                } else {
+                    ProfileTargetDisposition::Create
+                },
+                mode: *mode,
+            }
+        }
+        _ => ProfileTargetDecision {
+            disposition: ProfileTargetDisposition::Remove,
+            mode: FileMode::Regular,
+        },
+    })
 }
 
 /// Compose one profile selection and record its aggregate lifecycle outcome.
@@ -910,7 +942,7 @@ pub(super) fn derive_profile_applications(
     profiles: &[ProfileApplicationInput],
     context: &MutationContext,
     operation: ProfileLifecycleOperation,
-    forced_changed: std::collections::BTreeSet<crate::profile::ProfileId>,
+    forced_changed: std::collections::BTreeSet<ProfileId>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let mut proposed = base.clone();
     let mut actions = BTreeMap::new();
@@ -919,13 +951,12 @@ pub(super) fn derive_profile_applications(
     let mut lifecycle_profiles = Vec::with_capacity(profiles.len());
     let mut applied_profiles = forced_changed.clone();
     let mut aggregate_changed = !forced_changed.is_empty();
-    let contested_assets = super::profile_apply::contested_asset_targets(
+    let contested_files = super::profile_apply::contested_file_targets(
         profiles.iter().map(|profile| &profile.claims),
     );
 
     for profile in profiles {
-        let candidate =
-            derive_profile_application_candidate(&proposed, profile, &contested_assets)?;
+        let candidate = derive_profile_application_candidate(&proposed, profile, &contested_files)?;
         let candidate_actions = candidate
             .delta
             .actions()
@@ -948,7 +979,7 @@ pub(super) fn derive_profile_applications(
     }
 
     if aggregate_changed {
-        let event = Event::draft_profile_lifecycle(operation, lifecycle_profiles);
+        let event = EventBody::draft_profile_lifecycle(operation, lifecycle_profiles);
         if let Some(action) = finalize_audit_append(base, context, vec![(2, event)])? {
             fold_rebased_action(base, &mut actions, &action)?;
         }
@@ -1028,7 +1059,7 @@ fn directory_actions(
         match base.entry(&dir)? {
             RepositoryEntry::Absent => actions.push(RepositoryAction::CreateDirectory {
                 path: dir,
-                owner: SCAFFOLD_OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             }),
             RepositoryEntry::Directory { .. } => {}
@@ -1089,7 +1120,7 @@ fn push_file_actions(
         if write {
             actions.push(RepositoryAction::WriteFile {
                 path: file.path.clone(),
-                owner: file.owner.to_string(),
+                owner: file.owner,
                 expected: ExpectedPreimage::of(entry),
                 bytes: file.bytes.clone(),
                 mode: file.mode,
@@ -1103,7 +1134,6 @@ fn push_file_actions(
 mod tests {
     use super::*;
     use crate::repository_state::{CapturedBytes, EntryIdentity};
-    use std::collections::BTreeMap;
 
     const LINE: &str = ".jit/events.jsonl merge=union";
 
@@ -1116,15 +1146,15 @@ mod tests {
 
     fn profile_input(id: &str) -> ProfileApplicationInput {
         ProfileApplicationInput {
-            id: crate::profile::ProfileId::try_from(id).unwrap(),
-            version: "1.0.0".to_string(),
+            id: ProfileId::try_from(id).unwrap(),
+            version: semver::Version::new(1, 0, 0),
             variables: serde_json::from_value(serde_json::json!({
                 "NAME": {"value": "value", "source": "set"}
             }))
             .unwrap(),
-            target_hashes: BTreeMap::new(),
+            targets: Default::default(),
             claims: crate::repository_state::ProfileClaims {
-                package_id: crate::repository_state::ProfilePackageId::new(id),
+                package_id: ProfileId::try_from(id).unwrap(),
                 contributions: Vec::new(),
                 assets: Vec::new(),
                 regions: Vec::new(),

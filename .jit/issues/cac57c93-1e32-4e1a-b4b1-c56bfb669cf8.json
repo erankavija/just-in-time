@@ -3,8 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "855d027d-2575-4c9d-8c6a-049f406fe397",
-    "b06cee74-7635-49c0-bc13-448bcfa28324"
+    "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e"
   ],
   "description": "Delete repository validation's parse of the event log, which exists only to count records that nothing reads.\n\n## Background\n\nRepository validation parses the whole event log only to count its records (`event_count`, `crates/jit/src/validation/repository.rs:58,86,98,175,198,319-325,355,405-413`); nothing outside the module reads the count. A malformed log therefore fails `jit validate`. Event-log integrity stays observable through `jit events`.\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryValidationReport.event_count` and the event-log parse in repository validation no longer exist.\n- [hard] REQ-02: A test shows that repository validation succeeds over an image whose event log is unparseable.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
@@ -23,10 +22,11 @@
     "component:validation",
     "per:@/charter/D-19",
     "per:@/charter/D-18",
-    "satisfies:f8a6b298/REQ-13"
+    "satisfies:f8a6b298/REQ-13",
+    "resolution:merged-into-5b0e3d63"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Repository validation stops parsing the event log",
-  "updated_at": "2026-10-21T10:40:08.481676769Z"
+  "updated_at": "2026-11-02T23:41:52.260800416Z"
 }

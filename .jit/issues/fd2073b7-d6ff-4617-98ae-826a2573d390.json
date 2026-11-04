@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T22:59:41.518849866Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "27f0a575-f1ea-49ba-9b91-eca4385c32e7"
   ],
-  "description": "Moves the gate definition, preset, attachment and run-lookup methods onto a `gates()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/gate.rs`: `add_gate`, `add_gates`, `remove_gates`, `pass_gate`, `pass_all_gates`, `pass_gate_many`, `fail_gate`, `list_gates`, `define_gate`, `update_gate`, `remove_gate_definition`, `show_gate_definition`, `list_gate_presets`, `show_gate_preset`, `apply_gate_preset`, `create_gate_preset`, `list_gate_runs`, `get_gate_run_result`, and `add_gate_definition` if it still exists. Callers: the gate arms of `crates/jit/src/main.rs` (or their handler module), the server's gate routes (`list_gates`, `show_gate_definition`, `list_gate_runs`, `get_gate_run_result` in `crates/server/src/routes.rs`), `crates/jit/src/gate_execution.rs` doc links, and the gate suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::gates()` returns `GateOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `GateOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GateOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `gates()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "description": "Moves the gate definition, preset, attachment and run-lookup methods onto a `gates()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/gate.rs`: `add_gate`, `add_gates`, `remove_gates`, `pass_gate`, `pass_all_gates`, `pass_gate_many`, `fail_gate`, `list_gates`, `define_gate`, `update_gate`, `remove_gate_definition`, `show_gate_definition`, `list_gate_presets`, `show_gate_preset`, `apply_gate_preset`, `create_gate_preset`, `list_gate_runs` and `get_gate_run_result`. Callers: the gate arms of `crates/jit/src/main.rs` (or their handler module), the server's gate routes (`list_gates`, `show_gate_definition`, `list_gate_runs`, `get_gate_run_result` in `crates/server/src/routes.rs`), `crates/jit/src/gate_execution.rs` doc links, and the gate suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::gates()` returns `GateOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `GateOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GateOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `gates()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T03:29:38.273350534Z",
   "first_ready_at": "2026-10-22T14:01:54.009336777Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "11a5f04c-3837-4dae-ba9a-cfff3bb14e99",
+      "status": "passed",
+      "updated_at": "2026-11-03T03:27:58.501036182Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "13aaec23-5884-4993-be6a-ddc4392bfb16",
+      "status": "passed",
+      "updated_at": "2026-11-03T03:29:31.836097913Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fd2073b7-d6ff-4617-98ae-826a2573d390",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Gate definition and attachment methods behind a gates facade",
-  "updated_at": "2026-10-22T14:01:54.009336777Z"
+  "updated_at": "2026-11-03T03:29:38.273350534Z"
 }

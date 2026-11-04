@@ -6,10 +6,12 @@
 
 use super::manifest::{
     AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration, ProfileDependencyRequirement,
-    ProfileId, ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration,
-    ProfileVariableName, RegionDeclaration,
+    ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration, ProfileVariableName,
+    RegionDeclaration,
 };
+use crate::domain::identity::ProfileId;
 use crate::repository_state::Contribution;
+use semver::{Version, VersionReq};
 use serde::Deserialize;
 
 const MANIFEST_VERSION: u32 = 2;
@@ -113,22 +115,22 @@ struct ManifestProfile {
     #[serde(rename = "manifest-version")]
     _manifest_version: u32,
     id: ProfileId,
-    version: String,
-    compatible_jit: String,
+    version: Version,
+    compatible_jit: VersionReq,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManifestDependency {
     id: ProfileId,
-    version: String,
+    version: VersionReq,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManifestIncompatibility {
     id: ProfileId,
-    version: String,
+    version: VersionReq,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,7 +145,7 @@ struct ManifestVariable {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_manifest;
+    use super::{decode_manifest, ManifestWireError};
 
     #[test]
     fn test_decode_manifest_accepts_lifecycle_fields_and_normalizes_wire_names() {
@@ -172,12 +174,12 @@ env = "PROJECT_NAME"
         .expect("the lifecycle manifest wire should decode");
 
         assert_eq!(model.id.as_str(), "example-package");
-        assert_eq!(model.version, "2.0.0");
-        assert_eq!(model.compatible_jit, ">=2.0.0, <3.0.0");
+        assert_eq!(model.version.to_string(), "2.0.0");
+        assert_eq!(model.compatible_jit.to_string(), ">=2.0.0, <3.0.0");
         assert_eq!(model.dependencies[0].id.as_str(), "base-package");
-        assert_eq!(model.dependencies[0].version, ">=1.4.0, <2.0.0");
+        assert_eq!(model.dependencies[0].version.to_string(), ">=1.4.0, <2.0.0");
         assert_eq!(model.incompatibilities[0].id.as_str(), "legacy-package");
-        assert_eq!(model.incompatibilities[0].version, ">=4.0.0");
+        assert_eq!(model.incompatibilities[0].version.to_string(), ">=4.0.0");
         assert_eq!(model.variables[0].name.as_str(), "PROJECT_NAME");
         assert_eq!(model.variables[0].default.as_deref(), Some("example"));
         assert_eq!(
@@ -257,5 +259,31 @@ version = "*"
         )
         .expect_err("the wire must require its compatible-jit field");
         assert!(missing_field.to_string().contains("compatible-jit"));
+    }
+
+    #[test]
+    fn test_decode_manifest_rejects_each_malformed_version_field_naming_it() {
+        let manifest = |version: &str,
+                        compatible: &str,
+                        dependency: &str,
+                        incompatibility: &str| {
+            format!(
+                "[profile]\nmanifest-version = 2\nid = \"example\"\nversion = \"{version}\"\ncompatible-jit = \"{compatible}\"\n\n[[dependency]]\nid = \"base\"\nversion = \"{dependency}\"\n\n[[incompatibility]]\nid = \"old\"\nversion = \"{incompatibility}\"\n"
+            )
+        };
+        assert!(decode_manifest(manifest("1.0.0", "*", "*", "*").as_bytes()).is_ok());
+
+        for (malformed, field) in [
+            (manifest("01.2.3", "*", "*", "*"), "version"),
+            (manifest("1.0.0", "nope", "*", "*"), "compatible-jit"),
+            (manifest("1.0.0", "*", "nope", "*"), "dependency"),
+            (manifest("1.0.0", "*", "*", "nope"), "incompatibility"),
+        ] {
+            let error = decode_manifest(malformed.as_bytes()).unwrap_err();
+            assert!(
+                matches!(error, ManifestWireError::Toml(_)) && error.to_string().contains(field),
+                "{error}"
+            );
+        }
     }
 }

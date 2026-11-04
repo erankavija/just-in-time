@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T13:33:49.991004377Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Add the git module's one query for paths that differ from `HEAD`: modified, staged, deleted, renamed or untracked.\n\n## Background\n\n- Snapshot export decides whether a checkout is dirty with libgit2's `statuses(None)` (`crates/jit/src/commands/snapshot.rs:371`), whose default options also report ignored files.\n- Applying a profile must refuse while a path it writes carries uncommitted changes (`@/charter/D-8`), which needs the same query.\n- `git status --porcelain -z --untracked-files=all` lists changed and untracked paths, one per entry and excluding ignored files, in one process.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::dirty_paths()` starts one git process and returns the repository-relative paths that are modified, staged, deleted, renamed (both names) or untracked, excluding ignored files.\n- [hard] REQ-02: The behaviour suite covers each class, an ignored file, a clean tree and a path with spaces.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-01T14:06:08.266059278Z",
+  "first_ready_at": "2026-11-01T14:05:18.145657506Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a5245f1f-3c19-47ed-9448-77f4b57231b1",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:35:21.621135307Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1f3d6c13-312f-455c-8586-0526fa0e502f",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:39:14.448888846Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Dirty-path query in the git module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-01T14:06:08.266059278Z"
 }

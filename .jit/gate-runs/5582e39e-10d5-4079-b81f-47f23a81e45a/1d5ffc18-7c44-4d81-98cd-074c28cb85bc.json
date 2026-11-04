@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "34fb03c4beee228b670c0a24d63c2134f64247ba",
+  "completed_at": "2026-11-03T21:47:25.192296581Z",
+  "duration_ms": 212336,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributed changes satisfy the event-tail capture and coverage requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5582e39e-10d5-4079-b81f-47f23a81e45a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1d5ffc18-7c44-4d81-98cd-074c28cb85bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:43:52.856238115Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 969772377 (`jit:5582e39e`); uncommitted tracker metadata excluded\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/charter/D-17, @/charter/D-18, @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-13 (.jit issue description); @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T21:42:44Z); code-review pending\nTruncation recovery: recovered per-file patches, bounded capture/tail source reads, and the complete added test after aggregate reads truncated\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributed changes satisfy the event-tail capture and coverage requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

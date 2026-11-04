@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:07:30.083018804Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Profile composition resolves a key that two packages declare by their declared dependency order, with the dependent package winning, and refuses two unrelated packages that declare one key differently.\n\n## Background\n\nCharter decision D-8 composes packages \"in declared dependency order with the dependent package winning a key both declare\" and \"refuses two unrelated packages that declare one key differently\". Today `compose_contribution_identity` (`crates/jit/src/repository_state/profile_apply.rs:350-383` at the investigation baseline) contests every differing definition, so a workflow package cannot override a value its base package contributes. The order derives from dependencies the manifests declare, so the rule is mechanism over declared data (`@/inv/domain-agnostic`). Composition receives that order from the profile selection the command layer builds once per invocation (`crates/jit/src/commands/profile.rs`), which holds the resolved package graph.\n\n## Success Criteria\n\n- [hard] REQ-01: When one package depends on another, directly or transitively, and both define one key, the dependent package's value is composed.\n- [hard] REQ-02: When two packages with no dependency path between them define one key differently, composition refuses with a conflict naming both packages.\n- [hard] REQ-03: Two packages defining one key identically compose without conflict.\n- [hard] REQ-04: A property test shows the composed result is independent of the order in which packages are selected.\n",
   "documents": [],
+  "done_at": "2026-11-01T16:08:06.244230386Z",
+  "first_ready_at": "2026-11-01T15:06:07.953622327Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f4a8f6ce-3057-4f51-a03c-5333e9ee716e",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:05:45.379742478Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8baf242e-0b86-4a81-9bf8-ba1c3d943d9d",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:07:35.441028328Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0dcabcca-d6f5-415f-90f2-12dc29f97313",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Let the dependent package win a key both packages declare",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T16:08:06.244230386Z"
 }

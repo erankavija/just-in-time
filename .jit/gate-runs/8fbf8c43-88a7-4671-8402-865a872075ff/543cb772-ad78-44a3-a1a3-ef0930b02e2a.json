@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0d17458ef0bbefab1a9616affc95679b47569480",
+  "completed_at": "2026-11-04T14:18:23.405955332Z",
+  "duration_ms": 214300,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8fbf8c43-88a7-4671-8402-865a872075ff",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "543cb772-ad78-44a3-a1a3-ef0930b02e2a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T14:14:49.105190426Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 202e8fa39, 9f05d201, 1aaba5b84 (`jit:8fbf8c43`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose (registry-first: .jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T14:13:18Z)\nTruncation recovery: re-read the initial patch in 26 path-sized reads; restricted invariant evidence to .jit/invariants.toml after unrelated issue records appeared in broad search output\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

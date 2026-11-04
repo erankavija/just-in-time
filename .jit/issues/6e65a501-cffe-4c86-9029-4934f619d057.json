@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:41:14.240656613Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "The core crate has one canonical-JSON function, in repository-state serialization, and a unit test fails when `serde_json`'s `preserve_order` feature is enabled.\n\n## Background\n\nAt the investigation baseline five private canonical-JSON copies existed. Three serve only mechanisms that earlier work removes: the profile composition copy served record fingerprints, and the copies in `crates/jit/src/profile/package.rs` (near line 980) and `crates/jit/src/profile/variables.rs` (near 512) served per-target value hashing. The manifest v1 decoder's `canonicalize` in `crates/jit/src/profile/wire.rs` is removed by the manifest v2 cutover. The survivor is in `crates/jit/src/repository_state/mutation.rs` (`canonical_json` and `canonicalize_json`, 576-588), which serializes issues, gate runs, events and presets. This work converges whatever copies remain when it lands, including any that profile package identity hashing still reaches.\n\n`serde_json`'s `preserve_order` feature is off in this workspace, so `serde_json::Map` is a sorted map and each recursive canonicalize helper is an identity transform. The order-bearing step is `serde_json::to_value`, which turns struct field order into sorted key order; the on-disk record format pins that sorted output. The survivor therefore keeps `to_value` followed by serialization. `serde_json` exposes no configuration flag for the feature, so a unit test is the guard: it serializes a struct whose fields are declared out of key order and asserts sorted bytes.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one canonical-JSON function exists in the core crate, in repository-state serialization, and each former copy's callers use it.\n- [hard] REQ-02: Bytes written for issues, gate runs, events and presets are unchanged.\n- [hard] REQ-03: A unit test fails when `serde_json`'s `preserve_order` feature is enabled.\n- [hard] REQ-04: The package identity hash of each shipped package is unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:48:22.508455193Z",
+  "first_ready_at": "2026-11-01T19:47:58.973357805Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c3949ced-38c9-43d7-8fc0-da504b4da055",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:42:39.061799694Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b593d3fe-3f5b-4675-bf2e-f005de7a1c51",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:45:11.452464647Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6e65a501-cffe-4c86-9029-4934f619d057",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Keep one canonical JSON function",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:48:22.508455193Z"
 }

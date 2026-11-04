@@ -21,7 +21,9 @@ pub use reference::render_reference_markdown;
 
 use crate::declarations::GateDefinition;
 use crate::declarations::{GateChecker, GateMode, GateStage};
+use crate::domain::identity::GateKey;
 use anyhow::{anyhow, Context, Result};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -29,7 +31,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GateTemplate {
     /// Gate key (unique identifier)
-    pub key: String,
+    pub key: GateKey,
     /// Human-readable title
     pub title: String,
     /// Description of what this gate checks
@@ -90,9 +92,6 @@ impl GatePresetDefinition {
 
         // Validate each gate
         for gate in &self.gates {
-            if gate.key.is_empty() {
-                return Err(anyhow!("Gate key cannot be empty"));
-            }
             if gate.title.is_empty() {
                 return Err(anyhow!("Gate title cannot be empty"));
             }
@@ -185,7 +184,7 @@ pub(crate) fn load_presets_from_custom_files(
 }
 
 /// Preset metadata for listing
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PresetInfo {
     /// Preset name
     pub name: String,
@@ -202,7 +201,7 @@ mod tests {
     #[test]
     fn test_gate_template_to_gate() {
         let template = GateTemplate {
-            key: "tests".to_string(),
+            key: "tests".parse().unwrap(),
             title: "All tests pass".to_string(),
             description: "Run test suite".to_string(),
             stage: GateStage::Postcheck,
@@ -219,7 +218,7 @@ mod tests {
         };
 
         let gate = template.to_gate();
-        assert_eq!(gate.key, "tests");
+        assert_eq!(gate.key.as_str(), "tests");
         assert_eq!(gate.title, "All tests pass");
         assert_eq!(gate.stage, GateStage::Postcheck);
         assert_eq!(gate.mode, GateMode::Auto);
@@ -232,7 +231,7 @@ mod tests {
             name: "test-preset".to_string(),
             description: "A test preset".to_string(),
             gates: vec![GateTemplate {
-                key: "test-gate".to_string(),
+                key: "test-gate".parse().unwrap(),
                 title: "Test Gate".to_string(),
                 description: "A test gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -291,7 +290,7 @@ mod tests {
             name: "test".to_string(),
             description: "A test preset".to_string(),
             gates: vec![GateTemplate {
-                key: "auto-gate".to_string(),
+                key: "auto-gate".parse().unwrap(),
                 title: "Automated Gate".to_string(),
                 description: "Should have checker".to_string(),
                 stage: GateStage::Postcheck,
@@ -315,7 +314,7 @@ mod tests {
             description: "A test preset".to_string(),
             gates: vec![
                 GateTemplate {
-                    key: "gate1".to_string(),
+                    key: "gate1".parse().unwrap(),
                     title: "Gate 1".to_string(),
                     description: "First".to_string(),
                     stage: GateStage::Postcheck,
@@ -323,7 +322,7 @@ mod tests {
                     checker: None,
                 },
                 GateTemplate {
-                    key: "gate1".to_string(), // Duplicate
+                    key: "gate1".parse().unwrap(), // Duplicate
                     title: "Gate 1 Again".to_string(),
                     description: "Second".to_string(),
                     stage: GateStage::Postcheck,
@@ -365,6 +364,6 @@ mod tests {
         let preset: GatePresetDefinition = serde_json::from_str(json).unwrap();
         assert_eq!(preset.name, "test-preset");
         assert_eq!(preset.gates.len(), 1);
-        assert_eq!(preset.gates[0].key, "tests");
+        assert_eq!(preset.gates[0].key.as_str(), "tests");
     }
 }

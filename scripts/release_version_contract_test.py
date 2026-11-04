@@ -178,7 +178,7 @@ class ReleaseVersionContractTests(unittest.TestCase):
         # release checker must neither compare nor rewrite this marker.
         self._write_json(
             ".jit/index.json",
-            {"schema_version": 314, "all_ids": [], "deleted_ids": []},
+            {"schema_version": 314, "deleted_ids": []},
         )
 
     def _run(

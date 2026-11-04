@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T07:53:41.597529638Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
-    "612ee9d4-d14a-45a8-b1e5-8bedec9951ce"
+    "2c8c13b2-1079-4400-b0b9-deb107ea34b4"
   ],
-  "description": "Make `jit validate <id> --rule <rule>` compute the one report from the records the capture parsed and return its rule selection.\n\n## Background\n\n- `validate_rule` (`crates/jit/src/commands/validate.rs:1896-1907`) captures the validation image and calls `rule_validation_report` (`:1063-1137`), which parses issues and declarations again, assembles configuration twice and evaluates the rule with the issue as its sole firing subject. A missing, off, non-graph or non-matching rule becomes one error finding (`validation::graph::select_graph_rule`). An unloadable rule set propagates as an error (`declarations_from_image(image)?`, `:1078`).\n- `rule_validation_report` also serves the rule-validation gate checker, which keeps calling it.\n- Tests: `tests/cli_query_graph/scope_validation_tests.rs:307-434` (rule validation through the executor) and `tests/cli_item_validate/validate_cli_rule_tests.rs:750-849` (CLI output).\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_rule` returns the report's rule selection for the issue and rule, computed from one validation capture whose parsed records the report reads.\n- [hard] REQ-02: A selection error reports the same error finding as before, and the CLI rule tests pass unchanged.\n- [hard] REQ-03: A harness test with an unloadable rule set shows that the rule view reports the `rules-file` finding; it fails on today's code, which returns an error.\n- [hard] REQ-04: The executor-level rule tests in `scope_validation_tests.rs` are reduced to wiring or removed where the selection tests own the property.\n\n## Notes\n\n- Behaviour change: with an unloadable rule set the rule view reports the `rules-file` finding where it returned a load error.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit validate <id> --rule <rule>` compute the one report from the records the capture parsed and call `ValidationReport::select(&Selection::Rule { .. })` on it directly, deleting `validate_rule`.\n\n## Background\n\n- `validate_rule` (`crates/jit/src/commands/validate.rs:1959-1970`) captures the validation image and calls `rule_validation_outcome` (`:1114-1174`), which parses issues and declarations again (`:1120-1126`), assembles configuration a second time (`:1127`) and evaluates the rule with the issue as its sole firing subject. A missing, off, non-graph or non-matching rule is a `RuleSelectionFault` (`:1177-1201`, from `validation::graph::select_graph_rule`), which the view renders as one error finding (`:1969`). An unloadable rule set propagates as an error (`declarations_from_image(image)?`, `:1126`).\n- `rule_validation_outcome` also serves the rule-validation gate checker, which keeps calling it and records a `RuleSelectionFault` as an `error` run.\n- The validation capture holds no event-log history and no gate-run listing; only whole-repository validation and the repository-validation gate checker read those.\n- Tests: `crates/jit/tests/cli_query_graph/scope_validation_tests.rs:285-468` (rule validation through the executor) and `tests/cli_item_validate/validate_cli_rule_tests.rs:666-808` (CLI output).\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate <id> --rule <rule>` calls `ValidationReport::select` for the issue and rule directly on the report computed from one validation capture whose parsed records the report reads; no per-view wrapper remains (`validate_rule` is deleted), and the view reads no event-log history and no gate-run listing.\n- [hard] REQ-02: A rule selection fault reports the same error finding as before, and the CLI rule tests pass unchanged.\n- [hard] REQ-03: A harness test with an unloadable rule set shows that the rule view reports the `rules-file` finding; it fails on today's code, which returns an error.\n- [hard] REQ-04: The executor-level rule tests in `scope_validation_tests.rs` are reduced to wiring or removed where the selection tests own the property.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: the CLI and the checkers call the one `ValidationReport::select(&Selection)` entry point (and `ValidationReport::explain`) directly, with no per-view wrapper function; the issue, rule and scope views share one executor function that captures once and computes the report without history, which 2c8c13b2 introduces and 86f7e6eb and 208edf4c reuse. Rejected: per-view wrappers (`run_rules`, `explain_rules`, `validate_scope`, `validate_rule`), four thin copies around one selection.\n\n## Notes\n\n- Behaviour change: with an unloadable rule set the rule view reports the `rules-file` finding where it returned a load error.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T08:29:20.079952778Z",
+  "first_ready_at": "2026-11-04T07:52:54.296316907Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "daa75ff7-748e-483e-adaa-c6bfdac6cd39",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:25:20.972241600Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c0428323-6c11-4fbb-809c-6f46723f53b3",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:28:43.742934514Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "86f7e6eb-554b-4d5e-8b97-208e9a1d509e",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "satisfies:9876a23a/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Single-rule validation selects from the report",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-04T08:29:20.079952778Z"
 }

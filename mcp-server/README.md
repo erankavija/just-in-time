@@ -31,6 +31,7 @@ it from there.
 
 Every leaf command in `jit --schema` becomes a callable tool named `jit_<command_path>`, so
 `jit doc assets list` is `jit_doc_assets_list`. Any generated tool can be invoked by name.
+`jit worktree exec` runs an arbitrary host command, so it generates no tool.
 
 `tools/list` advertises a curated subset: the commands an autonomous agent drives to find work,
 claim it, inspect it, transition it, check gates, and read repository structure. Interactive
@@ -86,10 +87,11 @@ mcp-server/
 ### Schema Loading
 
 The CLI is the source of truth for the command schema. The server invokes `jit --schema` once at
-startup and fails fast when the binary is absent from `PATH`. Its MCP surface matches that loaded
+startup and fails fast when the binary is absent from `PATH` (or from `JIT_BIN`, which names the executable
+explicitly). Its MCP surface matches that loaded
 schema; after rebuilding or replacing `jit`, restart the MCP server to load the changed schema.
 The generated `jit_profile_apply`, `jit_project_render`, and `jit_validate` tools therefore expose
-the same redo-record publication, managed-region, drift-repair, and actionable JSON error contracts
+the same redo-record publication, managed-region, and actionable JSON error contracts
 documented in the CLI's [Repository Profiles reference](../docs/reference/profiles.md): a tool call
 publishes through the same record as the CLI invocation it runs, and MCP maintains no publication or
 error model of its own.
@@ -207,6 +209,10 @@ Run the automated test suite, from the same setup:
 ```bash
 npm test
 ```
+
+`npm test` builds `jit` from this checkout and runs both suites against that binary, whatever
+`jit` is on `PATH`. `npm run test:suites` runs them against `JIT_BIN`, or the `jit` on `PATH` when
+it is unset. The server also honours `JIT_BIN` as the executable it invokes.
 
 The test suite verifies:
 - MCP protocol initialization

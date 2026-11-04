@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:43.992011318Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retire the private in-process repository and executor setups of the `cli_repo_workflow` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root, and builds memory stores and executors from declarations passed as data. Most tests in this target spawn `jit`, but these helpers build an in-process repository or executor of their own. Its sibling `executor_with_interruptions` builds failure-injected storage that is the test's own subject, and stays. The in-process setups of the other `cli_repo_workflow` files belong to their own migrations.\n\n`ordinary_executor` is `pub(super)` and `profile_concurrency_tests.rs` also calls it; this entry moves that caller to the shared constructor in the same change.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs`: `ordinary_executor` (`:117`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in this entry's footprint defines a function that creates an in-process repository, store or executor of its own; each obtains it from the shared constructors, and no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-28T22:59:52.030851703Z",
+  "first_ready_at": "2026-10-26T23:39:01.035607306Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "07be95e7-84fe-4a1e-b884-4417ffda8135",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:52:20.850027553Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3c8be21a-ed4e-4fd1-8b68-497754ed55f0",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:53:13.744034265Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aadae7cd-767c-439b-b818-d7b7d96f557e",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "cli_repo_workflow in-process tests use the shared constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T22:59:52.030851703Z"
 }

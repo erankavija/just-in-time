@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54d018a340670d1bfd85a62539164bcb428ea23f",
+  "completed_at": "2026-11-03T00:04:08.664359617Z",
+  "duration_ms": 204205,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable default-search history exclusions satisfy all three hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7a8773ca-c9a5-4edd-8e2e-b7dfcfc63ab8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "17e55a87-21da-4e12-8d4f-d2cf13dcdbd9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T00:00:44.459027002Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 86e819d0ae16a99f7669905fb02a87a5d0966dfd (`jit:7a8773ca`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-19; @/issue/f8a6b298/requirement/REQ-11; @/invariant/essential-code-prose; @/invariant/orthogonal-tests; @/invariant/semantic-types; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-11-02T23:58:42Z)\nTruncation recovery: Re-read relevant path registry, search implementation/test, charter, and call sites in bounded commands after a broad search truncated.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable default-search history exclusions satisfy all three hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

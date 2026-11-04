@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "064faa948fb81af493fd0d35628b2fe776287ccb",
+  "completed_at": "2026-11-01T01:41:46.239836140Z",
+  "duration_ms": 76076,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared conformance suite now owns the moved cross-backend properties, while backend-specific storage tests remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6f9f5d1e-f594-43c6-8817-33fd4813bd4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20edbe80-2366-4250-a9d2-ab77843154b4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T01:40:30.163089639Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2bca55537; 69f1b2ae3\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-08 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-11-01T01:40:29Z; exit code unavailable); code-review pending\nTruncation recovery: narrowed config/source reads and inspected each tagged commit’s storage-test patches separately\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared conformance suite now owns the moved cross-backend properties, while backend-specific storage tests remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

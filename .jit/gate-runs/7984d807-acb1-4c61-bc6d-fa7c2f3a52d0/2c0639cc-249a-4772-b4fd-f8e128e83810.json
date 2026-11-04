@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "320ad24fef7fb4dfd7ad067757fe85920b790bce",
+  "completed_at": "2026-11-01T08:54:41.491490185Z",
+  "duration_ms": 148862,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed changes correctly bind git guards and branch-drift validation to the selected repository, preserve git-optional guard behavior, and add an owned-repository regression test.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7984d807-acb1-4c61-bc6d-fa7c2f3a52d0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2c0639cc-249a-4772-b4fd-f8e128e83810",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:52:12.628610060Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 320ad24fe, 724c1ea6e, b27d75188, 75be992bc, cf257e56f\nPolicy sources: AGENTS.md; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T08:50:34Z); code-review pending\nTruncation recovery: bounded rereads of AGENTS.md, production git spawns, layout discovery, merge first-parent diff, and call sites\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed changes correctly bind git guards and branch-drift validation to the selected repository, preserve git-optional guard behavior, and add an owned-repository regression test.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

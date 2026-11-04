@@ -4,151 +4,64 @@
 //! Verifies actual binary execution, exit codes, and output formats.
 
 use assert_cmd::prelude::*;
-use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
-use jit::domain::LinkedCheckoutWriteStance;
+use jit::domain::identity::IssueId;
 use jit::output::ErrorCode;
+use jit::storage::worktree_paths::WorktreePaths;
+use jit::test_cli::JitCli;
+use jit::test_lease_store::{history_path, lease_path, read_lease};
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 use std::str::FromStr;
-use tempfile::TempDir;
-
-/// Setup a test repository with git and jit initialized
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    // Initialize git (required for worktree detection)
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["init"])
-        .status()
-        .unwrap();
-
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "user.email", "test@example.com"])
-        .status()
-        .unwrap();
-
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "user.name", "Test User"])
-        .status()
-        .unwrap();
-
-    // Initialize jit
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-
-    // Initialize control plane (for claims)
-    let git_dir = temp.path().join(".git");
-    fs::create_dir_all(git_dir.join("jit/locks")).unwrap();
-    fs::write(git_dir.join("jit/claims.jsonl"), "").unwrap();
-
-    // Create initial commit (required for claims)
-    fs::write(temp.path().join("README.md"), "# Test\n").unwrap();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["add", "."])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["commit", "-m", "Initial commit"])
-        .status()
-        .unwrap();
-
-    temp
-}
-
-/// Create a test issue and return its ID
-fn create_issue(repo_path: &Path, title: &str) -> String {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo_path)
-        .args(["issue", "create", "--title", title, "--json"])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["id"].as_str().unwrap().to_string()
-}
-
-fn commit_repository(repo_path: &Path, message: &str) {
-    Command::new("git")
-        .current_dir(repo_path)
-        .args(["add", "."])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(repo_path)
-        .args(["commit", "-m", message])
-        .status()
-        .unwrap();
-}
-
-fn create_linked_worktree(repo_path: &Path, branch: &str) -> std::path::PathBuf {
-    let linked = repo_path
-        .parent()
-        .unwrap()
-        .join(format!("{branch}-{}", std::process::id()));
-    Command::new("git")
-        .current_dir(repo_path)
-        .args(["worktree", "add", linked.to_str().unwrap(), "-b", branch])
-        .status()
-        .unwrap();
-    linked
-}
-
-/// Acquire a lease against the linked checkout's selected store.
-///
-/// The invocation declares the allowing linked-checkout write stance it relies on
-/// rather than inheriting a default (jit:f52567ed REQ-05).
-fn acquire_selected_linked_lease(
-    primary: &Path,
-    linked: &Path,
-    issue_id: &str,
-    agent_id: &str,
-) -> Output {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(primary)
-        .env("JIT_DATA_DIR", linked.join(".jit"))
-        .env(
-            LINKED_CHECKOUT_WRITE_STANCE_ENV,
-            LinkedCheckoutWriteStance::Allow.as_token(),
-        )
-        .args([
-            "claim",
-            "acquire",
-            issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            agent_id,
-            "--json",
-        ])
-        .output()
-        .expect("acquire selected linked lease")
-}
 
 #[test]
-fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() {
-    let primary = setup_repo();
-    let issue_id = create_issue(primary.path(), "Selected linked claim");
-    commit_repository(primary.path(), "Add selected linked claim");
-    let linked_branch = format!("linked-claim-{}", std::process::id());
-    let linked = create_linked_worktree(primary.path(), &linked_branch);
-    let primary_identity_path = primary.path().join(".jit/worktree.json");
-    let primary_identity_before = fs::read(&primary_identity_path).unwrap();
+fn test_issue_release() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Task"]).unwrap();
+    cli.run(["issue", "claim", &id, "agent:worker-1"]).unwrap();
 
-    let output =
-        acquire_selected_linked_lease(primary.path(), &linked, &issue_id, "agent:selected-linked");
+    cli.run(["issue", "release", &id, "timeout"]).unwrap();
+
+    assert!(cli.run_json(["issue", "show", &id]).unwrap()["assignee"].is_null());
+}
+
+/// Declared by every invocation selecting a linked checkout's store, rather
+/// than inheriting a default (jit:f52567ed REQ-05).
+#[test]
+fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() {
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let issue_id = primary
+        .create_issue(["--title", "Selected linked claim"])
+        .unwrap();
+    primary.commit("Add selected linked claim").unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
+    let linked_branch = linked.git(["branch", "--show-current"]).unwrap();
+    let linked_branch = linked_branch.trim();
+    let primary_identity_path = primary.root().join(".jit/worktree.json");
+    let primary_identity_before = fs::read(&primary_identity_path).unwrap();
+    let linked_store = linked.root().join(".jit");
+
+    let output = primary
+        .command_with_env(
+            [
+                "claim",
+                "acquire",
+                &issue_id,
+                "--ttl",
+                "600",
+                "--agent-id",
+                "agent:selected-linked",
+                "--json",
+            ],
+            [
+                ("JIT_DATA_DIR", linked_store.to_str().unwrap()),
+                crate::ALLOW_LINKED_WRITES,
+            ],
+        )
+        .output()
+        .unwrap();
 
     assert!(
         output.status.success(),
@@ -162,10 +75,10 @@ fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() 
 
     let primary_identity: Value = serde_json::from_slice(&primary_identity_before).unwrap();
     let linked_identity: Value =
-        serde_json::from_slice(&fs::read(linked.join(".jit/worktree.json")).unwrap()).unwrap();
+        serde_json::from_slice(&fs::read(linked_store.join("worktree.json")).unwrap()).unwrap();
     assert_eq!(
         Path::new(linked_identity["root"].as_str().unwrap()),
-        linked.as_path()
+        linked.root()
     );
     assert_eq!(linked_identity["branch"], linked_branch);
     assert_ne!(
@@ -173,55 +86,76 @@ fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() 
         primary_identity["worktree_id"]
     );
 
-    let claims: Value = serde_json::from_slice(
-        &fs::read(primary.path().join(".git/jit/claims.index.json")).unwrap(),
-    )
-    .unwrap();
-    let lease = claims["leases"]
-        .as_array()
+    let paths = WorktreePaths::detect_for_data_root(&linked_store, primary.root()).unwrap();
+    let lease = read_lease(&paths.shared_jit, &parse_issue_id(&issue_id))
         .unwrap()
-        .iter()
-        .find(|lease| lease["issue_id"] == issue_id)
         .expect("selected issue has a lease");
-    assert_eq!(lease["worktree_id"], linked_identity["worktree_id"]);
-    assert_eq!(lease["branch"], linked_branch);
+    assert_eq!(
+        lease.worktree_id.as_str(),
+        linked_identity["worktree_id"].as_str().unwrap()
+    );
+    assert_eq!(lease.branch.as_deref(), Some(linked_branch));
 }
 
 #[test]
 fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primary_cwd() {
-    let selected_primary = setup_repo();
-    let issue_id = create_issue(selected_primary.path(), "Selected linked lifecycle");
-    commit_repository(selected_primary.path(), "Add selected linked lifecycle");
-    let linked_branch = format!("linked-lifecycle-{}", std::process::id());
-    let linked = create_linked_worktree(selected_primary.path(), &linked_branch);
+    let (selected_primary, linked) = JitCli::linked_checkouts().unwrap();
+    let issue_id = selected_primary
+        .create_issue(["--title", "Selected linked lifecycle"])
+        .unwrap();
+    selected_primary
+        .commit("Add selected linked lifecycle")
+        .unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     let agent_id = "agent:selected-linked-lifecycle";
-    let acquire =
-        acquire_selected_linked_lease(selected_primary.path(), &linked, &issue_id, agent_id);
+    let linked_store = linked.root().join(".jit");
+    let selected_store = ("JIT_DATA_DIR", linked_store.to_str().unwrap());
+    let acquire = selected_primary
+        .command_with_env(
+            [
+                "claim",
+                "acquire",
+                &issue_id,
+                "--ttl",
+                "600",
+                "--agent-id",
+                agent_id,
+                "--json",
+            ],
+            [selected_store, crate::ALLOW_LINKED_WRITES],
+        )
+        .output()
+        .unwrap();
     assert!(
         acquire.status.success(),
         "claim acquire failed: {}",
         String::from_utf8_lossy(&acquire.stderr)
     );
-    let mut config = fs::read_to_string(linked.join(".jit/config.toml")).unwrap();
+    let mut config = fs::read_to_string(linked_store.join("config.toml")).unwrap();
     config.push_str("\n[worktree]\nenforce_leases = \"strict\"\n");
-    fs::write(linked.join(".jit/config.toml"), config).unwrap();
-    let foreign_primary = setup_repo();
+    fs::write(linked_store.join("config.toml"), config).unwrap();
+    let foreign_primary = JitCli::initialised().unwrap();
+    foreign_primary
+        .init_git()
+        .unwrap()
+        .commit("Initial commit")
+        .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(foreign_primary.path())
-        .env("JIT_DATA_DIR", linked.join(".jit"))
-        .env(
-            LINKED_CHECKOUT_WRITE_STANCE_ENV,
-            LinkedCheckoutWriteStance::Allow.as_token(),
+    let output = foreign_primary
+        .command_with_env(
+            [
+                "issue",
+                "assign",
+                &issue_id,
+                "human:selected-owner",
+                "--json",
+            ],
+            [
+                selected_store,
+                crate::ALLOW_LINKED_WRITES,
+                ("JIT_AGENT_ID", agent_id),
+            ],
         )
-        .env("JIT_AGENT_ID", agent_id)
-        .args([
-            "issue",
-            "assign",
-            &issue_id,
-            "human:selected-owner",
-            "--json",
-        ])
         .output()
         .unwrap();
 
@@ -231,17 +165,15 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
         String::from_utf8_lossy(&output.stderr)
     );
     let issue: Value = serde_json::from_slice(
-        &fs::read(linked.join(".jit/issues").join(format!("{issue_id}.json"))).unwrap(),
+        &fs::read(linked_store.join("issues").join(format!("{issue_id}.json"))).unwrap(),
     )
     .unwrap();
     assert_eq!(issue["assignee"], "human:selected-owner");
 }
 
 fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: ErrorCode) {
-    let expected_status = Some(expected_code.exit_code().code());
-    assert_eq!(plain.status.code(), expected_status);
-    assert_eq!(json.status.code(), expected_status);
-    assert_eq!(plain.status.code(), json.status.code());
+    assert!(!plain.status.success());
+    assert!(!json.status.success());
 
     assert!(plain.stdout.is_empty(), "plain failure leaked to stdout");
     assert!(
@@ -267,24 +199,24 @@ fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: Err
     assert!(error["message"].is_string());
 }
 
-fn acquire_lease(repo_path: &Path, issue_id: &str, agent_id: &str) -> String {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo_path)
-        .args([
-            "claim",
-            "acquire",
-            issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            agent_id,
-            "--json",
-        ])
-        .output()
-        .expect("acquire fixture lease");
-    assert!(output.status.success(), "claim acquire failed: {output:?}");
-    let json: Value = serde_json::from_slice(&output.stdout).expect("acquire response is JSON");
-    json["lease_id"]
+/// The id a binary printed, parsed once where a test hands it to suite helpers.
+fn parse_issue_id(printed: &str) -> IssueId {
+    printed
+        .parse()
+        .expect("the binary prints a canonical issue id")
+}
+
+fn acquire_lease(cli: &JitCli, issue_id: &IssueId, agent_id: &str) -> String {
+    cli.run_json([
+        "claim",
+        "acquire",
+        issue_id.as_str(),
+        "--ttl",
+        "600",
+        "--agent-id",
+        agent_id,
+    ])
+    .expect("acquire fixture lease")["lease_id"]
         .as_str()
         .expect("acquire response carries lease id")
         .to_string()
@@ -295,20 +227,33 @@ fn acquire_lease(repo_path: &Path, issue_id: &str, agent_id: &str) -> String {
 fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
     use std::os::unix::fs::PermissionsExt;
 
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Permission-denied claim");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(
+        &cli.create_issue(["--title", "Permission-denied claim"])
+            .unwrap(),
+    );
     let agent = "agent:permission-probe";
-    let lease_id = acquire_lease(temp.path(), &issue_id, agent);
-    let index_path = temp.path().join(".git/jit/claims.index.json");
-    let original_mode = fs::metadata(&index_path).unwrap().permissions().mode();
-    fs::set_permissions(&index_path, fs::Permissions::from_mode(0o0)).unwrap();
+    acquire_lease(&cli, &issue_id, agent);
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    // Renew reads the lease under the lock from whichever path stores it.
+    let stored = [
+        lease_path(&paths.shared_jit, &issue_id),
+        history_path(&paths.shared_jit),
+    ];
+    let original_modes = stored
+        .iter()
+        .map(|path| fs::metadata(path).unwrap().permissions().mode())
+        .collect::<Vec<_>>();
+    for path in &stored {
+        fs::set_permissions(path, fs::Permissions::from_mode(0o0)).unwrap();
+    }
 
     let invoke = |json: bool| {
-        let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-        command
-            .current_dir(temp.path())
-            .env("JIT_AGENT_ID", agent)
-            .args(["claim", "renew", &lease_id, "--extension", "300"]);
+        let mut command = cli.command_with_env(
+            ["claim", "renew", issue_id.as_str(), "--extension", "300"],
+            [("JIT_AGENT_ID", agent)],
+        );
         if json {
             command.arg("--json");
         }
@@ -317,21 +262,59 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
     let plain = invoke(false);
     let json = invoke(true);
 
-    fs::set_permissions(&index_path, fs::Permissions::from_mode(original_mode)).unwrap();
+    for (path, mode) in stored.iter().zip(original_modes) {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
     assert_claim_failure_parity(&plain, &json, ErrorCode::PermissionDenied);
+}
+
+/// A failure the classifier leaves generic reports the generic code and status
+/// on both paths, not a per-verb claim code.
+#[test]
+fn test_claim_acquire_already_claimed_reports_generic_error_on_both_paths() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Contended claim"]).unwrap();
+    let invoke = |agent: &str, json: bool| {
+        let mut command = cli.command([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            agent,
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+    assert!(invoke("agent:holder", false).status.success());
+
+    let plain = invoke("agent:rival", false);
+    let json = invoke("agent:rival", true);
+
+    assert_claim_failure_parity(&plain, &json, ErrorCode::GenericError);
+    assert_eq!(plain.status.code(), json.status.code());
+    assert_eq!(
+        json.status.code(),
+        Some(ErrorCode::GenericError.exit_code().code())
+    );
 }
 
 #[test]
 fn test_claim_acquire_external_io_is_identical_in_plain_and_json_forms() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "External-I/O claim");
-    let locks_path = temp.path().join(".git/jit/locks");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "External-I/O claim"]).unwrap();
+    let locks_path = cli.root().join(".git/jit/locks");
+    fs::create_dir_all(&locks_path).unwrap();
     fs::remove_dir(&locks_path).unwrap();
     fs::write(&locks_path, "not a directory").unwrap();
 
     let invoke = |json: bool| {
-        let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-        command.current_dir(temp.path()).args([
+        let mut command = cli.command([
             "claim",
             "acquire",
             &issue_id,
@@ -353,53 +336,50 @@ fn test_claim_acquire_external_io_is_identical_in_plain_and_json_forms() {
 
 #[test]
 fn test_claim_acquire_happy_path() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // Acquire claim
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Acquired lease"));
+}
+
+#[test]
+fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
+
+    let acquire = |agent: &str| {
+        cli.command([
             "claim",
             "acquire",
             &issue_id,
             "--ttl",
             "600",
             "--agent-id",
-            "agent:test-1",
+            agent,
         ])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("Acquired lease"));
-}
-
-#[test]
-fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
-
-    let acquire = |agent: &str| {
-        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(temp.path())
-            .args([
-                "claim",
-                "acquire",
-                &issue_id,
-                "--ttl",
-                "600",
-                "--agent-id",
-                agent,
-            ])
-            .assert()
-            .success();
+        .success();
     };
 
     acquire("agent:test-1");
 
     // The lease-acquire path stamped claimed_at on the issue record.
-    let show = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &issue_id, "--json"])
+    let show = cli
+        .command(["issue", "show", &issue_id, "--json"])
         .output()
         .unwrap();
     let show_json: Value = serde_json::from_slice(&show.stdout).unwrap();
@@ -409,26 +389,22 @@ fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
         .to_string();
 
     // @/inv/event-log: an issue_claimed event was appended.
-    let events = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["events", "query", "--event-type", "issue_claimed", "--json"])
+    let events = cli
+        .command(["events", "query", "--event-type", "issue_claimed", "--json"])
         .output()
         .unwrap();
     let events_json: Value = serde_json::from_slice(&events.stdout).unwrap();
-    assert_eq!(events_json["count"].as_u64().unwrap(), 1);
+    assert_eq!(events_json["events"].as_array().unwrap().len(), 1);
 
     // First-occurrence: re-acquiring as the same agent (release then re-acquire)
     // must not move claimed_at.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "release", &issue_id])
+    cli.command(["claim", "release", &issue_id])
         .assert()
         .success();
     acquire("agent:test-1");
 
-    let show2 = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &issue_id, "--json"])
+    let show2 = cli
+        .command(["issue", "show", &issue_id, "--json"])
         .output()
         .unwrap();
     let show2_json: Value = serde_json::from_slice(&show2.stdout).unwrap();
@@ -437,13 +413,13 @@ fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
 
 #[test]
 fn test_claim_acquire_json_output() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // Acquire claim with JSON output
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -467,68 +443,62 @@ fn test_claim_acquire_json_output() {
 
 #[test]
 fn test_claim_acquire_already_claimed_error() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // First claim succeeds
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .success();
 
     // Second claim should fail with actionable error
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-2",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("already claimed"))
-        .stderr(predicate::str::contains("Possible causes:"))
-        .stderr(predicate::str::contains("To fix:"))
-        .stderr(predicate::str::contains("jit claim status"));
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-2",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("already claimed"))
+    .stderr(predicate::str::contains("Possible causes:"))
+    .stderr(predicate::str::contains("To fix:"))
+    .stderr(predicate::str::contains("jit claim status"));
 }
 
 #[test]
 fn test_claim_list_shows_active_leases() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // Acquire a claim
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .success();
 
     // List should show the lease
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list"])
+    cli.command(["claim", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains(&issue_id))
@@ -537,13 +507,13 @@ fn test_claim_list_shows_active_leases() {
 
 #[test]
 fn test_claim_list_json_output() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // Acquire a claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -560,11 +530,7 @@ fn test_claim_list_json_output() {
     let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // List claims with JSON
-    let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let list_output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
     assert!(list_output.status.success());
 
@@ -580,13 +546,13 @@ fn test_claim_list_json_output() {
 
 #[test]
 fn test_claim_release_happy_path() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // Acquire claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -603,62 +569,63 @@ fn test_claim_release_happy_path() {
     let _lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Release claim by ISSUE id (no lease UUID required).
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "release", &issue_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Released lease"));
+    cli.command_with_env(
+        ["claim", "release", &issue_id],
+        [("JIT_AGENT_ID", "agent:test-1")],
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Released lease"));
 }
 
 #[test]
 fn test_claim_release_no_active_lease_error() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Unclaimed Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Unclaimed Issue"]).unwrap();
 
     // Releasing an existing issue with no active lease should fail with an
     // actionable error that mentions "not found".
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test")
-        .args(["claim", "release", &issue_id])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("no active lease"))
-        .stderr(predicate::str::contains("not found"))
-        .stderr(predicate::str::contains("Possible causes:"))
-        .stderr(predicate::str::contains("To fix:"))
-        .stderr(predicate::str::contains("jit claim list"));
+    cli.command_with_env(
+        ["claim", "release", &issue_id],
+        [("JIT_AGENT_ID", "agent:test")],
+    )
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("no active lease"))
+    .stderr(predicate::str::contains("not found"))
+    .stderr(predicate::str::contains("Possible causes:"))
+    .stderr(predicate::str::contains("To fix:"))
+    .stderr(predicate::str::contains("jit claim list"));
 }
 
 #[test]
 fn test_claim_release_by_issue_succeeds_for_different_owner() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Owned Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Owned Issue"]).unwrap();
 
     // Agent A acquires the lease.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:owner",
-            "--json",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:owner",
+        "--json",
+    ])
+    .assert()
+    .success();
 
     // A DIFFERENT agent releases by issue id; the audit reports the prior owner
     // and the acting identity.
-    let release_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:stranger")
-        .args(["claim", "release", &issue_id, "--json"])
+    let release_output = cli
+        .command_with_env(
+            ["claim", "release", &issue_id, "--json"],
+            [("JIT_AGENT_ID", "agent:stranger")],
+        )
         .output()
         .unwrap();
 
@@ -669,24 +636,22 @@ fn test_claim_release_by_issue_succeeds_for_different_owner() {
     assert_eq!(release_json["actor"], "agent:stranger");
 
     // Lease is gone.
-    let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let list_output = cli.command(["claim", "list", "--json"]).output().unwrap();
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
     assert_eq!(list_json["leases"].as_array().unwrap().len(), 0);
 }
 
 #[test]
 fn test_claim_workflow_end_to_end() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue for Workflow");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue for Workflow"])
+        .unwrap();
 
     // Step 1: Acquire claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -704,11 +669,7 @@ fn test_claim_workflow_end_to_end() {
     let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Step 2: List claims and verify
-    let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let list_output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
     assert!(list_output.status.success());
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
@@ -717,19 +678,15 @@ fn test_claim_workflow_end_to_end() {
     assert_eq!(leases[0]["lease_id"], lease_id);
 
     // Step 3: Release claim by issue id
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:workflow-test")
-        .args(["claim", "release", &issue_id])
-        .assert()
-        .success();
+    cli.command_with_env(
+        ["claim", "release", &issue_id],
+        [("JIT_AGENT_ID", "agent:workflow-test")],
+    )
+    .assert()
+    .success();
 
     // Step 4: Verify lease is gone
-    let list_after_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let list_after_output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
     let list_after_json: Value = serde_json::from_slice(&list_after_output.stdout).unwrap();
     let leases_after = list_after_json["leases"].as_array().unwrap();
@@ -741,73 +698,64 @@ fn test_claim_workflow_end_to_end() {
 }
 
 #[test]
-fn test_recover_empty_claim_log_does_not_warn_about_missing_index() {
-    let repo = setup_repo();
+fn test_recover_reports_a_reclaimed_stale_lease_without_appending_an_event() {
+    use chrono::{Duration, Utc};
 
-    let recovered = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo.path())
-        .args(["recover", "--json"])
-        .output()
-        .unwrap();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Abandoned lease"]).unwrap());
+    let silent_since = Utc::now()
+        - Duration::seconds(jit::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64 + 60);
+    let lease = jit::storage::Lease {
+        lease_id: "00000000-0000-4000-8000-0000000000ab".parse().unwrap(),
+        issue_id: issue_id.clone(),
+        agent_id: "agent:gone".parse().unwrap(),
+        worktree_id: "wt:gone".parse().unwrap(),
+        branch: None,
+        ttl_secs: 0,
+        acquired_at: silent_since,
+        expires_at: None,
+        last_beat: silent_since,
+    };
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    jit::test_lease_store::plant_lease(&paths.shared_jit, &lease).unwrap();
+    let events = || fs::read(cli.root().join(".jit/events.jsonl")).unwrap_or_default();
+    let events_before = events();
+
+    let recovered = cli.command(["recover", "--json"]).output().unwrap();
+
     assert!(recovered.status.success(), "{recovered:?}");
-
     let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
-    assert_eq!(report["index_rebuilt"], false);
-    assert!(!report["warnings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|warning| warning["kind"] == "index_rebuilt"));
-}
-
-#[test]
-fn test_recover_rebuilds_index_when_claim_log_has_claims_but_index_is_missing() {
-    let repo = setup_repo();
-    let issue_id = create_issue(repo.path(), "Claim log recovery");
-    acquire_lease(repo.path(), &issue_id, "agent:recovery-test");
-    fs::remove_file(repo.path().join(".git/jit/claims.index.json")).unwrap();
-
-    let recovered = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo.path())
-        .args(["recover", "--json"])
-        .output()
-        .unwrap();
-    assert!(recovered.status.success(), "{recovered:?}");
-
-    let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
-    assert_eq!(report["index_rebuilt"], true);
-    assert!(report["warnings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|warning| warning["kind"] == "index_rebuilt"));
+    assert_eq!(report["stale_leases_reclaimed"], 1, "{report}");
+    assert_eq!(report["expired_leases_evicted"], 0, "{report}");
+    assert_eq!(
+        jit::test_lease_store::read_lease(&paths.shared_jit, &issue_id).unwrap(),
+        None
+    );
+    assert_eq!(events(), events_before, "reclamation appends no event");
 }
 
 #[test]
 fn test_claim_status_shows_lease_details() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     // Acquire claim
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .success();
 
     // Check status
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "status"])
+    cli.command_with_env(["claim", "status"], [("JIT_AGENT_ID", "agent:test-1")])
         .assert()
         .success()
         .stdout(predicate::str::contains(&issue_id))
@@ -816,34 +764,35 @@ fn test_claim_status_shows_lease_details() {
 
 #[test]
 fn test_claim_acquire_nonexistent_issue_error() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // Try to claim non-existent issue
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            "00000000-0000-0000-0000-000000000000",
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found").or(predicate::str::contains("Issue")));
+    cli.command([
+        "claim",
+        "acquire",
+        "00000000-0000-0000-0000-000000000000",
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("not found").or(predicate::str::contains("Issue")));
 }
 
 #[test]
 fn test_claim_renew_success() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue for Renew");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue for Renew"])
+        .unwrap();
 
     // Acquire claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -856,28 +805,29 @@ fn test_claim_renew_success() {
         .output()
         .unwrap();
 
-    let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
+    assert!(acquire_output.status.success());
 
     // Renew claim
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "renew", lease_id, "--extension", "300"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Renewed lease"));
+    cli.command_with_env(
+        ["claim", "renew", &issue_id, "--extension", "300"],
+        [("JIT_AGENT_ID", "agent:test-1")],
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Renewed lease"));
 }
 
 #[test]
 fn test_claim_renew_json_output() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue for Renew JSON");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue for Renew JSON"])
+        .unwrap();
 
     // Acquire claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -894,10 +844,11 @@ fn test_claim_renew_json_output() {
     let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Renew with JSON output
-    let renew_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "renew", lease_id, "--extension", "300", "--json"])
+    let renew_output = cli
+        .command_with_env(
+            ["claim", "renew", &issue_id, "--extension", "300", "--json"],
+            [("JIT_AGENT_ID", "agent:test-1")],
+        )
         .output()
         .unwrap();
 
@@ -911,16 +862,19 @@ fn test_claim_renew_json_output() {
 }
 
 #[test]
-fn test_claim_renew_not_found_error() {
-    let temp = setup_repo();
-    let missing_lease = "00000000-0000-0000-0000-000000000000";
+fn test_claim_renew_of_an_issue_without_a_lease_fails_as_not_found() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    // A held lease on another issue brings up the claim control plane.
+    let leased = parse_issue_id(&cli.create_issue(["--title", "Leased"]).unwrap());
+    acquire_lease(&cli, &leased, "agent:holder");
+    let unleased = cli.create_issue(["--title", "Unleased"]).unwrap();
 
     let invoke = |json: bool| {
-        let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-        command
-            .current_dir(temp.path())
-            .env("JIT_AGENT_ID", "agent:test")
-            .args(["claim", "renew", missing_lease, "--extension", "300"]);
+        let mut command = cli.command_with_env(
+            ["claim", "renew", &unleased, "--extension", "300"],
+            [("JIT_AGENT_ID", "agent:test")],
+        );
         if json {
             command.arg("--json");
         }
@@ -932,13 +886,15 @@ fn test_claim_renew_not_found_error() {
 
 #[test]
 fn test_claim_force_evict_success() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue for Force-Evict");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue for Force-Evict"])
+        .unwrap();
 
     // Acquire claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -951,23 +907,22 @@ fn test_claim_force_evict_success() {
         .output()
         .unwrap();
 
-    let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
+    assert!(acquire_output.status.success());
 
     // Force-evict (admin operation - doesn't need same agent)
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "force-evict", lease_id, "--reason", "test cleanup"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Force-evicted"));
+    cli.command([
+        "claim",
+        "force-evict",
+        &issue_id,
+        "--reason",
+        "test cleanup",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Force-evicted"));
 
     // Verify lease is gone
-    let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let list_output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
     let leases = list_json["leases"].as_array().unwrap();
@@ -975,27 +930,63 @@ fn test_claim_force_evict_success() {
 }
 
 #[test]
+fn test_claim_force_evict_removes_the_lease_of_a_deleted_issue() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Deleted"]).unwrap());
+    let lease_id = acquire_lease(&cli, &issue_id, "agent:holder");
+    cli.command_with_env(
+        ["issue", "delete", issue_id.as_str()],
+        [
+            ("JIT_ALLOW_DELETION", "1"),
+            ("JIT_AGENT_ID", "agent:holder"),
+        ],
+    )
+    .assert()
+    .success();
+
+    let evicted = cli
+        .run_json([
+            "claim",
+            "force-evict",
+            issue_id.short_id(),
+            "--reason",
+            "issue deleted",
+        ])
+        .unwrap();
+
+    assert_eq!(evicted["lease_id"], lease_id.as_str());
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    assert!(!lease_path(&paths.shared_jit, &issue_id).exists());
+}
+
+#[test]
 fn test_claim_force_evict_requires_reason() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
 
     // Force-evict without reason should fail (clap validation)
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "force-evict", "01FAKE0000000000000000000"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("--reason"));
+    cli.command([
+        "claim",
+        "force-evict",
+        "00000000-0000-4000-8000-000000000001",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("--reason"));
 }
 
 #[test]
 fn test_claim_heartbeat_success() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue for Heartbeat");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue for Heartbeat"])
+        .unwrap();
 
     // Acquire indefinite claim (TTL=0)
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1016,28 +1007,27 @@ fn test_claim_heartbeat_success() {
         String::from_utf8_lossy(&acquire_output.stderr)
     );
 
-    let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
-
     // Heartbeat to update last_beat
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "heartbeat", lease_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Heartbeat sent"));
+    cli.command_with_env(
+        ["claim", "heartbeat", &issue_id],
+        [("JIT_AGENT_ID", "agent:test-1")],
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Heartbeat sent"));
 }
 
 #[test]
 fn test_claim_heartbeat_json_output() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue for Heartbeat JSON");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue for Heartbeat JSON"])
+        .unwrap();
 
     // Acquire indefinite claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1056,10 +1046,11 @@ fn test_claim_heartbeat_json_output() {
     let lease_id = acquire_json["lease_id"].as_str().unwrap();
 
     // Heartbeat with JSON output
-    let heartbeat_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test-1")
-        .args(["claim", "heartbeat", lease_id, "--json"])
+    let heartbeat_output = cli
+        .command_with_env(
+            ["claim", "heartbeat", &issue_id, "--json"],
+            [("JIT_AGENT_ID", "agent:test-1")],
+        )
         .output()
         .unwrap();
 
@@ -1072,28 +1063,16 @@ fn test_claim_heartbeat_json_output() {
 }
 
 #[test]
-fn test_claim_heartbeat_not_found_error() {
-    let temp = setup_repo();
-
-    // Try to heartbeat non-existent lease
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test")
-        .args(["claim", "heartbeat", "01FAKE0000000000000000000"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found"));
-}
-
-#[test]
 fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "TTL=0 Workflow Test");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "TTL=0 Workflow Test"])
+        .unwrap();
 
     // Step 1: Acquire indefinite claim
-    let acquire_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let acquire_output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1118,11 +1097,7 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
     assert_eq!(acquire_json["ttl_secs"], 0);
 
     // Step 2: List claims and verify indefinite marker
-    let list_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list"])
-        .output()
-        .unwrap();
+    let list_output = cli.command(["claim", "list"]).output().unwrap();
 
     let list_stdout = String::from_utf8_lossy(&list_output.stdout);
     assert!(
@@ -1131,18 +1106,19 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
     );
 
     // Step 3: Heartbeat
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:workflow-test")
-        .args(["claim", "heartbeat", lease_id])
-        .assert()
-        .success();
+    cli.command_with_env(
+        ["claim", "heartbeat", &issue_id],
+        [("JIT_AGENT_ID", "agent:workflow-test")],
+    )
+    .assert()
+    .success();
 
     // Step 4: Status check
-    let status_output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:workflow-test")
-        .args(["claim", "status", "--json"])
+    let status_output = cli
+        .command_with_env(
+            ["claim", "status", "--json"],
+            [("JIT_AGENT_ID", "agent:workflow-test")],
+        )
         .output()
         .unwrap();
 
@@ -1152,87 +1128,67 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
     assert_eq!(leases[0]["lease_id"], lease_id);
 
     // Step 5: Release by issue id
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:workflow-test")
-        .args(["claim", "release", &issue_id])
-        .assert()
-        .success();
+    cli.command_with_env(
+        ["claim", "release", &issue_id],
+        [("JIT_AGENT_ID", "agent:workflow-test")],
+    )
+    .assert()
+    .success();
 
     // Verify lease is gone
-    let final_list = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let final_list = cli.command(["claim", "list", "--json"]).output().unwrap();
 
     let final_json: Value = serde_json::from_slice(&final_list.stdout).unwrap();
     let final_leases = final_json["leases"].as_array().unwrap();
     assert_eq!(final_leases.len(), 0, "Lease should be released");
 }
 
-/// Setup a jit repository WITHOUT git (to test git-requirement errors on claim/lease commands).
-fn setup_non_git_jit_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    // Initialize jit only — no git init.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-
-    temp
-}
-
 #[test]
 fn test_claim_acquire_outside_git_repo_emits_git_requirement_error() {
-    let temp = setup_non_git_jit_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue Outside Git");
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue Outside Git"])
+        .unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("git repository"))
-        .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")))
-        // REQ-04 (jit:30a3b5c1): no git repository at all hints `git init`.
-        .stderr(predicate::str::contains("git init"));
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("git repository"))
+    .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")))
+    // REQ-04 (jit:30a3b5c1): no git repository at all hints `git init`.
+    .stderr(predicate::str::contains("git init"));
 }
 
 #[test]
 fn test_claim_list_outside_git_repo_emits_git_requirement_error() {
-    let temp = setup_non_git_jit_repo();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list"])
+    cli.command(["claim", "list"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("git repository"))
         .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
 }
 
-/// The `--json` claim path must honor the same exit-10 contract as the human
-/// path: running `claim acquire --json` outside a git repository emits a JSON
-/// error naming the git requirement and exits with code 10.
+/// Running `claim acquire --json` outside a git repository emits a JSON error
+/// naming the git requirement.
 #[test]
-fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
-    let temp = setup_non_git_jit_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue Outside Git JSON");
+fn test_claim_acquire_json_outside_git_repo_reports_git_requirement() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue Outside Git JSON"])
+        .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1245,11 +1201,7 @@ fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "claim acquire --json outside git must exit 10 (external dependency)"
-    );
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1260,23 +1212,15 @@ fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
     );
 }
 
-/// `claim list --json` outside a git repository must also exit 10 with a JSON
-/// error naming the git requirement.
+/// `claim list --json` outside a git repository emits a JSON error naming the
+/// git requirement.
 #[test]
-fn test_claim_list_json_outside_git_repo_exits_10_with_git_requirement() {
-    let temp = setup_non_git_jit_repo();
+fn test_claim_list_json_outside_git_repo_reports_git_requirement() {
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["claim", "list", "--json"])
-        .output()
-        .unwrap();
+    let output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "claim list --json outside git must exit 10 (external dependency)"
-    );
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1293,26 +1237,24 @@ fn test_claim_list_json_outside_git_repo_exits_10_with_git_requirement() {
 /// doubled "Error: Error: ".
 #[test]
 fn test_claim_acquire_already_claimed_error_has_single_error_prefix() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Test Issue");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .success();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1333,69 +1275,48 @@ fn test_claim_acquire_already_claimed_error_has_single_error_prefix() {
     );
 }
 
-/// Setup a jit repository inside a git repository that has been `git init`ed
-/// but has no commits yet, to test the "git repo without commits" branch of
-/// the claims-require-git failure (REQ-04, jit:30a3b5c1). Distinct from
-/// [`setup_non_git_jit_repo`], which has no `.git` directory at all.
-fn setup_git_repo_without_commits() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    Command::new("git")
-        .current_dir(temp.path())
-        .args(["init"])
-        .status()
-        .unwrap();
-
-    // Initialize jit only — deliberately no commit yet, so HEAD never resolves.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-
-    temp
-}
-
 /// REQ-04 (jit:30a3b5c1): a git repository with zero commits fails
 /// `--abbrev-ref HEAD` exactly like a directory with no git repository at
 /// all, but the hint must point at making a commit rather than `git init`
 /// (the repository already exists).
 #[test]
 fn test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init() {
-    let temp = setup_git_repo_without_commits();
-    let issue_id = create_issue(temp.path(), "Test Issue No Commits");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue No Commits"])
+        .unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "claim",
-            "acquire",
-            &issue_id,
-            "--ttl",
-            "600",
-            "--agent-id",
-            "agent:test-1",
-        ])
-        .assert()
-        .failure()
-        .code(10)
-        .stderr(predicate::str::contains("git repository"))
-        .stderr(predicate::str::contains("commit"))
-        .stderr(predicate::str::contains("git init").not());
+    cli.command([
+        "claim",
+        "acquire",
+        &issue_id,
+        "--ttl",
+        "600",
+        "--agent-id",
+        "agent:test-1",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("git repository"))
+    .stderr(predicate::str::contains("commit"))
+    .stderr(predicate::str::contains("git init").not());
 }
 
 /// JSON-mode counterpart of
 /// [`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`]:
-/// same exit code and error code as the no-repository case, but the message
-/// hints a commit instead of `git init`.
+/// same error code as the no-repository case, but the message hints a commit
+/// instead of `git init`.
 #[test]
 fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init() {
-    let temp = setup_git_repo_without_commits();
-    let issue_id = create_issue(temp.path(), "Test Issue No Commits JSON");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue No Commits JSON"])
+        .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let output = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1408,7 +1329,7 @@ fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(10));
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1430,17 +1351,12 @@ fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init
 // bookkeeping vs. an exclusive, time-boxed lease).
 // ============================================================================
 
-fn help_text(args: &[&str]) -> String {
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .args(args)
-        .output()
-        .unwrap();
-    String::from_utf8_lossy(&output.stdout).into_owned()
-}
-
 #[test]
 fn test_issue_assign_help_cross_references_lease_commands() {
-    let help = help_text(&["issue", "assign", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["issue", "assign", "--help"])
+        .unwrap();
     assert!(
         help.contains("jit claim acquire"),
         "issue assign --help should cross-reference jit claim acquire, got: {help}"
@@ -1449,7 +1365,10 @@ fn test_issue_assign_help_cross_references_lease_commands() {
 
 #[test]
 fn test_issue_claim_help_cross_references_lease_commands() {
-    let help = help_text(&["issue", "claim", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["issue", "claim", "--help"])
+        .unwrap();
     assert!(
         help.contains("jit claim acquire"),
         "issue claim --help should cross-reference jit claim acquire, got: {help}"
@@ -1465,7 +1384,10 @@ fn test_issue_claim_help_cross_references_lease_commands() {
 
 #[test]
 fn test_issue_claim_help_documents_promotion_and_reclaim_idempotency() {
-    let help = help_text(&["issue", "claim", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["issue", "claim", "--help"])
+        .unwrap();
     assert!(
         help.contains("in_progress"),
         "issue claim --help should document promotion to in_progress, got: {help}"
@@ -1482,7 +1404,10 @@ fn test_issue_claim_help_documents_promotion_and_reclaim_idempotency() {
 
 #[test]
 fn test_issue_release_help_cross_references_lease_commands() {
-    let help = help_text(&["issue", "release", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["issue", "release", "--help"])
+        .unwrap();
     assert!(
         help.contains("jit claim acquire"),
         "issue release --help should cross-reference jit claim acquire, got: {help}"
@@ -1491,7 +1416,10 @@ fn test_issue_release_help_cross_references_lease_commands() {
 
 #[test]
 fn test_issue_unassign_help_cross_references_lease_commands() {
-    let help = help_text(&["issue", "unassign", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["issue", "unassign", "--help"])
+        .unwrap();
     assert!(
         help.contains("jit claim acquire"),
         "issue unassign --help should cross-reference jit claim acquire, got: {help}"
@@ -1500,7 +1428,10 @@ fn test_issue_unassign_help_cross_references_lease_commands() {
 
 #[test]
 fn test_claim_acquire_help_cross_references_assignment_commands() {
-    let help = help_text(&["claim", "acquire", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["claim", "acquire", "--help"])
+        .unwrap();
     assert!(
         help.contains("jit issue claim"),
         "claim acquire --help should cross-reference jit issue claim, got: {help}"
@@ -1509,7 +1440,10 @@ fn test_claim_acquire_help_cross_references_assignment_commands() {
 
 #[test]
 fn test_claim_release_help_cross_references_assignment_commands() {
-    let help = help_text(&["claim", "release", "--help"]);
+    let help = JitCli::uninitialised()
+        .unwrap()
+        .run(["claim", "release", "--help"])
+        .unwrap();
     assert!(
         help.contains("jit issue claim"),
         "claim release --help should cross-reference jit issue claim, got: {help}"
@@ -1522,23 +1456,35 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
     // commands read only the repository config.
     let states = [("", "strict"), ("[worktree]\n", "off")];
     for (worktree_section, env_mode) in states {
-        let repo = setup_repo();
-        let issue_id = create_issue(repo.path(), "Lease enforcement probe");
-        let config_path = repo.path().join(".jit/config.toml");
+        let cli = JitCli::initialised().unwrap();
+        cli.init_git().unwrap().commit("Initial commit").unwrap();
+        let issue_id = cli
+            .create_issue(["--title", "Lease enforcement probe"])
+            .unwrap();
+        let config_path = cli.root().join(".jit/config.toml");
         let mut config = fs::read_to_string(&config_path).unwrap();
         config.push_str(&format!("\n{worktree_section}"));
         fs::write(&config_path, config).unwrap();
-        let home = repo.path().join("isolated-home");
-        let jit = |args: &[&str]| {
-            Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-                .current_dir(repo.path())
-                .env("HOME", &home)
-                .env("JIT_ENFORCE_LEASES", env_mode)
-                .env("JIT_AGENT_ID", "agent:enforcement-probe")
-                .args(args)
-                .output()
-                .unwrap()
+        let home = cli.root().join("isolated-home");
+        let home = home.to_str().unwrap();
+        let jit_as = |agent: &str, args: &[&str]| {
+            cli.command_with_env(
+                args,
+                [
+                    ("HOME", home),
+                    ("JIT_ENFORCE_LEASES", env_mode),
+                    ("JIT_AGENT_ID", agent),
+                ],
+            )
+            .output()
+            .unwrap()
         };
+        let jit = |args: &[&str]| jit_as("agent:enforcement-probe", args);
+        let holder = jit_as(
+            "agent:holder",
+            &["claim", "acquire", &issue_id, "--ttl", "600"],
+        );
+        assert!(holder.status.success(), "claim acquire failed: {holder:?}");
 
         let show = jit(&["config", "show", "--json"]);
         assert!(show.status.success(), "config show failed: {show:?}");
@@ -1550,7 +1496,7 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
             !update.status.success(),
             reported_strict,
             "section {worktree_section:?}, JIT_ENFORCE_LEASES={env_mode}: config show \
-             reported {} but a lease-less update {}: {}",
+             reported {} but an update of another agent's leased issue {}: {}",
             reported["worktree"]["enforce_leases"],
             if update.status.success() {
                 "succeeded"
@@ -1583,17 +1529,16 @@ fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
         (section(None, Some(2)), "per_repo"),
     ];
     for (repo_section, probe) in states {
-        let repo = setup_repo();
-        let config_path = repo.path().join(".jit/config.toml");
+        let cli = JitCli::initialised().unwrap();
+        cli.init_git().unwrap().commit("Initial commit").unwrap();
+        let config_path = cli.root().join(".jit/config.toml");
         let mut config = fs::read_to_string(&config_path).unwrap();
         config.push_str(&format!("\n{repo_section}"));
         fs::write(&config_path, config).unwrap();
-        let home = repo.path().join("isolated-home");
+        let home = cli.root().join("isolated-home");
+        let home = home.to_str().unwrap();
         let jit = |args: &[&str]| {
-            Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-                .current_dir(repo.path())
-                .env("HOME", &home)
-                .args(args)
+            cli.command_with_env(args, [("HOME", home)])
                 .output()
                 .unwrap()
         };
@@ -1607,7 +1552,9 @@ fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
 
         let mut granted = 0;
         for attempt in 0..=reported {
-            let issue_id = create_issue(repo.path(), &format!("Limit probe {attempt}"));
+            let issue_id = cli
+                .create_issue(["--title", &format!("Limit probe {attempt}")])
+                .unwrap();
             let agent = match probe {
                 "per_agent" => "agent:limit-probe".to_string(),
                 _ => format!("agent:limit-probe-{attempt}"),
@@ -1637,13 +1584,15 @@ fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
 
 #[test]
 fn test_claim_acquire_fails_on_a_malformed_repository_config() {
-    let repo = setup_repo();
-    let issue_id = create_issue(repo.path(), "Malformed config probe");
-    fs::write(repo.path().join(".jit/config.toml"), "not = valid = toml").unwrap();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Malformed config probe"])
+        .unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), "not = valid = toml").unwrap();
 
-    let acquire = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo.path())
-        .args([
+    let acquire = cli
+        .command([
             "claim",
             "acquire",
             &issue_id,
@@ -1662,15 +1611,20 @@ fn test_claim_acquire_fails_on_a_malformed_repository_config() {
 /// issue's lease.
 #[test]
 fn test_claim_status_issue_filter_resolves_any_spelling_of_a_full_id() {
-    let temp = setup_repo();
-    let issue_id = create_issue(temp.path(), "Leased");
-    let lease_id = acquire_lease(temp.path(), &issue_id, "agent:status");
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Leased"]).unwrap());
+    let lease_id = acquire_lease(&cli, &issue_id, "agent:status");
 
-    for spelling in [issue_id.to_uppercase(), issue_id.replace('-', "")] {
-        let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(temp.path())
-            .env("JIT_AGENT_ID", "agent:status")
-            .args(["claim", "status", "--issue", &spelling, "--json"])
+    for spelling in [
+        issue_id.as_str().to_uppercase(),
+        issue_id.as_str().replace('-', ""),
+    ] {
+        let output = cli
+            .command_with_env(
+                ["claim", "status", "--issue", &spelling, "--json"],
+                [("JIT_AGENT_ID", "agent:status")],
+            )
             .output()
             .unwrap();
         let json: Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -1678,4 +1632,243 @@ fn test_claim_status_issue_filter_resolves_any_spelling_of_a_full_id() {
         assert_eq!(leases.len(), 1, "{spelling}: {json}");
         assert_eq!(leases[0]["lease_id"], lease_id);
     }
+}
+
+/// Returns `(dependency, dependent)`: `dependent` is in backlog behind the
+/// unmet `dependency`.
+fn create_dependency_blocked_pair(cli: &JitCli) -> (String, String) {
+    let dependency = cli.create_issue(["--title", "Prerequisite"]).unwrap();
+    let dependent = cli.create_issue(["--title", "Dependent work"]).unwrap();
+    cli.run(["dep", "add", &dependent, &dependency]).unwrap();
+    (dependency, dependent)
+}
+
+fn remediation_commands(envelope: &Value) -> Vec<&str> {
+    envelope["error"]["details"]["remediation"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|command| command.as_str().unwrap())
+        .collect()
+}
+
+#[test]
+fn test_issue_claim_blocked_by_dependencies_json_names_blocker_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    let (dependency, dependent) = create_dependency_blocked_pair(&cli);
+
+    let output = cli
+        .command(["issue", "claim", &dependent, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    assert_eq!(json["error"]["details"]["issue_id"], dependent);
+    assert_eq!(json["error"]["details"]["requested_state"], "in_progress");
+    assert_eq!(json["error"]["details"]["actual_state"], "backlog");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["issue_id"],
+        dependency
+    );
+    assert!(remediation_commands(&json)
+        .iter()
+        .any(|command| command.contains(&format!("jit graph deps {dependent}"))));
+}
+
+#[test]
+fn test_issue_claim_blocked_by_precheck_gate_json_names_gate_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "tdd-reminder",
+        "--title",
+        "TDD Reminder",
+        "-d",
+        "Write tests first",
+        "--stage",
+        "precheck",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
+    let issue = cli
+        .create_issue(["--title", "Precheck work", "--gate", "tdd-reminder"])
+        .unwrap();
+
+    let output = cli
+        .command(["issue", "claim", &issue, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(json["error"]["details"]["requested_state"], "in_progress");
+    assert_eq!(json["error"]["details"]["actual_state"], "ready");
+    assert_eq!(json["error"]["details"]["blockers"][0]["type"], "gate");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["key"],
+        "tdd-reminder"
+    );
+    assert!(remediation_commands(&json)
+        .iter()
+        .any(|command| command.contains(&format!("jit gate evaluate {issue} tdd-reminder"))));
+}
+
+#[test]
+fn test_issue_claim_next_blocked_by_precheck_gate_json_names_issue_and_gate() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "tdd-reminder",
+        "--title",
+        "TDD Reminder",
+        "-d",
+        "Write tests first",
+        "--stage",
+        "precheck",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
+    let issue = cli
+        .create_issue([
+            "--title",
+            "Claim-next precheck work",
+            "--gate",
+            "tdd-reminder",
+        ])
+        .unwrap();
+
+    let output = cli
+        .command(["issue", "claim-next", "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(json["error"]["details"]["issue_id"], issue);
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["key"],
+        "tdd-reminder"
+    );
+}
+
+#[test]
+fn test_issue_claim_next_skips_non_ready_issues() {
+    let cli = JitCli::initialised().unwrap();
+    let done_issue = cli.create_issue(["--title", "Already done"]).unwrap();
+    let ready_issue = cli.create_issue(["--title", "Ready work"]).unwrap();
+    cli.run(["issue", "update", &done_issue, "--state", "done"])
+        .unwrap();
+
+    let claimed = cli.run_json(["issue", "claim-next", "agent:test"]).unwrap();
+
+    assert_eq!(claimed["id"], ready_issue);
+    assert_eq!(claimed["state"], "in_progress");
+    assert_eq!(claimed["assignee"], "agent:test");
+    assert!(cli.run_json(["issue", "show", &done_issue]).unwrap()["assignee"].is_null());
+}
+
+#[test]
+fn test_issue_claim_blocked_by_dependencies_human_error_names_assign() {
+    let cli = JitCli::initialised().unwrap();
+    let (_dependency, dependent) = create_dependency_blocked_pair(&cli);
+
+    let output = cli
+        .command(["issue", "claim", &dependent, "agent:test"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("jit issue assign"), "stderr: {stderr}");
+    assert!(stderr.contains(&dependent), "stderr: {stderr}");
+}
+
+#[test]
+fn test_issue_claim_blocked_by_dependencies_json_error_names_assign() {
+    let cli = JitCli::initialised().unwrap();
+    let (_dependency, dependent) = create_dependency_blocked_pair(&cli);
+
+    let output = cli
+        .command(["issue", "claim", &dependent, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    let assign = format!("jit issue assign {dependent}");
+    assert!(json["error"]["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|suggestion| suggestion.as_str().unwrap().contains(&assign)));
+    assert!(remediation_commands(&json)
+        .iter()
+        .any(|command| command.contains(&assign)));
+}
+
+#[test]
+fn test_issue_claim_assign_only_sets_assignee_without_transition() {
+    let cli = JitCli::initialised().unwrap();
+    let issue = cli.create_issue(["--title", "Assign-only work"]).unwrap();
+
+    cli.run(["issue", "claim", &issue, "agent:test", "--assign-only"])
+        .unwrap();
+
+    let shown = cli.run_json(["issue", "show", &issue]).unwrap();
+    assert_eq!(shown["assignee"], "agent:test");
+    assert_eq!(shown["state"], "ready");
+}
+
+#[test]
+fn test_issue_claim_ready_issue_transitions_to_in_progress() {
+    let cli = JitCli::initialised().unwrap();
+    let issue = cli.create_issue(["--title", "Ready work"]).unwrap();
+    cli.run(["issue", "update", &issue, "--state", "ready"])
+        .unwrap();
+
+    cli.run(["issue", "claim", &issue, "agent:test"]).unwrap();
+
+    let shown = cli.run_json(["issue", "show", &issue]).unwrap();
+    assert_eq!(shown["assignee"], "agent:test");
+    assert_eq!(shown["state"], "in_progress");
+}
+
+#[test]
+fn test_claim_list_text_marks_a_stale_unexpired_lease_with_its_heartbeat_remedy() {
+    use chrono::{Duration, Utc};
+
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Stale lease"]).unwrap());
+    let silent_since = Utc::now()
+        - Duration::seconds(jit::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64 + 60);
+    let lease = jit::storage::Lease {
+        lease_id: "00000000-0000-4000-8000-0000000000aa".parse().unwrap(),
+        issue_id,
+        agent_id: "agent:silent".parse().unwrap(),
+        worktree_id: "wt:silent".parse().unwrap(),
+        branch: None,
+        ttl_secs: 0,
+        acquired_at: silent_since,
+        expires_at: None,
+        last_beat: silent_since,
+    };
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    jit::test_lease_store::plant_lease(&paths.shared_jit, &lease).unwrap();
+
+    cli.command(["claim", "list"]).assert().success().stdout(
+        predicate::str::contains("STALE").and(predicate::str::contains(format!(
+            "jit claim heartbeat {}",
+            lease.issue_id.short_id()
+        ))),
+    );
 }

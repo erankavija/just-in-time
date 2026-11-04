@@ -1,44 +1,59 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T20:13:20.592826718Z",
   "context": {},
   "created_at": "2026-10-20T20:12:37.837021516Z",
   "dependencies": [
-    "45e3e442-e157-4d73-918c-2fc7df04accc"
+    "45e3e442-e157-4d73-918c-2fc7df04accc",
+    "952ed1e7-2d3c-4d57-8851-ca3a91babcb0",
+    "e7d98542-456d-4421-9e17-faf4f739a800"
   ],
-  "description": "The Rust test suites prove many properties several times over, at layers above their owners, through fixtures that each test file re-implements. This epic gives each property one owning test on shared fixtures and shared interface contracts, so the suite is cheaper to run and a failure names one cause.\n\n## Background\n\nDuplicated properties, re-verified at `71ed9d4ce` (full evidence in `dev/active/c780514e-test-topology/investigation.md`):\n\n- Exit codes. `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs` (32 tests) binds every projected command row in both invocation forms (`assert_projected_exit_status_in_both_forms`, `:156-187`) and compares the projection with a hand-maintained verified set (`test_command_exit_codes_every_row_is_verified`, `:1128`). `exit_code_tests.rs` (39 subprocess tests, 1,637 lines) re-proves the same codes, for example success (`:36` vs `:774`), cycle (`:69` vs `:818`) and unconfirmed delete (`:1566` vs `:966`), and also owns behaviour with no other owner (claim assign, remediation text, prefix resolution, startup envelopes). `invocation_exit_status_parity_tests.rs` re-proves human/machine parity; two of its cases have no projection row.\n- Query semantics. `crates/jit/tests/fast_issue/domain_queries_tests.rs` and `crates/jit/src/domain/queries.rs` own the pure query filters. `crates/jit/tests/cli_query_graph/query_tests.rs` re-proves them in 25 subprocess tests (1,422 lines). `query available` composes its filters and priority order in the commands layer (`commands/query.rs:122-148`, repeated at `commands/issue.rs:800`), so that property has no domain owner yet. `crates/jit/tests/fast_docs_templates/harness_demo.rs` (14 tests), a self-described demonstration, re-proves queries, blocking, cycle rejection and gates; six of its cases have no other owner. `crates/jit/tests/cli_repo_workflow/workflow_tests.rs:529-743` re-proves dependency auto-transitions; the domain predicates are tested in `crates/jit/src/domain/types.rs:2546-2703`, while the cascade to dependents is command-layer orchestration (`commands/issue.rs:816-859`).\n- Cycle detection. Four tests in `crates/jit/src/commands/batch_create.rs:686-707` repeat `crates/jit/src/graph/keyed.rs` tests over an adapter. `harness_demo.rs:133`, `cli_repo_workflow/integration_test.rs:616` and `exit_code_tests.rs:69` re-prove dependency cycle rejection owned by `crates/jit/src/graph/mod.rs`.\n- Mutation finalization. About 830 lines of `crates/jit/src/storage/repository_state_store_tests.rs` (`:1754-2585`) re-prove `repository_state` finalization, which that section itself states is a pure function of the image.\n- List envelope. `count == len` is asserted per command by 19 subprocess tests in `crates/jit/tests/cli_issue/list_envelope_tests.rs` and again in `search_tests.rs`, `artifact_conformance_cli_tests.rs`, `profile_cli_tests.rs`, `worktree_cli_tests.rs` and `container_rollup_tests.rs`. `crates/jit/src/domain/list_envelope.rs` derives `count` by construction, but only one response uses it.\n\nFixtures and contracts:\n\n- No shared subprocess fixture exists. `fn jit_binary` is defined in 56 test files; 43 files spawn through `assert_cmd`'s `cargo_bin!` and 69 through `env!(\"CARGO_BIN_EXE_jit\")`. 56 test files define a local `setup_test_repo` or `setup_repo`, and 33 more define differently named setups. 114 `split_whitespace` sites in 39 files parse human-readable output, most of them to scrape ids. 20 test files and 8 source test modules hand-roll `git init`. A few files remove chosen `JIT_*` variables, but no shared fixture removes them all, so a developer's agent identity and data-directory overrides leak into most spawned processes.\n- In-process fixtures have parallel copies: `fixture_issue` 5 times, `TaxonomyRepo` twice, `memory_executor` twice with different config and index seeding (one with a literal `\"schema_version\": 2` index). Fixture code lives in `crate::test_utils`, `crate::test_harness`, `crate::commands::test_helpers`, `crate::test_taxonomy`, `crate::storage::test_support` and suite `main.rs` files. Product initialisation exists only for `JsonFileStorage` (`commands/init.rs:73-215`).\n- The shipped item-kind declarations are hand-copied three times as `CANONICAL_ITEM_KINDS` (`test_harness.rs`, `commands/item.rs`, `commands/validate.rs`) and restated a fourth time in `test_taxonomy.rs`, from `profiles/jit-default/manifest.toml`; the `D-[0-9]+` id pattern appears 14 times.\n- `IssueStore` has two implementations (`crates/jit/src/storage/json.rs:1042`, `crates/jit/src/storage/memory.rs:814`) and no shared conformance suite; three ad-hoc cross-backend reader tests exist in `repository_state_store_tests.rs`. `InMemoryStorage::read_path_bytes` reads the real disk and ignores its commit argument (`memory.rs:943-990`).\n- Process-wide state. `EnvGuard` and `CurrentDirGuard` in `crates/jit/src/test_utils.rs` are the only mutators of the environment and working directory, enforced by `crates/jit/tests/scratch_build/process_state_policy_tests.rs`. A second fixture-specific environment lock remains beside `EnvGuard`.\n- Missing toolchains pass. `crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs:48-53` prints `SKIP:` and passes when `scripts/cargo-ci-selftest.sh` exits 2 for missing git, cargo or jq; `rust_build_budget_checker_tests.rs` has 14 more `SKIP` passes and `dependency_feature_policy_tests.rs` two. That self-test script runs nested cargo builds of six fixture crates inside the default suite (about 4 s). `build_profile_policy_tests.rs:332`, `cli_issue/failure_probe_fixture.rs:1060` and `rust_build_budget_checker_tests.rs` drive `profile-test-suite.sh`, `setup-recorded-failure-corpus.sh` and `rust-build-budget.sh` the same way, and the corpus setup script runs a nested `cargo test`. No gate in `.jit/gates.toml` runs a script self-test.\n- Fixture cache. `crates/jit/src/test_utils.rs` keys a profiled-repository cache on SHA-256 hashes of the setup and scenario executables, so every rebuild invalidates every key; adds a nextest receipt path to skip that hashing; compiles a hidden `__test-fixture-setup` subcommand into the product binary under the `test-support` feature (`crates/jit/src/main.rs:1787`), which the crate's self dev-dependency enables for every test build; and filters three nextest setup scripts by individual test names in `.config/nextest.toml`. Entries are never collected: the cache held 1,341 entries (747 MB) at investigation. Cold keys after a rebuild cost 5.5-8 s of suite clock and are what makes the profiled-fixture tests time out under host load.\n\nBuild footprint against `@/inv/bounded-rust-build-footprint` (`scripts/rust-build-budget.sh`): 10 integration-test targets against a limit of 12; 1.61 GiB of active test executables across 14 executables against a 2 GiB limit; suite-duration budget 30 s. The warm `cargo-ci` suite clock was about 21.1 s (16.7 s test, 4.4 s doctest) and 24-29.6 s after a rebuild. Each suite executable is 82-134 MB because each links the whole `jit` library.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite. Other subprocess tests assert only what they add, such as remediation text or empty stdout on error.\n- [hard] REQ-02: Query filters, dependency auto-transitions and cycle detection are proven only at the domain and graph layers. CLI and harness tests of those commands assert one wiring case per subcommand or flag, and the harness demonstration suite is deleted, its unique cases moved beside their owners.\n- [hard] REQ-03: Mutation finalization is proven once, in the repository-state layer. Storage tests cover only the backend behaviour storage adds.\n- [hard] REQ-04: The list-envelope `count` property is proven by one test that covers every list-emitting command, and no per-command test re-asserts it.\n- [hard] REQ-05: One shared subprocess fixture spawns `jit` for every CLI test. It owns its temporary repository, uses one spawn convention, removes inherited `JIT_*` variables, initialises git on request, and reads created ids from machine-readable output. No test file defines its own binary locator, repository setup or id scraping from human-readable output.\n- [hard] REQ-06: Issue construction, the taxonomy repository and the memory executor each have one definition in shared test support. The memory executor seeds configuration and index through the product's own initialisation, with no literal schema version.\n- [hard] REQ-07: Tests that need the shipped item kinds derive them from the shipped default package. A deliberately custom kind is a minimal literal that says it is custom.\n- [hard] REQ-08: Every `IssueStore` implementation runs one shared reader and writer conformance suite. The in-memory backend's path reads, decoding and commit-pinned reads pass it, and implementation-specific tests cover only implementation-specific behaviour.\n- [hard] REQ-09: Tests reach the working directory and environment variables only through shared scoped guards that serialise and restore them. Every test passes alone, in any order and in parallel.\n- [hard] REQ-10: A test whose tool is missing fails. The default test suite runs no nested cargo build; shell-script self-tests run as declared gates over the scripts.\n- [hard] REQ-11: The profiled-repository fixture is reused under a key derived only from its inputs (package bytes and crate source). The product binary has no hidden fixture subcommand, and no test-runner configuration lists individual test names.\n- [hard] REQ-12: The build-footprint budget checker passes. Integration-target count and active test-executable bytes are measured before and after the change and reported.\n- [hard] REQ-13: Under the build turnstile on a quiet host, the cargo-ci suite clock is measured before and after the change and reported; and no test in the default suite exceeds 5 s on a warm target at load ≤ 10.\n\n## Decisions\n\n- **D-01** — REQ-13 is a steward-ruled amendment (2026-10-21). Its scope includes the server shutdown test and the doctest substep. Before figures: warm suite clock about 21.1 s (16.7 s test plus 4.4 s doctest), 24-29.6 s after a rebuild.\n- **D-02** — Fixture consolidation lands first: 2195c98f's id-retyping tasks depend on this epic's fixture tasks, which carry no dependency on 2195c98f or 842b0ac6 (steward ruling).\n- **D-03** — This epic owns the shared `IssueStore` conformance suite; 2195c98f's storage-trait retype depends on it (steward ruling).\n- **D-04** — The exit-code and list-envelope consolidation follows df129d9e's `ListEnvelope` conversion of the count structs and does not wait for its handler moves (steward ruling).\n- **D-05** — The script self-test gates are registered in `.jit/gates.toml` at planning, before their owning tasks run. Each owning task and this container require them, and a gate whose script still passes on a skip starts out failing until its task lands (steward ruling, per `@/charter/D-2`).\n- **D-06** — A terminal task touches at most about six files, or one file family with one concern; a task over six files names that family and concern in its sizing reason (steward ruling, 2026-10-22).\n\n## Notes\n\nServes `@/inv/orthogonal-tests` (one owning test per property, at the cheapest layer), `@/inv/shared-test-contracts` (shared fixtures; every implementation runs one contract), `@/inv/no-ignored-tests` (a skipped test is a held-out test), `@/inv/bounded-rust-build-footprint`, and `@/charter/D-18` (delete re-proofs and private fixture copies rather than maintain them). Script self-tests become repository gates per `@/charter/D-2`.\n\nDeleting a re-proof keeps the owning test; coverage moves, it is not lost. Where an owner lacks a case a deleted test covered, the case moves to the owner.\n\n\n",
+  "description": "The Rust test suites prove many properties several times over, at layers above their owners, through fixtures that each test file re-implements. This epic gives each property one owning test on shared fixtures and shared interface contracts, so the suite is cheaper to run and a failure names one cause.\n\n## Background\n\nDuplicated properties, re-verified at `71ed9d4ce` (full evidence in `dev/active/c780514e-test-topology/investigation.md`):\n\n- Exit codes. `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs` (32 tests) binds every projected command row in both invocation forms (`assert_projected_exit_status_in_both_forms`, `:156-187`) and compares the projection with a hand-maintained verified set (`test_command_exit_codes_every_row_is_verified`, `:1128`). `exit_code_tests.rs` (39 subprocess tests, 1,637 lines) re-proves the same codes, for example success (`:36` vs `:774`), cycle (`:69` vs `:818`) and unconfirmed delete (`:1566` vs `:966`), and also owns behaviour with no other owner (claim assign, remediation text, prefix resolution, startup envelopes). `invocation_exit_status_parity_tests.rs` re-proves human/machine parity; two of its cases have no projection row.\n- Query semantics. `crates/jit/tests/fast_issue/domain_queries_tests.rs` and `crates/jit/src/domain/queries.rs` own the pure query filters. `crates/jit/tests/cli_query_graph/query_tests.rs` re-proves them in 25 subprocess tests (1,422 lines). `query available` composes its filters and priority order in the commands layer (`commands/query.rs:122-148`, repeated at `commands/issue.rs:800`), so that property has no domain owner yet. `crates/jit/tests/fast_docs_templates/harness_demo.rs` (14 tests), a self-described demonstration, re-proves queries, blocking, cycle rejection and gates; six of its cases have no other owner. `crates/jit/tests/cli_repo_workflow/workflow_tests.rs:529-743` re-proves dependency auto-transitions; the domain predicates are tested in `crates/jit/src/domain/types.rs:2546-2703`, while the cascade to dependents is command-layer orchestration (`commands/issue.rs:816-859`).\n- Cycle detection. Four tests in `crates/jit/src/commands/batch_create.rs:686-707` repeat `crates/jit/src/graph/keyed.rs` tests over an adapter. `harness_demo.rs:133`, `cli_repo_workflow/integration_test.rs:616` and `exit_code_tests.rs:69` re-prove dependency cycle rejection owned by `crates/jit/src/graph/mod.rs`.\n- Mutation finalization. About 830 lines of `crates/jit/src/storage/repository_state_store_tests.rs` (`:1754-2585`) re-prove `repository_state` finalization, which that section itself states is a pure function of the image.\n- List envelope. `count == len` is asserted per command by 19 subprocess tests in `crates/jit/tests/cli_issue/list_envelope_tests.rs` and again in `search_tests.rs`, `artifact_conformance_cli_tests.rs`, `profile_cli_tests.rs`, `worktree_cli_tests.rs` and `container_rollup_tests.rs`. `crates/jit/src/domain/list_envelope.rs` derives `count` by construction, but only one response uses it.\n\nFixtures and contracts:\n\n- No shared subprocess fixture exists. `fn jit_binary` is defined in 56 test files; 43 files spawn through `assert_cmd`'s `cargo_bin!` and 69 through `env!(\"CARGO_BIN_EXE_jit\")`. 56 test files define a local `setup_test_repo` or `setup_repo`, and 33 more define differently named setups. 114 `split_whitespace` sites in 39 files parse human-readable output, most of them to scrape ids. 20 test files and 8 source test modules hand-roll `git init`. A few files remove chosen `JIT_*` variables, but no shared fixture removes them all, so a developer's agent identity and data-directory overrides leak into most spawned processes.\n- In-process fixtures have parallel copies: `fixture_issue` 5 times, `TaxonomyRepo` twice, `memory_executor` twice with different config and index seeding (one with a literal `\"schema_version\": 2` index). Fixture code lives in `crate::test_utils`, `crate::test_harness`, `crate::commands::test_helpers`, `crate::test_taxonomy`, `crate::storage::test_support` and suite `main.rs` files. Product initialisation exists only for `JsonFileStorage` (`commands/init.rs:73-215`).\n- The shipped item-kind declarations are hand-copied three times as `CANONICAL_ITEM_KINDS` (`test_harness.rs`, `commands/item.rs`, `commands/validate.rs`) and restated a fourth time in `test_taxonomy.rs`, from `profiles/jit-default/manifest.toml`; the `D-[0-9]+` id pattern appears 14 times.\n- `IssueStore` has two implementations (`crates/jit/src/storage/json.rs:1042`, `crates/jit/src/storage/memory.rs:814`) and no shared conformance suite; three ad-hoc cross-backend reader tests exist in `repository_state_store_tests.rs`. `InMemoryStorage::read_path_bytes` reads the real disk and ignores its commit argument (`memory.rs:943-990`).\n- Process-wide state. `EnvGuard` and `CurrentDirGuard` in `crates/jit/src/test_utils.rs` are the only mutators of the environment and working directory, enforced by `crates/jit/tests/scratch_build/process_state_policy_tests.rs`. A second fixture-specific environment lock remains beside `EnvGuard`.\n- Missing toolchains pass. `crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs:48-53` prints `SKIP:` and passes when `scripts/cargo-ci-selftest.sh` exits 2 for missing git, cargo or jq; `rust_build_budget_checker_tests.rs` has 14 more `SKIP` passes and `dependency_feature_policy_tests.rs` two. That self-test script runs nested cargo builds of six fixture crates inside the default suite (about 4 s). `build_profile_policy_tests.rs:332`, `cli_issue/failure_probe_fixture.rs:1060` and `rust_build_budget_checker_tests.rs` drive `profile-test-suite.sh`, `setup-recorded-failure-corpus.sh` and `rust-build-budget.sh` the same way, and the corpus setup script runs a nested `cargo test`. No gate in `.jit/gates.toml` runs a script self-test.\n- Fixture cache. `crates/jit/src/test_utils.rs` keys a profiled-repository cache on SHA-256 hashes of the setup and scenario executables, so every rebuild invalidates every key; adds a nextest receipt path to skip that hashing; compiles a hidden `__test-fixture-setup` subcommand into the product binary under the `test-support` feature (`crates/jit/src/main.rs:1787`), which the crate's self dev-dependency enables for every test build; and filters three nextest setup scripts by individual test names in `.config/nextest.toml`. Entries are never collected: the cache held 1,341 entries (747 MB) at investigation. Cold keys after a rebuild cost 5.5-8 s of suite clock and are what makes the profiled-fixture tests time out under host load.\n\nBuild footprint against `@/inv/bounded-rust-build-footprint` (`scripts/rust-build-budget.sh`): 10 integration-test targets against a limit of 12; 1.61 GiB of active test executables across 14 executables against a 2 GiB limit; suite-duration budget 30 s. The warm `cargo-ci` suite clock was about 21.1 s (16.7 s test, 4.4 s doctest) and 24-29.6 s after a rebuild. Each suite executable is 82-134 MB because each links the whole `jit` library.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite. Other subprocess tests assert only what they add, such as remediation text or empty stdout on error.\n- [hard] REQ-02: Query filters, dependency auto-transitions and cycle detection are proven only at the domain and graph layers. CLI and harness tests of those commands assert one wiring case per subcommand or flag, and the harness demonstration suite is deleted, its unique cases moved beside their owners.\n- [hard] REQ-03: Mutation finalization is proven once, in the repository-state layer. Storage tests cover only the backend behaviour storage adds.\n- [hard] REQ-04: The list-envelope `count` property is proven by one test that covers every list-emitting command, and no per-command test re-asserts it.\n- [hard] REQ-05: One shared subprocess fixture spawns `jit` for every CLI test. It owns its temporary repository, uses one spawn convention, removes inherited `JIT_*` variables, initialises git on request, and reads created ids from machine-readable output. No test file defines its own binary locator, repository setup or id scraping from human-readable output.\n- [hard] REQ-06: Issue construction, the taxonomy repository and the memory executor each have one definition in shared test support. The memory executor seeds configuration and index through the product's own initialisation, with no literal schema version.\n- [hard] REQ-07: Tests that need the shipped item kinds derive them from the shipped default package. A deliberately custom kind is a minimal literal that says it is custom.\n- [hard] REQ-08: Every `IssueStore` implementation runs one shared reader and writer conformance suite. The in-memory backend's path reads, decoding and commit-pinned reads pass it, and implementation-specific tests cover only implementation-specific behaviour.\n- [hard] REQ-09: Tests never change process-wide state (working directory, environment variables); a value a test varies is passed explicitly. Every test passes alone, in any order and in parallel.\n- [hard] REQ-10: A test whose tool is missing fails. The default test suite runs no nested cargo build; shell-script self-tests run as declared gates over the scripts.\n- [hard] REQ-11: The profiled-repository fixture is reused under a key derived only from its inputs (package bytes and crate source). The product binary has no hidden fixture subcommand, and no test-runner configuration lists individual test names.\n- [hard] REQ-12: The build-footprint budget checker passes. Integration-target count and active test-executable bytes are measured before and after the change and reported.\n- [hard] REQ-13: Under the build turnstile on a quiet host, the cargo-ci suite clock is measured before and after the change and reported; and no test in the default suite exceeds 5 s on a warm target at load ≤ 10.\n\n## Decisions\n\n- **D-01** — REQ-13 is a steward-ruled amendment (2026-10-21). Its scope includes the server shutdown test and the doctest substep. Before figures: warm suite clock about 21.1 s (16.7 s test plus 4.4 s doctest), 24-29.6 s after a rebuild.\n- **D-02** — Fixture consolidation lands first: 2195c98f's id-retyping tasks depend on this epic's fixture tasks, which carry no dependency on 2195c98f or 842b0ac6 (steward ruling).\n- **D-03** — This epic owns the shared `IssueStore` conformance suite; 2195c98f's storage-trait retype depends on it (steward ruling).\n- **D-04** — The exit-code and list-envelope consolidation follows df129d9e's `ListEnvelope` conversion of the count structs and does not wait for its handler moves (steward ruling).\n- **D-05** — The script self-test gates are registered in `.jit/gates.toml` at planning, before their owning tasks run. Each owning task and this container require them, and a gate whose script still passes on a skip starts out failing until its task lands (steward ruling, per `@/charter/D-2`).\n- **D-06** — A terminal task touches at most about six files, or one file family with one concern; a task over six files names that family and concern in its sizing reason (steward ruling, 2026-10-22).\n\n## Notes\n\nServes `@/inv/orthogonal-tests` (one owning test per property, at the cheapest layer), `@/inv/shared-test-contracts` (shared fixtures; every implementation runs one contract), `@/inv/no-ignored-tests` (a skipped test is a held-out test), `@/inv/bounded-rust-build-footprint`, and `@/charter/D-18` (delete re-proofs and private fixture copies rather than maintain them). Script self-tests become repository gates per `@/charter/D-2`.\n\nDeleting a re-proof keeps the owning test; coverage moves, it is not lost. Where an owner lacks a case a deleted test covered, the case moves to the owner.\n\n\n",
   "documents": [
     {
       "commit": null,
       "doc_type": "implementation",
       "label": "Execution progress",
-      "path": "dev/active/c780514e-test-topology/progress.json"
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/progress.json"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "b2bc900087b9bd24adb8eae71f57b3144246015ff2f77c2b1b9821768be2820f",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../../active/c780514e-test-topology/plan.md",
-          "resolved_path": "dev/active/c780514e-test-topology/plan.md"
-        }
-      ],
       "commit": null,
       "doc_type": "implementation",
       "format": "markdown",
       "label": "Test topology measurements",
-      "path": "dev/benchmarks/test-topology-c780514e/README.md"
+      "path": "dev/archive/c780514e-test-topology/benchmarks/test-topology-c780514e/README.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Paused execution handoff",
-      "path": "dev/active/c780514e-test-topology/handoff.md"
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Session 2 handoff",
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff-2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Session 3 handoff",
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff-3.md"
     }
   ],
+  "done_at": "2026-11-01T11:26:11.277311316Z",
   "first_ready_at": "2026-10-20T20:12:37.837021516Z",
   "gates_required": [
     "repo-validate",
@@ -52,58 +67,87 @@
     "session-cost-benchmark-selftest",
     "standards-scan-test",
     "standards-fix-test",
-    "manifest-tool-test"
+    "manifest-tool-test",
+    "package-drift"
   ],
   "gates_status": {
     "build-budget-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.389709164Z",
-      "updated_by": null
+      "run_id": "007e96f8-5033-4ef5-aa22-d6549ee19d3d",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:13.984781787Z",
+      "updated_by": "auto:executor"
     },
     "cargo-ci-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.317519163Z",
-      "updated_by": null
+      "run_id": "f8ada3d5-94d1-482e-97e7-64e5d2a2b940",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:13.684925987Z",
+      "updated_by": "auto:executor"
     },
     "docs-check-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.423381926Z",
-      "updated_by": null
+      "run_id": "055b0481-5dc9-4d86-b760-192339c64e68",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.301959624Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "7bfd8f84-6340-42ac-b60b-965dff091127",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:07.803776522Z",
+      "updated_by": "auto:executor"
     },
     "manifest-tool-test": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.735069493Z",
-      "updated_by": null
+      "run_id": "45a6baf8-b0f4-46a3-b756-fe6bba906b96",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:33.192185974Z",
+      "updated_by": "auto:executor"
+    },
+    "package-drift": {
+      "run_id": "919bd45a-20ea-41ac-9f6d-8ef471aead6d",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:46.307590104Z",
+      "updated_by": "auto:executor"
     },
     "profile-suite-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.353690919Z",
-      "updated_by": null
+      "run_id": "d08441b7-f900-4a8d-9818-5456fd0d8ba6",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:13.838173145Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "3621d9d6-701c-434e-bf87-dcc4b1193e2a",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:20:30.840590056Z",
+      "updated_by": "auto:executor"
     },
     "session-cost-benchmark-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.572618537Z",
-      "updated_by": null
+      "run_id": "afd54949-5fc4-45b2-9764-9388d418bdaf",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.745016468Z",
+      "updated_by": "auto:executor"
     },
     "shipped-policy-regions-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.460426947Z",
-      "updated_by": null
+      "run_id": "f2ec17cb-90ba-46c2-bfcd-9e25431817bc",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.452319776Z",
+      "updated_by": "auto:executor"
     },
     "standards-fix-test": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.681016225Z",
-      "updated_by": null
+      "run_id": "deda5d94-a613-4630-9c30-772a6407ff0c",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:33.043062809Z",
+      "updated_by": "auto:executor"
     },
     "standards-scan-test": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.621395465Z",
-      "updated_by": null
+      "run_id": "fe66a727-ad88-4dbe-91b2-7fc7b217e847",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.896208955Z",
+      "updated_by": "auto:executor"
     },
     "workflow-contract-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.492762811Z",
-      "updated_by": null
+      "run_id": "e3edeca2-fe18-4cdb-80f9-3c77232727d3",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.598652397Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "c780514e-8491-40a7-8844-3974bba91257",
@@ -118,7 +162,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "archived",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T22:10:37.600802487Z"
+  "updated_at": "2026-11-01T11:27:08.124439602Z"
 }

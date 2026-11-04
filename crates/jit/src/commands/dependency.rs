@@ -1,83 +1,33 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::IssueId;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
-use crate::storage::{AmbiguousIdError, IssueNotFoundError};
+use crate::storage::IssueNotFoundError;
 use std::collections::HashSet;
 
-/// A dependency mutation over requested ids, or, with `Id = String`, over the
-/// ids a capture resolved them to.
+/// A dependency mutation over resolved issue identities.
 #[derive(Clone)]
-enum CapturedDependencyMutation<Id = IssueIdPrefix> {
-    Single {
-        issue_id: Id,
-        dependency_id: IssueIdPrefix,
-        policy: RedundancyPolicy,
-    },
+enum CapturedDependencyMutation {
     Batch {
-        issue_id: Id,
-        dependency_ids: Vec<IssueIdPrefix>,
+        issue_id: IssueId,
+        dependency_ids: Vec<IssueId>,
         policy: RedundancyPolicy,
-    },
-    ReduceAll {
-        dry_run: bool,
     },
     RemoveSingle {
-        issue_id: Id,
-        dependency_id: Id,
+        issue_id: IssueId,
+        dependency_id: IssueId,
     },
     RemoveBatch {
-        issue_id: Id,
-        dependency_ids: Vec<IssueIdPrefix>,
+        issue_id: IssueId,
+        dependency_ids: Vec<IssueId>,
     },
-}
-
-impl CapturedDependencyMutation<String> {
-    fn issue_id(&self) -> &str {
-        match self {
-            Self::Single { issue_id, .. }
-            | Self::Batch { issue_id, .. }
-            | Self::RemoveSingle { issue_id, .. }
-            | Self::RemoveBatch { issue_id, .. } => issue_id,
-            Self::ReduceAll { .. } => "",
-        }
-    }
-}
-
-/// Parse a batch's requested dependency ids, naming every one that is too
-/// short in one batch rejection.
-fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<IssueIdPrefix>> {
-    let mut rejected = Vec::new();
-    let parsed = ids
-        .iter()
-        .filter_map(|id| {
-            IssueIdPrefix::parse(id)
-                .map_err(|error| rejected.push((id.clone(), error.into())))
-                .ok()
-        })
-        .collect();
-    if rejected.is_empty() {
-        Ok(parsed)
-    } else {
-        Err(DependencyBatchRejectedError::new(from.requested(), rejected).into())
-    }
 }
 
 enum CapturedDependencyOutcome {
-    Single {
-        result: DependencyAddResult,
-        warning: Option<String>,
-    },
     Batch(DependenciesAddResult),
-    Reduced {
-        count: usize,
-        messages: Vec<String>,
-    },
-    RemovedSingle {
-        warning: Option<String>,
-    },
+    RemovedSingle { warning: Option<String> },
     RemovedBatch(DependenciesRemoveResult),
 }
 
@@ -89,92 +39,41 @@ struct DerivedDependencyMutation {
 
 /// Result of adding multiple dependencies.
 ///
-/// All-or-nothing (jit:c8518f2a): [`add_dependencies_with_policy`](CommandExecutor::add_dependencies_with_policy)
+/// All-or-nothing (jit:c8518f2a): [`add_dependencies_with_policy`](GraphOps::add_dependencies_with_policy)
 /// returns this only when every requested edge validated. A batch with any
 /// rejected edge instead returns `Err(`[`DependencyBatchRejectedError`]`)` and
 /// leaves the dependency set — and the event log — completely unchanged, so
 /// there is no per-batch `errors` field to populate here.
 #[derive(Debug, Serialize)]
 pub struct DependenciesAddResult {
-    pub added: Vec<String>,
-    pub already_exist: Vec<String>,
-    pub skipped: Vec<(String, String)>, // (id, reason)
+    pub added: Vec<IssueId>,
+    pub already_exist: Vec<IssueId>,
+    pub skipped: Vec<(IssueId, String)>, // (id, reason)
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
 /// Result of removing multiple dependencies
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct DependenciesRemoveResult {
-    pub removed: Vec<String>,
-    pub not_found: Vec<String>,
+    pub removed: Vec<IssueId>,
+    pub not_found: Vec<IssueId>,
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
-    /// Add a dependency to an issue, dropping any now-redundant edge(s).
-    ///
-    /// Convenience wrapper over
-    /// [`add_dependency_with_policy`](Self::add_dependency_with_policy) with
-    /// [`RedundancyPolicy::Reduce`]: the resulting graph is left acyclic and
-    /// transitively reduced, which internal callers (templates, breakdown,
-    /// batch-create) rely on. Returns `(result, warnings)` where `warnings`
-    /// carries any lease warning.
-    pub fn add_dependency(
-        &self,
-        issue_id: &str,
-        dep_id: &str,
-    ) -> Result<(DependencyAddResult, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.add_dependency_with_policy(issue_id, dep_id, RedundancyPolicy::Reduce)
-    }
-
-    /// Add a dependency under an explicit transitive-reduction [`RedundancyPolicy`].
-    ///
-    /// Cycle detection runs first (the existing write-time guard,
-    /// @/inv/dag-acyclic). The candidate graph (the current issues plus the new
-    /// edge) is then checked for transitive-reduction violations with the same
-    /// [`DependencyGraph::find_redundant_edges`] property `jit validate` enforces:
-    ///
-    /// * [`RedundancyPolicy::Reject`] — if the edge shadows an existing direct
-    ///   edge or is itself already reachable, the add fails with a
-    ///   [`RedundantDependencyError`](crate::errors::RedundantDependencyError)
-    ///   naming the offending edge pair; nothing is written.
-    /// * [`RedundancyPolicy::Reduce`] — the edge is added and every now-redundant
-    ///   edge is dropped in the same operation, leaving the graph reduced.
-    ///
-    /// A non-redundant edge is added normally under either policy.
-    pub fn add_dependency_with_policy(
-        &self,
-        issue_id: &str,
-        dep_id: &str,
-        policy: RedundancyPolicy,
-    ) -> Result<(DependencyAddResult, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Single {
-            issue_id: IssueIdPrefix::parse(issue_id)?,
-            dependency_id: IssueIdPrefix::parse(dep_id)?,
-            policy,
-        })? {
-            CapturedDependencyOutcome::Single { result, warning } => {
-                Ok((result, warning.into_iter().collect()))
-            }
-            _ => unreachable!("single dependency request returns a single outcome"),
-        }
-    }
-
+impl<S: IssueStore> GraphOps<'_, S> {
     /// Remove a dependency from an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn remove_dependency(&self, issue_id: &str, dep_id: &str) -> Result<Vec<String>>
+    pub fn remove_dependency(&self, issue_id: &IssueId, dep_id: &IssueId) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        match self.publish_captured_dependency_mutation(
+        match self.exec.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveSingle {
-                issue_id: IssueIdPrefix::parse(issue_id)?,
-                dependency_id: IssueIdPrefix::parse(dep_id)?,
+                issue_id: issue_id.clone(),
+                dependency_id: dep_id.clone(),
             },
         )? {
             CapturedDependencyOutcome::RemovedSingle { warning } => {
@@ -184,27 +83,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Add multiple dependencies to an issue, dropping now-redundant edge(s).
-    ///
-    /// Convenience wrapper over
-    /// [`add_dependencies_with_policy`](Self::add_dependencies_with_policy) with
-    /// [`RedundancyPolicy::Reduce`], preserving the eager-reduction behavior
-    /// internal callers rely on.
-    pub fn add_dependencies(
-        &self,
-        issue_id: &str,
-        dep_ids: &[String],
-    ) -> Result<DependenciesAddResult>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.add_dependencies_with_policy(issue_id, dep_ids, RedundancyPolicy::Reduce)
-    }
-
     /// Add multiple dependencies under an explicit [`RedundancyPolicy`], atomically.
     ///
-    /// All-or-nothing (jit:c8518f2a): every requested edge is validated —
-    /// id parsing before any read, then id resolution, cycle detection and (under
+    /// Takes full ids the caller already resolved. All-or-nothing
+    /// (jit:c8518f2a): every requested edge is validated — id resolution
+    /// against the capture, cycle detection and (under
     /// [`RedundancyPolicy::Reject`]) the transitive-reduction check, all against
     /// the WOULD-BE final graph with every edge of this call applied at once —
     /// before anything is written. If any edge fails, `Err(`[`DependencyBatchRejectedError`]`)`
@@ -220,8 +103,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// make one of them transitively redundant.
     pub fn add_dependencies_with_policy(
         &self,
-        issue_id: &str,
-        dep_ids: &[String],
+        issue_id: &IssueId,
+        dep_ids: &[IssueId],
         policy: RedundancyPolicy,
     ) -> Result<DependenciesAddResult>
     where
@@ -230,35 +113,27 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let issue_id = IssueIdPrefix::parse(issue_id)?;
-        let dependency_ids = parse_dependency_batch(&issue_id, dep_ids)?;
-        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
-            issue_id,
-            dependency_ids,
-            policy,
-        })? {
-            CapturedDependencyOutcome::Batch(result) => Ok(result),
+        let warnings = self.exec.refuse_foreign_lease(issue_id)?;
+        match self
+            .exec
+            .publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
+                issue_id: issue_id.clone(),
+                dependency_ids: dep_ids.to_vec(),
+                policy,
+            })? {
+            CapturedDependencyOutcome::Batch(result) => {
+                Ok(DependenciesAddResult { warnings, ..result })
+            }
             _ => unreachable!("batch dependency request returns a batch outcome"),
         }
     }
+}
 
-    /// Repair every transitive-reduction violation from one captured graph.
-    pub(super) fn reduce_all_dependencies(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::ReduceAll {
-            dry_run,
-        })? {
-            CapturedDependencyOutcome::Reduced { count, messages } => Ok((count, messages)),
-            _ => unreachable!("reduction repair returns a reduction outcome"),
-        }
-    }
-
+impl<S: IssueStore> CommandExecutor<S> {
     /// Capture the complete active issue graph and publish one dependency mutation.
     ///
-    /// The index is the sole discovery authority. The second phase captures every
-    /// indexed record, the complete issues-directory listing, and the event log;
+    /// The issues listing is the sole discovery authority. The second phase captures every
+    /// issue record, the complete issues-directory listing, and the event log;
     /// semantic derivation reads only that closed image. A conflict restarts both
     /// phases in a fresh mutation session while reusing one mutation context.
     fn publish_captured_dependency_mutation(
@@ -278,76 +153,32 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
 
-        let enforce_lease = matches!(request, CapturedDependencyMutation::Single { .. });
         with_mutation_attempts("dependency mutation", || {
-            // The claims guard depends only on the request, so it is taken before
-            // the one session whose image decides source and lease policy.
-            let claims_guard = enforce_lease
-                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
-                .transpose()?
-                .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) =
                 self.capture_mutation_base(session.as_mut(), &[], None)?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let expected_source = match &request {
-                CapturedDependencyMutation::Single { issue_id, .. }
-                | CapturedDependencyMutation::Batch { issue_id, .. } => {
-                    Some(super::resolve_issue_from_capture(&issues, issue_id)?)
-                }
-                CapturedDependencyMutation::ReduceAll { .. } => None,
-                _ => unreachable!("removals use the captured removal coordinator"),
+            let CapturedDependencyMutation::Batch {
+                issue_id,
+                dependency_ids,
+                policy,
+            } = &request
+            else {
+                unreachable!("removals use the captured removal coordinator");
             };
-            let lease_warnings = if enforce_lease {
-                let config = crate::repository_state::assemble_config(&image)?;
-                captured_lease_warnings(
-                    config.enforcement_mode(),
-                    std::slice::from_ref(
-                        expected_source
-                            .as_ref()
-                            .ok_or_else(|| anyhow!("missing source"))?,
-                    ),
-                    &issues,
-                    claims_guard.as_ref(),
-                )?
-            } else {
-                Vec::new()
-            };
-            let pinned_request: CapturedDependencyMutation<String> = match &request {
-                CapturedDependencyMutation::Single {
-                    dependency_id,
-                    policy,
-                    ..
-                } => CapturedDependencyMutation::Single {
-                    issue_id: expected_source.clone().expect("single add has a source"),
-                    dependency_id: dependency_id.clone(),
-                    policy: *policy,
-                },
-                CapturedDependencyMutation::Batch {
-                    dependency_ids,
-                    policy,
-                    ..
-                } => CapturedDependencyMutation::Batch {
-                    issue_id: expected_source.clone().expect("batch add has a source"),
-                    dependency_ids: dependency_ids.clone(),
-                    policy: *policy,
-                },
-                CapturedDependencyMutation::ReduceAll { dry_run } => {
-                    CapturedDependencyMutation::ReduceAll { dry_run: *dry_run }
-                }
-                _ => unreachable!("removals use the captured removal coordinator"),
-            };
-            let warning = lease_warnings.into_iter().next();
-            let derived = derive_dependency_mutation(&issues, &pinned_request, warning)?;
+            let source_id = super::require_issue_in_capture(&issues, issue_id)?;
+            let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let derived =
+                derive_batch_dependency_add(&issues, &source_id, dependency_ids, *policy, &graph)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
                     None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -381,31 +212,39 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let config = crate::repository_state::assemble_config(&image)?;
-            let resolved_request: CapturedDependencyMutation<String> = match &request {
+            let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let resolved_request: CapturedDependencyMutation = match &request {
                 CapturedDependencyMutation::RemoveSingle {
                     issue_id,
                     dependency_id,
                 } => CapturedDependencyMutation::RemoveSingle {
-                    issue_id: super::resolve_issue_from_capture(&issues, issue_id)?,
-                    dependency_id: super::resolve_issue_from_capture(&issues, dependency_id)?,
+                    issue_id: super::require_issue_in_capture(&issues, issue_id)?,
+                    dependency_id: dependency_id.clone(),
                 },
                 CapturedDependencyMutation::RemoveBatch {
                     issue_id,
                     dependency_ids,
                 } => CapturedDependencyMutation::RemoveBatch {
-                    issue_id: super::resolve_issue_from_capture(&issues, issue_id)?,
+                    issue_id: issue_id.clone(),
                     dependency_ids: dependency_ids.clone(),
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
             };
-            let plan_content = super::validate::plan_content_with_issues(&image, &issues, &issues)?;
             let warning = if enforce_lease {
-                captured_lease_warnings(
-                    config.enforcement_mode(),
-                    &[resolved_request.issue_id().to_string()],
-                    &issues,
+                let (CapturedDependencyMutation::RemoveSingle {
+                    issue_id: resolved_id,
+                    ..
+                }
+                | CapturedDependencyMutation::RemoveBatch {
+                    issue_id: resolved_id,
+                    ..
+                }) = &resolved_request
+                else {
+                    unreachable!("removal coordinator receives only removals");
+                };
+                refuse_foreign_leases_held(
+                    graph.declarations.config().enforcement_mode(),
+                    std::slice::from_ref(resolved_id),
                     claims_guard.as_ref(),
                 )?
                 .into_iter()
@@ -413,25 +252,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 None
             };
-            let derived = derive_dependency_removal(
-                &issues,
-                &resolved_request,
-                warning,
-                super::CapturedTransitionEvidence {
-                    issues: &issues,
-                    declarations: &declarations,
-                    config: &config,
-                    plan_content: &plan_content,
-                    context: &context,
-                },
-            )?;
+            let derived = derive_dependency_removal(&issues, &resolved_request, warning, &graph)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
                     None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -441,82 +269,52 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         })
     }
+}
 
-    /// Remove multiple dependencies from an issue.
+impl<S: IssueStore> GraphOps<'_, S> {
+    /// Remove the stored dependencies `dep_ids` from `issue_id`.
     ///
-    /// This is what `jit dep rm <from> <id>...` calls. Each `dep_id` is
-    /// matched by [`IssueIdPrefix`] directly against `issue`'s OWN stored
-    /// `dependencies` — NOT resolved through the repo-wide index first. A
-    /// dependency whose target issue was deleted no longer resolves there,
-    /// which previously made a dangling edge permanently unremovable via the
-    /// CLI (jit:f847df3f); matching the raw stored id sidesteps that
-    /// resolution step entirely and works whether the target is alive or gone. A prefix that matches more
-    /// than one stored dependency is rejected as ambiguous rather than
-    /// removing an arbitrary one.
+    /// Each id is compared exactly with `issue_id`'s own stored dependencies,
+    /// so an edge whose target was deleted is removable (jit:f847df3f). An id
+    /// not stored, or repeated after its removal, is reported as not found.
     pub fn remove_dependencies(
         &self,
-        issue_id: &str,
-        dep_ids: &[String],
+        issue_id: &IssueId,
+        dep_ids: &[IssueId],
     ) -> Result<DependenciesRemoveResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
         if dep_ids.is_empty() {
-            return Err(anyhow!("Must provide at least one dependency"));
+            return Ok(DependenciesRemoveResult::default());
         }
-        match self.publish_captured_dependency_mutation(
+        let warnings = self.exec.refuse_foreign_lease(issue_id)?;
+        match self.exec.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
-                issue_id: IssueIdPrefix::parse(issue_id)?,
-                dependency_ids: dep_ids
-                    .iter()
-                    .map(|id| IssueIdPrefix::parse(id))
-                    .collect::<Result<_, _>>()?,
+                issue_id: issue_id.clone(),
+                dependency_ids: dep_ids.to_vec(),
             },
         )? {
-            CapturedDependencyOutcome::RemovedBatch(result) => Ok(result),
+            CapturedDependencyOutcome::RemovedBatch(result) => {
+                Ok(DependenciesRemoveResult { warnings, ..result })
+            }
             _ => unreachable!("batch removal returns a batch-removal outcome"),
         }
     }
 }
 
-fn captured_issue<'a>(issues: &'a [Issue], id: &str) -> Result<&'a Issue> {
+fn captured_issue<'a>(issues: &'a [Issue], id: &IssueId) -> Result<&'a Issue> {
     issues
         .iter()
-        .find(|issue| issue.id == id)
-        .ok_or_else(|| IssueNotFoundError::new(id).into())
-}
-
-fn derive_dependency_mutation(
-    issues: &[Issue],
-    request: &CapturedDependencyMutation<String>,
-    warning: Option<String>,
-) -> Result<DerivedDependencyMutation> {
-    match request {
-        CapturedDependencyMutation::Single {
-            issue_id,
-            dependency_id,
-            policy,
-        } => derive_single_dependency_add(issues, issue_id, dependency_id, *policy, warning),
-        CapturedDependencyMutation::Batch {
-            issue_id,
-            dependency_ids,
-            policy,
-        } => derive_batch_dependency_add(issues, issue_id, dependency_ids, *policy),
-        CapturedDependencyMutation::ReduceAll { dry_run } => {
-            derive_dependency_repair(issues, *dry_run)
-        }
-        CapturedDependencyMutation::RemoveSingle { .. }
-        | CapturedDependencyMutation::RemoveBatch { .. } => {
-            unreachable!("removals use their captured derivation")
-        }
-    }
+        .find(|issue| &issue.id == id)
+        .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
 }
 
 fn derive_dependency_removal(
     issues: &[Issue],
-    request: &CapturedDependencyMutation<String>,
+    request: &CapturedDependencyMutation,
     warning: Option<String>,
-    evidence: super::CapturedTransitionEvidence<'_>,
+    graph: &super::CapturedGraphEvidence<'_>,
 ) -> Result<DerivedDependencyMutation> {
     let (source_id, removed, outcome) = match request {
         CapturedDependencyMutation::RemoveSingle {
@@ -540,38 +338,18 @@ fn derive_dependency_removal(
             dependency_ids,
         } => {
             let issue = captured_issue(issues, issue_id)?;
-            let mut removed = Vec::new();
-            let mut reported_removed = Vec::new();
-            let mut not_found = Vec::new();
-            for prefix in dependency_ids {
-                let requested = prefix.requested();
-                let matches = issue
-                    .dependencies
-                    .iter()
-                    .filter(|stored| !removed.contains(*stored))
-                    .filter(|stored| prefix.matches(stored))
-                    .cloned()
-                    .collect::<Vec<_>>();
-                let matched = match matches.as_slice() {
-                    [] => None,
-                    [only] => Some(only.clone()),
-                    _ => return Err(AmbiguousIdError::dependency(requested, matches).into()),
-                };
-                match matched {
-                    Some(id) => {
-                        removed.push(id);
-                        reported_removed.push(requested.to_string());
-                    }
-                    None => not_found.push(requested.to_string()),
+            let mut result = DependenciesRemoveResult::default();
+            for id in dependency_ids {
+                if issue.dependencies.contains(id) && !result.removed.contains(id) {
+                    result.removed.push(id.clone());
+                } else {
+                    result.not_found.push(id.clone());
                 }
             }
             (
                 issue_id.clone(),
-                removed,
-                CapturedDependencyOutcome::RemovedBatch(DependenciesRemoveResult {
-                    removed: reported_removed,
-                    not_found,
-                }),
+                result.removed.clone(),
+                CapturedDependencyOutcome::RemovedBatch(result),
             )
         }
         _ => unreachable!("removal derivation receives only removals"),
@@ -592,125 +370,39 @@ fn derive_dependency_removal(
     *candidate
         .iter_mut()
         .find(|candidate| candidate.id == source_id)
-        .ok_or_else(|| IssueNotFoundError::new(&source_id))? = issue.clone();
-    let resolved = crate::domain::queries::build_issue_map(&candidate);
-    let mut intents = vec![MutationIntent::RecordEvent {
-        phase: 1,
-        event: Box::new(Event::draft_issue_updated(
-            source_id.clone(),
-            "dependency-remove".to_string(),
-            vec!["dependencies".to_string()],
-        )),
-    }];
-    if issue.should_auto_transition_to_ready(&resolved) {
-        match super::derive_state_transition(issue.clone(), State::Ready, false, evidence)? {
-            super::DerivedStateTransition::Applied {
-                issue: transitioned,
-                events,
-                ..
-            } => {
-                issue = *transitioned;
-                intents.extend(events.into_iter().map(|(phase, event)| {
-                    MutationIntent::RecordEvent {
-                        phase: phase.saturating_add(1),
-                        event: Box::new(event),
-                    }
-                }));
-            }
-            super::DerivedStateTransition::GraphBlocked { error, events } => {
-                intents.extend(events.into_iter().map(|(phase, event)| {
-                    MutationIntent::RecordEvent {
-                        phase: phase.saturating_add(1),
-                        event: Box::new(event),
-                    }
-                }));
-                intents.insert(
-                    0,
-                    MutationIntent::UpdateIssue {
-                        issue: Box::new(issue),
-                    },
-                );
-                return Ok(DerivedDependencyMutation {
-                    outcome,
-                    intents,
-                    error_after_apply: Some(error),
-                });
-            }
-        }
-    }
-    intents.insert(
-        0,
-        MutationIntent::UpdateIssue {
+        .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))? = issue.clone();
+    let readiness =
+        super::derive_readiness_intents(issues, &candidate, graph, ReadinessScope::Affected)?;
+    let intents = (!readiness.corrects(&source_id))
+        .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
-        },
-    );
+        })
+        .into_iter()
+        .chain(std::iter::once(MutationIntent::RecordEvent {
+            phase: 1,
+            event: Box::new(EventBody::draft_issue_updated(
+                source_id,
+                "dependency-remove".to_string(),
+                vec!["dependencies".to_string()],
+            )),
+        }))
+        .chain(readiness.intents)
+        .collect();
     Ok(DerivedDependencyMutation {
         outcome,
         intents,
-        error_after_apply: None,
-    })
-}
-
-fn derive_single_dependency_add(
-    issues: &[Issue],
-    full_issue_id: &str,
-    dependency_id: &IssueIdPrefix,
-    policy: RedundancyPolicy,
-    warning: Option<String>,
-) -> Result<DerivedDependencyMutation> {
-    let full_issue_id = full_issue_id.to_string();
-    let full_dependency_id = super::resolve_issue_from_capture(issues, dependency_id)?;
-    let graph = dependency_graph(issues);
-    graph.validate_add_dependency(&full_issue_id, &full_dependency_id)?;
-    let from = captured_issue(issues, &full_issue_id)?;
-    if from.dependencies.contains(&full_dependency_id) {
-        return Ok(DerivedDependencyMutation {
-            outcome: CapturedDependencyOutcome::Single {
-                result: DependencyAddResult::AlreadyExists,
-                warning,
-            },
-            intents: Vec::new(),
-            error_after_apply: None,
-        });
-    }
-
-    let candidate = candidate_issues(issues, &full_issue_id, [&full_dependency_id])?;
-    let candidate_graph = dependency_graph(&candidate);
-    let mut redundant = candidate_graph.find_redundant_edges();
-    redundant.sort();
-    if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
-        return Err(
-            RedundantDependencyError::new((full_issue_id, full_dependency_id), redundant).into(),
-        );
-    }
-    let reduced = candidate_graph.compute_transitive_reduction(&full_issue_id);
-    let original = dependency_set(from);
-    let result = if reduced == original {
-        DependencyAddResult::Skipped {
-            reason: "transitive (already reachable via other dependencies)".to_string(),
-        }
-    } else {
-        DependencyAddResult::Added
-    };
-    let intents = if reduced == original {
-        Vec::new()
-    } else {
-        derive_reduced_graph_intents(issues, &candidate, Some((&full_issue_id, &reduced)))?
-    };
-    Ok(DerivedDependencyMutation {
-        outcome: CapturedDependencyOutcome::Single { result, warning },
-        intents,
-        error_after_apply: None,
+        error_after_apply: readiness.error_after_apply,
     })
 }
 
 fn derive_batch_dependency_add(
     issues: &[Issue],
-    full_issue_id: &str,
-    dependency_ids: &[IssueIdPrefix],
+    full_issue_id: &IssueId,
+    dependency_ids: &[IssueId],
     policy: RedundancyPolicy,
+    graph: &super::CapturedGraphEvidence<'_>,
 ) -> Result<DerivedDependencyMutation> {
-    let full_issue_id = full_issue_id.to_string();
+    let full_issue_id = full_issue_id.clone();
     let from_deps = dependency_set(captured_issue(issues, &full_issue_id)?);
     let mut already_exist = Vec::new();
     let mut new_edges = Vec::new();
@@ -718,8 +410,8 @@ fn derive_batch_dependency_add(
     let mut seen = HashSet::new();
 
     for (ordinal, prefix) in dependency_ids.iter().enumerate() {
-        let dependency_id = prefix.requested().to_string();
-        match super::resolve_issue_from_capture(issues, prefix) {
+        let dependency_id = prefix.clone();
+        match super::require_issue_in_capture(issues, prefix) {
             Ok(full_id) if from_deps.contains(&full_id) || !seen.insert(full_id.clone()) => {
                 already_exist.push(dependency_id);
             }
@@ -757,8 +449,11 @@ fn derive_batch_dependency_add(
             valid_edges.iter().map(|(_, _, full_id)| full_id),
         )?;
         let graph = dependency_graph(&acyclic_candidate);
-        let mut redundant = graph.find_redundant_edges();
-        redundant.sort();
+        let redundant = graph
+            .find_redundant_edges()
+            .into_iter()
+            .map(|(from, to)| (from.id.clone(), to.id.clone()))
+            .collect::<Vec<_>>();
         let self_redundant = redundant
             .iter()
             .filter(|(from, to)| {
@@ -793,8 +488,11 @@ fn derive_batch_dependency_add(
                     continue;
                 }
                 let singleton = candidate_issues(issues, &full_issue_id, [full_id])?;
-                let mut singleton_redundant = dependency_graph(&singleton).find_redundant_edges();
-                singleton_redundant.sort();
+                let singleton_redundant = dependency_graph(&singleton)
+                    .find_redundant_edges()
+                    .into_iter()
+                    .map(|(from, to)| (from.id.clone(), to.id.clone()))
+                    .collect::<Vec<_>>();
                 if !singleton_redundant.is_empty() {
                     rejected.push((
                         *ordinal,
@@ -808,16 +506,20 @@ fn derive_batch_dependency_add(
                 }
             }
         }
-        reduced_from = graph.compute_transitive_reduction(&full_issue_id);
+        reduced_from = graph
+            .compute_transitive_reduction(&full_issue_id)
+            .into_iter()
+            .map(|node| node.id.clone())
+            .collect();
     }
 
     if !rejected.is_empty() {
         rejected.sort_by_key(|(ordinal, _, _)| *ordinal);
         return Err(DependencyBatchRejectedError::new(
-            full_issue_id,
+            full_issue_id.clone(),
             rejected
                 .into_iter()
-                .map(|(_, dependency_id, error)| (dependency_id, error))
+                .map(|(_, dependency_id, error)| (dependency_id.to_string(), error))
                 .collect(),
         )
         .into());
@@ -831,78 +533,64 @@ fn derive_batch_dependency_add(
         .filter(|(_, _, full_id)| added_ids.contains(full_id))
         .map(|(_, text, _)| text.clone())
         .collect();
-    let intents = if reduced_from == from_deps {
-        Vec::new()
-    } else {
-        derive_reduced_graph_intents(
-            issues,
-            &acyclic_candidate,
-            Some((&full_issue_id, &reduced_from)),
-        )?
-    };
-    Ok(DerivedDependencyMutation {
-        outcome: CapturedDependencyOutcome::Batch(DependenciesAddResult {
-            added,
-            already_exist,
-            skipped,
-        }),
-        intents,
-        error_after_apply: None,
-    })
-}
-
-fn derive_dependency_repair(issues: &[Issue], dry_run: bool) -> Result<DerivedDependencyMutation> {
-    let graph = dependency_graph(issues);
-    let reductions = issues
+    let outcome = CapturedDependencyOutcome::Batch(DependenciesAddResult {
+        added,
+        already_exist,
+        skipped,
+        warnings: Vec::new(),
+    });
+    if reduced_from == from_deps {
+        return Ok(DerivedDependencyMutation {
+            outcome,
+            intents: Vec::new(),
+            error_after_apply: None,
+        });
+    }
+    let reduced = derive_reduced_graph_intents(
+        issues,
+        &acyclic_candidate,
+        Some((&full_issue_id, &reduced_from)),
+    )?;
+    let projected = issues
         .iter()
-        .filter_map(|issue| {
-            let reduced = graph.compute_transitive_reduction(&issue.id);
-            let removed = issue.dependencies.len().saturating_sub(reduced.len());
-            (removed > 0).then_some((issue, reduced, removed))
+        .map(|issue| {
+            reduced
+                .iter()
+                .find_map(|intent| match intent {
+                    MutationIntent::UpdateIssue { issue: updated } if updated.id == issue.id => {
+                        Some((**updated).clone())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| issue.clone())
         })
         .collect::<Vec<_>>();
-    let count = reductions.iter().map(|(_, _, count)| count).sum();
-    let messages = if dry_run {
-        Vec::new()
-    } else {
-        reductions
-            .iter()
-            .map(|(issue, _, fixed)| {
-                format!(
-                    "Fixed {} redundant {} in issue {}",
-                    fixed,
-                    if *fixed == 1 {
-                        "dependency"
-                    } else {
-                        "dependencies"
-                    },
-                    &issue.id[..8.min(issue.id.len())]
-                )
-            })
-            .collect()
-    };
-    let intents = if dry_run || reductions.is_empty() {
-        Vec::new()
-    } else {
-        derive_reduced_graph_intents(issues, issues, None)?
-    };
+    let readiness =
+        super::derive_readiness_intents(issues, &projected, graph, ReadinessScope::Affected)?;
+    let mut intents = reduced
+        .into_iter()
+        .filter(|intent| {
+            !matches!(intent, MutationIntent::UpdateIssue { issue } if readiness.corrects(&issue.id))
+        })
+        .collect::<Vec<_>>();
+    intents.extend(readiness.intents);
     Ok(DerivedDependencyMutation {
-        outcome: CapturedDependencyOutcome::Reduced { count, messages },
+        outcome,
         intents,
-        error_after_apply: None,
+        error_after_apply: readiness.error_after_apply,
     })
 }
 
 fn candidate_issues<'a>(
     issues: &[Issue],
-    source_id: &str,
-    dependencies: impl IntoIterator<Item = &'a String>,
+    source_id: &IssueId,
+    dependencies: impl IntoIterator<Item = &'a IssueId>,
 ) -> Result<Vec<Issue>> {
     let mut candidate = issues.to_vec();
     let source = candidate
         .iter_mut()
-        .find(|issue| issue.id == source_id)
-        .ok_or_else(|| IssueNotFoundError::new(source_id))?;
+        .find(|issue| &issue.id == source_id)
+        .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))?;
     source
         .dependencies
         .extend(dependencies.into_iter().cloned());
@@ -915,20 +603,16 @@ fn dependency_graph(issues: &[Issue]) -> DependencyGraph<'_, Issue> {
     DependencyGraph::new(&issues.iter().collect::<Vec<_>>())
 }
 
-fn dependency_set(issue: &Issue) -> HashSet<String> {
+fn dependency_set(issue: &Issue) -> HashSet<IssueId> {
     issue.dependencies.iter().cloned().collect()
 }
 
-fn derive_reduced_graph_intents(
+pub(super) fn derive_reduced_graph_intents(
     original: &[Issue],
     candidate: &[Issue],
-    source: Option<(&str, &HashSet<String>)>,
+    source: Option<(&IssueId, &HashSet<IssueId>)>,
 ) -> Result<Vec<MutationIntent>> {
     let graph = dependency_graph(candidate);
-    // Dependency states are what readiness reads, and this derivation changes no
-    // issue's state, so the original view resolves every dependency the reduced
-    // sets can name.
-    let resolved = crate::domain::queries::build_issue_map(original);
     let mut updates = Vec::new();
     let mut events = Vec::new();
 
@@ -936,10 +620,14 @@ fn derive_reduced_graph_intents(
         let original_issue = captured_issue(original, &candidate_issue.id)?;
         let original_deps = dependency_set(original_issue);
         let reduced = match source {
-            Some((source_id, source_reduced)) if source_id == candidate_issue.id => {
+            Some((source_id, source_reduced)) if source_id == &candidate_issue.id => {
                 source_reduced.clone()
             }
-            _ => graph.compute_transitive_reduction(&candidate_issue.id),
+            _ => graph
+                .compute_transitive_reduction(&candidate_issue.id)
+                .into_iter()
+                .map(|node| node.id.clone())
+                .collect(),
         };
         if reduced == original_deps {
             continue;
@@ -954,44 +642,30 @@ fn derive_reduced_graph_intents(
         issue.dependencies.sort();
         let issue_id = issue.id.clone();
 
-        if source.is_some_and(|(source_id, _)| source_id == issue_id) {
-            // Readiness derives from the final dependency set through the shared
-            // domain helper, the same one the graph-template apply path consults,
-            // so the two cannot drift (`@/invariant/derived-state-coherence`). An
-            // edge addition owns only the demotion direction; promotion belongs to
-            // the removal path below and to dependency completion.
-            let demoted =
-                issue.derive_readiness_correction(&resolved) == Some(ReadinessCorrection::Demote);
-            if demoted {
-                issue.state = State::Backlog;
-                events.push(MutationIntent::RecordEvent {
-                    phase: 1,
-                    event: Box::new(Event::draft_issue_state_changed(
-                        issue_id.clone(),
-                        State::Ready,
-                        State::Backlog,
-                    )),
-                });
-            }
-            events.push(MutationIntent::RecordEvent {
-                phase: 2,
-                event: Box::new(Event::draft_issue_updated(
+        let (phase, event) = if source.is_some_and(|(source_id, _)| source_id == &issue_id) {
+            (
+                2,
+                EventBody::draft_issue_updated(
                     issue_id,
                     "dependency-add".to_string(),
                     vec!["dependencies".to_string()],
-                )),
-            });
+                ),
+            )
         } else {
-            events.push(MutationIntent::RecordEvent {
-                phase: 3,
-                event: Box::new(Event::draft_dependency_reduced(
+            (
+                3,
+                EventBody::draft_dependency_reduced(
                     issue_id,
                     original_deps.len(),
                     reduced.len(),
                     removed,
-                )),
-            });
-        }
+                ),
+            )
+        };
+        events.push(MutationIntent::RecordEvent {
+            phase,
+            event: Box::new(event),
+        });
         updates.push(MutationIntent::UpdateIssue {
             issue: Box::new(issue),
         });
@@ -1003,7 +677,9 @@ fn derive_reduced_graph_intents(
 #[cfg(test)]
 mod captured_tests {
     use super::*;
+    use crate::domain::event_catalog::EventTag;
     use crate::storage::{InMemoryStorage, IssueStore, MutationPoint, RepositoryStateStore};
+    use crate::test_utils::add_reducing_edge;
 
     #[derive(Default)]
     struct OneFailure(std::sync::Mutex<Option<MutationPoint>>);
@@ -1037,7 +713,7 @@ mod captured_tests {
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        executor.add_dependency(&source_id, &dependency_id).unwrap();
+        add_reducing_edge(&executor, &source_id, &dependency_id).unwrap();
 
         let updated = executor.storage.load_issue(&source_id).unwrap();
         assert_eq!(updated.title, "concurrent title");
@@ -1045,8 +721,13 @@ mod captured_tests {
         assert_eq!(updated.state, State::Backlog);
         let events = executor.storage.read_events().unwrap();
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].get_type(), "issue_state_changed");
-        assert_eq!(events[1].get_type(), "issue_updated");
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| event.get_type())
+                .collect::<Vec<_>>(),
+            [EventTag::IssueStateChanged, EventTag::IssueUpdated].map(EventTag::as_str)
+        );
         let first = serde_json::to_value(&events[0]).unwrap();
         let second = serde_json::to_value(&events[1]).unwrap();
         assert_eq!(first["timestamp"], second["timestamp"]);
@@ -1074,6 +755,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
         assert!(executor
+            .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .is_err());
 
@@ -1085,6 +767,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(recovered.clone()).with_layout(layout);
         executor
+            .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .unwrap();
         let updated = recovered.load_issue(&source_id).unwrap();
@@ -1129,6 +812,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let error = executor
+            .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .expect_err("the ready graph rule blocks only the automatic transition");
         assert!(error
@@ -1144,11 +828,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .into_iter()
             .map(|event| event.get_type().to_string())
             .collect::<Vec<_>>();
-        assert_eq!(event_types, vec!["issue_updated", "transition_blocked"]);
+        assert_eq!(
+            event_types,
+            [EventTag::IssueUpdated, EventTag::TransitionBlocked].map(EventTag::as_str)
+        );
     }
 
     #[test]
-    fn test_dependency_removal_duplicate_alias_is_not_found_after_first_match() {
+    fn test_dependency_removal_repeated_id_is_not_found_after_its_removal() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "");
         let layout = storage.repository_layout();
@@ -1159,101 +846,65 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source);
-        let prefix = dependency_id[..8].to_string();
 
         let executor = CommandExecutor::new(storage).with_layout(layout);
         let result = executor
-            .remove_dependencies(&source_id, &[dependency_id.clone(), prefix.clone()])
+            .graph()
+            .remove_dependencies(&source_id, &[dependency_id.clone(), dependency_id.clone()])
             .unwrap();
-        assert_eq!(result.removed, vec![dependency_id]);
-        assert_eq!(result.not_found, vec![prefix]);
+        assert_eq!(result.removed, vec![dependency_id.clone()]);
+        assert_eq!(result.not_found, vec![dependency_id]);
     }
 
-    /// The removal resolves its prefix against the issues the session captured,
-    /// so a second issue sharing the prefix makes it ambiguous.
     #[test]
-    fn test_single_removal_rejects_a_dependency_prefix_matching_several_issues() {
+    fn test_remove_dependency_uses_the_exact_target_when_issue_prefixes_collide() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
-        dependency.id = "22221111111111111111111111111111".to_string();
+        dependency.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_2222_1111);
         let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
-        source.id = "11111111111111111111111111111111".to_string();
-        source.dependencies = vec![dependency.id.clone()];
-        crate::commands::test_helpers::seed_issue(&storage, source.clone());
-        crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut collision = crate::test_utils::fixture_issue("collision".into(), String::new());
-        collision.id = "22222222222222222222222222222222".to_string();
-        crate::commands::test_helpers::seed_issue(&storage, collision);
-        let executor = crate::commands::test_helpers::memory_executor(storage);
-        let events_before = executor.storage.read_events().unwrap();
-
-        let error = executor
-            .remove_dependency(&source.id, "2222")
-            .expect_err("a prefix matching several issues must be ambiguous");
-
-        assert!(error
-            .downcast_ref::<crate::storage::AmbiguousIdError>()
-            .is_some());
-        assert_eq!(
-            executor
-                .storage
-                .load_issue(&source.id)
-                .unwrap()
-                .dependencies,
-            source.dependencies
-        );
-        assert_eq!(executor.storage.read_events().unwrap(), events_before);
-    }
-
-    /// Mark `id` deleted in the fixture's index, as a concurrent deletion leaves
-    /// it.
-    fn mark_index_deleted(storage: &InMemoryStorage, id: &str) {
-        let bytes = storage
-            .read_repo_file(".jit/index.json")
-            .unwrap()
-            .expect("fixture index exists");
-        let mut index = crate::repository_state::RepositoryIndex::parse(bytes.as_bytes()).unwrap();
-        index.mark_deleted(id.to_string());
-        crate::commands::test_helpers::seed_repo_file(
-            storage,
-            ".jit/index.json",
-            std::str::from_utf8(&index.to_pretty_bytes().unwrap()).unwrap(),
-        );
-    }
-
-    /// The removal resolves its prefix over live index membership, so a
-    /// dependency the index marks deleted is no longer found.
-    #[test]
-    fn test_single_removal_rejects_a_dependency_the_index_marks_deleted() {
-        let storage = InMemoryStorage::new();
-        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
-        dependency.id = "22221111111111111111111111111111".to_string();
-        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
-        source.id = "11111111111111111111111111111111".to_string();
+        source.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_1111_1111);
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
-        mark_index_deleted(&storage, &dependency.id);
+        let mut collision = crate::test_utils::fixture_issue("collision".into(), String::new());
+        collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_2222_2222);
+        crate::commands::test_helpers::seed_issue(&storage, collision);
         let executor = crate::commands::test_helpers::memory_executor(storage);
-        let events_before = executor.storage.read_events().unwrap();
 
-        let error = executor
-            .remove_dependency(&source.id, "2222")
-            .expect_err("a dependency the index marks deleted must be rejected");
+        executor
+            .graph()
+            .remove_dependency(&source.id, &dependency.id)
+            .unwrap();
+        assert!(executor
+            .storage
+            .load_issue(&source.id)
+            .unwrap()
+            .dependencies
+            .is_empty());
+    }
 
-        assert!(error
-            .downcast_ref::<crate::storage::IssueNotFoundError>()
-            .is_some());
-        assert_eq!(
-            executor
-                .storage
-                .load_issue(&source.id)
-                .unwrap()
-                .dependencies,
-            source.dependencies
-        );
-        assert_eq!(executor.storage.read_events().unwrap(), events_before);
+    #[test]
+    fn test_remove_dependency_removes_a_target_whose_record_is_gone() {
+        let storage = InMemoryStorage::new();
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
+        dependency.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_2222_1111);
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
+        source.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_1111_1111);
+        source.dependencies = vec![dependency.id.clone()];
+        crate::commands::test_helpers::seed_issue(&storage, source.clone());
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        executor
+            .graph()
+            .remove_dependency(&source.id, &dependency.id)
+            .unwrap();
+        assert!(executor
+            .storage
+            .load_issue(&source.id)
+            .unwrap()
+            .dependencies
+            .is_empty());
     }
 }

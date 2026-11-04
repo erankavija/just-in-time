@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "18a5a57b0d4c07d8d43930b893ca140c2d0ff68f",
+  "completed_at": "2026-11-03T01:57:19.625395109Z",
+  "duration_ms": 168800,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "ArchiveOps is correctly introduced, bounded, re-exported, and adopted by attributable callers; recorded Rust CI passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a015dcbb-a124-4168-872f-16f7dd5f2f7d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b4ac053b-1940-46cd-afa6-cc403e760eb0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T01:54:30.825034873Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6743622ce (jit:a015dcbb)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (issue markdown); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T01:52:55Z)\nTruncation recovery: narrowed the truncated document/global-call searches to the linked investigation’s architecture section and crates/jit plus crates/server call sites\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"ArchiveOps is correctly introduced, bounded, re-exported, and adopted by attributable callers; recorded Rust CI passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

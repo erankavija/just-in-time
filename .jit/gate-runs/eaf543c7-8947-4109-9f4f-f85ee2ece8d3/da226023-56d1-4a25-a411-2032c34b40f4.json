@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5f0e15931cc7357fbf463869e032d02daecf122f",
+  "completed_at": "2026-10-25T00:58:17.335087968Z",
+  "duration_ms": 172445,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/main.rs",
+        "id": "F1",
+        "line": 23,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "high",
+        "summary": "Recurring helper rustdoc restates obvious code rather than documenting a material contract."
+      }
+    ],
+    "summary": "The migration correctly uses the shared CLI fixture, but adds recurring tautological rustdoc.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eaf543c7-8947-4109-9f4f-f85ee2ece8d3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "da226023-56d1-4a25-a411-2032c34b40f4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:55:24.889644856Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9184 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1708e-207a-7ae0-b4d9-b4798cd197a3\n--------\nuser\n--- 9171 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e4e69f2ae, 78a9d3856, edc86d121, 5f0e15931 (`jit:eaf543c7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-10-25T00:54:58Z (exit code unavailable); code-review pending\nTruncation recovery: re-read individual commits by affected file and zero-context hunk inventory; inspected current scoped files and JitCli fixture; excluded the merge’s unrelated second-parent diff outside this issue’s impact cone\n\n1. [blocking][issue-impact] `crates/jit/tests/cli_gate/main.rs:23` adds six repetitive rustdoc comments (lines 23, 43, 59, 66, 72, and 78) that merely restate each helper’s name and signature. This recurring attributable prose violates the non-obvious-only standard; only the `run_gate_forced` comment conveys a material behavior.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The migration correctly uses the shared CLI fixture, but adds recurring tautological rustdoc.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recurring helper rustdoc restates obvious code rather than documenting a material contract.\",\"file\":\"crates/jit/tests/cli_gate/main.rs\",\"line\":23,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

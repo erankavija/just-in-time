@@ -1,36 +1,30 @@
 //! Event log operations
 
 use super::*;
+use crate::domain::event_catalog::EventTag;
+use crate::domain::identity::IssueIdPrefix;
 
-impl<S: IssueStore> CommandExecutor<S> {
-    pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
-        let events = self.storage.read_events()?;
-        let start = events.len().saturating_sub(n);
-        Ok(events[start..].to_vec())
-    }
-
+impl<S: IssueStore> QueryOps<'_, S> {
+    /// Newest-first events matching `event_type` and the `issue` filter.
     pub fn query_events(
         &self,
-        event_type: Option<String>,
-        issue_id: Option<String>,
+        event_type: Option<EventTag>,
+        issue: Option<IssueIdPrefix>,
         limit: usize,
     ) -> Result<Vec<Event>> {
-        let issue = issue_id
-            .map(|id| super::resolve_issue_filter(&self.storage, &id))
-            .transpose()?;
-        let events = self.storage.read_events()?;
+        let events = self.exec.storage.read_events()?;
 
         let filtered: Vec<Event> = events
             .into_iter()
             .rev()
             .filter(|e| {
                 if let Some(ref et) = event_type {
-                    if e.get_type() != et {
+                    if e.body().tag() != *et {
                         return false;
                     }
                 }
                 if let Some(ref issue) = issue {
-                    if !issue.matches(e.get_issue_id()) {
+                    if !e.issue_id().is_some_and(|id| issue.matches(id)) {
                         return false;
                     }
                 }
@@ -47,11 +41,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::event_catalog::EventTag;
+    use crate::domain::identity::IssueIdPrefix;
+    use crate::domain::EventBody;
     use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;
 
-    fn seeded_override_executor() -> (CommandExecutor<InMemoryStorage>, Event) {
-        let storage = InMemoryStorage::new();
+    fn seed_override_event(storage: &InMemoryStorage) -> Event {
         let event = EventTag::LinkedCheckoutWriteOverridden.sample();
         let bytes = crate::repository_state::serialize_event(&event)
             .expect("the override event serializes");
@@ -60,28 +55,27 @@ mod tests {
             String::from_utf8(bytes).expect("serialized event is UTF-8")
         );
         storage.add_data_file("events.jsonl", &line);
-        (CommandExecutor::new(storage), event)
+        event
     }
 
     /// REQ-03: an override-audit record in the log is read back and reported by
     /// the event query, and its event-type filter selects it by its stable tag.
     #[test]
     fn test_query_events_reports_linked_checkout_write_override_record() {
-        let (executor, expected) = seeded_override_executor();
+        let storage = InMemoryStorage::new();
+        let expected = seed_override_event(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let events = executor
-            .query_events(
-                Some("linked_checkout_write_overridden".to_string()),
-                None,
-                10,
-            )
+            .queries()
+            .query_events(Some(EventTag::LinkedCheckoutWriteOverridden), None, 10)
             .expect("the event query succeeds");
 
         assert_eq!(events, vec![expected]);
-        let Event::LinkedCheckoutWriteOverridden {
+        let EventBody::LinkedCheckoutWriteOverridden {
             declared_stance,
             invocation_override,
             ..
-        } = &events[0]
+        } = events[0].body()
         else {
             panic!("the event query reports the override record");
         };
@@ -93,9 +87,12 @@ mod tests {
     /// it while an issue-id filter never does.
     #[test]
     fn test_query_events_excludes_repository_scoped_override_record_from_issue_filter() {
-        let (executor, expected) = seeded_override_executor();
+        let storage = InMemoryStorage::new();
+        let expected = seed_override_event(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         assert_eq!(
             executor
+                .queries()
                 .query_events(None, None, 10)
                 .expect("the event query succeeds"),
             vec![expected],
@@ -104,9 +101,12 @@ mod tests {
 
         assert!(
             executor
+                .queries()
                 .query_events(
                     None,
-                    Some("00000000-0000-0000-0000-000000000001".to_string()),
+                    Some(IssueIdPrefix::from(&crate::test_utils::issue_id(
+                        0x100000000
+                    ))),
                     10,
                 )
                 .expect("the event query succeeds")

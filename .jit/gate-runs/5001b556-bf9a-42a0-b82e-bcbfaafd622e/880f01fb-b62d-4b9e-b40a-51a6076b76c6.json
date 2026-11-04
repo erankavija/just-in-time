@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6e18820676f30f4f4f75322e7fecd5c17b87681c",
+  "completed_at": "2026-10-28T22:09:56.292146232Z",
+  "duration_ms": 198804,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs",
+        "id": "F1",
+        "line": 133,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/5001b556/requirement/REQ-01",
+          "@/issue/c780514e/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "Hierarchy E2E assertions still read IDs and values from human-readable CLI output instead of JSON."
+      }
+    ],
+    "summary": "The hierarchy E2E test still consumes human-readable output for IDs and values, leaving REQ-01 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5001b556-bf9a-42a0-b82e-bcbfaafd622e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "880f01fb-b62d-4b9e-b40a-51a6076b76c6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:06:37.487756028Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3723 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1848d-0854-7e50-b5f4-1da81be51985\n--------\nuser\n--- 3710 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fallback — no reachable commit contains `jit:5001b556`; reviewed issue intent and current named files  \nPolicy sources: AGENTS.md  \nResolved items: @/issue/5001b556/requirement/REQ-01 and REQ-02 (.jit/issues/5001b556-bf9a-42a0-b82e-bcbfaafd622e.json); @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, semantic-test-assertions, orthogonal-tests (.jit/invariants.toml)  \nGate evidence: cargo-ci: passed at 2026-10-28T22:06:35Z (reused; no exit code/stdout recorded); code-review: pending  \nTruncation recovery: none — bounded reads returned completely  \n\n1. **[blocking][issue-impact]** `label_hierarchy_e2e_test.rs` still reads and checks IDs and values from human-readable output via `cli.run`, including query results at lines 133–175, strategic/query state results at 184–206 and 265–340, and namespace values at 242–258. This leaves hard REQ-01 unmet; use `run_json` and structured fields for these assertions.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The hierarchy E2E test still consumes human-readable output for IDs and values, leaving REQ-01 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Hierarchy E2E assertions still read IDs and values from human-readable CLI output instead of JSON.\",\"file\":\"crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs\",\"line\":133,\"references\":[\"@/issue/5001b556/requirement/REQ-01\",\"@/issue/c780514e/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

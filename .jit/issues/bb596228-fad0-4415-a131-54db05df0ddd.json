@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "578ed10d-29f9-4b25-87c0-b3c50a1e9d6e"
+  ],
+  "description": "Measure that lock-free reads scale beside a continuous writer and do not starve it, against the pre-change binary, and record the evidence under `dev/benchmarks/` (`@/charter/D-22`).\n\n## Background\n\n- Benchmark conventions: `dev/benchmarks/nextest-concurrency-934985ca/` (`benchmark.py`, `validate.py`, `raw/`, `summary.json`, `README.md`, `SHA256SUMS`, with `validate.py` rederiving the verdict from `raw/`) and `dev/benchmarks/publication-cost-722878d4/README.md` (base and tip binaries built from named commits in detached worktrees with `cargo build --release --locked -p jit`, binary hashes recorded, a load-average wait before runs).\n- `scripts/benchmark-session-cost.sh` generates a 665-issue fixture (`:211-255`).\n- The base binary is commit `369d35a42`, where `jit doc check-links` opens a mutation session (`crates/jit/src/commands/document.rs:1380`).\n- The design and the expected fallback probability are in `dev/active/b697a3f7-one-mutation-path/investigation-read-concurrency.md` §3 and §6.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/benchmark-read-concurrency.sh` builds base (`369d35a42`) and tip binaries, generates the fixture with the session-cost generator (shared, not copied), and for each binary runs one back-to-back writer (`jit issue update <id> --priority`, alternating values) with 0, 1 and 8 reader loops of `jit doc check-links --scope issue:<id> --json` for 15 s per arm, interleaving base and tip arms over five rounds after the 1-minute load average falls below 2.0.\n- [hard] REQ-02: It records reader completions per second R(N), writer completions per second W(N) and reader p95 latency per arm, and the verdict uses the median per-round ratio: tip R(8)/R(1) ≥ 4 and tip W(8)/W(0) ≥ 0.8. The base ratios are recorded beside them, and the harness refuses a verdict on a host with fewer than 16 logical CPUs.\n- [hard] REQ-03: `dev/benchmarks/read-concurrency-<short-id>/`, where `<short-id>` is this issue's short id as other issue-bound benchmark directories carry, holds `README.md`, `raw/`, `summary.json`, `validate.py` and `SHA256SUMS`; `validate.py` rederives both ratios and the verdict from `raw/`, and the recorded verdict passes.\n\n## Notes\n\n- Evidence for REQ-21; the barrier test in `read-session` owns the property itself.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T19:18:50.598665123Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "bb596228-fad0-4415-a131-54db05df0ddd",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:read-concurrency",
+    "component:core",
+    "per:@/charter/D-22",
+    "satisfies:b697a3f7/REQ-21"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Benchmark: concurrent readers beside a continuous writer",
+  "updated_at": "2026-11-04T19:18:50.598665123Z"
+}

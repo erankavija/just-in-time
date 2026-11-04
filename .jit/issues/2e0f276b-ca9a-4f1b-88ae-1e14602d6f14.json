@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T21:28:43.201732378Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "8b7f2973-a1da-45c0-be2a-226318330d10"
   ],
-  "description": "Makes each issue mutation resolve its id and return the updated `Issue`, so the CLI's issue command paths report results without reaching into storage.\n\n## Background\n\nAfter mutating, the issue arms of `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`) go back to storage to find out what they changed:\n\n- `IssueCommands::Create` calls `storage.load_issue` because `create_issue` returns `(String, Vec<String>)`.\n- `IssueCommands::Update` calls `storage.load_issue` because `update_issue_resolved` returns `(String, Vec<String>)`.\n- `Assign`, `Claim`, `Unassign`, `Reject` and `Release` each call `storage.resolve_issue_id` first and `storage.load_issue` after; `assign_issue` and `unassign_issue` return `Vec<String>`, `claim_issue` returns `Vec<StorageWarning>`, `release_issue` returns `()`.\n- `ClaimNext` calls `storage.load_issue` because `claim_next` returns `(String, Vec<StorageWarning>)`.\n\nThese methods live on the issue facade `IssueOps<'_, S>` reached through `CommandExecutor::issues()` in `crates/jit/src/commands/issue.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `update_issue_resolved`, `assign_issue`, `claim_issue`, `unassign_issue`, `release_issue`, `claim_next` and the single reject operation accept a user-supplied id where they take one, resolve it through the shared issue-id resolver, and return the updated `Issue` together with the warnings they return today.\n- [hard] REQ-02: The CLI's update, assign, claim, unassign, reject, release and claim-next paths call neither `resolve_issue_id` nor `load_issue` on storage.\n- [hard] REQ-03: A harness test per return shape shows that the returned `Issue` equals what storage holds after the mutation (for example `test_assign_issue_returns_updated_issue`), and the CLI's human and JSON output for these commands is unchanged, with existing suites passing unweakened.\n\n## Notes\n\n- 2d10f1dd introduces the single atomic reject operation and removes the early `resolve_issue_id` in `Update`; 16d63038 owns the shared resolver. This work uses both rather than adding its own.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "description": "Makes each issue mutation resolve its id and return the updated `Issue`, so the CLI's issue command paths report results without reaching into storage.\n\n## Background\n\nAfter mutating, the issue arms of `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`) go back to storage to find out what they changed:\n\n- `IssueCommands::Create` already reports the issue `create_issue` returns (8b7f2973) and makes no storage call.\n- `IssueCommands::Update` calls `storage.load_issue` because `update_issue_resolved` returns `(String, Vec<String>)`.\n- `Assign`, `Claim`, `Unassign`, `Reject` and `Release` each call `storage.resolve_issue_id` first and `storage.load_issue` after; `assign_issue` and `unassign_issue` return `Vec<String>`, `claim_issue` returns `Vec<StorageWarning>`, `release_issue` returns `()`.\n- `ClaimNext` calls `storage.load_issue` because `claim_next` returns `(String, Vec<StorageWarning>)`.\n\nThese methods live on the issue facade `IssueOps<'_, S>` reached through `CommandExecutor::issues()` in `crates/jit/src/commands/issue.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `update_issue_resolved`, `assign_issue`, `claim_issue`, `unassign_issue`, `release_issue`, `claim_next` and the single reject operation accept a user-supplied id where they take one, resolve it through the shared issue-id resolver, and return the updated `Issue` together with the warnings they return today.\n- [hard] REQ-02: The CLI's update, assign, claim, unassign, reject, release and claim-next paths call neither `resolve_issue_id` nor `load_issue` on storage.\n- [hard] REQ-03: A harness test per return shape shows that the returned `Issue` equals what storage holds after the mutation (for example `test_assign_issue_returns_updated_issue`), and the CLI's human and JSON output for these commands is unchanged, with existing suites passing unweakened.\n\n## Notes\n\n- 2d10f1dd introduces the single atomic reject operation (`reject_issue`); 16d63038 owns the shared resolver. `Update` still resolves its id early, through `resolve_issue_arg` in `main.rs` (a wrapper over `storage.resolve_issue_id`), which REQ-02 removes. This work uses the existing operation and resolver rather than adding its own.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T22:44:35.090514741Z",
+  "first_ready_at": "2026-11-03T21:01:01.167610581Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e99189fd-9b11-42e6-ba94-7be4f144e097",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:40:48.057720934Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b7ef1064-2dc7-421e-8142-ab15db785ab2",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:44:29.118046791Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2e0f276b-ca9a-4f1b-88ae-1e14602d6f14",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Issue mutations return the updated issue",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T22:44:35.090514741Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-8acca4f4",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "071ffc0ea53d158400d6900b00bef3eddc434c33",
+  "completed_at": "2026-10-27T19:59:20.280679595Z",
+  "duration_ms": 294576,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable type-retention, serialization, and short-id criteria are satisfied; prior findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8acca4f4-af5d-4dd8-b135-5f4a87eb1311",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "95e331d2-d0fe-403e-8d62-d572492a052e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T19:54:25.704503661Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: adeaec6f8, c3f5402e, 0f24f36a (`jit:8acca4f4`)\nPolicy sources: AGENTS.md\nResolved items: issue requirements and parent requirements from .jit/issues; invariants from .jit/invariants.toml; @/charter/D-18 from dev/vision/9db27a3a-charter.md; @/gate/jit-validate from .jit/gates.toml\nGate evidence: cargo-ci pending (no recorded run); prior code-review failed (exit 1) and its F1/F2 are addressed by later tagged commits\nTruncation recovery: recovered combined output through per-commit/path patches, targeted source ranges, and source-of-truth reads\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable type-retention, serialization, and short-id criteria are satisfied; prior findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

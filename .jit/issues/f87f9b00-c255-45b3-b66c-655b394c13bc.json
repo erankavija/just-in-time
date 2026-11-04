@@ -1,20 +1,43 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T14:29:13.354430902Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "1ac651c7-665b-40a5-b214-9abbc14e0534",
+    "8fbf8c43-88a7-4671-8402-865a872075ff",
     "9fa12e75-2632-4e68-8d67-b80caf78770d",
     "a24b11aa-7a20-45ff-a72e-6d0a6c0354cc"
   ],
-  "description": "The gate status arms label every failure `GATE_CHECK_ERROR`, print a bare `null` for gates never run, and reach storage to detect transposed arguments. This moves them to library handlers.\n\n## Background\n\n`GateCommands::Status` in `crates/jit/src/main.rs` (latest run, `--all` run history, flat and findings views) builds `GateRunHistoryResponse` and related responses inline and reports any failure under `--json` as `GATE_CHECK_ERROR` (exit 3) at four sites while the human path uses the classifier. Its \"not run\" branches print `JsonOutput::<Option<()>>::success(None)`, so stdout is the bare text `null`. Its transposed-argument guard calls `executor.storage().resolve_issue_id` twice, then prints an inline `INVALID_ARGUMENT` `JsonError` or calls `exit(2)` on the human path. `GateCommands::StatusAll` prints a success envelope and then exits 4 when not all gates passed, so its exit code matches no envelope code. `gate status` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `gate status` (all views, including `--all` history) and `gate status-all` to handlers in `crates/jit/src/dispatch/gate.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: The transposed-argument guard uses an executor predicate instead of `storage().resolve_issue_id` and raises a typed error classified as `INVALID_ARGUMENT` with exit 2 on both paths.\n- [hard] REQ-03: Each view returns a registered typed response, the not-run case is a typed object instead of bare `null`, human output uses the shared gate-run-status renderer, and the schema names the response; a test states the not-run payload.\n- [hard] REQ-04: `gate status-all` with a failed or unrun gate returns a findings outcome, and a test asserts the failure envelope with `GATE_FAILED`, exit 4 and the report in `error.details`; failures carry the classifier's code instead of `GATE_CHECK_ERROR`, which a test asserts for one non-missing-gate failure.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n8673dc5e changes how manual attestation appears in gate status.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "The gate status arms label every failure `GATE_CHECK_ERROR`, print a bare `null` for gates never run, and reach storage to detect transposed arguments. This moves them to library handlers.\n\n## Background\n\n`GateCommands::Status` in `crates/jit/src/main.rs` (latest run, `--all` run history, flat and findings views) builds `GateRunHistoryResponse` and related responses inline and reports any failure under `--json` as `GATE_CHECK_ERROR` (exit 3) at four sites while the human path uses the classifier. Its \"not run\" branches print `JsonOutput::<Option<()>>::success(None)`, so stdout is the bare text `null`. Its transposed-argument guard calls `executor.storage().resolve_issue_id` twice, then prints an inline `INVALID_ARGUMENT` `JsonError` or calls `exit(2)` on the human path. `GateCommands::StatusAll` prints a success envelope and then exits 4 when not all gates passed, so its exit code matches no envelope code. `gate status` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `gate status` (all views, including `--all` history) and `gate status-all` to handlers in `crates/jit/src/dispatch/gate.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: The transposed-argument guard uses an executor predicate instead of `storage().resolve_issue_id` and raises a typed error classified as `INVALID_ARGUMENT` with exit 2 on both paths.\n- [hard] REQ-03: Each view returns a registered typed response, the not-run case is a typed object instead of bare `null`, human output uses the shared gate-run-status renderer, and the schema names the response; a test states the not-run payload.\n- [hard] REQ-04: `gate status-all` with a failed or unrun gate returns a findings outcome, and a test asserts the failure envelope with `GATE_FAILED`, exit 4 and the report in `error.details`; failures carry the classifier's code instead of `GATE_CHECK_ERROR`, which a test asserts for one non-missing-gate failure.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-06's unchanged human output excludes one line: a failed `gate status-all` prints its findings message as a one-line summary on stderr in human mode, by the uniform findings-stderr rule (epic df129d9e D-03; steward ruling, 2026-11-04).\n\n## Notes\n\n8673dc5e changes how manual attestation appears in gate status.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T15:38:26.350350951Z",
+  "first_ready_at": "2026-11-04T11:59:35.235940428Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "147c1d4d-4eea-4bce-a6cc-1f1094232040",
+      "status": "passed",
+      "updated_at": "2026-11-04T15:33:45.933491803Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a2f28bc6-216a-4fc9-869f-c1988d5f617b",
+      "status": "passed",
+      "updated_at": "2026-11-04T15:38:02.726552376Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "2736fbfa-afc8-4523-ba1a-fc3a45acb17f",
+      "status": "passed",
+      "updated_at": "2026-11-04T15:34:03.277687534Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f87f9b00-c255-45b3-b66c-655b394c13bc",
   "labels": [
     "type:task",
@@ -31,7 +54,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate status commands move to library handlers",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T15:38:26.350350951Z"
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T23:29:21.267894177Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -7,14 +8,28 @@
     "855d027d-2575-4c9d-8c6a-049f406fe397",
     "de9a7557-2061-4b63-9c74-6c18ed840c17"
   ],
-  "description": "Give `JitConfig` one accessor for the repository's default content format and one for its validation strictness, each applying the default when `[validation]` or the key is absent, and move the validation layer and projection rendering onto them.\n\n## Background\n\n- `[validation].content_format` and `[validation].strictness` are typed at load: absent means Markdown and loose respectively (`crates/jit/src/config.rs`, `ValidationConfig`).\n- Callers restate the default when `config.validation` is `None`. In the validation layer and repository state: `collect_rule_findings` (`crates/jit/src/validation/repository.rs:561-566`), `collect_item_link_findings` (`validation/repository.rs:707-712`), and `repo_content_format` (`crates/jit/src/repository_state/projection_render.rs:245-260`, called at `:102`), which also re-implements the token match with its own error.\n- Command-layer readers move separately, onto these accessors.\n\n## Success Criteria\n\n- [hard] REQ-01: `JitConfig::content_format()` returns the repository's content format, Markdown when undeclared, and `JitConfig::strictness()` returns its strictness, loose when undeclared; each default is stated once, in its accessor.\n- [hard] REQ-02: The three listed readers read the content format through `JitConfig::content_format()`, and `projection_render.rs` keeps no token matching or default of its own.\n- [hard] REQ-03: Config unit tests show both accessors' result for an absent `[validation]` table, an absent key and a declared value.\n\n## Notes\n\n- Behaviour is unchanged; the projection error variant for an invalid format goes away because loading rejects such a value.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `JitConfig::content_format()` and `JitConfig::strictness()` the only readers of the repository's default content format and validation strictness: delete the two wrappers that still sit in front of them and give the accessors their own tests.\n\n## Background\n\n- `JitConfig::content_format()` (`crates/jit/src/config.rs:1209-1214`) and `JitConfig::strictness()` (`:1220-1225`) apply the defaults when `[validation]` is absent, delegating to `ValidationConfig::content_format()` and `ValidationConfig::strictness()` (`:258-266`), which apply them when the key is absent. Loading rejects an invalid token. The validation layer and most command sites already call them (for example `crates/jit/src/validation/repository.rs:542`, `commands/mod.rs:1219-1220`, `commands/bulk_update.rs:609`, `commands/template.rs:1100`).\n- Two wrappers remain. `repo_content_format` (`crates/jit/src/repository_state/projection_render.rs:244-246`, called at `:102`) only forwards to the accessor. `CommandExecutor::repo_content_format` (`crates/jit/src/commands/mod.rs:2726-2729`) wraps it in a `Result` over the cached configuration and is called from `commands/validate.rs:1581,1680,1844,2001`, `commands/bulk_update.rs:608` and `commands/item.rs:152,307,389`.\n- No unit test covers either accessor; `config.rs:1921,1932,1949,2097` cover token parsing only.\n\n## Success Criteria\n\n- [hard] REQ-01: `JitConfig::content_format()` returns the repository's content format, Markdown when undeclared, and `JitConfig::strictness()` returns its strictness, loose when undeclared; each default is stated once, in the `ValidationConfig` accessor the `JitConfig` accessor delegates to.\n- [hard] REQ-02: Neither `repo_content_format` function exists; each former caller reads the content format through `JitConfig::content_format()`, and no code outside `config.rs` maps an absent `[validation]` value to a default.\n- [hard] REQ-03: Config unit tests show both accessors' result for an absent `[validation]` table, an absent key and a declared value, and the existing suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-03T23:46:17.159491737Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8a941b4c-6e7a-48d5-b4a4-450674f827db",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:42:25.279383305Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "40bd5f1a-e92b-4147-8581-313fba68fd68",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:45:50.940781958Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "977d01d8-2757-48c2-ad73-25f42c4b2105",
   "labels": [
     "type:task",
@@ -28,7 +43,7 @@
     "satisfies:9876a23a/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Configuration accessors for content format and strictness",
-  "updated_at": "2026-10-21T20:31:34.112543831Z"
+  "updated_at": "2026-11-03T23:46:17.159491737Z"
 }

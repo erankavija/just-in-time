@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4abae3c9fbf005b976b9d1265f53ba0c1c9c08d8",
+  "completed_at": "2026-10-27T21:58:48.345157725Z",
+  "duration_ms": 258302,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared file-backed fixture adoption meets the issue criteria with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "077937f5-ed4c-4a76-be4a-2819bd5f556b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "44d0070b-7224-4db5-83c4-5aea5484ca73",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:54:30.043077334Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e648f9cb8; 4abae3c9f merge parent-relative patch\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-27T21:52:42Z\nTruncation recovery: narrowed fixture, constructor, helper-absence, merge-hunk, and current-test reads; co-tagged unrelated merge paths were outside this issue’s impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared file-backed fixture adoption meets the issue criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

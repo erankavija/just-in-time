@@ -22,73 +22,31 @@
 //! matching `jit --schema` declaration, so a rename on either side fails the
 //! build (REQ-04).
 
-use crate::TaxonomyRepo;
-use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::process::Command;
-
-fn jit(temp: &TaxonomyRepo, args: &[&str]) -> Vec<u8> {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone()
-}
 
 /// Create an issue carrying one required (manual) gate so every surface has a
 /// non-empty gate list to project.
-fn setup_repo_with_gated_issue() -> (TaxonomyRepo, String) {
-    // `query strategic` resolves the tiers the repository's own
-    // `[type_hierarchy]` declares, so the fixture repository declares one.
-    let temp = crate::setup_test_repo_with_taxonomy();
+fn seed_gated_issue(temp: &JitCli) -> String {
+    let id = temp
+        .create_issue(["--title", "Gated", "--description", "Body"])
+        .unwrap();
 
-    let stdout = jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Gated",
-            "--description",
-            "Body",
-        ],
-    );
-    let stdout = String::from_utf8_lossy(&stdout);
-    let id = stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    jit(
-        &temp,
-        &[
-            "gate",
-            "define",
-            "manual-gate",
-            "--title",
-            "Manual",
-            "--description",
-            "Manual gate",
-            "--mode",
-            "manual",
-        ],
-    );
-    jit(
-        &temp,
-        &["issue", "update", &id, "--add-gate", "manual-gate"],
-    );
-    (temp, id)
-}
-
-fn json(temp: &TaxonomyRepo, args: &[&str]) -> Value {
-    serde_json::from_slice(&jit(temp, args)).unwrap()
+    temp.run([
+        "gate",
+        "define",
+        "manual-gate",
+        "--title",
+        "Manual",
+        "--description",
+        "Manual gate",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
+    temp.run(["issue", "update", &id, "--add-gate", "manual-gate"])
+        .unwrap();
+    id
 }
 
 /// Assert the value carries the projected `gates` array and neither raw
@@ -123,29 +81,35 @@ fn assert_gates_array(view: &Value, ctx: &str) {
 
 #[test]
 fn test_issue_show_full_exposes_gates_array() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let view = json(&temp, &["issue", "show", &id, "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let view = temp.run_json(["issue", "show", &id]).unwrap();
     assert_gates_array(&view, "issue show --json");
 }
 
 #[test]
 fn test_issue_show_summary_exposes_gates_array() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let view = json(&temp, &["issue", "show", &id, "--summary", "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let view = temp.run_json(["issue", "show", &id, "--summary"]).unwrap();
     assert_gates_array(&view, "issue show --summary --json");
 }
 
 #[test]
 fn test_issue_status_exposes_gates_array() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let view = json(&temp, &["issue", "status", &id, "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let view = temp.run_json(["issue", "status", &id]).unwrap();
     assert_gates_array(&view, "issue status --json");
 }
 
 #[test]
 fn test_graph_export_full_keeps_storage_gate_fields() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let doc = json(&temp, &["graph", "export", "--format", "json", "--full"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let doc = temp
+        .run_json(["graph", "export", "--format", "json", "--full"])
+        .unwrap();
     let node = doc["nodes"]
         .as_array()
         .unwrap()
@@ -210,15 +174,16 @@ fn assert_summary_omits_gates(record: &Value, ctx: &str) {
 
 #[test]
 fn test_query_full_keeps_storage_gate_fields_and_summary_omits_them() {
-    let (temp, id) = setup_repo_with_gated_issue();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
 
-    let full = json(&temp, &["query", "all", "--full", "--json"]);
+    let full = temp.run_json(["query", "all", "--full"]).unwrap();
     assert_storage_record(
         find_issue(&full, &id, "query all --full"),
         "query all --full",
     );
 
-    let summary = json(&temp, &["query", "all", "--json"]);
+    let summary = temp.run_json(["query", "all"]).unwrap();
     assert_summary_omits_gates(find_issue(&summary, &id, "query all"), "query all");
 }
 
@@ -229,68 +194,56 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
     // member. `query strategic` needs a strategic-typed issue, so one is
     // created with the same gate. Together these pin every documented
     // raw-record query variant to the storage shape.
-    let (temp, id) = setup_repo_with_gated_issue();
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let temp = JitCli::with_repository(taxonomy_repo.temp);
+    let id = seed_gated_issue(&temp);
 
-    let available = json(&temp, &["query", "available", "--full", "--json"]);
+    let available = temp.run_json(["query", "available", "--full"]).unwrap();
     assert_storage_record(
         find_issue(&available, &id, "query available --full"),
         "query available --full",
     );
     assert_summary_omits_gates(
         find_issue(
-            &json(&temp, &["query", "available", "--json"]),
+            &temp.run_json(["query", "available"]).unwrap(),
             &id,
             "query available",
         ),
         "query available",
     );
 
-    let strategic_type = temp
+    let strategic_type = taxonomy_repo
         .taxonomy
         .strategic_types
         .first()
         .expect("the declared vocabulary names a strategic type")
         .clone();
-    let strategic_out = jit(
-        &temp,
-        &[
-            "issue",
-            "create",
+    let strategic_id = temp
+        .create_issue([
             "--title",
             "Strategic gated",
             "--type",
             &strategic_type,
             "--description",
             "Body",
-        ],
-    );
-    let strategic_stdout = String::from_utf8_lossy(&strategic_out);
-    let strategic_id = strategic_stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-    jit(
-        &temp,
-        &[
-            "issue",
-            "update",
-            &strategic_id,
-            "--add-gate",
-            "manual-gate",
-        ],
-    );
-    let strategic = json(&temp, &["query", "strategic", "--full", "--json"]);
+        ])
+        .unwrap();
+    temp.run([
+        "issue",
+        "update",
+        &strategic_id,
+        "--add-gate",
+        "manual-gate",
+    ])
+    .unwrap();
+    let strategic = temp.run_json(["query", "strategic", "--full"]).unwrap();
     assert_storage_record(
         find_issue(&strategic, &strategic_id, "query strategic --full"),
         "query strategic --full",
     );
 
-    jit(&temp, &["issue", "update", &id, "--state", "rejected"]);
-    let closed = json(&temp, &["query", "closed", "--full", "--json"]);
+    temp.run(["issue", "reject", &id]).unwrap();
+    let closed = temp.run_json(["query", "closed", "--full"]).unwrap();
     assert_storage_record(
         find_issue(&closed, &id, "query closed --full"),
         "query closed --full",
@@ -299,39 +252,44 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
 
 #[test]
 fn test_issue_list_full_keeps_storage_gate_fields_and_summary_omits_them() {
-    let (temp, id) = setup_repo_with_gated_issue();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
 
-    let full = json(&temp, &["issue", "list", "--full", "--json"]);
+    let full = temp.run_json(["issue", "list", "--full"]).unwrap();
     assert_storage_record(
         find_issue(&full, &id, "issue list --full"),
         "issue list --full",
     );
 
-    let summary = json(&temp, &["issue", "list", "--json"]);
+    let summary = temp.run_json(["issue", "list"]).unwrap();
     assert_summary_omits_gates(find_issue(&summary, &id, "issue list"), "issue list");
 }
 
 #[test]
 fn test_top_level_list_full_keeps_storage_gate_fields() {
-    let (temp, id) = setup_repo_with_gated_issue();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
 
     // Top-level `list` normalizes to `issue list`, so `--full` must expose the
     // same raw record.
-    let full = json(&temp, &["list", "--full", "--json"]);
+    let full = temp.run_json(["list", "--full"]).unwrap();
     assert_storage_record(find_issue(&full, &id, "list --full"), "list --full");
 }
 
 #[test]
 fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
-    let (temp, id) = setup_repo_with_gated_issue();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
 
-    let full = json(&temp, &["issue", "search", "Gated", "--full", "--json"]);
+    let full = temp
+        .run_json(["issue", "search", "Gated", "--full"])
+        .unwrap();
     assert_storage_record(
         find_issue(&full, &id, "issue search --full"),
         "issue search --full",
     );
 
-    let summary = json(&temp, &["issue", "search", "Gated", "--json"]);
+    let summary = temp.run_json(["issue", "search", "Gated"]).unwrap();
     assert_summary_omits_gates(find_issue(&summary, &id, "issue search"), "issue search");
 }
 
@@ -343,26 +301,23 @@ fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
 
 #[test]
 fn test_issue_create_exposes_gates_array() {
-    let temp = crate::setup_test_repo_with_taxonomy();
-    jit(
-        &temp,
-        &[
-            "gate",
-            "define",
-            "manual-gate",
-            "--title",
-            "Manual",
-            "--description",
-            "Manual gate",
-            "--mode",
-            "manual",
-        ],
-    );
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    temp.run([
+        "gate",
+        "define",
+        "manual-gate",
+        "--title",
+        "Manual",
+        "--description",
+        "Manual gate",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
     // `issue create --json` returns the `issue show` projection, so it exposes
     // the required gate under `gates`, never the storage split.
-    let view = json(
-        &temp,
-        &[
+    let view = temp
+        .run_json([
             "issue",
             "create",
             "--title",
@@ -371,69 +326,78 @@ fn test_issue_create_exposes_gates_array() {
             "Body",
             "--gate",
             "manual-gate",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_gates_array(&view, "issue create --json");
 }
 
 #[test]
 fn test_issue_assign_keeps_storage_gate_fields() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let record = json(&temp, &["issue", "assign", &id, "agent:worker-1", "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let record = temp
+        .run_json(["issue", "assign", &id, "agent:worker-1"])
+        .unwrap();
     assert_storage_record(&record, "issue assign");
 }
 
 #[test]
 fn test_issue_unassign_keeps_storage_gate_fields() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    jit(&temp, &["issue", "assign", &id, "agent:worker-1"]);
-    let record = json(&temp, &["issue", "unassign", &id, "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    temp.run(["issue", "assign", &id, "agent:worker-1"])
+        .unwrap();
+    let record = temp.run_json(["issue", "unassign", &id]).unwrap();
     assert_storage_record(&record, "issue unassign");
 }
 
 #[test]
 fn test_issue_reject_keeps_storage_gate_fields() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let record = json(&temp, &["issue", "reject", &id, "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let record = temp.run_json(["issue", "reject", &id]).unwrap();
     assert_storage_record(&record, "issue reject");
 }
 
 #[test]
-fn test_issue_claim_keeps_storage_gate_fields_and_carries_warnings() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    let record = json(&temp, &["issue", "claim", &id, "agent:worker-1", "--json"]);
+fn test_issue_claim_keeps_storage_gate_fields() {
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    let record = temp
+        .run_json(["issue", "claim", &id, "agent:worker-1"])
+        .unwrap();
     assert_storage_record(&record, "issue claim");
-    assert!(
-        record.get("warnings").is_some(),
-        "issue claim record carries the advisory warnings array; got: {record}"
-    );
 }
 
 #[test]
 fn test_issue_claim_next_keeps_storage_gate_fields() {
-    let (temp, _id) = setup_repo_with_gated_issue();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let _id = seed_gated_issue(&temp);
     // The freshly created dependency-free issue auto-promotes to ready, so it is
     // the next claimable issue.
-    let record = json(&temp, &["issue", "claim-next", "agent:worker-1", "--json"]);
+    let record = temp
+        .run_json(["issue", "claim-next", "agent:worker-1"])
+        .unwrap();
     assert_storage_record(&record, "issue claim-next");
 }
 
 #[test]
 fn test_issue_release_keeps_storage_gate_fields() {
-    let (temp, id) = setup_repo_with_gated_issue();
-    jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
-    let record = json(&temp, &["issue", "release", &id, "timeout", "--json"]);
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
+    let id = seed_gated_issue(&temp);
+    temp.run(["issue", "claim", &id, "agent:worker-1"]).unwrap();
+    let record = temp.run_json(["issue", "release", &id, "timeout"]).unwrap();
     assert_storage_record(&record, "issue release");
 }
 
 #[test]
 fn test_issue_show_summary_help_names_gates_not_storage_fields() {
-    let temp = crate::setup_test_repo_with_taxonomy();
+    let temp = JitCli::uninitialised().unwrap();
     // `--help` exits 0 and prints the generated command help, including the
     // `--summary` description that must promise `gates`, not the storage split.
-    let out = jit(&temp, &["issue", "show", "--help"]);
-    let text = String::from_utf8_lossy(&out);
+    let out = temp.command(["issue", "show", "--help"]).output().unwrap();
+    assert!(out.status.success());
+    let text = String::from_utf8_lossy(&out.stdout);
     assert!(
         text.contains("gates"),
         "issue show --help should name the `gates` field; got: {text}"

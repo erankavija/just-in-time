@@ -19,29 +19,48 @@ use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactEdge, ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion,
     BlockerCode, EdgeKind, EdgeResolutionMode, PlanBlocker, PlanError, PlanWarning, WarningCode,
 };
+use crate::domain::identity::IssueId;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
 use pulldown_cmark::{Event, Parser, Tag};
 use regex::Regex;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::LazyLock;
 
+wire_vocabulary! {
+    /// Artifact format recognized by extension; its token is the format
+    /// identifier archive-plan entries carry.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    pub enum ArtifactFormat {
+        /// Markdown source.
+        Markdown = "markdown",
+        /// HTML markup.
+        Html = "html",
+        /// CSS stylesheet.
+        Css = "css",
+        /// JavaScript module or script.
+        JavaScript = "javascript",
+    }
+}
+
 /// Parsed, side-effect-free facts about one already-read artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedArtifact {
-    format: Option<&'static str>,
-    references: Vec<String>,
+    format: Option<ArtifactFormat>,
+    references: Vec<ParsedReference>,
     dynamic_loading_suspected: bool,
 }
 
 impl ParsedArtifact {
     /// Stable format identifier used in archive-plan entries.
     pub fn format(&self) -> Option<&'static str> {
-        self.format
+        self.format.map(ArtifactFormat::as_str)
     }
 
     /// Canonically ordered textual references extracted from supported syntax.
-    pub fn references(&self) -> &[String] {
+    pub fn references(&self) -> &[ParsedReference] {
         &self.references
     }
 
@@ -49,6 +68,13 @@ impl ParsedArtifact {
     pub fn dynamic_loading_suspected(&self) -> bool {
         self.dynamic_loading_suspected
     }
+}
+
+/// An extracted reference and its resolution relative to the parsed artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedReference {
+    pub reference: String,
+    pub resolution: ReferenceResolution,
 }
 
 /// Pure outcome of resolving one textual reference from its parent path.
@@ -163,20 +189,13 @@ pub type ArtifactEvidenceMap = BTreeMap<String, ArtifactEvidence>;
 /// The copy each source was published to by recorded archivals of `target`,
 /// keyed by normalized source; a later record supersedes an earlier one.
 pub fn recorded_archived_copies(
-    events: &[crate::domain::Event],
+    executions: &[crate::domain::artifact_execution::ArchiveExecution],
     target: &crate::domain::artifact_plan::PlanTarget,
 ) -> BTreeMap<String, String> {
-    events
+    executions
         .iter()
-        .filter_map(|event| match event {
-            crate::domain::Event::ArtifactArchiveExecuted {
-                target: recorded,
-                publications,
-                ..
-            } if recorded == target => Some(publications),
-            _ => None,
-        })
-        .flatten()
+        .filter(|execution| &execution.target == target)
+        .flat_map(|execution| &execution.publications)
         .filter_map(|publication| {
             publication.source.as_deref().map(|source| {
                 (
@@ -257,10 +276,8 @@ pub fn expand_artifact_closure(
             Some(ArtifactEvidence::File(bytes)) => {
                 let artifact = parse_artifact(&path, bytes);
                 artifact.references().iter().for_each(|reference| {
-                    if let ReferenceResolution::Local { target, .. } =
-                        resolve_reference(&path, reference)
-                    {
-                        state.graph.enqueue(target);
+                    if let ReferenceResolution::Local { target, .. } = &reference.resolution {
+                        state.graph.enqueue(target.clone());
                     }
                 });
                 state.parsed.insert(path, artifact);
@@ -287,17 +304,17 @@ pub fn expand_artifact_closure(
 
 /// The references of one parsed artifact that the plan's walk resolves.
 ///
-/// An artifact the policy retains outside the development root contributes
+/// An artifact the policy retains in place contributes
 /// none: the walk stops at it, so it names no edge and admits no descendant of
 /// it to the plan (`@/issue/8e071e18/decision/D-14`).
 fn followed_references<'a>(
     path: &str,
     artifact: &'a ParsedArtifact,
     policy: &ArtifactClassificationPolicy,
-) -> std::slice::Iter<'a, String> {
-    const BOUNDED: &[String] = &[];
+) -> std::slice::Iter<'a, ParsedReference> {
+    const BOUNDED: &[ParsedReference] = &[];
 
-    if policy.retains_outside_development_root(path) {
+    if policy.retains_source_in_place(path) {
         BOUNDED.iter()
     } else {
         artifact.references().iter()
@@ -410,41 +427,41 @@ pub fn discover_archive_artifacts(
                     ));
                 }
                 for reference in followed_references(&path, parsed, policy) {
-                    match resolve_reference(&path, reference) {
+                    match &reference.resolution {
                         ReferenceResolution::Ignored => {}
                         ReferenceResolution::External(edge) => {
-                            edges.push(edge);
+                            edges.push(edge.clone());
                             entry_warnings
                                 .push(PlanWarning::new(WarningCode::ExternalEdge, Some(&path)));
                         }
                         ReferenceResolution::RepositoryEscape { edge, blocker } => {
-                            edges.push(edge);
-                            entry_blockers.push(blocker);
+                            edges.push(edge.clone());
+                            entry_blockers.push(blocker.clone());
                         }
                         ReferenceResolution::Local { edge, target } => {
-                            if is_navigation_target(&target, evidence) {
+                            if is_navigation_target(target, evidence) {
                                 continue;
                             }
-                            edges.push(edge);
+                            edges.push(edge.clone());
                             referencing
                                 .entry(target.clone())
                                 .or_default()
                                 .insert(path.clone());
-                            if missing.contains(&target) {
+                            if missing.contains(target) {
                                 entry_warnings.push(PlanWarning::new(
                                     WarningCode::MissingEdgeTarget,
-                                    Some(&target),
+                                    Some(target),
                                 ));
                             }
                             working.entry(target.clone()).or_insert_with(|| {
                                 ArtifactPlanEntry::new(
-                                    &target,
+                                    target,
                                     ArtifactVersion::WorkingTree,
                                     ArtifactAction::Retain,
                                 )
                                 .with_provenance(vec![ArtifactProvenance::Embedded])
                             });
-                            graph.enqueue(target);
+                            graph.enqueue(target.clone());
                         }
                     }
                 }
@@ -455,7 +472,7 @@ pub fn discover_archive_artifacts(
                     .clone()
                     .with_edges(merge(entry.edges(), edges))
                     .with_blockers(merge(entry.blockers(), entry_blockers))
-                    .with_warnings(merge(entry.warnings(), entry_warnings));
+                    .with_plan_warnings(merge(entry.plan_warnings(), entry_warnings));
                 if let Some(format) = parsed.format() {
                     updated = updated.with_format(format);
                 }
@@ -500,9 +517,10 @@ fn is_navigation_target(target: &str, evidence: &ArtifactEvidenceMap) -> bool {
 /// an archive delete a file another issue's document still reaches.
 fn discover_embedded_owners(
     issues: &[Issue],
-    selected_member_ids: &BTreeSet<String>,
+    selected_member_ids: &BTreeSet<IssueId>,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
 ) -> Vec<EmbeddedArtifactOwner> {
+    let reachable_by_root = reachable_document_paths(issues, parsed_by_path);
     let mut owners = Vec::new();
     for issue in issues {
         for document in issue
@@ -512,9 +530,11 @@ fn discover_embedded_owners(
         {
             let root = crate::domain::artifact_plan::normalize_artifact_path(&document.path);
             owners.extend(
-                reachable_parsed_paths(&root, parsed_by_path)
+                reachable_by_root
+                    .get(&root)
                     .into_iter()
-                    .filter(|path| path != &root)
+                    .flatten()
+                    .filter(|path| *path != &root)
                     .map(|path| EmbeddedArtifactOwner {
                         artifact: path.clone(),
                         root: root.clone(),
@@ -533,6 +553,24 @@ fn discover_embedded_owners(
     owners
 }
 
+fn reachable_document_paths(
+    issues: &[Issue],
+    parsed_by_path: &BTreeMap<String, ParsedArtifact>,
+) -> BTreeMap<String, BTreeSet<String>> {
+    issues
+        .iter()
+        .flat_map(|issue| &issue.documents)
+        .filter(|document| document.commit.is_none())
+        .map(|document| crate::domain::artifact_plan::normalize_artifact_path(&document.path))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|root| {
+            let reachable = reachable_parsed_paths(&root, parsed_by_path);
+            (root, reachable)
+        })
+        .collect()
+}
+
 fn reachable_parsed_paths(
     root: &str,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
@@ -545,8 +583,8 @@ fn reachable_parsed_paths(
         };
         reachable.insert(path.clone());
         parsed.references().iter().for_each(|reference| {
-            if let ReferenceResolution::Local { target, .. } = resolve_reference(&path, reference) {
-                graph.enqueue(target);
+            if let ReferenceResolution::Local { target, .. } = &reference.resolution {
+                graph.enqueue(target.clone());
             }
         });
     }
@@ -564,7 +602,7 @@ fn append_blocker(entry: &mut ArtifactPlanEntry, blocker: PlanBlocker) -> Result
 fn append_warning(entry: &mut ArtifactPlanEntry, warning: PlanWarning) -> Result<(), PlanError> {
     let mut updated = entry
         .clone()
-        .with_warnings(merge(entry.warnings(), [warning]));
+        .with_plan_warnings(merge(entry.plan_warnings(), [warning]));
     updated.normalize()?;
     *entry = updated;
     Ok(())
@@ -613,18 +651,22 @@ pub fn parse_artifact(path: &str, bytes: &[u8]) -> ParsedArtifact {
     let text = String::from_utf8_lossy(bytes);
     let format = format_for_path(path);
     let references = match format {
-        Some("markdown") => markdown_references(&text),
-        Some("html") => html_references(&text),
-        Some("css") => css_references(&text),
-        _ => Vec::new(),
+        Some(ArtifactFormat::Markdown) => markdown_references(&text),
+        Some(ArtifactFormat::Html) => html_references(&text),
+        Some(ArtifactFormat::Css) => css_references(&text),
+        Some(ArtifactFormat::JavaScript) | None => Vec::new(),
     };
-    let dynamic_loading_suspected =
-        matches!(format, Some("markdown" | "html" | "css" | "javascript"))
-            && suspects_dynamic_loading(&text);
+    let dynamic_loading_suspected = format.is_some() && suspects_dynamic_loading(&text);
 
     ParsedArtifact {
         format,
-        references,
+        references: references
+            .into_iter()
+            .map(|reference| ParsedReference {
+                resolution: resolve_reference(path, &reference),
+                reference,
+            })
+            .collect(),
         dynamic_loading_suspected,
     }
 }
@@ -708,17 +750,17 @@ pub fn resolve_reference(parent: &str, reference: &str) -> ReferenceResolution {
     }
 }
 
-fn format_for_path(path: &str) -> Option<&'static str> {
+fn format_for_path(path: &str) -> Option<ArtifactFormat> {
     match Path::new(path)
         .extension()
         .and_then(|extension| extension.to_str())
         .map(str::to_ascii_lowercase)
         .as_deref()
     {
-        Some("md" | "markdown") => Some("markdown"),
-        Some("html" | "htm") => Some("html"),
-        Some("css") => Some("css"),
-        Some("js" | "mjs" | "cjs") => Some("javascript"),
+        Some("md" | "markdown") => Some(ArtifactFormat::Markdown),
+        Some("html" | "htm") => Some(ArtifactFormat::Html),
+        Some("css") => Some(ArtifactFormat::Css),
+        Some("js" | "mjs" | "cjs") => Some(ArtifactFormat::JavaScript),
         _ => None,
     }
 }
@@ -894,4 +936,95 @@ fn capture_alternative<'a>(
     indices
         .iter()
         .find_map(|index| captures.get(*index).map(|value| value.as_str()))
+}
+
+#[cfg(test)]
+mod archived_copy_tests {
+    use super::recorded_archived_copies;
+    use crate::domain::artifact_plan::PlanTarget;
+    use crate::test_utils::archive_execution;
+
+    fn document(path: &str) -> PlanTarget {
+        PlanTarget::Document { path: path.into() }
+    }
+
+    #[test]
+    fn test_recorded_archived_copies_later_execution_supersedes_and_other_targets_are_ignored() {
+        let executions = [
+            archive_execution(document("a.md"), "arc", &[("src/x.md", "arc/old/x.md")]),
+            archive_execution(document("b.md"), "arc", &[("src/x.md", "arc/other/x.md")]),
+            archive_execution(document("a.md"), "arc", &[("src/x.md", "arc/new/x.md")]),
+        ];
+        let copies = recorded_archived_copies(&executions, &document("a.md"));
+        assert_eq!(copies.len(), 1);
+        assert_eq!(copies["src/x.md"], "arc/new/x.md");
+    }
+}
+
+#[cfg(test)]
+mod resolution_cache_tests {
+    use super::*;
+    use crate::test_utils::{document_reference, fixture_issue};
+
+    #[test]
+    fn test_parse_artifact_stores_each_reference_with_its_parent_resolution() {
+        let parent = "docs/root.md";
+        let source = "[local](child.md) [root](/asset.png) [external](https://example.com) [anchor](#here) [escape](../../outside.md)";
+        let parsed = parse_artifact(parent, source.as_bytes());
+        let extracted = markdown_references(source);
+        assert_eq!(parsed.references().len(), extracted.len());
+        for (stored, reference) in parsed.references().iter().zip(extracted) {
+            assert_eq!(stored.reference, reference);
+            assert_eq!(stored.resolution, resolve_reference(parent, &reference));
+        }
+    }
+
+    #[test]
+    fn test_discover_embedded_owners_shared_normalized_roots_reuse_reachability() {
+        let mut first = fixture_issue("first".into(), String::new());
+        first.documents = vec![document_reference("docs/root.md")];
+        let mut second = fixture_issue("second".into(), String::new());
+        second.documents = vec![
+            document_reference("./docs/root.md"),
+            document_reference("docs/other.md"),
+        ];
+        let mut pinned = document_reference("docs/pinned.md");
+        pinned.commit = Some("abc123".into());
+        second.documents.push(pinned);
+        let issues = [first, second];
+        let parsed = [
+            ("docs/root.md", "[child](child.md)"),
+            ("docs/other.md", "[child](child.md)"),
+            ("docs/child.md", "[root](root.md) ![asset](asset.png)"),
+            ("docs/asset.png", ""),
+        ]
+        .into_iter()
+        .map(|(path, text)| (path.to_string(), parse_artifact(path, text.as_bytes())))
+        .collect();
+        let members = BTreeSet::from([issues[0].id.clone()]);
+        let by_root = reachable_document_paths(&issues, &parsed);
+        assert_eq!(
+            by_root.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["docs/other.md", "docs/root.md"]
+        );
+        for (root, paths) in &by_root {
+            assert_eq!(paths, &reachable_parsed_paths(root, &parsed));
+        }
+        let mut separately = issues
+            .iter()
+            .flat_map(|issue| {
+                discover_embedded_owners(std::slice::from_ref(issue), &members, &parsed)
+            })
+            .collect::<Vec<_>>();
+        separately.sort_by(|left, right| {
+            (&left.artifact, &left.root, &left.issue).cmp(&(
+                &right.artifact,
+                &right.root,
+                &right.issue,
+            ))
+        });
+        let shared = discover_embedded_owners(&issues, &members, &parsed);
+        assert!(!shared.is_empty());
+        assert_eq!(shared, separately);
+    }
 }

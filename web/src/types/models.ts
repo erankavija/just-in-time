@@ -43,11 +43,11 @@ export interface GateRunSummary {
 }
 
 /** Where a recorded gate verdict came from: this run's own checker execution,
- * an earlier run over the same declared inputs, which `source_run` names, or a
- * manual attestation. */
+ * an earlier run over the same declared inputs, addressed by `source_issue`
+ * and `source_run`, or a manual attestation. */
 export type GateVerdictOrigin =
   | { derivation: 'executed' }
-  | { derivation: 'reused'; source_run: string }
+  | { derivation: 'reused'; source_issue: string; source_run: string }
   | { derivation: 'attested' };
 
 /** Whether the evaluation inputs held still through recording. */
@@ -58,14 +58,22 @@ export interface GateRunDetail extends GateRunSummary {
   stderr: string;
 }
 
+/** A dependency entry of an issue: its id and the server-derived short id. */
+export interface DependencyRef {
+  id: string;
+  short_id: string;
+}
+
 export interface Issue {
   id: string;
+  /** Server-derived short id; clients display it rather than truncating `id`. */
+  short_id: string;
   title: string;
   description: string;
   state: State;
   priority: Priority;
   assignee?: string;
-  dependencies: string[];
+  dependencies: DependencyRef[];
   labels: string[];
   documents: DocumentReference[];
   gates_required: string[];
@@ -82,6 +90,8 @@ export interface Issue {
  */
 export interface GraphNode {
   id: string;
+  /** Server-derived short id; clients display it rather than truncating `id`. */
+  short_id: string;
   label: string;
   state: State;
   priority: Priority;

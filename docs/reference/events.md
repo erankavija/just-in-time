@@ -19,6 +19,7 @@ to shared state. The tags whose records carry no `issue_id` are exactly:
 - `gate_definition_removed` (registry)
 - `profile_lifecycle` (repository)
 - `linked_checkout_write_overridden` (repository)
+- `files_published` (repository)
 
 A `jit events query --issue-id <ID>` filter therefore never returns them.
 
@@ -33,7 +34,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_removed` | issue | yes | A quality gate was removed from the issue's required gates. |
 | `issue_completed` | issue | yes | An issue was completed. |
 | `issue_deleted` | issue | yes | An issue was permanently deleted. |
-| `issue_released` | issue | yes | An issue was released from its assignee; the record carries the former assignee and the reason. |
+| `issue_released` | issue | yes | An issue was released from its assignee; the record carries the former assignee, the reason, and who released it. |
 | `issue_updated` | issue | yes | An issue's fields were updated; the record names the changed fields. |
 | `artifact_archive_executed` | repository | no | `jit archive ... --execute` durably recorded publications, exact reference changes, and identity-guarded planned deletions before deletion attempts. |
 | `dependency_reduced` | issue | yes | `jit validate --fix` removed the issue's redundant (transitively implied) dependency edges. |
@@ -45,6 +46,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_definition_removed` | registry | no | `jit gate remove` unregistered a gate. |
 | `profile_lifecycle` | repository | no | A profile lifecycle operation reached its commit point, the redo record carrying its writes; the event summarizes per-profile actions, recording each package's id, version and applied variable values. |
 | `linked_checkout_write_overridden` | repository | no | An explicit per-invocation override permitted a state-mutating command inside a linked checkout that the declared write stance refuses; the record names the checkout, the refusing stance, and the permitting override. |
+| `files_published` | repository | no | A write that records no domain event, such as `jit config set` or `jit project render`, reached its commit point; the record names the sorted repository-relative paths it wrote, made or deleted. |
 
 For the commands that read the log, see
 [Event Log Commands](cli-commands.md#event-log-commands); for the file's place in

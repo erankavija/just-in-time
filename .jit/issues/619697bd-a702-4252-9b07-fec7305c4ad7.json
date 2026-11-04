@@ -9,11 +9,26 @@
   ],
   "description": "The profiles reference and the profile apply command entry describe how applying a package refuses over uncommitted target changes in a git repository and proceeds without git.\n\n## Background\n\nApplying a newer package version or other variable values writes the new rendering over the repository's files, and the adopter keeps local edits through git (`@/charter/D-8`). In a git repository apply therefore refuses while a path it would write differs from HEAD, naming those paths. Without git it proceeds, and the diff command is the comparison to read before applying (`@/charter/D-4`). Initialization over an absent data root is never refused.\n\nThe pages are the apply section of `docs/reference/profiles.md` and the profile apply entry of `docs/reference/cli-commands.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: The profiles reference states when apply refuses over uncommitted target changes, how to proceed, and that apply proceeds without git.\n- [hard] REQ-02: The profile apply command entry describes the refusal and its JSON error.\n- [hard] REQ-03: Both pages state that initialization over an absent data root is exempt.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:57:24.074754575Z",
+  "first_ready_at": "2026-11-01T19:55:16.992080336Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "e0b3d86f-5ca5-4366-82eb-9f46f6a6698d",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:57:09.464775976Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "487ceb8a-7558-44e7-9785-6d8589f90eab",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:55:40.649290257Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "619697bd-a702-4252-9b07-fec7305c4ad7",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Describe the uncommitted-target refusal in the profile references",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:57:24.074754575Z"
 }

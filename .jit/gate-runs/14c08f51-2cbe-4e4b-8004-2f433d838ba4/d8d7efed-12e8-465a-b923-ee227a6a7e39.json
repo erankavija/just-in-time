@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "cargo run --quiet -p jit --example package-drift",
+  "commit": "175a7a0cb33b9f6827a38a0fc06bf61a97c63edc",
+  "completed_at": "2026-11-01T08:07:43.219972560Z",
+  "duration_ms": 26130,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "package-drift",
+  "inputs_digest": "3413a7119204be53263e1272f829239172d2a5c0babd89d3ebcf0b77cc4a38c6",
+  "issue_id": "14c08f51-2cbe-4e4b-8004-2f433d838ba4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8d7efed-12e8-465a-b923-ee227a6a7e39",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:07:17.089371177Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "OK: the registries agree with the packages, and gate inputs hold\n"
+}

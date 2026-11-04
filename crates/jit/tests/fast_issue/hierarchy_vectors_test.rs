@@ -12,14 +12,14 @@
 use std::collections::HashMap;
 
 use jit::domain::type_taxonomy::HierarchyConfig;
-use jit::graph::hierarchy::{resolve_hierarchy, HierarchyNode};
+use jit::graph::hierarchy::{resolve_hierarchy, HierarchyNode, NodeHierarchy};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Fixture {
     hierarchy: HashMap<String, u8>,
     nodes: Vec<FixtureNode>,
-    expected: HashMap<String, ExpectedNode>,
+    expected: HashMap<String, NodeHierarchy<String>>,
 }
 
 #[derive(Deserialize)]
@@ -30,20 +30,14 @@ struct FixtureNode {
     dependencies: Vec<String>,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
-struct ExpectedNode {
-    parent: Option<String>,
-    children: Vec<String>,
-    cluster: Option<String>,
-    rank: u32,
-}
-
 impl HierarchyNode for FixtureNode {
-    fn id(&self) -> &str {
+    type Id = String;
+
+    fn id(&self) -> &String {
         &self.id
     }
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &String> + '_ {
+        self.dependencies.iter()
     }
     fn type_name(&self) -> Option<&str> {
         self.type_name.as_deref()
@@ -75,12 +69,6 @@ fn test_shared_vectors_match_core_resolution() {
         let facts = resolution
             .get(id)
             .unwrap_or_else(|| panic!("missing node {id}"));
-        let actual = ExpectedNode {
-            parent: facts.parent.clone(),
-            children: facts.children.clone(),
-            cluster: facts.cluster.clone(),
-            rank: facts.rank,
-        };
-        assert_eq!(&actual, expected, "resolution mismatch for node {id}");
+        assert_eq!(facts, expected, "resolution mismatch for node {id}");
     }
 }

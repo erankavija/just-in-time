@@ -13,7 +13,7 @@ type Result<T> = std::result::Result<T, QueryParseError>;
 /// an unknown field is rejected at tokenization, and the parser's match over
 /// fields is exhaustive with no string fallback. `value` semantics differ per
 /// field and are resolved later: `State`/`Priority` parse into typed domain
-/// values, while `Label`/`Assignee` carry open free-form strings.
+/// values, while `Assignee` parses into a typed assignee and `Label` carries an open string.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterField {
     /// `state:` — filter by lifecycle state (closed, typed value).
@@ -22,7 +22,7 @@ pub enum FilterField {
     Label,
     /// `priority:` — filter by priority (closed, typed value).
     Priority,
-    /// `assignee:` — filter by assignee (open value).
+    /// `assignee:` — filter by assignee (`type:identifier` value).
     Assignee,
 }
 

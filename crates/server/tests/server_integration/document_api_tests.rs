@@ -1,6 +1,7 @@
 //! Integration tests for document API endpoints
 
 use axum_test::TestServer;
+use jit::commands::test_helpers::setup;
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
@@ -9,40 +10,31 @@ use jit_server::watcher::ChangeTracker;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
-fn test_memory_storage() -> InMemoryStorage {
-    let storage = InMemoryStorage::new();
-    storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-    storage.add_data_file(
-        "index.json",
-        r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
-    );
-    storage
-}
-
-/// Helper to create a test server with empty storage.
-async fn create_test_server() -> TestServer {
-    let storage = test_memory_storage();
-    let layout = storage.repository_layout();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
-
+fn serve(executor: CommandExecutor<InMemoryStorage>) -> TestServer {
     let state = AppState {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
         project_name: "test-project".to_string(),
         shutdown: CancellationToken::new(),
     };
-    let app = jit_server::routes::create_routes(state);
-    TestServer::new(app).expect("Failed to create test server")
+    TestServer::new(jit_server::routes::create_routes(state)).expect("Failed to create test server")
 }
 
-/// Helper to create test server with a test issue
-async fn create_test_server_with_issue() -> (TestServer, String) {
-    let storage = test_memory_storage();
-    let layout = storage.repository_layout();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+#[tokio::test]
+async fn test_get_document_content_missing_issue() {
+    let server = serve(setup());
 
-    // Create a test issue
-    let (issue_id, _) = executor
+    let response = server
+        .get("/issues/nonexistent/documents/README.md/content")
+        .await;
+
+    response.assert_status_not_found();
+}
+
+#[tokio::test]
+async fn test_get_document_content_missing_document() {
+    let executor = setup();
+    let issue_id = executor
         .issues()
         .create_issue(
             "Test Issue".to_string(),
@@ -54,34 +46,10 @@ async fn create_test_server_with_issue() -> (TestServer, String) {
             None,
             false,
         )
-        .expect("Failed to create issue");
-
-    let state = AppState {
-        executor: Arc::new(executor),
-        tracker: Arc::new(ChangeTracker::new(16)),
-        project_name: "test-project".to_string(),
-        shutdown: CancellationToken::new(),
-    };
-    let app = jit_server::routes::create_routes(state);
-    let server = TestServer::new(app).expect("Failed to create test server");
-
-    (server, issue_id)
-}
-
-#[tokio::test]
-async fn test_get_document_content_missing_issue() {
-    let server = create_test_server().await;
-
-    let response = server
-        .get("/issues/nonexistent/documents/README.md/content")
-        .await;
-
-    response.assert_status_not_found();
-}
-
-#[tokio::test]
-async fn test_get_document_content_missing_document() {
-    let (server, issue_id) = create_test_server_with_issue().await;
+        .expect("Failed to create issue")
+        .issue
+        .id;
+    let server = serve(executor);
 
     let response = server
         .get(&format!("/issues/{}/documents/README.md/content", issue_id))
@@ -93,12 +61,10 @@ async fn test_get_document_content_missing_document() {
 
 #[tokio::test]
 async fn test_get_document_content_not_yet_implemented() {
-    let storage = test_memory_storage();
-    let layout = storage.repository_layout();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = setup();
 
     // Create issue with document reference
-    let (issue_id, _) = executor
+    let issue_id = executor
         .issues()
         .create_issue(
             "Test Issue".to_string(),
@@ -110,19 +76,14 @@ async fn test_get_document_content_not_yet_implemented() {
             None,
             false,
         )
-        .expect("Failed to create issue");
+        .expect("Failed to create issue")
+        .issue
+        .id;
 
     // Add document reference (if method exists)
     // For now, this will fail because we need the document to exist
 
-    let state = AppState {
-        executor: Arc::new(executor),
-        tracker: Arc::new(ChangeTracker::new(16)),
-        project_name: "test-project".to_string(),
-        shutdown: CancellationToken::new(),
-    };
-    let app = jit_server::routes::create_routes(state);
-    let server = TestServer::new(app).expect("Failed to create test server");
+    let server = serve(executor);
 
     // Without a document, we get 404
     let response = server
@@ -134,7 +95,7 @@ async fn test_get_document_content_not_yet_implemented() {
 
 #[tokio::test]
 async fn test_get_document_history_missing_issue() {
-    let server = create_test_server().await;
+    let server = serve(setup());
 
     let response = server
         .get("/issues/nonexistent/documents/README.md/history")
@@ -145,7 +106,7 @@ async fn test_get_document_history_missing_issue() {
 
 #[tokio::test]
 async fn test_get_document_diff_missing_issue() {
-    let server = create_test_server().await;
+    let server = serve(setup());
 
     let response = server
         .get("/issues/nonexistent/documents/README.md/diff?from=abc123")

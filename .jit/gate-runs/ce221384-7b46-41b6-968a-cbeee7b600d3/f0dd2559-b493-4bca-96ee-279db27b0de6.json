@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "413bb5138ed371916f8bd2330e9acf1115e49058",
+  "completed_at": "2026-11-04T12:58:46.132287587Z",
+  "duration_ms": 105483,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's documentation accurately describes all attributable user-visible behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ce221384-7b46-41b6-968a-cbeee7b600d3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f0dd2559-b493-4bca-96ee-279db27b0de6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:57:00.648416674Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `ce221384` is a level-4 leaf with no DAG-resolved children. I reviewed its two reachable tagged commits individually (`1a863107`, `708aee59`), including rename detection; no fallback was needed.\n\nThe current command references accurately cover creation findings, forced bypasses, post-fix validation, and deduplicated bounded URL probes. The two prior blocking findings are addressed.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's documentation accurately describes all attributable user-visible behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

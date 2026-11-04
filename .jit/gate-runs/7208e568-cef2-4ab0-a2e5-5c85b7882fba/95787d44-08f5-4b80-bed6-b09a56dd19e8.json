@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a781bc12ce3f95abead05ce8da75cc59acea9d4a",
+  "completed_at": "2026-10-28T23:19:37.754757303Z",
+  "duration_ms": 216089,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+        "id": "F1",
+        "line": 743,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7208e568/requirement/REQ-02",
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "The human-output check accepts extra profile lines and no longer proves the exact ordered duplicate sequence asserted before."
+      }
+    ],
+    "summary": "The replacement human-rendering assertion permits extra profile decisions, weakening the original exact sequence property.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "95787d44-08f5-4b80-bed6-b09a56dd19e8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:16:01.665567432Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4194 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184cc-92a8-7d62-b315-c3876b59bcbd\n--------\nuser\n--- 4181 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5630d0e78, 3558721b0, 092b81b0b\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/7208e568/requirement/REQ-01, @/issue/7208e568/requirement/REQ-02, @/issue/c780514e/requirement/REQ-05, @/charter/D-18, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:14:55Z); prior code-review failed (exit 1, 2026-10-28T23:03:42Z)\nTruncation recovery: narrowed reads of the affected test ranges, merge-parent patch, fixture implementation, and governing item sources\n\n1. **[blocking][issue-impact]** [profile_cli_tests.rs:743](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs:743) now proves only that the expected JSON-derived `Profile <id>` strings form a subsequence of human output. Extra profile lines—such as an additional trailing `Profile first`—still pass. The prior assertion collected every profile line and required an exact ordered sequence, so the edited test no longer fully asserts its original duplicates-and-order property. This leaves hard REQ-02 unmet. References: `@/issue/7208e568/requirement/REQ-02`, `@/invariant/semantic-test-assertions`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The replacement human-rendering assertion permits extra profile decisions, weakening the original exact sequence property.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The human-output check accepts extra profile lines and no longer proves the exact ordered duplicate sequence asserted before.\",\"file\":\"crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs\",\"line\":743,\"references\":[\"@/issue/7208e568/requirement/REQ-02\",\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

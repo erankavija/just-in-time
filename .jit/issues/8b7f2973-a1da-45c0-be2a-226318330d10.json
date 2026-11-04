@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T20:28:37.425981013Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "`create_issue` returns only the new id, so the CLI reloads the issue from storage to report it. This makes creation return the created issue.\n\n## Background\n\n`CommandExecutor::create_issue` (`crates/jit/src/commands/issue.rs`, reached through the issues facade) returns `Result<(String, Vec<String>)>`: the new id and warnings. `IssueCommands::Create` in `crates/jit/src/main.rs` then calls `storage.load_issue(&id)` to build its response. About 390 call sites across `crates/jit` (including `test_utils.rs` and the integration suites) and `crates/server` (`lib.rs`, `routes.rs` tests and `crates/server/tests/`) destructure the returned tuple, almost all only for the id.\n\n## Success Criteria\n\n- [hard] REQ-01: `create_issue` returns a value carrying the created `Issue` as stored and the warnings it returns today, and the returned issue equals what storage holds after creation, shown by a harness test through `CommandExecutor` over `InMemoryStorage`.\n- [hard] REQ-02: The CLI create path reports the returned issue and makes no `load_issue` call.\n- [hard] REQ-03: Every caller compiles against the new return value, with test call sites reading the id from the returned issue, and the existing suites pass without weakened assertions.\n\n## Notes\n\nThe call-site rewrite is mechanical and compiler-driven. Other mutations change their return values separately. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
   "documents": [],
+  "done_at": "2026-11-03T21:01:01.040685329Z",
+  "first_ready_at": "2026-11-03T03:44:41.567638846Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "04a61946-e507-479f-88f7-bf40355ee1ec",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:57:19.100795121Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e73b5850-32b2-4a8c-a404-e1baf28d576e",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:00:54.976327865Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8b7f2973-a1da-45c0-be2a-226318330d10",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Issue creation returns the created issue",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T21:01:01.040685329Z"
 }

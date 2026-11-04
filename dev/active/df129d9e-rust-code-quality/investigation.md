@@ -37,7 +37,7 @@ Census and guard suites (all in the `cli_issue` target, crates/jit/tests/cli_iss
 - `failure_envelope_contract_tests.rs` — canonical envelope shape.
 - `payload_stream_purity_tests.rs` — stdout carries exactly one document (stderr not constrained, :49).
 - `top_level_failure_envelope_tests.rs` — propagated vs handler-owned envelope, stderr expectations.
-- `exit_code_tests.rs`, `command_exit_code_projection_tests.rs` (1,186 lines) — exit-code/code parity.
+- `the removed exit-code subprocess suite`, `command_exit_code_projection_tests.rs` (1,186 lines) — exit-code/code parity.
 - In-binary unit tests that test the classifier and move with it: main.rs `mod exit_code_projection_tests` (8949), `mod repository_state_classifier_tests` (9269), `mod lock_timeout_classification_tests` (9527). `mod linked_checkout_write_decision_tests` (8785) tests `linked_checkout_write_decision`.
 - Others relevant to REQ-09: `crates/jit/tests/cli_repo_workflow/test_cli_consistency.rs`, `crates/jit/tests/scratch_build/stale_binary_json_exit_tests.rs`, `crates/jit/tests/cli_gate/gate_evaluate_all_test.rs`, `crates/jit/tests/cli_query_graph/scope_validation_tests.rs`, `crates/jit/tests/cli_item_validate/validation_lease_tests.rs`, `crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs`; server route tests in `crates/server/src/routes.rs` `mod tests` (1049+; status asserts at 2011-2025, 2497-2506 call `path_read_error_status` directly).
 

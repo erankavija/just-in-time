@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8a105a0fc30d5ee04dac198818e09455f5685666",
+  "completed_at": "2026-10-27T00:31:36.462522014Z",
+  "duration_ms": 272168,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The focused change derives shared item kinds from the shipped default-package manifest, preserves targeted harness assertions, and updates the testing guidance.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5876e131-02c4-4d66-b5ae-a969dfc78b32",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ecfe0e52-d3f9-445f-a6a0-d8e708f7fc5d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:27:04.294254754Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e2679eea1; 8a105a0fc (merge; no combined-diff changes)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose, @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-07 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json)\nGate evidence: cargo-ci passed (latest reused run, 2026-10-27T00:27:03Z); code-review pending\nTruncation recovery: reread the focused four-path patch and relevant sources in bounded calls; separately confirmed the tagged merge has no combined-diff changes\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The focused change derives shared item kinds from the shipped default-package manifest, preserves targeted harness assertions, and updates the testing guidance.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

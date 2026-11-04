@@ -1,0 +1,40 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "086f080e6e0958908b05237712a96f2ef45c6322",
+  "completed_at": "2026-10-31T23:18:35.991504379Z",
+  "duration_ms": 77364,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-01",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "high",
+        "summary": "Two affected test comments still claim their tests pin exit code 2 after the assertions were removed."
+      }
+    ],
+    "summary": "Two affected test comments still claim removed exit-code assertions.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "69341a9d-a518-4ed6-972e-070760d085ab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6afabfca-d6ef-4efa-ab19-8a0665b9aca9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:17:18.627345343Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3598 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19440-d34a-75c0-8cba-7930f518a071\n--------\nuser\n--- 3585 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 49fd27f89, 7d87deeee, fa8b68007 (jit:69341a9d)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed, exit_code null, 2026-10-31T23:17:16Z (reused; stdout unavailable)\nTruncation recovery: none\n\n1. [blocking, issue-impact] The exit-code-removal change leaves two affected test comments falsely claiming that those tests pin exit code 2: [verb_hint_tests.rs:8](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/verb_hint_tests.rs:8) and [issue_status_projection_tests.rs:324](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/issue_status_projection_tests.rs:324). The tests now correctly assert failure plus their diagnostic/error-class evidence, with numeric status ownership moved to the projection suite. Remove the stale numeric-status claims so the test contracts agree with REQ-01 and the current assertions. References: @/issue/c780514e/requirement/REQ-01, @/invariant/essential-code-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two affected test comments still claim removed exit-code assertions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Two affected test comments still claim their tests pin exit code 2 after the assertions were removed.\",\"references\":[\"@/issue/c780514e/requirement/REQ-01\",\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

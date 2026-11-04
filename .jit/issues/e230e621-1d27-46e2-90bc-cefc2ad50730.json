@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T00:55:48.281551009Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the configuration, schema, serve, steering and lifecycle workflow tests in `crates/jit/tests/cli_repo_workflow` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThese files include `integration_test.rs` (17 `split_whitespace` sites), `workflow_tests.rs`, `serve_cli_tests.rs`, and `steering_scenarios.rs` and `project_config_tests.rs`, which remove or pin chosen `JIT_*` variables by hand.\n\nThis entry covers `config_get_tests.rs`, `project_config_tests.rs`, `help_cross_reference_tests.rs`, `test_cli_consistency.rs`, `version_cli_tests.rs`, `format_compat_cli_tests.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/cli_repo_workflow/format_compat_cli_tests.rs`: `setup_too_new_repo` (`:19`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-26T23:38:39.857755516Z",
   "first_ready_at": "2026-10-22T15:47:00.874517008Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "26373346-2d1c-4e48-b12e-a327b91c1f7b",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:57:05.418852314Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ff10c5df-709a-4acf-abc9-e281dbbd3864",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:00:46.183826697Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e230e621-1d27-46e2-90bc-cefc2ad50730",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "configuration and CLI-surface tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:47:00.874517008Z"
+  "updated_at": "2026-10-26T23:38:39.857755516Z"
 }

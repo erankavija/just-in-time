@@ -25,6 +25,7 @@
 use jit::declarations::rules::RuleSet;
 use jit::domain::{ContentFormat, Issue};
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
+use jit::test_utils::issue_id;
 use jit::validation::local::evaluate_local;
 #[cfg(any(not(feature = "html"), not(feature = "xml")))]
 use jit::validation::local::LocalEvalError;
@@ -49,6 +50,7 @@ assert = {{ require-section = {{ heading = "Success Criteria" }} }}
 
 fn typed_issue(body: &str, format: Option<ContentFormat>, taxonomy: &TestTaxonomy) -> Issue {
     let mut issue = crate::fixture_issue("A strategic issue".to_string(), body.to_string());
+    issue.id = issue_id(1);
     issue.labels = vec![format!("type:{}", taxonomy.type_at_level(2))];
     issue.content_format = format;
     issue
@@ -200,6 +202,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     // Strategic issue with an HTML success-criteria section declaring REQ-01, no covering child.
     let mut html_issue =
         crate::fixture_issue("A strategic issue".to_string(), HTML_BODY.to_string());
+    html_issue.id = issue_id(1);
     html_issue.labels = vec![format!("type:{}", taxonomy.type_at_level(2))];
     html_issue.content_format = Some(ContentFormat::Html);
 

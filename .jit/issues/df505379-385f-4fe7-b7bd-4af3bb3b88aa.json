@@ -8,13 +8,33 @@
   ],
   "description": "Replace the inline `json!` list bodies of six commands with typed list envelopes declared as their output schemas, and fix the schema key that hides `graph rdeps`.\n\n## Background\n\n`crates/jit/src/schema.rs` maps commands to output schemas and falls back to `(None, \"CommandResponse\")` (`:730`) for unregistered ones. `ListEnvelope<K, T, E>` (`crates/jit/src/output.rs`, `crates/jit/src/domain/list_envelope.rs`) derives `count` from its collection and has a manual `JsonSchema`. A command whose JSON carries `count` beside a collection under the fallback is invisible to a schema-driven list check.\n\nSix commands build `count` beside a collection as inline `json!` in `crates/jit/src/main.rs`: `gate preset list` (`:4547`), `events tail` (`:4984`), `events query` (`:5005`), `label values` (`:5900`), `claim status` (`:7391`) and `claim list` (`:7476`). `graph rdeps` emits `GraphDownstreamResponse`, but `schema.rs:668` registers it under the key `graph_downstream`, so its schema falls back.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the six commands emits a `ListEnvelope` instantiation declared as its output schema, and no inline `json!` body in `main.rs` carries a `count` key.\n- [hard] REQ-02: `graph rdeps` declares `GraphDownstreamResponse` as its output schema.\n- [hard] REQ-03: Each command's JSON output is unchanged apart from field order.\n- [hard] REQ-04: MCP tool generation and its unit tests pass against the regenerated schema.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:42:48.053212286Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "93442c9f-aabc-4886-ad0d-17db25779323",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:37:13.716846517Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "adaeeab5-1d5d-4e83-8a3c-fefb79dc8b24",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:42:27.413440964Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "759f7904-6bcd-4022-b6a7-cca9f0ce3576",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:37:51.815125675Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
   "labels": [
     "type:task",
@@ -28,7 +48,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Inline list bodies in main.rs become typed list envelopes",
-  "updated_at": "2026-10-22T22:06:43.025457015Z"
+  "updated_at": "2026-10-24T23:42:48.053212286Z"
 }

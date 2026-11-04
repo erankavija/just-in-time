@@ -13,9 +13,12 @@
 //! The examples live in the repository's `docs/` tree, not in `.jit/`, so they
 //! never activate on this repository; these tests load them directly from disk.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::test_utils::add_reducing_edge;
 use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
+use jit::domain::identity::IssueId;
 use jit::domain::{ContentFormat, Issue, State};
 use jit::test_utils::document_reference_typed;
 use jit::validation::graph::{evaluate_graph, GraphFinding};
@@ -39,7 +42,7 @@ fn example_dir(name: &str) -> PathBuf {
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
     jit::storage::ruleset_store::load_ruleset(
-        &dir,
+        &jit::test_utils::repository_layout_for_data_root(&dir),
         &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     )
     .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
@@ -603,40 +606,19 @@ mod sdd_criteria_label_match {
 
 mod sdd_lifecycle {
     use super::*;
-    use jit::commands::CommandExecutor;
+    use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::errors::TransitionBlockedError;
     use jit::storage::{InMemoryStorage, IssueStore};
 
-    /// Load the SDD example ruleset from disk and write it into an executor's
-    /// in-memory storage root so the executor picks it up as the operative set.
-    fn executor_with_sdd_example() -> CommandExecutor<InMemoryStorage> {
-        jit::test_mode::enable();
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), "").unwrap();
-        storage.add_data_file("config.toml", "");
-
-        // Read the example rules.toml and copy the schemas/ dir into the storage root.
+    fn seed_sdd_schemas(storage: &InMemoryStorage) {
         let sdd_dir = example_dir("sdd");
-        let rules_toml = std::fs::read_to_string(sdd_dir.join("rules.toml")).unwrap();
-        std::fs::write(storage.root().join("rules.toml"), &rules_toml).unwrap();
-        storage.add_data_file("rules.toml", &rules_toml);
-
-        // Copy the schemas/ directory so json-schema references resolve.
-        let schemas_src = sdd_dir.join("schemas");
-        let schemas_dst = storage.root().join("schemas");
-        std::fs::create_dir_all(&schemas_dst).unwrap();
-        for entry in std::fs::read_dir(&schemas_src).unwrap() {
+        for entry in std::fs::read_dir(sdd_dir.join("schemas")).unwrap() {
             let entry = entry.unwrap();
-            let content = std::fs::read_to_string(entry.path()).unwrap();
-            std::fs::write(schemas_dst.join(entry.file_name()), &content).unwrap();
             storage.add_data_file(
                 format!("schemas/{}", entry.file_name().to_string_lossy()),
-                &content,
+                &std::fs::read_to_string(entry.path()).unwrap(),
             );
         }
-
-        crate::memory_executor(storage)
     }
 
     /// A well-formed SDD spec body: Requirements, Scenarios, and Success Criteria.
@@ -692,15 +674,21 @@ mod sdd_lifecycle {
     // the executor must be blocked with TransitionBlockedError (exit 4).
     #[test]
     fn test_sdd_premature_done_blocked_by_coverage_rule() {
-        let executor = executor_with_sdd_example();
-
-        // Seed an epic with a well-formed spec body and req:REQ-01, but NO child
-        // that satisfies it. The epic is in-progress.
+        let rules_toml = std::fs::read_to_string(example_dir("sdd").join("rules.toml")).unwrap();
         let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        jit::test_harness::seed_memory_issue(executor.storage(), &epic);
+        let storage = InMemoryStorage::new();
+        seed_sdd_schemas(&storage);
+        jit::test_harness::seed_memory_issue(&storage, &epic);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(&rules_toml),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Attempt to transition to done: must be blocked.
         let result = executor.issues().update_issue(
@@ -793,16 +781,12 @@ mod sdd_lifecycle {
     // must be able to transition to done without being blocked.
     #[test]
     fn test_sdd_happy_path_done_transition_succeeds() {
-        let executor = executor_with_sdd_example();
-
-        // Seed the epic.
+        let rules_toml = std::fs::read_to_string(example_dir("sdd").join("rules.toml")).unwrap();
         let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        jit::test_harness::seed_memory_issue(executor.storage(), &epic);
 
-        // Seed a done child the epic depends on (containment) satisfying REQ-01.
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
         child.labels = vec![
             "type:task".to_string(),
@@ -810,9 +794,20 @@ mod sdd_lifecycle {
         ];
         child.state = State::Done;
         let child_id = child.id.clone();
-        jit::test_harness::seed_memory_issue(executor.storage(), &child);
+
+        let storage = InMemoryStorage::new();
+        seed_sdd_schemas(&storage);
+        jit::test_harness::seed_memory_issue(&storage, &epic);
+        jit::test_harness::seed_memory_issue(&storage, &child);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(&rules_toml),
+                ..MemoryDeclarations::default()
+            },
+        );
         // Wire containment: the epic depends on its child.
-        executor.add_dependency(&epic_id, &child_id).unwrap();
+        add_reducing_edge(&executor, &epic_id, &child_id).unwrap();
 
         // Transition to done: must succeed.
         let result = executor.issues().update_issue(
@@ -860,9 +855,9 @@ mod fresh_evidence {
     fn done_with_code_review(hours_ago: i64) -> Issue {
         let mut issue = crate::fixture_issue("implement feature".to_string(), String::new());
         issue.state = State::Done;
-        issue.gates_required = vec!["code-review".to_string()];
+        issue.gates_required = vec!["code-review".parse().unwrap()];
         issue.gates_status.insert(
-            "code-review".to_string(),
+            "code-review".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("agent:reviewer".parse().unwrap()),
@@ -910,7 +905,7 @@ mod fresh_evidence {
         // Done, requires the gate, but has no recorded result.
         let mut issue = crate::fixture_issue("implement feature".to_string(), String::new());
         issue.state = State::Done;
-        issue.gates_required = vec!["code-review".to_string()];
+        issue.gates_required = vec!["code-review".parse().unwrap()];
         let findings = issue_graph_findings_at(&rules, std::slice::from_ref(&issue), fixed_now());
         assert!(
             findings
@@ -957,18 +952,9 @@ mod nyquist {
             .to_string()
     }
 
-    /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via gates.
-    fn epic_with_both_verified() -> Issue {
+    /// An epic with check labels for [hard] criteria REQ-01 and REQ-02.
+    fn epic_with_both_checked() -> Issue {
         let mut epic = crate::fixture_issue("Feature X".to_string(), nyquist_compliant_body());
-        epic.labels = vec!["type:epic".to_string()];
-        // Both [hard] criteria are verified via gates_required.
-        epic.gates_required = vec!["verify:REQ-01".to_string(), "verify:REQ-02".to_string()];
-        epic
-    }
-
-    /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via labels.
-    fn epic_with_label_verification() -> Issue {
-        let mut epic = crate::fixture_issue("Feature Y".to_string(), nyquist_compliant_body());
         let short = epic.short_id();
         epic.labels = vec![
             "type:epic".to_string(),
@@ -979,26 +965,14 @@ mod nyquist {
     }
 
     #[test]
-    fn test_nyquist_compliant_via_gates_passes_graph() {
-        let set = load_example("nyquist");
-        let rules = graph_rules(&set);
-        let epic = epic_with_both_verified();
-        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
-        assert!(
-            findings.is_empty(),
-            "an epic with all [hard] criteria gate-verified must pass: {findings:?}"
-        );
-    }
-
-    #[test]
     fn test_nyquist_compliant_via_labels_passes_graph() {
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        let epic = epic_with_label_verification();
+        let epic = epic_with_both_checked();
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         assert!(
             findings.is_empty(),
-            "an epic with all [hard] criteria label-verified must pass: {findings:?}"
+            "an epic with check labels for all [hard] criteria must pass: {findings:?}"
         );
     }
 
@@ -1006,10 +980,10 @@ mod nyquist {
     fn test_nyquist_unmapped_criterion_reports_finding() {
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        // Only REQ-01 is verified; REQ-02 is unmapped.
+        // Only REQ-01 has a check label; REQ-02 is unmapped.
         let mut epic = crate::fixture_issue("Feature Z".to_string(), nyquist_compliant_body());
-        epic.labels = vec!["type:epic".to_string()];
-        epic.gates_required = vec!["verify:REQ-01".to_string()];
+        let short = epic.short_id();
+        epic.labels = vec!["type:epic".to_string(), format!("checks:{short}/REQ-01")];
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         // REQ-02 must be reported as unmapped; REQ-01 must not.
@@ -1023,18 +997,17 @@ mod nyquist {
             !findings
                 .iter()
                 .any(|f| f.finding.message.contains("REQ-01")),
-            "verified criterion REQ-01 must not be reported: {findings:?}"
+            "checked criterion REQ-01 must not be reported: {findings:?}"
         );
     }
 
     #[test]
-    fn test_nyquist_finding_names_both_mechanisms() {
-        // When both gate-prefix and check-namespace are configured (as in the
-        // nyquist example), the unmapped-criterion finding mentions both.
+    fn test_nyquist_finding_names_expected_check_label() {
+        // An unmapped criterion names its expected issue-scoped check label.
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
         let mut epic = crate::fixture_issue("Feature W".to_string(), nyquist_compliant_body());
-        epic.labels = vec!["type:epic".to_string()]; // no gates, no checks labels
+        epic.labels = vec!["type:epic".to_string()];
         let short = epic.short_id();
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
@@ -1047,10 +1020,6 @@ mod nyquist {
         );
         let msg = &req01_finding.unwrap().finding.message;
         assert!(
-            msg.contains("verify:REQ-01"),
-            "finding must name the expected gate: {msg}"
-        );
-        assert!(
             msg.contains(&format!("checks:{short}/REQ-01")),
             "finding must name the expected label: {msg}"
         );
@@ -1062,8 +1031,8 @@ mod nyquist {
         // filter must exclude REQ-03 (marked [aspirational]).
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        // An epic that verifies REQ-01 and REQ-02 but leaves REQ-03 unmapped.
-        let epic = epic_with_both_verified();
+        // An epic with check labels for REQ-01 and REQ-02 but not REQ-03.
+        let epic = epic_with_both_checked();
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         // REQ-03 is [aspirational] and must not be required.
@@ -1083,8 +1052,8 @@ mod nyquist {
         let rule = set
             .rules
             .iter()
-            .find(|r| r.name == "nyquist-criteria-verified-at-done")
-            .expect("example must define nyquist-criteria-verified-at-done");
+            .find(|r| r.name == "nyquist-criteria-checked-at-done")
+            .expect("example must define nyquist-criteria-checked-at-done");
         assert_eq!(rule.severity, jit::declarations::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped rule must enforce");
         assert_eq!(rule.scope, RuleScope::Graph);
@@ -1171,8 +1140,8 @@ mod cross_epic {
         let rules = graph_rules(&set);
 
         let (epic_a, epic_b) = two_epics_colliding_on("REQ-01");
-        let id_a = epic_a.short_id().to_string();
-        let id_b = epic_b.short_id().to_string();
+        let id_a = epic_a.short_id();
+        let id_b = epic_b.short_id();
 
         let findings = issue_graph_findings(&rules, &[epic_a, epic_b]);
         assert_eq!(findings.len(), 1);
@@ -1261,6 +1230,7 @@ mod cross_epic {
 
 mod research {
     use super::*;
+    use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 
     // -----------------------------------------------------------------------
     // Shared fixtures
@@ -1287,7 +1257,7 @@ mod research {
 
     /// A `type:experiment` that tests the goal's hypothesis H-1 and has the
     /// required `## Method` and `## Evidence` sections.
-    fn compliant_experiment(goal_id: &str) -> Issue {
+    fn compliant_experiment(goal_id: &IssueId) -> Issue {
         let body = "## Method\n\n\
             - train with 10x the original dataset size\n\
             - evaluate on the held-out test set\n\n\
@@ -1297,7 +1267,7 @@ mod research {
         // Containment is wired by the caller: goal depends on exp.
         exp.labels = vec![
             "type:experiment".to_string(),
-            format!("tests:{}/H-1", &goal_id[..8]),
+            format!("tests:{}/H-1", goal_id.short_id()),
         ];
         exp.state = State::Done;
         exp
@@ -1421,7 +1391,7 @@ mod research {
     #[test]
     fn test_research_compliant_experiment_passes_local() {
         let set = load_example("research");
-        let exp = compliant_experiment("dummy-goal-id");
+        let exp = compliant_experiment(&jit::test_utils::issue_id(4));
         assert!(
             !has_local_finding(&exp, &set),
             "a well-formed experiment body must produce no local findings"
@@ -1431,7 +1401,7 @@ mod research {
     #[test]
     fn test_research_experiment_missing_method_section_is_blocked() {
         let set = load_example("research");
-        let mut exp = compliant_experiment("dummy-goal-id");
+        let mut exp = compliant_experiment(&jit::test_utils::issue_id(4));
         exp.description = "## Evidence\n\n- observations\n".to_string();
         let eval = evaluate_local(&exp, &set, ContentFormat::Markdown).unwrap();
         assert!(
@@ -1443,7 +1413,7 @@ mod research {
     #[test]
     fn test_research_experiment_missing_evidence_section_is_blocked() {
         let set = load_example("research");
-        let mut exp = compliant_experiment("dummy-goal-id");
+        let mut exp = compliant_experiment(&jit::test_utils::issue_id(4));
         exp.description = "## Method\n\n- the protocol\n".to_string();
         let eval = evaluate_local(&exp, &set, ContentFormat::Markdown).unwrap();
         assert!(
@@ -1492,8 +1462,8 @@ mod research {
 
     #[test]
     fn test_research_inflight_goal_produces_zero_error_findings() {
-        // The coverage rule is scoped `state = "done"`. A goal in_progress with
-        // no covering experiments must produce zero ERROR findings from graph
+        // The coverage rule is scoped to the delivered state. An in-flight goal
+        // with no covering experiments must produce zero ERROR findings from graph
         // rules (the done-scoped rule simply does not match).
         let set = load_example("research");
         let rules = graph_rules(&set);
@@ -1518,30 +1488,6 @@ mod research {
     // 5. Done-scoped coverage rule blocks transition via executor
     // -----------------------------------------------------------------------
 
-    /// Build an in-memory executor whose rules.toml is the research coverage
-    /// rule only (local schema rules are omitted to keep the test self-contained;
-    /// coverage is the graph rule under test here).
-    fn research_coverage_executor() -> CommandExecutor<InMemoryStorage> {
-        jit::test_mode::enable();
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), "").unwrap();
-        storage.add_data_file("config.toml", "");
-        // Write only the done-scoped coverage rule: no local schema rules needed
-        // because the graph test does not write through the write-path validator.
-        let rules_toml = r#"
-[[rules]]
-name = "research-hard-hypotheses-covered-at-done"
-when = { type = "goal", state = "done" }
-severity = "error"
-enforce = true
-assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
-"#;
-        std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-        storage.add_data_file("rules.toml", rules_toml);
-        crate::memory_executor(storage)
-    }
-
     /// Seed an exact issue preimage at a given state, bypassing validation.
     fn seed(
         executor: &CommandExecutor<InMemoryStorage>,
@@ -1549,7 +1495,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         labels: &[&str],
         body: &str,
         state: State,
-    ) -> String {
+    ) -> IssueId {
         let mut issue = crate::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;
@@ -1564,7 +1510,23 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         // but NO done experiment that tests it. The done transition must be
         // blocked by the enforcing coverage rule (exit 4 semantics via
         // TransitionBlockedError).
-        let executor = research_coverage_executor();
+        // Only the done-scoped coverage rule: no local schema rules are needed
+        // because the graph test does not write through the write-path validator.
+        let rules_toml = r#"
+[[rules]]
+name = "research-hard-hypotheses-covered-at-done"
+when = { type = "goal", state = "done" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
+"#;
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                rules: Some(rules_toml),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let goal_id = seed(
             &executor,

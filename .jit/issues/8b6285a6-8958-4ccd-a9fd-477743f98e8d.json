@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:40:38.614817644Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the private git setup in the git-revision suite file in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:15-20` hand-rolls `git init` with a fixed author identity in its `Repo` fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: `git_revision_tests.rs` initialises git only through the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:49:42.938411696Z",
   "first_ready_at": "2026-10-22T15:47:00.132285826Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d56cb097-c904-4166-9b39-e0d2d885de40",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:40:48.566299737Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a6685181-5640-4c9b-9366-52ecb345fc78",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:41:58.808778779Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Git revision tests initialise git through the shared helper",
-  "updated_at": "2026-10-22T15:47:00.132285826Z"
+  "updated_at": "2026-10-27T00:49:42.938411696Z"
 }

@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T21:30:36.439425664Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "945f65f3-9c13-49fd-b85d-1307122cb654",
-    "97f5f2b7-5c95-441f-ae03-d8feeedc8420"
+    "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e",
+    "945f65f3-9c13-49fd-b85d-1307122cb654"
   ],
-  "description": "Make every event-appending mutation capture the event log as its bounded end, so no mutation reads the log's records.\n\n## Background\n\nThe append base of an event-appending mutation is the log's length and final line (`CaptureSpec::discover_tail`, `crates/jit/src/repository_state/image.rs:581-589`). Several captures still request `VirtualPath::EVENTS` whole, reading the full log on every run:\n\n- `publish_captured_issue_mutation` (`commands/mod.rs:2301`), shared by issue lifecycle and field mutations;\n- document add, remove and asset rescan (`commands/document.rs:406,476,976`);\n- gate evaluation (`commands/gate_check.rs:753`);\n- gate preset apply and gate registry mutations (`commands/gate.rs:296,1097`);\n- template apply (`commands/template.rs:384`);\n- profile apply and refresh (`commands/profile.rs:2059`);\n- re-initialization over an existing data root (`repository_state/initialize.rs:424`, read again by `events_action` at `:783-795`).\n\nWith one torn-line rule, no mutation needs more of the log than its final line.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed capture requests the event log through `discover_tail`, and re-initialization decides whether the log exists from the tail entry.\n- [hard] REQ-02: A test shows that a mutation from each listed command family succeeds when every line of the event log except the final one is unparseable.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make every event-appending mutation capture the event log as its bounded end, so no mutation reads the log's records.\n\n## Background\n\nThe append base of an event-appending mutation is the log's length and final line (`CaptureSpec::discover_tail`, `crates/jit/src/repository_state/image.rs`). Several captures still request `VirtualPath::EVENTS` whole, reading the full log on every run:\n\n- `publish_captured_issue_mutation` (`commands/mod.rs`), shared by issue lifecycle and field mutations;\n- document add, remove and asset rescan (`commands/document.rs`);\n- gate evaluation (`capture_gate_evaluation_image`, `commands/gate_check.rs`);\n- gate preset apply and gate registry mutations (`commands/gate.rs`);\n- template apply (`commands/template.rs`);\n- profile apply and refresh (`commands/profile.rs`);\n- init and re-initialization over an existing data root (`commands/init.rs`, `repository_state/initialize.rs`, read again by `events_action`, which errors on a tail).\n\nProfile and init reach `capture_proposed_base` with the log among their extra paths (`scaffold.delta_paths()` in `commands/init.rs`, `events_path` in `commands/profile.rs`), and a whole request wins over the base's tail in `discover_tail`, so those extra paths must change too. Their `validate_repository` calls read no event log.\n\nA profile's composition reads only the log's final line (`captured_log_end`), so the torn-tail marker does not hold this back.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed capture requests the event log through `discover_tail`, and re-initialization decides whether the log exists from the tail entry.\n- [hard] REQ-02: A test shows that a mutation from each listed command family succeeds when every line of the event log except the final one is unparseable.\n",
   "documents": [],
+  "done_at": "2026-11-03T21:47:25.968690413Z",
+  "first_ready_at": "2026-11-02T23:39:54.261163422Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "756f6a9f-93f7-4f5a-aa90-c34d7dab2c57",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:43:52.436719911Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1d5ffc18-7c44-4d81-98cd-074c28cb85bc",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:47:25.480457141Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5582e39e-10d5-4079-b81f-47f23a81e45a",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "satisfies:f8a6b298/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Mutations capture the event log's end, not the whole log",
-  "updated_at": "2026-10-21T10:40:09.616831510Z"
+  "updated_at": "2026-11-03T21:47:25.968690413Z"
 }

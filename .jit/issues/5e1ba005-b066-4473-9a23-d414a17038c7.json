@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T02:11:18.833120692Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "7fc08dff-8c4a-4f50-bbe4-abf3358554b2"
   ],
-  "description": "Make archive preview and `archive candidates` read each target's prior executions from its evidence record through storage, once per target, instead of reading the event log.\n\n## Background\n\nPreview and `archive candidates` read the whole event log once per target through `IssueStore::read_artifact_archive_events` (`crates/jit/src/commands/archive.rs:178,248`; trait default `storage/mod.rs:245-256`; file backend `storage/json.rs:1328-1364`). Each target's executions are in `archive-evidence/<target-key>.json`. Command tests plant prior executions as events (`commands/archive.rs:1050-2226`). Both integration-test `IssueStore` wrappers implement the trait (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: Preview and `archive candidates` read each target's evidence record once through a new `IssueStore` method implemented by both backends and both test wrappers, and read no event-log content.\n- [hard] REQ-02: Preview tests plant prior executions as evidence records, and a test shows that preview of a re-archived target succeeds with an unparseable event log and reports the same coverage as before.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make archive preview and `archive candidates` read each target's prior executions from its evidence record through storage, once per target, and delete the archive readers of the event log, including the file backend's second parser.\n\n## Background\n\nPreview and `archive candidates` read the whole event log once per target through `IssueStore::read_artifact_archive_events` (`crates/jit/src/commands/archive.rs`; trait default in `storage/mod.rs`; file-backend override in `storage/json.rs`). The override is a second event-log parser with its own torn-prefix rule (`is_torn_event_prefix`) and a raw `\"artifact_archive_executed\"` literal. Each target's executions are in `archive-evidence/<target-key>.json`. Command tests plant prior executions as events and call the reader directly in `commands/archive.rs`, including `test_archive_event_reader_accepts_final_and_multiple_nested_brace_torn_prefixes`; a conformance case in `storage/issue_store_conformance.rs` covers it too. Both integration-test `IssueStore` wrappers implement the trait.\n\n## Success Criteria\n\n- [hard] REQ-01: Preview and `archive candidates` read each target's evidence record once through a new `IssueStore` method implemented by both backends and both test wrappers, and read no event-log content.\n- [hard] REQ-02: Preview tests plant prior executions as evidence records, and a test shows that preview of a re-archived target succeeds with an unparseable event log and reports the same coverage as before.\n- [hard] REQ-03: `read_artifact_archive_events`, `is_torn_event_prefix` and their conformance case no longer exist, and no test calls them.\n- [hard] REQ-04: Outside tests of the parser, no code parses the event log except through `domain::parse_known_events`.\n",
   "documents": [],
+  "done_at": "2026-11-04T02:50:38.887952785Z",
+  "first_ready_at": "2026-11-04T01:32:26.125932117Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4e65c5b1-e126-48b9-8a29-9a3345cc449c",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:46:41.791319011Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f3aeac14-c38c-42b5-abe5-029fd3f6573e",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:50:38.375036979Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5e1ba005-b066-4473-9a23-d414a17038c7",
   "labels": [
     "type:task",
@@ -21,10 +37,13 @@
     "component:core",
     "component:storage",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-09"
+    "satisfies:f8a6b298/REQ-09",
+    "enforces:@/invariant/convention-convergence",
+    "per:@/charter/D-18",
+    "satisfies:f8a6b298/REQ-10"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Archive preview reads the per-target evidence record",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T02:50:38.887952785Z"
 }

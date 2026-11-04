@@ -97,15 +97,20 @@ Canonical rules:
   `jit dep add <from> <to>...`, `jit issue show <id>...`,
   `jit gate preset apply <name> [<id>...]` (its id list is optional; zero ids
   applies the preset to nothing).
-- **A list modifier is a repeatable/comma-joined flag.** Where a list tunes the
-  verb rather than naming its subjects, it is a flag that accepts both repetition
-  and comma-separation: `--label a:b --label c:d` or `--label a:b,c:d`. This
-  governs `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`,
-  and `--except`.
+- **A list modifier is a repeated flag.** Where a list tunes the verb rather
+  than naming its subjects, it is a flag repeated once per value:
+  `--label a:b --label c:d`. A value is taken whole and a comma is part of it,
+  never a separator. `--label` stores it only under `--force`, because the
+  label-format rule blocks the write otherwise. `--gate`, `--add-gate`,
+  `--remove-gate`, `--except` and `--fields` always fail on it, as an invalid
+  gate key or unknown field. `--remove-label` treats it as the name of one
+  label: it removes a stored label of that exact name and fails only when the
+  issue lacks it. This governs `--label`, `--gate`, `--add-gate`,
+  `--remove-label`, `--remove-gate`, `--except`, and `--fields`.
 
 The positional-list-versus-flag-list split is the canonical reason
 `jit gate add abc tests clippy` (subjects) reads differently from
-`jit issue create --gate tests,clippy` (modifier): the first names the gates the
+`jit issue create --gate tests --gate clippy` (modifier): the first names the gates the
 verb attaches; the second tunes a create.
 
 ---
@@ -118,13 +123,16 @@ subject. The forms are fixed per identifier kind:
 | Identifier kind | Accepted forms | Notes |
 |-----------------|----------------|-------|
 | **Issue reference** | full UUID, 8-char `short_id`, or any unique prefix of at least 4 characters | The canonical form. Every command taking an issue subject resolves all three; none may demand the full UUID. A prefix shorter than 4 characters is rejected. |
-| **Gate key** | exact registry key | No prefix or fuzzy match. A gate key is an exact string from the registry. |
-| **Lease id** | full lease UUID | `claim renew`, `claim heartbeat`, and `claim force-evict` take the lease's own UUID, distinct from the issue id. |
+| **Gate key** | exact registry key | No prefix or fuzzy match. A gate key is an exact lowercase-kebab string from the registry. |
 | **Qualified item id** | `@/<kind>/<self-id>` (project) or `@/issue/<issue-ref>/<kind>/<self-id>` (issue) | Every explicit address includes its kind segment. `<issue-ref>/<self-id>` is accepted as input sugar only when the configured item kinds can infer the kind unambiguously. |
+
+`claim force-evict` resolves the issue reference among stored leases, including
+leases whose issue was deleted. Other claim mutations resolve it among issues.
 
 **Consistency rule.** Every positional that names an issue (`issue show`,
 `issue update`, `gate add`, `gate evaluate`, `dep add`, `doc add`, `claim acquire`,
-`claim release`, `archive container`, and the rest) accepts the full UUID, the
+`claim release`, `claim renew`, `claim heartbeat`, `claim force-evict`,
+`archive container`, and the rest) accepts the full UUID, the
 short id, and a unique prefix, identically — the three forms and their resolution
 are specified in
 [Storage Record Layout → Issue Identifiers](storage-records.md#issue-identifiers).

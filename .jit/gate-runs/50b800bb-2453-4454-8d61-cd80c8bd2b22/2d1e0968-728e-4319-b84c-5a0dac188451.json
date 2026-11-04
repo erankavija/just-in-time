@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e371e3a16cbffa09dd2af6f0e787cb7bea071418",
+  "completed_at": "2026-10-27T21:52:03.196405694Z",
+  "duration_ms": 240745,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six retired harness cases have appropriate current owners; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "50b800bb-2453-4454-8d61-cd80c8bd2b22",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2d1e0968-728e-4319-b84c-5a0dac188451",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:48:02.450717173Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cce28f9fe, e371e3a16\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-02 (issue description); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T21:46:22Z); code-review pending\nTruncation recovery: reread retired-case ranges, current owner tests, documentation delta, and item-policy sources in bounded calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six retired harness cases have appropriate current owners; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

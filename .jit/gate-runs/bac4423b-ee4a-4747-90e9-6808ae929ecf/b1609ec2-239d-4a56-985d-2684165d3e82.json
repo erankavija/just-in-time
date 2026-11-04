@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f0d7a6ed0455553d7335db597d90f80cdaf119d",
+  "completed_at": "2026-10-27T00:46:21.879858380Z",
+  "duration_ms": 331942,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_item_validate/item_cli_tests.rs",
+        "id": "F1",
+        "line": 8,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "Two migrated test files directly call jit_binary() to construct their repositories."
+      }
+    ],
+    "summary": "Migrated tests still directly call the shared binary locator.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bac4423b-ee4a-4747-90e9-6808ae929ecf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b1609ec2-239d-4a56-985d-2684165d3e82",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:40:49.937297961Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7413 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17acd-7eb4-7cc0-98f1-27af1dd1e009\n--------\nuser\n--- 7400 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 97a1066fe; 6f0d7a6ed (merge; scoped files match 97a1066fe)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue description); @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-27; exit code unavailable); code-review pending\nTruncation recovery: reread each scoped patch/file separately and recovered narrowed source/diff sections\n1. [blocking][issue-impact] `item_cli_tests.rs:8` and `invariant_registry_story_tests.rs:20` still import and directly call `jit_binary()` (21 and 4 call sites respectively) to supply `profiled_repository_fixture`. This leaves the migrated test files calling a binary locator rather than having the shared CLI fixture own that concern, violating REQ-02 and the shared-fixture requirement. Move profiled-repository construction behind `JitCli` or another shared fixture API that does not require tests to name `jit_binary`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Migrated tests still directly call the shared binary locator.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Two migrated test files directly call jit_binary() to construct their repositories.\",\"file\":\"crates/jit/tests/cli_item_validate/item_cli_tests.rs\",\"line\":8,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

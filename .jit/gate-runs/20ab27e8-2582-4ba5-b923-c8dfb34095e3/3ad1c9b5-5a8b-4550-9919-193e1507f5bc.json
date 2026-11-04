@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f3ec4c23fb7b0aeec8cb40aebab3f9a48e0d12b1",
+  "completed_at": "2026-11-01T00:59:21.370528648Z",
+  "duration_ms": 153135,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All reviewed decision-kind tests derive shipped kinds from the default package and no longer restate their declarations or ID patterns.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "20ab27e8-2582-4ba5-b923-c8dfb34095e3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3ad1c9b5-5a8b-4550-9919-193e1507f5bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T00:56:48.234623771Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9d338588 (direct) and f0ef0f0 (merge, first-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-07 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-11-01T00:56:46Z, exit code unavailable); code-review pending\nTruncation recovery: narrowed reads of target-file patches/current lines, helper implementation, manifest declarations, and workflow patch\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All reviewed decision-kind tests derive shipped kinds from the default package and no longer restate their declarations or ID patterns.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

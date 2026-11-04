@@ -1,73 +1,54 @@
-//! Integration tests for search functionality
-
 use jit::search::{search, SearchOptions};
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::setup_test_repo_with_taxonomy;
 use std::fs;
-use std::process::Command;
-use tempfile::TempDir;
 
-fn create_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    let issues_dir = jit_dir.join("issues");
-    fs::create_dir_all(&issues_dir).unwrap();
+/// Seed three issues and one design document into `cli`.
+fn seed_searchable_content(cli: &JitCli) {
+    [
+        (
+            "Implement user authentication",
+            "Add JWT authentication middleware",
+            "high",
+        ),
+        (
+            "Add rate limiting",
+            "Prevent brute force attacks",
+            "critical",
+        ),
+        (
+            "Write documentation",
+            "Document the API endpoints",
+            "normal",
+        ),
+    ]
+    .into_iter()
+    .for_each(|(title, description, priority)| {
+        cli.create_issue([
+            "--title",
+            title,
+            "--description",
+            description,
+            "--priority",
+            priority,
+        ])
+        .unwrap();
+    });
 
-    // Create test issues
-    fs::write(
-        issues_dir.join("abc123.json"),
-        r#"{
-  "id": "abc123",
-  "title": "Implement user authentication",
-  "description": "Add JWT authentication middleware",
-  "state": "in_progress",
-  "priority": "high"
-}"#,
-    )
-    .unwrap();
-
-    fs::write(
-        issues_dir.join("def456.json"),
-        r#"{
-  "id": "def456",
-  "title": "Add rate limiting",
-  "description": "Prevent brute force attacks",
-  "state": "ready",
-  "priority": "critical"
-}"#,
-    )
-    .unwrap();
-
-    fs::write(
-        issues_dir.join("ghi789.json"),
-        r#"{
-  "id": "ghi789",
-  "title": "Write documentation",
-  "description": "Document the API endpoints",
-  "state": "backlog",
-  "priority": "normal"
-}"#,
-    )
-    .unwrap();
-
-    // Create a document
-    let docs_dir = jit_dir.join("docs");
+    let docs_dir = cli.root().join(".jit/docs");
     fs::create_dir_all(&docs_dir).unwrap();
     fs::write(
         docs_dir.join("design.md"),
         "# Authentication Design\n\nThe authentication flow uses OAuth 2.0 with PKCE.\n",
     )
     .unwrap();
-
-    temp
-}
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
 }
 
 #[test]
 fn test_search_finds_issue_by_title() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let results = search(&jit_dir, "authentication", SearchOptions::default()).unwrap();
 
@@ -81,8 +62,9 @@ fn test_search_finds_issue_by_title() {
 
 #[test]
 fn test_search_finds_issue_by_description() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let results = search(&jit_dir, "JWT", SearchOptions::default()).unwrap();
 
@@ -93,8 +75,9 @@ fn test_search_finds_issue_by_description() {
 
 #[test]
 fn test_search_with_regex() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let options = SearchOptions {
         regex: true,
@@ -107,8 +90,9 @@ fn test_search_with_regex() {
 
 #[test]
 fn test_search_with_glob_filter_json_only() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let options = SearchOptions {
         file_pattern: Some("*.json".to_string()),
@@ -127,8 +111,9 @@ fn test_search_with_glob_filter_json_only() {
 
 #[test]
 fn test_search_with_glob_filter_markdown_only() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let options = SearchOptions {
         file_pattern: Some("*.md".to_string()),
@@ -147,8 +132,9 @@ fn test_search_with_glob_filter_markdown_only() {
 
 #[test]
 fn test_search_case_sensitive() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let case_insensitive = SearchOptions {
         case_sensitive: false,
@@ -170,8 +156,9 @@ fn test_search_case_sensitive() {
 
 #[test]
 fn test_search_limit_results() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let options = SearchOptions {
         max_results: Some(2),
@@ -186,8 +173,9 @@ fn test_search_limit_results() {
 
 #[test]
 fn test_search_no_matches() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let results = search(&jit_dir, "nonexistent_term_xyz", SearchOptions::default()).unwrap();
 
@@ -196,8 +184,9 @@ fn test_search_no_matches() {
 
 #[test]
 fn test_search_in_documents() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let results = search(&jit_dir, "PKCE", SearchOptions::default()).unwrap();
 
@@ -210,8 +199,9 @@ fn test_search_in_documents() {
 
 #[test]
 fn test_search_extracts_issue_ids() {
-    let temp = create_test_repo();
-    let jit_dir = temp.path().join(".jit");
+    let cli = JitCli::initialised().unwrap();
+    seed_searchable_content(&cli);
+    let jit_dir = cli.root().join(".jit");
 
     let results = search(&jit_dir, "priority", SearchOptions::default()).unwrap();
 
@@ -228,46 +218,25 @@ fn test_search_extracts_issue_ids() {
         assert!(result.issue_id.is_some());
         // ID should match filename pattern
         let id = result.issue_id.as_ref().unwrap();
-        assert!(result.path.contains(id));
+        assert!(result.path.contains(id.as_str()));
     }
 }
 
 #[test]
-fn test_search_json_uses_count_not_total() {
-    let temp = crate::setup_test_repo_with_taxonomy();
+fn test_search_json_omits_total() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue([
+        "--title",
+        "Implement user authentication",
+        "--description",
+        "Add JWT authentication middleware",
+    ])
+    .unwrap();
 
-    let create = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Implement user authentication",
-            "--description",
-            "Add JWT authentication middleware",
-        ])
-        .output()
-        .unwrap();
-    assert!(create.status.success());
+    let json = cli.run_json(["search", "authentication"]).unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .args(["search", "authentication", "--json"])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "search failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let results = json["results"].as_array().unwrap();
-    assert_eq!(json["count"].as_u64(), Some(results.len() as u64));
     assert!(
         json.get("total").is_none(),
-        "top-level search JSON should use count, not total: {json}"
+        "top-level search JSON carries no total: {json}"
     );
 }

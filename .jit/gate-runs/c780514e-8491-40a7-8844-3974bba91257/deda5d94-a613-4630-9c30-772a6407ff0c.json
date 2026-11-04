@@ -1,0 +1,26 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "./.agents/skills/jit-project-lead/scripts/test-standards-fix.sh",
+  "commit": null,
+  "completed_at": "2026-11-01T11:24:33.036097381Z",
+  "duration_ms": 0,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "standards-fix-test",
+  "inputs_digest": "757dda6f1cfb19898530fdd0f208c821747cc8b502162df3ea041e74114301ec",
+  "issue_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_issue": "7495521e-8338-4ef8-82b9-cb4ddf182739",
+    "source_run": "678dd17d-8ee3-4e04-86f7-5b307ae09e54"
+  },
+  "run_id": "deda5d94-a613-4630-9c30-772a6407ff0c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T11:24:33.036097381Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

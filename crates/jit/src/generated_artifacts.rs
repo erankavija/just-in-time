@@ -2,7 +2,8 @@
 //! point that brings each one back into agreement with its source.
 //!
 //! Each artifact is committed, and each carries a drift assertion that fails
-//! when the committed bytes differ from what its source now renders. That
+//! when the committed bytes differ from what its source now renders; a registry
+//! region's is the `package-drift` example, which a gate runs. That
 //! assertion makes drift visible; the entry point declared here repairs it. Both
 //! sides read the render named in [`ArtifactRender::InCrate`], so the repair and
 //! the assertion cannot disagree about what the artifact should hold.
@@ -21,14 +22,45 @@
 //! dev-dependency-active builds the example needs, so an adopter build carries
 //! none of it.
 
-use crate::profile::template_region;
+use crate::profile::registry_region;
 
-use crate::profile::template_region::TEMPLATE_REGION_PACKAGE_ID;
+use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use std::path::PathBuf;
 
 /// A render of one committed artifact's current bytes, given the bytes the
 /// checkout holds. A whole-file render ignores them; a region render splices
 /// into them, preserving every authored byte outside its delimiters.
 pub type RenderFn = fn(&[u8]) -> Result<Vec<u8>, String>;
+
+/// Identity of a generated repository artifact.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ArtifactTarget {
+    /// A repository-relative spelling whose path is not a well-known JIT path.
+    RepositoryRelative(&'static str),
+    /// A well-known path resolved through the repository layout.
+    Virtual(VirtualPath),
+}
+
+impl ArtifactTarget {
+    /// Repository-relative spelling used in diagnostics and metadata.
+    pub fn repository_relative(&self) -> String {
+        match self {
+            Self::RepositoryRelative(path) => (*path).to_string(),
+            Self::Virtual(path) => path.repository_relative(),
+        }
+    }
+
+    /// Resolve this target against the selected repository roots.
+    pub fn resolve(&self, layout: &RepositoryLayout) -> Result<PathBuf, RepositoryLayoutError> {
+        match self {
+            Self::RepositoryRelative(path) => {
+                let path = layout.classify_repository_relative(path)?;
+                layout.resolve(&path)
+            }
+            Self::Virtual(path) => layout.resolve(path),
+        }
+    }
+}
 
 /// Where an artifact's render lives.
 pub enum ArtifactRender {
@@ -37,7 +69,7 @@ pub enum ArtifactRender {
     /// result; the artifact's drift assertion calls the same function.
     InCrate {
         /// Repository-relative path of the committed file.
-        target: &'static str,
+        target: ArtifactTarget,
         /// The render both the entry point and the drift assertion read.
         render: RenderFn,
     },
@@ -67,10 +99,14 @@ pub struct GeneratedArtifact {
 
 impl GeneratedArtifact {
     /// The committed files this artifact writes.
-    pub fn targets(&self) -> Vec<&'static str> {
+    pub fn targets(&self) -> Vec<ArtifactTarget> {
         match &self.render {
-            ArtifactRender::InCrate { target, .. } => vec![target],
-            ArtifactRender::InEntryPoint { targets } => targets.to_vec(),
+            ArtifactRender::InCrate { target, .. } => vec![target.clone()],
+            ArtifactRender::InEntryPoint { targets } => targets
+                .iter()
+                .copied()
+                .map(ArtifactTarget::RepositoryRelative)
+                .collect(),
         }
     }
 }
@@ -85,7 +121,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::output::test_support::ERROR_CODE_REFERENCE_GENERATOR,
         holds: "the error-code vocabulary declared in `jit::output::ErrorCode`",
         render: ArtifactRender::InCrate {
-            target: crate::output::test_support::ERROR_CODE_REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::output::test_support::ERROR_CODE_REFERENCE_PATH,
+            ),
             render: render_error_code_reference,
         },
     },
@@ -94,7 +132,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::domain::event_catalog::test_support::REFERENCE_GENERATOR,
         holds: "the event catalog declared in `jit::domain::event_catalog::event_catalog`",
         render: ArtifactRender::InCrate {
-            target: crate::domain::event_catalog::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::domain::event_catalog::test_support::REFERENCE_PATH,
+            ),
             render: render_events_reference,
         },
     },
@@ -103,7 +143,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::schema::test_support::EXIT_CODE_REFERENCE_GENERATOR,
         holds: "the exit-code taxonomy declared in `jit::schema`",
         render: ArtifactRender::InCrate {
-            target: crate::schema::test_support::EXIT_CODE_REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::schema::test_support::EXIT_CODE_REFERENCE_PATH,
+            ),
             render: render_exit_code_reference,
         },
     },
@@ -112,7 +154,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::gate_presets::reference::test_support::REFERENCE_GENERATOR,
         holds: "the preset contract and portable checker syntax in `jit::gate_presets`",
         render: ArtifactRender::InCrate {
-            target: crate::gate_presets::reference::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::gate_presets::reference::test_support::REFERENCE_PATH,
+            ),
             render: render_gate_presets_reference,
         },
     },
@@ -121,7 +165,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::runtime_defaults::test_support::REFERENCE_GENERATOR,
         holds: "the defaults declared in `jit::runtime_defaults`",
         render: ArtifactRender::InCrate {
-            target: crate::runtime_defaults::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::runtime_defaults::test_support::REFERENCE_PATH,
+            ),
             render: render_runtime_defaults_reference,
         },
     },
@@ -141,17 +187,28 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::storage::reference::test_support::REFERENCE_GENERATOR,
         holds: "the record layout declared in `jit::storage::reference`",
         render: ArtifactRender::InCrate {
-            target: crate::storage::reference::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::storage::reference::test_support::REFERENCE_PATH,
+            ),
             render: render_storage_records_reference,
         },
     },
     GeneratedArtifact {
         name: "template-region",
-        generator: template_region::TEMPLATE_REGION_GENERATOR,
+        generator: registry_region::TEMPLATE_REGION_GENERATOR,
         holds: "the packaged template declarations",
         render: ArtifactRender::InCrate {
-            target: template_region::TEMPLATE_REGISTRY_PATH,
+            target: ArtifactTarget::Virtual(VirtualPath::TEMPLATES),
             render: render_template_region,
+        },
+    },
+    GeneratedArtifact {
+        name: "invariant-region",
+        generator: registry_region::INVARIANT_REGION_GENERATOR,
+        holds: "the packaged invariant declarations",
+        render: ArtifactRender::InCrate {
+            target: ArtifactTarget::Virtual(VirtualPath::INVARIANTS),
+            render: render_invariant_region,
         },
     },
 ];
@@ -189,32 +246,39 @@ fn render_storage_records_reference(_committed: &[u8]) -> Result<Vec<u8>, String
         .map_err(|error| error.to_string())
 }
 
-/// The registry's bytes with the packaged declarations spliced into its
-/// generated region.
-///
-/// The declarations come from this repository's workflow package captured from
-/// the checkout, so a run renders what the checkout currently declares.
+fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
+    render_registry_region(&registry_region::TEMPLATE_REGION, committed)
+}
+
+fn render_invariant_region(committed: &[u8]) -> Result<Vec<u8>, String> {
+    render_registry_region(&registry_region::INVARIANT_REGION, committed)
+}
+
+/// Render `region` over `committed`, from this repository's workflow package
+/// captured from the checkout.
 ///
 /// A render that moved a byte outside the delimiters is a defect in the splice
 /// rather than an edit to publish, so it is reported instead of returned.
-fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
-    let outside = |registry: &[u8]| {
-        template_region::outside_template_region(registry).map_err(|error| error.to_string())
-    };
+fn render_registry_region(
+    region: &registry_region::RegistryRegion,
+    committed: &[u8],
+) -> Result<Vec<u8>, String> {
+    let outside = |registry: &[u8]| region.outside(registry).map_err(|error| error.to_string());
     let destination = tempfile::TempDir::new().map_err(|error| error.to_string())?;
     let package = crate::test_utils::capture_repository_package(
-        TEMPLATE_REGION_PACKAGE_ID,
-        &destination.path().join(TEMPLATE_REGION_PACKAGE_ID),
+        registry_region::REGION_PACKAGE_ID,
+        &destination.path().join(registry_region::REGION_PACKAGE_ID),
     )
     .map_err(|error| error.to_string())?;
-    let rendered = template_region::render_template_registry(committed, &package)
+    let rendered = region
+        .render(committed, &package)
         .map_err(|error| error.to_string())?;
     (outside(&rendered)? == outside(committed)?)
         .then_some(rendered)
         .ok_or_else(|| {
             format!(
                 "the render changed {} outside the delimiters",
-                template_region::TEMPLATE_REGISTRY_PATH
+                region.registry.repository_relative()
             )
         })
 }
@@ -226,7 +290,10 @@ mod tests {
 
     /// The checkout these sources were compiled from.
     fn repository_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap()
     }
 
     /// Every declared entry point is a runnable script in the checkout, so a
@@ -265,17 +332,20 @@ mod tests {
         }
     }
 
-    /// Every declared target is a committed file, so the set describes the
-    /// checkout it regenerates rather than a stale inventory.
+    /// Every declared worktree target is a committed file, so the set describes
+    /// the checkout it regenerates rather than a stale inventory.
     #[test]
-    fn test_generated_artifacts_declare_targets_that_exist() {
+    fn test_generated_artifacts_declare_worktree_targets_that_exist() {
+        let root = repository_root();
         for artifact in GENERATED_ARTIFACTS {
             for target in artifact.targets() {
-                assert!(
-                    repository_root().join(target).is_file(),
-                    "{}: {target} is not in the checkout",
-                    artifact.name
-                );
+                if let ArtifactTarget::RepositoryRelative(path) = target {
+                    assert!(
+                        root.join(path).is_file(),
+                        "{}: {path} is not in the checkout",
+                        artifact.name,
+                    );
+                }
             }
         }
     }

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f00e710078c539943782aa68380f6fd5e2bcb9a2",
+  "completed_at": "2026-11-01T16:24:15.492728411Z",
+  "duration_ms": 260979,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/lease_enforcement_tests.rs",
+        "id": "F1",
+        "line": 60,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The lease-enforcement table misclassifies mutating `gate remove` as no-record, so it is not exercised under a foreign lease or without one."
+      }
+    ],
+    "summary": "The required table-driven lease-enforcement coverage omits the mutating `gate remove` command.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "17fbcf25-67cd-41a8-acc4-adb6df43b4a2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a5bd5ad2-e7ce-467c-bc1a-21de3b135a3c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:19:54.512789072Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7913 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197e9-6afb-7673-8ca4-3ef409eed0e8\n--------\nuser\n--- 7900 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f00e71007, 13e25ab41, c3b503b42, d643aaa42, aa555d17f, 2b21efee4 (all `jit:17fbcf25`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T16:18:24Z)\nTruncation recovery: narrowed reads by commit/path; read current hook, enforcement table, commands, docs, and source policies; read-only merge view showed no resolution hunk after remerge-diff could not create its temporary object\n1. **Blocking — issue-impact:** The owning lease-enforcement table incorrectly classifies `gate remove` as writing no issue record, so it never tests refusal under another agent’s lease or success once unleased. `remove_gates` does mutate an issue record and calls the lease check (`crates/jit/src/commands/gate.rs:722-744`), leaving REQ-06 incomplete. Move it into `REFUSES` with a removable seeded gate. References: @/invariant/orthogonal-tests. (`crates/jit/tests/cli_repo_workflow/lease_enforcement_tests.rs:60`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required table-driven lease-enforcement coverage omits the mutating `gate remove` command.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The lease-enforcement table misclassifies mutating `gate remove` as no-record, so it is not exercised under a foreign lease or without one.\",\"file\":\"crates/jit/tests/cli_repo_workflow/lease_enforcement_tests.rs\",\"line\":60,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T21:50:08.405678158Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retire the private memory-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. \n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/fast_rules/example_rulesets_tests.rs`: `executor_with_sdd_example` (`:612`), `research_coverage_executor` (`:1524`).\n- `crates/jit/tests/fast_rules/label_strategic_tests.rs`: `strategic_executor` (`:13`).\n- `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs`: `executor_with_rules` (`:20`).\n- `crates/jit/tests/fast_rules/project_render_harness_tests.rs`: `storage_with` (`:77`), `render_executor` (`:90`).\n- `crates/jit/tests/fast_rules/validate_rule_runner_tests.rs`: `store_with_rules` (`:21`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in `fast_rules` defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:10:10.249607920Z",
+  "first_ready_at": "2026-10-28T21:48:19.775543470Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8007ccb7-14bf-4db5-8599-223636f800e8",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:03:40.794288626Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d14c3aa0-51d1-4a13-8a98-0fb556ac30ce",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:07:44.418165780Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2d342676-a0a5-4980-856e-310363f78564",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "fast_rules memory-backed tests use the shared seeding",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:10:10.249607920Z"
 }

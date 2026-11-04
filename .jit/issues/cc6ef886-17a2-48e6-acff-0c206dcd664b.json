@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-02T23:48:35.750568890Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "627fdcc4-6245-4b37-bf8d-c3d52a7dbe8b"
+    "b06cee74-7635-49c0-bc13-448bcfa28324"
   ],
-  "description": "Route every CLI test that plants, reads or corrupts lease storage through one shared test helper, so the lease store layout is spelled once in the test tree.\n\n## Background\n\nCLI tests reach the claims index directly:\n\n- `tests/cli_item_validate/validation_lease_tests.rs:112-125` (`write_claims_index`, used by the `validate --leases` tests) and `:180-190` (a malformed index);\n- `tests/cli_repo_workflow/claim_integration_tests.rs:177` (reads a lease from the index) and `:302-304` (removes the index's permissions);\n- `tests/cli_issue/failure_probe_fixture.rs:636-640` (`malformed-claim-index` writes invalid JSON over the index);\n- `tests/cli_issue/command_exit_code_projection_tests.rs:755-760` (corrupts the index).\n\nShared test code lives in `tests/common/` and is included per suite through `#[path]` (`tests/fast_issue/main.rs:6`).\n\n## Success Criteria\n\n- [hard] REQ-01: One helper module under `crates/jit/tests/common/` plants a lease, reads a lease, names an issue's lease storage path and corrupts lease storage, and the listed tests use it; no CLI test names `claims.index.json` outside the helper.\n- [hard] REQ-02: The listed tests pass unchanged in what they assert.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Route every CLI test that plants, reads or corrupts lease storage through one test-support module, so the lease store layout is spelled once in the test tree.\n\n## Background\n\nCLI tests reach the claims store directly:\n\n- `tests/cli_item_validate/validation_lease_tests.rs` (`write_claims_index`, a malformed index);\n- `tests/cli_repo_workflow/claim_integration_tests.rs` (reads a lease from the index, removes the index's permissions, removes the index in recovery tests);\n- `tests/cli_repo_workflow/external_data_root_tests.rs` (asserts `jit/claims.jsonl` exists under a data root outside every checkout);\n- `tests/cli_issue/failure_probe_fixture.rs` (`malformed-claim-index`), with setup notes in `tests/cli_issue/failure_lever_registry.toml`;\n- `tests/cli_issue/command_exit_code_projection_tests.rs` (corrupts the index).\n\nShared CLI test code lives in the `test-support` surface: `src/test_cli.rs`, `src/test_utils.rs`, `src/test_harness.rs`, declared in `src/lib.rs` under `#[cfg(any(test, feature = \"test-support\"))]` (`dev/TESTING.md`). Lease storage lives under `WorktreePaths::shared_jit`, which is `<common-dir>/jit` in primary, linked and external-data-root layouts, so a fixture cannot derive it as `root/.git/jit`.\n\n## Success Criteria\n\n- [hard] REQ-01: One `test-support` module takes `shared_jit` as input and plants a lease, reads a lease, names an issue's lease storage path and corrupts lease storage. The listed tests use it, and no CLI test names `claims.index.json` or `claims.jsonl` outside it.\n- [hard] REQ-02: The listed tests pass unchanged in what they assert.\n",
   "documents": [],
+  "done_at": "2026-11-03T00:10:20.032354933Z",
+  "first_ready_at": "2026-11-01T16:48:21.594658943Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "095e2343-4832-4c55-8a36-2862a01f2565",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:07:05.117140630Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c58dce5f-5e54-48ad-99dd-1de904922835",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:10:19.549932079Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cc6ef886-17a2-48e6-acff-0c206dcd664b",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:f8a6b298/REQ-05"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "CLI tests reach lease storage through one test helper",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-03T00:10:20.032354933Z"
 }

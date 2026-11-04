@@ -1,19 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
   "claimed_at": "2026-10-21T01:26:46.437873388Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "27f0a575-f1ea-49ba-9b91-eca4385c32e7",
-    "614a6f97-e1fc-4e03-bd44-05949e33078c"
+    "27f0a575-f1ea-49ba-9b91-eca4385c32e7"
   ],
   "description": "Turns the claim and recovery free functions into a `claims()` executor facade, so the CLI's claim and recover arms call the executor instead of passing a storage handle into `commands::claim`.\n\n## Background\n\nClaims are the one command family outside `CommandExecutor`. `crates/jit/src/commands/claim.rs` exposes free functions that take `&storage` and `&WorktreePaths` explicitly: `execute_claim_acquire`, `execute_claim_heartbeat`, `execute_claim_release_by_issue`, `execute_claim_renew`, `execute_claim_status`, `execute_claim_list`, `execute_claim_force_evict` and `execute_recover`, with bounds ranging from none to `IssueStore + RepositoryStateStore`. The `Commands::Claim` arms and the `Commands::Recover` arm of `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`) import these functions and pass `&storage` and the worktree paths the executor already holds. That is a storage call the CLI makes on its own, and it leaves claims outside the narrow-capability scheme every other family follows: `CommandExecutor::<family>()` returns a borrowing facade (`IssueOps<'_, S>` and its peers) whose methods use the executor's storage and worktree paths.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::claims` returns a `ClaimOps<'_, S>` facade whose methods perform acquire, heartbeat, release-by-issue, renew, status, list, force-evict and recover, taking their storage and worktree paths from the executor.\n- [hard] REQ-02: The CLI's claim and recover command paths call `claims()` methods and pass no storage handle or worktree paths, and `commands::claim` exports no public `execute_*` free function.\n- [hard] REQ-03: Claim and recover output, exit codes and lease behaviour are unchanged: the existing claim, lease and recovery suites pass with no assertion weakened.\n\n## Notes\n\n- Methods keep the per-function storage bounds as bounds on their facade impl blocks; operations that need no storage still read worktree paths from the executor.\n- Recovery's session ordering (claim coordination before the operation session) is behaviour this work preserves, not changes.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "cargo-ci evidence and commit ancestry",
+      "path": "dev/active/df129d9e-rust-code-quality/evidence-083c9a91-ci-ancestry.md"
+    }
+  ],
+  "done_at": "2026-11-03T20:25:12.892318681Z",
+  "first_ready_at": "2026-11-02T22:59:43.633205903Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "44b22429-4611-4d33-b08c-12caff2d8b9c",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:11:12.837687373Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a03297cf-86de-4c39-8696-b9a760adcac2",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:25:03.231753266Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "083c9a91-9582-4af5-a38a-bac606392d17",
   "labels": [
     "type:task",
@@ -25,7 +47,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Claim and recover operations behind a claims facade",
-  "updated_at": "2026-10-21T10:40:10.479370938Z"
+  "updated_at": "2026-11-03T20:25:12.892318681Z"
 }

@@ -14,15 +14,17 @@ use super::{
     compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
     render_rule_block, serialize_ruleset, splice_default_membership, AmbiguousOwnershipError,
     ExpectedPreimage, FileMode, ManagedDocumentClaim, ProducerError, ProjectionInputs,
-    RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
-    RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
+    RegionPlacement, RepositoryAction, RepositoryActionOwner, RepositoryDeclarations,
+    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
 };
 use crate::config::{JitConfig, ProjectionMode};
-use crate::declarations::invariants::InvariantRegistry;
+use crate::domain::identity::IssueId;
 use crate::repository_state::default_rule_membership_diff_from_identities;
 use std::collections::BTreeMap;
 
-pub(super) fn serialized_default_ruleset(config: &JitConfig) -> super::SerializedRuleSet {
+pub(super) fn serialized_default_ruleset(
+    config: &JitConfig,
+) -> Result<super::SerializedRuleSet, super::RepositoryLayoutError> {
     let namespaces = crate::config_manager::namespaces_from_config(config);
     serialize_ruleset(&default_ruleset(&namespaces))
 }
@@ -52,44 +54,37 @@ fn read_text(
     repo_relative: &str,
 ) -> Result<Option<String>, ProducerError> {
     let vpath = image_path(image, repo_relative)?;
-    match image.file_bytes(&vpath)? {
+    read_text_at(image, &vpath)
+}
+
+fn read_text_at(
+    image: &RepositoryImage,
+    path: &VirtualPath,
+) -> Result<Option<String>, ProducerError> {
+    match image.file_bytes(path)? {
         Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
         None => Ok(None),
     }
 }
 
-/// Assemble the repository configuration from the captured declaration bytes.
+/// Assemble the repository configuration from the image's captured declaration
+/// bytes through [`assemble_configuration`](crate::declarations::assemble_configuration).
 ///
-/// `config.toml` supplies the item-kind registry, projection registry, and
-/// validation settings; the sibling `invariants.toml` populates the `#[serde(skip)]`
-/// invariant registry the `full` invariant view renders. An absent `invariants.toml`
-/// is an empty registry, matching the on-disk load boundary.
+/// `config.toml` must lie in the captured closure; a `templates.toml` or
+/// `invariants.toml` outside it is absent, matching the on-disk load boundary.
 pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
-    let config_bytes = image
-        .file_bytes(&image_path(image, ".jit/config.toml")?)?
-        .ok_or(ProducerError::MissingCapture(".jit/config.toml"))?;
-    let declarations = crate::declarations::parse_configuration(config_bytes)?;
-    assemble_config_from_declarations(image, &declarations)
-}
-
-/// Assemble the materialization view from the operation's authoritative config
-/// parse plus the captured sibling invariant registry.
-pub(crate) fn assemble_config_from_declarations(
-    image: &RepositoryImage,
-    declarations: &crate::declarations::ConfigurationDeclarations,
-) -> Result<JitConfig, ProducerError> {
-    // An invariants.toml outside the captured closure (or captured absent) is an
-    // empty registry, matching the on-disk load boundary.
-    let invariants_path = image_path(image, ".jit/invariants.toml")?;
-    let invariants = if image.capture_spec().contains_path(&invariants_path) {
-        match read_text(image, ".jit/invariants.toml")? {
-            Some(text) => InvariantRegistry::from_toml_str(&text)?,
-            None => InvariantRegistry::empty(),
+    let sibling = |path: &VirtualPath| -> Result<Option<&[u8]>, ProducerError> {
+        if image.capture_spec().contains_path(path) {
+            Ok(image.file_bytes(path)?)
+        } else {
+            Ok(None)
         }
-    } else {
-        InvariantRegistry::empty()
     };
-    Ok(declarations.materialization_config(invariants))
+    Ok(crate::declarations::assemble_configuration(
+        image.file_bytes(&VirtualPath::CONFIG)?,
+        sibling(&VirtualPath::TEMPLATES)?,
+        sibling(&VirtualPath::INVARIANTS)?,
+    )?)
 }
 
 /// Enumerate the capture closure for `jit project render`.
@@ -123,10 +118,10 @@ pub fn render_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        layout.classify_repository_relative(".jit/config.toml")?,
-        layout.classify_repository_relative(".jit/invariants.toml")?,
-        layout.classify_repository_relative(".jit/rules.toml")?,
-        layout.classify_repository_relative(".jit/gates.toml")?,
+        VirtualPath::CONFIG,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
     ];
     let registry = config.projection.clone().unwrap_or_default();
     let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
@@ -163,10 +158,8 @@ pub fn render_capture_closure(
         }
     }
     if let Some(content) = rules_content {
-        // A rule schema reference is relative to the data root (`schemas/...`),
-        // so it is a `Data(...)` path directly rather than a repo-relative one.
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::data(&request.reference)?);
+            paths.push(VirtualPath::schema_reference(&request.reference)?);
         }
     }
     paths.sort();
@@ -179,23 +172,23 @@ pub fn render_capture_closure(
 /// The exact bounded set the validation pipeline reads from the captured image,
 /// so validation touches no live filesystem path outside the closure. [`paths`](ValidationCaptureClosure::paths) enumerates
 /// exact files; [`listings`](ValidationCaptureClosure::listings) enumerates the
-/// complete directory listings validation reconciles against the index.
+/// complete directory listings validation derives issue membership from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationCaptureClosure {
     /// Every exact `.jit/...` or worktree file validation reads.
     pub paths: Vec<VirtualPath>,
-    /// Every complete directory listing validation reconciles (the issue files).
+    /// Every complete directory listing validation reads (the issue files).
     pub listings: Vec<VirtualPath>,
 }
 
 /// Enumerate the validation closure from the captured declarations.
 ///
-/// Given the captured configuration, the index's `all_ids`, and (when present)
+/// Given the captured configuration, the issue ids the listing states, and (when present)
 /// the captured `rules.toml` bytes, this returns every additional canonical path
 /// and listing whole-repository validation reads so it consumes only
 /// image-projected content: the engine registries (`config.toml`,
 /// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
-/// repository index, the event log and the data root's ignore file, every
+/// repository index and the data root's ignore file, every
 /// ordinary issue record plus the complete
 /// `issues` listing, the schema files the effective rules reference and the ones
 /// the current configuration derives, every declared
@@ -211,28 +204,26 @@ pub struct ValidationCaptureClosure {
 pub fn validate_capture_closure(
     layout: &super::RepositoryLayout,
     config: &JitConfig,
-    all_ids: &[String],
+    issue_ids: &[IssueId],
     rules_content: Option<&str>,
 ) -> Result<ValidationCaptureClosure, ProducerError> {
     use crate::config::SourceOfTruth;
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        layout.classify_repository_relative(".jit/config.toml")?,
-        layout.classify_repository_relative(".jit/invariants.toml")?,
-        layout.classify_repository_relative(".jit/rules.toml")?,
-        layout.classify_repository_relative(".jit/gates.toml")?,
-        layout.classify_repository_relative(".jit/templates.toml")?,
-        layout.classify_repository_relative(".jit/index.json")?,
-        layout.classify_repository_relative(".jit/events.jsonl")?,
+        VirtualPath::CONFIG,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
+        VirtualPath::TEMPLATES,
+        VirtualPath::INDEX,
         // The data root's ignore file, so derived-state repair sees the target
         // its producer composes rather than treating it as uncaptured.
         VirtualPath::DATA_IGNORE,
     ];
-    // Every ordinary issue record named by the index, plus the complete listing
-    // whole-repository validation reconciles against those ids.
-    for id in all_ids {
-        paths.push(layout.classify_repository_relative(format!(".jit/issues/{id}.json"))?);
+    // Every issue record the listing states, plus that listing.
+    for id in issue_ids {
+        paths.push(VirtualPath::issue_record(id));
     }
     let listings = vec![VirtualPath::ISSUES];
 
@@ -280,14 +271,14 @@ pub fn validate_capture_closure(
 
     if let Some(content) = rules_content {
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::data(&request.reference)?);
+            paths.push(VirtualPath::schema_reference(&request.reference)?);
         }
     }
     // Every schema the CURRENT configuration derives, whether or not the authored
     // file references it yet: a newly-declared table adds a default rule whose
     // projection must be publishable in the same pass that adds its row.
-    for schema in &serialized_default_ruleset(config).schema_files {
-        paths.push(VirtualPath::data(format!("schemas/{}", schema.name))?);
+    for schema in &serialized_default_ruleset(config)?.schema_files {
+        paths.push(VirtualPath::schema(&schema.name)?);
     }
     paths.sort();
     paths.dedup();
@@ -305,21 +296,15 @@ pub fn validate_capture_closure(
 /// action.
 pub(crate) fn compose_configured_projections(
     image: &RepositoryImage,
-    config: &JitConfig,
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<ConfiguredProjections, ProducerError> {
+    let config = declarations.config;
     let Some(projections) = config.projection.as_ref() else {
         return Ok(ConfiguredProjections {
             actions: Vec::new(),
             counts: BTreeMap::new(),
         });
-    };
-
-    let inputs = ProjectionInputs {
-        config,
-        rules: declarations.rules,
-        gates: declarations.gates,
     };
 
     // Phase one: render every in-scope projection body and build its
@@ -333,6 +318,15 @@ pub(crate) fn compose_configured_projections(
         if selected.is_some_and(|names| !names.contains(name)) {
             continue;
         }
+        let inputs = ProjectionInputs {
+            kinds: declarations
+                .item_kinds
+                .as_deref()
+                .map_err(std::sync::Arc::clone)?,
+            config,
+            rules: declarations.rules,
+            gates: declarations.gates,
+        };
         let mut read = |path: &str| read_text(image, path);
         let (body, count) = render_projection_body(projection, &inputs, &mut read)?;
         counts.insert(name.clone(), count);
@@ -370,7 +364,7 @@ pub(crate) fn compose_configured_projections(
         }
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
-            owner: "configured-projection".to_string(),
+            owner: RepositoryActionOwner::ConfiguredProjection,
             expected: ExpectedPreimage::of(entry),
             bytes: expected_bytes,
             mode: FileMode::Regular,
@@ -378,9 +372,6 @@ pub(crate) fn compose_configured_projections(
     }
     Ok(ConfiguredProjections { actions, counts })
 }
-
-/// Stable ownership identity for the data root's ignore file.
-const DATA_ROOT_IGNORE_OWNER: &str = "data-root-ignore";
 
 /// Stable region identity of the engine's block inside that file; its
 /// delimiters are this identity in the file's own comment syntax.
@@ -391,7 +382,7 @@ const DATA_ROOT_IGNORE_REGION: &str = "data-root-ignore";
 /// file's own comment syntax.
 fn data_root_ignore_claim() -> ManagedDocumentClaim {
     ManagedDocumentClaim::Region {
-        owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+        owner: RepositoryActionOwner::DataRootIgnore.to_string(),
         region_id: DATA_ROOT_IGNORE_REGION.to_string(),
         begin: format!("# jit:{DATA_ROOT_IGNORE_REGION}:begin").into_bytes(),
         end: format!("# jit:{DATA_ROOT_IGNORE_REGION}:end").into_bytes(),
@@ -449,7 +440,7 @@ pub(crate) fn compose_data_root_ignore(
             );
             Ok((!unchanged).then(|| RepositoryAction::WriteFile {
                 path: path.clone(),
-                owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+                owner: RepositoryActionOwner::DataRootIgnore,
                 expected: ExpectedPreimage::of(entry),
                 bytes: expected,
                 mode: FileMode::Regular,
@@ -490,11 +481,11 @@ pub(crate) fn compose_default_ruleset(
     // A ruleset outside the captured closure (or captured absent) is not an owned
     // materialization: defaults live only in memory, nothing on disk to keep
     // coherent, so no rules/schema targets are owned.
-    let rules_path = image_path(image, ".jit/rules.toml")?;
+    let rules_path = VirtualPath::RULES;
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
-    let Some(current_rules) = read_text(image, ".jit/rules.toml")? else {
+    let Some(current_rules) = read_text_at(image, &rules_path)? else {
         return Ok(Vec::new());
     };
     let namespaces = crate::config_manager::namespaces_from_config(config);
@@ -509,17 +500,22 @@ pub(crate) fn compose_default_ruleset(
 
     // rules.toml: splice only the generated default-family membership + assertions,
     // preserving every authored byte outside those proven-generated spans.
-    let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
-    let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
+    let diff = default_rule_membership_diff_from_identities(&identities, &namespaces)
+        .map_err(ProducerError::from)?;
+    let rendered_add: Vec<String> = diff
+        .to_add
+        .iter()
+        .map(render_rule_block)
+        .collect::<Result<_, _>>()?;
     let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
         .map_err(ProducerError::RulesDocument)?;
-    let serialized = serialized_default_ruleset(config);
+    let serialized = serialized_default_ruleset(config)?;
     let expected_rules = rewrite_default_assertions(&spliced, &serialized.rules_toml)
         .map_err(ProducerError::RulesDocument)?;
     if expected_rules != current_rules {
         actions.push(RepositoryAction::WriteFile {
             path: rules_path.clone(),
-            owner: "default-rule-membership".to_string(),
+            owner: RepositoryActionOwner::DefaultRuleMembership,
             expected: ExpectedPreimage::of(entry(image, &rules_path)?),
             bytes: expected_rules.into_bytes(),
             mode: FileMode::Regular,
@@ -535,7 +531,7 @@ pub(crate) fn compose_default_ruleset(
         .map(|f| f.name.as_str())
         .collect();
     for schema in &serialized.schema_files {
-        let vpath = image_path(image, &format!(".jit/schemas/{}", schema.name))?;
+        let vpath = VirtualPath::schema(&schema.name)?;
         if !image.capture_spec().contains_path(&vpath) {
             continue;
         }
@@ -547,7 +543,7 @@ pub(crate) fn compose_default_ruleset(
         }
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
-            owner: "default-schema".to_string(),
+            owner: RepositoryActionOwner::DefaultSchema,
             expected: ExpectedPreimage::of(occupant),
             bytes: schema.content.clone().into_bytes(),
             mode: FileMode::Regular,
@@ -571,34 +567,42 @@ pub(crate) fn compose_default_ruleset(
         .collect();
     let mut default_refs = std::collections::BTreeSet::new();
     let mut foreign_refs = std::collections::BTreeSet::new();
-    for req in
-        crate::declarations::rules::RuleSet::schema_requests(&current_rules).unwrap_or_default()
+    for req in crate::declarations::rules::RuleSet::schema_requests(&current_rules)
+        .map_err(ProducerError::from)?
     {
+        let schema_path = VirtualPath::schema_reference(&req.reference)?;
         if origins.get(req.rule.as_str()).copied().flatten()
             == Some(crate::declarations::rules::DEFAULT_ORIGIN)
         {
-            default_refs.insert(req.reference);
+            default_refs.insert(schema_path);
         } else {
-            foreign_refs.insert(req.reference);
+            foreign_refs.insert(schema_path);
         }
     }
     for (vpath, occupant) in image.entries() {
         let RepositoryEntry::File { .. } = occupant else {
             continue;
         };
-        let Some(name) = schema_file_name(vpath) else {
+        let Some(schema_path) = schema_file_path(vpath) else {
             continue;
         };
-        let reference = format!("schemas/{name}");
+        let Some(name) = schema_path
+            .relative()
+            .as_path()
+            .file_name()
+            .and_then(|name| name.to_str())
+        else {
+            continue;
+        };
         // Proven generated (referenced ONLY by default rules), not shared with any
         // custom rule, and no longer an expected target.
-        if default_refs.contains(&reference)
-            && !foreign_refs.contains(&reference)
+        if default_refs.contains(&schema_path)
+            && !foreign_refs.contains(&schema_path)
             && !expected_names.contains(name)
         {
             actions.push(RepositoryAction::DeleteFile {
                 path: vpath.clone(),
-                owner: "default-schema".to_string(),
+                owner: RepositoryActionOwner::DefaultSchema,
                 expected: ExpectedPreimage::of(occupant),
             });
         }
@@ -628,17 +632,17 @@ fn entry<'a>(
         .map_err(|error| ProducerError::from(error).into())
 }
 
-/// The file name of a `Data("schemas/<name>")` entry, or `None` for any other
-/// path. Used to locate obsolete generated schema targets for repair.
-fn schema_file_name(path: &VirtualPath) -> Option<&str> {
+/// Parse a schema entry's relative spelling through the shared reference parser.
+fn schema_file_path(path: &VirtualPath) -> Option<VirtualPath> {
     if path.root_class() != crate::repository_state::RepositoryRootClass::Data {
         return None;
     }
     match path.relative() {
-        crate::repository_state::RootRelativePath::Descendant(rel) => rel
-            .strip_prefix("schemas/")
-            .filter(|name| !name.contains('/')),
-        crate::repository_state::RootRelativePath::Root => None,
+        crate::domain::relative_path::RootRelativePath::Descendant(rel) => {
+            let schema_path = VirtualPath::schema_reference(rel.as_ref()).ok()?;
+            schema_path.eq(path).then_some(schema_path)
+        }
+        crate::domain::relative_path::RootRelativePath::Root => None,
     }
 }
 
@@ -648,34 +652,23 @@ mod tests {
     use crate::config::ProjectName;
     use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
+    use crate::domain::identity::ProfileId;
     use crate::repository_state::{
-        compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
-        CaptureSpec, CapturedBytes, InitializationScaffold, MaterializationDriftKind,
-        MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
-        ProfileClaims, ProfilePackageId, RepositoryAction, RepositoryImage, RepositoryLayout,
-        RepositoryRootEvidence,
+        compare_materializations, derive_materialization, repair_target_paths,
+        InitializationScaffold, MaterializationDriftKind, MaterializationPlan,
+        MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileClaims,
+        RepositoryAction, RepositoryImage,
     };
-    use std::collections::BTreeMap;
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
 
-    const CONFIG: &str = r#"
-[project]
-name = "materialize-test"
-
-[item_kinds.invariant]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
-source-of-truth = "registry-first"
-
-[projection.invariants]
-kind = "invariant"
-mode = "region"
-target = "AGENTS.md"
-style = "id-anchor"
-"#;
+    static CONFIG: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        format!(
+            "[project]\nname = \"materialize-test\"\n\n{}\n\
+             [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\n\
+             target = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        )
+    });
 
     const INVARIANTS: &str = r#"
 [[invariants]]
@@ -692,62 +685,6 @@ kind = "advisory"
     const EXPECTED_ROWS: &str = "- **sample-invariant** — Every dependency edge stays acyclic.\n\
          - **second-invariant** — Issues prefer functional style.\n";
 
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
-
-    /// Build a closed image from repo-relative path → bytes (`.jit/...` is Data,
-    /// everything else Worktree). A `None` value captures the path as absent.
-    fn image(files: &[(&str, Option<&str>)]) -> RepositoryImage {
-        let layout = layout();
-        let mut entries = BTreeMap::new();
-        for (repo_rel, contents) in files {
-            let vpath = layout.classify_repository_relative(repo_rel).unwrap();
-            let entry = match contents {
-                Some(text) => RepositoryEntry::File {
-                    content: CapturedBytes::new(*repo_rel, text.as_bytes().to_vec()).unwrap(),
-                    mode: FileMode::Regular,
-                },
-                None => RepositoryEntry::Absent,
-            };
-            entries.insert(vpath, entry);
-        }
-        let budget = CaptureBudget {
-            max_listings: 0,
-            max_bytes: 1 << 20,
-            max_depth: 8,
-        };
-        let spec = CaptureSpec::new(entries.keys().cloned(), budget).unwrap();
-        RepositoryImage::close(layout, spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
-    }
-
-    fn absent_image(paths: Vec<VirtualPath>) -> RepositoryImage {
-        let spec = CaptureSpec::new(
-            paths.iter().cloned(),
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 1 << 20,
-                max_depth: 16,
-            },
-        )
-        .unwrap();
-        RepositoryImage::close(
-            layout(),
-            spec,
-            paths
-                .into_iter()
-                .map(|path| (path, RepositoryEntry::Absent))
-                .collect(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
     fn rules() -> RuleSet {
         RuleSet::default()
     }
@@ -757,11 +694,16 @@ kind = "advisory"
 
     #[test]
     fn test_render_capture_closure_enumerates_registries_sources_and_target() {
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
         // Selecting the single declared projection captures the four engine
         // registries, its region target, and its registry-first kind source.
-        let paths =
-            render_capture_closure(&layout(), &config, &["invariants".to_string()], None).unwrap();
+        let paths = render_capture_closure(
+            &synthetic_layout(),
+            &config,
+            &["invariants".to_string()],
+            None,
+        )
+        .unwrap();
         let expected: std::collections::BTreeSet<VirtualPath> = [
             VirtualPath::data("config.toml").unwrap(),
             VirtualPath::data("invariants.toml").unwrap(),
@@ -776,31 +718,39 @@ kind = "advisory"
             expected
         );
         // An empty selection enumerates the same closure (one projection declared).
-        let all = render_capture_closure(&layout(), &config, &[], None).unwrap();
+        let all = render_capture_closure(&synthetic_layout(), &config, &[], None).unwrap();
         assert!(all.contains(&VirtualPath::worktree("AGENTS.md").unwrap()));
         // An unknown selected name is a defensive error.
         assert!(matches!(
-            render_capture_closure(&layout(), &config, &["nope".to_string()], None),
+            render_capture_closure(&synthetic_layout(), &config, &["nope".to_string()], None),
             Err(ProducerError::UnknownProjection(name)) if name == "nope"
         ));
     }
 
     #[test]
-    fn test_assemble_config_reports_missing_capture_with_typed_error() {
-        let image = image(&[(".jit/config.toml", None)]);
+    fn test_assemble_config_absent_config_is_empty_configuration() {
+        let image = ImageBuilder::new()
+            .files(&[(".jit/config.toml", None)])
+            .build();
 
-        assert!(matches!(
-            assemble_config(&image),
-            Err(ProducerError::MissingCapture(".jit/config.toml"))
-        ));
+        let config = assemble_config(&image).unwrap();
+        assert!(config.type_hierarchy.is_none());
+        assert!(config.item_kinds.is_none());
+        assert!(config.projection.is_none());
     }
 
     #[test]
     fn test_validate_capture_closure_covers_registries_records_and_projections() {
         use std::collections::BTreeSet;
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
-        let closure =
-            validate_capture_closure(&layout(), &config, &["abc".to_string()], None).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
+        let id = crate::test_utils::issue_id(1);
+        let closure = validate_capture_closure(
+            &synthetic_layout(),
+            &config,
+            std::slice::from_ref(&id),
+            None,
+        )
+        .unwrap();
         let paths: BTreeSet<VirtualPath> = closure.paths.into_iter().collect();
         for expected in [
             VirtualPath::data("config.toml").unwrap(),
@@ -809,18 +759,18 @@ kind = "advisory"
             VirtualPath::data("gates.toml").unwrap(),
             VirtualPath::data("templates.toml").unwrap(),
             VirtualPath::data("index.json").unwrap(),
-            VirtualPath::data("events.jsonl").unwrap(),
-            VirtualPath::data("issues/abc.json").unwrap(),
+            VirtualPath::issue_record(&id),
             VirtualPath::worktree("AGENTS.md").unwrap(),
         ] {
             assert!(paths.contains(&expected), "closure missing {expected:?}");
         }
-        // The complete issues listing is reconciled against the index ids.
+        // The complete issues listing states the issue ids.
         assert_eq!(closure.listings, vec![VirtualPath::data("issues").unwrap()]);
         // A referenced rule schema enters the closure when rules bytes are supplied.
         let rules = "[[rules]]\nname = \"shape\"\n\
              assert = { json-schema = \"schemas/custom.json\" }\n";
-        let with_schema = validate_capture_closure(&layout(), &config, &[], Some(rules)).unwrap();
+        let with_schema =
+            validate_capture_closure(&synthetic_layout(), &config, &[], Some(rules)).unwrap();
         assert!(with_schema
             .paths
             .contains(&VirtualPath::data("schemas/custom.json").unwrap()));
@@ -828,28 +778,30 @@ kind = "advisory"
 
     #[test]
     fn test_render_capture_closure_adds_referenced_rule_schemas() {
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
         // A rules.toml that references a json-schema pulls that schema into the
         // closure, so the effective-rule parse reads image-projected bytes.
         let rules = "[[rules]]\nname = \"shape\"\n\
              assert = { json-schema = \"schemas/custom.json\" }\n";
-        let paths = render_capture_closure(&layout(), &config, &[], Some(rules)).unwrap();
+        let paths = render_capture_closure(&synthetic_layout(), &config, &[], Some(rules)).unwrap();
         assert!(paths.contains(&VirtualPath::data("schemas/custom.json").unwrap()));
     }
 
     #[test]
     fn test_render_selection_scopes_to_named_projection() {
         use std::collections::BTreeSet;
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
-        let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (
-                "AGENTS.md",
-                Some(&agents_with_region("invariants", "STALE")),
-            ),
-        ]);
+        let image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (
+                    "AGENTS.md",
+                    Some(&agents_with_region("invariants", "STALE")),
+                ),
+            ])
+            .build();
         // Selecting the declared projection renders it (stale region → write).
         let in_scope: BTreeSet<String> = ["invariants".to_string()].into_iter().collect();
         let plan = derive_declared(
@@ -882,12 +834,13 @@ kind = "advisory"
     }
 
     fn declarations<'a>(
-        config: &'a crate::declarations::ConfigurationDeclarations,
+        config: &'a JitConfig,
         gates: &'a GateRegistry,
         rules: &'a RuleSet,
     ) -> RepositoryDeclarations<'a> {
         RepositoryDeclarations {
-            configuration: config,
+            item_kinds: crate::repository_state::resolved_item_kinds(config),
+            config,
             gates,
             rules,
         }
@@ -908,6 +861,7 @@ kind = "advisory"
     ) -> Result<MaterializationPlan, RepositoryStateError> {
         derive_materialization(
             image,
+            &MutationContext::preview(),
             match intent {
                 TestIntent::SemanticMutation => {
                     MaterializationRequest::SemanticMutation { declarations }
@@ -925,8 +879,14 @@ kind = "advisory"
         )
     }
 
-    fn config_decls(config: &str) -> crate::declarations::ConfigurationDeclarations {
-        crate::declarations::parse_configuration(config.as_bytes()).unwrap()
+    /// `config` assembled with the fixture invariant registry the images carry.
+    fn config_decls(config: &str) -> JitConfig {
+        crate::declarations::assemble_configuration(
+            Some(config.as_bytes()),
+            None,
+            Some(INVARIANTS.as_bytes()),
+        )
+        .unwrap()
     }
 
     fn agents_with_region(region: &str, inner: &str) -> String {
@@ -935,18 +895,21 @@ kind = "advisory"
 
     #[test]
     fn test_derive_materialization_closes_over_its_image_for_every_request_variant() {
-        let config = config_decls(CONFIG);
+        let config = config_decls(&CONFIG);
         let (gate_registry, rule_set) = (gates(), rules());
-        let declared_image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (
-                "AGENTS.md",
-                Some(&agents_with_region("invariants", "STALE")),
-            ),
-        ]);
+        let declared_image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (
+                    "AGENTS.md",
+                    Some(&agents_with_region("invariants", "STALE")),
+                ),
+            ])
+            .build();
         let semantic = derive_materialization(
             &declared_image,
+            &MutationContext::preview(),
             MaterializationRequest::SemanticMutation {
                 declarations: declarations(&config, &gate_registry, &rule_set),
             },
@@ -954,6 +917,7 @@ kind = "advisory"
         .unwrap();
         let render = derive_materialization(
             &declared_image,
+            &MutationContext::preview(),
             MaterializationRequest::RenderConfiguredProjections {
                 declarations: declarations(&config, &gate_registry, &rule_set),
                 selected: None,
@@ -962,25 +926,32 @@ kind = "advisory"
         .unwrap();
         let repair = derive_materialization(
             &declared_image,
+            &MutationContext::preview(),
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&config, &gate_registry, &rule_set),
             },
         )
         .unwrap();
 
-        let context = MutationContext::preview();
         let scaffold = InitializationScaffold::render(
             "",
             "identity-test".parse::<ProjectName>().unwrap(),
             None,
         )
         .unwrap();
-        let initialization_image = absent_image(scaffold.delta_paths().unwrap());
+        let initialization_image = scaffold
+            .delta_paths()
+            .unwrap()
+            .into_iter()
+            .fold(ImageBuilder::new(), |builder, path| {
+                builder.entry(path, RepositoryEntry::Absent)
+            })
+            .build();
         let initialize = derive_materialization(
             &initialization_image,
+            &MutationContext::preview(),
             MaterializationRequest::Initialize {
                 scaffold: &scaffold,
-                context: &context,
             },
         )
         .unwrap();
@@ -989,31 +960,33 @@ kind = "advisory"
             id: "identity-test"
                 .try_into()
                 .expect("test profile id is canonical"),
-            version: "1.0.0".into(),
+            version: semver::Version::new(1, 0, 0),
             variables: crate::profile::ResolvedVariables::default(),
-            target_hashes: BTreeMap::new(),
+            targets: Default::default(),
             claims: ProfileClaims {
-                package_id: ProfilePackageId::new("identity-test"),
+                package_id: ProfileId::try_from("identity-test").unwrap(),
                 contributions: Vec::new(),
                 assets: Vec::new(),
                 regions: Vec::new(),
             },
             contribution_context: Vec::new(),
         };
-        let profile_image = image(&[
-            (
-                ".jit/config.toml",
-                Some("[project]\nname = \"identity-test\"\n"),
-            ),
-            (".jit/gates.toml", None),
-            (".jit/rules.toml", None),
-            (".jit/events.jsonl", None),
-        ]);
+        let profile_image = ImageBuilder::new()
+            .files(&[
+                (
+                    ".jit/config.toml",
+                    Some("[project]\nname = \"identity-test\"\n"),
+                ),
+                (".jit/gates.toml", None),
+                (".jit/rules.toml", None),
+                (".jit/events.jsonl", None),
+            ])
+            .build();
         let apply_profile = derive_materialization(
             &profile_image,
+            &MutationContext::preview(),
             MaterializationRequest::ApplyProfileSelection {
-                profiles: vec![profile],
-                context: &context,
+                profiles: std::slice::from_ref(&profile),
                 operation: crate::domain::ProfileLifecycleOperation::Apply,
             },
         )
@@ -1032,17 +1005,19 @@ kind = "advisory"
 
     #[test]
     fn test_derive_project_render_emits_write_for_stale_region() {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let decls = declarations(&cfg, &g, &r);
-        let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (
-                "AGENTS.md",
-                Some(&agents_with_region("invariants", "STALE")),
-            ),
-        ]);
+        let image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (
+                    "AGENTS.md",
+                    Some(&agents_with_region("invariants", "STALE")),
+                ),
+            ])
+            .build();
         let plan = derive_declared(
             &image,
             decls,
@@ -1065,18 +1040,20 @@ kind = "advisory"
 
     #[test]
     fn test_derive_project_render_fresh_region_emits_no_action() {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let decls = declarations(&cfg, &g, &r);
         // First derive against a stale doc to obtain the exact fresh bytes.
-        let stale = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (
-                "AGENTS.md",
-                Some(&agents_with_region("invariants", "STALE")),
-            ),
-        ]);
+        let stale = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (
+                    "AGENTS.md",
+                    Some(&agents_with_region("invariants", "STALE")),
+                ),
+            ])
+            .build();
         let plan = derive_declared(
             &stale,
             declarations(&cfg, &g, &r),
@@ -1088,11 +1065,13 @@ kind = "advisory"
         };
         let fresh_text = String::from_utf8(bytes.clone()).unwrap();
         // Re-derive against a doc that already holds the fresh bytes → no drift.
-        let fresh = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            ("AGENTS.md", Some(&fresh_text)),
-        ]);
+        let fresh = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                ("AGENTS.md", Some(&fresh_text)),
+            ])
+            .build();
         let plan2 = derive_declared(
             &fresh,
             decls,
@@ -1110,15 +1089,18 @@ kind = "advisory"
         // Two region projections into ONE target compose deterministically.
         // CONFIG already declares the `invariants` projection; append a second.
         let config = format!(
-            "{CONFIG}\n[projection.extra]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n"
+            "{}\n[projection.extra]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            *CONFIG
         );
         let agents = "# Doc\n\n<!-- jit:invariants:begin -->\nOLD-A\n<!-- jit:invariants:end -->\n\nmiddle\n\n<!-- jit:extra:begin -->\nOLD-B\n<!-- jit:extra:end -->\n".to_string();
         let build = || {
-            image(&[
-                (".jit/config.toml", Some(&config)),
-                (".jit/invariants.toml", Some(INVARIANTS)),
-                ("AGENTS.md", Some(&agents)),
-            ])
+            ImageBuilder::new()
+                .files(&[
+                    (".jit/config.toml", Some(&config)),
+                    (".jit/invariants.toml", Some(INVARIANTS)),
+                    ("AGENTS.md", Some(&agents)),
+                ])
+                .build()
         };
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
@@ -1151,16 +1133,18 @@ kind = "advisory"
 
     #[test]
     fn test_derive_then_compare_reports_stale_drift() {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
-        let stale = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (
-                "AGENTS.md",
-                Some(&agents_with_region("invariants", "STALE")),
-            ),
-        ]);
+        let stale = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (
+                    "AGENTS.md",
+                    Some(&agents_with_region("invariants", "STALE")),
+                ),
+            ])
+            .build();
         let plan = derive_declared(
             &stale,
             declarations(&cfg, &g, &r),
@@ -1180,7 +1164,7 @@ kind = "advisory"
         // Repair of a region projection splices ONLY the managed region; every
         // authored byte outside the markers is preserved unconditionally (ownership
         // matrix: configured region projection).
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let authored_prefix =
             "# Hand-authored heading\n\nAuthored intro the tool must never touch.\n\n";
@@ -1188,11 +1172,13 @@ kind = "advisory"
         let agents = format!(
             "{authored_prefix}<!-- jit:invariants:begin -->\nMANUALLY EDITED DERIVED CONTENT\n<!-- jit:invariants:end -->{authored_suffix}"
         );
-        let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            ("AGENTS.md", Some(&agents)),
-        ]);
+        let image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                ("AGENTS.md", Some(&agents)),
+            ])
+            .build();
         let plan = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
@@ -1228,7 +1214,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
 
         let schema_paths: Vec<(String, String)> = scaffold
             .schema_files
@@ -1242,7 +1228,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p, Some(c)));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
         let plan = derive_declared(
@@ -1267,7 +1253,7 @@ kind = "advisory"
         let config_partial = ns_config(&["component", "team"]);
         let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
         let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial)).unwrap();
         // Authored content the repair must preserve unconditionally.
         let authored_rules = format!(
             "{}\n[[rules]]\nname = \"custom-shape\"\n# hand-authored comment\nseverity = \"warn\"\nassert = {{ require-section = {{ heading = \"Goals\" }} }}\n",
@@ -1285,7 +1271,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p, Some(c)));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config_full);
         let (g, r) = (gates(), rules());
         let plan = derive_declared(
@@ -1337,7 +1323,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let mut schema_paths: Vec<(String, String)> = scaffold
             .schema_files
             .iter()
@@ -1355,7 +1341,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p, Some(c)));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
         let plan = derive_declared(
@@ -1382,7 +1368,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let rules_toml = format!(
             "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-obsolete.json\" }}\n",
             scaffold.rules_toml
@@ -1403,7 +1389,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p, Some(c)));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
         let plan = derive_declared(
@@ -1437,7 +1423,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let custom = "[[rules]]\nname = \"namespace-registry\"\nseverity = \"warn\"\nassert = { json-schema = \"schemas/custom-namespace.json\" }\n";
         let rules_toml = if custom_first {
             format!("{custom}\n{}", scaffold.rules_toml)
@@ -1461,7 +1447,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p, Some(c)));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
         let result = derive_declared(
@@ -1485,7 +1471,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let rules_toml = format!(
             "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n\
              [[rules]]\nname = \"custom-consumer\"\nseverity = \"warn\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n",
@@ -1507,7 +1493,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p, Some(c)));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
         let plan = derive_declared(
@@ -1542,14 +1528,16 @@ kind = "advisory"
         // A region-projection target carrying DUPLICATE begin markers has ambiguous
         // ownership: repair fails before publication rather than serializing a
         // whole-file fallback (ownership matrix: ambiguous ownership is non-repairable).
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let ambiguous = "# Doc\n\n<!-- jit:invariants:begin -->\nA\n<!-- jit:invariants:begin -->\nB\n<!-- jit:invariants:end -->\n";
-        let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            ("AGENTS.md", Some(ambiguous)),
-        ]);
+        let image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                ("AGENTS.md", Some(ambiguous)),
+            ])
+            .build();
         let result = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
@@ -1566,12 +1554,10 @@ kind = "advisory"
     /// drift both the default-ruleset family (a missing namespace-unique row) and
     /// the configured-projection family (a stale region) in one image.
     fn ns_and_projection_config(namespaces: &[&str]) -> String {
-        let mut out = String::from(
-            "[project]\nname = \"repair-target-paths-test\"\n\n\
-             [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z][a-z0-9-]*\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\n\
-             source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-             source-of-truth = \"registry-first\"\n\n\
+        let mut out = format!(
+            "[project]\nname = \"repair-target-paths-test\"\n\n{}\n\
              [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
         for ns in namespaces {
             out.push_str(&format!(
@@ -1595,7 +1581,7 @@ kind = "advisory"
         let config_full = ns_and_projection_config(&["component", "team"]);
         let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
         let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial)).unwrap();
         let schema_paths: Vec<(String, String)> = scaffold
             .schema_files
             .iter()
@@ -1611,7 +1597,7 @@ kind = "advisory"
         for (p, c) in &schema_paths {
             files.push((p.as_str(), Some(c.as_str())));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config_full);
         let (g, r) = (gates(), rules());
         let plan = derive_declared(
@@ -1658,7 +1644,7 @@ kind = "advisory"
         let config = ns_and_projection_config(&["component"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
 
         // Default-ruleset family: a syntax-preserving targeted swap of one baked
         // assertion (rules.toml must stay parseable — the producer needs to splice
@@ -1696,12 +1682,13 @@ kind = "advisory"
         for (p, c) in &stale_schema_paths {
             files.push((p.as_str(), Some(c.as_str())));
         }
-        let img = image(&files);
+        let img = ImageBuilder::new().files(&files).build();
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
 
         let plan = derive_materialization(
             &img,
+            &MutationContext::preview(),
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&cfg, &g, &r),
             },
@@ -1767,17 +1754,19 @@ kind = "advisory"
     /// no `rules.toml` so the default-rule family contributes nothing.
     fn image_with_ignore(ignore: Option<&str>) -> RepositoryImage {
         let agents = agents_with_region("invariants", EXPECTED_ROWS.trim_end());
-        image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (".jit/rules.toml", None),
-            ("AGENTS.md", Some(&agents)),
-            (".jit/.gitignore", ignore),
-        ])
+        ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (".jit/rules.toml", None),
+                ("AGENTS.md", Some(&agents)),
+                (".jit/.gitignore", ignore),
+            ])
+            .build()
     }
 
     fn repair(image: &RepositoryImage) -> Result<MaterializationPlan, RepositoryStateError> {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         derive_declared(
             image,
@@ -1794,12 +1783,19 @@ kind = "advisory"
         let scaffold =
             InitializationScaffold::render("", "ignore-test".parse::<ProjectName>().unwrap(), None)
                 .unwrap();
-        let image = absent_image(scaffold.delta_paths().unwrap());
+        let image = scaffold
+            .delta_paths()
+            .unwrap()
+            .into_iter()
+            .fold(ImageBuilder::new(), |builder, path| {
+                builder.entry(path, RepositoryEntry::Absent)
+            })
+            .build();
         let plan = derive_materialization(
             &image,
+            &MutationContext::preview(),
             MaterializationRequest::Initialize {
                 scaffold: &scaffold,
-                context: &MutationContext::preview(),
             },
         )
         .unwrap();
@@ -1891,12 +1887,14 @@ kind = "advisory"
     #[test]
     fn test_data_root_ignore_is_not_composed_when_its_target_is_outside_the_capture_closure() {
         let agents = agents_with_region("invariants", EXPECTED_ROWS.trim_end());
-        let uncaptured = image(&[
-            (".jit/config.toml", Some(CONFIG)),
-            (".jit/invariants.toml", Some(INVARIANTS)),
-            (".jit/rules.toml", None),
-            ("AGENTS.md", Some(&agents)),
-        ]);
+        let uncaptured = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(CONFIG.as_str())),
+                (".jit/invariants.toml", Some(INVARIANTS)),
+                (".jit/rules.toml", None),
+                ("AGENTS.md", Some(&agents)),
+            ])
+            .build();
 
         assert_eq!(
             written(&repair(&uncaptured).unwrap(), &VirtualPath::DATA_IGNORE),
@@ -1911,9 +1909,9 @@ kind = "advisory"
     #[test]
     fn test_the_worktree_root_ignore_file_is_neither_captured_nor_written() {
         let worktree_ignore = VirtualPath::worktree(".gitignore").unwrap();
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
 
-        let closure = validate_capture_closure(&layout(), &config, &[], None).unwrap();
+        let closure = validate_capture_closure(&synthetic_layout(), &config, &[], None).unwrap();
         assert!(
             !closure.paths.contains(&worktree_ignore),
             "derived-state repair must not read the adopter's root ignore file"
@@ -1928,10 +1926,15 @@ kind = "advisory"
             "initialization must not capture the adopter's root ignore file"
         );
         let plan = derive_materialization(
-            &absent_image(captured),
+            &captured
+                .into_iter()
+                .fold(ImageBuilder::new(), |builder, path| {
+                    builder.entry(path, RepositoryEntry::Absent)
+                })
+                .build(),
+            &MutationContext::preview(),
             MaterializationRequest::Initialize {
                 scaffold: &scaffold,
-                context: &MutationContext::preview(),
             },
         )
         .unwrap();

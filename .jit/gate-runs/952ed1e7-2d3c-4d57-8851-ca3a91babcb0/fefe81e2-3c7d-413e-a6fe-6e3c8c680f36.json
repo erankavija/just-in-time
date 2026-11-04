@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "175a7a0cb33b9f6827a38a0fc06bf61a97c63edc",
+  "completed_at": "2026-11-01T08:12:33.214166915Z",
+  "duration_ms": 289256,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed changes remove live-tracker reads from Rust tests, use owned fixtures, and move repository-record fidelity checks to configured whole-repository validation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "952ed1e7-2d3c-4d57-8851-ca3a91babcb0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fefe81e2-3c7d-413e-a6fe-6e3c8c680f36",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:07:43.957843212Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d7df0c035, 45c59e927, c36c6a393, 44aae0605, and merge 175a7a0cb (`jit:952ed1e7`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed at 2026-11-01T08:07:12Z (exit code not recorded)\nTruncation recovery: re-read bounded c36 code/test patches, merge package-drift paths, and focused CARGO_MANIFEST_DIR tracker-read searches after broad output truncated.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed changes remove live-tracker reads from Rust tests, use owned fixtures, and move repository-record fidelity checks to configured whole-repository validation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

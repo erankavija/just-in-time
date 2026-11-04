@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:41:14.360371530Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
     "6e65a501-cffe-4c86-9029-4934f619d057"
   ],
-  "description": "Profile package versions and version requirements are semver types in the package model, parsed once at decode, and graph resolution has no error variant for an unparseable version.\n\n## Background\n\nVersions are strings in the model (`crates/jit/src/profile/manifest.rs:136,139,168,176` at the investigation baseline). They are parsed and discarded in `validate_manifest_declarations` (`crates/jit/src/profile/package.rs:634-660`), then re-parsed in `ResolvedProfileGraph::resolve` (`crates/jit/src/profile/graph.rs:65,72,98,105,137,145`). That re-parse keeps four unreachable error variants: `InvalidPackageVersion` (220), `InvalidEngineRequirement` (227), `InvalidDependencyRequirement` (247) and `InvalidIncompatibilityRequirement` (266). The application input (`crates/jit/src/repository_state/profile_apply.rs:1513-1517`), the result types (`crates/jit/src/profile/application.rs`) and the version the profile lifecycle event records (`crates/jit/src/domain/types.rs`) carry versions as strings. Manifest decoding is in `crates/jit/src/profile/wire.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: Package version is `semver::Version` and each version requirement (engine compatibility, dependency, incompatibility) is `semver::VersionReq` in the package model, and the lifecycle event's version is `semver::Version`.\n- [hard] REQ-02: A malformed version or requirement is rejected at manifest decode.\n- [hard] REQ-03: Graph resolution has no error variant for an unparseable version or requirement.\n- [hard] REQ-04: Serialized manifests, results and published schemas render versions as the same strings as before.\n\n## Notes\n\n- `semver` is a direct dependency with only its default features (`crates/jit/Cargo.toml:54`). The model derives `Serialize` and `JsonSchema` (`manifest.rs:130`), so `semver` needs `features = [\"serde\"]`. schemars 0.8.22's `semver` feature implements `JsonSchema` for `Version` only, not `VersionReq`, so both fields take `#[schemars(with = \"String\")]` and no schemars feature is enabled.\n- `VersionReq` has no `Ord`, so the sort at `graph.rs:127` needs an explicit key.\n",
+  "description": "Profile package versions and version requirements are semver types in the package model, parsed once at decode, and graph resolution has no error variant for an unparseable version.\n\n## Background\n\nVersions are strings in the model (`crates/jit/src/profile/manifest.rs:136,139,168,176` at the investigation baseline). They are parsed and discarded in `validate_manifest_declarations` (`crates/jit/src/profile/package.rs:634-660`), then re-parsed in `ResolvedProfileGraph::resolve` (`crates/jit/src/profile/graph.rs:65,72,98,105,137,145`). That re-parse keeps four unreachable error variants: `InvalidPackageVersion` (220), `InvalidEngineRequirement` (227), `InvalidDependencyRequirement` (247) and `InvalidIncompatibilityRequirement` (266). The application input (`crates/jit/src/repository_state/profile_apply.rs:1513-1517`), the result types (`crates/jit/src/profile/application.rs`) and the version the profile lifecycle event records (`crates/jit/src/domain/types.rs`) carry versions as strings. Manifest decoding is in `crates/jit/src/profile/wire.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: Package version is `semver::Version` and each version requirement (engine compatibility, dependency, incompatibility) is `semver::VersionReq` in the package model, and the lifecycle event's version is `semver::Version`.\n- [hard] REQ-02: A malformed version or requirement is rejected at manifest decode.\n- [hard] REQ-03: Graph resolution has no error variant for an unparseable version or requirement.\n- [hard] REQ-04: Serialized manifests, results and published schemas render versions as the same strings as before. A requirement renders in `VersionReq`'s normalized form, so an authored `>=1,<2` shows as `>=1, <2`.\n\n## Notes\n\n- `semver` is a direct dependency with only its default features (`crates/jit/Cargo.toml:54`). The model derives `Serialize` and `JsonSchema` (`manifest.rs:130`), so `semver` needs `features = [\"serde\"]`. schemars 0.8.22's `semver` feature implements `JsonSchema` for `Version` only, not `VersionReq`, so both fields take `#[schemars(with = \"String\")]` and no schemars feature is enabled.\n- `VersionReq` has no `Ord`, so the sort at `graph.rs:127` needs an explicit key.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:48:46.023007865Z",
+  "first_ready_at": "2026-11-01T19:48:22.630129081Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "122b188e-a943-451c-b442-acd8c026f6b6",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:42:39.369437961Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dd7dbe1c-0e4f-4abe-b679-3287675d2d35",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:46:11.200864460Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "216f70b4-e98f-4fe1-b2e2-4371258694f0",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-15"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Type profile versions as semver values",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:48:46.023007865Z"
 }

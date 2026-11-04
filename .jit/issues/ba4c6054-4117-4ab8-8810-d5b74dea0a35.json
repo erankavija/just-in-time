@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T05:16:50.752559082Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "2a23bb58-9b3d-445b-afb9-e369dfe3504e",
+    "1630015d-101d-4e1b-bc3a-da1026998588",
     "7a8773ca-c9a5-4edd-8e2e-b7dfcfc63ab8"
   ],
-  "description": "Update the command reference, the custom-gates guide and the execution-lead skill for reused-verdict provenance that names its source issue, for per-issue gate-run records, and for searches that exclude history files by default.\n\n## Background\n\nThe execution-lead skill reads review findings through the glob `.jit/gate-runs/*/result.json` (`.agents/skills/jit-execution-lead/references/lead-review-protocol.md:30`, `references/rework-prompt-template.md:24`); under per-issue run records (`gate-runs/<issue-id>/<run-id>.json`) the glob matches nothing, silently. `jit gate status <id> <gate> --all --json` reports an issue's runs of a gate.\n\n`docs/how-to/custom-gates.md:220-224` and `docs/reference/cli-commands.md:2171-2172` show a reused verdict as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`; it now also carries `source_issue`. The `jit search` section of `docs/reference/cli-commands.md` does not say that a search without `--glob` excludes the event log, gate-run records and redo scratch files.\n\n## Success Criteria\n\n- [hard] REQ-01: Both skill references read findings through `jit gate status <id> <gate> --all --json` and name no gate-run path.\n- [hard] REQ-02: Both pages show the reused-verdict shape with `source_issue` and `source_run`.\n- [hard] REQ-03: The `jit search` reference states that a search without an explicit file selection excludes history files, and that an explicit glob can still select them.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Update the command reference, the custom-gates guide and the execution-lead skill for reused-verdict provenance that names its source issue, for per-issue gate-run records, and for searches that exclude history files by default.\n\n## Background\n\nThe execution-lead skill reads review findings through the glob `.jit/gate-runs/*/result.json` (`.agents/skills/jit-execution-lead/references/lead-review-protocol.md`, `references/rework-prompt-template.md`); under per-issue run records (`gate-runs/<issue-id>/<run-id>.json`) the glob matches nothing, silently. `jit gate status <id> <gate> --all --json` reports an issue's runs of a gate and works on both layouts, so live sessions lose nothing while this repository's tracker stays at format 3.\n\n`docs/how-to/custom-gates.md` and `docs/reference/cli-commands.md` show a reused verdict as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`; it also carries `source_issue`. The `jit search` section of `docs/reference/cli-commands.md` says that search covers the event log.\n\n## Success Criteria\n\n- [hard] REQ-01: Both skill references read findings through `jit gate status <id> <gate> --all --json` and name no gate-run path.\n- [hard] REQ-02: Both pages show the reused-verdict shape with `source_issue` and `source_run`.\n- [hard] REQ-03: The `jit search` reference no longer says that search covers the event log, states that a search without an explicit file selection excludes history files, and states that an explicit glob can still select them.\n",
   "documents": [],
+  "done_at": "2026-11-04T05:26:05.301983418Z",
+  "first_ready_at": "2026-11-04T03:28:13.134883760Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "6c825752-6240-41b7-8b6b-015f4c3c5809",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:26:01.889389832Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "1d36e7ff-8bec-4b8f-9f1b-474044125dd6",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:26:04.823382498Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ba4c6054-4117-4ab8-8810-d5b74dea0a35",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "satisfies:f8a6b298/REQ-11"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate provenance, gate-run lookup and search docs match per-key reads",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T05:26:05.301983418Z"
 }

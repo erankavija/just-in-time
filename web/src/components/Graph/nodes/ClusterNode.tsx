@@ -29,8 +29,8 @@ export interface ClusterNodeData {
   state?: string;
   priority?: string;
   labels?: string[];
-  nodeId?: string;
-  
+  /** Server-derived short id of the container issue */
+  shortId?: string;
 }
 
 const stateColors: Record<string, string> = {
@@ -66,7 +66,7 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
     onToggleExpansion,
     state = 'backlog',
     priority = 'normal',
-    nodeId = '',
+    shortId = '',
   } = data;
 
   const collapseIcon = isExpanded ? '⊟' : '⊞';
@@ -103,7 +103,7 @@ const ClusterNode = memo(({ data }: NodeProps<ClusterNodeData>) => {
         <span style={{ opacity: 0.85 }}>
           {icon && `${icon} `}
           {typeName && `${typeName.charAt(0).toUpperCase() + typeName.slice(1)} `}
-          #{nodeId.substring(0, 8)}
+          #{shortId}
         </span>
         <button
           className="cluster-node-toggle-button-compact"

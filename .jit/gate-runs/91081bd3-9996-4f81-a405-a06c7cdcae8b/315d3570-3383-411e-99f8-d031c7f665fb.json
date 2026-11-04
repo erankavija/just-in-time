@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-91081bd3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "25a58025cd08cc8c10cfcdd248e94ed9f0df8ac4",
+  "completed_at": "2026-10-25T23:07:37.816963136Z",
+  "duration_ms": 301631,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 4724,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91081bd3/requirement/REQ-14",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "A gate-check unit test assigns raw noncanonical text directly to GateRunResult.issue_id, so it will fail once IssueId becomes the validated newtype."
+      }
+    ],
+    "summary": "A gate-check family test still assigns a raw string directly to an IssueId field.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "315d3570-3383-411e-99f8-d031c7f665fb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T23:02:36.184978998Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 71482 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1754d-3448-77a1-9d07-34caea2b19c7\n--------\nuser\n--- 71469 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e003ac083, b546c3dae, eee7fe3f1, 624404474, 1afad91f6, 499127386, 90439e25, 25a58025 and record-only tagged commits (`jit:91081bd3`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/91081bd3/requirement/REQ-01–REQ-14 (.jit/issues/91081bd3-9996-4f81-a405-a06c7cdcae8b.json); @/issue/2195c98f/requirement/REQ-01, REQ-02, REQ-03, REQ-17 (issue Markdown); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T16:33:21.536678676Z)\nTruncation recovery: split initial combined reads into bounded commit/path diffs, current-source slices, targeted identity searches, and blame for the remaining raw test identity\n\n1. [blocking, issue-impact] `gate_check` still assigns a raw, noncanonical string directly to `GateRunResult.issue_id` at `crates/jit/src/commands/gate_check.rs:4724`. `IssueId` becoming its validated newtype will reject `\"unrelated-issue\"` and remove the implicit `String` assignment, so this family unit test does not compile unchanged. This leaves REQ-14 unmet.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A gate-check family test still assigns a raw string directly to an IssueId field.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A gate-check unit test assigns raw noncanonical text directly to GateRunResult.issue_id, so it will fail once IssueId becomes the validated newtype.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":4724,\"references\":[\"@/issue/91081bd3/requirement/REQ-14\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

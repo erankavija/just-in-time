@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T20:38:28.412414737Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retire the private file-backed repository and executor setups of the library unit tests.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. Helpers that only arrange paths or mutate a repository they are given are scenario steps, for example `linked_checkout_paths` in `commands/worktree.rs`. JSON-backend unit tests in `storage/json.rs` construct the backend they test. The helpers below duplicate the shared constructors or open an executor over a store they are given.\n\nThis entry covers `archive.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/commands/archive.rs`: `executor` (`:893`), `executable_document_repo` (`:994`), `configured_repo` (`:1764`), `development_root_repo` (`:1995`), `directory_link_repo` (`:2399`), `executable_container_repo` (`:2494`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: Each helper the Background lists no longer exists, and its tests obtain the repository, executor or declaration directory from the shared constructors.\n- [hard] REQ-03: No library test module defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own; scenario content stays in the tests as data.\n- [hard] REQ-04: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T22:01:37.412603530Z",
+  "first_ready_at": "2026-10-27T20:54:26.320943787Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9095d3e6-7173-4144-830a-d72c18135fbf",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:54:20.500302673Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4b6d3e4e-2321-4713-9e68-392ca1e7dc1c",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:58:27.390146162Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b469f36d-8fb3-4e73-a199-765c289dfe88",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Archive command tests use the shared file-backed constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:01:37.412603530Z"
 }

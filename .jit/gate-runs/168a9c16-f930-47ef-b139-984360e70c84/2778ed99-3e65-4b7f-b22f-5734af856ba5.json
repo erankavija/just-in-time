@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "261a71c8ebb36cba10b5d5c997b739abcf36495e",
+  "completed_at": "2026-10-29T07:26:19.741552894Z",
+  "duration_ms": 124129,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_query_graph/label_query_json_tests.rs",
+        "id": "F1",
+        "line": 9,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/168a9c16/requirement/REQ-01",
+          "@/issue/168a9c16/requirement/REQ-02",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "Three query-all --label membership cases remain, exceeding the one wiring case required and re-proving domain selection semantics."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs",
+        "id": "F2",
+        "line": 461,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/168a9c16/requirement/REQ-03"
+        ],
+        "severity": "medium",
+        "summary": "The hierarchy-warning test computes its condition but never asserts it; this predates the attributable patch."
+      }
+    ],
+    "summary": "The change leaves duplicate query-all label-selection coverage beyond the permitted wiring case.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "168a9c16-f930-47ef-b139-984360e70c84",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2778ed99-3e65-4b7f-b22f-5734af856ba5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:24:15.611680789Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8371 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1868b-9021-7741-8325-ed912a6bb38a\n--------\nuser\n--- 8358 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 31db51d6b, 261a71c8e\nPolicy sources: AGENTS.md\nResolved items: @/issue/168a9c16/requirement/REQ-01, REQ-02, REQ-03 (issue description); @/issue/c780514e/requirement/REQ-02 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-29T07:23:55Z); code-review pending (no run)\nTruncation recovery: narrowed the initial repository-wide AGENTS search; inspected both tagged commits and merge-parent source diffs; narrowed truncated query-call and domain-test reads\n\n1. **[blocking][issue-impact]** `query all --label` still has three filter-membership cases: the retained wiring case in `label_filter_repeatable_query_tests.rs:32`, plus `label_query_json_tests.rs:9` and `label_hierarchy_e2e_test.rs:144`. The latter two re-assert label selection already owned by `domain::queries` and exceed the one-case-per-subcommand/flag criterion. Consolidate to one wiring case and retain any distinct JSON or hierarchy coverage without re-proving selection semantics. References: `@/issue/168a9c16/requirement/REQ-01`, `@/issue/168a9c16/requirement/REQ-02`, `@/invariant/orthogonal-tests`.\n\n2. **[advisory][pre-existing]** `test_type_hierarchy_warnings` calculates `_has_warning_or_error` but never asserts it at `label_hierarchy_e2e_test.rs:461`; the hierarchy-warning property is therefore untested. This was unchanged from before the attributable patch. Reference: `@/issue/168a9c16/requirement/REQ-03`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The change leaves duplicate query-all label-selection coverage beyond the permitted wiring case.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Three query-all --label membership cases remain, exceeding the one wiring case required and re-proving domain selection semantics.\",\"file\":\"crates/jit/tests/cli_query_graph/label_query_json_tests.rs\",\"line\":9,\"references\":[\"@/issue/168a9c16/requirement/REQ-01\",\"@/issue/168a9c16/requirement/REQ-02\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The hierarchy-warning test computes its condition but never asserts it; this predates the attributable patch.\",\"file\":\"crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs\",\"line\":461,\"references\":[\"@/issue/168a9c16/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

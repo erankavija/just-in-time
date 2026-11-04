@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T00:24:41.279345610Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Declare lifecycle state through the vocabulary macro and delete each restated state token.\n\n## Background\n\nState tokens are spelled by `State::as_str` (`crates/jit/src/domain/types.rs:73-83`), the hand-written `State::all` (`types.rs:91`), `errors::state_name` (`errors.rs:975-985`), `state_token` (`declarations/rules.rs:338-349`), `VALID_STATE_TOKENS` (`rules.rs:354-362`) and its inverse parser `token_to_state` (`rules.rs:370-382`), `State::from_str` (`types.rs:156-170`), the query language's `STATE_VALUES` (`query_engine/error.rs:12-13`) and the visualization state table (`visualization.rs:189-197`). `errors::state_name` is used in JSON error payloads (`output.rs:1257,1258,1278,1304,1307`), and `State::all` is called from `domain/queries.rs`, `validation/engine.rs`, `schema.rs` and `crates/jit/tests/fast_docs_templates/harness_demo.rs`. `crates/jit/tests/cli_issue/quiet_mode_tests.rs:75` and `crates/jit/tests/cli_query_graph/query_tests.rs:1392` still pass the `open` alias, which exact parsing rejects.\n\n## Success Criteria\n\n- [hard] REQ-01: `State` is declared through the macro, and its parser accepts exact tokens only.\n- [hard] REQ-02: `errors::state_name`, `state_token`, `VALID_STATE_TOKENS`, `token_to_state` and the hand-written `State::all` are gone, their callers use the macro's `ALL`, `as_str` and `FromStr`, and the visualization state table derives from `as_str`.\n- [hard] REQ-03: Tests pass only canonical state tokens.\n- [hard] REQ-04: The query language's state value list derives from the enum.\n- [hard] REQ-05: Error payloads and rule messages spell states exactly as before.\n",
   "documents": [],
+  "done_at": "2026-10-25T01:51:07.236297560Z",
+  "first_ready_at": "2026-10-24T23:55:25.119462463Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3ced5752-260f-4432-9f68-8a7bc8e43050",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:50:59.920259911Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "42bcf535-abb1-4080-9356-7102a3f7a691",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:44:22.919143414Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2ac50581-29cb-4fbf-ad2f-a7c483e63647",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Lifecycle state tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T01:51:07.236297560Z"
 }

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e2292171d6cd08604dcad3d84171aad40ae3d569",
+  "completed_at": "2026-11-01T16:56:53.534783129Z",
+  "duration_ms": 148518,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/issue.rs",
+        "id": "F1",
+        "line": 709,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-20",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Rejection commits before dependent promotion, violating the required atomic same-mutation transition."
+      }
+    ],
+    "summary": "Dependent promotion is not included in the rejection mutation.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cba1bff8-58ec-4102-b56a-96d767ac05a2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "91c405c9-ab69-4df4-9242-fc4db0ce0fb3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:54:25.016105081Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2719 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19808-a29a-7f83-a048-0a35789fa991\n--------\nuser\n--- 2706 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 1332e6381, e2292171d (`jit:cba1bff8`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T16:52:59Z); code-review pending\nTruncation recovery: Focused reads recovered the item configuration, D-20 source, gate definition, and mutation paths after a broad source search truncated.\n\n1. **[blocking][issue-impact]** `crates/jit/src/commands/issue.rs:709` publishes rejection before calling `check_auto_transitions`, which then reads a new snapshot and publishes each promotion separately (`issue.rs:866`). An interruption or failure between these operations leaves the rejected issue committed while its dependent remains `backlog`, so REQ-01’s same-mutation requirement is not met. The added test verifies only the eventual state, not the single-session/atomic property. References: `@/charter/D-20`, `@/invariant/derived-state-coherence`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Dependent promotion is not included in the rejection mutation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Rejection commits before dependent promotion, violating the required atomic same-mutation transition.\",\"file\":\"crates/jit/src/commands/issue.rs\",\"line\":709,\"references\":[\"@/charter/D-20\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

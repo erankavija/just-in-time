@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T22:46:49.766038411Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Replace the empty-string sentinel of the event issue accessor with an optional typed id.\n\n## Background\n\n`Event::get_issue_id` returns `\"\"` for repository-scoped events (`crates/jit/src/domain/types.rs:1989-2013`, arms `:2001,2006-2011`). Production callers are `repository_state/mutation.rs:1349` (`event_identities`, which sorts by the returned string), `domain/queries.rs:77`, `commands/events.rs:30` and `domain/event_catalog.rs`. Test callers sit in the `commands/issue.rs` test module (10), `crates/jit/tests/fast_docs_templates/bracket_breakdown_tests.rs` (2), `fast_docs_templates/document_event_log_tests.rs` (1), `fast_issue/dep_add_atomic_tests.rs` (2), `fast_issue/transitive_reduction_validation_tests.rs` (1) and `fast_rules/local_rule_enforcement_tests.rs` (1).\n\n## Success Criteria\n\n- [hard] REQ-01: `EventBody::issue_id()`, and an `Event` delegate, return `Option<&IssueId>`: `Some` for issue-scoped variants and `None` for repository-scoped ones.\n- [hard] REQ-02: `get_issue_id` is gone, and no event accessor returns an empty string.\n- [hard] REQ-03: Event identity ordering in the mutation finalizer is unchanged: repository-scoped events still sort before issue-scoped ones.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n",
   "documents": [],
+  "done_at": "2026-10-26T23:10:20.640970829Z",
+  "first_ready_at": "2026-10-25T22:45:30.200326533Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fe466a34-cdfc-44e0-98ff-42b00c1e3899",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:08:35.454977416Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e21ee45c-934d-4246-9a1c-f3efe7771578",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:42:38.125369177Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f265e748-e350-4ba6-949f-575acf122bd9",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Event issue accessor returns an optional IssueId",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T23:10:20.640970829Z"
 }

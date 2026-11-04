@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:09:10.411606741Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
     "07f4b1d4-7dde-47ae-929c-c0d892741b27"
   ],
-  "description": "Remove the test hook from the product binary and the runner configuration, now that profiled fixtures build cheaply on first use.\n\n## Background\n\n`crates/jit/src/main.rs:1787-1793` compiles a hidden `__test-fixture-setup` subcommand under `cfg(feature = \"test-support\")`, which the crate's self dev-dependency (`crates/jit/Cargo.toml:106`) enables for every test build of the binary. `.config/nextest.toml` runs it as the `default-repository-fixture` and `dogfood-repository-fixture` setup scripts, each filtered by module prefixes and individual test names. Consumers read a run-bound receipt (`prepare_nextest_profiled_repository_fixture`, `nextest_profiled_repository_fixture` and the receipt tests in `crates/jit/src/test_utils.rs`), and `PROFILED_REPOSITORY_FIXTURE_ENV_LOCK` serialises receipt-environment access beside `EnvGuard`. `fast_docs_templates/template_apply_tests.rs` and `scratch_build/build_profile_policy_tests.rs` parse the nextest configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: The `jit` binary has no `__test-fixture-setup` subcommand in any build configuration.\n- [hard] REQ-02: `.config/nextest.toml` declares no profiled-repository setup script and no filter that names individual tests or test modules.\n- [hard] REQ-03: Profiled-fixture consumers obtain their repository from the input-keyed cache on first use. The receipt code, its environment variables, its tests and `PROFILED_REPOSITORY_FIXTURE_ENV_LOCK` no longer exist.\n- [hard] REQ-04: Tests that parsed the removed setup scripts assert what remains of the runner configuration, or no longer exist.\n- [hard] REQ-05: `dev/TESTING.md` describes profiled fixtures as built in the suite on first use.\n",
+  "description": "Remove the test hook from the product binary and the runner configuration, now that profiled fixtures build cheaply on first use.\n\n## Background\n\n`crates/jit/src/main.rs:1787-1793` compiles a hidden `__test-fixture-setup` subcommand under `cfg(feature = \"test-support\")`, which the crate's self dev-dependency (`crates/jit/Cargo.toml:106`) enables for every test build of the binary. `.config/nextest.toml` runs it as the `default-repository-fixture` and `dogfood-repository-fixture` setup scripts, each filtered by module prefixes and individual test names. Consumers read a run-bound receipt (`prepare_nextest_profiled_repository_fixture`, `nextest_profiled_repository_fixture` and the receipt tests in `crates/jit/src/test_utils.rs`), and `PROFILED_REPOSITORY_FIXTURE_ENV_LOCK` serialises receipt-environment access beside `EnvGuard`. `fast_docs_templates/template_apply_tests.rs` and `scratch_build/build_profile_policy_tests.rs` parse the nextest configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: The `jit` binary has no `__test-fixture-setup` subcommand in any build configuration.\n- [hard] REQ-02: `.config/nextest.toml` declares no profiled-repository setup script, and no profiled-repository script filter that names individual tests or test modules remains.\n- [hard] REQ-03: Profiled-fixture consumers obtain their repository from the input-keyed cache on first use. The receipt code, its environment variables, its tests and `PROFILED_REPOSITORY_FIXTURE_ENV_LOCK` no longer exist.\n- [hard] REQ-04: Tests that parsed the removed setup scripts assert what remains of the runner configuration, or no longer exist.\n- [hard] REQ-05: `dev/TESTING.md` describes profiled fixtures as built in the suite on first use.",
   "documents": [],
+  "done_at": "2026-10-27T22:25:44.129263602Z",
+  "first_ready_at": "2026-10-27T20:54:49.715609287Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "053e0e52-1bbc-4b18-815b-0eea82e56ab4",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:25:33.004248343Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fb4782d7-813d-4301-8b84-81c801a59265",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:23:27.247372926Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2a6bc44c-459e-4837-baf9-0022778b0870",
   "labels": [
     "type:task",
@@ -28,7 +44,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Fixture setup runs inside the suite with no runner hook",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:25:44.129263602Z"
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T22:38:09.437029820Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the `fast_issue` suite's copy of the issue-construction fixture.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. `crates/jit/tests/fast_issue/main.rs` defines its own copy, which the suite's modules call.\n\n## Success Criteria\n\n- [hard] REQ-01: `fast_issue/main.rs` defines no issue-construction fixture, and the suite calls the shared one.\n- [hard] REQ-02: Each test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:18:05.466572524Z",
   "first_ready_at": "2026-10-22T15:28:22.888902361Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "124dd77f-1bc4-411e-9104-05226eb7fcfa",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:10:22.161928810Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b8e6f8a8-eff9-482a-aebd-8008b4cee222",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:14:58.238633708Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f95b4f6-9e73-4ad3-bed0-79e63b14101a",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "fast_issue uses the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:22.888902361Z"
+  "updated_at": "2026-10-27T00:18:05.466572524Z"
 }

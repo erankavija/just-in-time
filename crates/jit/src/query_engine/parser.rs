@@ -2,9 +2,9 @@
 //!
 //! Builds an abstract syntax tree (AST) from tokens.
 
-use super::error::{state_values, QueryParseError, PRIORITY_VALUES};
+use super::error::{priority_values, state_values, QueryParseError};
 use super::lexer::{FilterField, Token};
-use crate::domain::{Priority, State};
+use crate::domain::{Assignee, Priority, State};
 use std::str::FromStr;
 
 type Result<T> = std::result::Result<T, QueryParseError>;
@@ -35,8 +35,10 @@ pub enum QueryCondition {
     /// invalid value (e.g. `priority:nope`) is a parse error rather than a
     /// silent no-match.
     Priority(Priority),
-    /// Filter by assignee (open value)
-    Assignee(String),
+    /// Filter by assignee, parsed into a typed [`Assignee`] at parse time so a
+    /// malformed value (e.g. `assignee:*`) is a parse error rather than a
+    /// silent no-match.
+    Assignee(Assignee),
     /// Issues with no assignee
     Unassigned,
     /// Issues blocked by dependencies or gates
@@ -139,7 +141,7 @@ impl Parser {
                     FilterField::State => QueryCondition::State(parse_state(&value)?),
                     FilterField::Label => QueryCondition::Label(value),
                     FilterField::Priority => QueryCondition::Priority(parse_priority(&value)?),
-                    FilterField::Assignee => QueryCondition::Assignee(value),
+                    FilterField::Assignee => QueryCondition::Assignee(parse_assignee(&value)?),
                 };
                 Ok(QueryExpr::Condition(condition))
             }
@@ -196,7 +198,16 @@ fn parse_state(value: &str) -> Result<State> {
 fn parse_priority(value: &str) -> Result<Priority> {
     Priority::from_str(value).map_err(|_| QueryParseError::InvalidPriority {
         value: value.to_string(),
-        valid: PRIORITY_VALUES.to_string(),
+        valid: priority_values(),
+    })
+}
+
+/// Parse an `assignee:` filter value into a typed [`Assignee`], mapping any
+/// failure to a typed [`QueryParseError::InvalidAssignee`].
+fn parse_assignee(value: &str) -> Result<Assignee> {
+    Assignee::from_str(value).map_err(|reason| QueryParseError::InvalidAssignee {
+        value: value.to_string(),
+        reason,
     })
 }
 
@@ -269,7 +280,7 @@ mod tests {
             QueryParseError::InvalidState { value, .. } if value == "notastate"
         ));
         let message = err.to_string();
-        for state in crate::domain::State::all() {
+        for state in crate::domain::State::ALL {
             assert!(
                 message.contains(state.as_str()),
                 "missing {state:?}: {message}"
@@ -286,8 +297,33 @@ mod tests {
             result.unwrap_err(),
             QueryParseError::InvalidPriority {
                 value: "nope".to_string(),
-                valid: PRIORITY_VALUES.to_string(),
+                valid: priority_values(),
             }
+        );
+    }
+
+    #[test]
+    fn test_parse_assignee_value_without_colon_or_wildcard_names_value() {
+        ["worker-1", "*"].into_iter().for_each(|value| {
+            let tokens = Lexer::tokenize(&format!("assignee:{value}")).unwrap();
+            let err = Parser::parse(tokens).unwrap_err();
+
+            assert!(matches!(
+                &err,
+                QueryParseError::InvalidAssignee { value: v, .. } if v == value
+            ));
+            assert!(err.to_string().contains(&format!("'{value}'")));
+        });
+    }
+
+    #[test]
+    fn test_parse_assignee_typed_value() {
+        let tokens = Lexer::tokenize("assignee:agent:worker-1").unwrap();
+        let expr = Parser::parse(tokens).unwrap();
+
+        assert_eq!(
+            expr,
+            QueryExpr::Condition(QueryCondition::Assignee("agent:worker-1".parse().unwrap()))
         );
     }
 

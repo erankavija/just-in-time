@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T00:56:34.335328661Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Render the short id the server provides, so no web code derives a short id by truncation.\n\n## Background\n\nThe web UI truncates issue ids with `substring(0, 8)` at `web/src/components/Issue/IssueDetail.tsx:295,460`, `web/src/components/Graph/nodes/ClusterNode.tsx:106` and `web/src/components/Graph/GraphView.tsx:214,715`. Issue and graph responses carry a `short_id` derived by the domain. Commit-hash truncation (`IssueDetail.tsx:701`, `components/Document/DocumentViewer.tsx:278,345`) is not issue identity.\n\n## Success Criteria\n\n- [hard] REQ-01: The web issue and graph types declare the server's `short_id` fields.\n- [hard] REQ-02: The five issue-id truncation sites render the provided short id, and no web source truncates an issue id by length.\n- [hard] REQ-03: Web tests, lint and build pass.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:00:59.635912549Z",
+  "first_ready_at": "2026-11-01T00:56:19.866618431Z",
   "gates_required": [
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "c1b932af-1d5e-497c-a9c3-f169f1a844cd",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:59:24.677921567Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "b3a8ecd8-4e43-4429-85e6-6e509f979120",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:56:53.242723060Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "be18da9e-bfe2-4813-a69e-72ee1904c344",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Web UI renders the server-provided short id",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-11-01T01:00:59.635912549Z"
 }

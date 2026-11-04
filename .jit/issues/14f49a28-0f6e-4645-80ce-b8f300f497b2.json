@@ -1,0 +1,39 @@
+{
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T23:40:40.264134171Z",
+  "context": {},
+  "created_at": "2026-11-03T23:39:55.842992240Z",
+  "dependencies": [],
+  "description": "Make the docs-mechanical package-content check (M8) assemble its throwaway package outside this repository, so the check works when `target/` is a symlink.\n\n## Background\n\n- `scripts/docs-check-package-content.sh` packs each profile package with `jit profile pack --output <repo>/target/docs-check-package-content.XXXX/<package>.tar`, then publishes it there with `jit profile add` to read the package manifest.\n- On this host `target/` is a symlink (since 2026-11-03, 01:24), and `jit profile pack` refuses to write through it: \"unsafe repository mutation target: target\". Every docs-mechanical run on main has failed at M8 since then (first: c92f4011's run at 2026-11-03T23:29); M1–M7 and M9 pass.\n- `jit profile add --destination` accepts only a path inside the current repository worktree, which is why the script used `target/`.\n\n## Success Criteria\n\n- [hard] REQ-01: The script packs each package into a temporary directory under the system temp directory, initialises a throwaway jit repository there, and adds and shows the package inside it; it creates, writes and removes nothing in this repository's tree.\n- [hard] REQ-02: On this host `./scripts/docs-mechanical.sh` passes M8 with `target/` a symlink. Its findings and exit codes for dangling citations and prohibited content are unchanged, and the temporary directory is removed when the check finishes, passes or fails.\n- [hard] REQ-03: No gate definition changes.\n\n## Notes\n\n- Owner ruling 2026-11-04 (relayed by just-in-time-6a): fix the script, not the gate. The assembly happens outside the repository because the gate-input walk applies no ignore rule, so a throwaway directory inside the tree could enter other gates' input digests while it exists.",
+  "documents": [],
+  "done_at": "2026-11-03T23:45:29.877182906Z",
+  "first_ready_at": "2026-11-03T23:39:55.842992240Z",
+  "gates_required": [
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "code-review": {
+      "run_id": "a5269dcb-e4a2-485e-be3e-8a0092701fbf",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:45:19.719584012Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "00ad1278-235a-433e-b59f-26fcbfacdfd2",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:42:06.029202683Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "14f49a28-0f6e-4645-80ce-b8f300f497b2",
+  "labels": [
+    "type:task",
+    "component:docs",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Package-content docs check assembles its packages outside the repository",
+  "updated_at": "2026-11-03T23:45:29.877182906Z"
+}

@@ -2,8 +2,8 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Query, State},
-    http::{HeaderValue, StatusCode},
+    extract::{FromRequestParts, State},
+    http::{request::Parts, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -14,14 +14,102 @@ use tokio_util::sync::CancellationToken;
 
 use jit::commands::CommandExecutor;
 use jit::declarations::GateDefinition;
+use jit::domain::identity::{GateKey, GateRunId, IssueId, IssueIdPrefix};
 use jit::domain::{Issue, Priority, State as IssueState};
+use jit::errors::InvalidArgumentError;
 use jit::graph::hierarchy::NodeHierarchy;
-use jit::output::GateRunSummary;
+use jit::output::failure::classify;
+use jit::output::{ErrorCode, GateRunSummary};
 use jit::search::{SearchOptions, SearchResult};
-use jit::storage::{IssueStore, PathReadError};
+use jit::storage::IssueStore;
 
 use crate::sse;
 use crate::watcher::ChangeTracker;
+
+/// The HTTP status a failure of class `code` is reported with.
+fn status_of(code: ErrorCode) -> StatusCode {
+    match code {
+        ErrorCode::IssueNotFound
+        | ErrorCode::GateNotFound
+        | ErrorCode::RepositoryNotFound
+        | ErrorCode::DocumentNotFound
+        | ErrorCode::ItemNotFound => StatusCode::NOT_FOUND,
+        ErrorCode::InvalidArgument
+        | ErrorCode::InvalidLabelPattern
+        | ErrorCode::InvalidState
+        | ErrorCode::AmbiguousId
+        | ErrorCode::InvalidIdPrefix
+        | ErrorCode::DeletionNotConfirmed => StatusCode::BAD_REQUEST,
+        ErrorCode::CycleDetected
+        | ErrorCode::AlreadyExists
+        | ErrorCode::Blocked
+        | ErrorCode::ProfileConflict
+        | ErrorCode::ProfileUncommittedTargets
+        | ErrorCode::LinkedCheckoutWriteRefused => StatusCode::CONFLICT,
+        ErrorCode::ValidationFailed | ErrorCode::GateFailed => StatusCode::UNPROCESSABLE_ENTITY,
+        ErrorCode::PermissionDenied => StatusCode::FORBIDDEN,
+        ErrorCode::LockTimeout => StatusCode::SERVICE_UNAVAILABLE,
+        ErrorCode::IoError
+        | ErrorCode::ParseError
+        | ErrorCode::ClaimRequiresGit
+        | ErrorCode::RepositoryFormatUnsupported
+        | ErrorCode::DependencyError
+        | ErrorCode::GateError
+        | ErrorCode::GateCheckError
+        | ErrorCode::PresetError
+        | ErrorCode::InvariantCommandFailed
+        | ErrorCode::ProfileError
+        | ErrorCode::SearchFailed
+        | ErrorCode::RipgrepNotFound
+        | ErrorCode::WorktreeInfoError
+        | ErrorCode::WorktreeListError
+        | ErrorCode::WorktreeStoreDivergenceError
+        | ErrorCode::GenericError
+        | ErrorCode::RecoveryFailed
+        | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+/// The status of `error`, projected from the library's classification.
+fn status_of_failure(error: &anyhow::Error) -> StatusCode {
+    status_of(classify(error).error.code)
+}
+
+/// Log `error` and report it with the status its classification maps to.
+fn reject(error: impl Into<anyhow::Error>) -> StatusCode {
+    let error = error.into();
+    let status = status_of_failure(&error);
+    tracing::warn!(%status, "request failed: {error:#}");
+    status
+}
+
+/// Declares an extractor that reports a malformed request through [`reject`],
+/// so the rejection takes its status from the classification like any failure.
+macro_rules! classified_extractor {
+    ($name:ident, $extractor:ident) => {
+        struct $name<T>(T);
+
+        #[axum::async_trait]
+        impl<T, S> FromRequestParts<S> for $name<T>
+        where
+            axum::extract::$extractor<T>: FromRequestParts<S>,
+            <axum::extract::$extractor<T> as FromRequestParts<S>>::Rejection: std::fmt::Display,
+            S: Send + Sync,
+        {
+            type Rejection = StatusCode;
+
+            async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, StatusCode> {
+                axum::extract::$extractor::<T>::from_request_parts(parts, state)
+                    .await
+                    .map(|axum::extract::$extractor(value)| Self(value))
+                    .map_err(|rejection| reject(InvalidArgumentError::new(rejection.to_string())))
+            }
+        }
+    };
+}
+
+classified_extractor!(Path, Path);
+classified_extractor!(Query, Query);
 
 /// Shared application state
 #[derive(Clone)]
@@ -78,35 +166,96 @@ async fn health_check<S: IssueStore>(State(state): State<AppState<S>>) -> impl I
     }))
 }
 
-/// List all issues
+/// An issue as served by the API: the stored record's fields, plus its
+/// `short_id`, with each `dependencies` entry expanded to a [`DependencyRef`].
+/// The stored record keeps its own shape.
+#[derive(Debug, Serialize)]
+pub struct IssueResponse {
+    #[serde(flatten)]
+    issue: IssueBody,
+    /// Domain-derived short id ([`IssueId::short_id`]).
+    short_id: String,
+    dependencies: Vec<DependencyRef>,
+}
+
+/// A dependency entry: the id and its short id, as `issue show --json` pairs them.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DependencyRef {
+    pub id: IssueId,
+    pub short_id: String,
+}
+
+impl From<&IssueId> for DependencyRef {
+    fn from(id: &IssueId) -> Self {
+        Self {
+            id: id.clone(),
+            short_id: id.short_id().to_string(),
+        }
+    }
+}
+
+impl From<Issue> for IssueResponse {
+    fn from(issue: Issue) -> Self {
+        Self {
+            short_id: issue.id.short_id().to_string(),
+            dependencies: issue.dependencies.iter().map(DependencyRef::from).collect(),
+            issue: IssueBody(issue),
+        }
+    }
+}
+
+/// An [`Issue`] serialized without its `dependencies`, which [`IssueResponse`]
+/// serves expanded.
+#[derive(Debug)]
+struct IssueBody(Issue);
+
+impl Serialize for IssueBody {
+    fn serialize<Ser: serde::Serializer>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error> {
+        use serde::ser::Error;
+        match serde_json::to_value(&self.0).map_err(Ser::Error::custom)? {
+            serde_json::Value::Object(mut fields) => {
+                fields.remove("dependencies");
+                fields.serialize(serializer)
+            }
+            _ => Err(Ser::Error::custom("issue did not serialize as an object")),
+        }
+    }
+}
+
+/// List all issues, each `documents` explicit and derived from one shared listing of the declared areas.
 async fn list_issues<S: IssueStore>(
     State(state): State<AppState<S>>,
-) -> Result<Json<Vec<Issue>>, StatusCode> {
+) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
     state
         .executor
         .issues()
         .list_issues(None, None, None)
-        .map(Json)
-        .map_err(|e| {
-            tracing::error!("Failed to list issues: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
+        .and_then(|issues| state.executor.documents().with_reported_documents(issues))
+        .map(|issues| Json(issues.into_iter().map(IssueResponse::from).collect()))
+        .map_err(reject)
 }
 
-/// Get single issue by ID
+fn resolve_issue_path_id<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    requested: &str,
+) -> Result<IssueId, StatusCode> {
+    let prefix = requested.parse::<IssueIdPrefix>().map_err(reject)?;
+    executor.issues().resolve_issue_id(&prefix).map_err(reject)
+}
+
+/// Get single issue by ID, its `documents` explicit and derived.
 async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
-) -> Result<Json<Issue>, StatusCode> {
-    state
+) -> Result<Json<IssueResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
+    let mut issue = state.executor.issues().show_issue(&id).map_err(reject)?;
+    issue.documents = state
         .executor
-        .issues()
-        .show_issue(&id)
-        .map(Json)
-        .map_err(|e| {
-            tracing::error!("Failed to get issue {}: {:?}", id, e);
-            StatusCode::NOT_FOUND
-        })
+        .documents()
+        .issue_documents(&issue)
+        .map_err(reject)?;
+    Ok(Json(IssueResponse::from(issue)))
 }
 
 /// Graph data for visualization: one node per issue, one edge per dependency.
@@ -136,7 +285,9 @@ pub struct GraphData {
 /// containment.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphNode {
-    pub id: String,
+    pub id: IssueId,
+    /// Domain-derived short id ([`IssueId::short_id`]).
+    pub short_id: String,
     pub label: String,
     pub state: IssueState,
     pub priority: Priority,
@@ -153,8 +304,8 @@ pub struct GraphNode {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphEdge {
-    pub from: String,
-    pub to: String,
+    pub from: IssueId,
+    pub to: IssueId,
 }
 
 /// Get dependency graph
@@ -173,22 +324,19 @@ async fn get_graph<S: IssueStore>(
         .executor
         .issues()
         .list_issues(None, None, None)
-        .map_err(|e| {
-            tracing::error!("Failed to list issues for graph: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     // Build node lookup for blocked state calculation
-    let issue_map: std::collections::HashMap<String, &Issue> =
+    let issue_map: std::collections::HashMap<IssueId, &Issue> =
         issues.iter().map(|i| (i.id.clone(), i)).collect();
 
     // Resolve the hierarchy with the core resolver, over the repo's type levels.
     let issue_refs: Vec<&Issue> = issues.iter().collect();
-    let config =
-        jit::config_manager::get_hierarchy_config(state.executor.storage()).map_err(|e| {
-            tracing::error!("Failed to load hierarchy configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let config = state
+        .executor
+        .config()
+        .get_hierarchy_config()
+        .map_err(reject)?;
     let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
     // Create nodes
@@ -196,6 +344,7 @@ async fn get_graph<S: IssueStore>(
         .iter()
         .map(|issue| GraphNode {
             id: issue.id.clone(),
+            short_id: issue.id.short_id().to_string(),
             label: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
@@ -240,10 +389,7 @@ pub struct StatusResponse {
 async fn get_status<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = state.executor.get_status().map_err(|e| {
-        tracing::error!("Failed to get status: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let summary = state.executor.validation().get_status().map_err(reject)?;
 
     Ok(Json(StatusResponse {
         backlog: summary.backlog,
@@ -292,15 +438,14 @@ async fn search_issues<S: IssueStore>(
     let start = std::time::Instant::now();
 
     // Restrict search to issue documents, explicit or derived
-    let document_paths = state.executor.get_issue_document_paths().map_err(|e| {
-        tracing::error!("Failed to get issue documents: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let document_paths = state
+        .executor
+        .documents()
+        .get_issue_document_paths()
+        .map_err(reject)?;
 
-    let layout = state.executor.repository_layout().map_err(|error| {
-        tracing::error!("Search has no repository layout: {:?}", error);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let config = state.executor.config();
+    let layout = config.repository_layout().map_err(reject)?;
     // An empty glob list would search every worktree file, so documents are searched only when linked.
     let mut results = if document_paths.is_empty() {
         Vec::new()
@@ -312,10 +457,7 @@ async fn search_issues<S: IssueStore>(
             file_patterns: document_paths,
             ..Default::default()
         };
-        jit::search::search(layout.worktree_root(), &params.q, options).map_err(|e| {
-            tracing::error!("Search failed: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?
+        jit::search::search(layout.worktree_root(), &params.q, options).map_err(reject)?
     };
     if results.len() < params.limit {
         let remaining = params.limit - results.len();
@@ -326,11 +468,8 @@ async fn search_issues<S: IssueStore>(
             file_patterns: vec!["issues/*.json".to_string()],
             ..Default::default()
         };
-        let mut data_results = jit::search::search(layout.data_root(), &params.q, data_options)
-            .map_err(|e| {
-                tracing::error!("Data-root search failed: {:?}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        let mut data_results =
+            jit::search::search(layout.data_root(), &params.q, data_options).map_err(reject)?;
         results.append(&mut data_results);
     }
 
@@ -351,24 +490,13 @@ struct DocumentByPathQuery {
     commit: Option<String>,
 }
 
-/// Map a typed `PathReadError` to an HTTP status code.
-fn path_read_error_status(e: &PathReadError) -> StatusCode {
-    match e {
-        PathReadError::NotFound(_) | PathReadError::CommitNotFound(_) => StatusCode::NOT_FOUND,
-        PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_) => {
-            StatusCode::BAD_REQUEST
-        }
-        PathReadError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
-}
-
 /// Get document content by path (without requiring issue ID)
 ///
 /// This endpoint allows accessing documents directly by their filesystem path,
 /// which is useful for opening documents from search results that may not be
 /// associated with a specific issue context.
 ///
-/// Delegates I/O to `CommandExecutor::read_path_bytes` so that filesystem/git
+/// Delegates I/O to `DocumentOps::read_path_bytes` so that filesystem/git
 /// reads remain in the domain layer, not in the route handler.
 async fn get_document_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
@@ -376,11 +504,9 @@ async fn get_document_by_path<S: IssueStore>(
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
     let (bytes, commit_hash) = state
         .executor
+        .documents()
         .read_path_bytes(&query.path, query.commit.as_deref())
-        .map_err(|e| {
-            tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
     // Convert bytes to String for the JSON response (lossy for binary files).
     let content = String::from_utf8_lossy(&bytes).into_owned();
     Ok(Json(DocumentContentResponse {
@@ -605,15 +731,14 @@ async fn get_document_content<S: IssueStore>(
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let at_commit = query.commit.as_deref();
 
     let (content, commit_hash) = state
         .executor
+        .documents()
         .read_document_content(&id, &path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read document content: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     Ok(Json(DocumentContentResponse {
         path: path.clone(),
@@ -635,15 +760,14 @@ async fn get_document_raw<S: IssueStore>(
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let at_commit = query.commit.as_deref();
 
     let (bytes, _commit_hash) = state
         .executor
+        .documents()
         .read_document_bytes(&id, &path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read raw document bytes: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let content_type = infer_content_type(&path);
 
@@ -673,7 +797,7 @@ async fn get_document_raw<S: IssueStore>(
 
 /// Get raw document bytes (path-only variant)
 ///
-/// Delegates I/O to `CommandExecutor::read_path_bytes` so persistence stays
+/// Delegates I/O to `DocumentOps::read_path_bytes` so persistence stays
 /// in the domain layer.  Returns raw bytes with the inferred Content-Type and
 /// CSP headers.  Binary files are served faithfully without UTF-8 conversion.
 /// HTML responses get a `<base href>` injected so sibling assets resolve via
@@ -683,7 +807,7 @@ async fn get_document_raw<S: IssueStore>(
 /// escapes) is enforced by `JsonFileStorage::read_path_bytes`, which is
 /// invariant-owning for this concern.  Invalid paths and out-of-repo escapes
 /// surface as `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`,
-/// both mapped to HTTP 400 by `path_read_error_status`.
+/// both classified as invalid arguments.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
@@ -692,11 +816,9 @@ async fn get_document_raw_by_path<S: IssueStore>(
 
     let (bytes, _commit_hash) = state
         .executor
+        .documents()
         .read_path_bytes(&query.path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
     let content_type = infer_content_type(&query.path);
 
     // Inject <base href> into HTML responses.  The storage layer rejects
@@ -736,7 +858,7 @@ async fn get_document_raw_by_path<S: IssueStore>(
 /// Security: repo-root containment (rejecting empty/absolute/`..` paths and
 /// symlink escapes) is enforced by `JsonFileStorage::read_path_bytes`.  The
 /// resulting `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`
-/// variants map to HTTP 400 via `path_read_error_status`.
+/// variants classify as invalid arguments.
 async fn get_raw_wildcard<S: IssueStore>(
     Path(path): Path<String>,
     Query(query): Query<DocumentContentQuery>,
@@ -746,11 +868,9 @@ async fn get_raw_wildcard<S: IssueStore>(
 
     let (bytes, _commit_hash) = state
         .executor
+        .documents()
         .read_path_bytes(&path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read raw path {}: {:?}", path, e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let content_type = infer_content_type(&path);
 
@@ -798,13 +918,12 @@ async fn get_document_history<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let commits = state
         .executor
+        .documents()
         .get_document_history(&id, &path)
-        .map_err(|e| {
-            tracing::error!("Failed to get document history: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let commits_response = commits
         .into_iter()
@@ -844,15 +963,14 @@ async fn get_document_diff<S: IssueStore>(
     Query(query): Query<DocumentDiffQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentDiffResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let to = query.to.as_deref();
 
     let diff = state
         .executor
+        .documents()
         .get_document_diff(&id, &path, &query.from, to)
-        .map_err(|e| {
-            tracing::error!("Failed to get document diff: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let to_ref = to.unwrap_or("HEAD");
 
@@ -868,10 +986,12 @@ async fn get_document_diff<S: IssueStore>(
 async fn list_gates<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
-    state.executor.list_gates().map(Json).map_err(|e| {
-        tracing::error!("Failed to list gates: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+    state
+        .executor
+        .gates()
+        .list_gates()
+        .map(Json)
+        .map_err(reject)
 }
 
 /// Get a single gate definition by key
@@ -879,14 +999,13 @@ async fn get_gate_definition<S: IssueStore>(
     Path(key): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateDefinition>, StatusCode> {
+    let key = key.parse::<GateKey>().map_err(reject)?;
     state
         .executor
+        .gates()
         .show_gate_definition(&key)
         .map(Json)
-        .map_err(|e| {
-            tracing::error!("Failed to get gate definition {}: {:?}", key, e);
-            StatusCode::NOT_FOUND
-        })
+        .map_err(reject)
 }
 
 /// Query parameters for gate runs
@@ -901,30 +1020,34 @@ async fn list_gate_runs<S: IssueStore>(
     Query(params): Query<GateRunsQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
+    let gate_key = params
+        .gate_key
+        .map(|key| key.parse::<GateKey>())
+        .transpose()
+        .map_err(reject)?;
     let runs = state
         .executor
-        .list_gate_runs(&id, params.gate_key.as_deref())
-        .map_err(|e| {
-            tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
-            StatusCode::NOT_FOUND
-        })?;
+        .gates()
+        .list_gate_runs(&id, gate_key.as_ref())
+        .map_err(reject)?;
 
     Ok(Json(runs.iter().map(GateRunSummary::lean).collect()))
 }
 
 /// Get a single gate run result with full stdout/stderr
 async fn get_gate_run<S: IssueStore>(
-    Path((_id, run_id)): Path<(String, String)>,
+    Path((id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
+    let run_id = run_id.parse::<GateRunId>().map_err(reject)?;
     state
         .executor
-        .get_gate_run_result(&run_id)
+        .gates()
+        .get_gate_run_result(&id, &run_id)
         .map(|r| Json(GateRunSummary::full(&r)))
-        .map_err(|e| {
-            tracing::error!("Failed to get gate run {}: {:?}", run_id, e);
-            StatusCode::NOT_FOUND
-        })
+        .map_err(reject)
 }
 
 /// Response for strategic types
@@ -937,14 +1060,7 @@ struct StrategicTypesResponse {
 async fn get_strategic_types<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StrategicTypesResponse>, StatusCode> {
-    let namespaces = state
-        .executor
-        .config_manager
-        .get_namespaces()
-        .map_err(|e| {
-            tracing::error!("Failed to load configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let namespaces = state.executor.config().get_namespaces().map_err(reject)?;
 
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
@@ -963,14 +1079,7 @@ struct HierarchyResponse {
 async fn get_hierarchy<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<HierarchyResponse>, StatusCode> {
-    let namespaces = state
-        .executor
-        .config_manager
-        .get_namespaces()
-        .map_err(|e| {
-            tracing::error!("Failed to load configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let namespaces = state.executor.config().get_namespaces().map_err(reject)?;
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
@@ -978,12 +1087,9 @@ async fn get_hierarchy<S: IssueStore>(
     // Get resolved icons
     let icons = state
         .executor
-        .config_manager
+        .config()
         .get_hierarchy_icons()
-        .map_err(|e| {
-            tracing::error!("Failed to load hierarchy icons: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     Ok(Json(HierarchyResponse {
         types,
@@ -1008,14 +1114,7 @@ struct NamespaceInfo {
 async fn get_namespaces<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
-    let label_namespaces = state
-        .executor
-        .config_manager
-        .get_namespaces()
-        .map_err(|e| {
-            tracing::error!("Failed to load configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let label_namespaces = state.executor.config().get_namespaces().map_err(reject)?;
 
     let namespaces = label_namespaces
         .namespaces
@@ -1056,90 +1155,266 @@ async fn events_stream<S: IssueStore>(State(state): State<AppState<S>>) -> impl 
 mod tests {
     use super::*;
     use axum_test::TestServer;
+    use jit::commands::test_helpers::ExecutorTestAccess;
+    use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::domain::Priority;
-    use jit::storage::{InMemoryStorage, RepositoryStateStore};
+    use jit::storage::{InMemoryStorage, JsonFileStorage, PathReadError};
+    use jit::test_utils::add_reducing_edge;
+    use jit::test_utils::setup_test_repo_with_config;
 
     use crate::watcher::ChangeTracker;
 
-    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
-    where
-        S: IssueStore + RepositoryStateStore,
-    {
-        let layout = if storage.is_file_backed() {
-            let data_root = storage.root();
-            let worktree_root = data_root
-                .parent()
-                .expect("a file-backed test data root has a worktree parent");
-            jit::storage::discover_repository_layout(worktree_root, data_root).unwrap()
-        } else {
-            jit::repository_state::RepositoryLayout::new(
-                jit::repository_state::RepositoryRootEvidence::new(
-                    storage.root(),
-                    format!("test-worktree:{}", storage.root().display()),
-                    true,
-                ),
-                jit::repository_state::RepositoryRootEvidence::new(
-                    storage.root().join(".jit"),
-                    format!("test-data:{}", storage.root().display()),
-                    true,
-                ),
-            )
-            .unwrap()
-        };
-        Arc::new(CommandExecutor::new(storage).with_layout(layout))
-    }
-
-    fn test_memory_storage() -> InMemoryStorage {
-        use jit::storage::IssueStore;
-
-        let storage = InMemoryStorage::new();
-        // The taxonomy the taxonomy-serving routes answer with, declared by this
-        // repository. The config-reading routes resolve it through a
-        // `ConfigManager` rooted at the store, so it is written there as well as
-        // into the memory image.
-        let config = format!(
+    /// The taxonomy the taxonomy-serving routes answer with, declared by this
+    /// repository.
+    fn taxonomy_config() -> String {
+        format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             jit::test_taxonomy::test_taxonomy().config_fragment()
-        );
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
-        storage.add_data_file("config.toml", &config);
-        storage.add_data_file(
-            "index.json",
-            r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
-        );
-        storage
+        )
     }
 
-    fn initialize_file_backed_test_repository(worktree_root: &std::path::Path) {
-        use jit::storage::JsonFileStorage;
-
-        let storage = JsonFileStorage::new(worktree_root.join(".jit"));
-        let layout =
-            jit::storage::discover_repository_layout(worktree_root, storage.root()).unwrap();
-        CommandExecutor::new(storage)
-            .with_layout(layout)
-            .initialize_fresh_repository(worktree_root, None)
-            .unwrap();
-    }
-
-    fn create_test_app() -> TestServer {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
-        let tracker = Arc::new(ChangeTracker::new(16));
+    fn test_app<S: IssueStore + Send + Sync + 'static>(executor: CommandExecutor<S>) -> TestServer {
         let state = AppState {
-            executor,
-            tracker,
+            executor: Arc::new(executor),
+            tracker: Arc::new(ChangeTracker::new(16)),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
-        let app = create_routes(state);
-        TestServer::new(app).unwrap()
+        TestServer::new(create_routes(state)).unwrap()
+    }
+
+    /// The status the server reports for `error`, derived from its classification.
+    fn status_of_error(error: impl Into<anyhow::Error>) -> StatusCode {
+        status_of(classify(&error.into()).error.code)
+    }
+
+    #[test]
+    fn test_status_of_maps_each_error_class_to_its_http_status() {
+        let expected = [
+            (ErrorCode::IssueNotFound, StatusCode::NOT_FOUND),
+            (ErrorCode::DocumentNotFound, StatusCode::NOT_FOUND),
+            (ErrorCode::InvalidArgument, StatusCode::BAD_REQUEST),
+            (ErrorCode::AmbiguousId, StatusCode::BAD_REQUEST),
+            (ErrorCode::CycleDetected, StatusCode::CONFLICT),
+            (
+                ErrorCode::ValidationFailed,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (ErrorCode::PermissionDenied, StatusCode::FORBIDDEN),
+            (ErrorCode::LockTimeout, StatusCode::SERVICE_UNAVAILABLE),
+            (ErrorCode::IoError, StatusCode::INTERNAL_SERVER_ERROR),
+            (ErrorCode::ParseError, StatusCode::INTERNAL_SERVER_ERROR),
+        ];
+        for (code, status) in expected {
+            assert_eq!(status_of(code), status, "{code:?}");
+        }
+        assert!(ErrorCode::ALL
+            .into_iter()
+            .map(status_of)
+            .all(|status| status.is_client_error() || status.is_server_error()));
+    }
+
+    #[test]
+    fn test_status_of_failure_reports_path_read_errors_by_what_they_describe() {
+        let status = |error: PathReadError| status_of_failure(&error.into());
+        assert_eq!(
+            status(PathReadError::NotFound("a".into())),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status(PathReadError::CommitNotFound("abc1234".into())),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status(PathReadError::InvalidPath("../x".into())),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(PathReadError::OutsideRepoRoot("link".into())),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(PathReadError::Other(anyhow::anyhow!("disk fault"))),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    /// A repository whose only gate run result is unreadable.
+    fn unreadable_gate_run() -> (
+        tempfile::TempDir,
+        TestServer,
+        IssueId,
+        GateRunId,
+        anyhow::Error,
+    ) {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let gate_key: jit::domain::identity::GateKey = "review".parse().unwrap();
+        executor
+            .gates()
+            .define_gate(
+                &gate_key,
+                "Review".to_string(),
+                "Manual review".to_string(),
+                jit::declarations::GateStage::Postcheck,
+                jit::declarations::GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "Gated".to_string(),
+                String::new(),
+                Priority::Normal,
+                vec![gate_key.clone()],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        executor
+            .gates()
+            .pass_gate(&id, &gate_key, Some("human:reviewer".to_string()), false)
+            .unwrap();
+        let run = executor
+            .gates()
+            .get_last_gate_run(&id, &gate_key)
+            .unwrap()
+            .unwrap();
+        let result = temp.path().join(".jit").join(
+            jit::repository_state::VirtualPath::gate_run_record(&id, &run.run_id)
+                .relative()
+                .as_path(),
+        );
+        std::fs::write(result, "{").unwrap();
+        let failure = executor
+            .gates()
+            .get_gate_run_result(&id, &run.run_id)
+            .unwrap_err();
+        (temp, test_app(executor), id, run.run_id, failure)
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_run_reports_an_unreadable_result_as_a_server_error() {
+        let (_temp, server, id, run_id, failure) = unreadable_gate_run();
+        let expected = status_of_error(failure);
+
+        let response = server
+            .get(&format!("/issues/{id}/gate-runs/{run_id}"))
+            .await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_list_gate_runs_reports_an_unreadable_result_as_a_server_error() {
+        let (_temp, server, id, _run_id, failure) = unreadable_gate_run();
+        let expected = status_of_error(failure);
+
+        let response = server.get(&format!("/issues/{id}/gate-runs")).await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_definition_reports_an_unreadable_registry_as_a_server_error() {
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                gates: Some("= [ not toml"),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let key = "review".parse().unwrap();
+        let expected = status_of_error(executor.gates().show_gate_definition(&key).unwrap_err());
+
+        let response = test_app(executor).get("/gates/review").await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_get_issue_reports_an_ambiguous_prefix_as_a_bad_request() {
+        let harness = jit::test_harness::TestHarness::new();
+        for seed in [1, 2] {
+            jit::test_harness::seed_memory_issue(
+                &harness.storage,
+                &jit::domain::Issue::draft(
+                    jit::test_utils::issue_id(seed),
+                    "Twin".into(),
+                    "".into(),
+                ),
+            )
+        }
+        let prefix = "0000".parse().unwrap();
+        let expected = status_of_error(
+            harness
+                .executor
+                .storage()
+                .resolve_issue_id(&prefix)
+                .unwrap_err(),
+        );
+
+        let response = test_app(harness.executor).get("/issues/0000").await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::BAD_REQUEST);
+    }
+
+    /// An unreadable issue index fails id resolution as a server fault, not a missing issue.
+    #[tokio::test]
+    async fn test_get_issue_reports_an_unreadable_index_as_a_server_error() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        std::fs::write(temp.path().join(".jit/index.json"), "{").unwrap();
+        let prefix = "abcd".parse().unwrap();
+        let expected = status_of_error(executor.storage().resolve_issue_id(&prefix).unwrap_err());
+
+        let response = test_app(executor).get("/issues/abcd").await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_search_reports_a_malformed_query_parameter_as_a_bad_request() {
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
+        let expected = status_of_error(InvalidArgumentError::new("limit is not a number"));
+
+        let response = server
+            .get("/search")
+            .add_query_param("q", "x")
+            .add_query_param("limit", "many")
+            .await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
     async fn test_health_check() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/health").await;
         response.assert_status_ok();
         let body: serde_json::Value = response.json();
@@ -1151,27 +1426,170 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_issues_empty() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/issues").await;
         response.assert_status_ok();
-        let issues: Vec<Issue> = response.json();
+        let issues: Vec<serde_json::Value> = response.json();
         assert_eq!(issues.len(), 0);
     }
 
     #[tokio::test]
     async fn test_get_issue_not_found() {
-        let server = create_test_app();
-        let response = server.get("/issues/nonexistent").await;
-        response.assert_status(StatusCode::NOT_FOUND);
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let missing = executor
+            .storage()
+            .resolve_issue_id(&"nonexistent".parse().unwrap())
+            .unwrap_err();
+        let expected = status_of_error(missing);
+        let response = test_app(executor).get("/issues/nonexistent").await;
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::NOT_FOUND);
+    }
+
+    /// A stored issue that cannot be read is a server fault, not a missing issue.
+    #[tokio::test]
+    async fn test_get_issue_reports_an_unreadable_issue_as_a_server_error() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "Broken".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        std::fs::write(temp.path().join(format!(".jit/issues/{id}.json")), "{").unwrap();
+        let expected = status_of_error(executor.issues().show_issue(&id).unwrap_err());
+
+        let response = test_app(executor).get(&format!("/issues/{id}")).await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_get_issue_rejects_too_short_id_prefix() {
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
+        let response = server.get("/issues/abc").await;
+        response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_gate_key_routes_reject_malformed_tokens_at_extraction() {
+        let (server, id, _) = dependent_pair_server();
+        let malformed = status_of_error("Bad_Key".parse::<GateKey>().unwrap_err());
+        assert_eq!(malformed, StatusCode::BAD_REQUEST);
+        server.get("/gates/Bad_Key").await.assert_status(malformed);
+        server
+            .get("/gates/unknown-gate")
+            .await
+            .assert_status(StatusCode::NOT_FOUND);
+        server
+            .get(&format!("/issues/{id}/gate-runs"))
+            .add_query_param("gate_key", "Bad_Key")
+            .await
+            .assert_status(malformed);
+        server
+            .get(&format!("/issues/{id}/gate-runs"))
+            .add_query_param("gate_key", "unknown-gate")
+            .await
+            .assert_status_ok();
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_run_returns_not_found_under_another_issues_path() {
+        let harness = jit::test_harness::TestHarness::new();
+        let gate_key = "review".parse().unwrap();
+        harness.add_gate(
+            &gate_key,
+            "Review",
+            "Manual review",
+            jit::declarations::GateMode::Manual,
+            None,
+        );
+        let owner = harness.create_issue_with_gates("Run owner", vec![gate_key.clone()]);
+        let other = harness.create_issue("Other issue");
+        harness
+            .executor
+            .gates()
+            .pass_gate(&owner, &gate_key, Some("human:reviewer".to_string()), false)
+            .unwrap();
+        let run = harness
+            .executor
+            .gates()
+            .get_last_gate_run(&owner, &gate_key)
+            .unwrap()
+            .unwrap();
+        let server = test_app(harness.executor);
+
+        server
+            .get(&format!("/issues/{owner}/gate-runs/{}", run.run_id))
+            .await
+            .assert_status_ok();
+        server
+            .get(&format!("/issues/{other}/gate-runs/{}", run.run_id))
+            .await
+            .assert_status(StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_run_reports_a_malformed_run_id_as_a_bad_request_and_an_unknown_one_missing(
+    ) {
+        let (server, id, _) = dependent_pair_server();
+        let malformed = status_of_error("not-a-run-id".parse::<GateRunId>().unwrap_err());
+        assert_eq!(malformed, StatusCode::BAD_REQUEST);
+
+        server
+            .get(&format!("/issues/{id}/gate-runs/not-a-run-id"))
+            .await
+            .assert_status(malformed);
+        server
+            .get(&format!(
+                "/issues/{id}/gate-runs/{}",
+                jit::test_utils::gate_run_id(1)
+            ))
+            .await
+            .assert_status(StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
     async fn test_list_issues_with_data() {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         // Create test issues
-        let (_id1, _) = executor
+        let _id1 = executor
             .issues()
             .create_issue(
                 "Issue 1".to_string(),
@@ -1183,8 +1601,10 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
-        let (_id2, _) = executor
+            .unwrap()
+            .issue
+            .id;
+        let _id2 = executor
             .issues()
             .create_issue(
                 "Issue 2".to_string(),
@@ -1196,7 +1616,9 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1210,18 +1632,113 @@ mod tests {
 
         let response = server.get("/issues").await;
         response.assert_status_ok();
-        let issues: Vec<Issue> = response.json();
+        let issues: Vec<serde_json::Value> = response.json();
         assert_eq!(issues.len(), 2);
+    }
+
+    fn dependent_pair_server() -> (TestServer, IssueId, IssueId) {
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
+        let create = |title: &str| {
+            executor
+                .issues()
+                .create_issue(
+                    title.to_string(),
+                    "Description".to_string(),
+                    Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .issue
+                .id
+        };
+        let dependency = create("Dependency");
+        let dependent = create("Dependent");
+        add_reducing_edge(&executor, &dependent, &dependency).unwrap();
+        let state = AppState {
+            executor,
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        (
+            TestServer::new(create_routes(state)).unwrap(),
+            dependent,
+            dependency,
+        )
+    }
+
+    fn assert_serves_short_ids(issue: &serde_json::Value, id: &IssueId, dependency: &IssueId) {
+        assert_eq!(issue["id"], id.as_str());
+        assert_eq!(issue["short_id"], id.short_id());
+        let entries = issue["dependencies"].as_array().unwrap();
+        assert!(entries
+            .iter()
+            .any(|entry| entry["id"] == dependency.as_str()
+                && entry["short_id"] == dependency.short_id()));
+    }
+
+    #[tokio::test]
+    async fn test_get_issue_serves_domain_short_ids_for_issue_and_dependencies() {
+        let (server, dependent, dependency) = dependent_pair_server();
+
+        let response = server.get(&format!("/issues/{}", dependent)).await;
+
+        response.assert_status_ok();
+        assert_serves_short_ids(&response.json(), &dependent, &dependency);
+    }
+
+    #[tokio::test]
+    async fn test_list_issues_serves_domain_short_ids_for_every_issue() {
+        let (server, dependent, dependency) = dependent_pair_server();
+
+        let response = server.get("/issues").await;
+
+        response.assert_status_ok();
+        let issues: Vec<serde_json::Value> = response.json();
+        let served = |id: &IssueId| issues.iter().find(|issue| issue["id"] == id.as_str());
+        assert_serves_short_ids(served(&dependent).unwrap(), &dependent, &dependency);
+        assert_eq!(
+            served(&dependency).unwrap()["short_id"],
+            dependency.short_id()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_graph_serves_domain_short_id_for_every_node() {
+        let (server, dependent, dependency) = dependent_pair_server();
+
+        let response = server.get("/graph").await;
+
+        response.assert_status_ok();
+        let graph: GraphData = response.json();
+        for id in [&dependent, &dependency] {
+            let node = graph.nodes.iter().find(|node| &node.id == id).unwrap();
+            assert_eq!(node.short_id, id.short_id());
+        }
     }
 
     #[tokio::test]
     async fn test_get_graph() {
-        let storage = test_memory_storage();
-
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         // Create issues with dependencies
-        let (id1, _) = executor
+        let id1 = executor
             .issues()
             .create_issue(
                 "Issue 1".to_string(),
@@ -1233,8 +1750,10 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
-        let (id2, _) = executor
+            .unwrap()
+            .issue
+            .id;
+        let id2 = executor
             .issues()
             .create_issue(
                 "Issue 2".to_string(),
@@ -1246,9 +1765,11 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
-        executor.add_dependency(&id2, &id1).unwrap();
+        add_reducing_edge(&executor, &id2, &id1).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1269,13 +1790,34 @@ mod tests {
         assert_eq!(graph.edges[0].to, id1);
     }
 
+    #[tokio::test]
+    async fn test_get_graph_returns_server_error_for_invalid_hierarchy() {
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&jit::test_taxonomy::invalid_hierarchy_config_fragment()),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        ));
+
+        server
+            .get("/graph")
+            .await
+            .assert_status(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
     /// The response body carries the `count` envelope field, and it counts
     /// `nodes` rather than `edges` (which differ in number here).
     #[tokio::test]
     async fn test_get_graph_body_carries_node_count() {
-        let storage = test_memory_storage();
-
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let new = |title: &str| {
             executor
                 .issues()
@@ -1290,12 +1832,13 @@ mod tests {
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         let (id1, id2) = (new("Issue 1"), new("Issue 2"));
         new("Issue 3");
         // One edge over three nodes, so a `count` of edges could not pass.
-        executor.add_dependency(&id2, &id1).unwrap();
+        add_reducing_edge(&executor, &id2, &id1).unwrap();
 
         let state = AppState {
             executor,
@@ -1318,9 +1861,13 @@ mod tests {
     /// type value, so the client derives none of them.
     #[tokio::test]
     async fn test_get_graph_nodes_carry_resolved_hierarchy() {
-        let storage = test_memory_storage();
-
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let new = |title: &str, labels: Vec<String>| {
             executor
                 .issues()
@@ -1335,7 +1882,8 @@ mod tests {
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         // The container and leaf kinds this repository declares, read from the
         // declaration its configuration was rendered from.
@@ -1344,7 +1892,7 @@ mod tests {
         let leaf_type = taxonomy.type_at_level(4);
         let container = new("Container", vec![format!("type:{container_type}")]);
         let leaf = new("Leaf", vec![format!("type:{leaf_type}")]);
-        executor.add_dependency(&container, &leaf).unwrap();
+        add_reducing_edge(&executor, &container, &leaf).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1368,17 +1916,17 @@ mod tests {
                 .clone()
         };
 
-        let leaf_node = node(&leaf);
+        let leaf_node = node(leaf.as_str());
         assert_eq!(leaf_node["type"], leaf_type);
-        assert_eq!(leaf_node["parent"], container);
-        assert_eq!(leaf_node["cluster"], container);
+        assert_eq!(leaf_node["parent"], container.as_str());
+        assert_eq!(leaf_node["cluster"], container.as_str());
         assert_eq!(leaf_node["children"], serde_json::json!([]));
         assert_eq!(leaf_node["rank"], 0);
 
-        let container_node = node(&container);
+        let container_node = node(container.as_str());
         assert_eq!(container_node["type"], container_type);
         assert_eq!(container_node["parent"], serde_json::Value::Null);
-        assert_eq!(container_node["cluster"], container);
+        assert_eq!(container_node["cluster"], container.as_str());
         assert_eq!(container_node["children"], serde_json::json!([leaf]));
         assert_eq!(container_node["rank"], 1);
     }
@@ -1386,14 +1934,23 @@ mod tests {
     /// A node with no `type:` label reports a null type and an orphan resolution.
     #[tokio::test]
     async fn test_get_graph_untyped_node_has_null_type() {
-        let storage = test_memory_storage();
+        let storage = InMemoryStorage::new();
         // The repository declares a default type, so an issue reaches the store
         // without a `type:` label only when it is seeded rather than created.
-        let mut untyped = jit::domain::Issue::draft("Untyped".to_string(), String::new());
-        untyped.id = "untyped-node".to_string();
+        let untyped = jit::domain::Issue::draft(
+            jit::test_utils::issue_id(1),
+            "Untyped".to_string(),
+            String::new(),
+        );
         storage.seed_issue_fixture(&untyped);
 
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1416,10 +1973,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_status() {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
-        let (_id, _) = executor
+        let _id = executor
             .issues()
             .create_issue(
                 "Issue 1".to_string(),
@@ -1431,7 +1993,9 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1452,7 +2016,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_endpoint_requires_query() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/search").await;
         // Should fail without query parameter
         assert!(response.status_code() != StatusCode::OK);
@@ -1460,7 +2030,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_endpoint_empty_results() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         // Search for something that doesn't exist
         let response = server.get("/search?q=nonexistent").await;
 
@@ -1475,7 +2051,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_response_structure() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/search?q=test&limit=10").await;
 
         if response.status_code() == StatusCode::OK {
@@ -1492,14 +2074,26 @@ mod tests {
         // This test verifies that search is restricted to issue documents
         // by checking that get_issue_document_paths is called
         // (implementation detail test - would need integration test for full verification)
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let _response = server.get("/search?q=test").await;
         // If it doesn't panic or error, the issue-document logic is being used
     }
 
     #[tokio::test]
     async fn test_get_strategic_types() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/config/strategic-types").await;
         response.assert_status_ok();
         let data: StrategicTypesResponse = response.json();
@@ -1509,7 +2103,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_hierarchy() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/config/hierarchy").await;
         response.assert_status_ok();
         let data: HierarchyResponse = response.json();
@@ -1537,7 +2137,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_namespaces() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/config/namespaces").await;
         response.assert_status_ok();
         let data: NamespacesResponse = response.json();
@@ -1552,16 +2158,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_namespaces_exposes_taxonomy_only() {
-        use jit::storage::JsonFileStorage;
-
         // A file-backed storage with a config.toml carrying the taxonomy keys,
         // so the response contract (mirror of CLI config show --json) stays
         // protected against drift.
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        std::fs::write(
-            jit_dir.join("config.toml"),
+        let (_temp, executor) = setup_test_repo_with_config(
             r#"
 [namespaces.type]
 description = "Issue type"
@@ -1573,11 +2173,9 @@ unique = false
 "#,
         )
         .unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test".to_string(),
             shutdown: CancellationToken::new(),
@@ -1603,7 +2201,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_by_path_missing_param() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/documents").await;
         // Should fail without path parameter
         assert!(response.status_code() != StatusCode::OK);
@@ -1611,28 +2215,28 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_by_path_nonexistent() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/documents?path=nonexistent.md").await;
         // Should return 404 for file that doesn't exist
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     #[tokio::test]
     async fn test_get_document_by_path_success() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
         // Set up a real tempdir acting as repo root with a .jit subdir.
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-
-        // Write a permissive config so the executor is happy.
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         // Write the fixture document at a subdirectory path relative to repo root.
         // This exercises the path-resolution fix: storage must resolve against
@@ -1643,16 +2247,13 @@ unique = false
         fs::create_dir_all(doc_abs.parent().unwrap()).unwrap();
         fs::write(&doc_abs, doc_content).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-
-        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
 
         // Keep tempdir alive for the duration of the test.
         Box::leak(Box::new(temp));
 
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -1710,35 +2311,16 @@ unique = false
 
     // ── /api/issues/:id/documents/:path/raw tests ────────────────────────────
 
-    /// Build a JsonFileStorage-backed server with a real tempdir that has an
-    /// HTML document linked to an issue.  Returns the server, the issue id, and
-    /// the document path string.
-    fn create_test_app_with_html_doc() -> (
-        axum_test::TestServer,
-        String, // issue id
-        String, // doc path relative to repo root
-    ) {
+    const HTML_DOC: &str = "slide.html";
+
+    /// Writes `HTML_DOC` under `worktree` and links it to a new issue, whose id it returns.
+    fn link_html_document(
+        worktree: &std::path::Path,
+        executor: &CommandExecutor<JsonFileStorage>,
+    ) -> IssueId {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
-        use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-
-        // Write a permissive config so the executor is happy.
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-
-        let executor = test_executor(storage);
-
-        // Create an issue.
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Test issue".to_string(),
@@ -1750,31 +2332,16 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
-
-        // Write the HTML file relative to repo root (parent of .jit/).
-        let doc_rel = "slide.html";
-        let doc_abs = temp.path().join(doc_rel);
-        fs::write(&doc_abs, "<html><body>hello</body></html>").unwrap();
-
-        // Link the document to the issue (skip_scan=true to avoid git dep).
+            .unwrap()
+            .issue
+            .id;
+        std::fs::write(worktree.join(HTML_DOC), "<html><body>hello</body></html>").unwrap();
+        // skip_scan avoids the git dependency.
         executor
-            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .documents()
+            .add_document_reference(&id, HTML_DOC, None, None, None, true)
             .unwrap();
-
-        // Keep tempdir alive for the duration of the test via Box::leak – this
-        // is acceptable in test code; the OS cleans it up.
-        Box::leak(Box::new(temp));
-
-        let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let server = TestServer::new(create_routes(state)).unwrap();
-        (server, id, doc_rel.to_string())
+        id
     }
 
     async fn search_hits(server: &axum_test::TestServer, query: &str) -> Vec<SearchResult> {
@@ -1790,17 +2357,24 @@ unique = false
 
     #[tokio::test]
     async fn test_search_nested_data_root_returns_issue_record_match() {
-        let (server, id, _) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
         let hits = search_hits(&server, "Test issue").await;
         assert!(
-            hits.iter().any(|hit| hit.issue_id.as_deref() == Some(&id)),
+            hits.iter().any(|hit| hit.issue_id.as_ref() == Some(&id)),
             "{hits:?}"
         );
     }
 
     #[tokio::test]
     async fn test_search_nested_data_root_keeps_linked_documents_and_excludes_other_files() {
-        let (server, _, doc) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let _id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let doc = HTML_DOC;
         let hits = search_hits(&server, "hello").await;
         assert!(hits.iter().any(|hit| hit.path.ends_with(&doc)), "{hits:?}");
         assert!(search_hits(&server, "enforce_leases").await.is_empty());
@@ -1808,7 +2382,11 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_html_returns_200_with_correct_content_type() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
@@ -1825,7 +2403,11 @@ unique = false
     /// after the opening `<html>` tag (fixture has no `<head>`).
     #[tokio::test]
     async fn test_get_document_raw_html_injects_base_tag() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
@@ -1840,7 +2422,11 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_has_csp_header() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
@@ -1859,34 +2445,31 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_not_found_when_path_not_linked() {
-        let (server, id, _path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let _path = HTML_DOC;
         let url = format!("/issues/{}/documents/nonexistent.html/raw", id);
         let response = server.get(&url).await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     #[tokio::test]
     async fn test_get_document_raw_returns_byte_faithful_for_non_utf8() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
         // 4-byte sequence that is not valid UTF-8.
         let binary_fixture: &[u8] = b"\xff\xfe\xfd\xfc";
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Binary test".to_string(),
@@ -1898,7 +2481,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         // Write binary fixture with a .dat extension (catches the text/plain fallback).
         let doc_rel = "artifact.dat";
@@ -1906,6 +2491,7 @@ unique = false
         fs::write(&doc_abs, binary_fixture).unwrap();
 
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -1914,7 +2500,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -1937,7 +2523,6 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_by_path_html_returns_correct_content_type() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
         // Build a JsonFileStorage-backed server rooted at a tempdir and write
@@ -1945,26 +2530,18 @@ unique = false
         // longer accepted by the storage layer (they surface as
         // PathReadError::InvalidPath → 400), so every test must use a
         // repo-relative path.
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let doc_rel = "slide.html";
         let html_body = "<p>test</p>";
         fs::write(temp.path().join(doc_rel), html_body).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -1997,17 +2574,32 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_by_path_not_found() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server
             .get("/documents/raw")
             .add_query_param("path", "no_such_file.html")
             .await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     #[tokio::test]
     async fn test_get_changes_returns_version() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/changes").await;
         response.assert_status_ok();
         let data: ChangesResponse = response.json();
@@ -2016,8 +2608,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_changes_reflects_tracker_state() {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let tracker = Arc::new(ChangeTracker::new(16));
 
         // Simulate a change
@@ -2039,87 +2636,68 @@ unique = false
         assert_eq!(data.version, 2);
     }
 
-    // ── path_read_error_status unit tests ─────────────────────────────────────
-
-    /// Verify that `PathReadError::NotFound` → 404 and `Other` → 500.
-    ///
-    /// These are the two invariants the route handlers rely on; having them as
-    /// unit tests ensures a copy-change in the dispatch function is caught
-    /// immediately rather than only at the integration level.
-    #[test]
-    fn test_path_read_error_status_not_found_returns_404() {
-        let err = PathReadError::NotFound("docs/spec.md".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::NOT_FOUND);
-    }
-
-    #[test]
-    fn test_path_read_error_status_commit_not_found_returns_404() {
-        let err = PathReadError::CommitNotFound("abc1234".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::NOT_FOUND);
-    }
-
-    #[test]
-    fn test_path_read_error_status_other_returns_500() {
-        let err = PathReadError::Other(anyhow::Error::msg("I/O error: permission denied"));
-        assert_eq!(
-            path_read_error_status(&err),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-    }
-
     /// Verify that the `get_document_by_path` endpoint returns 404 for a
     /// missing file (relying on typed dispatch, not string-matching).
     #[tokio::test]
     async fn test_get_document_by_path_not_found_returns_404() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         // Repo-relative path (absolute paths are rejected as InvalidPath → 400).
         let response = server
             .get("/documents")
             .add_query_param("path", "does_not_exist.md")
             .await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     /// Verify that the `get_document_raw_by_path` endpoint returns 404 for a
     /// missing file (relying on typed dispatch, not string-matching).
     #[tokio::test]
     async fn test_get_document_raw_by_path_returns_404_for_missing() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         // Repo-relative path (absolute paths are rejected as InvalidPath → 400).
         let response = server
             .get("/documents/raw")
             .add_query_param("path", "does_not_exist.bin")
             .await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     /// A directory is not an ordinary document file and is rejected as an
     /// unsafe path, not passed to `fs::read` as a server-side I/O failure.
     #[tokio::test]
     async fn test_get_document_by_path_rejects_directory() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_rel = "not-a-file";
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         // Keep tempdir alive.
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2130,35 +2708,29 @@ unique = false
             .get("/documents")
             .add_query_param("path", dir_rel)
             .await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
     /// The standalone raw endpoint applies the same ordinary-file contract.
     #[tokio::test]
     async fn test_get_document_raw_by_path_rejects_directory() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_rel = "also-not-a-file";
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2169,7 +2741,10 @@ unique = false
             .get("/documents/raw")
             .add_query_param("path", dir_rel)
             .await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
@@ -2177,27 +2752,17 @@ unique = false
     #[tokio::test]
     async fn test_get_document_content_rejects_directory() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_path = temp.path().join("broken-doc");
         fs::create_dir_all(&dir_path).unwrap();
         // Use a relative path so the URL stays clean (no slashes in the segment).
         let doc_rel = "broken-doc";
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "IO error test".to_string(),
@@ -2209,11 +2774,14 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         // Link the directory path as a document (skip_scan=true avoids the read
         // during registration so we can store the bad reference).
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -2221,7 +2789,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2231,8 +2799,127 @@ unique = false
         let encoded = percent_encode_segment(doc_rel);
         let url = format!("/issues/{}/documents/{}/content", id, encoded);
         let response = server.get(&url).await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
+    }
+
+    /// Every surface reporting an issue's documents reports one set: explicit
+    /// links, then files under the issue's artifact directory.
+    #[tokio::test]
+    async fn test_every_issue_surface_reports_the_same_documents() {
+        use jit::declarations::{GateChecker, GateMode, GateStage};
+        use jit::domain::Priority;
+        use std::collections::HashMap;
+
+        let (temp, executor) =
+            setup_test_repo_with_config("[documentation]\nissue_scoped_areas = [\"notes\"]\n")
+                .unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "Documents on every surface".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        let directory = executor
+            .documents()
+            .resolve_issue_artifact_directory(&id, "notes")
+            .unwrap()
+            .directory;
+        let derived = format!("{directory}/plan.md");
+        std::fs::create_dir_all(temp.path().join(&directory)).unwrap();
+        std::fs::write(temp.path().join(&derived), "plan\n").unwrap();
+        executor
+            .documents()
+            .add_document_reference(&id, "linked.md", None, Some("Linked"), Some("design"), true)
+            .unwrap();
+        let observed = temp.path().join("observed-issue-docs.json");
+        let gate_key = "docs-gate".parse().unwrap();
+        executor
+            .gates()
+            .define_gate(
+                &gate_key,
+                "Docs".to_string(),
+                "Records JIT_ISSUE_DOCS".to_string(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::Exec {
+                    command: format!("printf '%s' \"$JIT_ISSUE_DOCS\" > {}", observed.display()),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                100,
+            )
+            .unwrap();
+        executor.gates().add_gate(&id, &gate_key).unwrap();
+        executor.gates().check_gate(&id, &gate_key).unwrap();
+
+        let listed_by_doc_list =
+            serde_json::to_value(executor.documents().list_document_references(&id).unwrap())
+                .unwrap();
+        let shown = executor
+            .issues()
+            .show_response(executor.issues().show_issue(&id).unwrap())
+            .unwrap();
+        let state = AppState {
+            executor: Arc::new(executor),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        let single: serde_json::Value = server.get(&format!("/issues/{id}")).await.json();
+        let listed: serde_json::Value = server.get("/issues").await.json();
+
+        let entries = |documents: &serde_json::Value| {
+            documents
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|document| {
+                    (
+                        document["path"].as_str().unwrap().to_string(),
+                        document["doc_type"].as_str().map(str::to_string),
+                        document["label"].as_str().map(str::to_string),
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        let expected = entries(&listed_by_doc_list["documents"]);
+        assert!(expected.contains(&(derived, None, None)));
+        assert!(expected.contains(&(
+            "linked.md".to_string(),
+            Some("design".to_string()),
+            Some("Linked".to_string())
+        )));
+        let received: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(observed).unwrap()).unwrap();
+        for (surface, documents) in [
+            (
+                "issue show",
+                serde_json::to_value(&shown.documents).unwrap(),
+            ),
+            ("GET /issues/:id", single["documents"].clone()),
+            ("GET /issues", listed[0]["documents"].clone()),
+            ("JIT_ISSUE_DOCS", received),
+        ] {
+            assert_eq!(entries(&documents), expected, "{surface}");
+        }
     }
 
     /// Every issue-scoped document read, and the search universe, accept a
@@ -2240,11 +2927,14 @@ unique = false
     #[tokio::test]
     async fn test_document_reads_serve_a_derived_document_without_a_link() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::process::Command;
 
-        let temp = tempfile::tempdir().unwrap();
+        let (temp, executor) = setup_test_repo_with_config(
+            "[worktree]\nenforce_leases = \"off\"\n\n[documentation]\nissue_scoped_areas = [\"notes\"]\n",
+        )
+        .unwrap();
+        jit::test_cli::init_git_repository(temp.path()).unwrap();
         let git = |args: &[&str]| {
             let status = Command::new("git")
                 .current_dir(temp.path())
@@ -2253,18 +2943,7 @@ unique = false
                 .unwrap();
             assert!(status.success(), "git {args:?}");
         };
-        git(&["init", "-q"]);
-        git(&["config", "user.email", "test@example.com"]);
-        git(&["config", "user.name", "Test"]);
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n\n[documentation]\nissue_scoped_areas = [\"notes\"]\n",
-        )
-        .unwrap();
-        let executor = test_executor(JsonFileStorage::new(&jit_dir));
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Derived document reads".to_string(),
@@ -2276,8 +2955,11 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         let directory = executor
+            .documents()
             .resolve_issue_artifact_directory(&id, "notes")
             .unwrap()
             .directory;
@@ -2291,12 +2973,13 @@ unique = false
         });
 
         assert!(executor
+            .documents()
             .get_issue_document_paths()
             .unwrap()
             .contains(&doc_rel));
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2325,20 +3008,10 @@ unique = false
     #[tokio::test]
     async fn test_get_document_content_csv_returns_text_csv() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let doc_rel = "bench/results.csv";
         let doc_content = "prime,n,kernel\n31,1024,C\n";
@@ -2346,7 +3019,7 @@ unique = false
         fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
         fs::write(&doc_path, doc_content).unwrap();
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "CSV content test".to_string(),
@@ -2358,8 +3031,11 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, false)
             .unwrap();
 
@@ -2367,7 +3043,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2389,26 +3065,16 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_rejects_directory() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_path = temp.path().join("broken-raw-doc");
         fs::create_dir_all(&dir_path).unwrap();
         let doc_rel = "broken-raw-doc";
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "IO error raw test".to_string(),
@@ -2420,9 +3086,12 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -2430,7 +3099,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2439,26 +3108,19 @@ unique = false
 
         let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
         let response = server.get(&url).await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
     #[tokio::test]
     async fn test_get_document_by_path_csv_returns_text_csv() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let doc_rel = "bench/results.csv";
         let doc_content = "prime,n,kernel\n7,256,F\n";
@@ -2470,7 +3132,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2617,71 +3279,25 @@ unique = false
         );
     }
 
-    // ── PathReadError → InvalidPath / OutsideRepoRoot mapping ─────────────────
-
-    /// `PathReadError::InvalidPath` must map to HTTP 400.  The storage layer
-    /// raises this for empty paths, absolute paths, and `..` traversal
-    /// attempts, and route handlers must surface those as client errors.
-    #[test]
-    fn test_path_read_error_status_invalid_path_returns_400() {
-        let err = PathReadError::InvalidPath("../etc/passwd".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::BAD_REQUEST);
-    }
-
-    /// `PathReadError::OutsideRepoRoot` must map to HTTP 400.  The storage
-    /// layer raises this when canonicalization shows the path escapes the
-    /// repo root (e.g. via a symlink).
-    #[test]
-    fn test_path_read_error_status_outside_repo_root_returns_400() {
-        let err = PathReadError::OutsideRepoRoot("docs/secret.txt".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::BAD_REQUEST);
-    }
-
     // ── GET /raw/*path integration tests ─────────────────────────────────────
 
-    /// Helper: create a JsonFileStorage-backed server with a file at a nested
-    /// path under the repo root.  Returns the server and tempdir (kept alive).
-    fn create_app_with_raw_fixture(
-        rel_path: &str,
-        content: &[u8],
-    ) -> (axum_test::TestServer, tempfile::TempDir) {
-        use jit::storage::JsonFileStorage;
-        use std::fs;
-
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        // Write the fixture file.
-        let abs_path = temp.path().join(rel_path);
-        if let Some(parent) = abs_path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
-        fs::write(&abs_path, content).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-        let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let server = TestServer::new(create_routes(state)).unwrap();
-        (server, temp)
+    fn seed_worktree_file(worktree: &std::path::Path, rel_path: &str, content: &[u8]) {
+        let path = worktree.join(rel_path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
     }
 
     #[tokio::test]
     async fn test_get_raw_wildcard_serves_svg() {
         let svg_content = br#"<svg xmlns="http://www.w3.org/2000/svg"><circle r="5"/></svg>"#;
-        let (server, _temp) =
-            create_app_with_raw_fixture("docs/presentations/figures/fig4.svg", svg_content);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        seed_worktree_file(
+            temp.path(),
+            "docs/presentations/figures/fig4.svg",
+            svg_content,
+        );
+        let server = test_app(executor);
 
         let response = server.get("/raw/docs/presentations/figures/fig4.svg").await;
         response.assert_status_ok();
@@ -2702,8 +3318,10 @@ unique = false
     #[tokio::test]
     async fn test_get_raw_wildcard_html_injects_base_tag() {
         let html_content = b"<html><head></head><body></body></html>";
-        let (server, _temp) =
-            create_app_with_raw_fixture("docs/presentations/deck.html", html_content);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        seed_worktree_file(temp.path(), "docs/presentations/deck.html", html_content);
+        let server = test_app(executor);
 
         let response = server.get("/raw/docs/presentations/deck.html").await;
         response.assert_status_ok();
@@ -2742,7 +3360,13 @@ unique = false
         // The normalised path `bar` doesn't exist, so the expected status is
         // 404 (not 400).  Any 4xx response is acceptable; 400 from the storage
         // validator would also be fine.
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/raw/foo/../bar").await;
         assert!(
             response.status_code().is_client_error(),
@@ -2755,7 +3379,13 @@ unique = false
     async fn test_get_raw_wildcard_rejects_embedded_dotdot() {
         // Same normalisation behaviour as the above test: `/raw/a/../b` → `/raw/b`.
         // The file doesn't exist, so we get 404.  Any 4xx is the invariant.
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/raw/a/../b").await;
         assert!(
             response.status_code().is_client_error(),
@@ -2766,9 +3396,18 @@ unique = false
 
     #[tokio::test]
     async fn test_get_raw_wildcard_404_for_missing_file() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/raw/definitely/does/not/exist.svg").await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     /// Commit-pinned HTML also gets base-tag injection (same as working-tree reads).
@@ -2776,7 +3415,11 @@ unique = false
     /// backends, so we only verify that we reach the injection code path when 200.
     #[tokio::test]
     async fn test_get_document_raw_html_with_commit_param() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         // Pass a fake commit SHA; non-git storage will return 404.
         let url = format!("/issues/{}/documents/{}/raw?commit=abc1234", id, path);
         let response = server.get(&url).await;
@@ -2793,22 +3436,12 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_preserves_existing_base_tag() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "base tag test".to_string(),
@@ -2820,7 +3453,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         // HTML that already has its own <base> tag.
         let original =
@@ -2828,6 +3463,7 @@ unique = false
         let doc_rel = "withbase.html";
         fs::write(temp.path().join(doc_rel), original).unwrap();
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -2835,7 +3471,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2857,7 +3493,10 @@ unique = false
     async fn test_get_raw_wildcard_preserves_existing_base_tag() {
         let original =
             br#"<html><head><base href="https://cdn.example.com/"></head><body></body></html>"#;
-        let (server, _temp) = create_app_with_raw_fixture("docs/deck.html", original);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        seed_worktree_file(temp.path(), "docs/deck.html", original);
+        let server = test_app(executor);
 
         let response = server.get("/raw/docs/deck.html").await;
         response.assert_status_ok();
@@ -2895,18 +3534,11 @@ unique = false
     #[cfg(unix)]
     #[tokio::test]
     async fn test_get_raw_wildcard_rejects_symlink_escape() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         // Create a file outside the repo that we'll try to reach via symlink.
         let outside = tempfile::NamedTempFile::new().unwrap();
@@ -2917,11 +3549,9 @@ unique = false
         fs::create_dir_all(link_path.parent().unwrap()).unwrap();
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2934,7 +3564,7 @@ unique = false
         let response = server.get("/raw/docs/secret.txt").await;
         assert_eq!(
             response.status_code(),
-            StatusCode::BAD_REQUEST,
+            status_of_error(PathReadError::InvalidPath(String::new())),
             "symlink escaping repo root must be rejected with 400"
         );
     }
@@ -2947,18 +3577,11 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_rejects_symlink_escape() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         // File outside the repo the attacker wants to read.
         let outside = tempfile::NamedTempFile::new().unwrap();
@@ -2973,9 +3596,7 @@ unique = false
         let link_path = temp.path().join(doc_rel);
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Symlink escape repro".to_string(),
@@ -2987,14 +3608,17 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -3007,7 +3631,7 @@ unique = false
         let response = server.get(&url).await;
         assert_eq!(
             response.status_code(),
-            StatusCode::BAD_REQUEST,
+            status_of_error(PathReadError::InvalidPath(String::new())),
             "symlink escaping repo root must be rejected on issue-scoped raw endpoint"
         );
     }
@@ -3018,18 +3642,11 @@ unique = false
     #[cfg(unix)]
     #[tokio::test]
     async fn test_get_document_raw_by_path_rejects_symlink_escape() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let outside = tempfile::NamedTempFile::new().unwrap();
         fs::write(outside.path(), b"secret outside repo").unwrap();
@@ -3040,12 +3657,9 @@ unique = false
         fs::create_dir_all(link_path.parent().unwrap()).unwrap();
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -3060,7 +3674,7 @@ unique = false
             .await;
         assert_eq!(
             response.status_code(),
-            StatusCode::BAD_REQUEST,
+            status_of_error(PathReadError::InvalidPath(String::new())),
             "symlink escaping repo root must be rejected on path-only raw endpoint"
         );
     }

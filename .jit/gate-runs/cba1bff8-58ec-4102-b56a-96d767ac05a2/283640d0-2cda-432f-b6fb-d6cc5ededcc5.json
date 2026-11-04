@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d2da90a4deb1f4930879ad99d6ab1505fae3c2e1",
+  "completed_at": "2026-11-01T17:45:57.272443958Z",
+  "duration_ms": 191517,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Rejection now derives and publishes dependent readiness in the captured mutation; the prior atomicity finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cba1bff8-58ec-4102-b56a-96d767ac05a2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "283640d0-2cda-432f-b6fb-d6cc5ededcc5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T17:42:45.754614971Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1332e6381, e2292171d, ebba98dc8, ccf42836c, e855e2133, 7f9673d7e, d2da90a4 (`jit:cba1bff8`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/derived-state-coherence, @/charter/D-20, @/gate/jit-validate, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions\nGate evidence: cargo-ci passed (exit 0); prior code-review failed (exit 1), with F1 verified resolved by the atomic captured mutation\nTruncation recovery: individual tagged patches, merge first-parent patches, and bounded implementation/test/source reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Rejection now derives and publishes dependent readiness in the captured mutation; the prior atomicity finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

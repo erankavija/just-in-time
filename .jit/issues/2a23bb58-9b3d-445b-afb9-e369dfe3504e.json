@@ -3,10 +3,11 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "1630015d-101d-4e1b-bc3a-da1026998588"
+    "944edb32-2fe3-481e-9086-4cffaef7cfc8"
   ],
   "description": "Rewrite this repository's recorded gate runs once into the per-issue layout, with each issue's latest run named on its gate state and a verdict record for each reusable verdict, so no run history or cited run id is lost.\n\n## Background\n\n`.jit/gate-runs/` holds about 4,700 flat run directories (`gate-runs/<run-id>/result.json`), owned by about 980 issues. 584 runs carry an inputs digest over 395 distinct `(gate, digest)` keys, 123 runs are reused verdicts in the old provenance shape, and 92 run ids are cited in `dev/`, `docs/` or issue records. The released binary reads runs only at `gate-runs/<issue-id>/<run-id>.json`, takes the latest run of a gate from `GateState.last_run`, finds reuse through `gate-runs/verdicts/<gate-key>/<inputs-digest>.json`, and requires `source_issue` on a reused verdict. There is no migration reader.\n\nIssue records are serialized canonically: sorted keys, two-space indentation, no trailing newline (`crates/jit/src/repository_state/mutation.rs:576-597`).\n\n## Success Criteria\n\n- [hard] REQ-01: A script under `dev/active/f8a6b298-history-independent-reads/` moves each run record to `gate-runs/<issue-id>/<run-id>.json`, adds `source_issue` to each reused verdict, sets `last_run` on each issue's gate states from the run with the greatest `(started_at, run_id)` for that gate, and writes one verdict record per `(gate, digest)` key naming the latest qualifying run. Run bytes are otherwise unchanged.\n- [hard] REQ-02: The script is idempotent: a second run changes no byte.\n- [hard] REQ-03: The run count before equals the run count after, every run is reachable from its issue's directory, every cited run id still resolves, and repository validation passes.\n- [hard] REQ-04: The rewritten data and a reinstall of the dogfood binary land together.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Leads in other worktrees must reinstall the binary after this lands; an older binary reads the new tree as having no runs.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:40.345696866Z",
   "gates_required": [
     "repo-validate"
   ],
@@ -19,10 +20,11 @@
     "story:per-key-gate-runs",
     "component:storage",
     "enforces:@/invariant/canonical-cutover",
-    "satisfies:f8a6b298/REQ-01"
+    "satisfies:f8a6b298/REQ-01",
+    "resolution:merged-into-944edb32"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "This repository's gate runs are rewritten into the per-issue layout",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:53.929948499Z"
 }

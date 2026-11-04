@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:03:19.481502876Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retire the private file-backed repository and executor setups of the library unit tests.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. Helpers that only arrange paths or mutate a repository they are given are scenario steps, for example `linked_checkout_paths` in `commands/worktree.rs`. JSON-backend unit tests in `storage/json.rs` construct the backend they test. The helpers below duplicate the shared constructors or open an executor over a store they are given.\n\nThis entry covers `gate_runs.rs`, `repository.rs`, `main.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/main.rs`: `repository_declaring` (`:7645`).\n- `crates/jit/src/storage/gate_runs.rs`: `setup_storage` (`:17`).\n- `crates/jit/src/validation/repository.rs`: `executor` (`:892`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: Each helper the Background lists no longer exists, and its tests obtain the repository, executor or declaration directory from the shared constructors.\n- [hard] REQ-03: No library test module defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own; scenario content stays in the tests as data.\n- [hard] REQ-04: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T22:47:20.044715758Z",
+  "first_ready_at": "2026-10-27T20:54:26.134264910Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "61fbcb2c-894a-4d90-99cf-413bb8d1bf4a",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:41:36.095847494Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1be5c891-4822-40e1-9b03-851075fc11ec",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:44:46.503849257Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "44b40ce1-5e1e-48b4-b65e-d44fc192b3ca",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate-run, repository-validation and CLI tests use the shared file-backed constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:47:20.044715758Z"
 }

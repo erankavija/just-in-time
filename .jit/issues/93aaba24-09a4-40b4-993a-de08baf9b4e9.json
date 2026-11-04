@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T23:27:21.637632360Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Moves the dependency-graph methods onto a `graph()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/graph.rs` and `commands/dependency.rs`: `publish_graph_export`, `build_dependency_tree`, `show_dependencies_with_depth`, `show_rdeps_with_depth`, `show_roots`, `export_graph`, `export_graph_batch`, `resolve_hierarchy_tree`, `detect_divergences`, `add_dependency`, `add_dependency_with_policy`, `remove_dependency`, `add_dependencies`, `add_dependencies_with_policy` and `remove_dependencies`. Callers: the dep, graph and divergence arms of `crates/jit/src/main.rs` (or their handler modules), `commands/issue.rs`, `commands/gate_check.rs`, `commands/breakdown.rs`, the server route tests that add dependencies (`crates/server/src/routes.rs`), and the dependency and graph suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::graph()` returns `GraphOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `GraphOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GraphOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `graph()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T03:44:41.472575951Z",
   "first_ready_at": "2026-10-22T14:01:53.552454256Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2d0c32d4-e66a-483d-be73-e40d6e9bdbaf",
+      "status": "passed",
+      "updated_at": "2026-11-03T03:40:20.314533079Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "476cf034-9fae-4a6c-84e4-9b5b74e734bc",
+      "status": "passed",
+      "updated_at": "2026-11-03T03:44:35.899854506Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "93aaba24-09a4-40b4-993a-de08baf9b4e9",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Graph and dependency methods behind a graph facade",
-  "updated_at": "2026-10-22T14:01:53.552454256Z"
+  "updated_at": "2026-11-03T03:44:41.472575951Z"
 }

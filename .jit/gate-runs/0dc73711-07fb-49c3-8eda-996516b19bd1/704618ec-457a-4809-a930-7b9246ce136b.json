@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "34fb03c4beee228b670c0a24d63c2134f64247ba",
+  "completed_at": "2026-11-03T21:46:31.006782393Z",
+  "duration_ms": 208455,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/b697a3f7-one-mutation-path/breakdown.json",
+        "id": "F1",
+        "line": 1572,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b697a3f7/requirement/REQ-17",
+          "@/charter/D-17",
+          "@/inv/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "The control-files-publication leaf retains a two-value data-root identity contract while its appended amendment requires a third Git-directory target for linked/external-root identities; consolidate and regenerate the artifact."
+      }
+    ],
+    "summary": "The control-file publication leaf has an unresolved identity-target contract conflict.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "0dc73711-07fb-49c3-8eda-996516b19bd1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "704618ec-457a-4809-a930-7b9246ce136b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:43:02.551355145Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7414 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a35d-9957-7ef0-ae9e-8db860b35bc0\n--------\nuser\n--- 7401 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact (high):** `control-files-publication` is self-contradictory: its REQ-03 and generated plan contract restrict identity publication to a two-value data-root type, but its appended amendment says linked/external-root identities live under the checkout Git directory and require a third target. Current `identity_file` confirms that location. Consolidate the amended fact into Background, criteria, tests, footprint, and the `atomic-publication` plan contract; remove the append-only amendment and regenerate the overview. [breakdown.json:1572](/home/vkaskivuo/Projects/just-in-time/dev/active/b697a3f7-one-mutation-path/breakdown.json:1572), [plan.md:120](/home/vkaskivuo/Projects/just-in-time/dev/active/b697a3f7-one-mutation-path/plan.md:120), [worktree_identity.rs:175](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/worktree_identity.rs:175)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The control-file publication leaf has an unresolved identity-target contract conflict.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The control-files-publication leaf retains a two-value data-root identity contract while its appended amendment requires a third Git-directory target for linked/external-root identities; consolidate and regenerate the artifact.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/breakdown.json\",\"line\":1572,\"references\":[\"@/issue/b697a3f7/requirement/REQ-17\",\"@/charter/D-17\",\"@/inv/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

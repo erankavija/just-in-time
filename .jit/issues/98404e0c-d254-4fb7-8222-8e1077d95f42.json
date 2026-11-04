@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T03:20:10.227947417Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Type the issue a lease names, and remove the tolerance for short-id lease records.\n\n## Background\n\n`Lease.issue_id` is a `String` (`crates/jit/src/storage/claim_coordinator.rs:35`), as are the issue fields of `ClaimOp` (`:105-139`). To tolerate lease records persisted with an 8-character issue id, `ClaimsMutationGuard::resolved_active_leases` (`:294`) resolves ids through a closure and `is_issue_identity_candidate` (`:806`) accepts short forms. This checkout's `.git/jit/claims.jsonl` holds 26 acquire records with short issue ids; its five active leases are canonical. The log is replayed on each lease-enforced mutation (`:432,701`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Lease` and `ClaimOp` hold the issue as `IssueId`.\n- [hard] REQ-02: The short-id resolver closure and `is_issue_identity_candidate` are gone, together with the resolver closures that `commands/claim.rs` passes in (`:146,1707,2002,2042`), and leases match issues by `IssueId` equality alone.\n- [hard] REQ-03: An active lease blocks mutation of its own issue and of no other issue, as shown by the claim coordinator tests.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\nOnce issue ids are validated, short-id lease records are rejected at decode; no compatibility reader is added (`@/inv/canonical-cutover`).\n",
   "documents": [],
+  "done_at": "2026-10-25T03:53:50.202399680Z",
+  "first_ready_at": "2026-10-25T03:18:12.366269670Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b831bce7-305f-409d-8698-7fab576c51f2",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:52:19.406926241Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "441904a2-e8ed-4d59-9456-d0863f77640c",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:53:49.342287488Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
   "labels": [
     "type:task",
@@ -28,7 +44,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Lease records name their issue by IssueId",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T03:53:50.202399680Z"
 }

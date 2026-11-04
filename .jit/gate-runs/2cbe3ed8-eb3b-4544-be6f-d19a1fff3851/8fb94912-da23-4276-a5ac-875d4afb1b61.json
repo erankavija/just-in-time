@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "057386652f6d9eab34655bc24084edc27bace876",
+  "completed_at": "2026-10-28T21:48:59.017652961Z",
+  "duration_ms": 161830,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2cbe3ed8-eb3b-4544-be6f-d19a1fff3851",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8fb94912-da23-4276-a5ac-875d4afb1b61",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T21:46:17.187226277Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c25d5733f, 057386652f (both `jit:2cbe3ed8`; merge first-parent patch duplicates the 28-line deletion)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/c780514e-8491-40a7-8844-3974bba91257.json; .jit/gates.toml\nResolved items: @/charter/D-18; @/invariant/orthogonal-tests; @/invariant/dag-acyclic; @/issue/c780514e/requirement/REQ-02; @/gate/cargo-ci; @/gate/code-review\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T21:44:50Z); code-review pending (current review)\nTruncation recovery: Re-read bounded first-parent patches, batch-create caller/tests, keyed graph implementation/tests, CLI wiring test, and governing source records after one broad search truncated.\n\n1. No findings. The four adapter re-proofs are removed; keyed graph tests directly own each removed cycle property, while one CLI test retains entry-point rejection coverage.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

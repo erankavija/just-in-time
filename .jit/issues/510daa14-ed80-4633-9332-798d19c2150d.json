@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:15:01.962241578Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Replace the per-command list-envelope tests with one schema-driven test that covers each list-emitting command.\n\n## Background\n\n`ListEnvelope` (`crates/jit/src/output.rs`) derives `count` from its collection on serialize and rejects a mismatch on deserialize. Each list-emitting command, found from its emission site, declares a typed output schema in the generated CLI schema (`CommandSchema::generate()`). `crates/jit/tests/cli_issue/list_envelope_tests.rs` asserts `count == len` in 19 per-command subprocess tests, covering `issue list`, the `query` family, `issue search`, `search`, `gate list`, `gate preset list`, `events tail` and `events query`, `doc list`, `doc assets list`, `claim list`, `label namespaces` and `label values`, `item list` and `item search`, `worktree list`, `worktree store-divergence`, `graph roots` and `graph rdeps`, `invariant check`, multi-id `issue show`, `graph deps` and `gate status-all`.\n\n## Success Criteria\n\n- [hard] REQ-01: One test enumerates the list-emitting commands from the generated schema, meaning commands whose output schema carries `count` beside a collection. It runs each on a seeded repository through the shared CLI process fixture and asserts that `count` equals the collection's length.\n- [hard] REQ-02: The test fails and names the command when a list-emitting command in the schema has no invocation in it.\n- [hard] REQ-03: Its invocations cover each command the 19 per-command cases covered, plus `claim status`, `project render` and the three `archive` commands.\n- [hard] REQ-04: Independently of the schema, the test fails and names the command when an invocation's JSON body carries `count` beside an array while that command's schema output is the untyped fallback.\n- [hard] REQ-05: The 19 per-command cases of `list_envelope_tests.rs` no longer exist.\n",
   "documents": [],
+  "done_at": "2026-10-31T23:46:35.774331387Z",
+  "first_ready_at": "2026-10-27T01:01:28.566603205Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "292731ae-e1f6-412f-b428-23c567ad580d",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:42:19.198948889Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a94b40f6-80d2-41c4-a0f8-45d1ff751a2e",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:44:54.589684718Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "510daa14-ed80-4633-9332-798d19c2150d",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "One test proves the list-envelope count for each list-emitting command",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-31T23:46:35.774331387Z"
 }

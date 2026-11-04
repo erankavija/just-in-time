@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T22:46:48.075428003Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Declare event tags and event scopes through the vocabulary macro, and type the places that still compare tags as strings.\n\n## Background\n\n`EventTag` derives `rename_all = \"snake_case\"` and also hand-writes `ALL` (`crates/jit/src/domain/event_catalog.rs:130-153`) and `as_str` (`:157-182`); `EventScope::as_str` (`:63-69`) is a further twin. A schemars test (`event_catalog.rs:620`) checks `ALL` against the enum, and the module prose at `event_catalog.rs:9-25` describes that arrangement. `PendingEvent.tag` is a `String` (`repository_state/mutation.rs:422`) sorted as a string (`:433`), and the events command compares `--event-type` as a string (`commands/events.rs:25`). The generated event reference (`docs/reference/events.md`) is checked by a golden test.\n\n## Success Criteria\n\n- [hard] REQ-01: `EventTag` and `EventScope` are declared through the macro, and their hand-written `as_str` and `ALL` are gone, together with the schemars test the macro's owning test supersedes.\n- [hard] REQ-02: `PendingEvent.tag` is an `EventTag`, sorted by its wire spelling so event order is unchanged.\n- [hard] REQ-03: The events command parses `--event-type` into an `EventTag` at the boundary, and an unknown tag is a parse error.\n- [hard] REQ-04: The generated event reference and the event log are byte-identical.\n",
   "documents": [],
+  "done_at": "2026-10-26T22:13:42.728864364Z",
+  "first_ready_at": "2026-10-25T22:45:29.627941607Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1db1238d-ff52-4e3f-b2fe-c8aacb5f5ec7",
+      "status": "passed",
+      "updated_at": "2026-10-25T23:27:08.617725694Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1fdbcbd2-2c38-4426-b9c9-8b09e62c4360",
+      "status": "passed",
+      "updated_at": "2026-10-25T23:02:48.898223186Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Event tags declare their wire spelling once",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T22:13:42.728864364Z"
 }

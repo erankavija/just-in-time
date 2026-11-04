@@ -1,18 +1,40 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T00:49:10.384275617Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
     "5d5a1794-c98e-41d9-8329-344d1ae8b316"
   ],
-  "description": "Make `jit issue create` report the findings creation returns, the same set in human and JSON output, and stop reading the repository after the mutation publishes.\n\n## Background\n\n- The `IssueCommands::Create` arm of `crates/jit/src/main.rs` builds its JSON response through `get_dependencies_enriched` and `list_gate_runs` after the commit, and its human path lists every issue and calls `evaluate_graph_rules`, which captures a whole validation image, to print graph warnings; `--force` and `--quiet` suppress them, `--orphan` drops `orphan-leaf`. JSON output carries no findings. Measured on this repository: human 629 ms against 76 ms with `--quiet` (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, C6).\n- A new issue has no dependencies and no gate runs, so its enriched dependencies and gate runs are empty by construction.\n- The JSON payload type is `IssueShowResponse` (`crates/jit/src/output.rs`), registered for `issue create` in `crates/jit/src/schema.rs:538-545`; the MCP bridge generates its create tool from that schema. `ClaimResponse` (`output.rs:1331`) flattens an issue beside `warnings`.\n- `--orphan` tests: `tests/cli_issue/quiet_mode_tests.rs`, `tests/cli_query_graph/label_hierarchy_e2e_test.rs`, `tests/cli_query_graph/graph_json_tests.rs`; create-warning tests: `tests/fast_rules/cli_warnings_integration_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `issue create --json` returns an `IssueCreateResponse` that flattens the issue view and adds `findings`, registered in the schema for `issue create`; the human path prints one line per finding. Both show the same findings, after `--orphan` drops `orphan-leaf`; `--force` suppresses none; `--quiet` keeps printing only the id.\n- [hard] REQ-02: After creation publishes, the arm makes no storage, executor or capture call: no issue list, no graph-rule evaluation, no dependency enrichment and no gate-run listing.\n- [hard] REQ-03: A CLI test creates an orphan leaf with `--json` and finds its `orphan-leaf` finding in `findings`, and with the human path finds the same finding; the JSON assertion fails on today's code, whose response has no `findings`.\n- [hard] REQ-04: The create-warning tests read the CLI output or the returned findings, and the `--orphan` tests pass.\n\n## Notes\n\n- Behaviour change: JSON output gains `findings`; local-rule and graph-rule findings print together; `--force` no longer hides them.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit issue create` render the findings creation returns through one renderer, the same set in human and JSON output.\n\n## Background\n\n- Creation returns `findings` (wire `ReportedFinding`), local-rule findings first and then graph-rule findings, derived inside its mutation. The `IssueCommands::Create` arm of `crates/jit/src/main.rs` (`:1841-1869`) makes no read after the mutation publishes, and `--json` returns `IssueCreateResponse` with those `findings`, registered in the schema for `issue create`.\n- The human path still renders the two halves differently: local findings through `eprintln!(\"Warning: [rule] message\")` (`:1842-1844`), which also runs under `--quiet` and in `--json` mode, and graph findings through `OutputContext::print_warning` (`:1866-1868`), which `--quiet` silences. `IssueCreation::split_findings` exists only to feed the two paths.\n- Create-time warning coverage lives in the workflow-package tests of `crates/jit/src/profile/repository_package.rs` (`create_time_warnings` and its tests), which evaluate the package's hierarchy rules over one issue through `evaluate_graph`.\n\n## Success Criteria\n\n- [hard] REQ-01: `issue create --json` returns an `IssueCreateResponse` that flattens the issue view and adds `findings`, registered in the schema for `issue create`, and in `--json` mode no human finding line reaches stdout or stderr. The human path prints one line per finding through one renderer, in one format. Both show the same findings; `--force` suppresses none; `--quiet` prints only the id.\n- [hard] REQ-02: After creation publishes, the arm makes no storage, executor or capture call: no issue list, no graph-rule evaluation, no dependency enrichment and no gate-run listing.\n- [hard] REQ-03: A CLI test creates an orphan leaf with `--json` and finds its `orphan-leaf` finding in `findings`, and with the human path finds the same finding.\n- [hard] REQ-04: The workflow-package create-time warning tests in `profile/repository_package.rs` pass unchanged.\n\n## Notes\n\n- Behaviour change: local-rule and graph-rule findings print together in one format, and `--json` output carries findings only in its response.\n- Steward amendment 2026-11-04: criteria trimmed after the creation-findings task delivered the response type and the no-read arm, and removed `--orphan`.",
   "documents": [],
+  "done_at": "2026-11-04T06:38:55.344628115Z",
+  "first_ready_at": "2026-11-04T00:47:12.555874306Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ab121c9e-529b-4eee-b180-7b3be16dbc17",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:03:23.463351353Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "39c42c51-97fe-4b8b-8d8a-1a3c853e8f47",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:06:56.969117353Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "81da4899-11a7-4a54-bacb-3734a414bae8",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:38:55.256827085Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "03c59566-093f-4a7c-a3a6-65098a4b28de",
   "labels": [
     "type:task",
@@ -24,7 +46,7 @@
     "satisfies:9876a23a/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Issue creation output shows its findings, with no read after the mutation commits",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-04T06:38:55.344628115Z"
 }

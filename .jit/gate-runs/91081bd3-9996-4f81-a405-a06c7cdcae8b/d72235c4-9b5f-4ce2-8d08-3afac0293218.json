@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-91081bd3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "90439e25cda29f612587214097b1cc13af29666e",
+  "completed_at": "2026-10-25T22:36:20.634442068Z",
+  "duration_ms": 296430,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/91081bd3-9996-4f81-a405-a06c7cdcae8b.json",
+        "id": "F1",
+        "line": 10,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The added subgroup headings move every marked requirement out of the configured success_criteria section, so none resolves as an addressable requirement."
+      }
+    ],
+    "summary": "The attributable issue description makes all hard requirements unaddressable.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d72235c4-9b5f-4ce2-8d08-3afac0293218",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T22:31:24.203470134Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 36898 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17530-a3d4-7fa1-82bf-5a4b4464c4b2\n--------\nuser\n--- 36885 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e003ac083, b546c3dae, d6301e500, eee7fe3f1, 624404474, 4f6fa08a1, 1afad91f6, 499127386, e773ffd12, d3c92dd44, 502341a61, 90439e25c\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/reference/content-standards.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-01, REQ-02, REQ-03, REQ-17 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T16:33:21Z); code-review failed (exit 1, prior structured run ee5de642—its F1/F2 are addressed in current code)\nTruncation recovery: per-commit stats/name-status and narrowed patches for main.rs, executor families, scopes/item parsing, dependency removal, and CLI tests; direct item-resolution and parser probes\n\n1. **[blocking][issue-impact][high]** [`.jit/issues/91081bd3-9996-4f81-a405-a06c7cdcae8b.json:10`](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/.jit/issues/91081bd3-9996-4f81-a405-a06c7cdcae8b.json:10) places every marked requirement beneath new `###` subgroup headings. The parser starts a new section at each heading and item indexing scans only the configured `success_criteria` section, so `jit item show @/issue/91081bd3/requirement/REQ-01` and `REQ-14` both fail. The attributable issue now has no addressable hard criteria.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The attributable issue description makes all hard requirements unaddressable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The added subgroup headings move every marked requirement out of the configured success_criteria section, so none resolves as an addressable requirement.\",\"file\":\".jit/issues/91081bd3-9996-4f81-a405-a06c7cdcae8b.json\",\"line\":10}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

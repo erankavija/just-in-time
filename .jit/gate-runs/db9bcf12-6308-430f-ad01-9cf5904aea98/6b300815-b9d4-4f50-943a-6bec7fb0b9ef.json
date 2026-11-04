@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "17d989bacefeb4aafc40a7ca29616479151cb953",
+  "completed_at": "2026-11-04T00:51:02.055885243Z",
+  "duration_ms": 281000,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable archive-evidence implementation satisfies the scoped hard criteria and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "db9bcf12-6308-430f-ad01-9cf5904aea98",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6b300815-b9d4-4f50-943a-6bec7fb0b9ef",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:46:21.054976310Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `4baad9025` (`jit:db9bcf12`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`\nResolved items: `@/charter/D-17`, `@/charter/D-19` (`dev/vision/9db27a3a-charter.md`); `@/invariant/atomic-writes`, `@/invariant/derived-state-coherence`, `@/invariant/architecture-dependency-direction`, `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests` (`.jit/invariants.toml`); `@/issue/f8a6b298/requirement/REQ-09` (issue Markdown); `@/gate/jit-validate` (`.jit/gates.toml`)\nGate evidence: `cargo-ci` passed (exit 0, 2026-11-04T00:44:49Z); `code-review` pending (no exit code)\nTruncation recovery: re-read tagged patches by path and bounded current source/policy ranges; excluded unrelated repository-wide search output outside the seven-file footprint.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable archive-evidence implementation satisfies the scoped hard criteria and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

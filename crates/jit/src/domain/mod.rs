@@ -4,8 +4,9 @@
 //! - **types**: Core runtime records (Issue, State, Priority, GateState, Event, etc.);
 //!   authored gate/rule declarations live in crate-root [`crate::declarations`]
 //! - **projection**: Pure normalization of an Issue into the canonical validation shape
-//! - **issue_id**: The id normalisation and prefix-matching rule every issue-id
-//!   resolver applies
+//! - **identity**: Validated identity newtypes, such as the canonical issue id,
+//!   and the parsed issue-id prefix every resolver matches by
+//! - **id_pattern**: A compiled regex extracting ids from text, kept with its source
 //! - **item**: Addressable structured items (qualified ids, item kinds) projected
 //!   from issue descriptions
 //! - **event_catalog**: The event-log tag vocabulary, each tag's association scope,
@@ -32,15 +33,18 @@ pub mod artifact_plan;
 pub mod event_catalog;
 pub mod event_log;
 pub mod gate_findings;
-pub mod issue_id;
+pub mod id_pattern;
+pub mod identity;
 pub mod item;
 pub mod key_reference;
 pub mod list_envelope;
 pub mod projection;
 pub mod queries;
+pub mod relative_path;
 pub mod repository_inputs;
 pub mod store_divergence;
 pub mod type_taxonomy;
 mod types;
+pub mod vocabulary;
 
 pub use types::*;

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:50:27.773379977Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Remove the per-command checks of `count` against collection length from the `cli_repo_workflow` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_repo_workflow/artifact_conformance_cli_tests.rs (about :640)`, `cli_repo_workflow/profile_cli_tests.rs:1695 (assert_count_envelope)`, `cli_repo_workflow/worktree_cli_tests.rs:546,1036`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:03:04.382124927Z",
+  "first_ready_at": "2026-10-31T23:46:35.937488460Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b8815883-e5da-4dff-925a-ea54f9affbb1",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:56:45.755450193Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "aa82b563-9667-4d83-9985-e57cb811cb02",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:58:03.763745613Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "791344c8-aa2c-4b58-9d89-41c7da3808a8",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "cli_repo_workflow tests stop re-asserting the list-envelope count",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:03:04.382124927Z"
 }

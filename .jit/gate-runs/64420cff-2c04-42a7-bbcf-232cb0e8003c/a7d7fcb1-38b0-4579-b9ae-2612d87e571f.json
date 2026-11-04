@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-64420cff",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "db0192a7ca6e1bd6fb0eec9c90fc7dcfe4a9e6e5",
+  "completed_at": "2026-11-01T05:07:30.097282830Z",
+  "duration_ms": 103364,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Typed assignee handling satisfies the issue criteria with preserved wire output.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "64420cff-2c04-42a7-bbcf-232cb0e8003c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a7d7fcb1-38b0-4579-b9ae-2612d87e571f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T05:05:46.732629838Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 95a5d8bb, db0192a7 (`jit:64420cff`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-11 and REQ-17 (issue description)\nGate evidence: cargo-ci passed, exit 0, 2026-11-01T05:04:21Z\nTruncation recovery: narrowed assignee, schema, command, and serialization reads after broad source-search output truncated\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Typed assignee handling satisfies the issue criteria with preserved wire output.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

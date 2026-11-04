@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:16:05.470306411Z",
+  "duration_ms": 64569,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable gate declaration and rendered projection satisfy the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "21cce070-9b3d-4bde-a4d1-cd38af9c7889",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:15:00.900786492Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: aa8560c16 (`jit:0951556f`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-10 (issue description); @/gate/standards-scan-test and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code not recorded); standards-scan-test passed (exit 0); code-review pending\nTruncation recovery: reread the tagged commit patch, affected gate/projection ranges, self-test, and exec-gate status handling in bounded calls\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable gate declaration and rendered projection satisfy the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,19 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:57.340199258Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "9cc3056a-7147-4a9a-89bf-f0e6fd53806b",
-    "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
+    "12c0f3fb-fde6-4504-aac0-773b435f0a83",
+    "9cc3056a-7147-4a9a-89bf-f0e6fd53806b"
   ],
-  "description": "`jit validate` spans about 560 lines of `run()` with a different exit code and failure code per mode. This moves it to one library handler with one findings contract.\n\n## Background\n\n`Commands::Validate` in `crates/jit/src/main.rs` has modes `--scope`, `--rule`, `--explain`, `<id>`, `--branch-drift`, `--leases`, `--fix`, `--divergence` and the full repository run. Each renders its own findings block and decides its exit: `--scope` reports `VALIDATION_FAILED` and exits 4; `--rule`, `--explain`, `<id>`, `--branch-drift` and `--leases` report `GENERIC_ERROR` under `--json` and call `exit(1)` on the human path; the full run reports `VALIDATION_FAILED` or `GENERIC_ERROR` and exits 1 or returns the integrity error. JSON output goes through `render_validation_json`, and `--fix` failures through `validate_fix_json_error`. Its success bodies are built with `json!`, and `validate` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches every `jit validate` mode to a handler in `crates/jit/src/dispatch/validate.rs`, and `main.rs` keeps no validate arm body, `render_validation_json` or `validate_fix_json_error`.\n- [hard] REQ-02: A mode whose report has errors returns a findings outcome with `VALIDATION_FAILED`, rendered as the failure envelope with the report in `error.details` or as the human report, exiting 4.\n- [hard] REQ-03: Tests assert the changed contracts: `--rule`, `--explain`, `<id>`, `--branch-drift` and `--leases` findings now report `VALIDATION_FAILED` with exit 4 where they reported `GENERIC_ERROR` with exit 1.\n- [hard] REQ-04: Each mode's success returns a registered typed response, human findings go through the shared validation-report renderer, and the schema names the response; failures other than findings are classified errors with no `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "`jit validate` spans about 560 lines of `run()` with a different exit code and failure code per mode. This moves it to one library handler with one findings contract.\n\n## Background\n\n`Commands::Validate` in `crates/jit/src/main.rs` has modes `--scope`, `--rule`, `--explain`, `<id>`, `--branch-drift`, `--leases`, `--fix`, `--divergence` and the full repository run. Each renders its own findings block and decides its exit: `--scope` reports `VALIDATION_FAILED` and exits 4; `--rule`, `--explain`, `<id>`, `--branch-drift` and `--leases` report `GENERIC_ERROR` under `--json` and call `exit(1)` on the human path; the full run reports `VALIDATION_FAILED` or `GENERIC_ERROR` and exits 1 or returns the integrity error. JSON output goes through `render_validation_json`, and `--fix` failures through `validate_fix_json_error`. Its success bodies are built with `json!`, and `validate` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches every `jit validate` mode to a handler in `crates/jit/src/dispatch/validate.rs`, and `main.rs` keeps no validate arm body, `render_validation_json` or `validate_fix_json_error`.\n- [hard] REQ-02: A mode whose report has errors returns a findings outcome with `VALIDATION_FAILED`, rendered as the failure envelope with the report in `error.details` or as the human report, exiting 4.\n- [hard] REQ-03: Tests assert the changed contracts: `--rule`, `--explain`, `<id>`, `--branch-drift` and `--leases` findings now report `VALIDATION_FAILED` with exit 4 where they reported `GENERIC_ERROR` with exit 1.\n- [hard] REQ-04: Each mode's success returns a registered typed response, human findings go through the shared validation-report renderer, and the schema names the response; failures other than findings are classified errors with no `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-06's unchanged human output excludes one line: with error findings, `jit validate` prints its findings message as a one-line summary on stderr. In human mode the emitter prints every findings outcome's message on stderr, as one uniform rule (steward ruling, 2026-11-04, as for c9103fcf D-01 and 1ac651c7 D-01).\n- D-02: Two contracts follow 9876a23a's changes on main, which this issue's handler carried in as the second lander (steward ruling, 2026-11-04). (a) `--fix` renders through the repository validation response and exits as plain validation does, per 1f24e3e9. This issue's own part is that a `--fix` failure under `--json` goes through the shared classifier, as REQ-01 requires. (b) The per-issue and `--explain` unresolved-container-pointer property moved down a layer under 2c8c13b2 REQ-04, so its CLI tests were removed on main, not here. The owning tests are the evaluator's `graph.rs` tests, `test_select_issue_omits_a_config_error_fired_by_another_issue` and `test_explain_fails_a_matched_rule_exactly_when_the_issue_selection_holds_it` (`validation::report`), `test_validate_issue_omits_a_pointer_error_fired_by_another_issue` (`tests/fast_rules/validate_rule_runner_tests.rs`) and `validation/selection_proptests.rs`.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T10:04:30.835484769Z",
+  "first_ready_at": "2026-11-03T23:08:00.853554872Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "83a0c96b-7c20-40c6-8a30-d165e7098fca",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:50:51.417698885Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d1f855fb-d1e9-49be-8905-23e78c7febe1",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:56:47.786239622Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "804da1f7-43ee-4d89-b0c9-c5d21cd67abd",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:51:08.862682790Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "06ee9b67-07c3-48ad-a938-179a83d12564",
   "labels": [
     "type:task",
@@ -29,7 +51,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Validate command moves to a library handler",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T10:04:30.835484769Z"
 }

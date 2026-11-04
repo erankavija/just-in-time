@@ -2,21 +2,25 @@
 //!
 //! Provides CLI interface for worktree information and operations.
 
+use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
-use crate::storage::claim_coordinator::ClaimsIndex;
+use crate::output::ExitCode;
+use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
+use crate::storage::claim_coordinator::{read_active_leases, Lease};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{read_exact_store, StorageWarning};
-use anyhow::{Context, Result};
+use crate::storage::{read_exact_store, IssueStore, StorageWarning, RECORD_FILE_NAME};
+use anyhow::{anyhow, ensure, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::path::Path;
 use std::process::Command;
 
 /// Worktree information for display
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct WorktreeInfo {
     /// Stable worktree identifier
-    pub worktree_id: String,
+    pub worktree_id: WorktreeId,
     /// Current git branch
     pub branch: String,
     /// Absolute path to worktree root
@@ -31,7 +35,7 @@ pub struct WorktreeInfo {
 #[derive(Debug, Serialize, PartialEq, JsonSchema)]
 pub struct WorktreeListEntry {
     /// Stable worktree identifier
-    pub worktree_id: String,
+    pub worktree_id: WorktreeId,
     /// Current git branch
     pub branch: String,
     /// Absolute path to worktree root
@@ -40,6 +44,37 @@ pub struct WorktreeListEntry {
     pub is_main: bool,
     /// Number of active claims in this worktree
     pub active_claims: usize,
+}
+
+/// Run `program` holding the repository write lock, answering its exit status.
+/// Opens no mutation session, because a session would apply the leftover redo
+/// record this refuses.
+///
+/// # Errors
+///
+/// Returns a lock timeout when the bounded wait expires, and an error for a
+/// pending record or when `program` cannot start.
+pub fn execute_worktree_exec<S: IssueStore>(
+    storage: &S,
+    layout: &RepositoryLayout,
+    program: &str,
+    args: &[String],
+) -> Result<i32> {
+    let _guard = storage.acquire_repo_write_lock()?;
+    let record = layout
+        .data_root()
+        .join(RECORD_SCRATCH_DIR)
+        .join(RECORD_FILE_NAME);
+    ensure!(
+        !record.exists(),
+        "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+        record.display()
+    );
+    let status = Command::new(program)
+        .args(args)
+        .status()
+        .map_err(|error| anyhow!("Failed to run {program}: {error}"))?;
+    Ok(status.code().unwrap_or(ExitCode::GenericError.code()))
 }
 
 /// Get current git branch name.
@@ -122,32 +157,11 @@ fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
     Ok(entries)
 }
 
-/// Count active claims for a specific worktree.
-///
-/// Filters the claims index to count leases where the worktree_id matches
-/// the provided identifier.
-///
-/// Expiry is evaluated against `now` (supplied by the caller via the
-/// [`Clock`](crate::storage::clock::Clock) abstraction) rather than read from
-/// the system clock here, so the count is a
-/// pure function of its inputs and can be exercised deterministically in tests.
-///
-/// # Arguments
-/// * `index` - Claims index containing all active leases
-/// * `worktree_id` - Worktree identifier to filter by (e.g., "wt:abc12345")
-/// * `now` - Instant to evaluate lease expiry against
-///
-/// # Returns
-/// Number of active claims (leases) for the worktree
-fn count_claims_for_worktree(
-    index: &ClaimsIndex,
-    worktree_id: &str,
-    now: chrono::DateTime<chrono::Utc>,
-) -> usize {
-    index
-        .leases
+/// Group leases already filtered for activeness by worktree.
+fn count_claims_for_worktree(leases: &[Lease], worktree_id: &WorktreeId) -> usize {
+    leases
         .iter()
-        .filter(|lease| lease.worktree_id == worktree_id && !lease.is_expired(now))
+        .filter(|lease| &lease.worktree_id == worktree_id)
         .count()
 }
 
@@ -202,7 +216,7 @@ pub fn execute_worktree_info(paths: &WorktreePaths) -> Result<(WorktreeInfo, Vec
 /// # Errors
 ///
 /// Returns an error if `git worktree list` fails, the primary checkout cannot
-/// be resolved, or a present `.jit` identity cannot be read.
+/// be resolved, or a listed checkout's identity cannot be read.
 pub fn execute_worktree_list(
     paths: &WorktreePaths,
 ) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
@@ -214,7 +228,7 @@ pub fn execute_worktree_list(
 /// source injected.
 ///
 /// This holds the real command logic (running `git worktree list`, loading the
-/// claims index, resolving each worktree's identity, and counting active
+/// leases, resolving each worktree's identity, and counting active
 /// claims); the public wrapper supplies the invocation's authoritative `paths`
 /// and a [`SystemClock`](crate::storage::clock::SystemClock). `now` for every
 /// per-worktree expiry check is read once from `clock`, so a test can drive
@@ -224,7 +238,6 @@ fn execute_worktree_list_at(
     paths: &WorktreePaths,
     clock: &dyn crate::storage::clock::Clock,
 ) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
-    use crate::storage::claim_coordinator::ClaimsIndex;
     use std::path::PathBuf;
 
     // Execute git worktree list --porcelain from this worktree's root.
@@ -247,13 +260,7 @@ fn execute_worktree_list_at(
 
     let git_entries = parse_git_worktree_porcelain(&porcelain_output)?;
 
-    // Load the active-lease index through storage to count active claims per
-    // worktree (an absent index yields an empty one, i.e. no active claims).
-    let claims_index = ClaimsIndex::load(paths)?;
-
-    // Single "now" for all per-worktree expiry checks, read once from the
-    // injected clock.
-    let now = clock.now();
+    let leases = read_active_leases(paths, clock.now())?;
 
     // Enrich git entries with JIT data, collecting any relocation warnings
     // observed while loading each worktree's identity.
@@ -262,28 +269,41 @@ fn execute_worktree_list_at(
         .into_iter()
         .map(|git_entry| -> Result<WorktreeListEntry> {
             let worktree_path = PathBuf::from(&git_entry.path);
-            let local_jit = worktree_path.join(".jit");
+            let entry_paths = paths
+                .for_worktree_root(worktree_path.clone())?
+                .filter(|entry_paths| entry_paths.local_jit.exists());
 
-            // Load worktree identity - error if .jit exists but can't be read
-            let worktree_id = if local_jit.exists() {
-                let entry_paths = paths.for_worktree_root(worktree_path.clone());
-                let (identity, entry_warnings) =
-                    load_or_create_worktree_identity_with_warnings(&entry_paths, &git_entry.branch)
+            // Load worktree identity - error if the store exists but the identity
+            // can't be read
+            let worktree_id = match entry_paths {
+                Some(entry_paths) => {
+                    let (identity, entry_warnings) =
+                        load_or_create_worktree_identity_with_warnings(
+                            &entry_paths,
+                            &git_entry.branch,
+                        )
                         .with_context(|| {
                             format!(
-                                "Failed to load worktree identity from {}",
-                                local_jit.display()
+                                "Failed to load worktree identity for {}",
+                                worktree_path.display()
                             )
                         })?;
-                warnings.extend(entry_warnings);
-                identity.worktree_id
-            } else {
-                // No .jit directory yet - use branch-based temporary ID
-                format!("wt:{}", git_entry.branch)
+                    warnings.extend(entry_warnings);
+                    identity.worktree_id
+                }
+                // No store for this checkout yet - use branch-based temporary ID
+                None => {
+                    WorktreeId::try_from(format!("wt:{}", git_entry.branch)).with_context(|| {
+                        format!(
+                            "Invalid worktree id fallback from branch '{}'",
+                            git_entry.branch
+                        )
+                    })?
+                }
             };
 
             // Count active claims for this worktree
-            let active_claims = count_claims_for_worktree(&claims_index, &worktree_id, now);
+            let active_claims = count_claims_for_worktree(&leases, &worktree_id);
 
             let is_main = paths.is_primary_worktree_path(&worktree_path)?;
 
@@ -344,8 +364,15 @@ pub fn execute_worktree_store_divergence(paths: &WorktreePaths) -> Result<StoreD
         });
     };
 
-    let local = read_exact_store(&paths.local_jit)?;
-    let reference = read_exact_store(&reference_root)?;
+    let local_layout =
+        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+    let primary_worktree = paths
+        .primary_worktree_root()?
+        .ok_or_else(|| anyhow::anyhow!("primary worktree root is unavailable"))?;
+    let reference_layout =
+        crate::storage::discover_repository_layout(primary_worktree, &reference_root)?;
+    let local = read_exact_store(&local_layout)?;
+    let reference = read_exact_store(&reference_layout)?;
 
     Ok(StoreDivergenceReport {
         checkout_store,
@@ -363,31 +390,17 @@ pub fn execute_worktree_store_divergence(paths: &WorktreePaths) -> Result<StoreD
     })
 }
 
-/// Check if current branch has diverged from origin/main.
-///
-/// Returns `true` if the current branch has commits not in origin/main
-/// (i.e., merge-base is not equal to origin/main).
-///
-/// # Implementation
-///
-/// Uses git commands:
-/// - `git merge-base HEAD origin/main` - Find common ancestor
-/// - `git rev-parse origin/main` - Get main's current commit
-///
-/// If merge-base != origin/main, the branch has diverged.
+/// Whether the branch checked out at `repository` has moved off `origin/main`:
+/// `origin/main` is not an ancestor of its HEAD. A repository with no `origin/main`
+/// has not diverged.
 ///
 /// # Errors
 ///
-/// Returns error if git commands fail or origin/main doesn't exist.
-///
-/// # Returns
-///
-/// - `Ok(true)` if branch has diverged
-/// - `Ok(false)` if branch is up to date with origin/main
-/// - `Err(_)` if git commands fail (e.g., no origin/main)
-pub fn check_branch_divergence() -> Result<bool> {
+/// Returns an error when git cannot be spawned.
+pub fn check_branch_divergence(repository: &Path) -> Result<bool> {
     let merge_base_output = Command::new("git")
         .args(["merge-base", "HEAD", "origin/main"])
+        .current_dir(repository)
         .output()
         .context("Failed to execute git merge-base")?;
 
@@ -398,6 +411,7 @@ pub fn check_branch_divergence() -> Result<bool> {
 
     let main_commit_output = Command::new("git")
         .args(["rev-parse", "origin/main"])
+        .current_dir(repository)
         .output()
         .context("Failed to execute git rev-parse")?;
 
@@ -419,47 +433,32 @@ pub fn check_branch_divergence() -> Result<bool> {
     Ok(merge_base != main_commit)
 }
 
-/// Enforce that global operations only run on branches with common history to main.
+/// Refuse a global operation (config, gates registry, type hierarchy) on a
+/// repository whose branch has diverged from `origin/main`, since it would modify
+/// state shared by all agents.
 ///
-/// Global operations (config, gates registry, type hierarchy) modify shared state
-/// that affects all agents. To prevent conflicts, these must only be performed
-/// when the current branch shares common history with origin/main.
+/// `layout` names the repository the operation serves, and its data root decides
+/// what git sees: the worktree root of a store outside git is the invocation's
+/// directory. A store with no repository on disk, and a repository outside git
+/// (`@/charter/D-4`), have no history to guard.
 ///
 /// # Errors
 ///
-/// Returns error if:
-/// - Branch has diverged from origin/main (need rebase)
-/// - Git commands fail
-///
-/// # Test Mode
-///
-/// In test builds (`cfg(test)`), this check is skipped to allow tests to run
-/// in temporary repositories without origin/main.
-///
-/// # Example Error
-///
-/// ```text
-/// Error: Global operations require common history with main
-///
-/// Your branch has diverged from origin/main. To proceed:
-///   git fetch origin
-///   git rebase origin/main
-/// ```
-pub fn enforce_main_only_operations() -> Result<()> {
-    // Skip enforcement in test environments
-    // Test mode disables this check
-    if crate::test_mode::is_enabled() {
+/// Returns an error when the branch has diverged, naming the rebase that reconciles it.
+pub fn enforce_main_only_operations(layout: Option<&RepositoryLayout>) -> Result<()> {
+    let Some(repository) = layout.map(RepositoryLayout::data_root) else {
         return Ok(());
-    }
+    };
 
     // Skip enforcement if git is not available
-    match std::process::Command::new("git")
+    match Command::new("git")
         .args(["rev-parse", "--git-dir"])
+        .current_dir(repository)
         .output()
     {
         Ok(output) if output.status.success() => {
             // We're in a real git repo, check for divergence
-            if check_branch_divergence()? {
+            if check_branch_divergence(repository)? {
                 anyhow::bail!(
                     "Global operations require common history with main\n\n\
                      Your branch has diverged from origin/main. To proceed:\n  \
@@ -495,14 +494,14 @@ mod tests {
 
         // Just verify the types are correct by constructing manually
         let info = WorktreeInfo {
-            worktree_id: "wt:12345678".to_string(),
+            worktree_id: "wt:12345678".parse().unwrap(),
             branch: "main".to_string(),
             root_path: "/path/to/worktree".to_string(),
             is_main_worktree: true,
             common_dir: "/path/to/.git".to_string(),
         };
 
-        assert_eq!(info.worktree_id, "wt:12345678");
+        assert_eq!(info.worktree_id.as_str(), "wt:12345678");
         assert_eq!(info.branch, "main");
         assert!(info.is_main_worktree);
 
@@ -534,179 +533,77 @@ mod tests {
     fn test_worktree_list_entry_structure() {
         // Verify the structure is correct
         let entry = WorktreeListEntry {
-            worktree_id: "wt:12345678".to_string(),
+            worktree_id: "wt:12345678".parse().unwrap(),
             branch: "main".to_string(),
             path: "/home/user/project".to_string(),
             is_main: true,
             active_claims: 3,
         };
 
-        assert_eq!(entry.worktree_id, "wt:12345678");
+        assert_eq!(entry.worktree_id.as_str(), "wt:12345678");
         assert_eq!(entry.branch, "main");
         assert_eq!(entry.active_claims, 3);
         assert!(entry.is_main);
     }
 
     #[test]
-    fn test_count_claims_per_worktree() {
-        use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
-        use chrono::Utc;
-
-        // Create mock claims index with leases for different worktrees
-        let index = ClaimsIndex {
-            schema_version: 1,
-            generated_at: Utc::now(),
-            last_seq: 3,
-            sequence_gaps: Vec::new(),
-            leases: vec![
-                Lease {
-                    lease_id: "lease-1".to_string(),
-                    issue_id: "issue-1".to_string(),
-                    agent_id: "agent:1".to_string(),
-                    worktree_id: "wt:abc123".to_string(),
-                    branch: Some("main".to_string()),
-                    ttl_secs: 600,
-                    acquired_at: Utc::now(),
-                    expires_at: None,
-                    last_beat: Utc::now(),
-                    stale: false,
-                },
-                Lease {
-                    lease_id: "lease-2".to_string(),
-                    issue_id: "issue-2".to_string(),
-                    agent_id: "agent:1".to_string(),
-                    worktree_id: "wt:abc123".to_string(),
-                    branch: Some("main".to_string()),
-                    ttl_secs: 600,
-                    acquired_at: Utc::now(),
-                    expires_at: None,
-                    last_beat: Utc::now(),
-                    stale: false,
-                },
-                Lease {
-                    lease_id: "lease-3".to_string(),
-                    issue_id: "issue-3".to_string(),
-                    agent_id: "agent:2".to_string(),
-                    worktree_id: "wt:def456".to_string(),
-                    branch: Some("feature/test".to_string()),
-                    ttl_secs: 600,
-                    acquired_at: Utc::now(),
-                    expires_at: None,
-                    last_beat: Utc::now(),
-                    stale: false,
-                },
-            ],
-        };
-
-        let now = Utc::now();
-        let count_abc = count_claims_for_worktree(&index, "wt:abc123", now);
-        let count_def = count_claims_for_worktree(&index, "wt:def456", now);
-        let count_xyz = count_claims_for_worktree(&index, "wt:xyz789", now);
-
-        assert_eq!(count_abc, 2);
-        assert_eq!(count_def, 1);
-        assert_eq!(count_xyz, 0);
-    }
-
-    #[test]
-    fn test_count_claims_excludes_expired_leases() {
-        use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
-        use chrono::{Duration, Utc};
-
-        let now = Utc::now();
-        let make_lease =
-            |id: &str, ttl_secs: u64, expires_at: Option<chrono::DateTime<Utc>>| Lease {
-                lease_id: id.to_string(),
-                issue_id: format!("issue-{id}"),
-                agent_id: "agent:1".to_string(),
-                worktree_id: "wt:abc123".to_string(),
-                branch: Some("main".to_string()),
-                ttl_secs,
+    fn test_count_claims_for_worktree_groups_leases_by_worktree() {
+        let now = chrono::Utc::now();
+        let leases: Vec<_> = ["wt:abc123", "wt:abc123", "wt:def456"]
+            .into_iter()
+            .enumerate()
+            .map(|(seed, worktree)| Lease {
+                lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
+                issue_id: crate::test_utils::issue_id(seed as u128),
+                agent_id: "agent:1".parse().unwrap(),
+                worktree_id: worktree.parse().unwrap(),
+                branch: None,
+                ttl_secs: 0,
                 acquired_at: now,
-                expires_at,
+                expires_at: None,
                 last_beat: now,
-                stale: false,
-            };
+            })
+            .collect();
 
-        let index = ClaimsIndex {
-            schema_version: 1,
-            generated_at: now,
-            last_seq: 3,
-            sequence_gaps: Vec::new(),
-            leases: vec![
-                // Live: finite TTL, expiry in the future
-                make_lease("live", 600, Some(now + Duration::seconds(300))),
-                // Expired: finite TTL, expiry in the past -> must not be counted
-                make_lease("expired", 600, Some(now - Duration::seconds(1))),
-                // Indefinite: ttl_secs == 0, no expiry -> always live
-                make_lease("indefinite", 0, None),
-            ],
-        };
-
-        // Only the live and indefinite leases count; the expired one is excluded,
-        // matching `claim list` which evicts expired leases before reporting.
-        assert_eq!(count_claims_for_worktree(&index, "wt:abc123", now), 2);
+        assert_eq!(
+            count_claims_for_worktree(&leases, &"wt:abc123".parse().unwrap()),
+            2
+        );
+        assert_eq!(
+            count_claims_for_worktree(&leases, &"wt:def456".parse().unwrap()),
+            1
+        );
+        assert_eq!(
+            count_claims_for_worktree(&leases, &"wt:xyz789".parse().unwrap()),
+            0
+        );
     }
 
-    /// REQ-02: expiry is driven through an injected [`Clock`] rather than a real
-    /// `sleep`, exercising the real `execute_worktree_list_at` command path (the
-    /// core of `execute_worktree_list`) against a temporary git repo.
-    ///
-    /// The former subprocess test slept 1600ms to let a 1s TTL elapse; here a
-    /// [`FixedClock`] is advanced past the short lease's TTL and the real command
-    /// path is re-run, asserting the expired lease drops out of the reported
-    /// `active_claims`. See `tests/worktree_cli_tests.rs` for the CLI-boundary
-    /// happy-path smoke test.
     #[test]
-    fn test_worktree_list_excludes_expired_leases() {
+    fn test_execute_worktree_list_at_excludes_inactive_leases() {
         use crate::storage::clock::FixedClock;
-        use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use chrono::Utc;
-        use std::process::Command as StdCommand;
         use std::sync::Arc;
         use std::time::Duration as StdDuration;
 
-        fn git(dir: &std::path::Path, args: &[&str]) {
-            let status = StdCommand::new("git")
-                .current_dir(dir)
-                .args(args)
-                .status()
-                .unwrap();
-            assert!(status.success(), "git {:?} failed", args);
-        }
-
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let root = temp_dir.path();
+        let cli = crate::test_cli::JitCli::with_repository(tempfile::TempDir::new().unwrap());
+        let root = cli.root();
 
         // Minimal real git repo so `git worktree list` reports the main worktree.
-        git(root, &["init"]);
-        git(root, &["config", "user.email", "test@example.com"]);
-        git(root, &["config", "user.name", "Test User"]);
         std::fs::write(root.join("README.md"), "# test\n").unwrap();
-        git(root, &["add", "."]);
-        git(root, &["commit", "-m", "init"]);
+        cli.init_git().unwrap().commit("init").unwrap();
 
         // Resolve the actual branch so lease worktree_ids match what the command
         // computes (no local .jit -> worktree_id is `wt:<branch>`).
-        let branch_out = StdCommand::new("git")
-            .current_dir(root)
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
-            .output()
-            .unwrap();
-        let branch = String::from_utf8(branch_out.stdout)
+        let branch = cli
+            .git(["rev-parse", "--abbrev-ref", "HEAD"])
             .unwrap()
             .trim()
             .to_string();
-        let worktree_id = format!("wt:{branch}");
+        let worktree_id = WorktreeId::try_from(format!("wt:{branch}")).unwrap();
 
-        let paths = WorktreePaths {
-            git_repository: true,
-            common_dir: root.join(".git"),
-            worktree_root: root.to_path_buf(),
-            local_jit: root.join(".jit"),
-            shared_jit: root.join(".git/jit"),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(root);
 
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
@@ -716,38 +613,56 @@ mod tests {
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
             worktree_id,
-            "agent:test".to_string(),
+            "agent:test".parse().unwrap(),
         )
         .with_clock(clock.clone());
         coordinator.init().unwrap();
 
-        // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
-        coordinator.acquire_claim("issue-short", 1).unwrap();
-        coordinator.acquire_claim("issue-long", 600).unwrap();
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS;
+        coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(86),
+                1,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(87),
+                threshold * 2,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
+
+        coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(88),
+                0,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
 
         let active_total = |clock: &FixedClock| -> usize {
             let (entries, _warnings) = execute_worktree_list_at(&paths, clock).unwrap();
             entries.iter().map(|e| e.active_claims).sum()
         };
 
-        // Before expiry: both live leases are counted by the real command path.
-        assert_eq!(active_total(clock.as_ref()), 2, "both live leases counted");
-
-        // Advance time past the short lease's TTL (no real sleep) and re-run the
-        // same command path: the expired lease must be excluded.
-        clock.set(base + chrono::Duration::seconds(5));
-        assert_eq!(
-            active_total(clock.as_ref()),
-            1,
-            "expired lease excluded from list"
-        );
+        assert_eq!(active_total(clock.as_ref()), 3);
+        clock.set(base + chrono::Duration::seconds(threshold as i64 + 1));
+        assert_eq!(active_total(clock.as_ref()), 1);
     }
 
     mod store_divergence {
         use super::*;
         use crate::domain::store_divergence::{DivergenceClass, DivergentRecord};
-        use crate::domain::{fixture_issue, Priority};
         use crate::domain::{Event, Issue};
+        use crate::test_utils::fixture_issue;
         use std::collections::BTreeMap;
         use std::path::{Path, PathBuf};
 
@@ -764,23 +679,22 @@ mod tests {
             std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
             std::fs::create_dir_all(linked.join(".jit")).expect("create the linked store");
 
-            let paths = WorktreePaths {
-                git_repository: true,
-                common_dir: primary.join(".git"),
-                local_jit: linked.join(".jit"),
-                worktree_root: linked,
-                shared_jit: primary.join(".git/jit"),
-            };
+            let paths = crate::test_utils::linked_checkout_paths(&primary, &linked);
             assert!(paths.is_worktree(), "the fixture models a linked checkout");
             (temp, paths)
         }
 
-        /// Write `issue` into the store at `data_root`.
-        fn seed_issue(data_root: &Path, issue: &Issue) {
-            let issues = data_root.join("issues");
-            std::fs::create_dir_all(&issues).expect("create the issue directory");
+        /// Write `issue` at its canonical path in the selected layout.
+        fn seed_issue(layout: &crate::repository_state::RepositoryLayout, issue: &Issue) {
+            let path = layout
+                .resolve(&crate::repository_state::VirtualPath::issue_record(
+                    &issue.id,
+                ))
+                .expect("resolve the issue record path");
+            std::fs::create_dir_all(path.parent().expect("issue record has a parent"))
+                .expect("create the issue directory");
             std::fs::write(
-                issues.join(format!("{}.json", issue.id)),
+                path,
                 crate::repository_state::serialize_issue(issue).expect("serialize the issue"),
             )
             .expect("write the issue record");
@@ -801,14 +715,14 @@ mod tests {
         }
 
         /// An event carrying `id`, associated with `issue_id`.
-        fn event(id: &str, issue_id: &str, title: &str) -> Event {
-            Event::IssueCreated {
-                id: id.to_string(),
-                issue_id: issue_id.to_string(),
-                timestamp: chrono::DateTime::UNIX_EPOCH,
-                title: title.to_string(),
-                priority: Priority::Normal,
-            }
+        fn event(id: &str, issue_id: &crate::domain::identity::IssueId, title: &str) -> Event {
+            let issue =
+                crate::domain::Issue::draft(issue_id.clone(), title.to_string(), String::new());
+            crate::test_utils::stamped_event(
+                crate::domain::EventBody::draft_issue_created(&issue),
+                id,
+                chrono::DateTime::UNIX_EPOCH,
+            )
         }
 
         /// Every file under `root`, keyed by its path relative to `root`.
@@ -864,10 +778,20 @@ mod tests {
                 "Held by both stores identically".to_string(),
             );
 
-            seed_issue(&paths.local_jit, &local_only);
-            seed_issue(&paths.local_jit, &shared);
-            seed_issue(reference_root, &reference_only);
-            seed_issue(reference_root, &shared);
+            let local_layout =
+                crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
+                    .expect("resolve the local repository layout");
+            let primary_root = paths
+                .primary_worktree_root()
+                .expect("resolve the primary worktree")
+                .expect("a linked checkout has a primary worktree");
+            let reference_layout =
+                crate::storage::discover_repository_layout(primary_root, reference_root)
+                    .expect("resolve the primary repository layout");
+            seed_issue(&local_layout, &local_only);
+            seed_issue(&local_layout, &shared);
+            seed_issue(&reference_layout, &reference_only);
+            seed_issue(&reference_layout, &shared);
 
             let conflicting = event("shared-event", &shared.id, "The linked checkout's value");
             seed_events(&paths.local_jit, std::slice::from_ref(&conflicting));
@@ -973,8 +897,16 @@ mod tests {
                 "Both checkouts hold this record".to_string(),
             );
             let events = [event("shared-event", &issue.id, "Both logs hold this")];
+            let local_layout =
+                crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
+                    .unwrap();
+            let primary_root = paths.primary_worktree_root().unwrap().unwrap();
+            let reference_layout =
+                crate::storage::discover_repository_layout(primary_root, &reference_root).unwrap();
+            for layout in [&local_layout, &reference_layout] {
+                seed_issue(layout, &issue);
+            }
             for store in [paths.local_jit.as_path(), reference_root.as_path()] {
-                seed_issue(store, &issue);
                 seed_events(store, &events);
             }
 
@@ -994,16 +926,13 @@ mod tests {
             let primary = temp.path().join("main");
             std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
 
-            let paths = WorktreePaths {
-                git_repository: true,
-                common_dir: primary.join(".git"),
-                local_jit: primary.join(".jit"),
-                worktree_root: primary.clone(),
-                shared_jit: primary.join(".git/jit"),
-            };
+            let paths = crate::test_utils::primary_checkout_paths(&primary);
             assert!(paths.is_main_worktree(), "the fixture models the primary");
+            let layout =
+                crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
+                    .unwrap();
             seed_issue(
-                &paths.local_jit,
+                &layout,
                 &fixture_issue(
                     "Primary record".to_string(),
                     "The primary checkout's own store".to_string(),
@@ -1029,8 +958,10 @@ mod tests {
             let temp = tempfile::TempDir::new().expect("create a temporary directory");
             let data_root = temp.path().join(".jit");
             std::fs::create_dir_all(&data_root).expect("create the store");
+            let layout =
+                crate::storage::discover_repository_layout(temp.path(), &data_root).unwrap();
             seed_issue(
-                &data_root,
+                &layout,
                 &fixture_issue(
                     "Untracked record".to_string(),
                     "Held by a store outside version control".to_string(),
@@ -1067,22 +998,5 @@ mod tests {
         let result = parse_git_worktree_porcelain(invalid);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
-    }
-
-    #[test]
-    fn test_check_branch_divergence_on_main() -> Result<()> {
-        // When on origin/main, merge-base == origin/main (not diverged)
-        // This test only runs in actual git repo
-        let _temp = setup_test_repo()?;
-
-        // We can't fully test this without complex git setup
-        // Just verify the function signature exists
-        Ok(())
-    }
-
-    #[test]
-    fn test_enforce_main_only_operations_when_diverged() {
-        // Should fail when branch has diverged
-        // Requires actual git state, so we test the logic exists
     }
 }

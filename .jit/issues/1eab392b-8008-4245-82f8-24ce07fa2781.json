@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:09:04.352637568Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "`ProfileSelector` is replaced by the package directory path it holds, because a selector carries no tag.\n\n## Background\n\nA `--profile` selector is a bare package directory path, with no `id:` or `path:` tag (`@/charter/D-18`). `ProfileSelector` (`crates/jit/src/commands/profile.rs:120`) is left with one variant holding that path. It is read by `crates/jit/src/commands/init.rs`, `crates/jit/src/commands/mod.rs`, `crates/jit/src/commands/validate.rs`, `crates/jit/src/main.rs`, `crates/jit/src/test_utils.rs`, `crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs` and `crates/jit/tests/fast_rules/derived_state_repair_tests.rs`. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfileSelector` enum remains; each former use holds the package directory path.\n- [hard] REQ-02: Selector parsing, its error for a tagged argument, and selection behave as before, shown by the existing profile CLI tests.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:16:49.349930914Z",
+  "first_ready_at": "2026-11-01T19:16:25.400964824Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b115b5bf-6b34-4f8d-88cd-0064cef4f5de",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:10:37.127940518Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8193f102-024d-4738-8096-1c25596497dd",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:11:40.472733490Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1eab392b-8008-4245-82f8-24ce07fa2781",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Make the profile selector a package path",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:16:49.349930914Z"
 }

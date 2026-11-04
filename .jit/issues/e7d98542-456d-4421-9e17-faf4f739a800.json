@@ -1,0 +1,50 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T08:17:22.996876443Z",
+  "context": {},
+  "created_at": "2026-11-01T07:22:36.522475430Z",
+  "dependencies": [
+    "14c08f51-2cbe-4e4b-8004-2f433d838ba4"
+  ],
+  "description": "Remove the second copy behind the dogfood package's drift check, or record why it must stay.\n\n## Background\n\nThe dogfood package's contributions and this repository's `.jit/*.toml` registries are two copies of one declaration. About 1,250 lines of drift code (`crates/jit/src/profile/contribution_drift.rs`, `drift_report.rs`) and the `DECLARED_OVERRIDES` list keep them aligned, and 14c08f51 runs that comparison as a gate. Either the contributions could derive from the registries, for example through `jit profile capture`, or the check could be deleted.\n\n## Success Criteria\n\n- [hard] REQ-01: The issue records the choice between deriving the contributions and deleting the check, with the evidence for it.\n- [hard] REQ-02: The drift modules and `DECLARED_OVERRIDES` no longer exist, or the issue records with evidence why they must stay.\n\n\n## Decision\n\nThe package is the authority, with one copy per kind. Deriving contributions from the registries would need new product code and the two sides are not one set: the registries hold 26 further gates, and rules differ by 4 package-only and 7 repo-only entries.\n\n- Invariants: a generated region in `.jit/invariants.toml`, checked by byte equality as the template region is. `no-ignored-tests` stays outside it.\n- Delete `contribution_drift.rs`, `drift_report.rs` and `DECLARED_OVERRIDES`. `package-drift` keeps the template and invariant region checks and the gate-input checks.\n- `dag-acyclic` binds to `repo-validate` everywhere. `bounded-rust-build-footprint` and `gate-semantics` leave the package and stay repo-authored, bound to `cargo-ci`: the first is Rust-specific, and the second is enforced by the engine at the transition, so the package's `repo-validate` binding was false.\n- Accepted loss: gate, rule and namespace fields go unchecked. Most are not copies, and the drifts found in `9e4970283` were low impact.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:41:45.721358807Z",
+  "first_ready_at": "2026-11-01T07:22:36.522475430Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "package-drift"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3587fd8a-2a76-4ad8-8936-5ce9cb45d9fa",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:36:18.835793204Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "82a1fcac-e272-4abd-bc8f-ce36ed69cdf7",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:40:55.060549969Z",
+      "updated_by": "auto:executor"
+    },
+    "package-drift": {
+      "run_id": "4fc73e79-5663-4e39-b4ec-f74e95469c1a",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:36:48.614383933Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "e7d98542-456d-4421-9e17-faf4f739a800",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "component:testing",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "One copy of the dogfood package's declarations, without a drift check",
+  "updated_at": "2026-11-01T08:41:45.721358807Z"
+}

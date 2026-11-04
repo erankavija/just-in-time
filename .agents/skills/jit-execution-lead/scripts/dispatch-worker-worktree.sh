@@ -16,11 +16,17 @@
 #
 # Effects:
 #   - Snapshots `git status -uall --porcelain` of main to
-#     /tmp/lead-pre-dispatch-<ts>.txt and symlinks
-#     /tmp/lead-pre-dispatch-latest.txt to it.
+#     <dir>/lead-pre-dispatch-<ts>.txt and symlinks
+#     <dir>/lead-pre-dispatch-latest.txt to it, where <dir> is
+#     LEAD_SNAPSHOT_DIR, default /tmp.
 #   - Creates one worktree per short-id at
 #     .agents/worktrees/agent-<short-id> on branch
 #     worktree-agent-<short-id> anchored to current main HEAD.
+#   - Seeds build caches from LEAD_CACHE_POOL, default <repo>/.agents/cache-pool.
+#   - Creates its temporary directory at
+#     <LEAD_WORKTREE_TMP_ROOT>/<repo-path>/agent-<short-id>, defaulting
+#     LEAD_WORKTREE_TMP_ROOT to /tmp/lead-worker-tmp. Override it with an
+#     absolute path outside the repository; use the same value on reclaim.
 #   - Verifies every worktree HEAD == main HEAD.
 #   - Prints a prompt-header block to paste at the top of every
 #     dispatched Agent prompt.
@@ -32,6 +38,20 @@
 #   2 — bad invocation
 
 set -euo pipefail
+
+# Build tools rewrite these in place or lock them (dep-info, build-script output,
+# dot-named fingerprints, lock files and caches). A hardlink would carry those
+# writes and locks into the pool and every sibling worktree, so each gets its own
+# copy. Replacing the outermost match covers everything nested in it.
+unshare_mutable_build_state() {
+    local source="${1%/}" seeded="$2" entry
+    find "$seeded" \( -name '.*' -o -type d -name build \) -prune -print0 \
+        -o -type f -name '*.d' -print0 \
+        | while IFS= read -r -d '' entry; do
+            rm -rf "$entry"
+            cp -a "$source${entry#"$seeded"}" "$entry"
+        done
+}
 
 if [[ $# -lt 1 ]]; then
     echo "usage: $0 <short-id> [<short-id>...]" >&2
@@ -57,13 +77,21 @@ main_sha="$(git rev-parse HEAD)"
 short_main_sha="$(git rev-parse --short HEAD)"
 echo "[ok] main at ${short_main_sha} (${main_sha}); working tree clean"
 
+worker_tmp_root="${LEAD_WORKTREE_TMP_ROOT:-/tmp/lead-worker-tmp}"
+if [[ "$worker_tmp_root" != /* ]]; then
+    echo "ERROR: LEAD_WORKTREE_TMP_ROOT must be an absolute path." >&2
+    exit 1
+fi
+worker_tmp_root="${worker_tmp_root%/}"
+
 ts="$(date -u +%Y%m%d-%H%M%S)"
-snapshot="/tmp/lead-pre-dispatch-${ts}.txt"
+snapshot_dir="${LEAD_SNAPSHOT_DIR:-/tmp}"
+snapshot="${snapshot_dir}/lead-pre-dispatch-${ts}.txt"
 git status -uall --porcelain > "$snapshot"
-ln -sfn "$snapshot" /tmp/lead-pre-dispatch-latest.txt
+ln -sfn "$snapshot" "${snapshot_dir}/lead-pre-dispatch-latest.txt"
 snapshot_lines="$(wc -l < "$snapshot")"
 echo "[ok] snapshot: $snapshot (${snapshot_lines} entries)"
-echo "     latest -> /tmp/lead-pre-dispatch-latest.txt"
+echo "     latest -> ${snapshot_dir}/lead-pre-dispatch-latest.txt"
 
 mkdir -p .agents/worktrees
 created=()
@@ -89,12 +117,22 @@ for sid in "$@"; do
         exit 1
     fi
 
+    worker_tmp_dir="$worker_tmp_root/${repo_root#/}/agent-${sid}"
+    case "$worker_tmp_dir/" in
+        "$repo_root/"*)
+            echo "ERROR: worker temporary directory must be outside the repository: $worker_tmp_dir" >&2
+            exit 1
+            ;;
+    esac
+    mkdir -p "$worker_tmp_dir"
+
     pool="${LEAD_CACHE_POOL:-$repo_root/.agents/cache-pool}"
     if [[ -d "$pool" ]]; then
         for cache_dir in "$pool"/*/; do
             [[ -d "$cache_dir" ]] || continue
             name="$(basename "$cache_dir")"
             if cp -al "$cache_dir" "$wt_path/$name" 2>/dev/null; then
+                unshare_mutable_build_state "$cache_dir" "$wt_path/$name"
                 seed_mode="hardlink"
             else
                 rm -rf "${wt_path:?}/${name:?}"
@@ -105,7 +143,7 @@ for sid in "$@"; do
         done
     fi
 
-    echo "[ok] $wt_path  branch=$wt_branch  base=${short_main_sha}"
+    echo "[ok] $wt_path  branch=$wt_branch  base=${short_main_sha}  tmp=$worker_tmp_dir"
     created+=("$sid")
 done
 
@@ -115,6 +153,7 @@ cat <<EOF
 EOF
 
 for sid in "${created[@]}"; do
+    worker_tmp_dir="$worker_tmp_root/${repo_root#/}/agent-${sid}"
     cat <<EOF
 
 ---- prompt header for $sid ----
@@ -129,6 +168,7 @@ Hard rules for path discipline (worktree-dispatch-protocol):
 - Use only paths relative to the worktree root in your tool calls.
   Checkout-specific absolute paths are forbidden — they leak
   files into main's checkout.
+- Before every build and test command, export TMPDIR="$worker_tmp_dir".
 - Never run 'git checkout', 'git switch', 'git worktree add/remove'.
 - Commit on your worktree branch only. Do not push.
 - Keep build/dependency caches at their in-worktree defaults; they may

@@ -28,22 +28,22 @@
 
 use super::projection::{render_id_anchor_rows, render_invariants_markdown, ProjectionError};
 use super::rules_gates_projection::render_rules_and_gates_markdown;
-use super::ProducerError;
+use super::{ProducerError, VirtualPath};
 use crate::config::{JitConfig, ProjectionConfig, ProjectionStyle, SourceOfTruth};
 use crate::declarations::rules::RuleSet;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::item::{
-    derive_scope_items, index_markdown_items, load_toml_scope_items, resolve_item_kinds,
-    AddressableItem, ItemKind, Scope,
+    derive_scope_items, index_markdown_items, load_toml_scope_items, AddressableItem, ItemKind,
+    Scope,
 };
-use crate::domain::ContentFormat;
 use std::collections::BTreeSet;
 
 /// The loaded registries a projection body render reads besides its source files:
 /// the config (item kinds + invariant registry), the effective rules, and the gate
 /// registry. The rules/gates are only consulted by the `full` style.
 pub(crate) struct ProjectionInputs<'a> {
+    pub kinds: &'a [ItemKind],
     /// The loaded repository config (item-kind registry + invariant registry).
     pub config: &'a JitConfig,
     /// The effective rule set (for the `full` rule+gate view).
@@ -64,14 +64,14 @@ pub(crate) fn render_projection_body(
     inputs: &ProjectionInputs,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<(String, usize), ProducerError> {
-    let all_kinds = resolve_item_kinds(inputs.config.item_kinds.as_ref())?;
     // Resolve every declared kind name (accepting aliases) to its ItemKind up
     // front, so an unknown kind fails before any source is read (REQ-07).
     let resolved: Vec<&ItemKind> = proj
         .kinds()
         .iter()
         .map(|name| {
-            all_kinds
+            inputs
+                .kinds
                 .iter()
                 .find(|kind| kind.matches_name(name))
                 .ok_or_else(|| ProjectionError::UnknownKind { kind: name.clone() })
@@ -99,7 +99,7 @@ fn resolve_rows(
     config: &JitConfig,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<Vec<AddressableItem>, ProducerError> {
-    let parser = content_parser_for(None, repo_content_format(config)?)?;
+    let parser = content_parser_for(None, config.content_format())?;
     let mut rows = Vec::new();
     for kind in kinds {
         if !kind.kind_scope().is_project() {
@@ -152,10 +152,6 @@ fn resolve_rows(
 /// invariant, rule, and gate registries from (repository.rs loads `config.invariants`
 /// from `.jit/invariants.toml`, and the rule/gate stores live beside it). These are
 /// jit's infrastructure, NOT a user domain vocabulary.
-const INVARIANT_STORE: &str = ".jit/invariants.toml";
-const RULE_STORE: &str = ".jit/rules.toml";
-const GATE_STORE: &str = ".jit/gates.toml";
-
 /// Render the `full` body for the built-in registry-first kinds.
 ///
 /// Dispatches on what CONFIGURATION declares, not on kind NAMES: a projected
@@ -223,11 +219,14 @@ fn render_full_body(
         }
     }
 
-    if sources == BTreeSet::from([INVARIANT_STORE]) {
+    let invariant_store = VirtualPath::INVARIANTS.repository_relative();
+    let rule_store = VirtualPath::RULES.repository_relative();
+    let gate_store = VirtualPath::GATES.repository_relative();
+    if sources == BTreeSet::from([invariant_store.as_str()]) {
         let registry = &inputs.config.invariants;
         let body = render_invariants_markdown(registry, ProjectionStyle::Full);
         Ok((body, registry.invariants.len()))
-    } else if sources == BTreeSet::from([RULE_STORE, GATE_STORE]) {
+    } else if sources == BTreeSet::from([rule_store.as_str(), gate_store.as_str()]) {
         let body =
             render_rules_and_gates_markdown(inputs.rules, inputs.gates, ProjectionStyle::Full);
         Ok((body, inputs.rules.rules.len() + inputs.gates.gates.len()))
@@ -236,25 +235,5 @@ fn render_full_body(
             kinds: proj.kinds().to_vec(),
         }
         .into())
-    }
-}
-
-/// The repo-level content format (`[validation].content_format`, defaulting to
-/// [`ContentFormat::DEFAULT`]), matching the selection issue descriptions and project sources use so
-/// a projection scans its source identically.
-fn repo_content_format(config: &JitConfig) -> Result<ContentFormat, ProducerError> {
-    match config.validation.as_ref() {
-        Some(validation) => match validation.content_format.as_deref() {
-            None => Ok(ContentFormat::DEFAULT),
-            Some(value)
-                if value.eq_ignore_ascii_case("markdown") || value.eq_ignore_ascii_case("md") =>
-            {
-                Ok(ContentFormat::Markdown)
-            }
-            Some(value) if value.eq_ignore_ascii_case("html") => Ok(ContentFormat::Html),
-            Some(value) if value.eq_ignore_ascii_case("xml") => Ok(ContentFormat::Xml),
-            Some(value) => Err(ProducerError::InvalidContentFormat(value.to_string())),
-        },
-        None => Ok(ContentFormat::DEFAULT),
     }
 }

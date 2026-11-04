@@ -1,0 +1,43 @@
+{
+  "branch": "worktree-agent-f265e748",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "058fa677a77067e6c435c795fb9d131129b1b6ef",
+  "completed_at": "2026-10-26T22:16:41.823485318Z",
+  "duration_ms": 105902,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/types.rs",
+        "id": "F1",
+        "line": 1852,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f265e748/requirement/REQ-04",
+          "@/invariant/semantic-types",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "Event constructor tests pass raw String issue IDs and will fail after IssueId becomes the validated newtype."
+      }
+    ],
+    "summary": "Raw String event-constructor test inputs leave REQ-04 unmet after the IssueId newtype cutover.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f265e748-e350-4ba6-949f-575acf122bd9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "951acc4b-a468-4293-a10b-88fd5201cda1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:14:55.921137657Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7762 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a47-eb8d-7c50-a699-7c3c048db2a7\n--------\nuser\n--- 7749 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f1aaadc03, 5d83ac6e, 61400544b, fb3e6f327, 42a9d33e, 0b9770767, 9308cd32d, 67f48c045 (`jit:f265e748`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/f265e748/requirement/REQ-01–REQ-04 (.jit/issues/f265e748-e350-4ba6-949f-575acf122bd9.json); @/issue/2195c98f/requirement/REQ-04 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/invariant/semantic-types, @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci: pending, no exit code; prior code-review 97ec9022: failed, exit 1, with its raw EventBody-field finding addressed\nTruncation recovery: parent-specific merge diffs and targeted field, accessor, constructor, and call-site reads; historical .jit records excluded as past evidence\n\n1. [blocking, issue-impact] Event constructor tests still pass raw `String` values where constructors now require `IssueId`: [types.rs:1852](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/domain/types.rs:1852), [types.rs:2950](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/domain/types.rs:2950), [types.rs:2963](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/domain/types.rs:2963), [types.rs:2976](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/domain/types.rs:2976), and [repository_state_store_tests.rs:2056](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748/crates/jit/src/storage/repository_state_store_tests.rs:2056). They compile only while `IssueId` aliases `String`; after the validated-newtype cutover they fail, leaving REQ-04 unmet. References: @/issue/f265e748/requirement/REQ-04, @/invariant/semantic-types, @/invariant/canonical-cutover.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Raw String event-constructor test inputs leave REQ-04 unmet after the IssueId newtype cutover.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Event constructor tests pass raw String issue IDs and will fail after IssueId becomes the validated newtype.\",\"file\":\"crates/jit/src/domain/types.rs\",\"line\":1852,\"references\":[\"@/issue/f265e748/requirement/REQ-04\",\"@/invariant/semantic-types\",\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

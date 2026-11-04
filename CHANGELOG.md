@@ -8,12 +8,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Every repository write appends an event.** A write that records no domain
+  event, such as `jit config set`, `jit project render`, `jit validate --fix`
+  repair or an export into the repository, now appends one `files_published`
+  event naming the paths it writes, so the event log's length counts every
+  commit. See [Event Log Tags](docs/reference/events.md).
+
+- **Default validation rules apply when their rows are missing.** A repository
+  that disabled a default by deleting its row sees that rule in force again,
+  including with an empty or custom-only `rules.toml`. Config writes and
+  `jit validate --fix` restore missing rows while preserving existing policy
+  edits. To disable a default, set `severity = "off"` on its row; see
+  [Validation](docs/reference/configuration.md#validation).
+
 - **`jit doc check-links` exits `0` on warnings alone.** It exited `2` for
   advisory findings, which stopped `set -e` scripts and gates. It now fails
   (exit `1`) only on a broken link; warnings still appear in the output and
   the JSON result.
 
 ### Removed
+
+- **The profile ownership lifecycle.** An applied package is now repository
+  content, and git holds its history (`@/charter/D-8`): `jit profile list`,
+  `validate`, `reconfigure`, `upgrade` and `capture` are removed with the
+  applied-profile records, ownership claims, fingerprints and conflict remedies
+  they served. A selector is a bare package directory path, so the `id:` and
+  `path:` tags are gone, and a package's `origin` is its directory path.
+  `jit profile show` prints a package's target set (`targets`) without the
+  per-target `target_hashes`, and the package identity hash stays. Plan and
+  apply report through one result, and a preview's `would_conflict` carries a
+  `refusal`. A value a dependent package states wins at any depth, and
+  packages with no dependency path between them that disagree are refused.
+  Apply refuses with `PROFILE_UNCOMMITTED_TARGETS` while a path it would write
+  differs from HEAD in a git repository, and `PROFILE_NOT_FOUND` is removed.
+  Version requirements render normalized.
 
 - **Inert configuration keys.** `[worktree] mode`, the `JIT_WORKTREE_MODE`
   environment variable, and the `[global_operations]`, `[locks]`, and
@@ -22,8 +50,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   longer checks `JIT_WORKTREE_MODE`. A `config.toml` that still sets them
   loads, and the values have no effect.
 
-- **Transaction fields from profile and recover output.** `profile apply`,
-  `reconfigure`, and `upgrade` no longer report `plan_hash`, `transaction_id`,
+- **Transaction fields from profile and recover output.** `profile apply`
+  no longer reports `plan_hash`, `transaction_id`,
   or the `warnings` list whose only entry was the transaction-cleanup-pending
   flag, and `profile apply --dry-run` entries no longer report `plan_hash`; a
   redo record has no digest to show, no journal directory to name, and no
@@ -120,48 +148,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **The compiled-in workflow package and gate presets.** The binary carried the
   `jit-dogfood` workflow package and three gate presets derived from its plan
-  template, and a profile record could identify a package compiled into the
-  binary; the dependency resolver could use those bytes as a last resort. Those
-  routes are removed. Profile packages are read from directories inside the
-  repository, each applied record retains its worktree-relative location, and a
-  dependency is resolved beside the package that declares it before the
-  repository's own applied-profile records are consulted. The native archive
+  template, and the dependency resolver could use those bytes as a last resort.
+  Those routes are removed. Profile packages are read from directories inside the
+  repository, and a dependency is resolved beside the package that declares
+  it. The native archive
   supplies `packages/jit-default/` and `packages/jit-dogfood/`, so an adopter
   applies the package from the extracted directory, while gate names not
   supplied by a profile resolve from the repository's own `.jit/gates.toml`.
 
 ### Fixed
-
-- **A contributed value changed in place no longer wedges the repository.** A
-  profile contributes semantic values into a repository's declared
-  configuration, and the registry is the authority for what they mean — so an
-  adopter who changed one in place reached a state no sanctioned sequence
-  cleared: `jit profile validate` exited 4, `jit validate` failed the
-  profile-ownership rule permanently, `--fix` offered nothing, and capture,
-  apply, and reconfigure each reported the repository unchanged. Capture read
-  asset bytes back from the repository for a live-source declaration but read no
-  contribution at all, so the one class of profile-owned content whose author is
-  the repository was the one class it could not refresh. It now reads each
-  declared contribution back from the registry that holds it and republishes the
-  manifest carrying that value, so the loop closes: capture the package that
-  published the value, apply it, and both the profile check and whole-repository
-  validation agree while the registry keeps what the adopter chose. Which
-  declarations a capture may draw back is the repository's own applied-profile
-  record for the package, so a declaration no record of that package claims stays
-  the repository's own rather than being folded into a package that never
-  published it, and no contribution the manifest does not already declare enters
-  it. A declaration the package published that the repository no longer holds is
-  named in the capture's report rather than dropped or defaulted. The three
-  surfaces now answer alike, because they read one comparison: a declaration the
-  repository holds against what its owner recorded publishing decides
-  `jit profile diff`, the refusal an application makes, and the finding
-  `jit validate` reports, so a report consulted before acting can no longer call
-  a selection clean while validation fails on the same declaration. The
-  profile-agreement capture bounds only the shape of what it reads: one listing,
-  construction-derived path depth, declared target-path membership, and
-  CaptureSpec confinement. Record and claimed-target paths are explicitly named,
-  so their payload bytes are unbounded and no repository is refused a reading of
-  content its own profiles legitimately claim.
 
 - **The build gate decides on the tree rather than on build-cache state.** Two
   of its steps read the machine instead of the change. `incremental-preflight`
@@ -270,11 +265,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Machine consumers get the same failure guidance humans read.** A refused
   profile publication and a divergence report now carry structured
-  `details` naming each conflicting or diverged target, its class, and its
-  typed remedy, plus `suggestions` naming capture only where capture is valid;
-  the profile reference states the remedy contract once and the error-code
-  entry and MCP tool descriptions point at it. `jit profile show` accepts an
-  unambiguous positional profile id. Gate evaluation durability — success
+  `details` naming each conflicting or diverged target and its class. Gate evaluation durability — success
   reported only after the gate run, the issue gate status, and the event are
   durably recorded, on both the automated and the manual-attestation path — is
   now pinned by regression coverage that injects persistence failures and
@@ -287,18 +278,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   <SELECTOR>...` now resolves the selection, closes it over the packages it
   depends on, and plans it through the same preparation a publication runs, then
   states every target and registry declaration each participating profile
-  decided: the values it would create or update, the ones already exact, the
-  recorded claims it would retain or remove, and the ones it cannot publish,
-  each beside the packages that claim it — an empty owner list being the
-  repository's own content and several owners naming every owner of shared
-  content. A declaration is named by its semantic identity, as in
+  decided: the values it would create or update, the ones already exact, and the
+  ones it cannot publish, each beside the packages that define it differently.
+  A declaration is named by its semantic identity, as in
   `.jit/config.toml:map-entry:namespaces:workflow`, because that is how packages
   compose declarations: several of them contribute to one registry file and each
   declaration is decided on its own. The report writes nothing and exits `4`
   when any profile decided a target or a declaration that cannot be published,
   so it serves as a repository check; a package this repository has not applied
-  is reported from the location a `path:` selector names, which is what lets an
-  adopter inspect a package before applying it.
+  is reported from its directory path, which is what lets an adopter inspect a
+  package before applying it.
 
   The decision behind it is now complete rather than first-failure, for
   declarations as well as files. Composing a profile's targets used to stop at
@@ -312,8 +301,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   from the same entry. The three single-conflict error shapes — including the
   semantic-composition conflict, which no longer exists — are replaced by that
   one refusal, and a refusal now renders its facts instead of debug-printing
-  them: a fingerprint reaches a reader as its leading digits, an owner as who it
-  is, and every refusal names what resolves it.
+  them: a package reaches a reader as who it is, and every refusal names what resolves
+  it.
 
 - **`jit profile pack` and `jit profile add` move a package as one verifiable
   file.** Sharing a package meant copying a directory, with nothing stating what
@@ -338,32 +327,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   landed. Every mode is compared and never adopted: a package file's against the
   mode its manifest declaration implies, and the metadata entry's and any
   directory entry's against the mode the archive format defines. Extraction produces a value in memory and the
-  finished tree is published through the same recoverable transaction a capture
-  uses, so a refused or interrupted add leaves no partially extracted package
+  finished tree is published through one redo record, so a refused or interrupted add leaves no partially extracted package
   and an occupied destination is never published over.
-
-- **`jit profile capture` republishes a package tree from the repository files
-  its manifest declares.** Producing a package tree was a repository-local
-  render compiled only for this crate's tests, hardcoded to one package path and
-  one entry-point script, so no adopter could author a package from a configured
-  repository, and profile-owned content edited in place could not be folded back
-  into the package that owns it — an edit to a packaged skill or gate script had
-  to be made twice, and a missed second edit was drift a guard could only report
-  after the fact. `jit profile capture --source <DIR>
-  --destination <DIR>` now serves any package directory and any destination its
-  arguments name. It draws each asset declared under the `assets/live/` package
-  source prefix from the repository file its declaration targets and every other
-  declared source from the package directory itself, so a capture after an
-  in-place edit publishes a tree whose package identity reflects that edit and
-  re-applying it reconciles the repository. A declared target that is a symbolic
-  link, resolves outside the worktree, or carries executable permission its
-  declaration did not is refused before anything is published, and the captured
-  content is validated as a package before publication. Publication is whole and
-  recoverable: the destination ends up holding exactly the manifest, the
-  declared asset sources, and the declared region sources, and it rides the same
-  transaction every other repository mutation does, so a failure leaves an
-  occupied destination as it was rather than losing it. A capture that changes
-  nothing publishes nothing.
 
 - **A profile package is applied together with the packages it depends on.** A
   manifest could declare a dependency, and nothing read it: a package carrying
@@ -372,24 +337,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a dependency on, transitively, and applies each before the package that
   declares it, so a delta package and a self-contained one produce the same
   repository. A dependency is looked for beside the declaring package's own
-  directory, under the dependency's own id, before this repository's record
-  answers — so one obtained directory of packages applies as a set without every
-  member being named. Each applied package writes its own
-  provenance record and appends its own audit event, a package two others depend
+  directory, under the dependency's own id, — so one obtained directory of packages applies as a set without every
+  member being named. Each applied package appends its own
+  audit event, a package two others depend
   on is applied once, and re-applying a set that is already applied reports no
   work anywhere in it. Declared dependencies that close a cycle are rejected
   naming the cycle, and a dependency that resolves through no route fails the
   application naming the package that declared it beside the one that could not
   be found; both refusals are raised over the whole set before any of it is
   applied. `jit profile apply --json` therefore answers with the standard
-  count-wrapped envelope, one result per applied package, and `jit validate`
-  reporting a recorded package it cannot obtain states which recorded package
-  declared a dependency on it, where one did.
+  count-wrapped envelope, one result per applied package.
 
-- **One native download now carries the captured `jit-dogfood` workflow package
+- **One native download now carries the `jit-dogfood` workflow package
   for offline profile application.** An adopter could previously download the
   native archive but still needed a second source to apply the workflow package
-  offline; the archive now carries the captured package under
+  offline; the archive now carries the package under
   `packages/jit-dogfood/`. The `jit` and `jit-server` binaries and both license
   texts remain at the extraction root, so the documented install step is
   unchanged. The published asset set and checksum file are unchanged because
@@ -453,24 +415,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unchanged and no existing key changes meaning. `jit profile show --json`
   reports it beside the assets it bounds, and the shipped `jit-dogfood` package
   declares the three roots its live assets come from.
-- **A repository records where an applied profile package came from.** The
-  record beside an applied profile carries the location of the package directory
-  as a path relative to the worktree root. That location lives in the record and
-  nowhere else: it is repository-local state versioned with the repository that
-  applied the profile, and a configuration key carrying it as well would be a
-  second carrier of one fact plus a precedence question between them. The
-  recorded location is the one the package's own reader anchored its walk at,
-  never a path supplied beside the bytes, so a package read through a relative or
-  link-traversing argument records the directory those resolve to, and the record
-  addresses the bytes it describes.
-  Where the location may point is part of the contract: a package whose bytes
-  resolve outside the worktree, including under the tracker's data root, is
-  refused by name rather than recorded, because a location outside the worktree
-  makes a repository's derived-state repair depend on machine state. A stored
-  record whose location is absent or malformed fails the read rather than being
-  ignored, so a repository never resolves a package its record does not actually
-  name.
-
 - **A profile package is read from a directory on disk.** The package model
   validates untrusted external data — bounded file count and total size,
   rejected absolute, traversal, platform-prefix, control-character and
@@ -478,8 +422,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   declaration claims, and a content address over the manifest and every path.
   `ProfilePackage` owns the bytes it validates, and
   `ProfilePackage::from_directory` walks a directory into one path-to-bytes map,
-  so packages built from identical content agree in manifest, package hash, and
-  every per-target digest. No defence is weakened for directory packages. The
+  so packages built from identical content agree in manifest and package hash. No defence is weakened for directory packages. The
   reader rejects a directory entry that is neither a regular file nor a
   subdirectory, and an entry resolving outside the package root — which is how a
   symbolic link out of the tree is caught before its content is used. Both are decided against
@@ -673,20 +616,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   single `regenerate` example rather than one example apiece, and one whose
   values can only be read out of an already-installed binary keeps its render in
   its own script. `dev/index.md` states the convention.
-
-- **A repository decides for itself whether validation needs a profile
-  package.** Whole-repository validation and derived-state repair each took a
-  profile package by an identity compiled into the binary, before opening their
-  mutation session and propagating any failure, so every repository paid for one
-  whether or not it had ever applied a profile. Both paths now read the
-  repository's own applied-profile records under `.jit/profiles/` and resolve a
-  package only for the profiles those records name. A repository that has
-  applied nothing reads no path plain validation does not. A record whose
-  package resolves has its profile-owned targets checked and repaired exactly as
-  before. A record whose package cannot be obtained fails, naming the record and
-  the profile, rather than repairing the subset it can still account for —
-  silently narrowing what `--fix` restores would breach
-  `@/invariant/derived-state-coherence` where nobody would see it.
 
 - **The shipped development-area classification reaches the adopter
   configuration documents by generation.** `docs/reference/configuration.md`

@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T23:29:22.018576242Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
     "d40d6f74-8486-409a-9a43-8dfd2ad6016b"
   ],
-  "description": "Resolve a breakable container's plan document in one function and make every site that needs it call that function.\n\n## Background\n\nThe chain breakable type → container template with a plan-document location → planning node → planning node's `plan`-labelled document reference is written three times:\n\n- `plan_document_paths` (`crates/jit/src/commands/validate.rs:949-972`) derives the paths a validation capture must read;\n- `plan_content_with_issues` (`commands/validate.rs:1008-1055`) reads the content for graph-rule evaluation, and serves mutation callers too (`commands/mod.rs:2685,3175`, `commands/dependency.rs:403`, `commands/bulk_update.rs:377`, and `commands/issue.rs:90` through `plan_content_from_image`);\n- `project_plan_content` (`crates/jit/src/validation/repository.rs:657-695`) reads the content inside repository validation.\n\nThe two content readers share one rule: an absent plan whose planning node is not `done` is omitted, and an absent plan whose planning node is `done` is an error. The scope-validation tests over external plans (`crates/jit/tests/cli_query_graph/scope_validation_tests.rs:909-1085,1196,1221`) exercise the rule end to end.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function in `crate::templates` maps a container, the issues by id and the template registry to the container's plan-document reference, or none, together with whether its planning node is `done`.\n- [hard] REQ-02: `plan_document_paths`, `plan_content_with_issues` and `project_plan_content` obtain plan-document references only through that function; no other code walks from a breakable type to a planning node's plan document.\n- [hard] REQ-03: One templates unit test owns the resolution cases: an inline plan (no reference), a relinked non-default path, and the not-done and done planning node; the scope-validation suite passes unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Resolve a breakable container's plan document in one function, make every site that needs it call that function, and merge the two plan-content readers into one.\n\n## Background\n\nThe chain breakable type → container template with a plan-document location → planning node (`crate::templates::find_planning_node`, `crates/jit/src/templates.rs:658`) → planning node's `plan`-labelled document reference (`planning_node_plan_path`, `:685`) is written three times:\n\n- `plan_document_paths` (`crates/jit/src/commands/validate.rs:998-1019`) derives the paths a validation capture must read;\n- `plan_content_with_issues` (`commands/validate.rs:1056-1102`) reads the content for graph-rule evaluation and serves the mutation callers (`commands/mod.rs:2773,3191`, `commands/dependency.rs:382`, `commands/bulk_update.rs:377`);\n- `project_plan_content` (`crates/jit/src/validation/repository.rs:633-668`) reads the content inside repository validation.\n\n`plan_content_from_image` (`commands/validate.rs:1033-1052`) is a second content reader: it parses the image's issues leniently and forwards to `plan_content_with_issues`. Its callers already hold the issues (`commands/issue.rs:129`, `commands/validate.rs:1155`, `commands/gate_check.rs:458,534`) except `image_plan_content` (`validate.rs:1614-1623`).\n\nThe content readers share one rule: an absent plan whose planning node is not `done` is omitted, and an absent plan whose planning node is `done` is an error. The scope-validation tests over external plans (`crates/jit/tests/cli_query_graph/scope_validation_tests.rs:984-1215,1327,1356`) exercise the rule end to end.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function in `crate::templates` maps a container, the issues by id and the template registry to the container's plan-document reference, or none, together with whether its planning node is `done`.\n- [hard] REQ-02: `plan_document_paths`, the plan-content reader and `project_plan_content` obtain plan-document references only through that function; no other code walks from a breakable type to a planning node's plan document.\n- [hard] REQ-03: One function reads plan content from an image for given issues; `plan_content_from_image` no longer exists, each of its callers passes the issues it holds, and `image_plan_content` passes the issues its capture holds.\n- [hard] REQ-04: One templates unit test owns the resolution cases: an inline plan (no reference), a relinked non-default path, and the not-done and done planning node; the scope-validation suite passes unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-03T23:52:37.996938486Z",
+  "first_ready_at": "2026-11-03T22:16:34.508776737Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0c351f08-4c20-4b97-ab67-06b546aa9d81",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:48:57.114400387Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "78042568-9b5d-41c4-ae26-e594d74e5fde",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:52:22.070319042Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f968dfe1-64d2-4d37-8bdc-0f04bfca2bb8",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "satisfies:9876a23a/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "One resolver for plan-document references",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-03T23:52:37.996938486Z"
 }

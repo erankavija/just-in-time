@@ -22,10 +22,11 @@
 //! because a selection is refused as a whole and an adopter resolving one
 //! conflict per run cannot see how much work the selection actually is.
 
-use crate::domain::ProfileOrigin;
+use crate::domain::identity::ProfileId;
+use crate::domain::relative_path::RootRelativePath;
 use crate::profile::{
-    ProfileContributionChange, ProfileId, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileContributionChange, ProfileRunMode,
+    ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     MaterializationPlan, ProfileContributionMaterialization, ProfileTargetConflictEntry,
@@ -96,17 +97,17 @@ fn profile_contribution_changes(
         .collect()
 }
 
-/// Build one profile's preview entry from the decision the plan carries.
+/// Build one profile's answer from the decision the plan carries.
 ///
-/// A rehearsal of a publication and a difference report both answer through
-/// this projection, so the entry an adopter inspects before applying is the
-/// entry the run itself would report.
-pub(crate) fn profile_plan_entry(
+/// Every run mode answers through this projection, so the entry an adopter
+/// inspects before applying is the entry the run itself reports.
+pub(crate) fn profile_run_entry(
     plan: &MaterializationPlan,
     id: &ProfileId,
-    version: &str,
-    origin: ProfileOrigin,
-) -> ProfilePlanEntry {
+    version: &semver::Version,
+    origin: RootRelativePath,
+    mode: ProfileRunMode,
+) -> ProfileApplyResult {
     let targets = profile_target_changes(plan, id);
     let contributions = profile_contribution_changes(plan, id);
     let conflicted = targets
@@ -114,20 +115,21 @@ pub(crate) fn profile_plan_entry(
         .map(|target| target.action)
         .chain(contributions.iter().map(|contribution| contribution.action))
         .any(|action| action == ProfileTargetAction::Conflict);
-    let status = if conflicted {
-        ProfilePlanStatus::WouldConflict
-    } else if plan.applied_profiles().contains(id) {
-        ProfilePlanStatus::WouldApply
-    } else {
-        ProfilePlanStatus::Unchanged
+    let changed = !plan.delta().actions().is_empty() && plan.applied_profiles().contains(id);
+    let status = match (conflicted, changed, mode) {
+        (true, _, _) => ProfileApplicationStatus::WouldConflict,
+        (false, true, ProfileRunMode::Publish) => ProfileApplicationStatus::Applied,
+        (false, true, _) => ProfileApplicationStatus::WouldApply,
+        (false, false, _) => ProfileApplicationStatus::Unchanged,
     };
-    ProfilePlanEntry {
-        id: id.to_string(),
-        version: version.to_string(),
+    ProfileApplyResult {
+        id: id.clone(),
+        version: version.clone(),
         origin,
         status,
         targets,
         contributions,
+        refusal: None,
     }
 }
 
@@ -166,7 +168,9 @@ pub(crate) fn ensure_publishable_targets(
                 .filter_map(|target| {
                     refused(&target.disposition).map(|conflict| ProfileTargetConflictEntry {
                         owner: owner.clone(),
-                        subject: ProfileTargetSubject::File(target.path.clone()),
+                        subject: ProfileTargetSubject::File {
+                            path: target.path.clone(),
+                        },
                         conflict,
                     })
                 })
@@ -176,7 +180,9 @@ pub(crate) fn ensure_publishable_targets(
                 .filter_map(|contribution| {
                     refused(&contribution.disposition).map(|conflict| ProfileTargetConflictEntry {
                         owner: owner.clone(),
-                        subject: ProfileTargetSubject::Contribution(contribution.identity.clone()),
+                        subject: ProfileTargetSubject::Contribution {
+                            identity: contribution.identity.clone(),
+                        },
                         conflict,
                     })
                 })
@@ -197,6 +203,7 @@ fn target_action(disposition: &ProfileTargetDisposition) -> ProfileTargetAction 
         ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
         ProfileTargetDisposition::Create => ProfileTargetAction::Create,
         ProfileTargetDisposition::Update => ProfileTargetAction::Update,
+        ProfileTargetDisposition::Remove => ProfileTargetAction::Remove,
         ProfileTargetDisposition::Conflict(_) => ProfileTargetAction::Conflict,
     }
 }

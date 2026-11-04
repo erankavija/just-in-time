@@ -7,6 +7,7 @@
   ],
   "description": "Add the git module's query for the repository's configured `user.name`.\n\n## Background\n\n- The claim-release actor fallback reads `user.name` with its own `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`), the last git spawn in the claim commands once their branch lookup goes through the module.\n- `git config user.name` prints the value and exits 1 when it is unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::user_name()` reads `user.name` with one git process and returns `None` when it is unset.\n- [hard] REQ-02: The behaviour suite covers a set and an unset name and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T14:05:18.054432817Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "User name query in the git module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-01T14:05:18.054432817Z"
 }

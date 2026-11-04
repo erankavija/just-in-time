@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2b6635372b56ba33a4d1d8b909a5fd590d7f10bf",
+  "completed_at": "2026-10-27T00:26:12.343829895Z",
+  "duration_ms": 161463,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three migrated test files use JitCli; the prior direct Git-commit setup was replaced with the shared fixture.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e7764cb1-1077-4b2d-b30e-ba63750d82f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f87f6f40-5ba4-4df0-8b10-bcab1e5642cb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:23:30.880766794Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 66af637ba, fd77e353, 3609a2b08, 2b6635372 (`jit:e7764cb1`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/convention-convergence (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T00:22:14Z); code-review failed (exit 1) only for prior F1, addressed by 3609a2b08\nTruncation recovery: narrowed fixture/source reads, scoped pattern searches, and merge-specific recovery-test diff\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three migrated test files use JitCli; the prior direct Git-commit setup was replaced with the shared fixture.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

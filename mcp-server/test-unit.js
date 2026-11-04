@@ -13,9 +13,10 @@ import { CURATION, curationCoverage, generateTools, generateDefaultTools, parseT
 import { validateArguments, createValidator } from './lib/validator.js';
 import { buildCliArgs, getTimeoutForCommand } from './lib/cli-executor.js';
 import { ConcurrencyLimiter } from './lib/concurrency.js';
+import { JIT_BINARY } from './lib/jit-binary.js';
 
 // Load the real schema from the CLI (single source of truth)
-const realSchema = JSON.parse(execFileSync('jit', ['--schema'], { maxBuffer: 10 * 1024 * 1024 }).toString());
+const realSchema = JSON.parse(execFileSync(JIT_BINARY, ['--schema'], { maxBuffer: 10 * 1024 * 1024 }).toString());
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -194,6 +195,21 @@ await runTest('maps array<string> to JSON Schema array type', () => {
   const labelProp = createTool.inputSchema.properties.label;
   assert.strictEqual(labelProp.type, 'array');
   assert.deepStrictEqual(labelProp.items, { type: 'string' });
+});
+
+await runTest('closed flag vocabularies become enum constraints', () => {
+  const schema = {
+    version: '0.0.0-test',
+    commands: {
+      pick: {
+        description: 'Pick',
+        args: [],
+        flags: [{ name: 'state', type: 'string', required: false, description: 's', values: ['ready', 'done'] }],
+      },
+    },
+  };
+  const [tool] = generateTools(schema);
+  assert.deepStrictEqual(tool.inputSchema.properties.state.enum, ['ready', 'done']);
 });
 
 await runTest('propagates required fields to inputSchema', () => {
@@ -462,11 +478,12 @@ await runTest('$ref to a genuinely missing definition still warns (diagnostic st
     `dangling $ref should still warn, got: ${JSON.stringify(messages)}`);
 });
 
-await runTest('real schema: tools with success_schema get outputSchema', () => {
+await runTest('real schema: every generated tool gets outputSchema', () => {
 
   const tools = generateTools(realSchema);
   const withOutput = tools.filter(t => t.outputSchema);
   assert.ok(withOutput.length >= 10, `should have 10+ tools with outputSchema, got ${withOutput.length}`);
+  assert.strictEqual(withOutput.length, tools.length, 'every generated tool should have outputSchema');
   // All must have type: object at root
   for (const tool of withOutput) {
     assert.strictEqual(tool.outputSchema.type, 'object',

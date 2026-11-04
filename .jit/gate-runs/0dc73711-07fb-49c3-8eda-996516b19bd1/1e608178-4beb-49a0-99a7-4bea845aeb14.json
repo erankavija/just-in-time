@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5b0f29b68e7b6f686df37fe1ba406d7a0775823f",
+  "completed_at": "2026-11-03T21:16:35.171463214Z",
+  "duration_ms": 284201,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/b697a3f7-one-mutation-path/plan.md",
+        "id": "F1",
+        "line": 15,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b697a3f7/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The revised foreign-lease contract accepts unleased writes, so it does not cover the container's missing-lease REQ-04 as written."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/plan.md",
+        "id": "F2",
+        "line": 327,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The behavior-change summary still claims strict mode refuses an unleased automated pass, contradicting the foreign-lease contract."
+      }
+    ],
+    "summary": "One blocking REQ-04 coverage conflict and one advisory stale behavioral statement.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "0dc73711-07fb-49c3-8eda-996516b19bd1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1e608178-4beb-49a0-99a7-4bea845aeb14",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:11:50.969711148Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6657 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a341-0a6f-72c2-89ef-f4de82959e87\n--------\nuser\n--- 6644 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[blocking, issue-impact]** REQ-04 is no longer covered as written: the container requires a single missing-lease check/message, but the revised plan and manifest explicitly accept writes on unleased issues and only refuse another agent’s lease ([plan.md:15](dev/active/b697a3f7-one-mutation-path/plan.md:15), [plan.md:72](dev/active/b697a3f7-one-mutation-path/plan.md:72), `breakdown.json:258`). Reconcile the parent criterion with the cited `17fbcf25` ruling, or restore missing-lease enforcement in the planned tasks.\n2. **[advisory, issue-impact]** The behavior-change summary still says strict mode refuses an “unleased automated pass,” contradicting the new foreign-lease contract ([plan.md:327](dev/active/b697a3f7-one-mutation-path/plan.md:327)). Change it to “another agent’s lease” or remove it.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking REQ-04 coverage conflict and one advisory stale behavioral statement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The revised foreign-lease contract accepts unleased writes, so it does not cover the container's missing-lease REQ-04 as written.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/plan.md\",\"line\":15,\"references\":[\"@/issue/b697a3f7/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The behavior-change summary still claims strict mode refuses an unleased automated pass, contradicting the foreign-lease contract.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/plan.md\",\"line\":327}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

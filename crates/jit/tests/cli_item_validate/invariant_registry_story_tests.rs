@@ -17,35 +17,14 @@
 
 use jit::config::JitConfig;
 use jit::declarations::invariants::{InvariantConfigError, InvariantKind};
+use jit::test_cli::JitCli;
+use jit::test_utils::{declaration_dir, profiled_repository_fixture};
 use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
+const TYPE_HIERARCHY_CONFIG: &str = "[type_hierarchy]\ntypes = { task = 1 }\n";
 
-/// Bootstrap a minimal `.jit/` repo (just enough for the invariant tests).
-///
-/// Writes the `invariants.toml` entry so all five criteria share the same
-/// fixture shape.  Returns the path to the `.jit/` directory (= the
-/// `jit_root` that `JitConfig::load` expects).
-fn setup_jit_root_with_invariants_toml(with_config_toml: bool) -> (TempDir, std::path::PathBuf) {
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    std::fs::create_dir_all(&jit_dir).unwrap();
-
-    if with_config_toml {
-        std::fs::write(
-            jit_dir.join("config.toml"),
-            "[type_hierarchy]\ntypes = { task = 1 }\n",
-        )
-        .unwrap();
-    }
-
-    std::fs::write(
-        jit_dir.join("invariants.toml"),
-        r#"
+/// The `invariants.toml` shared by all five criteria.
+const INVARIANTS_TOML: &str = r#"
 [[invariants]]
 id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
@@ -56,36 +35,15 @@ enforced-by = "dag-no-cycles"
 id = "second-invariant"
 statement = "All state changes must be logged."
 kind = "advisory"
-"#,
-    )
-    .unwrap();
+"#;
 
-    (temp, jit_dir)
-}
-
-/// Initialize a full `jit` repo (via the real binary) and write an
-/// `invariants.toml` into it.  Used by CLI-path tests (REQ-03, REQ-05).
-fn setup_cli_repo() -> TempDir {
-    let temp = crate::setup_repo_with_default_vocabulary();
-
+/// Write the shared `invariants.toml` into a CLI repository (REQ-03, REQ-05).
+fn seed_invariants(cli: &JitCli) {
     std::fs::write(
-        temp.path().join(".jit").join("invariants.toml"),
-        r#"
-[[invariants]]
-id = "sample-invariant"
-statement = "Every dependency edge stays acyclic."
-kind = "enforced"
-enforced-by = "dag-no-cycles"
-
-[[invariants]]
-id = "second-invariant"
-statement = "All state changes must be logged."
-kind = "advisory"
-"#,
+        cli.root().join(".jit").join("invariants.toml"),
+        INVARIANTS_TOML,
     )
     .unwrap();
-
-    temp
 }
 
 // ---------------------------------------------------------------------------
@@ -96,9 +54,15 @@ kind = "advisory"
 fn req01_invariant_entry_loads_at_config_time_config_present() {
     // REQ-01, config-present path: `JitConfig::load` populates `config.invariants`
     // with the parsed entries, including the full `enforced-by` binding.
-    let (_temp, jit_root) = setup_jit_root_with_invariants_toml(true);
+    let temp = declaration_dir(&[
+        (".jit/config.toml", TYPE_HIERARCHY_CONFIG),
+        (".jit/invariants.toml", INVARIANTS_TOML),
+    ])
+    .unwrap();
+    let jit_root = temp.path().join(".jit");
 
-    let config = JitConfig::load(&jit_root).expect("config load must succeed");
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_root))
+        .expect("config load must succeed");
 
     let invs = &config.invariants.invariants;
     assert_eq!(invs.len(), 2, "both invariants must be loaded");
@@ -131,9 +95,11 @@ fn req01_invariant_entry_loads_at_config_time_config_present() {
 fn req02_invariants_load_without_config_toml() {
     // REQ-02, config-absent path: even when there is NO `config.toml`,
     // `JitConfig::load` still reads `invariants.toml` and populates the registry.
-    let (_temp, jit_root) = setup_jit_root_with_invariants_toml(false);
+    let temp = declaration_dir(&[(".jit/invariants.toml", INVARIANTS_TOML)]).unwrap();
+    let jit_root = temp.path().join(".jit");
 
-    let config = JitConfig::load(&jit_root).expect("config load must succeed without config.toml");
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_root))
+        .expect("config load must succeed without config.toml");
 
     // Sanity: config-absent path must have returned an empty type-hierarchy.
     assert!(
@@ -162,9 +128,15 @@ fn req02_invariants_load_without_config_toml() {
 fn req02_invariants_load_with_config_toml() {
     // REQ-02, config-present path: when `config.toml` exists, the chain-load of
     // `invariants.toml` still fires on the config-present code path.
-    let (_temp, jit_root) = setup_jit_root_with_invariants_toml(true);
+    let temp = declaration_dir(&[
+        (".jit/config.toml", TYPE_HIERARCHY_CONFIG),
+        (".jit/invariants.toml", INVARIANTS_TOML),
+    ])
+    .unwrap();
+    let jit_root = temp.path().join(".jit");
 
-    let config = JitConfig::load(&jit_root).expect("config load must succeed with config.toml");
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_root))
+        .expect("config load must succeed with config.toml");
 
     // Sanity: config-present path must have a type hierarchy.
     assert!(
@@ -190,17 +162,14 @@ fn req02_absent_invariants_toml_is_empty_on_both_paths() {
     // REQ-02 boundary: when `.jit/invariants.toml` does not exist, both paths
     // yield an empty registry (not an error).
     for with_config in [false, true] {
-        let temp = TempDir::new().unwrap();
+        let files: &[(&str, &str)] = if with_config {
+            &[(".jit/config.toml", TYPE_HIERARCHY_CONFIG)]
+        } else {
+            &[(".jit/placeholder", "")]
+        };
+        let temp = declaration_dir(files).unwrap();
         let jit_dir = temp.path().join(".jit");
-        std::fs::create_dir_all(&jit_dir).unwrap();
-        if with_config {
-            std::fs::write(
-                jit_dir.join("config.toml"),
-                "[type_hierarchy]\ntypes = { task = 1 }\n",
-            )
-            .unwrap();
-        }
-        let config = JitConfig::load(&jit_dir)
+        let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
             .unwrap_or_else(|e| panic!("load must succeed (with_config={with_config}): {e}"));
         assert!(
             config.invariants.invariants.is_empty(),
@@ -217,11 +186,13 @@ fn req02_absent_invariants_toml_is_empty_on_both_paths() {
 fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
     // REQ-03: the real binary, given a `.jit/invariants.toml`, returns each
     // invariant addressed as `@/<kind>/<self-id>` under `--kind invariant`.
-    let temp = setup_cli_repo();
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    seed_invariants(&cli);
 
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "invariant", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["item", "list", "--kind", "invariant", "--json"])
         .output()
         .unwrap();
     assert!(
@@ -234,7 +205,7 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
         serde_json::from_slice(&output.stdout).expect("--json output must be valid JSON");
 
     assert_eq!(
-        json["count"].as_u64().unwrap(),
+        json["items"].as_array().unwrap().len(),
         2,
         "both invariants must be listed"
     );
@@ -272,11 +243,13 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
 fn req03_item_show_at_qualified_id_resolves_invariant() {
     // REQ-03 (show path): `jit item show @/invariant/sample-invariant` also resolves the invariant
     // from the registry rather than the issue store.
-    let temp = setup_cli_repo();
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    seed_invariants(&cli);
 
-    let output = Command::new(jit_binary())
-        .args(["item", "show", "@/invariant/second-invariant", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["item", "show", "@/invariant/second-invariant", "--json"])
         .output()
         .unwrap();
     assert!(
@@ -310,29 +283,24 @@ fn req04_missing_statement_fails_with_typed_error() {
     // REQ-04: an invariant entry without `statement` makes `JitConfig::load` fail
     // with a typed error that names both the file and the missing field.
     for with_config in [false, true] {
-        let temp = TempDir::new().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        std::fs::create_dir_all(&jit_dir).unwrap();
-        if with_config {
-            std::fs::write(
-                jit_dir.join("config.toml"),
-                "[type_hierarchy]\ntypes = { task = 1 }\n",
-            )
-            .unwrap();
-        }
         // Valid id and kind but no statement.
-        std::fs::write(
-            jit_dir.join("invariants.toml"),
-            "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n",
-        )
-        .unwrap();
+        let invariants = "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n";
+        let files: &[(&str, &str)] = if with_config {
+            &[
+                (".jit/config.toml", TYPE_HIERARCHY_CONFIG),
+                (".jit/invariants.toml", invariants),
+            ]
+        } else {
+            &[(".jit/invariants.toml", invariants)]
+        };
+        let temp = declaration_dir(files).unwrap();
+        let jit_dir = temp.path().join(".jit");
 
-        let err = JitConfig::load(&jit_dir).expect_err("missing statement must fail config load");
+        let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
+            .expect_err("missing statement must fail config load");
 
-        // `JitConfig::load` wraps the underlying parse error with anyhow context
-        // ("invalid .jit/invariants.toml"), so `err.to_string()` gives the context
-        // layer.  The full chain (via `{err:#}`) carries the underlying TOML error
-        // that names both the file (context layer) and the missing field (cause).
+        // The assembly error names the file; the full chain (via `{err:#}`) also
+        // carries the underlying TOML error naming the missing field.
         let full = format!("{err:#}");
         assert!(
             full.contains("invariants.toml"),
@@ -349,17 +317,15 @@ fn req04_missing_statement_fails_with_typed_error() {
 fn req04_invalid_kind_token_fails_with_descriptive_error() {
     // REQ-04: a `kind = "bogus"` token (not `enforced` or `advisory`) must fail
     // config load with an error that names both the file and the valid options.
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    std::fs::create_dir_all(&jit_dir).unwrap();
-
-    std::fs::write(
-        jit_dir.join("invariants.toml"),
+    let temp = declaration_dir(&[(
+        ".jit/invariants.toml",
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"x\"\nkind = \"bogus\"\n",
-    )
+    )])
     .unwrap();
+    let jit_dir = temp.path().join(".jit");
 
-    let err = JitConfig::load(&jit_dir).expect_err("invalid kind token must fail config load");
+    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
+        .expect_err("invalid kind token must fail config load");
 
     // See req04_missing_statement_fails_with_typed_error for why we use `{err:#}`.
     let full = format!("{err:#}");
@@ -423,12 +389,14 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
     // REQ-05: the ONLY source of invariant items is `.jit/invariants.toml`.
     // An invariant-tagged line inside an issue description (which would be indexed by
     // a markdown-first kind) must NOT appear as an invariant.
-    let temp = setup_cli_repo();
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    seed_invariants(&cli);
 
     // Create an issue whose description contains an invariant-looking criterion line.
     // If the engine were to parse markdown for invariants, "missing-invariant" would leak in.
-    let output = Command::new(jit_binary())
-        .args([
+    let output = cli.command([
             "issue",
             "create",
             "-t",
@@ -436,10 +404,7 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
             "-d",
             "## Success Criteria\n\n- [hard] missing-invariant: this must NOT appear as an invariant\n",
             "--json",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+        ]).output().unwrap();
     assert!(
         output.status.success(),
         "issue create must succeed: {}",
@@ -447,9 +412,8 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
     );
 
     // Query only `invariant`-kind items.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "invariant", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["item", "list", "--kind", "invariant", "--json"])
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -463,7 +427,7 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
 
     // Only the two registry entries may appear.
     assert_eq!(
-        json["count"].as_u64().unwrap(),
+        json["items"].as_array().unwrap().len(),
         2,
         "only the registry's two entries must appear, not the markdown decoy: {qids:?}"
     );
@@ -483,11 +447,14 @@ fn req05_item_list_without_kind_filter_does_not_mix_invariants_with_requirements
     // REQ-05 (cross-kind boundary): when listing ALL items, invariants appear only
     // from the registry and requirements appear only from issue markdown.  The
     // registry does not bleed across kind boundaries.
-    let temp = setup_cli_repo();
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    seed_invariants(&cli);
 
     // Create an issue with a requirement criterion.
-    let output = Command::new(jit_binary())
-        .args([
+    let output = cli
+        .command([
             "issue",
             "create",
             "-t",
@@ -496,7 +463,6 @@ fn req05_item_list_without_kind_filter_does_not_mix_invariants_with_requirements
             "## Success Criteria\n\n- [hard] REQ-01: something must work\n",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
     assert!(
@@ -509,11 +475,7 @@ fn req05_item_list_without_kind_filter_does_not_mix_invariants_with_requirements
     let issue_short: String = issue_json["id"].as_str().unwrap().chars().take(8).collect();
 
     // List all items (no kind filter).
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["item", "list", "--json"]).output().unwrap();
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();

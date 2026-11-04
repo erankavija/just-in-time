@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T00:26:11.206757080Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "c2930451-2555-4bed-ae3a-eaa6d72b7522"
+    "84e1e27a-8272-4885-84af-8e667cbad57e"
   ],
-  "description": "Make a redo record refuse a put or delete at the event log, so the log changes only by its positioned append.\n\n## Background\n\nRepository deltas reject any non-append action on the event log (`crates/jit/src/repository_state/image.rs:1297`), but `RedoRecord::new` (`storage/redo_record.rs:110-130`) checks only path overlap, so a record could put or delete the log. Record tests: `storage/redo_record.rs:600-630`.\n\n## Success Criteria\n\n- [hard] REQ-01: `RedoRecord::new` returns an error for a put or delete at the event log, and one test owns the refusal.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make a redo record refuse a put or delete at the event log, so the log changes only by its positioned append, and delete the publish check's handling of either.\n\n## Background\n\nRepository deltas reject any non-append action on the event log (`crates/jit/src/repository_state/image.rs`), but `RedoRecord::new` (`storage/redo_record.rs`) checks only path overlap, so a record could put or delete the log. The publish check in `storage/repository_state_store.rs` treats a put or delete at the log as touching it. The rustdoc of `RedoRecord`'s event append states where the append lands as \"the log's length\"; appends land at the log's committed length, the end of its last newline-terminated line.\n\n## Success Criteria\n\n- [hard] REQ-01: `RedoRecord::new` returns an error for a put or delete at the event log, and one test owns the refusal.\n- [hard] REQ-02: The publish check decides whether a record touches the event log from its event append alone, and no code path handles a put or delete at the log.\n- [hard] REQ-03: The rustdoc of the record's event append says committed length.\n",
   "documents": [],
+  "done_at": "2026-11-03T00:35:04.221913072Z",
+  "first_ready_at": "2026-11-02T23:39:54.794421222Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7377a1e2-bb5a-4232-93d7-f01a7c1ae4a3",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:32:32.321250750Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b8d7639b-9008-4ff5-9119-c6e614a0c05a",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:35:03.584976070Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b32a720e-856c-43a4-b1cb-0cbd28c9328d",
   "labels": [
     "type:task",
@@ -22,10 +38,11 @@
     "per:@/charter/D-19",
     "per:@/charter/D-17",
     "enforces:@/invariant/atomic-writes",
-    "satisfies:f8a6b298/REQ-12"
+    "satisfies:f8a6b298/REQ-12",
+    "per:@/charter/D-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Redo records refuse a rewrite of the event log",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-03T00:35:04.221913072Z"
 }

@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T01:07:31.542282073Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
@@ -8,22 +8,35 @@
   ],
   "description": "Archiving an issue moves the files under its artifact directories with it, so a document an issue owns by location is archived the same way as an explicitly linked one.\n\n## Background\n\nAn issue's derived documents are the files under its resolved artifact directory in each declared documentation area; they belong to the issue without an explicit link. Archive planning takes its roots from explicit links only (`crates/jit/src/domain/artifact_inventory.rs:284-290`; `crates/jit/src/domain/artifact_discovery.rs:314-330,501-520`), and archive execution rewrites the linked document paths (`crates/jit/src/repository_state/archive.rs:175-190`). A derived document is therefore left behind in the active area when its issue is archived. Whether the archive classifier otherwise sweeps unlinked files under a short-id directory is unverified.\n\n## Success Criteria\n\n- [hard] REQ-01: Archiving an issue moves each of its derived documents to the archive location, beside its linked documents.\n- [hard] REQ-02: Archive planning lists derived documents among the issue's archive roots, so a preview shows them.\n- [hard] REQ-03: A derived document that is also explicitly linked moves once.\n- [hard] REQ-04: An issue with no derived documents archives exactly as before.\n- [hard] REQ-05: Harness tests over archive planning own the derived-document property.\n",
   "documents": [],
+  "done_at": "2026-11-01T13:37:01.518886066Z",
   "first_ready_at": "2026-10-21T01:06:58.361882571Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9715166c-d398-4894-9cf5-0f3d581c20d0",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:23:48.431650065Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0d042a60-8a6e-4310-b988-948425fd6d75",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:36:30.773445723Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
   "labels": [
     "type:task",
     "epic:lead-friction",
     "milestone:v1.0",
-    "component:core",
-    "satisfies:3d9a0ce3/REQ-03"
+    "component:core"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Archive derived documents with their issue",
-  "updated_at": "2026-10-21T10:48:13.530928211Z"
+  "updated_at": "2026-11-01T13:37:01.518886066Z"
 }

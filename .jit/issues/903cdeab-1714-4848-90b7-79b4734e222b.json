@@ -3,8 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "98404e0c-d254-4fb7-8222-8e1077d95f42",
-    "b06cee74-7635-49c0-bc13-448bcfa28324"
+    "becea20a-ff56-4499-8b13-d88ad816448f"
   ],
   "description": "Make every claim unit test and property test acquire and release leases through the entry points that commands use.\n\n## Background\n\n`ClaimCoordinator::acquire_claim` (`crates/jit/src/storage/claim_coordinator.rs:450`), `acquire_claim_with_reason` (`:527`) and `release_lease` (`:1087`) have no production caller. `jit claim acquire` uses `acquire_claim_synchronized` (`:659`, called at `commands/claim.rs:138`), and `jit claim release` evicts through `execute_claim_release_by_issue` (`commands/claim.rs:334-395`). The test-only methods are called by about 40 coordinator tests, by the property tests in `storage/claim_coordinator_proptests.rs` (including the concurrency props through `acquire_claim_when_reached`, `claim_coordinator.rs:1430-1470`), and by tests in `commands/claim.rs:867,1733`, `commands/worktree.rs:725-726` and `commands/mod.rs:4412`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test calls `acquire_claim`, `acquire_claim_with_reason` or `release_lease`: every coordinator test and property test acquires through `acquire_claim_synchronized` and releases through the production release path, and the concurrency property tests race the production acquire.\n- [hard] REQ-02: The property tests still prove exclusive acquisition under concurrency and monotonically increasing sequence numbers.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
@@ -22,10 +21,11 @@
     "story:per-key-leases",
     "component:testing",
     "enforces:@/invariant/convention-convergence",
-    "satisfies:f8a6b298/REQ-06"
+    "satisfies:f8a6b298/REQ-06",
+    "resolution:merged-into-becea20a"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Claim tests acquire leases through the production path",
-  "updated_at": "2026-10-21T10:40:06.897168068Z"
+  "updated_at": "2026-11-02T23:41:49.065737581Z"
 }

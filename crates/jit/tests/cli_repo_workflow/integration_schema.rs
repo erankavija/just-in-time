@@ -1,36 +1,35 @@
 //! Integration tests for the --schema flag
 
-use assert_cmd::prelude::*;
-use predicates::prelude::*;
 use serde_json::Value;
-use std::process::Command;
 
-// Helper macro using the new cargo_bin! approach
-macro_rules! cmd {
-    () => {
-        Command::new(assert_cmd::cargo::cargo_bin!(env!("CARGO_PKG_NAME")))
-    };
+#[test]
+fn test_schema_dependency_leaves_publish_response_types() {
+    let schema = jit::schema::CommandSchema::generate();
+    let leaves = schema.commands["dep"].subcommands.as_ref().unwrap();
+    for (leaf, response) in [
+        ("add", "DependencyAddResponse"),
+        ("rm", "DependencyRemoveResponse"),
+    ] {
+        let output = leaves[leaf].output.as_ref().unwrap();
+        assert_eq!(output.success, response);
+        assert!(output.success_schema.is_some());
+    }
 }
 
 #[test]
 fn test_schema_flag_outputs_json() {
-    let mut cmd = cmd!();
-    cmd.arg("--schema");
-
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("version"))
-        .stdout(predicate::str::contains("commands"))
-        .stdout(predicate::str::contains("types"))
-        .stdout(predicate::str::contains("exit_codes"));
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let schema = cli.run(["--schema"]).unwrap();
+    assert!(schema.contains("version"));
+    assert!(schema.contains("commands"));
+    assert!(schema.contains("types"));
+    assert!(schema.contains("exit_codes"));
 }
 
 #[test]
 fn test_schema_is_valid_json() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    assert!(output.status.success());
-
-    let json_str = String::from_utf8(output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let json_str = cli.run(["--schema"]).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     assert!(parsed.is_object());
@@ -39,9 +38,8 @@ fn test_schema_is_valid_json() {
 
 #[test]
 fn test_schema_has_all_commands() {
-    let output = cmd!().arg("--schema").output().unwrap();
-
-    let json_str = String::from_utf8(output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let json_str = cli.run(["--schema"]).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     let commands = parsed["commands"].as_object().unwrap();
@@ -58,8 +56,8 @@ fn test_schema_has_all_commands() {
 
 #[test]
 fn test_schema_exposes_profile_commands_and_typed_outputs() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let parsed: Value = serde_json::from_str(&cli.run(["--schema"]).unwrap()).unwrap();
     let profile = parsed["commands"]["profile"]["subcommands"]
         .as_object()
         .unwrap();
@@ -116,7 +114,11 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
                     .keys()
                     .cloned()
                     .collect::<std::collections::BTreeSet<_>>(),
-                std::collections::BTreeSet::from(["count".to_string(), "profiles".to_string()]),
+                std::collections::BTreeSet::from([
+                    "count".to_string(),
+                    "profiles".to_string(),
+                    "warnings".to_string()
+                ]),
                 "profile {command} must use the shared collection envelope"
             );
         }
@@ -125,8 +127,8 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
 
 #[test]
 fn test_schema_exposes_path_selectors_on_show_and_lifecycle_commands() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let parsed: Value = serde_json::from_str(&cli.run(["--schema"]).unwrap()).unwrap();
     let profile = &parsed["commands"]["profile"]["subcommands"];
 
     let show_flags = profile["show"]["flags"].as_array().unwrap();
@@ -176,8 +178,8 @@ fn test_schema_exposes_path_selectors_on_show_and_lifecycle_commands() {
 
 #[test]
 fn test_schema_exposes_only_dependency_aware_archive_family() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let parsed: Value = serde_json::from_str(&cli.run(["--schema"]).unwrap()).unwrap();
 
     let document_commands = parsed["commands"]["doc"]["subcommands"]
         .as_object()
@@ -205,8 +207,8 @@ fn test_schema_exposes_only_dependency_aware_archive_family() {
 
 #[test]
 fn test_schema_issue_create_details() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    let json_str = String::from_utf8(output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let json_str = cli.run(["--schema"]).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     let create = &parsed["commands"]["issue"]["subcommands"]["create"];
@@ -248,8 +250,8 @@ fn test_schema_issue_create_details() {
 /// its tools from this schema, DR §9.3) exposes the new authorable surface.
 #[test]
 fn test_schema_issue_create_and_update_expose_content_format() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    let json_str = String::from_utf8(output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let json_str = cli.run(["--schema"]).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     let create_flags = parsed["commands"]["issue"]["subcommands"]["create"]["flags"]
@@ -275,9 +277,8 @@ fn test_schema_issue_create_and_update_expose_content_format() {
 
 #[test]
 fn test_schema_includes_exit_codes() {
-    let output = cmd!().arg("--schema").output().unwrap();
-
-    let json_str = String::from_utf8(output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let json_str = cli.run(["--schema"]).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     let exit_codes = parsed["exit_codes"].as_array().unwrap();
@@ -290,8 +291,8 @@ fn test_schema_includes_exit_codes() {
 
 #[test]
 fn test_schema_includes_type_definitions() {
-    let output = cmd!().arg("--schema").output().unwrap();
-    let json_str = String::from_utf8(output.stdout).unwrap();
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
+    let json_str = cli.run(["--schema"]).unwrap();
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
 
     let types = parsed["types"].as_object().unwrap();
@@ -305,13 +306,14 @@ fn test_schema_includes_type_definitions() {
     let state = &types["State"];
     assert_eq!(state["type"], "enum");
     let state_values = state["enum"].as_array().unwrap();
-    assert!(state_values.iter().any(|v| v == "backlog"));
-    assert!(state_values.iter().any(|v| v == "ready"));
-    assert!(state_values.iter().any(|v| v == "done"));
+    assert!(jit::domain::State::ALL
+        .iter()
+        .all(|state| state_values.iter().any(|v| v == state.as_str())));
 }
 
 #[test]
 fn test_no_command_with_schema_works() {
+    let cli = jit::test_cli::JitCli::uninitialised().unwrap();
     // --schema should work without a subcommand
-    cmd!().arg("--schema").assert().success();
+    cli.run(["--schema"]).unwrap();
 }

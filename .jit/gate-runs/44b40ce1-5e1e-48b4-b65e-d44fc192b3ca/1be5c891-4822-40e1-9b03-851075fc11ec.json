@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a29e64c1dfaa5afa1fcff72127373f695ec3bd88",
+  "completed_at": "2026-10-27T22:44:46.137857184Z",
+  "duration_ms": 189370,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable test-fixture conversions use shared constructors and preserve the affected assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "44b40ce1-5e1e-48b4-b65e-d44fc192b3ca",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1be5c891-4822-40e1-9b03-851075fc11ec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:41:36.766901227Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ac03ec7af; aad88f272 merge, narrowed to its affected paths; uncommitted changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-27T22:41:36Z; exit code none); code-review pending (no prior run)\nTruncation recovery: partitioned merge and implementation diffs by affected paths and reviewed complete hunk lists/current test modules\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable test-fixture conversions use shared constructors and preserve the affected assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

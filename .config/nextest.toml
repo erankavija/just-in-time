@@ -1,39 +1,4 @@
 nextest-version = "0.9.133"
-experimental = ["setup-scripts"]
-
-[scripts.setup.default-repository-fixture]
-command = { command-line = "debug/jit __test-fixture-setup jit-default", relative-to = "target" }
-slow-timeout = { period = "15s", terminate-after = 4 }
-
-[[profile.default.scripts]]
-filter = '''
-binary(cli_item_validate) |
-(binary(jit) & test(/^(commands::(init|profile|validate)|test_utils)::tests::/))
-'''
-setup = 'default-repository-fixture'
-
-[scripts.setup.dogfood-repository-fixture]
-command = { command-line = "debug/jit __test-fixture-setup jit-dogfood", relative-to = "target" }
-slow-timeout = { period = "15s", terminate-after = 4 }
-
-[[profile.default.scripts]]
-filter = '''
-binary(cli_item_validate) |
-(binary(jit) & test(/^(commands::(init|profile|validate)|test_utils)::tests::/))
-'''
-setup = 'dogfood-repository-fixture'
-
-[scripts.setup.recorded-failure-corpus]
-command = { command-line = "scripts/setup-recorded-failure-corpus.sh", relative-to = "workspace-root" }
-slow-timeout = { period = "15s", terminate-after = 4 }
-capture-stdout = true
-capture-stderr = true
-
-[[profile.default.scripts]]
-filter = '''
-binary(cli_issue) & test(/^(failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope|failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes|payload_stream_purity_tests::test_machine_readable_failures_emit_one_json_document_on_payload_stream)$/)
-'''
-setup = 'recorded-failure-corpus'
 
 [profile.default]
 retries = 0

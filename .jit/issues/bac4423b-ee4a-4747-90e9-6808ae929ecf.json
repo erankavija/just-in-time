@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:40:39.306535144Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the item and validate CLI tests in `crates/jit/tests/cli_item_validate` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\n`cli_item_validate` has 15 test files. 12 define `fn jit_binary`, 14 use `env!(\"CARGO_BIN_EXE_jit\")`, 9 define a local setup, and 3 hand-roll `git init`.\n\nThis entry covers `decision_kind_tests.rs`, `decision_risk_story_tests.rs`, `risk_kind_tests.rs`, `item_cli_tests.rs`, `markdown_kind_source_path_tests.rs`, `invariant_registry_story_tests.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/cli_item_validate/decision_kind_tests.rs`: `setup_test_repo` (`:48`).\n- `crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs`: `setup_test_repo` (`:58`).\n- `crates/jit/tests/cli_item_validate/invariant_registry_story_tests.rs`: `setup_jit_root_with_invariants_toml` (`:33`), `setup_cli_repo` (`:68`).\n- `crates/jit/tests/cli_item_validate/risk_kind_tests.rs`: `setup_test_repo` (`:50`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:57:01.665772278Z",
   "first_ready_at": "2026-10-22T15:47:00.679959900Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c9fd499d-7d03-46af-b94a-865bcccb667b",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:53:11.612011730Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ffb31699-318d-4ef4-a525-9b2490d2593c",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:56:36.555009975Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bac4423b-ee4a-4747-90e9-6808ae929ecf",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "item-kind tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:47:00.679959900Z"
+  "updated_at": "2026-10-27T00:57:01.665772278Z"
 }

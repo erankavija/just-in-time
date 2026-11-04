@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "25515e0f57a80d855c132af37779f4bb6a541ae6",
+  "completed_at": "2026-11-01T04:36:20.281116472Z",
+  "duration_ms": 116873,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs",
+        "id": "F1",
+        "line": 307,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/8d64ffae/requirement/REQ-01",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "Failure-probe and command-specific subprocess tests still re-prove command exit-code bindings outside the designated projection suite."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/issue_show_projection_test.rs",
+        "id": "F2",
+        "line": 97,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/8d64ffae/requirement/REQ-02",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "Per-command and generic tests still re-assert list-envelope count, so the designated all-command suite is not the sole owner."
+      }
+    ],
+    "summary": "Both hard ownership criteria remain violated by duplicate exit-code and count assertions outside their designated suites.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "8d64ffae-719b-4631-9660-1317ba7b59cf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7abb9a4b-b035-4182-94f3-438a7b3b19d9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T04:34:23.407631731Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5839 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19563-1edf-7e23-add0-4c7dbf6ea640\n--------\nuser\n--- 5826 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. [high] REQ-01 is unmet: subprocess suites outside the projection suite still bind error classifications to process statuses. The failure-probe coverage test requires every recorded CLI failure arm’s exit status to equal `ErrorCode::exit_code()`; the failure-envelope contract repeats the same assertion. Further direct numeric re-proofs remain in gate modification, profile, and short-ID tests. This contradicts exclusive ownership by `command_exit_code_projection_tests.rs`.\n\n2. [high] REQ-02 is unmet: per-command tests still assert list-envelope `count`, including multi-ID `issue show` and `issue status` tests. The generic `ListEnvelope` unit test also independently asserts `count == items.len()`, despite the new all-command ownership test.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Both hard ownership criteria remain violated by duplicate exit-code and count assertions outside their designated suites.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"pre-existing\",\"summary\":\"Failure-probe and command-specific subprocess tests still re-prove command exit-code bindings outside the designated projection suite.\",\"file\":\"crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs\",\"line\":307,\"references\":[\"@/issue/8d64ffae/requirement/REQ-01\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"pre-existing\",\"summary\":\"Per-command and generic tests still re-assert list-envelope count, so the designated all-command suite is not the sole owner.\",\"file\":\"crates/jit/tests/cli_issue/issue_show_projection_test.rs\",\"line\":97,\"references\":[\"@/issue/8d64ffae/requirement/REQ-02\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

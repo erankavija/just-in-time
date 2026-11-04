@@ -1,0 +1,1777 @@
+[
+  {
+    "key": "planning-node-lookup-in-templates",
+    "title": "Planning-node lookup lives in the template module",
+    "description": "Move the pure lookup that finds a container's bracket planning node, and the container-label interpolation it depends on, out of `commands` into `crate::templates`, so the validation layer stops importing it from `commands`.\n\n## Background\n\n- `find_planning_node` (`crates/jit/src/commands/validate.rs:2280-2305`), `PLAN_DOC_LABEL` (`:2319`) and `planning_node_plan_path` (`:2328-2334`) are pure functions over issues and a `GraphTemplate`. `commands/mod.rs:96` re-exports the two functions for `crates/jit/src/validation/repository.rs:682-683`, an inverted dependency from the validation layer onto `commands`.\n- `find_planning_node` calls `declared_container_label` (`crates/jit/src/commands/template_expand.rs:626-653`, `pub(super)`), which interpolates container tokens through `InterpolationContext` (`template_expand.rs:528-610`). Template application also uses both (`commands/template.rs:14-15,916`; the `template_expand.rs` tests at `:1221-1303`).\n- `crate::templates` (`crates/jit/src/templates.rs`) already owns `GraphTemplate` (`:279`), `RoleBindings` (`:226`) and `GraphTemplate::plan_doc_location` (`:511`), and imports nothing from `commands`.\n- Callers: `commands/validate.rs:967-968` (`plan_document_paths`), `:1042-1043` (`plan_content_with_issues`), `validation/repository.rs:682-683` (`project_plan_content`), `commands/template.rs:916`, and the unit test `test_find_planning_node_resolves_template_declared_container_label` (`commands/validate.rs:2537`).\n\n## Success Criteria\n\n- [hard] REQ-01: `find_planning_node`, `planning_node_plan_path`, the plan-document label and `declared_container_label`, with the container-token interpolation they use, are defined under `crate::templates`; `commands` defines and re-exports none of them.\n- [hard] REQ-02: `crates/jit/src/validation/repository.rs` resolves planning nodes through `crate::templates`, and no production code under `crates/jit/src/validation/` names a `crate::commands` item for it.\n- [hard] REQ-03: Template application and validation resolve the same planning node and container label as before: the moved unit test passes in the templates module, and the template-application and scope-validation suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "satisfies:9876a23a/REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Planning-node and container-label resolution move from commands into crate::templates.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-06",
+        "DEC-05"
+      ],
+      "terminal": {
+        "consumer_family": "planning-node resolution callers",
+        "test_boundary": "templates unit tests",
+        "worker_sized_reason": "One pure lookup moves between modules with its import sites and one test.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/templates.rs",
+            "crates/jit/src/commands/template_expand.rs",
+            "crates/jit/src/commands/template.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/validation/repository.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "planning-node-lookup"
+      ]
+    }
+  },
+  {
+    "key": "one-plan-document-resolver",
+    "title": "One resolver for plan-document references",
+    "description": "Resolve a breakable container's plan document in one function, make every site that needs it call that function, and merge the two plan-content readers into one.\n\n## Background\n\nThe chain breakable type → container template with a plan-document location → planning node (`crate::templates::find_planning_node`, `crates/jit/src/templates.rs:658`) → planning node's `plan`-labelled document reference (`planning_node_plan_path`, `:685`) is written three times:\n\n- `plan_document_paths` (`crates/jit/src/commands/validate.rs:998-1019`) derives the paths a validation capture must read;\n- `plan_content_with_issues` (`commands/validate.rs:1056-1102`) reads the content for graph-rule evaluation and serves the mutation callers (`commands/mod.rs:2773,3191`, `commands/dependency.rs:382`, `commands/bulk_update.rs:377`);\n- `project_plan_content` (`crates/jit/src/validation/repository.rs:633-668`) reads the content inside repository validation.\n\n`plan_content_from_image` (`commands/validate.rs:1033-1052`) is a second content reader: it parses the image's issues leniently and forwards to `plan_content_with_issues`. Its callers already hold the issues (`commands/issue.rs:129`, `commands/validate.rs:1155`, `commands/gate_check.rs:458,534`) except `image_plan_content` (`validate.rs:1614-1623`).\n\nThe content readers share one rule: an absent plan whose planning node is not `done` is omitted, and an absent plan whose planning node is `done` is an error. The scope-validation tests over external plans (`crates/jit/tests/cli_query_graph/scope_validation_tests.rs:984-1215,1327,1356`) exercise the rule end to end.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function in `crate::templates` maps a container, the issues by id and the template registry to the container's plan-document reference, or none, together with whether its planning node is `done`.\n- [hard] REQ-02: `plan_document_paths`, the plan-content reader and `project_plan_content` obtain plan-document references only through that function; no other code walks from a breakable type to a planning node's plan document.\n- [hard] REQ-03: One function reads plan content from an image for given issues; `plan_content_from_image` no longer exists, each of its callers passes the issues it holds, and `image_plan_content` passes the issues its capture holds.\n- [hard] REQ-04: One templates unit test owns the resolution cases: an inline plan (no reference), a relinked non-default path, and the not-done and done planning node; the scope-validation suite passes unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "satisfies:9876a23a/REQ-12"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "planning-node-lookup-in-templates"
+    ],
+    "planning": {
+      "outcome": "Plan-document references resolve through one function, and plan content is read through one function.",
+      "contract_refs": [
+        "planning-node-lookup"
+      ],
+      "source_refs": [
+        "REQ-12",
+        "DEC-05",
+        "DEC-18"
+      ],
+      "terminal": {
+        "consumer_family": "plan-document resolution sites",
+        "test_boundary": "templates unit tests",
+        "worker_sized_reason": "Three copies of one resolution and two copies of one reader collapse in one focused change.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/templates.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/gate_check.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "plan-document-resolver"
+      ]
+    }
+  },
+  {
+    "key": "config-default-accessors",
+    "title": "Configuration accessors for content format and strictness",
+    "description": "Make `JitConfig::content_format()` and `JitConfig::strictness()` the only readers of the repository's default content format and validation strictness: delete the two wrappers that still sit in front of them and give the accessors their own tests.\n\n## Background\n\n- `JitConfig::content_format()` (`crates/jit/src/config.rs:1209-1214`) and `JitConfig::strictness()` (`:1220-1225`) apply the defaults when `[validation]` is absent, delegating to `ValidationConfig::content_format()` and `ValidationConfig::strictness()` (`:258-266`), which apply them when the key is absent. Loading rejects an invalid token. The validation layer and most command sites already call them (for example `crates/jit/src/validation/repository.rs:542`, `commands/mod.rs:1219-1220`, `commands/bulk_update.rs:609`, `commands/template.rs:1100`).\n- Two wrappers remain. `repo_content_format` (`crates/jit/src/repository_state/projection_render.rs:244-246`, called at `:102`) only forwards to the accessor. `CommandExecutor::repo_content_format` (`crates/jit/src/commands/mod.rs:2726-2729`) wraps it in a `Result` over the cached configuration and is called from `commands/validate.rs:1581,1680,1844,2001`, `commands/bulk_update.rs:608` and `commands/item.rs:152,307,389`.\n- No unit test covers either accessor; `config.rs:1921,1932,1949,2097` cover token parsing only.\n\n## Success Criteria\n\n- [hard] REQ-01: `JitConfig::content_format()` returns the repository's content format, Markdown when undeclared, and `JitConfig::strictness()` returns its strictness, loose when undeclared; each default is stated once, in the `ValidationConfig` accessor the `JitConfig` accessor delegates to.\n- [hard] REQ-02: Neither `repo_content_format` function exists; each former caller reads the content format through `JitConfig::content_format()`, and no code outside `config.rs` maps an absent `[validation]` value to a default.\n- [hard] REQ-03: Config unit tests show both accessors' result for an absent `[validation]` table, an absent key and a declared value, and the existing suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "satisfies:9876a23a/REQ-12"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The content-format and strictness defaults are read only through the JitConfig accessors, which have their own tests.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-12",
+        "DEC-18"
+      ],
+      "terminal": {
+        "consumer_family": "configuration default readers",
+        "test_boundary": "config unit tests",
+        "worker_sized_reason": "Two forwarding wrappers go, their eight call sites read the accessor, and the accessors gain tests.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/config.rs",
+            "crates/jit/src/repository_state/projection_render.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/bulk_update.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "config-default-accessors"
+      ]
+    }
+  },
+  {
+    "key": "built-in-pass-vocabulary",
+    "title": "Built-in validation pass names are one validation-layer vocabulary",
+    "description": "Declare the rule names of the built-in validation passes as one closed vocabulary in the validation layer, so `crates/jit/src/validation/` no longer imports them from `commands`.\n\n## Background\n\n- `DANGLING_LINK_RULE`, `ENFORCEMENT_DRIFT_RULE` and `REVIEW_PLACEHOLDER_RULE` are `&str` constants in `crates/jit/src/commands/validate.rs:12,19,23`, re-exported at `commands/mod.rs:97`. Repository validation reads them from `commands` (`crates/jit/src/validation/repository.rs:622,646,769,832`), and spells the fourth built-in name, `rules-file`, as a literal (`:215`). `commands/validate.rs:1605` spells it again.\n- Other readers: `commands/validate.rs` (dangling, drift and placeholder passes), `commands/gate_check.rs:513,592,597` and tests (`validation/repository.rs:1006,1236,1263`, `commands/gate_check.rs:2908,3048`, `crates/jit/tests/cli_item_validate/item_cli_tests.rs`, `cli_item_validate/validate_cli_rule_tests.rs`, `cli_repo_workflow/profile_acceptance_tests.rs`).\n- Closed vocabularies are declared through the crate's wire-vocabulary macro (`domain/vocabulary.rs`), which emits `as_str`, `ALL`, `FromStr` and serde from one list.\n\n## Success Criteria\n\n- [hard] REQ-01: A `BuiltInPass` vocabulary in the validation layer, declared through the wire-vocabulary macro, names `rules-file`, `dangling-item-link`, `enforcement-drift` and `review-placeholder`, and every built-in finding takes its rule name from it.\n- [hard] REQ-02: The three `commands` constants and their re-export no longer exist, and no code spells a built-in pass name as a string literal outside the vocabulary declaration and tests that assert wire output.\n- [hard] REQ-03: Findings keep their wire rule names: the existing validation and gate suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "config-default-accessors"
+    ],
+    "planning": {
+      "outcome": "The built-in pass rule names become a closed vocabulary in the validation layer.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-06",
+        "DEC-05"
+      ],
+      "terminal": {
+        "consumer_family": "built-in pass rule-name readers",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "One closed vocabulary replaces three constants and one literal at a known set of sites.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/validation/report.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/tests/cli_item_validate/item_cli_tests.rs",
+            "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "built-in-pass"
+      ]
+    }
+  },
+  {
+    "key": "compiled-local-rules",
+    "title": "Local rules compile each schema once per report",
+    "description": "Share one `SchemaEngine` across the issues repository validation evaluates, so each local rule's JSON Schema compiles once per report instead of once per issue.\n\n## Background\n\n- `evaluate_local` (`crates/jit/src/validation/local.rs:230`) desugars each matching rule's schema (`rule_schema`, `:272-278,343`) and builds a new `SchemaEngine` per call (`:289-290`). The engine already caches compiled validators by schema key (`crates/jit/src/validation/engine.rs:113-119`, `validator_for` `:317`, test `test_validator_is_cached_not_recompiled` `:947`), but the cache lives only for that one call.\n- Repository validation calls `evaluate_local` once per issue (`collect_rule_findings`, `crates/jit/src/validation/repository.rs:543-552`), so each schema compiles once per issue.\n- Single-issue write paths also call `evaluate_local` (`commands/mod.rs`, `commands/template.rs`, `commands/bulk_update.rs`, `commands/gate_check.rs`, `commands/validate.rs`), as do its tests (`validation/local.rs`, `repository_state/default_rules.rs`, `tests/fast_docs_templates/content_format_dispatch.rs`, `tests/fast_rules/example_rulesets_tests.rs`, `tests/fast_rules/default_rules_registry_derivation_tests.rs`). `SchemaEngine` is `!Sync`, which suits a single-threaded report.\n\n## Success Criteria\n\n- [hard] REQ-01: Local-rule evaluation accepts a caller's `SchemaEngine`, and repository validation evaluates every issue against one engine per report, so each distinct schema compiles once per report; no new compiled-rule-set type is introduced.\n- [hard] REQ-02: `evaluate_local` keeps its signature and evaluates against an engine of its own, so its callers are unchanged.\n- [hard] REQ-03: A unit test evaluates two issues against one shared engine and shows that a schema both match is compiled once.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "config-default-accessors"
+    ],
+    "planning": {
+      "outcome": "Repository validation evaluates its issues against one shared schema engine, so each schema compiles once per report.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-11",
+        "DEC-18"
+      ],
+      "terminal": {
+        "consumer_family": "local-rule evaluation",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "One engine parameter in local.rs plus its one repository-validation consumer.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/local.rs",
+            "crates/jit/src/validation/repository.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "Changes local.rs's engine ownership and one loop in collect_rule_findings; pure-validation-report, its neighbour on repository.rs, rewrites the report entry points around it, and folding a criterion-owning schema change into that build-reason change would grow the largest core entry."
+        }
+      },
+      "produces_contracts": [
+        "compiled-local-rules"
+      ]
+    }
+  },
+  {
+    "key": "graph-finding-subject",
+    "title": "Graph findings record their firing subject",
+    "description": "Record on every graph finding the issue whose rule application fired it, so a selection can tell the firing subject apart from the issue the finding is attributed to.\n\n## Background\n\n- `GraphFinding` (`crates/jit/src/validation/graph.rs:262-307`) carries `issue_id` (attribution) and a private config-error flag. Constructors: `for_issue` (`:277`), `unattributed` (`:289`), `issue_finding` (`:742`) and `config_error` (`:753`); `evaluate_one` (`:600-690`) dispatches the assertion kinds.\n- Attribution and subject differ in two cases: a `label-coverage` finding with `container-from-label` is attributed to the resolved container while the breakdown issue fired it (`:960-1060`), and a pointer that resolves to no issue or to several is a configuration error with no attribution although one issue fired it (`resolve_container` call sites in the same range).\n- `label-uniqueness` findings (`:692-731`) and rule-level configuration errors have no firing subject.\n\n## Success Criteria\n\n- [hard] REQ-01: `GraphFinding` exposes `subject: Option<IssueId>`: the firing issue for every finding produced while applying a rule to one issue, configuration errors raised for one firing issue included, and `None` for `label-uniqueness` findings and rule-level configuration errors.\n- [hard] REQ-02: Graph unit tests show a `container-from-label` coverage finding attributed to the container with the breakdown issue as subject, an unresolvable pointer reported as a configuration error whose subject is the firing issue, and a `label-uniqueness` finding with no subject.\n- [hard] REQ-03: Attribution, messages and severities are unchanged, and the existing graph and validation suites pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Each graph finding records the issue whose rule application produced it, separately from its attribution.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-02",
+        "DEC-07"
+      ],
+      "terminal": {
+        "consumer_family": "graph-rule evaluators",
+        "test_boundary": "graph unit tests",
+        "worker_sized_reason": "One field set by the existing finding constructors inside graph.rs.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/graph.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "graph-finding-subject"
+      ]
+    }
+  },
+  {
+    "key": "issue-id-prefix-match",
+    "title": "Issue-id prefixes match without allocating",
+    "description": "Make `IssueIdPrefix::matches` compare a prefix against a candidate issue id without allocating, removing the per-candidate allocation that dominates container-pointer and coverage-label resolution.\n\n## Background\n\n- `IssueIdPrefix::matches` (`crates/jit/src/domain/identity.rs:345-347`) normalises the candidate on every call: `normalise` (`:402-407`) allocates a lowercase, hyphen-free copy of the id before the `starts_with` test. The prefix already holds its own normalised form.\n- Graph evaluation calls it once per candidate issue. `resolve_container` (`crates/jit/src/validation/graph.rs:1090-1101`) tests every issue for each `container-from-label` pointer, from `evaluate_label_coverage` (`:743`) and `graph_rule_plan_source_ids` (`:431`), so resolution is O(pointers × issues) allocations; `label_credits_id` (`:122-143`) calls it for every crediting label (`:129,140`). Storage prefix resolution calls it per listed id (`crates/jit/src/storage/mod.rs:110`).\n- A release-build profile of `jit validate` on this repository attributes about 29% of inclusive time to that normalisation (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, C4).\n- Matching is covered by the identity property tests (`identity.rs:863-916`) and the container-pointer graph tests (`graph.rs:2320,2473,2515,2548,2583`).\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueIdPrefix::matches` decides whether the prefix names a candidate id without allocating; `resolve_container`, `label_credits_id` and storage prefix resolution keep calling it, and `GraphEvaluationContext` is unchanged.\n- [hard] REQ-02: Every caller resolves exactly as before: unique, ambiguous and unresolved container pointers, crediting labels and storage prefixes, the minimum prefix length included; the existing identity, graph and storage tests pass unchanged.\n- [hard] REQ-03: A property test shows that `matches` agrees with comparing the normalised candidate, for generated ids and for prefixes in any case and hyphenation.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-07"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "IssueIdPrefix::matches compares a prefix with a candidate id without allocating a normalised copy of the id.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-07",
+        "REQ-08",
+        "DEC-10",
+        "DEC-18"
+      ],
+      "terminal": {
+        "consumer_family": "issue-id prefix matching",
+        "test_boundary": "identity property tests",
+        "worker_sized_reason": "One comparison inside one domain method changes, with one property test.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/identity.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "item-address-index",
+    "title": "Item links resolve against one address index with item kinds resolved once",
+    "description": "Make item-link validation resolve every qualified link against one address index value, and resolve the configured item kinds once per set of captured declarations.\n\n## Background\n\n- `collect_item_link_findings` (`crates/jit/src/validation/repository.rs:697-843`) builds a set of canonical addresses from issue-embedded items and project sources (`:713-749`), then resolves each issue-scoped address by scanning every issue with a prefix (`:800-814`).\n- Item kinds are resolved by `resolve_item_kinds` in that pass (`:703`) and again for every rendered projection inside the same validation (`crates/jit/src/repository_state/projection_render.rs:67`, reached from `repository_state/materialize.rs:319`).\n- Captured declarations are parsed once into `CapturedRepositoryDeclarations` (`crates/jit/src/repository_state/mod.rs:435-490`).\n- Item kinds hold their id pattern as an `IdPattern`, kind scope is the domain `KindScope`, and item-address issue segments are `IssueIdPrefix` values.\n\n## Success Criteria\n\n- [hard] REQ-01: A domain address-index type holds the canonical addresses of every issue-embedded and project item and resolves an issue-scoped address's prefix in one lookup; repository validation builds it once per validation and resolves every link label against it.\n- [hard] REQ-02: `CapturedRepositoryDeclarations` resolves the configured item kinds once, and item-link validation and projection rendering read them from there; neither calls `resolve_item_kinds`.\n- [hard] REQ-03: Unit tests over the address index show a resolved project address, a resolved issue-scoped address given by short prefix, an alias-form address resolving like its canonical form, an ambiguous issue scope and a dangling address; the existing item-link tests pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged. An invalid item-kind declaration still fails the effective-configuration pass with the same error.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-07"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "built-in-pass-vocabulary"
+    ],
+    "planning": {
+      "outcome": "Repository validation resolves item links through one address index, and resolves item kinds once from the captured declarations.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-07",
+        "DEC-10"
+      ],
+      "terminal": {
+        "consumer_family": "item-link resolution",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "One extracted index type and one kinds field reach two consumers.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/item.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/repository_state/mod.rs",
+            "crates/jit/src/repository_state/projection_render.rs",
+            "crates/jit/src/repository_state/materialize.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "address-index"
+      ]
+    }
+  },
+  {
+    "key": "records-loader",
+    "title": "One loader parses the issue records",
+    "description": "Parse every listed issue record through one loader, and make repository validation, validation capture and mutation bases call it.\n\n## Background\n\nSince c47d78c8, issue membership comes from the captured `.jit/issues` listing (`captured_issue_ids`, `crates/jit/src/repository_state/index.rs:118-126`) and `.jit/index.json` holds tombstones only. Three loaders parse the listed records:\n\n- `load_records` (`crates/jit/src/validation/repository.rs:378-401`) checks that the index parses (`:380-384`), then parses every listed record with `serde_json` and checks its embedded id, reporting each defect as `RepositoryJudgedInvalid`.\n- `effective_issues` (`crates/jit/src/commands/validate.rs:785-799`) decodes the overlay-effective bytes of every listed record through `decode_issue_record` (`crates/jit/src/repository_state/issue_record.rs:18`) during capture.\n- `captured_active_issues` (`crates/jit/src/commands/mod.rs:2161-2185`) decodes the same records through `decode_issue_record`, reports a missing record as issue-not-found and a mismatched embedded id as an error; mutation bases, gate checking, archive and gate commands call it.\n\nKept as one change for a build reason: the three private loaders are replaced together, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: One function in `repository_state` parses every listed issue record from a byte source into parsed records, in listing order, checking embedded ids; its errors are typed.\n- [hard] REQ-02: `effective_issues` and the record parsing in `load_records` and `captured_active_issues` no longer exist; each former caller calls the loader.\n- [hard] REQ-03: Each caller keeps its contract: mutation captures still return the listed issues in listing order and report a missing record as issue-not-found, and repository validation reports a missing, unparseable or mismatched record, and an unparseable index, with today's messages.\n- [hard] REQ-04: Unit tests own the loader's cases: a well-formed set, a missing record, a mismatched embedded id, and an unparseable record.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "satisfies:9876a23a/REQ-10"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Listed issue records are parsed by one loader shared by validation, capture and mutation bases.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-10",
+        "DEC-05"
+      ],
+      "terminal": {
+        "consumer_family": "issue-record parsers",
+        "test_boundary": "repository_state unit tests",
+        "worker_sized_reason": "Three private loaders converge on one new loader; deleting them makes the change one unit.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/repository_state/records.rs"
+          ],
+          "touches": [
+            "crates/jit/src/repository_state/mod.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/mod.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "parsed-records"
+      ]
+    }
+  },
+  {
+    "key": "pure-validation-report",
+    "title": "One pure function computes the validation report",
+    "description": "Replace the two repository-validation entry points and their `Result` pair with one pure function that computes a `ValidationReport` from a captured validation and the inputs its caller supplies.\n\n## Background\n\n- `validate_repository` (`crates/jit/src/validation/repository.rs:169-202`) derives the materialization plan and calls `validate_repository_with_materializations` (`:204-357`) with both verdict arguments `Ok(())`; both return `Result<RepositoryValidationReport, RepositoryValidationFailure>` (`:52-132`), where the failure carries the partial report.\n- `validate_repository_with_materializations` takes two verdicts computed outside the image as `Result<()>` arguments (`:208-209`): record fidelity, which becomes the structural failure (`:261-265`), and document-reference resolution, which `validate_integrity` raises (`:403-430`). Only `capture_validation_report` (`crates/jit/src/commands/validate.rs:522-583`) computes them: `capture_document_reference_validation` (`:940-964`) captures each reference in its own bounded image, and `capture_record_fidelity_validation` (`:969-994`) captures every gate run and reads the whole event log through `RepositoryMutationSession::read_history_log`, outside `CaptureSpec`. Its two callers are whole `jit validate` and the `repository_validation` gate checker (`crates/jit/src/commands/gate_check.rs:1083-1086`), the history readers f8a6b298 names under its DEC-19.\n- The function is not pure: `collect_rule_findings` reads the wall clock. The machine-local claims-index check that `validate_repository` also ran was deleted by f8a6b298's lease work (merge 96be25331), so validation reads nothing under `.git/jit/`.\n- Callers: `commands/validate.rs` (`validate_silent` `:139`, `validate_repository_report` `:498`, `validate_repository_report_with_divergences` `:510`, `capture_validation_report` `:522`, `capture_repair_plan` `:655`), `commands/gate_check.rs` (`repository_rule_report` `:413`, `gate_findings_from_report` `:598`, the repository checker at `:1083-1086`), `commands/init.rs:164`, `commands/profile.rs:1084`, `commands/config.rs:293`, `main.rs` (the whole-repository branch of the `Commands::Validate` arm), the tests in `validation/repository.rs` and `crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs:175`. Initialization, configuration and profile application judge proposed overlay images without history verdicts and read the report directly.\n- The validation layer parses records through the shared records loader.\n\nKept as one change for a build reason: the report type replaces a `Result` pair whose callers only compile together.\n\n## Success Criteria\n\n- [hard] REQ-01: `validation::report(&CapturedValidation, &ReportInputs) -> ValidationReport` is the only function that computes the repository report. `CapturedValidation` pairs a captured image with the records the loader parsed from it, and `CapturedValidation::from_image` parses them. `validate_repository`, `validate_repository_with_materializations`, `RepositoryValidationReport` and `RepositoryValidationFailure` no longer exist.\n- [hard] REQ-02: The report reads only its arguments. `ReportInputs` carries the evaluation instant; while the claims-index check exists, the claims-index problems the executor computes from its own worktree paths with today's test-mode skip; and an optional history input holding the record-fidelity and document-reference verdicts. `crates/jit/src/validation/` reads no clock, environment, machine-local file or event-log history and calls no `crate::commands` function.\n- [hard] REQ-03: `ValidationReport` exposes the passes reached, the structural failure if any, whether it carries history verdicts, and the findings projected to the wire `RuleReport`; a structural failure keeps every finding collected before it, and a failed history verdict is a structural failure as today.\n- [hard] REQ-04: Every listed caller computes the report through the new function. Whole `jit validate` and the repository-validation gate are the only callers that supply the history input; `jit validate`, `config set`, `init`, profile apply and the repository-validation gate keep their output and exit status; the existing suites pass, and a unit test shows that an injected instant decides a `gate-recency` finding.\n\n## Notes\n\n- The history verdicts stay computed by the executor under its mutation session; this change moves only how they reach the report.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:gates",
+      "component:core",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "satisfies:9876a23a/REQ-01",
+      "satisfies:9876a23a/REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "records-loader",
+      "item-address-index",
+      "compiled-local-rules",
+      "one-plan-document-resolver"
+    ],
+    "planning": {
+      "outcome": "A single pure validation-layer function computes the whole-repository report from a captured image and injected inputs.",
+      "contract_refs": [
+        "parsed-records",
+        "address-index",
+        "compiled-local-rules",
+        "plan-document-resolver",
+        "built-in-pass"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "REQ-06",
+        "DEC-05",
+        "DEC-09",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "whole-repository report callers",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "The report type replaces a Result pair whose callers only compile together.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/validation/mod.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/init.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/commands/config.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "validation-report"
+      ]
+    }
+  },
+  {
+    "key": "capture-hands-records",
+    "title": "Validation capture hands its parsed records to the report",
+    "description": "Make the validation capture return the records it already parsed, so the report, the divergence view, document-reference discovery and record fidelity read them instead of parsing every issue again.\n\n## Background\n\n- `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:334-486`) parses every issue during capture to plan the closure (`:447-472`) and returns the image with those issues; `capture_proposed_base` (`:216-234`) drops the issues and returns the image alone.\n- `capture_validation_report` (`:522-584`) then parses the issues again three times: `captured_divergences` (`:715-747`) through `captured_active_issues` (`crates/jit/src/commands/mod.rs:2161`), document-reference discovery through `captured_active_issues` (`validate.rs:562`), and the report through its records pass (`load_records`, `crates/jit/src/validation/repository.rs:378`).\n- Record fidelity (`record_drift`, `crates/jit/src/validation/record_fidelity.rs:21-66`) decodes every issue record a fourth time: `issue_drift` (`:74-79`) parses the stored bytes to a JSON value, decodes an `Issue` from it, and compares the writer's serialization with the canonical form of the stored value. `index_drift` (`:68-71`) parses the index a second time after the records pass (`repository.rs:380-384`). Record fidelity runs only for the two history readers, whole `jit validate` and the `repository_validation` gate checker.\n- Capture parses the overlay-effective bytes before the overlay is applied, which equals a parse of the overlaid image.\n\n## Success Criteria\n\n- [hard] REQ-01: The validation capture returns a `CapturedValidation` holding the index and records it parsed, and the CLI validation path, `--fix` repair planning, document-reference discovery and the divergence view read those records; on this path the index and each issue record are decoded once.\n- [hard] REQ-02: `captured_divergences` derives divergences from the captured records and parses nothing.\n- [hard] REQ-03: Record fidelity takes the captured validation's parsed records and index plus the stored bytes it compares, and decodes no issue record or index again; it reports the same records as before.\n- [hard] REQ-04: Output is unchanged: the validation, divergence, repair and record-fidelity suites pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: `--fix` repair planning decodes no issue record, since it consumes none. The hierarchy-fix, transition and reduction steps of `--fix` still decode through their own mutation sessions until the single-capture `--fix` replaces them. `jit recover` no longer depends on issue records; `jit validate` still reports a malformed record. Rejected: restoring a strict record check in recover; restructuring the other `--fix` steps here.\n- **D-02** — Steward ruling 2026-11-04: record decoding keeps the typed decode's behaviour for repeated keys. A repeated issue field is rejected with its line and column; a repeated unknown or map key loads as before. The single value decode only notes a repeated key, and the typed decode then decides. Rejected: rejecting every repeated key, which is stricter than before (REQ-03, REQ-04).\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-10"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "pure-validation-report"
+    ],
+    "planning": {
+      "outcome": "Whole-repository validation parses its records once, during capture, and the report reads them.",
+      "contract_refs": [
+        "validation-report",
+        "parsed-records"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "DEC-05",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "validation capture",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "One capture return value changes for its three in-module consumers.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/validation/record_fidelity.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "image-test-builder",
+    "title": "Shared test fixture for repository images",
+    "description": "Give tests one way to build a closed `RepositoryImage` from declared entries, listings and pinned evidence, without a storage backend or a mutation session.\n\n## Background\n\n- Pure image construction exists only as private test helpers that each build a synthetic `RepositoryLayout`, a `CaptureSpec` and `RepositoryImage::close` (`crates/jit/src/repository_state/image.rs:708`), for example `layout` and `image_with` in `repository_state/mod.rs:1237,1434`, `image_with` in `repository_state/mutation.rs:1435`, `repository_state/archive.rs:631-645` and `image` in `document/reference.rs:320-350`.\n- The helpers it must serve close images over every `RepositoryEntry` kind: files, absences, directories (`repository_state/export.rs`, `archive.rs`, `initialize.rs`, `profile_apply.rs` tests) and symlinks (`export.rs` tests), over listings, over pinned `PinnedDocumentEvidence` keyed by revision and path (`document/reference.rs`, `archive.rs` tests), and some over a capture spec produced by the code under test (`RepositoryExportIntent::capture_spec` in the `export.rs` tests).\n- Shared test helpers live in `jit::test_harness` (`crates/jit/src/test_harness.rs`), compiled under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:35-36`), so library unit tests and integration suites both reach it.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit::test_harness` offers an image builder that takes any `RepositoryEntry` value at a repository-relative or virtual path (files, absences, directories and symlinks), tail-read entries, directory listings and pinned document evidence keyed by revision and path, with either a capture spec derived from what was declared or one the caller supplies, and returns a closed `RepositoryImage` over a fixed synthetic layout or one the caller supplies.\n- [hard] REQ-02: Fixture tests show that a file reads back with its bytes, an absence reads as absent, a directory and a symlink read back as declared, a listing reads back with its names, pinned evidence reads back by revision and path, a caller-supplied spec is the image's spec, and a path outside the declared set is refused as uncaptured.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/shared-test-contracts",
+      "satisfies:9876a23a/REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Tests close a RepositoryImage over declared entries, listings and pinned evidence through one shared fixture.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-04",
+        "DEC-11"
+      ],
+      "terminal": {
+        "consumer_family": "repository-image test fixtures",
+        "test_boundary": "test-support fixture tests",
+        "worker_sized_reason": "One builder with its own tests lands in one test-support module.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_harness.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "image-test-builder"
+      ]
+    }
+  },
+  {
+    "key": "image-builder-copies-converge",
+    "title": "Repository-state and document test images use the shared builder",
+    "description": "Replace the private image-building helpers in the core repository-state and document test modules with the shared test image builder.\n\n## Background\n\n- `jit::test_harness` offers a builder that closes a `RepositoryImage` over any declared entries, listings and pinned evidence, with a derived or caller-supplied capture spec and layout.\n- Private closers in these test modules:\n  - `crates/jit/src/repository_state/mod.rs`: `layout` (`:1237`), `image_with` (`:1434`) and the inline closes at `:1263,1325`;\n  - `repository_state/mutation.rs`: `layout` (`:1394`), `image_with` (`:1435`) and the close at `:1789`;\n  - `repository_state/archive.rs`: `image_with` (`:631-645`), over directories and pinned evidence;\n  - `repository_state/materialize.rs`: `image` (`:707-727`) and `image_with_ignore` (`:1837`);\n  - `repository_state/overlay.rs`: the test close at `:155-197`;\n  - `document/reference.rs`: `image` (`:320-350`), over pinned evidence.\n- `RepositoryImage`'s own tests in `repository_state/image.rs` test `close` itself, and `apply_overlay` (`overlay.rs:92`) and the storage capture close images in production; neither is a test helper.\n\n## Success Criteria\n\n- [hard] REQ-01: The listed test modules build images through the shared builder, and none of them closes a `RepositoryImage` through a helper or inline call of its own.\n- [hard] REQ-02: Each rewritten test asserts the property it asserted before, and the repository-state and document suites pass.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "image-test-builder"
+    ],
+    "planning": {
+      "outcome": "Core repository-state and document test modules build images through the shared builder and keep no private copy.",
+      "contract_refs": [
+        "image-test-builder"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "DEC-11"
+      ],
+      "terminal": {
+        "consumer_family": "repository-state test image helpers",
+        "test_boundary": "repository_state unit tests",
+        "worker_sized_reason": "Six test modules move their helpers onto one fixture with unchanged assertions.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/mod.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/repository_state/archive.rs",
+            "crates/jit/src/repository_state/materialize.rs",
+            "crates/jit/src/repository_state/overlay.rs",
+            "crates/jit/src/document/reference.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-test-images-converge",
+    "title": "Export, initialization and profile test images use the shared builder",
+    "description": "Replace the private image-building helpers in the export, initialization and profile-application test modules with the shared test image builder.\n\n## Background\n\n- `jit::test_harness` offers a builder that closes a `RepositoryImage` over any declared entries, listings and pinned evidence, with a derived or caller-supplied capture spec and layout.\n- Private closers in these test modules:\n  - `crates/jit/src/repository_state/export.rs`: `layout` and `image` (`:311-340`), over directory and symlink entries and the spec `RepositoryExportIntent::capture_spec` produces, and the inline close at `:471`;\n  - `repository_state/initialize.rs`: `image_with_records` (`:1305-1328`), over directory entries;\n  - `repository_state/profile_apply.rs`: `image_owning` (`:3385`), `image_with_profile_owner` (`:3506`) and the inline closes at `:4466,4624`, over directory entries.\n\n## Success Criteria\n\n- [hard] REQ-01: The listed test modules build images through the shared builder, and none of them closes a `RepositoryImage` through a helper or inline call of its own.\n- [hard] REQ-02: Each rewritten test asserts the property it asserted before, and the repository-state suites pass.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "image-test-builder"
+    ],
+    "planning": {
+      "outcome": "Export, initialization and profile-application test modules build images through the shared builder.",
+      "contract_refs": [
+        "image-test-builder"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "DEC-11"
+      ],
+      "terminal": {
+        "consumer_family": "profile-path test image helpers",
+        "test_boundary": "repository_state unit tests",
+        "worker_sized_reason": "Three test modules move their helpers onto one fixture with unchanged assertions.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/export.rs",
+            "crates/jit/src/repository_state/initialize.rs",
+            "crates/jit/src/repository_state/profile_apply.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "report-selection",
+    "title": "Validation views are selections of the report",
+    "description": "Give `ValidationReport` the provenance each finding needs and a selection operation, so every validation view can be computed as a filter of the one report.\n\n## Background\n\n- `ValidationReport` holds findings projected to the wire `ReportedFinding` (`crates/jit/src/validation/report.rs:24`), which keeps the attributed issue, rule, severity and message only. A view also needs each finding's origin (local rule, graph rule and whether it is repository-wide at transition, or a built-in pass), its firing subject (graph findings record it) and whether it is a configuration error. The report also records whether it carries the history verdicts (record fidelity and document references), which only whole `jit validate` and the `repository_validation` gate checker supply; a failed verdict is part of the structural failure.\n- Today each view filters its own pipeline: per-issue in `run_rules` (`crates/jit/src/commands/validate.rs:1643-1758`), scope in `validate_scope` (`:1833-1950`), explain in `explain_rules` (`:1993-2081`), single rule in `rule_validation_outcome` (`:1114-1174`), whose `RuleSelectionFault` (`:1177-1201`) the CLI renders as one error finding and the rule checker records as an `error` run, and the gate checkers in `crates/jit/src/commands/gate_check.rs:413-564`.\n- Scope membership comes from `domain::queries::bracket_scope_ids` (`crates/jit/src/domain/queries.rs:372`) with the container template's breakdown type; rule selection errors come from `validation::graph::select_graph_rule` (`crates/jit/src/validation/graph.rs:409`); explain rows use `Selector::match_failure` and `render_selector` (`commands/validate.rs:2040,2357-2376`, tests `:2851,2862`).\n- The membership of each selection is fixed by the plan's `selection-membership` contract (`dev/active/9876a23a-one-validation-report/plan.md`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each report finding carries its origin, firing subject, attribution and configuration-error flag, and the wire projection is unchanged.\n- [hard] REQ-02: `ValidationReport::select(&Selection)` returns the wire `RuleReport` for `Whole`, `Issue`, `Scope` and `Rule` selections through one membership predicate, and `ValidationReport::explain` returns the `ExplainReport` for an issue. A prefix that resolves to no issue or to several fails with today's not-found or ambiguity error; a report without parsed records fails every selection but `Whole` with its structural error; a `Whole` selection from a report without history verdicts fails with a typed error; a rule that cannot be selected for the issue returns its `RuleSelectionFault`.\n- [hard] REQ-03: `render_selector` and the explain grouping live in the validation layer.\n- [hard] REQ-04: Example unit tests show each selection's membership on one report, including the stated changes: a scope counts a coverage child outside the container's dependency closure, an issue selection omits a configuration error fired by another issue, an issue selection omits `enforcement-drift` and keeps `rules-file`, and only `Whole` reports a failed record-fidelity or document-reference verdict.\n\n## Notes\n\n- Behaviour changes, delivered to users as each view adopts the selection: scope rules see the whole repository; issue and explain configuration errors narrow to the selected issue's subject or rule; issue, explain, scope and rule selections report `rules-file` for an unloadable rule set; issue and explain selections never include `enforcement-drift`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "pure-validation-report",
+      "graph-finding-subject"
+    ],
+    "planning": {
+      "outcome": "ValidationReport answers whole, issue, scope, rule and explain selections through one membership predicate.",
+      "contract_refs": [
+        "validation-report",
+        "graph-finding-subject",
+        "selection-membership",
+        "built-in-pass"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "DEC-05",
+        "DEC-06",
+        "DEC-07",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "report selection",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "One selection type and its membership predicate land in the validation layer with example tests.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/validation/report.rs",
+            "crates/jit/src/validation/mod.rs",
+            "crates/jit/src/commands/validate.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "report-selection"
+      ]
+    }
+  },
+  {
+    "key": "dag-strategy-in-test-harness",
+    "title": "The acyclic-graph proptest strategy lives in the test harness",
+    "description": "Move the acyclic dependency-graph proptest strategy out of the hierarchy test module into `jit::test_harness`, so other library unit tests can generate issue graphs from the same strategy.\n\n## Background\n\n- `arbitrary_dag` (`crates/jit/src/graph/hierarchy.rs:1121`) is private to the hierarchy test module; it yields acyclic graphs by letting each node depend only on lower-indexed nodes.\n- `jit::test_harness` compiles under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:35-36`). `proptest` is a dev-dependency only (`crates/jit/Cargo.toml:109`), and `jit-server` enables `jit/test-support` for its own tests (`crates/server/Cargo.toml:70`), where jit compiles without `proptest`.\n\n## Success Criteria\n\n- [hard] REQ-01: The strategy is defined once in `jit::test_harness` behind `#[cfg(test)]`, so a build with `test-support` but without the dev-dependencies compiles.\n- [hard] REQ-02: The hierarchy tests generate their graphs from it, keep their assertions and pass, and `graph/hierarchy.rs` defines no strategy of its own.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The acyclic dependency-graph proptest strategy moves to the library test harness for unit-test modules to share.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-04",
+        "DEC-11"
+      ],
+      "terminal": {
+        "consumer_family": "graph proptest strategies",
+        "test_boundary": "graph unit tests",
+        "worker_sized_reason": "One private strategy moves to the harness and its one consumer follows.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_harness.rs",
+            "crates/jit/src/graph/hierarchy.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "selection-contract-proptest",
+    "title": "One property test owns the selection contract",
+    "description": "Prove the selection contract once, by property: for generated repository images and selections, each selected report is the whole report restricted to what the membership contract admits.\n\n## Background\n\n- `ValidationReport::select` and `ValidationReport::explain` compute every view through one production membership predicate; example tests in the validation layer show single cases.\n- The plan's `selection-membership` contract (`dev/active/9876a23a-one-validation-report/plan.md`) states, per selection, which findings it admits by origin, firing subject, attribution and configuration-error flag, and when the structural failure is reported.\n- `jit::test_harness` offers the image builder and an acyclic dependency-graph strategy. Unit tests under `crates/jit/src/validation/` add no Cargo target (`@/inv/bounded-rust-build-footprint`).\n\n## Success Criteria\n\n- [hard] REQ-01: A `cfg(test)` module under `crates/jit/src/validation/` generates images from: a configuration declaring an issue-scoped and a project-scoped item kind and a breakable type with a bracket template; a rule set from a fixed menu (a local schema rule, `label-coverage` with `container-from-label`, `label-uniqueness`, `dependency-shape`, each at a generated severity) or an unloadable `rules.toml`; invariants bound to generated rules and gates; a gate registry with an optional passing placeholder; 2-7 issues over an acyclic dependency graph, two of whose ids share a prefix, with valid, dangling and unqualified link labels.\n- [hard] REQ-02: For each image and each selection (whole, every issue, an ambiguous and a non-matching prefix, every breakable container's scope, every graph rule with every issue), an oracle written in the test from the contract's clauses over each finding's provenance, and not calling the production predicate, decides membership; the selected findings, and whether the structural failure is reported or the selection fails, equal the oracle's.\n- [hard] REQ-03: For each image, each finding in an issue I's selection is a whole-report finding reattributed to I, and the union of those source findings plus the unattributed and built-in findings equals the whole report's findings exactly; in each issue I's explain report, a matched rule fails exactly when I's selection holds a finding of it (`selection-membership`).\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: REQ-01's generated disagreement between the issue listing and the index is deleted. Since c47d78c8 the index holds only tombstones and membership comes from the listing, so no such disagreement exists to generate.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/orthogonal-tests",
+      "satisfies:9876a23a/REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "report-selection",
+      "image-test-builder",
+      "dag-strategy-in-test-harness"
+    ],
+    "planning": {
+      "outcome": "A proptest over generated images checks each selection against an oracle written from the membership contract.",
+      "contract_refs": [
+        "report-selection",
+        "image-test-builder",
+        "selection-membership"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "DEC-11"
+      ],
+      "terminal": {
+        "consumer_family": "selection contract",
+        "test_boundary": "validation property tests",
+        "worker_sized_reason": "One property test module with its generators fits one focused cycle.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/validation/selection_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/src/validation/mod.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "A test-only property owner; the shared path with report-selection is one `mod` declaration in validation/mod.rs, and merging would put the contract's oracle beside the predicate it must stay independent of (DEC-11)."
+        }
+      }
+    }
+  },
+  {
+    "key": "issue-views-over-selection",
+    "title": "Per-issue and explain validation select from the report",
+    "description": "Make `jit validate <id>` and `jit validate <id> --explain` capture the repository once, compute the one report from the records the capture parsed, and call `ValidationReport::select` and `explain` on it directly, deleting `run_rules` and `explain_rules`.\n\n## Background\n\n- `run_rules` (`crates/jit/src/commands/validate.rs:1643-1758`) and `explain_rules` (`:1993-2081`) read through storage and the executor's disk caches, evaluate graph rules over every issue, call the executor-side dangling-link and drift passes, and capture a whole validation image only to read plan documents (`image_plan_content`, `:1614-1623`). On a copy of this repository (1,863 issue files, release build) `jit validate <id>` takes 5.81 s against 4.53 s for whole-repository `jit validate`, even though whole validation also reads the event log and every gate run for record fidelity.\n- Today's per-issue filter keeps every configuration error of a rule whose selector matches the issue, whoever fired it (`:1716-1720`), and folds in drift only when the rule set is unloadable (`:1656-1677`); explain keeps every configuration error (`:2025`).\n- `run_rules(None)` (`:1724-1754`) is a second whole-repository report. Its only production caller passes `Some` (`crates/jit/src/main.rs:6006`, inside `if id.is_some()`); its test callers are `commands/batch_create.rs:1069`, `commands/validate.rs:3284`, `commands/gate_check.rs:2979,3415`, `tests/fast_docs_templates/batch_export_tests.rs:455` and `tests/fast_rules/validate_rule_runner_tests.rs:110`.\n- The validation capture returns a `CapturedValidation` with the records it parsed. Whole-repository validation also derives the divergence view and the claims-index input and, as a history reader, the record-fidelity and document-reference verdicts; the issue selection excludes the structural failure.\n- Other callers: `main.rs:5940` (explain), `tests/fast_rules/validate_rule_runner_tests.rs` and `tests/fast_rules/default_rules_registry_derivation_tests.rs:145`.\n- Tests that re-prove filtering: `commands/validate.rs:3263`; `tests/fast_rules/validate_rule_runner_tests.rs:97,117,152`; `tests/cli_item_validate/validate_cli_rule_tests.rs:611,631`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate <id>` and `--explain` call `ValidationReport::select(&Selection::Issue(..))` and `ValidationReport::explain` directly on the report computed from one validation capture whose parsed records the report reads; no per-view wrapper remains (`run_rules` and `explain_rules` are deleted), and neither path reads storage, the executor's caches, a second capture, the event-log history or the gate-run listing. The whole-repository arm no longer exists, and its test callers read the whole report from the validation capture.\n- [hard] REQ-02: The per-issue and explain paths derive no divergence view, no history verdict and no claims-index input, so their work is a subset of whole-repository validation's.\n- [hard] REQ-03: Harness tests show that `jit validate <id>` omits a `container-from-label` pointer error fired by another issue under a rule matching the selected issue, and that with an unloadable rule set and an invariant bound to a rule it reports `rules-file` and no `enforcement-drift`; each fails on today's code, whose per-issue filter keeps the pointer error and reports drift.\n- [hard] REQ-04: The listed filtering tests are reduced to wiring (the view equals the report's selection) or removed where the selection tests own the property; the CLI output and exit-code tests pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: the CLI and the checkers call the one `ValidationReport::select(&Selection)` entry point (and `ValidationReport::explain`) directly, with no per-view wrapper function; the issue, rule and scope views share one executor function that captures once and computes the report without history, which 2c8c13b2 introduces and 86f7e6eb and 208edf4c reuse. Rejected: per-view wrappers (`run_rules`, `explain_rules`, `validate_scope`, `validate_rule`), four thin copies around one selection.\n\n## Notes\n\n- Behaviour change: per-issue and explain configuration errors narrow to the selected issue's subject or rule; `rules-file` is always included and `enforcement-drift` never.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-02",
+      "satisfies:9876a23a/REQ-08"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "report-selection",
+      "capture-hands-records"
+    ],
+    "planning": {
+      "outcome": "jit validate <id> and --explain capture once and select from the one report; the whole-repository rule-report arm goes.",
+      "contract_refs": [
+        "report-selection",
+        "validation-report",
+        "selection-membership"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "REQ-08",
+        "DEC-07",
+        "DEC-11",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "issue-scoped validation views",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "Two executor methods become capture-and-select and their tests shrink to wiring.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/batch_create.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/tests/fast_docs_templates/batch_export_tests.rs",
+            "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
+            "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "rule-view-over-selection",
+    "title": "Single-rule validation selects from the report",
+    "description": "Make `jit validate <id> --rule <rule>` compute the one report from the records the capture parsed and call `ValidationReport::select(&Selection::Rule { .. })` on it directly, deleting `validate_rule`.\n\n## Background\n\n- `validate_rule` (`crates/jit/src/commands/validate.rs:1959-1970`) captures the validation image and calls `rule_validation_outcome` (`:1114-1174`), which parses issues and declarations again (`:1120-1126`), assembles configuration a second time (`:1127`) and evaluates the rule with the issue as its sole firing subject. A missing, off, non-graph or non-matching rule is a `RuleSelectionFault` (`:1177-1201`, from `validation::graph::select_graph_rule`), which the view renders as one error finding (`:1969`). An unloadable rule set propagates as an error (`declarations_from_image(image)?`, `:1126`).\n- `rule_validation_outcome` also serves the rule-validation gate checker, which keeps calling it and records a `RuleSelectionFault` as an `error` run.\n- The validation capture holds no event-log history and no gate-run listing; only whole-repository validation and the repository-validation gate checker read those.\n- Tests: `crates/jit/tests/cli_query_graph/scope_validation_tests.rs:285-468` (rule validation through the executor) and `tests/cli_item_validate/validate_cli_rule_tests.rs:666-808` (CLI output).\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate <id> --rule <rule>` calls `ValidationReport::select` for the issue and rule directly on the report computed from one validation capture whose parsed records the report reads; no per-view wrapper remains (`validate_rule` is deleted), and the view reads no event-log history and no gate-run listing.\n- [hard] REQ-02: A rule selection fault reports the same error finding as before, and the CLI rule tests pass unchanged.\n- [hard] REQ-03: A harness test with an unloadable rule set shows that the rule view reports the `rules-file` finding; it fails on today's code, which returns an error.\n- [hard] REQ-04: The executor-level rule tests in `scope_validation_tests.rs` are reduced to wiring or removed where the selection tests own the property.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: the CLI and the checkers call the one `ValidationReport::select(&Selection)` entry point (and `ValidationReport::explain`) directly, with no per-view wrapper function; the issue, rule and scope views share one executor function that captures once and computes the report without history, which 2c8c13b2 introduces and 86f7e6eb and 208edf4c reuse. Rejected: per-view wrappers (`run_rules`, `explain_rules`, `validate_scope`, `validate_rule`), four thin copies around one selection.\n\n## Notes\n\n- Behaviour change: with an unloadable rule set the rule view reports the `rules-file` finding where it returned a load error.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "issue-views-over-selection"
+    ],
+    "planning": {
+      "outcome": "jit validate <id> --rule <rule> captures once and selects the rule's findings for the issue from the one report.",
+      "contract_refs": [
+        "report-selection",
+        "validation-report",
+        "selection-membership"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "DEC-11",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "single-rule view",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "One executor method becomes capture-and-select with its tests reduced to wiring.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/tests/cli_query_graph/scope_validation_tests.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "Edits validate_rule and its executor tests; its neighbours edit other functions of validate.rs (report-selection the report, capture-hands-records the capture, gate-checkers-over-selection the rule checker after this view lands)."
+        }
+      }
+    }
+  },
+  {
+    "key": "scope-view-over-selection",
+    "title": "Scope validation selects from the report",
+    "description": "Make `jit validate --scope <container>` compute the one report over the whole repository, from the records the capture parsed, and call `ValidationReport::select(&Selection::Scope(..))` on it directly, deleting `validate_scope`.\n\n## Background\n\n- `validate_scope` (`crates/jit/src/commands/validate.rs:1833-1950`) reads storage and caches, fails on an unloadable rule set (`self.exec.effective_rules()?`, `:1843`), evaluates local rules on the bracket slice, evaluates graph rules with the slice as graph context (`evaluate_graph_scoped`, called at `:1915`, `crates/jit/src/validation/graph.rs:362-380`), and adds executor-side dangling-link and drift findings. Coverage candidates and dependency targets outside the slice are invisible to it.\n- The validation capture holds no event-log history and no gate-run listing; only whole-repository validation and the repository-validation gate checker read those. `--scope <epic>` takes 1.86 s on a copy of this repository (1,863 issue files, release build).\n- The out-of-scope container rule (ef0065ad) is asserted by `test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope` (`crates/jit/tests/cli_query_graph/scope_validation_tests.rs:800`).\n- Tests that re-prove filtering: `scope_validation_tests.rs:531,587,659,800,864`. The external-plan tests (`:984-1215,1327,1356`) and the CLI exit and JSON tests (`:1456-1533`) stay.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate --scope <container>` calls `ValidationReport::select` for the container's scope directly on the report computed from one validation capture whose parsed records the report reads; no per-view wrapper remains (`validate_scope` is deleted); graph rules are evaluated over the whole repository, and the view reads no event-log history and no gate-run listing.\n- [hard] REQ-02: Harness tests show that an issue outside the container's dependency closure carrying a coverage label for one of the container's criteria satisfies it in the scope report, and that an unloadable rule set yields the `rules-file` finding; each fails on today's code, which reports the criterion uncovered and returns a load error.\n- [hard] REQ-03: A finding attributed to a container outside the scope stays out of the scope report, and the out-of-scope container test passes unchanged.\n- [hard] REQ-04: The listed filtering tests are reduced to wiring or removed where the selection tests own the property; the external-plan and CLI tests pass unchanged.\n- [hard] REQ-05: The selection property test (`crates/jit/src/validation/selection_proptests.rs`) generates images whose rule pass fails, and asserts that every non-Whole selection and explain fails with that error while Whole reports it as the structural failure (D-02).\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: the CLI and the checkers call the one `ValidationReport::select(&Selection)` entry point (and `ValidationReport::explain`) directly, with no per-view wrapper function; the issue, rule and scope views share one executor function that captures once and computes the report without history, which 2c8c13b2 introduces and 86f7e6eb and 208edf4c reuse. Rejected: per-view wrappers (`run_rules`, `explain_rules`, `validate_scope`, `validate_rule`), four thin copies around one selection.\n- **D-02** — Steward ruling 2026-11-04: `selection-membership` now reads \"A report without parsed records, or whose rule pass failed, fails every selection but Whole with that error\". The report is not selectable when its rule pass errs, so the scope view fails instead of reporting a clean selection over missing findings. The clause's owning case joins the selection property test landed by 728ecfb0 (REQ-05), since the issue that introduces a clause extends its owning test.\n\n## Notes\n\n- Behaviour change: scope rules see the whole repository, so coverage children and dependency targets outside the container's subtree count; an unloadable rule set is reported as the `rules-file` finding instead of an error.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "issue-views-over-selection"
+    ],
+    "planning": {
+      "outcome": "jit validate --scope evaluates rules over the whole repository and restricts the report to the container's bracket scope.",
+      "contract_refs": [
+        "report-selection",
+        "validation-report",
+        "selection-membership"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "DEC-06",
+        "DEC-11",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "scope view",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "One executor method becomes capture-and-select with its tests reduced to wiring.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/tests/cli_query_graph/scope_validation_tests.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "Edits validate_scope and its executor tests; its neighbours edit other functions of validate.rs (the report and the capture), and the behaviour change it asserts has its own failing-first test."
+        }
+      }
+    }
+  },
+  {
+    "key": "invariant-drift-over-declarations",
+    "title": "Invariant check computes drift from captured declarations",
+    "description": "Make `jit invariant check` compute enforcement drift from captured declarations through the same function the validation report uses, fail on an unloadable gate registry as the report does, and drop the drift computation's unloadable-gate case.\n\n## Background\n\n- `check_invariants` (`crates/jit/src/commands/invariant.rs:50-58`) calls the executor's `compute_drift_findings` (`crates/jit/src/commands/validate.rs:1470-1504`), which loads rules and gates from disk and treats an unparseable `gates.toml` as an unloadable source.\n- The report's drift pass (`collect_enforcement_drift_findings`, `crates/jit/src/validation/repository.rs:576-605`) runs over captured declarations and always passes the gate registry as loaded; an unparseable `gates.toml` fails declaration loading there, so `jit validate` fails with an error naming the file.\n- `enforcement_drift` (`crates/jit/src/validation/drift.rs:165`) takes each source as a `SourceState` (`:104-120`). Once no caller passes an unloadable gate registry, the gate arm of `resolve_binding` that handles it (`:219`), its rustdoc and its unit tests (`drift.rs:443,463`) are dead; the unloadable rule-set case stays.\n- `test_check_reports_unloadable_gate_registry` (`crates/jit/tests/cli_item_validate/invariant_check_cli_tests.rs:198`) pins the tolerant behaviour; the unit tests at `invariant.rs:96-197` cover drift cases.\n\n## Success Criteria\n\n- [hard] REQ-01: `check_invariants` obtains the repository's declarations once and computes `DriftFinding`s through the validation-layer drift function the report's drift pass calls; it no longer calls `compute_drift_findings`.\n- [hard] REQ-02: An unparseable `gates.toml` makes `jit invariant check` fail with an error naming `.jit/gates.toml`; the rewritten CLI test asserts it and fails on today's code, which reports an unloadable-gate drift finding.\n- [hard] REQ-03: The drift function takes the gate registry as loaded keys, the unloadable-gate arm and its tests no longer exist, and drift findings, the unloadable-rules case included, are otherwise unchanged; the other invariant tests pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: `jit invariant check` reads its declarations once through the existing lock-free storage loads, so a read-only command never waits on writers (`@/charter/D-22`); no lock-free image capture exists yet. The interim loads move onto the read driver's lock-free capture with the read-driver work, whose criteria retire them. Rejected: capturing through a mutation session, which waits behind writers.\n\n## Notes\n\n- Behaviour change: an unloadable gate registry is an error for `jit invariant check`, as it is for `jit validate`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-05"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "pure-validation-report"
+    ],
+    "planning": {
+      "outcome": "jit invariant check computes drift through the report's drift function over one captured image, with no unloadable-gate case.",
+      "contract_refs": [
+        "validation-report"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "DEC-08"
+      ],
+      "terminal": {
+        "consumer_family": "invariant check command",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "One command moves onto the validation-layer drift computation with one changed test.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/invariant.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/validation/drift.rs",
+            "crates/jit/tests/cli_item_validate/invariant_check_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "gate-checkers-over-selection",
+    "title": "Built-in validation gate checkers select from the report",
+    "description": "Make each built-in validation gate checker compute the one report over its captured image and report the selection the plan's `checker-selections` contract assigns it, deleting the checkers' private pipelines.\n\n## Background\n\n- Dispatch: `execute_builtin_checker_with_repository_view` (`crates/jit/src/commands/gate_check.rs:1052-1200`). The repository checker calls `validate_repository_report` (`:1083-1086`), the whole capture that also reads every gate run and the whole event log for record fidelity; it is one of the two history readers f8a6b298 names under its DEC-19. The issue checker calls `captured_issue_rule_report` (`:423-485`), the label-target checker `label_target_report` (`:643-674`) and then `captured_scope_rule_report` (`:487-564`), and both call `repository_rule_report` (`:413-421`), a full repository validation, only to keep its dangling-link and drift findings. The rule checker calls `rule_validation_outcome` (`crates/jit/src/commands/validate.rs:1114-1174`) and records its `RuleSelectionFault` as an `error` run (`gate_check.rs:1089-1093`); the CLI rule view, its other caller, already selects from the report.\n- The label-target checker evaluates graph rules over the scope slice (`evaluate_graph_scoped`, `gate_check.rs:536`); the issue checker keeps every configuration error of a rule matching the issue (`:469-472`).\n- Built-in checker faults record `error` runs (`builtin_fault_run`, `:678`), while findings about repository content record `failed`. A missing or repeated target label, an empty namespace and an unresolvable or ambiguous target are faults today (`:659-673`), as is an unloadable rule set.\n- Tests that re-prove filtering: `gate_check.rs:3186` (`test_repository_validation_warns_for_sorted_placeholder_gate_keys`, which calls `review_placeholder_findings`), `:3213,3238,3258,3282,3316` (label target), `:3347,3445,3508` (rule validation); `run_rules(None)` comparisons at `:2979,3415`. The fault classification is asserted at `:3531,3568`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the repository, issue, rule and label-target checkers computes one report over its image and converts the selection the contract assigns it; `repository_rule_report`, `captured_issue_rule_report`, `captured_scope_rule_report` and `rule_validation_outcome` no longer exist. The repository checker keeps its history-reading capture; the issue, rule and label-target checkers read no event-log history and no gate-run listing.\n- [hard] REQ-02: One harness test shows, for one image and each checker kind, that the checker's findings equal the findings `jit validate` reports for the same selection.\n- [hard] REQ-03: A run's status keeps the fault classification: an unloadable rule set, a `RuleSelectionFault`, and a missing, repeated, unresolvable or ambiguous target label record `error`; a content finding records `failed`.\n- [hard] REQ-04: The listed checker tests are reduced to that wiring or removed where the selection tests own the property, and they no longer call the executor's placeholder pass or `run_rules`.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: REQ-01's \"read no event-log history and no gate-run listing\" concerns the report's inputs. The shared gate-evaluation capture that discovers the gate-run listing and event tail to publish the run (`capture_gate_evaluation_image`) is outside it and stays.\n\n## Notes\n\n- Behaviour changes: the label-target checker evaluates rules over the whole repository, so coverage children and dependency targets outside the target's subtree count; the issue checker's configuration errors narrow to the gated issue's subject or rule. With an unloadable rule set the issue checker keeps recording an `error` run, where `jit validate <id>` reports the `rules-file` finding.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:gates",
+      "component:validation",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-03",
+      "satisfies:9876a23a/REQ-05"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "rule-view-over-selection"
+    ],
+    "planning": {
+      "outcome": "Each built-in validation checker computes the one report over its image and returns its selection.",
+      "contract_refs": [
+        "report-selection",
+        "validation-report",
+        "checker-selections",
+        "selection-membership"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "REQ-05",
+        "DEC-03",
+        "DEC-11",
+        "DEC-17"
+      ],
+      "terminal": {
+        "consumer_family": "built-in validation gate checkers",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "Four checker arms in one dispatch move to selections and their private pipelines are deleted.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/validate.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "Rewrites the checker dispatch in gate_check.rs; its validate.rs edit deletes rule_validation_outcome, which the rule view stops calling first, so the rule view and the checkers are distinct consumer families."
+        }
+      }
+    }
+  },
+  {
+    "key": "executor-pass-cases-to-report-tests",
+    "title": "Report pass tests cover the executor-pass cases",
+    "description": "Assert, against the validation report's own passes, every case the executor-side dangling-link, drift and placeholder unit tests cover, so those executor copies can be deleted without losing a property.\n\n## Background\n\n- The executor-pass unit tests (`crates/jit/src/commands/validate.rs:3009-3326`) cover enforces-rule and enforces-gate links, unresolvable qualified ids, explicit kind forms, the named-project form, unqualified links and an invariant link.\n- The report's item-link, drift and placeholder tests live in `crates/jit/src/validation/repository.rs` (from about `:977`); `jit::test_harness` builds closed images for them.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case the listed executor-pass tests cover is asserted once by a report test built on the shared image builder, with the same expected finding or absence.\n- [hard] REQ-02: The report suite passes; the executor-pass tests are left in place.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/orthogonal-tests",
+      "satisfies:9876a23a/REQ-05"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "pure-validation-report",
+      "image-test-builder"
+    ],
+    "planning": {
+      "outcome": "The report's item-link, drift and placeholder tests assert each case the executor-pass unit tests cover.",
+      "contract_refs": [
+        "validation-report",
+        "image-test-builder"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "DEC-11"
+      ],
+      "terminal": {
+        "consumer_family": "report pass tests",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "One test relocation into the report's test module, built on the shared image builder.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/repository.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "Moves test cases onto the report before the copies are deleted, so coverage never lapses; it lands as soon as the report exists, while the deletion waits for five view and checker changes (DEC-11)."
+        }
+      }
+    }
+  },
+  {
+    "key": "executor-pass-copies-removal",
+    "title": "Remove the executor-side validation pass copies",
+    "description": "Delete the executor's copies of the dangling-link, enforcement-drift and review-placeholder passes and the scoped graph entry point, together with their unit tests.\n\n## Background\n\n- `dangling_link_findings` (`crates/jit/src/commands/validate.rs:1326-1397`), `enforcement_drift_findings` (`:1430-1451`), `compute_drift_findings` (`:1470-1504`), `loadable_rule_names` (`:1515-1542`) and `review_placeholder_findings` (`:1766-1799`) have no production caller once the views, the invariant check and the gate checkers read the report. They are public, so the build does not flag them.\n- Their unit tests (`commands/validate.rs:2933-3219`) have counterparts against the report's passes in `crates/jit/src/validation/repository.rs`.\n- `validation::graph::evaluate_graph_scoped` (`crates/jit/src/validation/graph.rs:349-380`) is called only by the former scope view and label-target checker, so it too has no production caller; the rustdoc of `evaluate_graph_indexed` names it (`:502`). Its two tests are selection properties with other owners: `test_scoped_container_pointer_resolves_outside_slice_and_skips` (`:2399`) by the scope view's out-of-scope container test, and `test_scoped_container_pointer_unresolvable_in_full_index_is_config_error` (`:2439`) by the unresolvable-pointer graph test (`:2320`).\n- The rustdoc of `graph.rs:66-90` names `dangling_link_findings` as a resolution path.\n\n## Success Criteria\n\n- [hard] REQ-01: The five listed methods and their unit tests no longer exist, and no executor method computes dangling-link, drift or placeholder findings.\n- [hard] REQ-02: `evaluate_graph_scoped` and its two tests no longer exist; each removed case is owned by the test named in Background.\n- [hard] REQ-03: No rustdoc names a removed function, and the validation suites pass.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/convention-convergence",
+      "satisfies:9876a23a/REQ-05"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "scope-view-over-selection",
+      "invariant-drift-over-declarations",
+      "gate-checkers-over-selection",
+      "executor-pass-cases-to-report-tests"
+    ],
+    "planning": {
+      "outcome": "The executor's dangling-link, drift and placeholder passes, the scoped graph entry point and their unit tests are gone.",
+      "contract_refs": [
+        "validation-report"
+      ],
+      "source_refs": [
+        "REQ-05"
+      ],
+      "terminal": {
+        "consumer_family": "executor validation passes",
+        "test_boundary": "existing validation suites",
+        "worker_sized_reason": "A deletion of six uncalled public functions and their unit tests.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/validation/graph.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "Pure deletion gated on five view and checker changes; the test relocation it follows lands earlier so coverage never lapses."
+        }
+      }
+    }
+  },
+  {
+    "key": "validation-layer-tests-off-commands",
+    "title": "Validation-layer tests and prose stop naming commands",
+    "description": "Remove the last references from the validation layer to `commands`: the test fixtures that drive an executor and the rustdoc that names executor items.\n\n## Background\n\n- The tests in `crates/jit/src/validation/repository.rs` (from about `:870`) build images through `crate::commands::CommandExecutor` (`:902-916`), `crate::commands::overrides_from_repo_changes`, `crate::commands::validation_overlay` and `capture_validation_image_with` (`:925-970`). They judge overlay validation, a command-layer composition of capture and report.\n- `crates/jit/src/validation/mod.rs:7` links `effective_rules` on `crate::commands::CommandExecutor`; `crates/jit/src/validation/graph.rs:76-96` names `CommandExecutor::resolve_link_label`, `query_by_label`, `show_item` and `commands::claim::assert_valid_actor`.\n- `jit::test_harness` builds closed images without an executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No code, test or rustdoc under `crates/jit/src/validation/` names a `crate::commands` item.\n- [hard] REQ-02: Report tests that need only an image build it through the shared test image builder; tests that judge overlay capture live in the commands test module; each asserts the property it asserted before.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:testing",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/architecture-dependency-direction",
+      "satisfies:9876a23a/REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "executor-pass-copies-removal"
+    ],
+    "planning": {
+      "outcome": "Nothing under crates/jit/src/validation names a commands item, tests and rustdoc included.",
+      "contract_refs": [
+        "image-test-builder",
+        "validation-report"
+      ],
+      "source_refs": [
+        "REQ-06"
+      ],
+      "terminal": {
+        "consumer_family": "validation-layer references to commands",
+        "test_boundary": "validation unit tests",
+        "worker_sized_reason": "One test module and three doc comments move off commands in one relocation.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/validation/mod.rs",
+            "crates/jit/src/validation/graph.rs",
+            "crates/jit/src/commands/validate.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "validation-view-docs",
+    "title": "Validation and gate references describe views as report selections",
+    "description": "Update the validation, gate-checker and invariant references to state that every validation view and built-in validation checker is a selection of one report, and the behaviour that follows.\n\n## Background\n\n- `docs/reference/cli-commands.md` documents `jit validate` (`:3249-3334`) and `jit invariant check` (`:3507-3520`); `docs/reference/worktree-validate.md` documents `jit validate` (`:288` onwards); `docs/reference/gate-presets.md` lists the portable checkers (`:25-105`); `docs/concepts/validation-engine.md` describes where rules run (`:40-80`); `docs/concepts/planning-bracket.md:248` and `docs/how-to/adopt-planning-bracket.md:408-415` describe `--scope`.\n- Changed behaviour: `--scope` evaluates rules over the whole repository, restricts findings to the container's bracket scope, and reports an unloadable rule set as the `rules-file` finding instead of failing; per-issue and `--explain` configuration errors narrow to the selected issue's subject or rule; issue and explain views always include `rules-file` and never `enforcement-drift`; the rule view reports `rules-file` for an unloadable rule set; `jit invariant check` fails on an unloadable gate registry; each built-in validation checker reports what `jit validate` reports for its selection, so the label-target checker evaluates rules over the whole repository and the issue checker's configuration errors narrow to the gated issue's subject or rule.\n\n## Success Criteria\n\n- [hard] REQ-01: The listed pages describe each view and each built-in validation checker as a selection of the one report, and state the changed behaviour above where each page covers the view.\n- [hard] REQ-02: No page under `docs/` describes `--scope` as evaluating rules over the slice alone, or `jit invariant check` as tolerating an unloadable gate registry.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:docs",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/single-source-prose",
+      "satisfies:9876a23a/REQ-02",
+      "satisfies:9876a23a/REQ-03"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "scope-view-over-selection",
+      "invariant-drift-over-declarations",
+      "gate-checkers-over-selection"
+    ],
+    "planning": {
+      "outcome": "The validation, gate and invariant references describe views as selections of one report.",
+      "contract_refs": [
+        "selection-membership",
+        "checker-selections"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "REQ-03",
+        "DEC-06",
+        "DEC-07",
+        "DEC-08"
+      ],
+      "terminal": {
+        "consumer_family": "validation reference pages",
+        "test_boundary": "documentation gates",
+        "worker_sized_reason": "Four reference pages receive one coherent description of the selection model.",
+        "footprint": {
+          "touches": [
+            "docs/reference/cli-commands.md",
+            "docs/reference/worktree-validate.md",
+            "docs/reference/gate-presets.md",
+            "docs/concepts/validation-engine.md",
+            "docs/concepts/planning-bracket.md",
+            "docs/how-to/adopt-planning-bracket.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "capture-spec-incremental",
+    "title": "Capture specs validate only added entries",
+    "description": "Make `CaptureSpec`'s growth methods validate only the entries they add, and apply a capture's base requests once, so growing a spec one request at a time is linear.\n\n## Background\n\n- `discover_paths`, `discover_tail`, `discover_kinds` and `discover_listings` (`crates/jit/src/repository_state/image.rs:586-652`) clone the whole spec, add the request and re-run `validate` (`:732-753`) over every held path, listing and pinned request. `discover_pinned` and `discover_pinned_kind` (`:660-685`) already validate only their request.\n- Every check in `validate` is per entry (depth within `max_depth`, `ensure_semantic`, `validate_pinned_request`) or a count (`listings.len()` within `max_listings`), and every mutator goes through these methods, so every held entry is already valid. `RepositoryImage::close` validates the spec once (`:787`).\n- `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:334-486`) applies its base requests (configuration, registries, index, the issue listing and the event-log tail) before the first capture (`:479-483`) and again at the start of every discovery round (`:408-411`), returning early when that changed the spec. A capture grown from a start image (`grow_discovering`, `crates/jit/src/commands/mod.rs:356-374`) receives them only through that round.\n- Document-reference resolution captures each reference in its own bounded spec (`capture_document_reference_validation`, `validate.rs:940-964`, test `:3514`), so no capture grows by one reference at a time. The round-count tests over `counted_session` (`validate.rs:3618-3637`) are at `:3642,3655,3669`.\n\n## Success Criteria\n\n- [hard] REQ-01: `discover_paths`, `discover_tail`, `discover_kinds` and `discover_listings` validate only the entries a call adds plus the listing count, and clone nothing; a refused call leaves the spec unchanged.\n- [hard] REQ-02: A capture applies its base requests once, to its initial spec or to its start image's spec, and no discovery round re-applies them.\n- [hard] REQ-03: A proptest shows that, for generated specs and batches, a batch is accepted exactly when whole-spec validation of the grown spec succeeds, and that the grown spec is the same either way; a unit test shows that a refused batch leaves the spec equal to its prior value.\n- [hard] REQ-04: The existing capture and round-count suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:core",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-09"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "capture-hands-records"
+    ],
+    "planning": {
+      "outcome": "Growing a capture spec checks only the entries a call adds, and a capture applies its base requests once.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-09",
+        "DEC-16",
+        "DEC-18"
+      ],
+      "terminal": {
+        "consumer_family": "capture-spec growth",
+        "test_boundary": "repository_state unit tests",
+        "worker_sized_reason": "Four growth methods of one type and one closure in the validation capture change, with one property test.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/image.rs",
+            "crates/jit/src/commands/validate.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "The work is CaptureSpec's growth methods in image.rs and their property test; its validate.rs edit is the base-application lines of the capture closure, ordered after capture-hands-records, which changes what that closure returns. It also waits on 725af076 (DEC-02), which capture-hands-records must not."
+        }
+      },
+      "produces_contracts": [
+        "incremental-capture-spec"
+      ]
+    }
+  },
+  {
+    "key": "link-probe-pool",
+    "title": "Link checking probes each distinct URL once through one timed agent",
+    "description": "Probe each distinct external URL once per link-check run, through one HTTP agent that has a request timeout, with a fixed bound on concurrent requests.\n\n## Background\n\n- `validate_external_url` (`crates/jit/src/commands/document.rs:1060-1083`) builds a new `ureq::Agent::new_with_defaults()` for every external asset and sends a `HEAD` request; `check_document_links` (`:1098` onwards) calls it inside its per-document, per-asset loop (`:1249-1280`), serially and once per occurrence. ureq 3.2's default configuration has no timeout, so an unresponsive host stalls the run.\n- `validate_external_url` never returns `Err`, so the `url_validation_failed` warning branch (`:1264-1277`) is unreachable; every failure is reported as an `unreachable_url` error.\n- `ureq` 3.2 offers `Agent::config_builder().timeout_global(...)` and `Agent::new_with_config`, and an `Agent` is `Clone + Send + Sync`; `std::thread::scope` needs no new dependency.\n- `crates/jit/Cargo.toml:60-71` says `Agent::new_with_defaults()` is the only call site; the module doc of `crates/jit/tests/cli_query_graph/remote_document_tls_tests.rs:6-12` says its agent is configured exactly like that call site. `tests/cli_query_graph/check_links_tests.rs:11-31` has an offline loopback HTTP server.\n\n## Success Criteria\n\n- [hard] REQ-01: A run collects the distinct external URLs of every checked document, probes each once through one agent with a request timeout, from a fixed number of `std::thread::scope` workers, and reports each occurrence from that probe's outcome.\n- [hard] REQ-02: A CLI test with a request-counting loopback server and two documents citing one URL shows one request; it fails on today's code, which sends two.\n- [hard] REQ-03: A unit test shows that a probe of a listener that accepts and never answers completes within the configured timeout and reports the URL unreachable.\n- [hard] REQ-04: The unreachable `url_validation_failed` branch is gone, and the `Cargo.toml` comment and the TLS test module doc describe the agent as configured now.\n\n## Notes\n\n- Behaviour change: an unresponsive host is reported unreachable after the timeout instead of stalling the run. Status classification is otherwise unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-15"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Document link checking probes each distinct external URL once, through one HTTP agent with a timeout and bounded threads.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-15",
+        "DEC-15"
+      ],
+      "terminal": {
+        "consumer_family": "external URL probing",
+        "test_boundary": "CLI link-check tests",
+        "worker_sized_reason": "One probe function replaces a per-asset call in one command function.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/Cargo.toml",
+            "crates/jit/tests/cli_query_graph/check_links_tests.rs",
+            "crates/jit/tests/cli_query_graph/remote_document_tls_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "create-findings-in-session",
+    "title": "Issue creation derives its findings inside its mutation",
+    "description": "Derive the new issue's advisory findings inside the creation mutation, from the image it captured, through one captured graph-evaluation helper that also replaces the hand-built copies in the other mutation paths.\n\n## Background\n\n- `publish_issue_creation` (`crates/jit/src/commands/mod.rs:2510-2587`) captures a mutation base holding the image and every issue, discards the issues (`:2525`), evaluates local rules through `derive_write_validation` (`:1091-1115`) and returns its warnings. `create_issue` (`crates/jit/src/commands/issue.rs:209-274`) returns the created issue with those warnings.\n- Graph-rule findings for a new issue are computed only by the CLI's human path after the commit, through `evaluate_graph_rules` over a fresh issue list and a whole validation capture (the `IssueCommands::Create` arm of `crates/jit/src/main.rs`, `:1874-1886`).\n- The other mutation paths assemble the same captured evidence by hand. Each reads the declarations and projects plan content from the mutation image (`commands/mod.rs:2762,2773` field update; `:3189,3191` lifecycle; `commands/dependency.rs:382` dependency removal; `commands/bulk_update.rs:373-377` bulk-update verification) into `CapturedTransitionEvidence` (`mod.rs:561-567`), and `derive_state_transition` (`:1118-1318`) evaluates graph rules over it with the mutation timestamp (`:1226-1233`). Issue deletion projects plan content the same way (`commands/issue.rs:129`).\n- Issue-linked documents are not part of a mutation image, so document-reading passes are not evaluated here.\n- Readers of the returned warnings: the `issue create` arm in `main.rs` (`:1838-1841`) and `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:167`.\n\n## Success Criteria\n\n- [hard] REQ-01: Creation returns `findings`, in the wire `ReportedFinding` shape: the new issue's local-rule findings and the graph-rule findings attributed to it, evaluated over the captured issues plus the new record with the mutation's timestamp and plan content from the mutation image. It replaces the returned warnings.\n- [hard] REQ-02: One helper derives the captured evidence (declarations and plan content from the mutation image) and evaluates graph rules over it at the mutation timestamp. Issue creation, state transitions, field updates, lifecycle mutations, dependency removal and bulk-update verification go through it, and no mutation path under `crates/jit/src/commands/` pairs plan-content projection with graph evaluation other than through the shared helper.\n- [hard] REQ-03: A harness test over `InMemoryStorage` shows that creating an orphan leaf returns its `orphan-leaf` finding and creating a compliant issue returns none.\n- [hard] REQ-04: The listed readers read `findings`, `issue create` prints today's warning lines from them, and the transition, dependency and bulk-update suites pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: `issue create --orphan` is removed. Creation findings are advisory and identical in human and JSON output, so a flag that only hid the `orphan-leaf` hint added a special case for no behaviour (`@/charter/D-18`) and named a workflow-package rule in the engine. Rejected: filtering `orphan-leaf` from the returned findings.\n\n## Notes\n\n- The validation views' own pairings of plan content and graph evaluation are removed by the epic's report work.\n- Behaviour is unchanged in this change; output changes land with the CLI rendering.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:core",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-13"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "config-default-accessors",
+      "one-plan-document-resolver"
+    ],
+    "planning": {
+      "outcome": "Issue creation returns the new issue's advisory findings through the one captured graph-evaluation helper.",
+      "contract_refs": [
+        "plan-document-resolver"
+      ],
+      "source_refs": [
+        "REQ-13",
+        "DEC-13",
+        "DEC-18"
+      ],
+      "terminal": {
+        "consumer_family": "issue creation",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "One helper replaces five hand-built evidence sites, and creation threads its findings through its return value.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/dependency.rs",
+            "crates/jit/src/commands/bulk_update.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
+          ]
+        }
+      },
+      "produces_contracts": [
+        "creation-findings"
+      ]
+    }
+  },
+  {
+    "key": "create-output-reports-findings",
+    "title": "Issue creation output shows its findings, with no read after the mutation commits",
+    "description": "Make `jit issue create` render the findings creation returns through one renderer, the same set in human and JSON output.\n\n## Background\n\n- Creation returns `findings` (wire `ReportedFinding`), local-rule findings first and then graph-rule findings, derived inside its mutation. The `IssueCommands::Create` arm of `crates/jit/src/main.rs` (`:1841-1869`) makes no read after the mutation publishes, and `--json` returns `IssueCreateResponse` with those `findings`, registered in the schema for `issue create`.\n- The human path still renders the two halves differently: local findings through `eprintln!(\"Warning: [rule] message\")` (`:1842-1844`), which also runs under `--quiet` and in `--json` mode, and graph findings through `OutputContext::print_warning` (`:1866-1868`), which `--quiet` silences. `IssueCreation::split_findings` exists only to feed the two paths.\n- Create-time warning coverage lives in the workflow-package tests of `crates/jit/src/profile/repository_package.rs` (`create_time_warnings` and its tests), which evaluate the package's hierarchy rules over one issue through `evaluate_graph`.\n\n## Success Criteria\n\n- [hard] REQ-01: `issue create --json` returns an `IssueCreateResponse` that flattens the issue view and adds `findings`, registered in the schema for `issue create`, and in `--json` mode no human finding line reaches stdout or stderr. The human path prints one line per finding through one renderer, in one format. Both show the same findings; `--force` suppresses none; `--quiet` prints only the id.\n- [hard] REQ-02: After creation publishes, the arm makes no storage, executor or capture call: no issue list, no graph-rule evaluation, no dependency enrichment and no gate-run listing.\n- [hard] REQ-03: A CLI test creates an orphan leaf with `--json` and finds its `orphan-leaf` finding in `findings`, and with the human path finds the same finding.\n- [hard] REQ-04: The workflow-package create-time warning tests in `profile/repository_package.rs` pass unchanged.\n\n## Notes\n\n- Behaviour change: local-rule and graph-rule findings print together in one format, and `--json` output carries findings only in its response.\n- Steward amendment 2026-11-04: criteria trimmed after the creation-findings task delivered the response type and the no-read arm, and removed `--orphan`.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-13"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "mcp-ci"
+    ],
+    "depends_on": [
+      "create-findings-in-session"
+    ],
+    "planning": {
+      "outcome": "issue create shows the returned findings identically in human and JSON output with no read after the mutation commits.",
+      "contract_refs": [
+        "creation-findings"
+      ],
+      "source_refs": [
+        "REQ-13",
+        "DEC-13"
+      ],
+      "terminal": {
+        "consumer_family": "issue create output",
+        "test_boundary": "CLI integration tests",
+        "worker_sized_reason": "One CLI arm, one response type and its schema registration change together.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/main.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/schema.rs",
+            "crates/jit/tests/cli_issue/quiet_mode_tests.rs",
+            "crates/jit/tests/cli_query_graph/graph_json_tests.rs",
+            "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "executor-graph-evaluation-removal",
+    "title": "Remove the executor's graph evaluation and the single-rule graph entry points",
+    "description": "Delete the executor's whole-repository graph-rule evaluation, the validation captures only it used, and the single-rule graph entry points that only the replaced rule view and checker called.\n\n## Background\n\n- `evaluate_graph_rules` (`crates/jit/src/commands/validate.rs:1557-1600`) evaluates every graph rule over a caller-supplied issue list with rules and namespaces from the executor's disk caches, and `image_plan_content` (`:1614-1623`) captures a whole validation image to read plan documents for it. `capture_validation_image` (`:164-166`, private) serves `image_plan_content` and the former rule view (`:1967`); `capture_validation_image_with` (`:180-200`, `pub(crate)`) serves it and test fixtures (`commands/gate_check.rs` tests at `:2194,3061,3548`; the overlay tests in `crates/jit/src/validation/repository.rs` at `:931,949,959`).\n- `validation::graph::evaluate_graph_rule` (`crates/jit/src/validation/graph.rs:490-500`) and `graph_rule_plan_source_ids` (`:431-454`) were called only by `rule_validation_outcome`, which served the former rule view and rule checker. Both are public, so the build does not flag them.\n- Their remaining caller is `test_rule_scoped_evaluation_isolates_firing_issue_from_repository_context` (`graph.rs:4040`), whose property the Rule clause of the selection property test owns.\n- Remaining test callers of `evaluate_graph_rules`: `test_evaluate_graph_rules_preserves_invalid_hierarchy_error` (`commands/validate.rs:2530`) and one call in `crates/jit/tests/fast_rules/config_loading_tests.rs:121`.\n- f8a6b298's read-driver work (578ed10d) moves `capture_validation_image_with` onto the read session and follows this change, so it moves only what remains.\n\n## Success Criteria\n\n- [hard] REQ-01: `evaluate_graph_rules`, `image_plan_content`, `capture_validation_image` and `capture_validation_image_with` no longer exist; their test callers capture through the validation capture the views use.\n- [hard] REQ-02: `evaluate_graph_rule`, `graph_rule_plan_source_ids` and the `graph.rs` test that calls them no longer exist; the removed case is owned by the Rule clause of the selection property test.\n- [hard] REQ-03: The migrated `evaluate_graph_rules` callers assert the same properties through the report or the findings issue creation returns.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:validation",
+      "per:@/charter/D-20",
+      "per:@/charter/D-18",
+      "satisfies:9876a23a/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "create-output-reports-findings",
+      "validation-layer-tests-off-commands",
+      "selection-contract-proptest"
+    ],
+    "planning": {
+      "outcome": "Graph findings come only from the report's evaluation and the mutation derivations; the single-rule entry points are gone.",
+      "contract_refs": [
+        "validation-report"
+      ],
+      "source_refs": [
+        "REQ-01"
+      ],
+      "terminal": {
+        "consumer_family": "parallel graph-rule computations",
+        "test_boundary": "existing rule suites",
+        "worker_sized_reason": "A deletion of uncalled functions with their remaining test callers migrated.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/validation/graph.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/tests/fast_rules/config_loading_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fix-in-one-mutation",
+    "title": "One mutation and one post-fix report for validate --fix",
+    "description": "Make `jit validate --fix` derive every fix from one captured validation, publish them in one mutation, and always render the one report computed over the fixed repository.\n\n## Background\n\n- `validate_with_fix` (`crates/jit/src/commands/validate.rs:68-131`) first runs a full validation (`:70`) whose result it uses only when it applied no fix (`:101-107`): since 8ffd504de a zero-fix `--fix` over an invalid repository fails with that report's errors. It then publishes each hierarchy type fix (`detect_and_fix_hierarchy_issues` `:1203-1280`, `apply_type_fix` `:1282-1299`, reading the hierarchy and issue list from disk), the transitive reduction (`fix_all_transitive_reductions` `:2113-2118` over `reduce_all_dependencies`, `commands/dependency.rs:226`, already one mutation), each readiness correction in up to ten passes (`check_pending_transitions` `validate.rs:2140-2200`, one lifecycle mutation per correction through `auto_transition_to_ready` and `auto_transition_to_backlog`, `commands/issue.rs:843,858`) and the derived-state repair (`repair_derived_state`, `validate.rs:597-648`, one mutation). After applying fixes it re-runs `validate_silent` (`:119`), which yields only pass or an error message.\n- The `--fix` branch of the `Commands::Validate` arm (`crates/jit/src/main.rs:6126-6169`) prints the fix messages in human mode and `{valid, fixes_applied, dry_run, message}` in JSON; neither renders the findings of a report.\n- `auto_transition_to_backlog` has no other caller; `auto_transition_to_ready` is also called at `commands/issue.rs:888`.\n- Pure derivations exist: `generate_fixes` over `detect_validation_issues` (`crates/jit/src/domain/type_taxonomy.rs:280,425`), `derive_dependency_repair` (`commands/dependency.rs:839`, private), `Issue::derive_readiness_correction` (`domain/types.rs:609`), and `derive_materialization` for derived state. `finalize` (`crates/jit/src/repository_state/mutation.rs:648`) turns issue intents into a plan, and `RepositoryDelta::new` (`repository_state/image.rs:1372-1389`) accepts concatenated actions and refuses duplicate targets.\n- `test_apply_type_fix_preserves_concurrent_type_correction` (`commands/validate.rs:2808`) shows that a type correction saved between capture and apply survives. `jit recover` calls `repair_derived_state` (`commands/claim.rs:715`) and keeps doing so.\n\nKept as one change for a build reason: the fix return value and its renderer compile only together.\n\n## Success Criteria\n\n- [hard] REQ-01: `--fix` computes no report before deriving its fixes. It derives the hierarchy, reduction, readiness and derived-state fixes from one validation capture's parsed records, decoding no issue record or index again, folding the issue edits per issue, and publishes them all through one mutation; `--dry-run` derives the same plan and publishes nothing; when the captured records do not parse, no fix is derived and the post-fix report carries the structural failure.\n- [hard] REQ-02: Readiness corrections apply `Issue::derive_readiness_correction` to the projected issue set until none remains, and no other readiness derivation is introduced; `detect_and_fix_hierarchy_issues`, `apply_type_fix`, `check_pending_transitions` and `auto_transition_to_backlog` no longer exist.\n- [hard] REQ-03: `--fix` always computes one report over the repository as the fixes leave it, including when it applied none, and renders it as plain `jit validate` does, with the fix count and messages; its exit status follows that report. A harness test shows one publication carrying fixes of every class, and a CLI test over a repository with a finding no fix repairs shows the post-fix report's findings in the human output and in `--fix --json`; the JSON assertion fails on today's code, whose `--fix` JSON carries no structured findings (its error envelope holds a message string, `crates/jit/src/output/failure.rs:656-658`).\n- [hard] REQ-04: A harness test replaces `test_apply_type_fix_preserves_concurrent_type_correction`: a type correction saved between capture and publish survives the composed fix, which re-derives over the new state. The listed fix suites pass with their assertions on repository state unchanged.\n\n## Notes\n\n- Behaviour and output change: `--fix` renders the post-fix report's findings, `--fix --json` carries the post-fix report fields, and its exit status follows that report.\n- A later pure readiness derivation that every mutation shares will replace the fixpoint loop in this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:validation",
+      "component:cli",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-14"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "capture-hands-records"
+    ],
+    "planning": {
+      "outcome": "--fix derives its fixes from one capture, commits them in one mutation and always shows one post-fix report.",
+      "contract_refs": [
+        "validation-report"
+      ],
+      "source_refs": [
+        "REQ-14",
+        "DEC-14",
+        "DEC-04"
+      ],
+      "terminal": {
+        "consumer_family": "validate --fix",
+        "test_boundary": "commands harness tests",
+        "worker_sized_reason": "The fix return value and its renderer compile only together, so one change carries both.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/dependency.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/fast_issue/state_transition_fix_tests.rs",
+            "crates/jit/tests/fast_issue/transitive_reduction_validation_tests.rs",
+            "crates/jit/tests/fast_issue/readiness_coherence_tests.rs",
+            "crates/jit/tests/cli_item_validate/type_hierarchy_fix_tests.rs",
+            "crates/jit/tests/cli_item_validate/derived_state_repair_tests.rs",
+            "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/steering_scenarios.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "side-path-output-docs",
+    "title": "Command references describe create findings, fix reporting and link probing",
+    "description": "Update the command reference for the changed `issue create`, `validate --fix` and `doc check-links` behaviour.\n\n## Background\n\n- `docs/reference/cli-commands.md` documents `jit issue create` (`:899` onwards), `jit doc check-links` (`:2841` onwards) and `jit validate --fix` (`:3249-3334`); `docs/reference/worktree-validate.md` documents `--fix` (`:367-368,449`).\n- `docs/how-to/multi-agent-coordination.md:421-425` tells readers to verify with plain `jit validate` because a `--fix` run that applies no fix reports `No fixes needed` without re-checking. Other pages only show the command.\n- Changed behaviour: `issue create` returns `findings` in JSON and prints the same findings in human output, and `--force` no longer hides them; `validate --fix` publishes every fix through one mutation and renders one report over the fixed repository, with its exit status, including when it applied no fix; `doc check-links` probes each distinct external URL once, with a request timeout and bounded concurrency.\n\n## Success Criteria\n\n- [hard] REQ-01: The `issue create`, `validate --fix` and `doc check-links` sections state the changed behaviour above.\n- [hard] REQ-02: No page under `docs/` describes `--fix` as publishing one mutation per fix or as skipping validation after a run that applied no fix.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:docs",
+      "per:@/charter/D-20",
+      "enforces:@/invariant/single-source-prose",
+      "satisfies:9876a23a/REQ-13",
+      "satisfies:9876a23a/REQ-14",
+      "satisfies:9876a23a/REQ-15"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "create-output-reports-findings",
+      "fix-in-one-mutation",
+      "link-probe-pool"
+    ],
+    "planning": {
+      "outcome": "The command reference states the create, fix and link-check behaviour once.",
+      "contract_refs": [
+        "creation-findings"
+      ],
+      "source_refs": [
+        "REQ-13",
+        "REQ-14",
+        "REQ-15",
+        "DEC-13",
+        "DEC-14",
+        "DEC-15"
+      ],
+      "terminal": {
+        "consumer_family": "command reference pages",
+        "test_boundary": "documentation gates",
+        "worker_sized_reason": "Three command sections and a sweep of fix mentions form one documentation pass.",
+        "footprint": {
+          "touches": [
+            "docs/reference/cli-commands.md",
+            "docs/how-to/multi-agent-coordination.md",
+            "docs/reference/worktree-validate.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "validation-cost-measurement",
+    "title": "Measure validation views on this repository",
+    "description": "Measure the validation views and the side paths on a copy of this repository with a release build, and record the run as evidence for the per-issue bound.\n\n## Background\n\n- `scripts/benchmark-mutation-cost.sh` builds fixture copies of this repository (`git clone --shared` plus `.jit` sync), waits until the 1-minute load average is below `BENCH_MAX_LOAD` (default 2.0, polled for at most 30 minutes, `:16-17,216-222`), and times commands as the median of three runs; its committed run is `dev/benchmarks/publication-cost-722878d4/`.\n- Before this work, `jit validate <id>` took about three times as long as whole-repository `jit validate` on this repository (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, REQ-08 row). After it, per-issue validation does a subset of whole validation's work, so the expected margin is small and host load during multi-agent work is high.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness, generalised in `scripts/benchmark-mutation-cost.sh`, times `jit validate` and `jit validate <id>` in at least five interleaved pairs (one of each per pair, alternating which runs first) on a fresh copy of this repository with a release binary, records the load threshold it applied and the load before and after, and times `jit validate --scope <container>`, `jit validate <id> --explain`, `jit issue create` (human, `--json`, `--quiet`) and `jit validate --fix --dry-run` as medians of at least five runs.\n- [hard] REQ-02: `dev/active/9876a23a-one-validation-report/benchmark/README.md` records one run with the commit, the binary, the fixture's issue count, the load threshold and loads, every median, each pair's difference (per-issue minus whole) with their median and spread, and the raw timings beside it.\n- [hard] REQ-03: The README states whether the median pair difference is at most zero, which is the REQ-08 bound.\n\n## Notes\n\n- A run whose median pair difference exceeds zero is reported as a blocking finding against the per-issue view change, and is not fixed inside this measurement.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:tooling",
+      "per:@/charter/D-20",
+      "satisfies:9876a23a/REQ-08"
+    ],
+    "gates": [
+      "code-review"
+    ],
+    "depends_on": [
+      "scope-view-over-selection",
+      "capture-spec-incremental",
+      "create-output-reports-findings",
+      "fix-in-one-mutation",
+      "issue-id-prefix-match"
+    ],
+    "planning": {
+      "outcome": "A scripted release-build run of interleaved pairs on a copy of this repository records per-issue against whole validation.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-08",
+        "DEC-12"
+      ],
+      "terminal": {
+        "consumer_family": "validation cost measurement",
+        "test_boundary": "scripted benchmark run",
+        "worker_sized_reason": "One harness extension and one recorded run fit one cycle.",
+        "footprint": {
+          "touches": [
+            "scripts/benchmark-mutation-cost.sh"
+          ],
+          "creates": [
+            "dev/active/9876a23a-one-validation-report/benchmark/README.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "report-core",
+    "title": "One pure validation report over parsed records",
+    "description": "Aggregate the work that makes repository validation one pure function in the validation layer, over records parsed once, with its resolvers, defaults and compiled rules stated once.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure validation-layer function computes the repository report from a captured validation and injected inputs, the history verdicts among them only when its caller is a named history reader.\n- [hard] REQ-02: The validation layer's production code imports nothing from `commands`.\n- [hard] REQ-03: Item links resolve against one address index with item kinds resolved once; issue-id prefixes match container pointers and coverage labels without allocating.\n- [hard] REQ-04: Whole-repository validation parses the index and each issue file once, through one loader, and every pass, record fidelity included, consumes those parsed issues; each schema compiles once per report.\n- [hard] REQ-05: Plan-document references, the content-format default and the strictness default each come from one function.\n\n## Notes\n\n`crates/jit/src/validation/record_fidelity.rs` adds a record-fidelity pass to whole-repository `jit validate`: stored index, issue, gate-run and event-log records must decode and reproduce what the writer would publish. It reads every gate run and the whole event log, so only whole `jit validate` and the built-in `repository_validation` gate checker run it, as the history readers f8a6b298 names under its DEC-19. It reaches the report with document-reference resolution as an optional history input, and the repository checker judges through the same function, history included, so a gate cannot pass where `jit validate` fails.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-core",
+      "component:validation",
+      "component:core",
+      "per:@/charter/D-20"
+    ],
+    "gates": [
+      "cargo-ci",
+      "holistic-review"
+    ],
+    "depends_on": [
+      "issue-id-prefix-match",
+      "capture-hands-records"
+    ],
+    "planning": {
+      "outcome": "One pure report function over once-parsed records, shared resolvers and compiled rules.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-01",
+        "REQ-06",
+        "REQ-07",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12"
+      ]
+    }
+  },
+  {
+    "key": "report-views",
+    "title": "Every validation view is a selection of the report",
+    "description": "Aggregate the work that turns every validation view and built-in validation gate checker into a selection of the one report.\n\n## Success Criteria\n\n- [hard] REQ-01: Whole, per-issue, scope, rule and explain validation select from one report computed from one capture; only whole validation and the repository-validation checker read event-log history and gate runs.\n- [hard] REQ-02: Each built-in validation checker reports what `jit validate` reports for its selection.\n- [hard] REQ-03: One property test owns the selection contract.\n- [hard] REQ-04: No executor-side validation pass copy or checker pipeline remains, and nothing under the validation layer names `commands`.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-views",
+      "component:validation",
+      "component:gates",
+      "component:cli",
+      "per:@/charter/D-20"
+    ],
+    "gates": [
+      "cargo-ci",
+      "holistic-review"
+    ],
+    "depends_on": [
+      "image-builder-copies-converge",
+      "profile-test-images-converge",
+      "selection-contract-proptest",
+      "validation-view-docs",
+      "validation-layer-tests-off-commands"
+    ],
+    "planning": {
+      "outcome": "Every validation view and built-in validation checker is a selection of the one report.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-02",
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06"
+      ]
+    }
+  },
+  {
+    "key": "report-side-paths",
+    "title": "Capture, creation, fix and link checking stop repeating work",
+    "description": "Aggregate the work that removes repeated work from validation capture, issue creation, `validate --fix` and link checking, and measures the result.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture specs validate only added entries, and a capture applies its base requests once.\n- [hard] REQ-02: Issue creation reports findings from its own mutation image, identically in human and JSON output.\n- [hard] REQ-03: `validate --fix` publishes one mutation and always reports one post-fix report.\n- [hard] REQ-04: Link checking probes each distinct URL once through one timed agent with bounded concurrency.\n- [hard] REQ-05: A recorded release-build run on this repository shows per-issue validation no slower than whole validation.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:one-validation-report",
+      "milestone:v1.0",
+      "story:report-side-paths",
+      "component:validation",
+      "component:cli",
+      "component:core",
+      "per:@/charter/D-20"
+    ],
+    "gates": [
+      "cargo-ci",
+      "holistic-review"
+    ],
+    "depends_on": [
+      "executor-graph-evaluation-removal",
+      "side-path-output-docs",
+      "validation-cost-measurement"
+    ],
+    "planning": {
+      "outcome": "Capture, issue creation, --fix and link checking do their work once, and the measured views meet the bound.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-08",
+        "REQ-09",
+        "REQ-13",
+        "REQ-14",
+        "REQ-15"
+      ]
+    }
+  }
+]

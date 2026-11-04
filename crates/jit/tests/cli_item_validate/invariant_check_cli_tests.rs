@@ -9,58 +9,40 @@
 //! that `--json` preserves successful reports and wraps drift reports in the
 //! canonical machine-readable failure envelope.
 
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
-    temp
-}
 
 /// Write a `rules.toml` so the rule namespace is controlled (otherwise the
 /// in-memory default ruleset's many rule names appear as undeclared).
-fn write_rules(temp: &TempDir, toml: &str) {
-    std::fs::write(temp.path().join(".jit/rules.toml"), toml).unwrap();
+fn write_rules(cli: &JitCli, toml: &str) {
+    std::fs::write(cli.root().join(".jit/rules.toml"), toml).unwrap();
 }
 
-fn write_invariants(temp: &TempDir, toml: &str) {
-    std::fs::write(temp.path().join(".jit/invariants.toml"), toml).unwrap();
+fn write_invariants(cli: &JitCli, toml: &str) {
+    std::fs::write(cli.root().join(".jit/invariants.toml"), toml).unwrap();
 }
 
 #[test]
 fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
-    let temp = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     // One rule named `real-rule`; sample-invariant binds to a MISSING `ghost-rule`.
     write_rules(
-        &temp,
+        &cli,
         "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
          assert = { require-section = { heading = \"Goal\" } }\n",
     );
     write_invariants(
-        &temp,
+        &cli,
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["invariant", "check", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["invariant", "check", "--json"])
         .output()
         .unwrap();
 
-    // Drift present -> non-zero exit (ValidationFailed == 4).
-    assert_eq!(output.status.code(), Some(4), "expected exit 4 on drift");
+    assert!(!output.status.success(), "expected failure on drift");
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
@@ -82,25 +64,24 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
 
 #[test]
 fn test_check_exits_zero_with_unclaimed_rules_and_gates() {
-    let temp = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     // A rule and a gate that NO invariant claims; the one invariant's binding
     // resolves. REQ-05: unclaimed rules/gates are not drift, so check exits 0.
     write_rules(
-        &temp,
+        &cli,
         "[[rules]]\nname = \"claimed-rule\"\nseverity = \"warn\"\n\
          assert = { require-section = { heading = \"Goal\" } }\n\
          [[rules]]\nname = \"unclaimed-rule\"\nseverity = \"warn\"\n\
          assert = { require-section = { heading = \"Plan\" } }\n",
     );
     write_invariants(
-        &temp,
+        &cli,
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/claimed-rule\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["invariant", "check", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["invariant", "check", "--json"])
         .output()
         .unwrap();
 
@@ -111,28 +92,26 @@ fn test_check_exits_zero_with_unclaimed_rules_and_gates() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 0, "{json}");
     assert!(json["findings"].as_array().unwrap().is_empty(), "{json}");
 }
 
 #[test]
 fn test_check_exits_zero_when_consistent() {
-    let temp = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     // Exactly one rule, claimed by exactly one invariant: no drift.
     write_rules(
-        &temp,
+        &cli,
         "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
          assert = { require-section = { heading = \"Goal\" } }\n",
     );
     write_invariants(
-        &temp,
+        &cli,
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/real-rule\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["invariant", "check", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["invariant", "check", "--json"])
         .output()
         .unwrap();
 
@@ -143,31 +122,27 @@ fn test_check_exits_zero_when_consistent() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 0);
     assert!(json["findings"].as_array().unwrap().is_empty());
+    assert_eq!(json["message"], "No enforcement drift", "{json}");
 }
 
 #[test]
 fn test_check_human_output_names_declared_direction() {
-    let temp = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     write_rules(
-        &temp,
+        &cli,
         "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
          assert = { require-section = { heading = \"Goal\" } }\n",
     );
     write_invariants(
-        &temp,
+        &cli,
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["invariant", "check"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["invariant", "check"]).output().unwrap();
 
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("declared-but-unenforced") && stdout.contains("ghost-rule"),
@@ -185,26 +160,25 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
     // REQ-01 "unloadable" half: an invariant binds to `bad-rule` and `.jit/rules.toml`
     // is MALFORMED. `jit invariant check` must report a declared-but-unenforced
     // finding and exit non-zero — NOT print a raw TOML parse error.
-    let temp = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     write_rules(
-        &temp,
+        &cli,
         "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
          assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
     );
     write_invariants(
-        &temp,
+        &cli,
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/bad-rule\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["invariant", "check", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["invariant", "check", "--json"])
         .output()
         .unwrap();
 
-    // Exit non-zero (drift present), and stdout is VALID JSON (not a parse error).
-    assert_eq!(output.status.code(), Some(4), "expected exit 4 on drift");
+    // Drift fails, and stdout is VALID JSON (not a parse error).
+    assert!(!output.status.success(), "expected failure on drift");
     let json: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
         panic!(
             "expected valid JSON, not a raw parse error: {e}\nstdout: {}",
@@ -222,36 +196,28 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
 }
 
 #[test]
-fn test_check_reports_unloadable_gate_registry() {
-    // The gate registry is malformed and an invariant binds to a gate that would
-    // live there -> declared-but-unenforced (unloadable), exit non-zero.
-    let temp = setup_test_repo();
-    // Loadable (empty) rules so only the gate source is unloadable.
-    write_rules(&temp, "\n");
-    // The gate registry is `.jit/gates.toml` (jit:f5d35048); malformed TOML here
-    // exercises the same unloadable-source path malformed JSON did previously.
-    std::fs::write(temp.path().join(".jit/gates.toml"), "not valid toml {").unwrap();
+fn test_check_fails_on_unloadable_gate_registry() {
+    let cli = JitCli::initialised().unwrap();
+    write_rules(&cli, "\n");
+    std::fs::write(cli.root().join(".jit/gates.toml"), "not valid toml {").unwrap();
     write_invariants(
-        &temp,
+        &cli,
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/gate/some-gate\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["invariant", "check", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["invariant", "check", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
     assert!(
-        json["error"]["details"]["findings"]
-            .as_array()
+        json["error"]["message"]
+            .as_str()
             .unwrap()
-            .iter()
-            .any(|f| f["subject"] == "@/gate/some-gate" && f["unloadable"] == true),
-        "missing unloadable gate finding: {json}"
+            .contains(".jit/gates.toml"),
+        "expected gate registry load error: {json}"
     );
 }

@@ -17,22 +17,35 @@ set -euo pipefail
 # A clean "N passed, 0 failed" summary is trustworthy evidence and keeps
 # .jit/gate-runs/ small. Modelled on ../gf2/scripts/cargo-ci.sh.
 #
+# The run owns and removes its temporary directory: every Cargo, rustc and test
+# process, the wrapper probe and `--cargo` included, runs with TMPDIR set to a
+# directory made inside the caller's TMPDIR, and the directory goes on every
+# exit, including a trapped INT, TERM or HUP. A compiler-wrapper daemon the
+# run starts keeps the caller's TMPDIR (scripts/caller-tmpdir-wrapper.sh).
+#
 # Exit codes:
 #   0 — all steps passed
 #   1 — one or more steps failed on repository content (a verdict)
 #   2 — environment problem: Cargo prerequisites are missing or mismatched
-#  75 — infrastructure fault (EX_TEMPFAIL): every failing step is
-#       environment-sensitive and the host was loaded while the suite ran
+#  75 — infrastructure fault (EX_TEMPFAIL): a compiler wrapper Cargo would use
+#       cannot run, so no step ran; or every failing step is
+#       environment-sensitive and either a step ran out of disk space (ENOSPC)
+#       or the host was loaded while the suite ran
 #
 # Exit 75 is the exec-checker convention that records an `error` gate run
 # instead of `failed`. An `error` run never passes and is never reused through
-# digest reuse, so a load-induced failure is rerun rather than carried to
-# another issue as a verdict. A step is environment-sensitive only when it is
+# digest reuse, so such a failure is rerun rather than carried to another
+# issue as a verdict. A step is environment-sensitive only when it is
+#   - any step whose output reports ENOSPC ("No space left on device" or
+#     os error 28) and no other failure: no test failing without ENOSPC in its
+#     own output, no compiler error, rustfmt diff or budget violation beyond
+#     the ENOSPC line. ENOSPC makes the run exit 75 whatever the load baseline,
 #   - `test` with at least one nextest TIMEOUT result and no FAIL or ABORT
 #     result, or
 #   - `budget` whose only violation is the suite-duration budget.
 # Any other failing step (fmt, clippy, doctest, excluded-tests, a test FAIL, a
 # footprint budget violation, a reporter failure) makes the run a verdict.
+# The load rule below applies to the TIMEOUT and duration cases only.
 # "Loaded" means the 1-minute load average from /proc/loadavg, sampled before
 # the run's first step, is at least LOAD_THRESHOLD_PER_CPU x `nproc`. The
 # baseline predates the run's own fmt, clippy and build fan-out, so it measures
@@ -51,6 +64,11 @@ set -euo pipefail
 # Cargo selection, and guarded sccache setup, then runs only that focused Cargo
 # command. Use this mode for compilation-heavy targeted checks; invoke the
 # script without arguments only when the complete gate is intended.
+#
+# `./scripts/cargo-ci.sh --suite` runs only the suite steps: pinned nextest,
+# doctests, and the excluded-tests check. CI uses it so CI and the gate share one
+# definition of the suite. CI's runners are not the quiet host the suite-duration
+# budget is measured on, so CI does not run the budget step.
 
 readonly LOAD_THRESHOLD_PER_CPU="0.17"
 
@@ -61,6 +79,63 @@ baseline_load1=""
 # 1-minute load average, empty when the host exposes none.
 sample_load1() {
   awk 'NR == 1 { print $1 }' /proc/loadavg 2>/dev/null || true
+}
+
+# The output reports the disk was full.
+reports_enospc() {
+  [ -f "$1" ] && grep -qE 'No space left on device|os error 28' "$1"
+}
+
+# Failure markers in a step's output that ENOSPC does not account for. A failed
+# test (nextest FAIL or ABORT, doctest FAILED) is ENOSPC-caused only when it
+# panicked and every panic message in its block reports ENOSPC; a message runs
+# from the `panicked at` line to the `note:` line or the end of the block, so
+# ENOSPC in captured stdout or elsewhere in the block does not count. Outside
+# test blocks a rustc `error` line (except the per-crate summary lines), a
+# rustfmt `Diff in` line, or a budget violation counts unless the line itself
+# reports ENOSPC.
+count_non_enospc_failures() {
+  awk '
+    function enospc(line) { return line ~ /No space left on device|os error 28/ }
+    function end_panic() {
+      if (in_panic) { panics[pcur]++; if (msg_hit) good[pcur]++ }
+      in_panic = 0
+    }
+    /^[[:space:]]*(TRY [0-9]+ )?[A-Z]+ \[/ {
+      end_panic(); cur = ""
+      if ($0 ~ /^[[:space:]]*(FAIL|ABORT) \[/) {
+        cur = $0
+        sub(/^[[:space:]]*[A-Z]+ \[[^]]*\][[:space:]]*/, "", cur)
+        failed[cur] = 1
+      }
+      next
+    }
+    /^---- .* stdout ----$/ { end_panic(); cur = $0; sub(/^---- /, "", cur); sub(/ stdout ----$/, "", cur); next }
+    /^test .* \.\.\. FAILED$/ { name = $0; sub(/^test /, "", name); sub(/ \.\.\. FAILED$/, "", name); failed[name] = 1; next }
+    /^(failures:|test result:)/ { end_panic(); cur = ""; next }
+    cur != "" && /panicked at / {
+      end_panic(); in_panic = 1; pcur = cur; msg_hit = 0
+      if ($0 !~ /:[0-9]+:[0-9]+:$/) msg_hit = enospc($0)
+      next
+    }
+    cur != "" && /^(note:|--- )/ { end_panic(); next }
+    cur != "" { if (in_panic && enospc($0)) msg_hit = 1; next }
+    enospc($0) { next }
+    /^error(\[[A-Za-z0-9]+\])?:/ && !/could not compile|aborting due to|previous error/ { n++; next }
+    /^Diff in / || /^  - / { n++ }
+    END {
+      end_panic()
+      for (name in failed) if (!(name in panics) || good[name] != panics[name]) n++
+      print n + 0
+    }
+  ' "$1"
+}
+
+# The step failed because the disk was full: its output reports ENOSPC and
+# carries no other failure marker.
+step_failed_by_enospc() {
+  local out="$WORK/$1.out"
+  reports_enospc "$out" && [ "$(count_non_enospc_failures "$out")" -eq 0 ]
 }
 
 # nextest reported a TIMEOUT and nothing that is a verdict on the test itself.
@@ -78,9 +153,15 @@ budget_failed_only_by_duration() {
 # Judges the failed steps in $failed_steps against the outputs in $WORK and the
 # baseline load in $baseline_load1 over $cpu_count CPUs; prints the diagnosis and returns
 # the exit status the run takes: 75 for an infrastructure fault, 1 for a verdict.
+# ENOSPC steps need no load; the other environment-sensitive steps do.
 classify_failure() {
   local step threshold
+  local enospc_steps=() load_steps=()
   for step in "${failed_steps[@]}"; do
+    if step_failed_by_enospc "$step"; then
+      enospc_steps+=("$step")
+      continue
+    fi
     case "$step" in
       test) test_failed_only_by_timeout "$WORK/test.out" ;;
       budget) budget_failed_only_by_duration "$WORK/budget.out" ;;
@@ -89,14 +170,19 @@ classify_failure() {
       echo "cargo-ci: verdict (exit 1): step '$step' failed on repository content"
       return 1
     }
+    load_steps+=("$step")
   done
+  if [ "${#load_steps[@]}" -eq 0 ]; then
+    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) ran out of disk space (ENOSPC: No space left on device); free space and rerun"
+    return 75
+  fi
   threshold=$(awk -v n="$cpu_count" -v r="$LOAD_THRESHOLD_PER_CPU" 'BEGIN { printf "%.2f", n * r }')
   if [ -n "$baseline_load1" ] &&
     awk -v l="$baseline_load1" -v t="$threshold" 'BEGIN { exit !(l + 0 >= t + 0) }'; then
-    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) are environment-sensitive; baseline load1=${baseline_load1} >= threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); rerun when the host is quiet"
+    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) are environment-sensitive${enospc_steps[*]:+ (ENOSPC: ${enospc_steps[*]})}; baseline load1=${baseline_load1} >= threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); rerun when the host is quiet"
     return 75
   fi
-  echo "cargo-ci: verdict (exit 1): failing steps (${failed_steps[*]}) are environment-sensitive but baseline load1=${baseline_load1:-unknown} < threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); a quiet-host failure is a real regression to investigate"
+  echo "cargo-ci: verdict (exit 1): failing steps (${load_steps[*]}) are environment-sensitive but baseline load1=${baseline_load1:-unknown} < threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); a quiet-host failure is a real regression to investigate"
   return 1
 }
 
@@ -129,13 +215,13 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
   LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
   if command -v flock >/dev/null 2>&1; then
-    if ! flock -n -o "$BUILD_LOCK" true 2>/dev/null; then
-      echo "cargo-ci: another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
-      report_build_lock_holders "$BUILD_LOCK" >&2
-    fi
     lock_status=0
     exec {build_lock_fd}>"$BUILD_LOCK"
-    flock -w "$LOCK_TIMEOUT" -E 75 "$build_lock_fd" || lock_status=$?
+    if ! flock -n "$build_lock_fd" 2>/dev/null; then
+      echo "cargo-ci: another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
+      report_build_lock_holders "$BUILD_LOCK" >&2
+      flock -w "$LOCK_TIMEOUT" -E 75 "$build_lock_fd" || lock_status=$?
+    fi
     if [ "$lock_status" -eq 75 ]; then
       echo "ERROR: cargo-ci: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
       report_build_lock_holders "$BUILD_LOCK" >&2
@@ -150,6 +236,19 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   fi
   echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi
+
+# The run owns one directory inside the caller's temporary directory and every
+# Cargo, rustc and test process below sees it as TMPDIR, so what a killed test
+# leaves behind dies with the run. The caller's TMPDIR is saved first: the
+# compiler-cache wrapper restores it, because a daemon outlives the run.
+export CARGO_CI_CALLER_TMPDIR="${TMPDIR:-/tmp}"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+export TMPDIR="$WORK/tmp"
+mkdir "$TMPDIR"
 
 BUSY_HOST_OVERRIDE_FOR_BUDGET="${BUSY_HOST_OVERRIDE:-}"
 unset BUSY_HOST_OVERRIDE
@@ -187,13 +286,63 @@ ensure_real_cargo
 # deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
 # changes Cargo fingerprints, so operators should clean a large pre-existing
 # target directory before opting an established checkout into this default.
-if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
-  export RUSTC_WRAPPER=sccache
+# Whichever wrapper runs goes through one script that restores the caller's
+# TMPDIR, because a daemon it starts or restarts mid-run outlives the run's own.
+# Its stable path keeps Cargo fingerprints stable across runs.
+unset CARGO_CI_CALLER_RUSTC_WRAPPER
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  export CARGO_CI_CALLER_RUSTC_WRAPPER="$RUSTC_WRAPPER"
 fi
+if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
+  RUSTC_WRAPPER=sccache
+fi
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  RUSTC_WRAPPER="$(cd "$(dirname "$0")" && pwd)/caller-tmpdir-wrapper.sh"
+  export RUSTC_WRAPPER
+fi
+
+# A wrapper that cannot compile would fail every compiling step as if on repository
+# content, so try one first. Cargo compiles the probe crate from this directory,
+# so it resolves every wrapper itself: RUSTC_WRAPPER, RUSTC_WORKSPACE_WRAPPER,
+# their CARGO_BUILD_* forms and `build.*` config. CARGO_INCREMENTAL=0 keeps the
+# compile cacheable, because sccache passes an incremental one through without
+# reaching the temp directory a cacheable compile needs. Empty wrapper variables
+# override every other source, so a failure that outlives them is no wrapper's
+# and the steps judge it. Output goes to a file because a daemon the wrapper
+# starts could hold a pipe open.
+ensure_compiler_wrapper_runs() {
+  local probe wrapper
+  probe=$(mktemp -d)
+  mkdir "$probe/src"
+  : >"$probe/src/lib.rs"
+  printf '[workspace]\n\n[package]\nname = "cargo-ci-wrapper-probe"\nversion = "0.0.0"\nedition = "2021"\n' \
+    >"$probe/Cargo.toml"
+  local -a check=(cargo check --verbose --manifest-path "$probe/Cargo.toml" --target-dir "$probe/target")
+  if ! CARGO_INCREMENTAL=0 "${check[@]}" >"$probe/out" 2>&1 &&
+    RUSTC_WRAPPER='' RUSTC_WORKSPACE_WRAPPER='' CARGO_INCREMENTAL=0 "${check[@]}" >/dev/null 2>&1; then
+    # Cargo's failure quotes the invocation; the wrappers are the words before rustc.
+    wrapper=$(grep -oE "(process didn't exit successfully: |could not execute process )\`[^\`]*" "$probe/out" |
+      tail -1 | sed "s/^[^\`]*\`//" |
+      awk '{ for (i = 1; i <= NF && $i !~ /(^|\/)rustc$/; i++) printf "%s%s", (i > 1 ? " " : ""), $i }' || true)
+    [ -z "${RUSTC_WRAPPER:-}" ] || [ "$wrapper" != "$RUSTC_WRAPPER" ] ||
+      wrapper="${CARGO_CI_CALLER_RUSTC_WRAPPER:-sccache}"
+    echo "cargo-ci: infrastructure fault (exit 75): compiler wrapper '$wrapper' cannot compile an empty crate; no step ran"
+    tail -20 "$probe/out"
+    echo "       Repair the wrapper and retry: a shared daemon may need stopping"
+    echo "       (e.g. sccache --stop-server), and CARGO_CI_NO_SCCACHE=1 bypasses sccache."
+    rm -rf "$probe"
+    exit 75
+  fi
+  rm -rf "$probe"
+}
+
+ensure_compiler_wrapper_runs
 
 if [ "${1:-}" = "--cargo" ]; then
   shift
-  exec cargo "$@"
+  cargo_status=0
+  cargo "$@" || cargo_status=$?
+  exit "$cargo_status"
 fi
 
 # The concise reporter below parses cargo-nextest's human summary contract.
@@ -213,17 +362,8 @@ ensure_pinned_nextest() {
 
 ensure_pinned_nextest
 
-# Incremental compilation is left at the workspace manifest's
-# [profile.dev]/[profile.test] setting for every step below, the same as an
-# ordinary interactive build. A gate run repeated against a warm target
-# directory — which is every agent worktree run and every local re-check —
-# recompiles one edited crate rather than the workspace, measured here at
-# 54.1 s against 25.3 s over the clippy and suite-build steps, at no cost to a
-# cold run. The derivation is under "Provenance" in
-# dev/benchmarks/rust-build-budgets/README.md.
-
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+# Cargo uses the workspace profile settings below: dev builds remain
+# incremental, while test builds disable incremental state in Cargo.toml.
 
 # This run's own scratch state (jit:0708d692): the Cargo artifact stream
 # describing what this run built, so the budget step judges what this run
@@ -438,8 +578,10 @@ baseline_load1=$(sample_load1)
 
 # Run all steps (continue through failures so every problem is reported, unlike
 # a short-circuiting `&&` chain). Same checks the inline gate ran.
-run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
-run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+if [ "${1:-}" != "--suite" ]; then
+  run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
+  run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+fi
 
 # Put the measured suite into the state the clock assumes, before the clock
 # starts (jit:94d85bf1, jit:0708d692): compiled, and read into the page cache.
@@ -457,8 +599,7 @@ run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D
 # on a warm one, failing and passing one budget for a reason the tree had no
 # part in (dev/benchmarks/cold-warm-verdict-0708d692/README.md). Most of that
 # was compilation this step had not covered, because the suite compiled from
-# inside its own clock — see scripts/setup-recorded-failure-corpus.sh, whose
-# Cargo package selection now matches the build below.
+# inside its own clock.
 #
 # What remains here is the artifacts themselves: nothing has read the
 # executables this step links, so the `test` substep would fault them in while
@@ -514,7 +655,9 @@ prepare_measured_suite() {
 
   echo "built in ${built_ms} ms, warmed ${#readable[@]} executables (${bytes} bytes) in $(( $(epoch_milliseconds) - warm_started_ms )) ms"
 }
-run_step suite-build prepare_measured_suite
+if [ "${1:-}" != "--suite" ]; then
+  run_step suite-build prepare_measured_suite
+fi
 
 # The named suite clock is deliberately narrower than the gate duration. It
 # starts immediately before the pinned workspace suite and ends after the
@@ -561,7 +704,9 @@ run_budget_check() {
     "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
     --root "$root" --artifacts-json "$SUITE_ARTIFACTS_JSON" --test-suite-ms "$suite_clock_ms"
 }
-run_step budget run_budget_check
+if [ "${1:-}" != "--suite" ]; then
+  run_step budget run_budget_check
+fi
 
 echo "$summary"
 

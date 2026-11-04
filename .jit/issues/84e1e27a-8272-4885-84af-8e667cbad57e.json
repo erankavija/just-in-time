@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-02T23:48:35.163633406Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "c2930451-2555-4bed-ae3a-eaa6d72b7522"
+    "b06cee74-7635-49c0-bc13-448bcfa28324"
   ],
-  "description": "Give the event-log parser one torn-line rule: ignore a final line without a terminating newline and reject any other malformed line.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`) skips a malformed line only when the next line is a profile-lifecycle record whose `isolated_torn_tail` is true (`certifies_preceding_torn_tail`, `:78`). Event appends now land at the committed length, so an unterminated final line is an uncommitted append that never becomes a middle line. The parser's tests are at `event_log.rs:96-160`.\n\n## Success Criteria\n\n- [hard] REQ-01: `parse_known_events` ignores a final line that has no terminating newline, skips blank lines and records with a retired tag, and returns an error naming the line for any other line that is not a well-formed event record.\n- [hard] REQ-02: No reader certifies a malformed line by the record that follows it, and `certifies_preceding_torn_tail` no longer exists.\n- [hard] REQ-03: One parser unit test owns the rule: an unterminated final line is ignored, and a malformed middle line is rejected.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Give the event log one torn-line rule on both sides: every append lands at the end of the last newline-terminated line, and the parser ignores a final line without a terminating newline and rejects any other malformed line.\n\n## Background\n\nThe finalizer appends at the captured log length and, when the log ends in an unterminated final line, prefixes a separator newline (`compose_events`, `captured_log_end`, `crates/jit/src/repository_state/mutation.rs`). That turns the fragment into a permanent malformed middle line. To avoid corrupting the log, the finalizer refuses every append over an unterminated, unparseable final line unless the mutation writes a profile marker (`MutationError::UncertifiedTornTail`). `finalize_audit_append` shares the path. Both backends already apply an event append at its offset and truncate to the offset plus its bytes (`storage/redo_apply.rs`, `storage/memory.rs`), and the end-of-log probe already holds the final line (@/issue/c88822a5/decision/D-1). `test_profile_application_does_not_mark_valid_unterminated_event_as_torn` in `commands/profile.rs` pins that a complete valid unterminated record is preserved; under this rule the next append overwrites it, since only a foreign writer can leave one: a crash mid-apply leaves a redo record the next session completes.\n\n`domain::parse_known_events` (`domain/event_log.rs`) iterates `contents.lines()`, which cannot see a terminator. It skips a malformed line only when the next line is a profile-lifecycle record whose `isolated_torn_tail` is true (`certifies_preceding_torn_tail`). An unknown tag is an error naming its line (`EventLogError::UnknownTag`), owned by `test_read_events_rejects_unknown_tags_and_malformed_records` (`storage/issue_store_conformance.rs`) and pinned by the failure levers; that stays.\n\n`event_log_drift` (`validation/record_fidelity.rs`) feeds each newline-stripped line to the parser, so under the new rule every line would be an ignored unterminated final line, and it scans the log a second time as raw `serde_json::Value` for ids. `read_events` (`storage/json.rs`) takes `.events.lock` shared, so `jit events` waits on writers, against @/charter/D-22; with this rule a partly appended line is simply ignored.\n\n## Success Criteria\n\n- [hard] REQ-01: The length a mutation reads from the event log is its committed length: the end of its last newline-terminated line, which the end-of-log probe determines. Every event append, `finalize_audit_append` included, is positioned at that length and writes no separator newline. The rustdoc of `compose_events` and `captured_log_end` and the offset tests say committed length.\n- [hard] REQ-02: No mutation refuses to append over an unterminated final line, and a finalizer unit test shows that an append over one starts at that line's offset and leaves a log every line of which is newline-terminated.\n- [hard] REQ-03: `parse_known_events` ignores a final line that has no terminating newline, skips blank lines, and returns an error naming the line for a line whose tag is unknown and for any other line that is not a well-formed event record.\n- [hard] REQ-04: No reader certifies a malformed line by the record that follows it, `certifies_preceding_torn_tail` no longer exists, and one parser unit test owns the rule: an unterminated final line is ignored, a malformed middle line is rejected.\n- [hard] REQ-05: `event_log_drift` passes each line to the parser with its terminator, takes event ids from the parsed events and parses no line as raw JSON, and `test_event_log_drift_reports_a_line_that_does_not_reproduce` still passes.\n- [hard] REQ-06: `read_events` reads the log without `.events.lock`.\n",
   "documents": [],
+  "done_at": "2026-11-03T00:24:45.030410564Z",
+  "first_ready_at": "2026-11-02T23:39:53.922345471Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8386085d-ae3b-4300-995c-6e79a4b91b8d",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:18:19.544087201Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7461de96-8b5a-47c2-8bf3-7378e393f914",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:24:44.598526568Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "84e1e27a-8272-4885-84af-8e667cbad57e",
   "labels": [
     "type:task",
@@ -21,10 +37,13 @@
     "component:core",
     "per:@/charter/D-18",
     "enforces:@/invariant/convention-convergence",
-    "satisfies:f8a6b298/REQ-10"
+    "satisfies:f8a6b298/REQ-10",
+    "enforces:@/invariant/atomic-writes",
+    "per:@/charter/D-17",
+    "satisfies:f8a6b298/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
-  "title": "Event-log readers ignore an unterminated final line",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "state": "done",
+  "title": "Event-log readers ignore an unterminated final line that the next append overwrites",
+  "updated_at": "2026-11-03T00:24:45.030410564Z"
 }

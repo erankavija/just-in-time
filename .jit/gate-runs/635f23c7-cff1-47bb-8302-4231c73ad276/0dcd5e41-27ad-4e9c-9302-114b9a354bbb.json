@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d9724f353493ee0c403b89a8bda6faa618637b76",
+  "completed_at": "2026-11-04T19:09:52.168728756Z",
+  "duration_ms": 244283,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable readiness, creation, test, and documentation criteria are satisfied; prior blocking gaps are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "635f23c7-cff1-47bb-8302-4231c73ad276",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0dcd5e41-27ad-4e9c-9302-114b9a354bbb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T19:05:47.885394161Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2ed79f45d8bd066285c709b7fad2a48a4f1ba0fc; 7c6c5eabc85b2db6e75eee79ed8bcc4754f97fa0\nPolicy sources: AGENTS.md\nResolved items: issue requirements/decision from `.jit/issues/635f23c7-cff1-47bb-8302-4231c73ad276.json`; charter items from `dev/vision/9db27a3a-charter.md`; invariants and gates from `.jit/invariants.toml` and `.jit/gates.toml`\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T19:04:02Z); prior code-review failed (exit 1), with both prior blocking test gaps addressed by the second tagged commit\nTruncation recovery: re-read affected patches and current implementation/tests/docs by path and bounded line range after a combined patch read truncated\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable readiness, creation, test, and documentation criteria are satisfied; prior blocking gaps are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

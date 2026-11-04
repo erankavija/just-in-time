@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:17:12.127327825Z",
+  "duration_ms": 132122,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The registered gate directly runs the self-test, propagates non-zero exits, declares all static script inputs, and has a fresh projection.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "35c5141b-1a1b-4b27-872b-4d08a34d11ba",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:15:00.004604465Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 703c26a26, 163e3a371, e4c0953b8\nPolicy sources: AGENTS.md\nResolved items: @/gate/session-cost-benchmark-selftest (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-2 and @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-10 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json)\nGate evidence: cargo-ci passed (exit 0, 2026-10-24T23:14:27Z); session-cost-benchmark-selftest passed (exit 0, 2026-10-24T23:14:15Z)\nTruncation recovery: recovered 163e3a371’s .jit/gates.toml patch and bounded current script/config reads; omitted truncated event/progress records as historical records outside behavior review.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The registered gate directly runs the self-test, propagates non-zero exits, declares all static script inputs, and has a fresh projection.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

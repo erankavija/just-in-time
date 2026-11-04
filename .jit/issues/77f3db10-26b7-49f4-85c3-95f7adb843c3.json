@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-02T23:48:36.317727887Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -7,14 +8,28 @@
     "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
     "b06cee74-7635-49c0-bc13-448bcfa28324"
   ],
-  "description": "Record, on each issue's gate state, the id of the latest run recorded for that gate, so the latest run is addressed from the issue record instead of being found by scanning runs.\n\n## Background\n\n`GateState` (`crates/jit/src/domain/types.rs:400-408`) holds a status, an actor and a timestamp, but not the run that produced it. Every reader that needs an issue's latest run of a gate therefore lists runs and selects one. The only conversion from a recorded run to a gate state is `gate_state_from_run` (`commands/gate_check.rs:225-246`), called by gate evaluation (`gate_check.rs:969`, `:1521`) and by lifecycle prechecks (`commands/mod.rs:2950`). A manual gate write replaces the state wholesale (`commands/mod.rs:1719-1723`), and a newly required gate is seeded at `commands/mod.rs:1647`.\n\n`GateState` is built by struct literal in `domain/types.rs` tests (`:2296-2573`), `domain/queries.rs:871`, `output.rs:3075`, `validation/graph.rs:3180`, `visualization.rs:518`, `commands/template.rs:1237`, `commands/mod.rs:3627,3878`, `repository_state/mutation.rs:1452,1460,1942,1951`, `storage/repository_state_store_tests.rs:1703,1711`, `tests/fast_issue/transition_graph_enforcement_tests.rs:656` and `tests/fast_rules/example_rulesets_tests.rs:865`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateState` has a `last_run: Option<GateRunId>` field. A record without the field decodes with `None`, and `None` is not serialized, so an issue record whose gates were never run serializes to the same bytes as before.\n- [hard] REQ-02: A gate state written in the same plan as a recorded run of that gate carries that run's id. Gate evaluation and lifecycle prechecks both produce it through `gate_state_from_run`.\n- [hard] REQ-03: A gate status write that records no run keeps the gate's prior `last_run`, and a newly required gate starts with none.\n- [hard] REQ-04: A unit test proves that evaluating a gate twice leaves `last_run` naming the second run, and a test proves that a manual status write leaves `last_run` unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Pin with tests that an issue's gate state names the latest run recorded for that gate, so the pointer every latest-run reader relies on cannot regress.\n\n## Background\n\n`GateState.run_id: Option<GateRunId>` (`crates/jit/src/domain/types.rs`) is optional and skipped when absent. `gate_state_from_run` (`commands/gate_check.rs`) sets it for gate evaluation and lifecycle prechecks. A manual status write mints an attestation run and names it (the gate family's manual status write), and a newly required gate starts with none. No status write exists without a run. No test covers two evaluations in a row or names the attestation run on a manual write.\n\n## Success Criteria\n\n- [hard] REQ-01: A unit test proves that evaluating a gate twice leaves `run_id` naming the second run.\n- [hard] REQ-02: A unit test proves that a manual gate status write leaves `run_id` naming the attestation run that write recorded.\n",
   "documents": [],
+  "done_at": "2026-11-03T00:02:27.259428168Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a4a6dda5-332b-4027-ae28-a99876d22d63",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:00:19.571272037Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ce6bec2c-ab28-494a-b9e4-c5cd31a72466",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:02:08.010445310Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "77f3db10-26b7-49f4-85c3-95f7adb843c3",
   "labels": [
     "type:task",
@@ -28,7 +43,7 @@
     "satisfies:f8a6b298/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate state names the run that produced it",
-  "updated_at": "2026-10-21T10:40:05.381715103Z"
+  "updated_at": "2026-11-03T00:02:27.259428168Z"
 }

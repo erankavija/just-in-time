@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:23.686035206Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,13 +8,33 @@
   ],
   "description": "Make the `scripts/workflow-contract-selftest.sh` self-test pass as the registered gate `workflow-contract-selftest` over the script it tests.\n\n## Background\n\n`scripts/workflow-contract-selftest.sh` is a re-runnable self-test of `scripts/workflow-contract.sh` over the case vectors in `test-vectors/workflow-contract/`, showing that the harness rejects the defects it claims to reject. It exits 2 when `python3` is missing. Until planning, no gate ran it. The gate `workflow-contract-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete. Only `.github/workflows/ci.yml:54` runs it today, so a local gate run never does.\n\nIts actionlint-wiring layer (`:119-135`) prints `SKIP` and passes when the entry point reports an environment error because actionlint is unavailable, so the actionlint defect seeds go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `workflow-contract-selftest` runs `scripts/workflow-contract-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `workflow-contract-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: When actionlint is unavailable, the self-test exits non-zero naming the missing tool; no branch prints a skip notice and continues to a passing exit.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:18:12.505385007Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "workflow-contract-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d66101b1-36d8-4d2c-8c34-cbf45a874edb",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.564876388Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c6892966-3256-4e0c-a3e3-2b8514db5a96",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:17:33.646542344Z",
+      "updated_by": "auto:executor"
+    },
+    "workflow-contract-selftest": {
+      "run_id": "47b2dbf6-c54d-49ef-bb58-d01faf534116",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:19.949582575Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c11bcdaa-03d2-4b89-8143-26abd58d4632",
   "labels": [
     "type:task",
@@ -29,7 +49,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Workflow-contract harness self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:44:33.121158296Z"
+  "updated_at": "2026-10-24T23:18:12.505385007Z"
 }

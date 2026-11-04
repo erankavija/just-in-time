@@ -18,78 +18,33 @@
 //! genuinely held, which an in-process command harness cannot reproduce.
 
 use assert_cmd::prelude::*;
-use std::process::Command;
+use jit::test_cli::{jit_binary, JitCli};
 use std::time::Duration;
-use tempfile::TempDir;
 
-fn jit_bin() -> std::path::PathBuf {
-    assert_cmd::cargo::cargo_bin!("jit").to_path_buf()
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(jit_bin())
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-    temp
-}
-
-/// Define an auto gate running `checker_command` and create an issue requiring
-/// it. Returns the short issue id.
-fn define_gate_and_issue(temp: &TempDir, gate: &str, checker_command: &str) -> String {
-    Command::new(jit_bin())
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            gate,
-            "--title",
-            gate,
-            "--description",
-            "nested-checker regression gate",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "30",
-        ])
-        .assert()
-        .success();
-
-    let output = Command::new(jit_bin())
-        .current_dir(temp.path())
-        .args(["issue", "create", "--title", "carrier", "--gate", gate])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let output_str = String::from_utf8_lossy(&output);
-    output_str
-        .lines()
-        .find(|l| l.contains("Created issue:"))
+fn define_gate_and_issue(cli: &JitCli, gate: &str, checker_command: &str) -> String {
+    cli.run([
+        "gate",
+        "define",
+        gate,
+        "--title",
+        gate,
+        "--description",
+        "nested-checker regression gate",
+        "--mode",
+        "auto",
+        "--checker-command",
+        checker_command,
+        "--timeout",
+        "30",
+    ])
+    .unwrap();
+    cli.create_issue(["--title", "carrier", "--gate", gate])
         .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
 }
 
 /// Titles of every issue currently in the repository.
-fn issue_titles(temp: &TempDir) -> Vec<String> {
-    let output = Command::new(jit_bin())
-        .current_dir(temp.path())
-        .args(["issue", "list", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    json["issues"]
+fn issue_titles(cli: &JitCli) -> Vec<String> {
+    cli.run_json(["issue", "list"]).unwrap()["issues"]
         .as_array()
         .unwrap()
         .iter()
@@ -101,38 +56,30 @@ fn issue_titles(temp: &TempDir) -> Vec<String> {
 /// repository runs to completion and the gate records a pass.
 #[test]
 fn test_gate_evaluate_allows_nested_mutating_jit() {
-    let temp = setup_repo();
-    let jit = jit_bin();
+    let cli = JitCli::initialised().unwrap();
+    let jit = jit_binary();
     // The checker creates a fresh issue in the SAME repository through a nested
     // `jit` invocation — a mutating command that takes the repository write
     // lock the evaluator is holding.
     let checker = format!("\"{}\" issue create --title nested-mutation", jit.display());
-    let issue_id = define_gate_and_issue(&temp, "nested-mut", &checker);
+    let issue_id = define_gate_and_issue(&cli, "nested-mut", &checker);
 
-    Command::new(&jit)
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id, "nested-mut"])
+    cli.command(["gate", "evaluate", &issue_id, "nested-mut"])
         .assert()
         .success();
 
     // The nested mutation actually landed: proof the child acquired the locks
     // rather than timing out and exiting nonzero.
-    let titles = issue_titles(&temp);
+    let titles = issue_titles(&cli);
     assert!(
         titles.iter().any(|t| t == "nested-mutation"),
         "nested `jit issue create` must have created its issue; titles: {titles:?}"
     );
 
     // And the gate is recorded as passed.
-    let output = Command::new(&jit)
-        .current_dir(temp.path())
-        .args(["gate", "status", &issue_id, "nested-mut", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let json = cli
+        .run_json(["gate", "status", &issue_id, "nested-mut"])
+        .unwrap();
     assert_eq!(
         json["status"], "passed",
         "gate must be recorded as passed: {json}"
@@ -144,22 +91,21 @@ fn test_gate_evaluate_allows_nested_mutating_jit() {
 /// in-process-only guard.
 #[test]
 fn test_unrelated_process_still_respects_bootstrap_lock() {
-    let temp = setup_repo();
-    let jit = jit_bin();
+    let cli = JitCli::initialised().unwrap();
     let lock = jit::storage::RepoWriteLock::for_lock_path(
-        temp.path().join(".jit-bootstrap.lock"),
+        cli.root().join(".jit-bootstrap.lock"),
         Duration::from_secs(1),
     );
     let _guard = lock.acquire().unwrap();
 
-    Command::new(&jit)
-        .current_dir(temp.path())
-        .env("JIT_LOCK_TIMEOUT", "1")
-        .args(["issue", "create", "--title", "unrelated-write"])
-        .assert()
-        .failure();
+    cli.command_with_env(
+        ["issue", "create", "--title", "unrelated-write"],
+        [("JIT_LOCK_TIMEOUT", "1")],
+    )
+    .assert()
+    .failure();
 
-    let titles = issue_titles(&temp);
+    let titles = issue_titles(&cli);
     assert!(
         !titles.iter().any(|t| t == "unrelated-write"),
         "an unrelated process must not mutate while the bootstrap lock is held; titles: {titles:?}"

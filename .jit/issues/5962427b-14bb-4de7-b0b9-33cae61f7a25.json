@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T22:59:40.821618091Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "27f0a575-f1ea-49ba-9b91-eca4385c32e7"
   ],
-  "description": "Moves the validation methods off `CommandExecutor` onto the `validation()` facade, so a validation consumer depends on `ValidationOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The validation family lives in `commands/validate.rs`, whose two `impl` blocks carry different bounds (`IssueStore + RepositoryStateStore` at about :32, `IssueStore` at about :1466): `validate_with_fix`, `validate_silent`, `validate_repository_report`, `validate_repository_report_with_divergences`, `dangling_link_findings`, `enforcement_drift_findings`, `compute_drift_findings`, `loadable_rule_names`, `validate_integrity_silent` (if it still exists), `evaluate_graph_rules`, `image_plan_content`, `run_rules`, `review_placeholder_findings`, `validate_scope`, `validate_rule`, `explain_rules`, `get_status`, `validate_branch_drift` and `validate_leases`. The `pub(crate)` `capture_*` helpers are kernel used by other families and stay on `CommandExecutor`. Consumers are the `validate`, `status` and rule arms of `crates/jit/src/main.rs` (or their handler modules under `crates/jit/src/dispatch/`), the server's status route (`get_status` in `crates/server/src/routes.rs`), library tests in `crates/jit/src/validation/repository.rs`, and the validation test suites.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::validation()` returns `ValidationOps<'_, S>`, and every public method listed in the Background is a method of `ValidationOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ValidationOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `validation()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "description": "Moves the validation methods off `CommandExecutor` onto the `validation()` facade, so a validation consumer depends on `ValidationOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The validation family lives in `commands/validate.rs`, whose two `impl` blocks carry different bounds (`IssueStore + RepositoryStateStore` at about :32, `IssueStore` at about :1466): `validate_with_fix`, `validate_silent`, `validate_repository_report`, `validate_repository_report_with_divergences`, `dangling_link_findings`, `enforcement_drift_findings`, `compute_drift_findings`, `loadable_rule_names`, `evaluate_graph_rules`, `image_plan_content`, `run_rules`, `review_placeholder_findings`, `validate_scope`, `validate_rule`, `explain_rules`, `get_status`, `validate_branch_drift` and `validate_leases`, plus the `pub(crate)` `repair_derived_state`, which keeps its visibility and which `commands/claim.rs` reaches through `validation()`. The `pub(crate)` `capture_*` helpers (`capture_validation_image_with`, `capture_proposed_base`, `capture_mutation_base`, `capture_mutation_preflight` and `capture_archive_base`) are kernel used by other families and stay on `CommandExecutor`. Consumers are the `validate`, `status` and rule arms of `crates/jit/src/main.rs` (or their handler modules under `crates/jit/src/dispatch/`), the server's status route (`get_status` in `crates/server/src/routes.rs`), library tests in `crates/jit/src/validation/repository.rs`, and the validation test suites.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::validation()` returns `ValidationOps<'_, S>`, and every public method listed in the Background is a method of `ValidationOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ValidationOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `validation()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T04:09:22.602699555Z",
   "first_ready_at": "2026-10-22T14:01:53.358669712Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b36741ea-e8a8-42db-9fc5-cce19baf18fe",
+      "status": "passed",
+      "updated_at": "2026-11-03T04:05:00.997372202Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3636c6b5-d504-4900-ac33-7791a8e38b9b",
+      "status": "passed",
+      "updated_at": "2026-11-03T04:09:18.132780978Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5962427b-14bb-4de7-b0b9-33cae61f7a25",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Validation methods behind a validation facade",
-  "updated_at": "2026-10-22T14:01:53.358669712Z"
+  "updated_at": "2026-11-03T04:09:22.602699555Z"
 }

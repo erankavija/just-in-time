@@ -1,0 +1,45 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:12:01.733319076Z",
+  "context": {},
+  "created_at": "2026-10-31T23:11:40.656753200Z",
+  "dependencies": [],
+  "description": "Type the node ids in resolved hierarchy facts, so `graph tree` takes a parent's short id from `IssueId` rather than truncating a string.\n\n## Background\n\n`NodeHierarchy` (`crates/jit/src/graph/hierarchy.rs:195`) holds `parent: Option<String>`, `children: Vec<String>` and `cluster: Option<String>`, and `graph tree`, `graph export --format json --full` and the server's `GET /graph` publish it. `resolve_hierarchy` is generic over `HierarchyNode`, and test fixtures implement that trait with non-UUID ids alongside `Issue`, so ids reach it as `&str`. Because the parent is a string, the `graph tree` renderer truncates it by `SHORT_ID_LENGTH` at `crates/jit/src/main.rs:4711`. `HierarchyResolution` also keys its accessors by `&str`.\n\n## Success Criteria\n\n- [hard] REQ-01: The `NodeHierarchy` that `graph tree`, `graph export --full` and `GET /graph` publish holds `parent`, `children` and `cluster` as `IssueId`.\n- [hard] REQ-02: The `graph tree` renderer takes the parent's short id from `IssueId::short_id()`, and no production code truncates an issue id by `SHORT_ID_LENGTH` outside `domain::identity`.\n- [hard] REQ-03: No new production site builds an `IssueId` from a string.\n- [hard] REQ-04: `graph tree`, `graph export --full` and `GET /graph` JSON is unchanged, and `jit --schema` still describes these fields as strings.\n",
+  "documents": [],
+  "done_at": "2026-10-31T23:49:10.551583834Z",
+  "first_ready_at": "2026-10-31T23:11:40.656753200Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "92d9d3b3-aa24-4a71-bb27-2dba93a5453d",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:46:31.447419011Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b6ed11d3-f366-4d33-9c54-fba0a1a1f94c",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:36:28.176195252Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "83413035-17f2-4fe0-a503-b8086ea28ac7",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:core",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "type:task",
+    "satisfies:2195c98f/REQ-03",
+    "satisfies:2195c98f/REQ-17"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Resolved hierarchy facts carry typed issue ids",
+  "updated_at": "2026-10-31T23:49:10.551583834Z"
+}

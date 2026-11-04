@@ -2,7 +2,7 @@
 //! validate, snapshot, instantiate (jit:14137e1a), plus edge wiring + the
 //! `move-upstream-to-role` transform (jit:73e5e853).
 //!
-//! These exercise the real `create_issue` + gate-preset + `add_dependency` +
+//! These exercise the real `create_issue` + gate-preset + `add_dependencies_with_policy` +
 //! storage path through the in-process `TestHarness` (InMemoryStorage), which is
 //! fully isolated from the production `.jit/`. The template is authored in-test
 //! via `TemplateRegistry::from_toml_str` and passed explicitly to
@@ -14,12 +14,16 @@
 //! pre-apply upstream deps move onto P), yielding the acyclic, transitively
 //! reduced spine C→B→P→upstream.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::declarations::{GateChecker, GateMode};
+use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
+use jit::test_utils::issue_id;
 use jit::CommandExecutor;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
@@ -96,8 +100,13 @@ const DOCUMENT_AREA: &str = "workspace/notes";
 fn declare_document_area(h: &TestHarness) {
     let config = format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n");
     h.storage.add_data_file("config.toml", &config);
-    std::fs::create_dir_all(h.storage.root()).unwrap();
-    std::fs::write(h.storage.root().join("config.toml"), &config).unwrap();
+    let config_path = h
+        .storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::CONFIG)
+        .unwrap();
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(config_path, &config).unwrap();
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
@@ -108,7 +117,7 @@ fn type_of(issue: &jit::domain::Issue) -> Option<String> {
     })
 }
 
-fn create_epic(h: &TestHarness, title: &str) -> String {
+fn create_epic(h: &TestHarness, title: &str) -> IssueId {
     // The area a document declaration names is one the repository declares, so
     // the fixture declares it before a template that names it is applied.
     declare_document_area(h);
@@ -125,7 +134,7 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
             Some(GateChecker::RepositoryValidation),
         );
     }
-    let (id, _) = h
+    let id = h
         .executor
         .issues()
         .create_issue(
@@ -138,12 +147,14 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     id
 }
 
-fn container_binding(id: &str) -> BTreeMap<String, String> {
-    BTreeMap::from([("container".to_string(), id.to_string())])
+fn container_binding(id: &IssueId) -> BTreeMap<String, IssueId> {
+    BTreeMap::from([("container".to_string(), id.clone())])
 }
 
 #[test]
@@ -177,6 +188,7 @@ applies_to = ["epic"]
 
     let result = h
         .executor
+        .templates()
         .apply_template("plan", &epic, &BTreeMap::new(), false)
         .unwrap()
         .0;
@@ -197,6 +209,7 @@ fn test_apply_instantiates_nodes_with_interpolated_descriptions() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -234,6 +247,7 @@ fn test_apply_resolves_node_doc_location() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -245,6 +259,7 @@ fn test_apply_resolves_node_doc_location() {
     // hand-composed `area/id` path.
     let directory = h
         .executor
+        .documents()
         .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;
@@ -289,6 +304,7 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -297,6 +313,7 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
     // that repeats no short id, because the directory already names the issue.
     let directory = h
         .executor
+        .documents()
         .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;
@@ -330,6 +347,7 @@ fn test_apply_rejects_a_document_area_the_registry_does_not_declare_and_creates_
     let before = h.all_issues().len();
     let error = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
 
@@ -349,6 +367,7 @@ fn test_apply_attaches_declared_gate_presets() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -356,13 +375,15 @@ fn test_apply_attaches_declared_gate_presets() {
     let breakdown = h.get_issue(&result.created_node_ids_by_role["breakdown"]);
 
     // APPA-04: each node carries its template-declared gate presets.
-    assert!(planning.gates_required.contains(&"plan-review".to_string()));
+    assert!(planning
+        .gates_required
+        .contains(&"plan-review".parse().unwrap()));
     assert!(breakdown
         .gates_required
-        .contains(&"coverage-preview".to_string()));
+        .contains(&"coverage-preview".parse().unwrap()));
     assert!(breakdown
         .gates_required
-        .contains(&"breakdown-review".to_string()));
+        .contains(&"breakdown-review".parse().unwrap()));
 }
 
 #[test]
@@ -372,11 +393,12 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
     let upstream = h.create_issue("Upstream");
     let epic = create_epic(&h, "Snapshot epic");
     // Give the container a pre-existing upstream dependency.
-    h.executor.add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
     let upstream_full = h.get_issue(&upstream).id;
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -397,7 +419,7 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     // the container's type rather than an undeclared area reached first.
     declare_document_area(&h);
     let template = plan_template();
-    let (task, _) = h
+    let task = h
         .executor
         .issues()
         .create_issue(
@@ -410,11 +432,14 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &task, &container_binding(&task), false)
         .unwrap_err();
     assert!(err.to_string().contains("does not apply"));
@@ -431,6 +456,7 @@ fn test_apply_rejects_unbound_anchor_and_creates_nothing() {
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &BTreeMap::new(), false)
         .unwrap_err();
     assert!(err.to_string().contains("not bound"));
@@ -444,9 +470,11 @@ fn test_apply_rejects_anchor_bound_to_missing_issue() {
     let epic = create_epic(&h, "Missing-anchor epic");
 
     let before = h.all_issues().len();
-    let bindings = BTreeMap::from([("container".to_string(), "deadbeefdeadbeef".to_string())]);
+    let missing_id = issue_id(1);
+    let bindings = BTreeMap::from([("container".to_string(), missing_id.clone())]);
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &bindings, false)
         .unwrap_err();
     // Validation fails before any node is created.
@@ -467,12 +495,14 @@ fn test_apply_rejects_already_applied_without_force() {
     // First apply succeeds and wires C→B (the fresh-apply path), so the breakdown
     // node is among the container's deps.
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("already"));
@@ -489,7 +519,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
     // Simulate a legacy P-only bracket (from the removed `jit plan`): a planning
     // node wired as the container's dependency, with NO breakdown node. Applying
     // must reject rather than create a duplicate planning node.
-    let (planning, _) = h
+    let planning = h
         .executor
         .issues()
         .create_issue(
@@ -502,12 +532,15 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
             None,
             false,
         )
-        .unwrap();
-    h.executor.add_dependency(&epic, &planning).unwrap();
+        .unwrap()
+        .issue
+        .id;
+    add_reducing_edge(&h.executor, &epic, &planning).unwrap();
 
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     let msg = err.to_string();
@@ -527,6 +560,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
 
     let (first, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = first.created_node_ids_by_role["planning"].clone();
@@ -554,6 +588,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
     let count_before = h.all_issues().len();
     let (refreshed, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), true)
         .unwrap();
 
@@ -586,6 +621,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
 
     let (first, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = first.created_node_ids_by_role["planning"].clone();
@@ -597,8 +633,8 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     // Simulate the breakdown splice: a child depends on B, and C depends on the
     // child. Transitive reduction then DROPS the direct C → B edge.
     let child = h.create_issue("impl child");
-    h.executor.add_dependency(&child, &breakdown_id).unwrap();
-    h.executor.add_dependency(&epic, &child).unwrap();
+    add_reducing_edge(&h.executor, &child, &breakdown_id).unwrap();
+    add_reducing_edge(&h.executor, &epic, &child).unwrap();
     assert!(
         !h.get_issue(&epic).dependencies.contains(&breakdown_id),
         "reduction must drop the now-redundant direct C → B edge"
@@ -607,6 +643,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     let count_before = h.all_issues().len();
     let (refreshed, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), true)
         .unwrap();
 
@@ -623,7 +660,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     assert_eq!(refreshed.created_node_ids_by_role["planning"], planning_id);
 
     // Exactly one breakdown node (with brackets:<C-short-id>) and one planning node remain.
-    let short_id: String = epic.chars().take(8).collect();
+    let short_id = epic.short_id();
     let bracket_label = format!("brackets:{short_id}");
     let breakdown_count = h
         .all_issues()
@@ -665,6 +702,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("does-not-exist"));
@@ -686,6 +724,7 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
     let epic = create_epic(&h, "Repo-validate epic");
 
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -693,7 +732,7 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
     assert!(
         container
             .gates_required
-            .contains(&"repo-validate".to_string()),
+            .contains(&"repo-validate".parse().unwrap()),
         "bound container missing the plan template's repo-validate anchor gate: {:?}",
         container.gates_required
     );
@@ -708,7 +747,7 @@ fn test_apply_attaches_registry_gate_key_not_preset() {
     // Here the anchor and a node each name `deploy-check`, a registry-only gate.
     let h = TestHarness::new();
     h.add_gate(
-        "deploy-check",
+        &"deploy-check".parse().unwrap(),
         "Deploy Check",
         "A config-declared gate with no preset of that name",
         GateMode::Auto,
@@ -747,6 +786,7 @@ applies_to  = ["epic"]
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -755,7 +795,7 @@ applies_to  = ["epic"]
     assert!(
         container
             .gates_required
-            .contains(&"deploy-check".to_string()),
+            .contains(&"deploy-check".parse().unwrap()),
         "bound anchor missing its registry-key gate: {:?}",
         container.gates_required
     );
@@ -764,7 +804,7 @@ applies_to  = ["epic"]
     assert!(
         breakdown
             .gates_required
-            .contains(&"deploy-check".to_string()),
+            .contains(&"deploy-check".parse().unwrap()),
         "node missing its registry-key gate: {:?}",
         breakdown.gates_required
     );
@@ -798,6 +838,7 @@ applies_to  = ["epic"]
     let epic = create_epic(&h, "Anchor-gated epic");
 
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -807,7 +848,7 @@ applies_to  = ["epic"]
     assert!(
         container
             .gates_required
-            .contains(&"plan-review".to_string()),
+            .contains(&"plan-review".parse().unwrap()),
         "bound anchor missing its declared gate preset: {:?}",
         container.gates_required
     );
@@ -845,6 +886,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("does-not-exist"), "{err}");
@@ -873,7 +915,7 @@ fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_su
                 .load_gate_registry()
                 .expect("an empty registry loads")
                 .gates
-                .contains_key(key),
+                .contains_key(&key.parse::<jit::domain::identity::GateKey>().unwrap()),
             "{key} must not be a registry gate this repository never declared"
         );
 
@@ -913,11 +955,13 @@ applies_to  = ["epic"]
                 false,
             )
             .unwrap()
-            .0;
+            .issue
+            .id;
 
         let before = h.all_issues().len();
         let error = h
             .executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap_err();
 
@@ -948,10 +992,17 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // same-named registry gate. This is exercised over a real file-based
     // `JsonFileStorage`: the parse-error path lives in `PresetManager::new`, which the
     // in-memory `TestHarness` (a HashMap lookup) cannot reproduce.
-    jit::test_mode::enable();
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
+    std::fs::write(
+        temp.path().join(
+            jit::repository_state::VirtualPath::CONFIG
+                .relative()
+                .as_path(),
+        ),
+        "",
+    )
+    .unwrap();
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
             .unwrap();
@@ -960,8 +1011,9 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // `repo-validate` is a config-declared REGISTRY gate with no preset of that
     // name, so the registry-key fallback WOULD match it.
     executor
+        .gates()
         .define_gate(
-            "repo-validate".to_string(),
+            &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),
             "Whole-repository validation".to_string(),
             jit::declarations::GateStage::Postcheck,
@@ -1029,7 +1081,7 @@ applies_to  = ["epic"]
         .unwrap()
         .clone();
 
-    let (epic, _) = executor
+    let epic = executor
         .issues()
         .create_issue(
             "Broken-preset epic".to_string(),
@@ -1041,12 +1093,15 @@ applies_to  = ["epic"]
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     let before = executor.storage().list_issues().unwrap().len();
     // Under the BUGGY code this would be `Ok(_)` (silent registry-key fallback), so
     // `unwrap_err` itself pins the regression: apply MUST abort.
     let err = executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     // The malformed-preset load error PROPAGATES. It must NOT be `PresetNotFoundError`
@@ -1063,162 +1118,6 @@ applies_to  = ["epic"]
         before,
         "a propagated preset-load failure must create nothing"
     );
-}
-
-#[test]
-fn test_repo_gates_toml_declares_repo_validate_whole_repo_checker() {
-    // REQ-13 (issue 552ff75c): `repo-validate` is CONFIG-DECLARED in the repo's
-    // own `.jit/gates.toml`, with a whole-repo checker —
-    // `jit validate` with NO issue id — distinct from the per-issue `jit-validate`
-    // gate (`jit validate "$JIT_ISSUE_ID"`). Gates persist as a `[[gates]]`
-    // array-of-tables (jit:f5d35048), so each entry is found by scanning for its
-    // `key` field rather than indexing a JSON object by key.
-    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.toml");
-    let raw = std::fs::read_to_string(&gates_path)
-        .unwrap_or_else(|e| panic!("reading {}: {e}", gates_path.display()));
-    let toml: toml::Value = toml::from_str(&raw).unwrap();
-    let gates = toml["gates"]
-        .as_array()
-        .expect(".jit/gates.toml must persist gates as a [[gates]] array");
-    let find_gate = |key: &str| -> &toml::Value {
-        gates
-            .iter()
-            .find(|g| g.get("key").and_then(toml::Value::as_str) == Some(key))
-            .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
-    };
-
-    let gate = find_gate("repo-validate");
-    assert_eq!(gate["stage"].as_str(), Some("postcheck"));
-    assert_eq!(gate["mode"].as_str(), Some("auto"));
-
-    let command = gate["checker"]["command"]
-        .as_str()
-        .expect("repo-validate checker must have a string command");
-    assert_eq!(
-        command, "jit validate",
-        "repo-validate must run whole-repo validation (no issue id)"
-    );
-    assert!(
-        !command.contains("JIT_ISSUE_ID"),
-        "repo-validate must NOT scope to a single issue like the jit-validate gate"
-    );
-
-    // Sanity: the per-issue jit-validate gate is the distinct, id-scoped one.
-    assert_eq!(
-        find_gate("jit-validate")["checker"]["command"].as_str(),
-        Some("jit validate \"$JIT_ISSUE_ID\"")
-    );
-}
-
-/// REQ-09 (issue 32779829): this repository's registry declares the inputs of
-/// the gates whose verdict is a function of the tree, and declares none for the
-/// issue-scoped review gate whose verdict differs per issue over one identical
-/// tree. Read through the registry parser, so the declarations are held to the
-/// constrained root and pattern types rather than to raw TOML.
-#[test]
-fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
-    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.toml");
-    let raw = std::fs::read(&gates_path)
-        .unwrap_or_else(|error| panic!("reading {}: {error}", gates_path.display()));
-    let registry = jit::declarations::parse_gate_registry(&raw)
-        .expect("this repository's gate registry parses");
-    let gate = |key: &str| {
-        registry
-            .gates
-            .get(key)
-            .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
-    };
-
-    let workspace = gate("cargo-ci")
-        .inputs
-        .as_ref()
-        .expect("the Rust workspace gate declares the files its checker reads");
-    assert!(
-        workspace.covers("crates/jit/src/lib.rs"),
-        "a workspace source the checker compiles must be a declared input"
-    );
-    assert!(
-        workspace.covers(".config/nextest.toml"),
-        "the test-runner configuration the CI script reads must be a declared input"
-    );
-
-    assert!(
-        gate("code-review").inputs.is_none(),
-        "an issue-scoped review's verdict is not a function of the tree, so it declares no inputs"
-    );
-}
-
-/// REQ-02 (issue 32779829): the digest consults no ignore rule, so every
-/// generated tree a gate does not read leaves its inputs because this
-/// repository's registry says so; tracker-written records leave every digest
-/// through the engine, not through a declaration. Each assertion below fails if the pattern
-/// that removes it is dropped, and the `excludes_directory` half is what keeps
-/// the walk from traversing what it would only discard.
-#[test]
-fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
-    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.toml");
-    let raw = std::fs::read(&gates_path)
-        .unwrap_or_else(|error| panic!("reading {}: {error}", gates_path.display()));
-    let registry = jit::declarations::parse_gate_registry(&raw)
-        .expect("this repository's gate registry parses");
-    let inputs = |key: &str| {
-        registry
-            .gates
-            .get(key)
-            .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
-            .inputs
-            .as_ref()
-            .unwrap_or_else(|| panic!("gate `{key}` must declare its inputs"))
-    };
-
-    // The web workspace's installed dependency tree is what the ignore rules
-    // used to drop silently. It leaves the digest by declaration now, and the
-    // lockfile that pins it stays in.
-    let web = inputs("npm-ci");
-    assert!(!web.covers("web/node_modules/react/index.js"));
-    assert!(web.excludes_directory("web/node_modules"));
-    assert!(!web.covers("web/dist/index.html"));
-    assert!(
-        web.covers("web/package-lock.json"),
-        "the lockfile pinning the excluded tree must stay in the digest"
-    );
-    assert!(web.covers("web/src/App.tsx"));
-
-    let bridge = inputs("mcp-ci");
-    assert!(!bridge.covers("mcp-server/node_modules/express/index.js"));
-    assert!(bridge.covers("mcp-server/package-lock.json"));
-
-    // The tree-wide gates prune the agent worktrees, which are checkouts of
-    // this repository and dwarf it.
-    for key in ["cargo-ci", "cargo-ci-features", "tests", "docs-mechanical"] {
-        let declared = inputs(key);
-        assert!(
-            declared.excludes_directory(".agents/worktrees"),
-            "gate `{key}` must skip the agent worktrees rather than walk them"
-        );
-        assert!(
-            declared.excludes_directory(".agents/cache-pool"),
-            "gate `{key}` must skip the shared build-cache pool"
-        );
-        assert!(
-            declared.excludes_directory("target"),
-            "gate `{key}` must skip build output"
-        );
-        assert!(
-            declared.covers(".agents/skills/jit-manage/SKILL.md"),
-            "gate `{key}` must keep the packaged skills its suites read"
-        );
-    }
-
-    // The secret scan reads every tracked file, records included, and records
-    // never enter a digest, so the gate declares no inputs and scans on every
-    // evaluation.
-    assert!(registry
-        .gates
-        .get("secret-detection")
-        .expect(".jit/gates.toml must declare the `secret-detection` gate")
-        .inputs
-        .is_none());
 }
 
 #[test]
@@ -1253,6 +1152,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     // The error names the offending node so the misconfiguration is actionable.
@@ -1286,6 +1186,7 @@ applies_to  = ["epic"]
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
@@ -1306,6 +1207,7 @@ fn test_force_errors_when_planning_node_unreachable() {
 
     let (first, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let breakdown_id = first.created_node_ids_by_role["breakdown"].clone();
@@ -1314,12 +1216,14 @@ fn test_force_errors_when_planning_node_unreachable() {
     // unreachable through the breakdown node's depends_on: a broken bracket the
     // --force refresh must reject rather than silently refresh only B.
     h.executor
+        .graph()
         .remove_dependency(&breakdown_id, &planning_id)
         .unwrap();
 
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), true)
         .unwrap_err();
     // APPA-03: a broken/incomplete bracket errors rather than silently refreshing
@@ -1339,13 +1243,14 @@ fn test_apply_wires_spine_and_moves_upstream_onto_planning() {
     let up1 = h.create_issue("Upstream 1");
     let up2 = h.create_issue("Upstream 2");
     let epic = create_epic(&h, "Spine epic");
-    h.executor.add_dependency(&epic, &up1).unwrap();
-    h.executor.add_dependency(&epic, &up2).unwrap();
+    add_reducing_edge(&h.executor, &epic, &up1).unwrap();
+    add_reducing_edge(&h.executor, &epic, &up2).unwrap();
     let up1_full = h.get_issue(&up1).id;
     let up2_full = h.get_issue(&up2).id;
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = result.created_node_ids_by_role["planning"].clone();
@@ -1386,6 +1291,7 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = result.created_node_ids_by_role["planning"].clone();
@@ -1402,27 +1308,6 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
     // The spine B→P is intact and not inverted.
     let breakdown = h.get_issue(&breakdown_id);
     assert_eq!(breakdown.dependencies, vec![planning_id]);
-}
-
-#[test]
-fn test_apply_rejects_unknown_transform_kind_and_creates_nothing() {
-    let h = TestHarness::new();
-    // The registry loader rejects an unsupported transform kind, so a template
-    // reaching the engine can only carry one by being hand-built. Expansion is the
-    // engine's defensive gate for that case, and it runs BEFORE any mutation.
-    let mut template = plan_template();
-    template.transforms[0].kind = "teleport".to_string();
-    let epic = create_epic(&h, "Weird epic");
-
-    let before = h.all_issues().len();
-    let err = h
-        .executor
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(err.to_string().contains("teleport"), "{err}");
-    // The unknown kind is caught during expansion, before any mutation:
-    // ZERO new issues (and thus zero edges) were created.
-    assert_eq!(h.all_issues().len(), before);
 }
 
 #[test]
@@ -1490,7 +1375,7 @@ applies_to  = ["epic"]
     let upstream = h.create_issue("Upstream U");
     let epic = create_epic(&h, "Cyclic epic");
     // C → U pre-existing.
-    h.executor.add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
 
     let bindings = BTreeMap::from([
         ("container".to_string(), epic.clone()),
@@ -1500,6 +1385,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &bindings, false)
         .unwrap_err();
     assert!(err.to_string().contains("cycle"), "{err}");
@@ -1516,7 +1402,7 @@ applies_to  = ["epic"]
     // (exit 1). This binds the test to the exit-code fix, not just the guard.
     assert!(
         matches!(
-            err.downcast_ref::<jit::graph::GraphError>(),
+            err.downcast_ref::<jit::graph::GraphError<jit::domain::identity::IssueId>>(),
             Some(jit::graph::GraphError::CycleDetected)
         ),
         "prospective-cycle rejection must be a typed CycleDetected (exit 4), got: {err}"
@@ -1539,6 +1425,7 @@ fn test_apply_template_leaves_no_node_ready_while_it_carries_an_unmet_dependency
     let epic = create_epic(&h, "Coherence epic");
 
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -1560,33 +1447,145 @@ fn test_apply_template_leaves_no_node_ready_while_it_carries_an_unmet_dependency
     assert!(!container.dependencies.is_empty());
 }
 
-/// REQ-01: the demotion the apply performs is auditable — each node it moves out
-/// of `Ready` appends its own `Ready → Backlog` state-change event.
+/// REQ-01: the demotion the apply performs on the container it wires is
+/// auditable: it appends its own `Ready → Backlog` state-change event.
 #[test]
-fn test_apply_template_appends_a_state_change_event_for_every_node_it_demotes() {
+fn test_apply_template_appends_a_state_change_event_for_the_container_it_demotes() {
     let h = TestHarness::new();
     let template = plan_template();
     let epic = create_epic(&h, "Demotion event epic");
 
-    let (result, _w) = h
-        .executor
+    h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
-    let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
-    let container_id = h.get_issue(&epic).id;
 
-    let events = h.storage.read_events().unwrap();
-    for demoted in [&container_id, &breakdown_id] {
-        assert!(
-            events.iter().any(|event| matches!(
-                event,
-                jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
-                    if issue_id == demoted
+    assert!(
+        h.storage
+            .read_events()
+            .unwrap()
+            .iter()
+            .any(|event| matches!(
+                event.body(),
+                jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
+                    if *issue_id == epic
                         && *from == jit::domain::State::Ready
                         && *to == jit::domain::State::Backlog
             )),
-            "no Ready → Backlog event recorded for the demoted node {demoted}"
-        );
+        "no Ready → Backlog event recorded for the demoted container"
+    );
+}
+
+/// A rule refusing a `Ready` node of `node_type` that carries no `req:` label.
+fn ready_node_needs_req(node_type: &str) -> String {
+    format!(
+        r#"
+[[rules]]
+name = "ready-node-needs-req"
+when = {{ type = "{node_type}", state = "ready" }}
+severity = "error"
+enforce = true
+assert = {{ require-label = {{ label = "req:*", min = 1 }} }}
+"#
+    )
+}
+
+/// A node blocked by another node of the same application is created `Backlog`
+/// and validated as `Backlog`: it is never `Ready`, so it records no demotion
+/// and no `first_ready_at`, while the node with no dependency is created `Ready`.
+#[test]
+fn test_apply_template_creates_a_node_blocked_inside_the_application_in_backlog() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Blocked node epic");
+    h.storage
+        .add_data_file("rules.toml", &ready_node_needs_req("breakdown"));
+
+    let (result, _) = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .expect("the breakdown node is validated as Backlog, which the rule ignores");
+
+    let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
+    let breakdown = h.get_issue(&result.created_node_ids_by_role["breakdown"]);
+    assert_eq!(planning.state, jit::domain::State::Ready);
+    assert_eq!(breakdown.state, jit::domain::State::Backlog);
+    assert!(breakdown.first_ready_at.is_none());
+    assert!(
+        !h.storage.read_events().unwrap().iter().any(|event| matches!(
+            event.body(),
+            jit::domain::EventBody::IssueStateChanged { issue_id, .. } if *issue_id == breakdown.id
+        )),
+        "the breakdown node records no state change"
+    );
+}
+
+/// A rule keyed on `Ready` sees the created state of a node nothing blocks.
+#[test]
+fn test_apply_template_validates_an_unblocked_node_as_ready() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Ready rule epic");
+    h.storage
+        .add_data_file("rules.toml", &ready_node_needs_req("planning"));
+    let before = h.all_issues().len();
+
+    h.executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .expect_err("the planning node is validated as Ready, which the rule refuses");
+
+    assert_eq!(h.all_issues().len(), before);
+}
+
+/// A node moved onto the container's upstream dependencies is created `Ready`
+/// when they are all terminal and `Backlog` when one is open.
+#[test]
+fn test_apply_template_derives_a_node_state_from_the_upstreams_moved_onto_it() {
+    let template = TemplateRegistry::from_toml_str(
+        r#"
+[[template]]
+name        = "move"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#,
+        &HIERARCHY,
+    )
+    .unwrap()
+    .get("move")
+    .unwrap()
+    .clone();
+    for (upstream_state, expected) in [
+        (jit::domain::State::Done, jit::domain::State::Ready),
+        (jit::domain::State::Rejected, jit::domain::State::Ready),
+        (jit::domain::State::InProgress, jit::domain::State::Backlog),
+    ] {
+        let h = TestHarness::new();
+        let epic = create_epic(&h, "Moved upstream epic");
+        let upstream = h.create_issue("Upstream");
+        add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
+        let mut closed = h.get_issue(&upstream);
+        closed.state = upstream_state;
+        jit::test_harness::seed_memory_issue(&h.storage, &closed);
+
+        let (result, _) = h
+            .executor
+            .templates()
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap();
+
+        let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
+        assert_eq!(planning.dependencies, [upstream]);
+        assert_eq!(planning.state, expected, "upstream {upstream_state:?}");
     }
 }
 
@@ -1601,6 +1600,7 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
@@ -1610,12 +1610,132 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
     for dependent in [&container_id, &breakdown_id] {
         assert!(
             events.iter().any(|event| matches!(
-                event,
-                jit::domain::Event::IssueUpdated { issue_id, updated_by, .. }
+                event.body(),
+                jit::domain::EventBody::IssueUpdated { issue_id, updated_by, .. }
                     if issue_id == dependent && updated_by == "dependency-add"
             )),
             "no dependency-add event recorded for the dependent {dependent}"
         );
+    }
+}
+
+/// The demotion the wired edge demands lands in the same mutation as the edge:
+/// the container's `Ready → Backlog` event and its dependency-add event carry
+/// one timestamp.
+#[test]
+fn test_apply_template_publishes_the_dependent_demotion_with_its_edge() {
+    let h = TestHarness::new();
+    let epic = create_epic(&h, "Same session epic");
+
+    h.executor
+        .templates()
+        .apply_template_with(&plan_template(), &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let events = h.storage.read_events().unwrap();
+    let timestamp_of = |matches: &dyn Fn(&jit::domain::EventBody) -> bool| {
+        events
+            .iter()
+            .find(|event| matches(event.body()))
+            .map(|event| serde_json::to_value(event).unwrap()["timestamp"].clone())
+            .expect("the apply records the event")
+    };
+    let demoted = timestamp_of(&|body| {
+        matches!(body, jit::domain::EventBody::IssueStateChanged { issue_id, to, .. }
+            if *issue_id == epic && *to == jit::domain::State::Backlog)
+    });
+    let wired = timestamp_of(&|body| {
+        matches!(body, jit::domain::EventBody::IssueUpdated { issue_id, updated_by, .. }
+            if *issue_id == epic && updated_by == "dependency-add")
+    });
+    assert_eq!(demoted, wired);
+}
+
+/// Removing a template edge promotes its dependent through graph rules: a rule
+/// refusing the container's `Ready` keeps it in `Backlog`, records the refusal,
+/// and reports it after the apply commits.
+#[test]
+fn test_apply_template_edge_removal_promotion_refused_by_graph_rule_stays_backlog() {
+    let h = TestHarness::new();
+    let template = TemplateRegistry::from_toml_str(
+        r#"
+[[template]]
+name        = "move"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#,
+        &HIERARCHY,
+    )
+    .unwrap()
+    .get("move")
+    .unwrap()
+    .clone();
+    let epic = create_epic(&h, "Refused epic");
+    let upstream = h.create_issue("Upstream");
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
+    h.storage.add_data_file(
+        "rules.toml",
+        r#"
+[[rules]]
+name = "ready-epic-needs-breakdown"
+when = { type = "epic", state = "ready" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "breakdown" }, mode = "must" } }
+"#,
+    );
+
+    let error = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .expect_err("the graph rule refuses the container's promotion");
+
+    assert!(error.is::<jit::errors::TransitionBlockedError>(), "{error}");
+    let container = h.get_issue(&epic);
+    assert!(container.dependencies.is_empty());
+    assert_eq!(container.state, jit::domain::State::Backlog);
+    assert!(h
+        .storage
+        .read_events()
+        .unwrap()
+        .iter()
+        .any(|event| matches!(
+            event.body(),
+            jit::domain::EventBody::TransitionBlocked { issue_id, .. } if *issue_id == epic
+        )));
+}
+
+#[test]
+fn test_apply_template_returns_created_issues_by_role() {
+    let h = TestHarness::new();
+    let mut template = plan_template();
+    let epic = create_epic(&h, "Returned issues");
+    let upstream = h.create_issue("Upstream");
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
+
+    for force in [false, true, true] {
+        let (result, _) = h
+            .executor
+            .templates()
+            .apply_template_with(&template, &epic, &container_binding(&epic), force)
+            .unwrap();
+
+        assert_eq!(result.created_issues.len(), template.nodes.len());
+        for node in &template.nodes {
+            let issue = &result.created_issues[&node.role];
+            assert_eq!(issue.id, result.created_node_ids_by_role[&node.role]);
+            assert_eq!(*issue, h.get_issue(&issue.id));
+        }
+        template.nodes[0].description = Some("Refreshed description".to_string());
     }
 }
 
@@ -1633,12 +1753,13 @@ fn test_apply_result_serializes_to_expected_json_shape() {
     let template = plan_template();
     let upstream = h.create_issue("Upstream");
     let epic = create_epic(&h, "JSON epic");
-    h.executor.add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
     let upstream_full = h.get_issue(&upstream).id;
     let epic_full = h.get_issue(&epic).id;
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -1646,13 +1767,19 @@ fn test_apply_result_serializes_to_expected_json_shape() {
 
     // Top-level fields are present under their documented names.
     assert_eq!(json["template"], "plan");
-    assert_eq!(json["anchor_bindings"]["container"], epic_full);
+    assert_eq!(json["anchor_bindings"]["container"], epic_full.as_str());
 
     // The role→id map names both roles with the ids the result reports.
     let planning_id = &result.created_node_ids_by_role["planning"];
     let breakdown_id = &result.created_node_ids_by_role["breakdown"];
-    assert_eq!(json["created_node_ids_by_role"]["planning"], *planning_id);
-    assert_eq!(json["created_node_ids_by_role"]["breakdown"], *breakdown_id);
+    assert_eq!(
+        json["created_node_ids_by_role"]["planning"],
+        planning_id.as_str()
+    );
+    assert_eq!(
+        json["created_node_ids_by_role"]["breakdown"],
+        breakdown_id.as_str()
+    );
 
     // The pre-apply snapshot is serialized as the container's ORIGINAL upstream
     // deps (the input the move-upstream transform consumed), not its post-apply
@@ -1701,19 +1828,18 @@ fn engine_config() -> ProptestConfig {
 }
 
 /// Build an isolated harness with an `epic` container that has `upstream_count`
-/// pre-existing upstream dependencies. Returns the harness, the container's short
-/// id, and the full ids of its upstream deps (the move-upstream transform's
-/// snapshot input).
+/// pre-existing upstream dependencies. Returns the harness, the container id,
+/// and its upstream dependency ids (the move-upstream transform's snapshot input).
 fn harness_with_upstreams(
     title: &str,
     upstream_count: usize,
-) -> (TestHarness, String, Vec<String>) {
+) -> (TestHarness, IssueId, Vec<IssueId>) {
     let h = TestHarness::new();
     let epic = create_epic(&h, title);
-    let upstreams: Vec<String> = (0..upstream_count)
+    let upstreams: Vec<IssueId> = (0..upstream_count)
         .map(|i| {
             let up = h.create_issue(&format!("Upstream {i}"));
-            h.executor.add_dependency(&epic, &up).unwrap();
+            add_reducing_edge(&h.executor, &epic, &up).unwrap();
             h.get_issue(&up).id
         })
         .collect();
@@ -1732,11 +1858,11 @@ fn store_is_acyclic(h: &TestHarness) -> bool {
 
 /// True iff the store's dependency graph carries no transitively-redundant DIRECT
 /// edge: for every edge `from -> to`, `to` must NOT be reachable from `from`
-/// through any OTHER direct dependency. `add_dependency`'s eager transitive
+/// through any OTHER direct dependency. Dependency addition's eager transitive
 /// reduction must leave the result in this reduced form.
 fn store_is_transitively_reduced(h: &TestHarness) -> bool {
     let issues = h.all_issues();
-    let deps_by_id: BTreeMap<String, Vec<String>> = issues
+    let deps_by_id: BTreeMap<IssueId, Vec<IssueId>> = issues
         .iter()
         .map(|i| (i.id.clone(), i.dependencies.clone()))
         .collect();
@@ -1745,12 +1871,12 @@ fn store_is_transitively_reduced(h: &TestHarness) -> bool {
     // ignoring a single direct edge `(start -> skip)` so we can ask "is `target`
     // reachable WITHOUT the direct edge under test".
     fn reachable(
-        deps_by_id: &BTreeMap<String, Vec<String>>,
-        start: &str,
-        target: &str,
-        skip: (&str, &str),
+        deps_by_id: &BTreeMap<IssueId, Vec<IssueId>>,
+        start: &IssueId,
+        target: &IssueId,
+        skip: (&IssueId, &IssueId),
     ) -> bool {
-        let mut stack = vec![start.to_string()];
+        let mut stack = vec![start.clone()];
         let mut seen = std::collections::HashSet::new();
         while let Some(node) = stack.pop() {
             if !seen.insert(node.clone()) {
@@ -1758,7 +1884,7 @@ fn store_is_transitively_reduced(h: &TestHarness) -> bool {
             }
             if let Some(deps) = deps_by_id.get(&node) {
                 for dep in deps {
-                    if node == skip.0 && dep == skip.1 {
+                    if &node == skip.0 && dep == skip.1 {
                         continue; // ignore the direct edge under test
                     }
                     if dep == target {
@@ -1775,14 +1901,14 @@ fn store_is_transitively_reduced(h: &TestHarness) -> bool {
         deps.iter().all(|to| {
             // The direct edge `from -> to` is redundant iff `to` is still reachable
             // from `from` after removing that edge. A reduced graph has none.
-            !reachable(&deps_by_id, from, to, (from.as_str(), to.as_str()))
+            !reachable(&deps_by_id, from, to, (from, to))
         })
     })
 }
 
 /// The set of `(issue_id, sorted dependency_ids)` pairs across the whole store —
 /// the canonical "node + edge set" fingerprint used to compare two graph states.
-fn edge_fingerprint(h: &TestHarness) -> BTreeMap<String, Vec<String>> {
+fn edge_fingerprint(h: &TestHarness) -> BTreeMap<IssueId, Vec<IssueId>> {
     h.all_issues()
         .into_iter()
         .map(|i| {
@@ -1806,6 +1932,7 @@ proptest! {
         let (h, epic, _ups) = harness_with_upstreams("Acyclic prop", upstream_count);
 
         h.executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap();
 
@@ -1825,6 +1952,7 @@ proptest! {
         let (h, epic, _ups) = harness_with_upstreams("Reduced prop", upstream_count);
 
         h.executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap();
 
@@ -1845,6 +1973,7 @@ proptest! {
 
         let (first, _) = h
             .executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap();
         let fingerprint_before = edge_fingerprint(&h);
@@ -1852,6 +1981,7 @@ proptest! {
 
         let (refreshed, _) = h
             .executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), true)
             .unwrap();
 

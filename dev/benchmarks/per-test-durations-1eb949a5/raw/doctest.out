@@ -1,0 +1,38 @@
+cargo-ci: another build holds /tmp/cargo-ci.lock; waiting up to 1800s
+COMMAND             PID MODE   PATH
+flock            565689 WRITE* /tmp/cargo-ci.lock
+bash             564544 WRITE  /tmp/cargo-ci.lock
+   Compiling jit v1.0.0 (/mnt/nvme/jit/agents/worktrees/agent-1eb949a5/crates/jit)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.99s
+   Doc-tests jit
+
+running 25 tests
+test crates/jit/src/commands/batch_create.rs - commands::batch_create::IssueOps<'_,S>::batch_create_from_json (line 249) - compile ... ok
+test crates/jit/src/output.rs - output::GateRunSummary (line 2401) ... ok
+test crates/jit/src/config.rs - config::ItemKindConfig (line 422) ... ok
+test crates/jit/src/output.rs - output::IssueStatusResponse (line 1924) ... ok
+test crates/jit/src/domain/queries.rs - domain::queries::bracket_scope_ids (line 341) ... ok
+test crates/jit/src/commands/config.rs - commands::config::resolve_dotted_key (line 102) ... ok
+test crates/jit/src/validation/drift.rs - validation::drift::enforcement_drift (line 142) ... ok
+test crates/jit/src/config.rs - config::ProjectionConfig (line 852) ... ok
+test crates/jit/src/output.rs - output::HierarchyNodeView (line 1598) ... ok
+test crates/jit/src/domain/item.rs - domain::item::index_project_sources (line 1151) ... ok
+test crates/jit/src/commands/batch_create.rs - commands::batch_create::BatchIssueDef (line 37) ... ok
+test crates/jit/src/graph/hierarchy.rs - graph::hierarchy (line 104) ... ok
+test crates/jit/src/commands/template_expand.rs - commands::template_expand::expand_template (line 128) ... ok
+test crates/jit/src/output.rs - output::GraphTreeResponse (line 1648) ... ok
+test crates/jit/src/repository_state/rules_gates_projection.rs - repository_state::rules_gates_projection::render_rules_and_gates_markdown (line 66) ... ok
+test crates/jit/src/validation/graph.rs - validation::graph::evaluate_graph (line 267) ... ok
+test crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine::with_keyword (line 175) ... ok
+test crates/jit/src/commands/gate.rs - commands::gate::GateOps<'_,S>::update_gate (line 1194) ... ok
+test crates/jit/src/validation/local.rs - validation::local::evaluate_local (line 208) ... ok
+test crates/jit/src/commands/query.rs - commands::query::QueryOps<'_,S>::query_count_by_state (line 176) ... ok
+test crates/jit/src/commands/issue.rs - commands::issue::IssueOps<'_,S>::issue_progress (line 467) ... ok
+test crates/jit/src/commands/graph.rs - commands::graph::GraphOps<'_,S>::detect_divergences (line 557) ... ok
+test crates/jit/src/domain/item.rs - domain::item::load_toml_scope_items (line 1232) ... ok
+test crates/jit/src/commands/issue.rs - commands::issue::IssueOps<'_,S>::issue_children (line 412) ... ok
+test crates/jit/src/commands/graph.rs - commands::graph::GraphOps<'_,S>::resolve_hierarchy_tree (line 472) ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.40s
+
+./scripts/cargo-ci.sh --cargo test --doc -p jit  47.03s user 8.89s system 86% cpu 1:04.52 total

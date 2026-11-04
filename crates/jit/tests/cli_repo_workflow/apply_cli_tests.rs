@@ -2,7 +2,7 @@
 //! command (issue 9cccfe0c, SCFA-01..04).
 //!
 //! These exercise the real subprocess path end-to-end: the built `jit` binary
-//! against an isolated `TempDir`-backed `.jit/` repo whose `config.toml` declares
+//! against an isolated `.jit/` repo whose `config.toml` declares
 //! the planning hierarchy, whose `templates.toml` declares the `plan` template,
 //! and whose gate registry declares the keys that template names.
 //!
@@ -11,13 +11,12 @@
 //! bracket and emits a machine-readable result.
 
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
 
 /// Hierarchy declaring the bracket node types so `epic`/`planning`/`breakdown`
 /// are valid types in the temp repo. The bracket vocabulary itself comes from the
 /// `plan` template (`PLAN_TEMPLATE_TOML`), not from config.
-const CONFIG_TOML: &str = r#"
+pub(crate) const CONFIG_TOML: &str = r#"
 [type_hierarchy]
 types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
 "#;
@@ -59,116 +58,19 @@ applies_to  = ["epic"]
   role = "planning"
 "#;
 
-fn jit(temp: &TempDir) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(temp.path());
-    cmd
-}
-
-/// Run a jit command, asserting success, and parse its JSON stdout.
-fn jit_json(temp: &TempDir, args: &[&str]) -> serde_json::Value {
-    let out = jit(temp)
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    serde_json::from_slice(&out).unwrap_or_else(|e| {
-        panic!(
-            "expected JSON from `jit {}`: {e}\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&out)
-        )
-    })
-}
-
-/// Initialize an isolated temp repo with the planning hierarchy + the `plan`
-/// graph template on disk.
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    // The configuration is written before initialization, which preserves it
-    // and derives the coupled rules and schemas from the registry it declares.
-    std::fs::create_dir_all(&jit_dir).unwrap();
-    std::fs::write(jit_dir.join("config.toml"), CONFIG_TOML).unwrap();
-    jit(&temp).arg("init").assert().success();
-    std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_TOML).unwrap();
-    // A template's gate entries resolve against the repository's own presets
-    // and its own gate registry, so the repository declares every key the
-    // template names before it is applied.
-    for key in template_gate_keys(PLAN_TEMPLATE_TOML) {
-        jit(&temp)
-            .args([
-                "gate",
-                "define",
-                &key,
-                "--title",
-                &format!("{key} gate"),
-                "--description",
-                &format!("Repository-declared {key} gate"),
-            ])
-            .assert()
-            .success();
-    }
-    temp
-}
-
-/// Every gate key the templates in `registry_toml` name, on a node or an
-/// anchor, read from that registry so a changed declaration needs no edit here.
-pub(crate) fn template_gate_keys(registry_toml: &str) -> Vec<String> {
-    let unchecked_hierarchy: [&str; 0] = [];
-    let mut keys: Vec<String> =
-        jit::templates::TemplateRegistry::from_toml_str(registry_toml, &unchecked_hierarchy)
-            .expect("the fixture template registry parses")
-            .templates
-            .iter()
-            .flat_map(|template| {
-                template
-                    .nodes
-                    .iter()
-                    .flat_map(|node| node.gates.iter())
-                    .chain(
-                        template
-                            .anchors
-                            .iter()
-                            .flat_map(|anchor| anchor.gates.iter()),
-                    )
-            })
-            .cloned()
-            .collect();
-    keys.sort();
-    keys.dedup();
-    keys
-}
-
-/// Create an `epic` container, returning its full id.
-fn create_epic(temp: &TempDir, title: &str) -> String {
-    let json = jit_json(
-        temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            title,
-            "--description",
-            "## Success Criteria\n\n- [hard] REQ-01: it works\n",
-            "--label",
-            "type:epic",
-            "--json",
-        ],
-    );
-    json["id"].as_str().expect("created epic id").to_string()
-}
-
 /// SCFA-01/03: `jit apply plan <epic>` is wired (parse, dispatch, print) and
 /// invokes the engine, creating the bracket's planning + breakdown nodes.
 #[test]
 fn test_apply_plan_creates_bracket_nodes() {
-    let temp = setup_repo();
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let out = jit_json(&temp, &["apply", "plan", &epic, "--json"]);
+    let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     let data = out.get("data").unwrap_or(&out);
     let roles = &data["created_node_ids_by_role"];
     let planning_id = roles["planning"].as_str().expect("planning role id");
@@ -177,7 +79,7 @@ fn test_apply_plan_creates_bracket_nodes() {
     // Each created node carries the type the template declared (confirming the
     // engine actually created them, not just reported ids).
     let labels_of = |id: &str| -> Vec<String> {
-        let issue = jit_json(&temp, &["issue", "show", id, "--json"]);
+        let issue = cli.run_json(["issue", "show", id]).unwrap();
         let issue = issue.get("data").unwrap_or(&issue);
         issue
             .get("labels")
@@ -201,7 +103,7 @@ fn test_apply_plan_creates_bracket_nodes() {
     );
 
     // The container now depends on the breakdown node (the C → B anchor edge).
-    let container = jit_json(&temp, &["issue", "show", &epic, "--json"]);
+    let container = cli.run_json(["issue", "show", &epic]).unwrap();
     let container = container.get("data").unwrap_or(&container);
     // `issue show --json` expands each dependency into an object; read its `id`.
     let deps: Vec<String> = container
@@ -223,10 +125,15 @@ fn test_apply_plan_creates_bracket_nodes() {
 /// name, resolved anchor bindings, and the created node ids by role.
 #[test]
 fn test_apply_plan_json_reports_template_and_created_nodes() {
-    let temp = setup_repo();
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let out = jit_json(&temp, &["apply", "plan", &epic, "--json"]);
+    let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     let data = out.get("data").unwrap_or(&out);
 
     assert_eq!(
@@ -258,20 +165,23 @@ fn test_apply_plan_json_reports_template_and_created_nodes() {
 /// and the `C → B` anchor edge.
 #[test]
 fn test_apply_with_explicit_container_anchor_creates_bracket() {
-    let temp = setup_repo();
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let out = jit_json(
-        &temp,
-        &[
+    let out = cli
+        .run_json([
             "apply",
             "plan",
             &epic,
             "--anchor",
             &format!("container={epic}"),
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     let data = out.get("data").unwrap_or(&out);
 
     // The explicit binding is reflected back in the result.
@@ -295,7 +205,7 @@ fn test_apply_with_explicit_container_anchor_creates_bracket() {
     // Read an issue's dependency ids (`issue show --json` expands deps into
     // objects; pull each `id`).
     let dep_ids = |id: &str| -> Vec<String> {
-        let issue = jit_json(&temp, &["issue", "show", id, "--json"]);
+        let issue = cli.run_json(["issue", "show", id]).unwrap();
         let issue = issue.get("data").unwrap_or(&issue);
         issue
             .get("dependencies")
@@ -324,11 +234,15 @@ fn test_apply_with_explicit_container_anchor_creates_bracket() {
 /// creates nothing.
 #[test]
 fn test_apply_rejects_malformed_anchor() {
-    let temp = setup_repo();
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    jit(&temp)
-        .args(["apply", "plan", &epic, "--anchor", "noequals"])
+    cli.command(["apply", "plan", &epic, "--anchor", "noequals"])
         .assert()
         .failure()
         .stderr(predicates::str::contains("role=id"));

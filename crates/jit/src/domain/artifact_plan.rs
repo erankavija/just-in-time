@@ -8,12 +8,14 @@
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_classifier::ArtifactEvidenceError;
+use crate::domain::identity::IssueId;
+use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::State;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
-use std::fmt;
 
 /// The first archive-plan JSON schema version.
 ///
@@ -26,36 +28,48 @@ pub const ARCHIVE_PLAN_SCHEMA_VERSION: u32 = 1;
 /// Each entry is the complete archive-plan envelope for one terminal container;
 /// the collection does not introduce a reduced candidate projection that could
 /// drift from preview or execution planning.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ArchiveCandidates {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
+pub struct ArchiveCandidates(ListEnvelope<CandidatesKey, ArtifactPlan, SchemaVersion>);
+
+/// Collection key of [`ArchiveCandidates`].
+enum CandidatesKey {}
+
+impl CollectionKey for CandidatesKey {
+    const KEY: &'static str = "candidates";
+    const SCHEMA_NAME: Option<&'static str> = Some("ArchiveCandidates");
+}
+
+/// The wire schema version an archive envelope carries beside its collection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+struct SchemaVersion {
     schema_version: u32,
-    count: usize,
-    candidates: Vec<ArtifactPlan>,
 }
 
 impl ArchiveCandidates {
     /// Construct the schema-v1 list envelope from fully evaluated plans.
     pub fn new(candidates: Vec<ArtifactPlan>) -> Self {
-        Self {
-            schema_version: ARCHIVE_PLAN_SCHEMA_VERSION,
-            count: candidates.len(),
+        Self(ListEnvelope::with_extras(
             candidates,
-        }
+            SchemaVersion {
+                schema_version: ARCHIVE_PLAN_SCHEMA_VERSION,
+            },
+        ))
     }
 
     /// Candidate collection schema version.
     pub fn schema_version(&self) -> u32 {
-        self.schema_version
+        self.0.extras.schema_version
     }
 
     /// Number of fully evaluated candidate plans.
     pub fn count(&self) -> usize {
-        self.count
+        self.0.count()
     }
 
     /// Canonically ordered complete archive plans.
     pub fn candidates(&self) -> &[ArtifactPlan] {
-        &self.candidates
+        &self.0.items
     }
 }
 
@@ -64,13 +78,13 @@ impl ArchiveCandidates {
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum PlanTarget {
     /// A resolved-hierarchy container, identified by its full durable id.
-    Container { id: String },
+    Container { id: IssueId },
     /// An arbitrary repository-relative document path.
     Document { path: String },
 }
 
 /// Whether the mutation-authorizing documentation policy is explicit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum PolicyStatus {
     /// All required archival policy fields were explicitly supplied.
@@ -179,6 +193,17 @@ impl Serialize for ArtifactVersion {
     }
 }
 
+impl JsonSchema for ArtifactVersion {
+    fn schema_name() -> String {
+        "ArtifactVersion".to_string()
+    }
+
+    /// `working-tree` or a canonical full commit OID, the string `Serialize` writes.
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(generator)
+    }
+}
+
 impl<'de> Deserialize<'de> for ArtifactVersion {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -272,7 +297,9 @@ impl<'de> Deserialize<'de> for ContentIdentity {
 }
 
 /// One archival action selected by the pure classifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum ArtifactAction {
     Move,
@@ -282,7 +309,9 @@ pub enum ArtifactAction {
 }
 
 /// How an artifact entered the selected closure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum ArtifactProvenance {
     Explicit,
@@ -290,10 +319,10 @@ pub enum ArtifactProvenance {
 }
 
 /// One issue document reference that owns an artifact version.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactOwner {
     /// Full durable issue id.
-    pub issue: String,
+    pub issue: IssueId,
     /// Stable index of the reference within the issue's document list.
     pub document_index: usize,
     /// Lifecycle state used for terminal-owner classification.
@@ -320,7 +349,9 @@ impl ArtifactOwner {
 }
 
 /// Planner classification for an embedded edge.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum EdgeKind {
     Supported,
@@ -329,7 +360,9 @@ pub enum EdgeKind {
 }
 
 /// How an embedded reference resolves from its parent artifact.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum EdgeResolutionMode {
     Relative,
@@ -338,7 +371,7 @@ pub enum EdgeResolutionMode {
 }
 
 /// One embedded reference observed while constructing the artifact graph.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactEdge {
     /// Reference text as it appeared in the parent artifact.
     pub reference: String,
@@ -354,7 +387,7 @@ pub struct ArtifactEdge {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReferenceChange {
     /// Full durable issue id.
-    pub issue: String,
+    pub issue: IssueId,
     /// Stable index of the reference within the issue's document list.
     pub document_index: usize,
     /// Existing normalized reference path.
@@ -372,101 +405,41 @@ pub struct PendingDeletion {
     pub content_identity: ContentIdentity,
 }
 
-/// Stable evidence flags. These constrain action selection but never block it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum EvidenceCode {
-    PermanentPath,
-    OutsideDevelopmentRoot,
-    OutsideOwner,
-    ActiveOwner,
-    UnmanagedPath,
-    ArchivedSource,
-    PinnedHistorical,
-}
-
-impl EvidenceCode {
-    /// Complete schema-v1 evidence vocabulary, in binding contract order.
-    pub const ALL: [Self; 7] = [
-        Self::PermanentPath,
-        Self::OutsideDevelopmentRoot,
-        Self::OutsideOwner,
-        Self::ActiveOwner,
-        Self::UnmanagedPath,
-        Self::ArchivedSource,
-        Self::PinnedHistorical,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PermanentPath => "permanent-path",
-            Self::OutsideDevelopmentRoot => "outside-development-root",
-            Self::OutsideOwner => "outside-owner",
-            Self::ActiveOwner => "active-owner",
-            Self::UnmanagedPath => "unmanaged-path",
-            Self::ArchivedSource => "archived-source",
-            Self::PinnedHistorical => "pinned-historical",
-        }
+wire_vocabulary! {
+    /// Stable evidence flags. These constrain action selection but never block it.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+    pub enum EvidenceCode {
+        PermanentPath = "permanent-path",
+        OutsideDevelopmentRoot = "outside-development-root",
+        OutsideOwner = "outside-owner",
+        ActiveOwner = "active-owner",
+        UnmanagedPath = "unmanaged-path",
+        ArchivedSource = "archived-source",
+        PinnedHistorical = "pinned-historical",
     }
 }
 
-/// Stable conditions that make a target or artifact ineligible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum BlockerCode {
-    PolicyUnconfigured,
-    PolicyIncomplete,
-    UnmanagedSelectedRoot,
-    DestinationConflict,
-    DocumentNonTerminalOwner,
-    PinnedReadFailed,
-    RepositoryEscape,
-    UnresolvableEdge,
-    UnpreservableLayout,
-    NonTerminalTarget,
-    MissingSource,
-    SymlinkArtifact,
-    UnsupportedArtifactType,
+wire_vocabulary! {
+    /// Stable conditions that make a target or artifact ineligible.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+    pub enum BlockerCode {
+        PolicyUnconfigured = "policy-unconfigured",
+        PolicyIncomplete = "policy-incomplete",
+        UnmanagedSelectedRoot = "unmanaged-selected-root",
+        DestinationConflict = "destination-conflict",
+        DocumentNonTerminalOwner = "document-non-terminal-owner",
+        PinnedReadFailed = "pinned-read-failed",
+        RepositoryEscape = "repository-escape",
+        UnresolvableEdge = "unresolvable-edge",
+        UnpreservableLayout = "unpreservable-layout",
+        NonTerminalTarget = "non-terminal-target",
+        MissingSource = "missing-source",
+        SymlinkArtifact = "symlink-artifact",
+        UnsupportedArtifactType = "unsupported-artifact-type",
+    }
 }
 
 impl BlockerCode {
-    /// Complete schema-v1 blocker vocabulary, in binding contract order.
-    pub const ALL: [Self; 13] = [
-        Self::PolicyUnconfigured,
-        Self::PolicyIncomplete,
-        Self::UnmanagedSelectedRoot,
-        Self::DestinationConflict,
-        Self::DocumentNonTerminalOwner,
-        Self::PinnedReadFailed,
-        Self::RepositoryEscape,
-        Self::UnresolvableEdge,
-        Self::UnpreservableLayout,
-        Self::NonTerminalTarget,
-        Self::MissingSource,
-        Self::SymlinkArtifact,
-        Self::UnsupportedArtifactType,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PolicyUnconfigured => "policy-unconfigured",
-            Self::PolicyIncomplete => "policy-incomplete",
-            Self::UnmanagedSelectedRoot => "unmanaged-selected-root",
-            Self::DestinationConflict => "destination-conflict",
-            Self::DocumentNonTerminalOwner => "document-non-terminal-owner",
-            Self::PinnedReadFailed => "pinned-read-failed",
-            Self::RepositoryEscape => "repository-escape",
-            Self::UnresolvableEdge => "unresolvable-edge",
-            Self::UnpreservableLayout => "unpreservable-layout",
-            Self::NonTerminalTarget => "non-terminal-target",
-            Self::MissingSource => "missing-source",
-            Self::SymlinkArtifact => "symlink-artifact",
-            Self::UnsupportedArtifactType => "unsupported-artifact-type",
-        }
-    }
-
     /// The permitted next action when a blocker is caused by lifecycle state,
     /// or `None` for blockers unrelated to state (`jit:45a140ae`, REQ-05).
     ///
@@ -496,53 +469,24 @@ impl BlockerCode {
     }
 }
 
-/// Stable non-blocking diagnostics emitted by planning or execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum WarningCode {
-    MissingEdgeTarget,
-    ExternalEdge,
-    NoOwner,
-    ResidueSource,
-    DeletionFailed,
-    NotSelectedSibling,
-    DynamicLoadingSuspected,
-    UnsupportedEdgeTarget,
-    /// One citation of a relocating artifact's path in the text of a scanned
-    /// file: an occurrence naming that path whole, rather than one sitting
-    /// inside a longer path such as the destination the relocation publishes.
-    /// Its [`PlanWarning::path`] names the citing file with the citation's
-    /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
-    MovingPathCitation,
-}
-
-impl WarningCode {
-    /// Complete schema-v1 warning vocabulary, in binding contract order.
-    pub const ALL: [Self; 9] = [
-        Self::MissingEdgeTarget,
-        Self::ExternalEdge,
-        Self::NoOwner,
-        Self::ResidueSource,
-        Self::DeletionFailed,
-        Self::NotSelectedSibling,
-        Self::DynamicLoadingSuspected,
-        Self::UnsupportedEdgeTarget,
-        Self::MovingPathCitation,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::MissingEdgeTarget => "missing-edge-target",
-            Self::ExternalEdge => "external-edge",
-            Self::NoOwner => "no-owner",
-            Self::ResidueSource => "residue-source",
-            Self::DeletionFailed => "deletion-failed",
-            Self::NotSelectedSibling => "not-selected-sibling",
-            Self::DynamicLoadingSuspected => "dynamic-loading-suspected",
-            Self::UnsupportedEdgeTarget => "unsupported-edge-target",
-            Self::MovingPathCitation => "moving-path-citation",
-        }
+wire_vocabulary! {
+    /// Stable non-blocking diagnostics emitted by planning or execution.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+    pub enum WarningCode {
+        MissingEdgeTarget = "missing-edge-target",
+        ExternalEdge = "external-edge",
+        NoOwner = "no-owner",
+        ResidueSource = "residue-source",
+        DeletionFailed = "deletion-failed",
+        NotSelectedSibling = "not-selected-sibling",
+        DynamicLoadingSuspected = "dynamic-loading-suspected",
+        UnsupportedEdgeTarget = "unsupported-edge-target",
+        /// One citation of a relocating artifact's path in the text of a scanned
+        /// file: an occurrence naming that path whole, rather than one sitting
+        /// inside a longer path such as the destination the relocation publishes.
+        /// Its [`PlanWarning::path`] names the citing file with the citation's
+        /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
+        MovingPathCitation = "moving-path-citation",
     }
 }
 
@@ -587,8 +531,36 @@ impl Serialize for PlanBlocker {
     }
 }
 
+impl JsonSchema for PlanBlocker {
+    fn schema_name() -> String {
+        "PlanBlocker".to_string()
+    }
+
+    /// The fields `Serialize` writes: `guidance` only for a state-caused code.
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::{InstanceType, ObjectValidation, SchemaObject};
+        let mut object = ObjectValidation::default();
+        object
+            .properties
+            .insert("code".into(), generator.subschema_for::<BlockerCode>());
+        object
+            .properties
+            .insert("path".into(), generator.subschema_for::<Option<String>>());
+        object
+            .properties
+            .insert("guidance".into(), generator.subschema_for::<String>());
+        object.required.extend(["code".into(), "path".into()]);
+        SchemaObject {
+            instance_type: Some(InstanceType::Object.into()),
+            object: Some(Box::new(object)),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
 /// A target- or artifact-level warning with an optional normalized path.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct PlanWarning {
     /// Stable schema-v1 warning code.
     pub code: WarningCode,
@@ -607,7 +579,7 @@ impl PlanWarning {
 }
 
 /// One artifact version and all pure classification data needed by consumers.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactPlanEntry {
     source: String,
     version: ArtifactVersion,
@@ -623,7 +595,7 @@ pub struct ArtifactPlanEntry {
     pending_deletions: Vec<PendingDeletion>,
     evidence: Vec<EvidenceCode>,
     blockers: Vec<PlanBlocker>,
-    warnings: Vec<PlanWarning>,
+    plan_warnings: Vec<PlanWarning>,
 }
 
 impl ArtifactPlanEntry {
@@ -649,7 +621,7 @@ impl ArtifactPlanEntry {
             pending_deletions: Vec::new(),
             evidence: Vec::new(),
             blockers: Vec::new(),
-            warnings: Vec::new(),
+            plan_warnings: Vec::new(),
         }
     }
 
@@ -727,8 +699,8 @@ impl ArtifactPlanEntry {
     }
 
     /// Supply artifact-level warnings.
-    pub fn with_warnings(mut self, warnings: Vec<PlanWarning>) -> Self {
-        self.warnings = warnings;
+    pub fn with_plan_warnings(mut self, plan_warnings: Vec<PlanWarning>) -> Self {
+        self.plan_warnings = plan_warnings;
         self
     }
 
@@ -811,8 +783,8 @@ impl ArtifactPlanEntry {
     }
 
     /// Canonically ordered artifact-level warnings.
-    pub fn warnings(&self) -> &[PlanWarning] {
-        &self.warnings
+    pub fn plan_warnings(&self) -> &[PlanWarning] {
+        &self.plan_warnings
     }
 
     pub(crate) fn normalize(&mut self) -> Result<(), PlanError> {
@@ -886,10 +858,10 @@ impl ArtifactPlanEntry {
             blocker.path = blocker.path.take().map(|path| normalize_path(&path));
         }
         sort_blockers(&mut self.blockers);
-        for warning in &mut self.warnings {
+        for warning in &mut self.plan_warnings {
             warning.path = warning.path.take().map(|path| normalize_path(&path));
         }
-        sort_warnings(&mut self.warnings);
+        sort_warnings(&mut self.plan_warnings);
 
         if self.version.is_pinned()
             && (self.action != ArtifactAction::Retain
@@ -928,7 +900,7 @@ impl ArtifactPlanEntry {
 }
 
 /// Derived action totals serialized in every plan envelope.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ActionCounts {
     /// Artifacts selected for relocation with source removal.
     pub r#move: usize,
@@ -962,19 +934,31 @@ impl ActionCounts {
     }
 }
 
-/// Schema-v1 archive plan shared by preview rendering and execution.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ArtifactPlan {
+/// Schema-v1 archive plan shared by preview rendering and execution: its
+/// artifacts beside the target-level fields of [`PlanHeader`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
+pub struct ArtifactPlan(ListEnvelope<ArtifactsKey, ArtifactPlanEntry, PlanHeader>);
+
+/// Collection key of an [`ArtifactPlan`].
+enum ArtifactsKey {}
+
+impl CollectionKey for ArtifactsKey {
+    const KEY: &'static str = "artifacts";
+    const SCHEMA_NAME: Option<&'static str> = Some("ArtifactPlan");
+}
+
+/// Fields of an [`ArtifactPlan`] beside its `artifacts`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+struct PlanHeader {
     schema_version: u32,
     target: PlanTarget,
     destination_root: String,
     eligible: bool,
     policy_status: PolicyStatus,
     action_counts: ActionCounts,
-    count: usize,
-    artifacts: Vec<ArtifactPlanEntry>,
     blockers: Vec<PlanBlocker>,
-    warnings: Vec<PlanWarning>,
+    plan_warnings: Vec<PlanWarning>,
 }
 
 impl ArtifactPlan {
@@ -1015,71 +999,71 @@ impl ArtifactPlan {
             && artifacts.iter().all(|artifact| {
                 artifact.action != ArtifactAction::Block && artifact.blockers.is_empty()
             });
-        let count = artifacts.len();
         let destination_root = destination_root.into();
 
-        Ok(Self {
-            schema_version: ARCHIVE_PLAN_SCHEMA_VERSION,
-            target: normalize_target(target),
-            destination_root: normalize_path(&destination_root),
-            eligible,
-            policy_status,
-            action_counts,
-            count,
+        Ok(Self(ListEnvelope::with_extras(
             artifacts,
-            blockers,
-            warnings,
-        })
+            PlanHeader {
+                schema_version: ARCHIVE_PLAN_SCHEMA_VERSION,
+                target: normalize_target(target),
+                destination_root: normalize_path(&destination_root),
+                eligible,
+                policy_status,
+                action_counts,
+                blockers,
+                plan_warnings: warnings,
+            },
+        )))
     }
 
     /// Whether all policy and plan/artifact blockers permit mutation.
     pub fn eligible(&self) -> bool {
-        self.eligible
+        self.0.extras.eligible
     }
 
     /// Wire schema version carried by this envelope.
     pub fn schema_version(&self) -> u32 {
-        self.schema_version
+        self.0.extras.schema_version
     }
 
     /// Selected container or document target.
     pub fn target(&self) -> &PlanTarget {
-        &self.target
+        &self.0.extras.target
     }
 
     /// Normalized configured archive root plus any target segment.
     pub fn destination_root(&self) -> &str {
-        &self.destination_root
+        &self.0.extras.destination_root
     }
 
     /// Explicitness state of the mutation-authorizing policy.
     pub fn policy_status(&self) -> PolicyStatus {
-        self.policy_status
+        self.0.extras.policy_status
     }
 
     /// Counts derived from the canonical artifact list.
     pub fn action_counts(&self) -> ActionCounts {
-        self.action_counts
+        self.0.extras.action_counts
     }
 
     /// Canonically ordered target-level blockers.
     pub fn blockers(&self) -> &[PlanBlocker] {
-        &self.blockers
+        &self.0.extras.blockers
     }
 
     /// Canonically ordered target-level warnings.
-    pub fn warnings(&self) -> &[PlanWarning] {
-        &self.warnings
+    pub fn plan_warnings(&self) -> &[PlanWarning] {
+        &self.0.extras.plan_warnings
     }
 
     /// Deterministically ordered artifacts used by preview rendering.
     pub fn artifacts(&self) -> &[ArtifactPlanEntry] {
-        &self.artifacts
+        &self.0.items
     }
 
-    /// Artifact count mirrored in the repository list-envelope convention.
+    /// Number of planned artifacts.
     pub fn count(&self) -> usize {
-        self.count
+        self.0.count()
     }
 
     /// Return the exact same artifact records for execution when eligible.
@@ -1088,117 +1072,70 @@ impl ArtifactPlan {
     /// bit so accessor defaults or a hand-authored JSON value cannot authorize
     /// mutation.
     pub fn executable_artifacts(&self) -> Result<&[ArtifactPlanEntry], PlanError> {
-        if self.schema_version != ARCHIVE_PLAN_SCHEMA_VERSION {
-            return Err(PlanError::UnsupportedSchemaVersion(self.schema_version));
+        if self.0.extras.schema_version != ARCHIVE_PLAN_SCHEMA_VERSION {
+            return Err(PlanError::UnsupportedSchemaVersion(
+                self.0.extras.schema_version,
+            ));
         }
-        let mut canonical_artifacts = self.artifacts.clone();
+        let mut canonical_artifacts = self.0.items.clone();
         canonical_artifacts
             .iter_mut()
             .try_for_each(ArtifactPlanEntry::normalize)?;
         canonical_artifacts.sort_by_key(ArtifactPlanEntry::identity);
-        if canonical_artifacts != self.artifacts
-            || self.count != self.artifacts.len()
-            || self.action_counts != ActionCounts::from_artifacts(&self.artifacts)
+        if canonical_artifacts != self.0.items
+            || self.0.extras.action_counts != ActionCounts::from_artifacts(&self.0.items)
         {
             return Err(PlanError::NonCanonicalEnvelope);
         }
-        if self.policy_status != PolicyStatus::Configured
-            || !self.eligible
-            || !self.blockers.is_empty()
-            || self.artifacts.iter().any(|artifact| {
+        if self.0.extras.policy_status != PolicyStatus::Configured
+            || !self.0.extras.eligible
+            || !self.0.extras.blockers.is_empty()
+            || self.0.items.iter().any(|artifact| {
                 artifact.action == ArtifactAction::Block || !artifact.blockers.is_empty()
             })
         {
             return Err(PlanError::Ineligible);
         }
-        Ok(&self.artifacts)
+        Ok(&self.0.items)
     }
 }
 
 /// Construction and execution-readiness failures for the plan model.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PlanError {
     /// A symbolic, abbreviated, uppercase, or otherwise non-canonical pin.
+    #[error("pinned artifact version is not a canonical full commit OID: {0}")]
     NonCanonicalCommitOid(String),
     /// A recorded digest that is not exactly 64 lowercase hexadecimal characters.
+    #[error("content identity is not a lowercase SHA-256: {0}")]
     InvalidContentHash(String),
     /// A publication or deletion lacks its required source identity.
+    #[error("published or deleted working-tree artifact lacks content identity: {0}")]
     MissingContentIdentity(String),
     /// An operation carrying no publication or deletion supplied an identity.
+    #[error("non-publishing artifact unexpectedly carries content identity: {0}")]
     UnexpectedContentIdentity(String),
     /// A move/copy action lacks its mirror destination.
+    #[error("relocating artifact lacks a destination: {0}")]
     MissingDestination(String),
     /// A retained artifact incorrectly names a relocation destination.
+    #[error("retained artifact unexpectedly has a destination: {0}")]
     UnexpectedDestination(String),
     /// A pinned historical entry attempted a relocating operation.
+    #[error("pinned historical artifact cannot relocate: {0}")]
     RelocatingPinnedArtifact(String),
     /// Execution was asked to consume an unknown wire schema.
+    #[error("unsupported artifact-plan schema version: {0}")]
     UnsupportedSchemaVersion(u32),
     /// Derived fields or ordering do not match the artifact contents.
+    #[error("artifact plan ordering or action counts are not canonical")]
     NonCanonicalEnvelope,
     /// Policy or plan blockers prohibit mutation.
+    #[error("artifact plan is not eligible for execution")]
     Ineligible,
     /// Classification lacked evidence for a path it names.
-    Evidence(ArtifactEvidenceError),
-}
-
-impl fmt::Display for PlanError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NonCanonicalCommitOid(oid) => write!(
-                formatter,
-                "pinned artifact version is not a canonical full commit OID: {oid}"
-            ),
-            Self::InvalidContentHash(hash) => {
-                write!(
-                    formatter,
-                    "content identity is not a lowercase SHA-256: {hash}"
-                )
-            }
-            Self::MissingContentIdentity(path) => write!(
-                formatter,
-                "published or deleted working-tree artifact lacks content identity: {path}"
-            ),
-            Self::UnexpectedContentIdentity(path) => write!(
-                formatter,
-                "non-publishing artifact unexpectedly carries content identity: {path}"
-            ),
-            Self::MissingDestination(path) => {
-                write!(formatter, "relocating artifact lacks a destination: {path}")
-            }
-            Self::UnexpectedDestination(path) => {
-                write!(
-                    formatter,
-                    "retained artifact unexpectedly has a destination: {path}"
-                )
-            }
-            Self::RelocatingPinnedArtifact(path) => {
-                write!(
-                    formatter,
-                    "pinned historical artifact cannot relocate: {path}"
-                )
-            }
-            Self::UnsupportedSchemaVersion(version) => {
-                write!(
-                    formatter,
-                    "unsupported artifact-plan schema version: {version}"
-                )
-            }
-            Self::NonCanonicalEnvelope => formatter
-                .write_str("artifact plan ordering, count, or action counts are not canonical"),
-            Self::Ineligible => formatter.write_str("artifact plan is not eligible for execution"),
-            Self::Evidence(error) => write!(formatter, "{error}"),
-        }
-    }
-}
-
-impl std::error::Error for PlanError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Evidence(error) => Some(error),
-            _ => None,
-        }
-    }
+    #[error("{0}")]
+    Evidence(#[source] ArtifactEvidenceError),
 }
 
 impl From<ArtifactEvidenceError> for PlanError {

@@ -5,131 +5,47 @@
 //! - `jit doc show --at` - View document at specific commit
 //! - `jit doc diff` - Compare document versions
 
+use jit::test_cli::JitCli;
 use std::fs;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
 
-/// Test helper: Initialize a git repository with test commits
-struct GitTestRepo {
-    #[allow(dead_code)]
-    temp_dir: TempDir,
-    repo_path: std::path::PathBuf,
-}
-
-impl GitTestRepo {
-    fn new() -> Self {
-        let temp_dir = TempDir::new().expect("create temp dir");
-        let repo_path = temp_dir.path().to_path_buf();
-
-        // Initialize git repo
-        Self::run_git(&repo_path, &["init"]);
-        Self::run_git(&repo_path, &["config", "user.name", "Test User"]);
-        Self::run_git(&repo_path, &["config", "user.email", "test@example.com"]);
-
-        Self {
-            temp_dir,
-            repo_path,
-        }
-    }
-
-    fn run_git(path: &Path, args: &[&str]) {
-        let status = Command::new("git")
-            .current_dir(path)
-            .args(args)
-            .status()
-            .expect("git command failed");
-        assert!(status.success(), "git command failed: {:?}", args);
-    }
-
-    fn run_git_output(path: &Path, args: &[&str]) -> String {
-        let output = Command::new("git")
-            .current_dir(path)
-            .args(args)
-            .output()
-            .expect("git command failed");
-        assert!(output.status.success(), "git command failed: {:?}", args);
-        String::from_utf8_lossy(&output.stdout).trim().to_string()
-    }
-
-    fn write_file(&self, path: &str, content: &str) {
-        let full_path = self.repo_path.join(path);
-        if let Some(parent) = full_path.parent() {
-            fs::create_dir_all(parent).expect("create parent dirs");
-        }
-        fs::write(full_path, content).expect("write file");
-    }
-
-    fn commit(&self, message: &str) {
-        Self::run_git(&self.repo_path, &["add", "-A"]);
-        Self::run_git(&self.repo_path, &["commit", "-m", message]);
-    }
-
-    fn get_commit_hash(&self, rev: &str) -> String {
-        Self::run_git_output(&self.repo_path, &["rev-parse", rev])
-    }
-
-    fn path(&self) -> &Path {
-        &self.repo_path
-    }
-
-    fn init_jit(&self) {
-        let status = Command::new(env!("CARGO_BIN_EXE_jit"))
-            .current_dir(self.path())
-            .arg("init")
-            .status()
-            .expect("jit init failed");
-        assert!(status.success());
-    }
-
-    fn run_jit(&self, args: &[&str]) -> std::process::Output {
-        Command::new(env!("CARGO_BIN_EXE_jit"))
-            .current_dir(self.path())
-            .args(args)
-            .output()
-            .expect("jit command failed")
-    }
-
-    fn run_jit_json(&self, args: &[&str]) -> serde_json::Value {
-        let mut full_args = args.to_vec();
-        full_args.push("--json");
-        let output = self.run_jit(&full_args);
-        assert!(
-            output.status.success(),
-            "jit command failed: {} - {}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        serde_json::from_slice(&output.stdout).expect("parse JSON output")
-    }
+fn write_file(cli: &JitCli, path: &str, content: &str) {
+    let full_path = cli.root().join(path);
+    fs::create_dir_all(full_path.parent().expect("a file sits in a directory"))
+        .expect("create parent dirs");
+    fs::write(full_path, content).expect("write file");
 }
 
 #[test]
 fn test_doc_history_lists_commits() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
     // Create document with multiple commits
-    repo.write_file("docs/design.md", "# Design v1\nInitial design");
-    repo.commit("Initial design document");
-    let commit1 = repo.get_commit_hash("HEAD");
+    write_file(&cli, "docs/design.md", "# Design v1\nInitial design");
+    cli.commit("Initial design document").unwrap();
+    let commit1 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit1 = commit1.trim();
 
-    repo.write_file("docs/design.md", "# Design v2\nAdded auth section");
-    repo.commit("Add authentication to design");
-    let commit2 = repo.get_commit_hash("HEAD");
+    write_file(&cli, "docs/design.md", "# Design v2\nAdded auth section");
+    cli.commit("Add authentication to design").unwrap();
+    let commit2 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit2 = commit2.trim();
 
-    repo.write_file("docs/design.md", "# Design v3\nAdded API endpoints");
-    repo.commit("Add API endpoints to design");
-    let commit3 = repo.get_commit_hash("HEAD");
+    write_file(&cli, "docs/design.md", "# Design v3\nAdded API endpoints");
+    cli.commit("Add API endpoints to design").unwrap();
+    let commit3 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit3 = commit3.trim();
 
     // Create issue with document reference
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Implement auth"]);
-    let issue_id = create_output["id"].as_str().unwrap();
+    let issue_id = cli.create_issue(["--title", "Implement auth"]).unwrap();
 
-    repo.run_jit(&["doc", "add", issue_id, "docs/design.md"]);
+    cli.run(["doc", "add", issue_id.as_str(), "docs/design.md"])
+        .unwrap();
 
     // Test: Get document history
-    let history_output = repo.run_jit_json(&["doc", "history", issue_id, "docs/design.md"]);
+    let history_output = cli
+        .run_json(["doc", "history", issue_id.as_str(), "docs/design.md"])
+        .unwrap();
 
     // Should return wrapped result with commits array
     let commits = history_output["commits"].as_array().unwrap();
@@ -159,14 +75,16 @@ fn test_doc_history_lists_commits() {
 
 #[test]
 fn test_doc_history_nonexistent_document() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
 
     // Try to get history for document not referenced in issue
-    let output = repo.run_jit(&["doc", "history", issue_id, "docs/missing.md"]);
+    let output = cli
+        .command(["doc", "history", issue_id.as_str(), "docs/missing.md"])
+        .output()
+        .unwrap();
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -175,30 +93,42 @@ fn test_doc_history_nonexistent_document() {
 
 #[test]
 fn test_doc_show_at_specific_commit() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
     // Create document with evolving content
-    repo.write_file("docs/api.md", "# API v1\n- GET /users");
-    repo.commit("Add users endpoint");
-    let commit1 = repo.get_commit_hash("HEAD");
+    write_file(&cli, "docs/api.md", "# API v1\n- GET /users");
+    cli.commit("Add users endpoint").unwrap();
+    let commit1 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit1 = commit1.trim();
 
-    repo.write_file("docs/api.md", "# API v2\n- GET /users\n- POST /users");
-    repo.commit("Add POST endpoint");
+    write_file(&cli, "docs/api.md", "# API v2\n- GET /users\n- POST /users");
+    cli.commit("Add POST endpoint").unwrap();
 
-    repo.write_file(
+    write_file(
+        &cli,
         "docs/api.md",
         "# API v3\n- GET /users\n- POST /users\n- DELETE /users",
     );
-    repo.commit("Add DELETE endpoint");
+    cli.commit("Add DELETE endpoint").unwrap();
 
     // Create issue with document reference
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "API work"]);
-    let issue_id = create_output["id"].as_str().unwrap();
-    repo.run_jit(&["doc", "add", issue_id, "docs/api.md"]);
+    let issue_id = cli.create_issue(["--title", "API work"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/api.md"])
+        .unwrap();
 
     // Test: View document at old commit
-    let output = repo.run_jit(&["doc", "show", issue_id, "docs/api.md", "--at", &commit1]);
+    let output = cli
+        .command([
+            "doc",
+            "show",
+            issue_id.as_str(),
+            "docs/api.md",
+            "--at",
+            commit1,
+        ])
+        .output()
+        .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -212,21 +142,24 @@ fn test_doc_show_at_specific_commit() {
 
 #[test]
 fn test_doc_show_at_head_by_default() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
-    repo.write_file("docs/readme.md", "# Original");
-    repo.commit("Initial readme");
+    write_file(&cli, "docs/readme.md", "# Original");
+    cli.commit("Initial readme").unwrap();
 
-    repo.write_file("docs/readme.md", "# Updated");
-    repo.commit("Update readme");
+    write_file(&cli, "docs/readme.md", "# Updated");
+    cli.commit("Update readme").unwrap();
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
-    repo.run_jit(&["doc", "add", issue_id, "docs/readme.md"]);
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/readme.md"])
+        .unwrap();
 
     // Without --at flag, should show HEAD
-    let output = repo.run_jit(&["doc", "show", issue_id, "docs/readme.md"]);
+    let output = cli
+        .command(["doc", "show", issue_id.as_str(), "docs/readme.md"])
+        .output()
+        .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -236,62 +169,75 @@ fn test_doc_show_at_head_by_default() {
 
 #[test]
 fn test_doc_show_at_invalid_commit() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
-    repo.write_file("docs/test.md", "content");
-    repo.commit("Add test doc");
+    write_file(&cli, "docs/test.md", "content");
+    cli.commit("Add test doc").unwrap();
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
-    repo.run_jit(&["doc", "add", issue_id, "docs/test.md"]);
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/test.md"])
+        .unwrap();
 
     // Invalid commit hash
-    let output = repo.run_jit(&[
-        "doc",
-        "show",
-        issue_id,
-        "docs/test.md",
-        "--at",
-        "invalid123",
-    ]);
+    let output = cli
+        .command([
+            "doc",
+            "show",
+            issue_id.as_str(),
+            "docs/test.md",
+            "--at",
+            "invalid123",
+        ])
+        .output()
+        .unwrap();
 
     assert!(!output.status.success());
 }
 
 #[test]
 fn test_doc_diff_between_commits() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
     // Version 1
-    repo.write_file("docs/spec.md", "# Spec\n\n## Feature A\nDescription A");
-    repo.commit("Add feature A");
-    let commit1 = repo.get_commit_hash("HEAD");
+    write_file(
+        &cli,
+        "docs/spec.md",
+        "# Spec\n\n## Feature A\nDescription A",
+    );
+    cli.commit("Add feature A").unwrap();
+    let commit1 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit1 = commit1.trim();
 
     // Version 2
-    repo.write_file(
+    write_file(
+        &cli,
         "docs/spec.md",
         "# Spec\n\n## Feature A\nDescription A\n\n## Feature B\nDescription B",
     );
-    repo.commit("Add feature B");
-    let commit2 = repo.get_commit_hash("HEAD");
+    cli.commit("Add feature B").unwrap();
+    let commit2 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit2 = commit2.trim();
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
-    repo.run_jit(&["doc", "add", issue_id, "docs/spec.md"]);
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/spec.md"])
+        .unwrap();
 
     // Test: Diff between commits
-    let output = repo.run_jit(&[
-        "doc",
-        "diff",
-        issue_id,
-        "docs/spec.md",
-        "--from",
-        &commit1,
-        "--to",
-        &commit2,
-    ]);
+    let output = cli
+        .command([
+            "doc",
+            "diff",
+            issue_id.as_str(),
+            "docs/spec.md",
+            "--from",
+            commit1,
+            "--to",
+            commit2,
+        ])
+        .output()
+        .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -303,22 +249,33 @@ fn test_doc_diff_between_commits() {
 
 #[test]
 fn test_doc_diff_from_old_to_head() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
-    repo.write_file("docs/plan.md", "# Plan v1");
-    repo.commit("Initial plan");
-    let commit1 = repo.get_commit_hash("HEAD");
+    write_file(&cli, "docs/plan.md", "# Plan v1");
+    cli.commit("Initial plan").unwrap();
+    let commit1 = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let commit1 = commit1.trim();
 
-    repo.write_file("docs/plan.md", "# Plan v2\nMore details");
-    repo.commit("Update plan");
+    write_file(&cli, "docs/plan.md", "# Plan v2\nMore details");
+    cli.commit("Update plan").unwrap();
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
-    repo.run_jit(&["doc", "add", issue_id, "docs/plan.md"]);
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/plan.md"])
+        .unwrap();
 
     // Diff from old commit to HEAD (implicit)
-    let output = repo.run_jit(&["doc", "diff", issue_id, "docs/plan.md", "--from", &commit1]);
+    let output = cli
+        .command([
+            "doc",
+            "diff",
+            issue_id.as_str(),
+            "docs/plan.md",
+            "--from",
+            commit1,
+        ])
+        .output()
+        .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -327,21 +284,23 @@ fn test_doc_diff_from_old_to_head() {
 
 #[test]
 fn test_doc_history_json_output() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
-    repo.write_file("docs/doc.md", "v1");
-    repo.commit("First version");
+    write_file(&cli, "docs/doc.md", "v1");
+    cli.commit("First version").unwrap();
 
-    repo.write_file("docs/doc.md", "v2");
-    repo.commit("Second version");
+    write_file(&cli, "docs/doc.md", "v2");
+    cli.commit("Second version").unwrap();
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
-    repo.run_jit(&["doc", "add", issue_id, "docs/doc.md"]);
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/doc.md"])
+        .unwrap();
 
     // JSON output for history
-    let history_output = repo.run_jit_json(&["doc", "history", issue_id, "docs/doc.md"]);
+    let history_output = cli
+        .run_json(["doc", "history", issue_id.as_str(), "docs/doc.md"])
+        .unwrap();
 
     let commits = history_output["commits"].as_array().unwrap();
     assert!(commits.len() >= 2);
@@ -357,23 +316,24 @@ fn test_doc_history_json_output() {
 
 #[test]
 fn test_doc_history_empty_for_new_file() {
-    let repo = GitTestRepo::new();
-    repo.init_jit();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
 
     // Create file but don't commit yet
-    repo.write_file("docs/new.md", "content");
+    write_file(&cli, "docs/new.md", "content");
 
-    let create_output = repo.run_jit_json(&["issue", "create", "--title", "Test"]);
-    let issue_id = create_output["id"].as_str().unwrap();
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
 
     // Can't add document reference to uncommitted file
-    let output = repo.run_jit(&["doc", "add", issue_id, "docs/new.md"]);
-
     // This should work - doc add doesn't validate git
-    assert!(output.status.success());
+    cli.run(["doc", "add", issue_id.as_str(), "docs/new.md"])
+        .unwrap();
 
     // But history should fail or return empty
-    let output = repo.run_jit(&["doc", "history", issue_id, "docs/new.md"]);
+    let output = cli
+        .command(["doc", "history", issue_id.as_str(), "docs/new.md"])
+        .output()
+        .unwrap();
 
     // Either fails or returns empty array
     if output.status.success() {

@@ -17,7 +17,7 @@
 //! - every `depends_on`, `anchor_edges`, and `transforms` reference resolves to
 //!   a declared node role / anchor name;
 //! - each node `type` exists in the configured `[type_hierarchy].types`;
-//! - each transform `kind` is a supported [`TransformKind`];
+//! - each transform `kind` decodes to a [`TransformKind`];
 //! - the internal `depends_on` edges form a DAG (no cycle).
 //!
 //! Following the production rules filesystem boundary
@@ -31,15 +31,27 @@
 //! task (W2). The reference-integrity checks above are all resolvable from the
 //! template file plus the type hierarchy alone.
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use crate::config::DocumentationConfig;
+use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
+use crate::domain::identity::{GateKey, IssueId};
+use crate::domain::type_taxonomy::HierarchyConfig;
+use crate::domain::{Issue, State};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::domain::vocabulary::wire_vocabulary;
+use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+
 /// Errors that can occur while loading and validating `.jit/templates.toml`.
 #[derive(Debug, Error)]
 pub enum TemplateConfigError {
+    /// The repository layout could not resolve the templates path.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+
     /// The templates file could not be read from disk.
     #[error("failed to read templates file '{path}': {source}")]
     Io {
@@ -131,18 +143,14 @@ pub enum TemplateConfigError {
         role: String,
     },
 
-    /// A transform declares a `kind` outside the supported set
-    /// ([`TransformKind`]).
-    #[error(
-        "template '{template}': unsupported transform kind '{kind}'; supported kinds: {supported}"
-    )]
-    UnknownTransformKind {
+    /// A template does not match the schema (e.g. a transform declares an
+    /// unknown `kind`).
+    #[error("template '{template}': {source}")]
+    InvalidTemplate {
         /// Name of the offending template.
         template: String,
-        /// The unsupported kind string.
-        kind: String,
-        /// Comma-separated list of the kinds the engine supports.
-        supported: String,
+        /// Underlying schema error.
+        source: toml::de::Error,
     },
 
     /// `applies_to` is empty: a template must name at least one container type.
@@ -153,30 +161,15 @@ pub enum TemplateConfigError {
     },
 }
 
-/// A supported graph-transform kind, parsed from a [`Transform::kind`] string.
-///
-/// The registry loader rejects any other kind ([`TemplateConfigError::UnknownTransformKind`]),
-/// so a template that reaches `jit apply` declares only kinds the engine can
-/// dispatch. Dispatch is by variant, keeping the transform set extensible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransformKind {
-    /// Move the container's pre-apply upstream deps onto a named role's node.
-    MoveUpstreamToRole,
-}
-
-impl TransformKind {
-    /// The `kind` string of [`TransformKind::MoveUpstreamToRole`].
-    pub const MOVE_UPSTREAM_TO_ROLE: &'static str = "move-upstream-to-role";
-
-    /// Every supported `kind` string, for error messages and documentation.
-    pub const SUPPORTED: &'static [&'static str] = &[Self::MOVE_UPSTREAM_TO_ROLE];
-
-    /// Parse a transform `kind` string, or `None` when the kind is unsupported.
-    pub fn from_kind(kind: &str) -> Option<Self> {
-        match kind {
-            Self::MOVE_UPSTREAM_TO_ROLE => Some(Self::MoveUpstreamToRole),
-            _ => None,
-        }
+wire_vocabulary! {
+    /// A graph-transform kind, decoded when the template loads.
+    ///
+    /// An unknown kind fails loading, so a template that reaches `jit apply`
+    /// declares only kinds the engine can dispatch.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TransformKind {
+        /// Move the container's pre-apply upstream deps onto a named role's node.
+        MoveUpstreamToRole = "move-upstream-to-role",
     }
 }
 
@@ -307,12 +300,11 @@ pub struct GraphTemplate {
 pub struct AnchorSlot {
     /// The anchor's name, referenced by `anchor_edges.from`.
     pub name: String,
-    /// Gate-preset names attached to the BOUND anchor issue at apply time,
-    /// declared exactly like a node's [`gates`](TemplateNode::gates). Preset
-    /// existence is validated by the apply engine (not at config load), and the
-    /// presets are attached through the same shared `apply_gate_preset` path.
+    /// Gate or preset keys attached to the bound issue, like a node's
+    /// [`gates`](TemplateNode::gates). Spelling is checked on decode;
+    /// existence is checked at apply time.
     #[serde(default)]
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
 }
 
 /// A node the template creates when applied.
@@ -326,10 +318,10 @@ pub struct TemplateNode {
     /// `[type_hierarchy].types`.
     #[serde(rename = "type")]
     pub type_name: String,
-    /// Gate-preset names attached to the node (resolved by the gate-preset
-    /// manager at apply time, not validated here).
+    /// Gate or preset keys attached to the node. Spelling is checked on decode;
+    /// existence is checked at apply time.
     #[serde(default)]
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
     /// Plan-doc location template for the node, with `{...}` interpolation
     /// tokens resolved at apply time.
     ///
@@ -377,13 +369,12 @@ pub struct AnchorEdge {
 
 /// A graph transform applied after nodes are created and edges wired.
 ///
-/// `kind` names a [`TransformKind`]; the loader rejects any other value. The
-/// shipped kind is `move-upstream-to-role`, which moves the container's pre-apply
-/// upstream dependencies onto the node of the named role.
+/// The shipped kind is `move-upstream-to-role`, which moves the container's
+/// pre-apply upstream dependencies onto the node of the named role.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transform {
-    /// Transform kind (e.g. `"move-upstream-to-role"`).
-    pub kind: String,
+    /// Transform kind.
+    pub kind: TransformKind,
     /// Target node role the transform acts on.
     pub role: String,
 }
@@ -430,10 +421,10 @@ impl TemplateRegistry {
     /// `type`s are checked; pass an empty slice to skip the type check (when no
     /// hierarchy is configured).
     pub fn load<S: AsRef<str>>(
-        jit_root: &Path,
+        layout: &RepositoryLayout,
         hierarchy_types: &[S],
     ) -> Result<Self, TemplateConfigError> {
-        let path = jit_root.join("templates.toml");
+        let path = layout.resolve(&VirtualPath::TEMPLATES)?;
         if !path.exists() {
             return Ok(Self::empty());
         }
@@ -452,7 +443,22 @@ impl TemplateRegistry {
         content: &str,
         hierarchy_types: &[S],
     ) -> Result<Self, TemplateConfigError> {
-        let registry: TemplateRegistry = toml::from_str(content)?;
+        let mut table: toml::Table = toml::from_str(content)?;
+        let templates = match table.remove("template") {
+            Some(toml::Value::Array(items)) => items
+                .into_iter()
+                .map(GraphTemplate::from_value)
+                .collect::<Result<Vec<_>, _>>()?,
+            Some(other) => {
+                table.insert("template".to_string(), other);
+                Vec::new()
+            }
+            None => Vec::new(),
+        };
+        let registry = TemplateRegistry {
+            templates,
+            ..table.try_into()?
+        };
 
         // Template names must be unique so `jit apply <name>` is unambiguous.
         let mut seen_templates = HashSet::new();
@@ -479,6 +485,18 @@ impl TemplateRegistry {
 }
 
 impl GraphTemplate {
+    /// Decode one `[[template]]` entry, naming the template on a schema error.
+    fn from_value(value: toml::Value) -> Result<Self, TemplateConfigError> {
+        let name = value
+            .get("name")
+            .and_then(toml::Value::as_str)
+            .map(str::to_owned);
+        value.try_into().map_err(|source| match name {
+            Some(template) => TemplateConfigError::InvalidTemplate { template, source },
+            None => TemplateConfigError::Toml(source),
+        })
+    }
+
     /// The node carrying the given `role`, or `None` if no node declares it.
     pub fn node(&self, role: &str) -> Option<&TemplateNode> {
         self.nodes.iter().find(|n| n.role == role)
@@ -595,18 +613,8 @@ impl GraphTemplate {
             }
         }
 
-        // transforms declare a supported kind and reference a declared node role.
-        // The kind check belongs here, with the other structural checks: an
-        // unsupported kind is a static config error, so `jit` fails at load and
-        // the apply engine only ever dispatches kinds it can execute.
+        // transforms reference a declared node role.
         for transform in &self.transforms {
-            if TransformKind::from_kind(&transform.kind).is_none() {
-                return Err(TemplateConfigError::UnknownTransformKind {
-                    template: self.name.clone(),
-                    kind: transform.kind.clone(),
-                    supported: TransformKind::SUPPORTED.join(", "),
-                });
-            }
             if !roles.contains(transform.role.as_str()) {
                 return Err(TemplateConfigError::UnknownRole {
                     template: self.name.clone(),
@@ -645,10 +653,322 @@ impl GraphTemplate {
     }
 }
 
+/// Find the planning dependency of a breakdown node carrying the template-declared
+/// container label. `by_id` must cover the whole repository, even for scoped validation.
+fn find_planning_node<'a>(
+    container: &Issue,
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    by_id: &HashMap<&IssueId, &'a Issue>,
+) -> Option<&'a Issue> {
+    let planning_type = template.planning_type(roles)?;
+    let bracket_label = declared_container_label(template, roles, container).ok()?;
+    let planning_type_label = crate::labels::type_label(planning_type);
+
+    by_id
+        .values()
+        .filter(|b| b.labels.contains(&bracket_label))
+        .find_map(|b| {
+            b.dependencies.iter().find_map(|dep_id| {
+                by_id
+                    .get(dep_id)
+                    .copied()
+                    .filter(|p| p.labels.contains(&planning_type_label))
+            })
+        })
+}
+
+/// Linked plan documents remain authoritative when moved or archived.
+const PLAN_DOC_LABEL: &str = "plan";
+
+/// A breakable container's linked plan document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PlanDocumentRef {
+    /// Repository-relative path.
+    pub(crate) path: String,
+    /// Whether the planning node is `done`, which makes an absent plan an error.
+    pub(crate) planning_done: bool,
+}
+
+/// The `plan`-labelled document of `container`'s planning node, when its template
+/// declares a plan-document location; `None` for an inline plan. `by_id` must
+/// cover the whole repository.
+pub(crate) fn plan_document_ref(
+    container: &Issue,
+    by_id: &HashMap<&IssueId, &Issue>,
+    templates: &TemplateRegistry,
+) -> Option<PlanDocumentRef> {
+    let template = crate::labels::type_label_value(&container.labels)
+        .and_then(|container_type| templates.template_for_container(container_type))
+        .filter(|template| template.plan_doc_location(&templates.roles).is_some())?;
+    let planning = find_planning_node(container, template, &templates.roles, by_id)?;
+    planning
+        .documents
+        .iter()
+        .find(|d| d.label.as_deref() == Some(PLAN_DOC_LABEL))
+        .map(|d| PlanDocumentRef {
+            path: d.path.clone(),
+            planning_done: planning.state == State::Done,
+        })
+}
+
+/// Fixed template-token substitution shared by container lookup and node expansion.
+#[derive(Debug, Clone)]
+pub(crate) struct InterpolationContext {
+    id: IssueId,
+    pub(crate) title: String,
+    hard_criteria: String,
+    directory: Option<String>,
+    pub(crate) doc: Option<String>,
+}
+
+impl InterpolationContext {
+    /// Resolve container tokens, the node's artifact directory, and its own `{doc}`.
+    /// Returns an error when the node's area is not configured as issue-scoped.
+    pub(crate) fn for_node(
+        container: &Issue,
+        node: &TemplateNode,
+        documentation: &DocumentationConfig,
+        hierarchy: &HierarchyConfig,
+    ) -> std::result::Result<Self, ArtifactDirectoryError> {
+        let directory = node
+            .doc_area
+            .as_deref()
+            .map(|area| resolve_artifact_directory(container, area, documentation, hierarchy))
+            .transpose()?;
+        Ok(Self::for_container(container).with_doc(node, directory))
+    }
+
+    /// Build the container-derived context (the `{container.dir}` and `{doc}`
+    /// tokens are unset until a node is selected via [`with_doc`](Self::with_doc)).
+    fn for_container(container: &Issue) -> Self {
+        Self {
+            id: container.id.clone(),
+            title: container.title.clone(),
+            hard_criteria: extract_hard_criteria(&container.description),
+            directory: None,
+            doc: None,
+        }
+    }
+
+    /// Resolve the node's document with its directory in scope and `{doc}` still unset.
+    fn with_doc(&self, node: &TemplateNode, directory: Option<String>) -> Self {
+        let scoped = Self {
+            directory,
+            ..self.clone()
+        };
+        let doc = node
+            .doc
+            .as_deref()
+            .map(|template| scoped.interpolate(template))
+            .unwrap_or_default();
+        Self {
+            doc: Some(doc),
+            ..scoped
+        }
+    }
+
+    /// Substitute every supported `{token}` in `template` with its context value.
+    ///
+    /// A token this context does not carry — `{container.dir}` for a node that
+    /// declares no area, `{doc}` before a node is selected — is left verbatim,
+    /// like any unknown `{...}` text.
+    pub(crate) fn interpolate(&self, template: &str) -> String {
+        let mut out = template
+            .replace("{container.id}", self.id.as_str())
+            .replace("{container.short_id}", self.id.short_id())
+            .replace("{container.title}", &self.title)
+            .replace("{container.hard_criteria}", &self.hard_criteria);
+        if let Some(directory) = &self.directory {
+            out = out.replace("{container.dir}", directory);
+        }
+        if let Some(doc) = &self.doc {
+            out = out.replace("{doc}", doc);
+        }
+        out
+    }
+}
+
+/// Resolve the breakdown node's first label containing a container identifier token.
+pub(crate) fn declared_container_label(
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    container: &Issue,
+) -> anyhow::Result<String> {
+    let node = template.breakdown_node(roles).ok_or_else(|| {
+        anyhow::anyhow!(
+            "template '{}' declares no '{}' node; bracket lookup needs a breakdown node label",
+            template.name,
+            roles.breakdown_role()
+        )
+    })?;
+    let context = InterpolationContext::for_container(container);
+    node.labels
+        .iter()
+        .find(|label| {
+            label.contains("{container.short_id}") || label.contains("{container.id}")
+        })
+        .map(|label| context.interpolate(label))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "template '{}' breakdown node '{}' declares no container label; bracket lookup cannot resolve the applied node",
+                template.name,
+                node.role
+            )
+        })
+}
+
+/// Collect `[hard]` list items in order for the `{container.hard_criteria}` token.
+fn extract_hard_criteria(description: &str) -> String {
+    description
+        .lines()
+        .map(str::trim)
+        .map(|line| line.trim_start_matches(['-', '*', '+']).trim())
+        .filter(|line| line.starts_with("[hard]"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    /// An epic bracketed by a template whose planning node declares a plan
+    /// location, with its planning and breakdown nodes.
+    fn bracket_fixture() -> (TemplateRegistry, Issue, Issue, Issue) {
+        let template_toml = r#"
+[[template]]
+name = "custom-plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+doc = "plans/{container.short_id}.md"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+labels = ["scaffold:{container.short_id}"]
+depends_on = ["planning"]
+"#;
+        let registry = TemplateRegistry::from_toml_str(template_toml, &[] as &[&str]).unwrap();
+
+        let mut container =
+            crate::test_utils::fixture_issue("container".to_string(), String::new());
+        container.id = crate::test_utils::issue_id(0xcd81_56d8_b74a_832a_9736_5c98_69cf_16b3);
+        container.labels = vec!["type:epic".to_string()];
+
+        let mut planning = crate::test_utils::fixture_issue("planning".to_string(), String::new());
+        planning.id = crate::test_utils::issue_id(0xb4cb_51e2_ab13_a142_2f78_4c62_d893_6a00);
+        planning.labels = vec!["type:planning".to_string()];
+
+        let mut breakdown =
+            crate::test_utils::fixture_issue("breakdown".to_string(), String::new());
+        breakdown.id = crate::test_utils::issue_id(0x3573_5a7e_98c3_97b9_ba56_46af_e8f2_0edc);
+        breakdown.labels = vec![
+            "type:breakdown".to_string(),
+            format!("scaffold:{}", container.short_id()),
+        ];
+        breakdown.dependencies = vec![planning.id.clone()];
+        (registry, container, planning, breakdown)
+    }
+
+    #[test]
+    fn test_find_planning_node_resolves_template_declared_container_label() {
+        let (registry, container, planning, breakdown) = bracket_fixture();
+        let template = registry.get("custom-plan").unwrap();
+        let by_id = HashMap::from([(&planning.id, &planning), (&breakdown.id, &breakdown)]);
+
+        let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
+
+        assert_eq!(resolved.id, planning.id);
+    }
+
+    #[test]
+    fn test_plan_document_ref_follows_planning_node_plan_link_and_state() {
+        let (registry, container, planning, breakdown) = bracket_fixture();
+        let resolve = |planning: &Issue| {
+            let by_id = HashMap::from([(&planning.id, planning), (&breakdown.id, &breakdown)]);
+            plan_document_ref(&container, &by_id, &registry)
+        };
+
+        assert_eq!(resolve(&planning), None, "an inline plan has no reference");
+
+        let relinked = Issue {
+            documents: vec![crate::domain::DocumentReference {
+                label: Some(PLAN_DOC_LABEL.to_string()),
+                ..crate::test_utils::document_reference("archive/moved-plan.md")
+            }],
+            ..planning.clone()
+        };
+        assert_eq!(
+            resolve(&relinked),
+            Some(PlanDocumentRef {
+                path: "archive/moved-plan.md".to_string(),
+                planning_done: false,
+            })
+        );
+
+        let done = Issue {
+            state: State::Done,
+            ..relinked
+        };
+        assert!(resolve(&done).is_some_and(|plan| plan.planning_done));
+    }
+
+    #[test]
+    fn test_extract_hard_criteria_pulls_only_hard_items() {
+        let desc = "## Success Criteria\n\n- [hard] REQ-01: a\n- [soft] nice\n- [hard] REQ-02: b\n";
+        assert_eq!(
+            extract_hard_criteria(desc),
+            "[hard] REQ-01: a\n[hard] REQ-02: b"
+        );
+    }
+
+    #[test]
+    fn test_extract_hard_criteria_empty_when_none() {
+        assert_eq!(extract_hard_criteria("no criteria here"), "");
+    }
+
+    #[test]
+    fn test_interpolation_resolves_container_and_doc_tokens() {
+        let mut issue = crate::test_utils::fixture_issue(
+            "Auth epic".to_string(),
+            "- [hard] REQ-01: x".to_string(),
+        );
+        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
+        let node = TemplateNode {
+            role: "planning".to_string(),
+            type_name: "planning".to_string(),
+            gates: vec![],
+            doc: Some("dev/active/{container.id}-plan.md".to_string()),
+            doc_area: None,
+            description: Some(
+                "Plan {container.title} ({container.short_id}). Doc: {doc}. Cover: {container.hard_criteria}."
+                    .to_string(),
+            ),
+            labels: vec![],
+            depends_on: vec![],
+        };
+        let ctx = InterpolationContext::for_container(&issue).with_doc(&node, None);
+        let rendered = ctx.interpolate(node.description.as_deref().unwrap());
+        assert!(rendered.contains("Auth epic"));
+        assert!(rendered.contains(&issue.short_id()));
+        assert!(rendered.contains(&format!("dev/active/{}-plan.md", issue.id)));
+        assert!(rendered.contains("[hard] REQ-01: x"));
+    }
+
+    #[test]
+    fn test_interpolate_leaves_unknown_token_verbatim() {
+        // The interpolation context is a fixed `{token}` substitution, not a
+        // templating language: an unsupported `{token}` is left untouched while the
+        // known container tokens around it still resolve.
+        let mut issue = crate::test_utils::fixture_issue("Auth epic".to_string(), String::new());
+        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
+        let ctx = InterpolationContext::for_container(&issue);
+        let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
+        assert_eq!(rendered, "Auth epic then {totally.unknown} end");
+    }
 
     /// A complete, valid `plan`-shaped template fixture for round-trip and
     /// happy-path tests. Mirrors the plan doc's schema section.
@@ -709,7 +1029,10 @@ applies_to  = ["epic"]
         let planning = &t.nodes[0];
         assert_eq!(planning.role, "planning");
         assert_eq!(planning.type_name, "planning");
-        assert_eq!(planning.gates, vec!["plan-review"]);
+        assert_eq!(
+            planning.gates,
+            vec!["plan-review".parse::<GateKey>().unwrap()]
+        );
         assert_eq!(
             planning.doc.as_deref(),
             Some("dev/active/{container.id}-plan.md")
@@ -722,6 +1045,9 @@ applies_to  = ["epic"]
         assert_eq!(
             breakdown.gates,
             vec!["coverage-preview", "breakdown-review"]
+                .into_iter()
+                .map(|key| key.parse::<GateKey>().unwrap())
+                .collect::<Vec<_>>()
         );
         assert_eq!(breakdown.labels, vec!["brackets:{container.short_id}"]);
         assert_eq!(breakdown.depends_on, vec!["planning"]);
@@ -731,7 +1057,7 @@ applies_to  = ["epic"]
         assert_eq!(t.anchor_edges[0].to, "breakdown");
 
         assert_eq!(t.transforms.len(), 1);
-        assert_eq!(t.transforms[0].kind, "move-upstream-to-role");
+        assert_eq!(t.transforms[0].kind, TransformKind::MoveUpstreamToRole);
         assert_eq!(t.transforms[0].role, "planning");
     }
 
@@ -759,6 +1085,9 @@ applies_to  = ["epic"]
         assert_eq!(
             reg.get("anchored").unwrap().anchors[0].gates,
             vec!["plan-review", "coverage-preview"]
+                .into_iter()
+                .map(|key| key.parse::<GateKey>().unwrap())
+                .collect::<Vec<_>>()
         );
     }
 
@@ -807,15 +1136,24 @@ applies_to  = ["epic"]
     #[test]
     fn test_load_missing_file_is_empty_registry() {
         let dir = TempDir::new().unwrap();
-        let reg = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap();
+        let reg = TemplateRegistry::load(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+            &HIERARCHY,
+        )
+        .unwrap();
         assert!(reg.templates.is_empty());
     }
 
     #[test]
     fn test_load_valid_file_from_disk() {
         let dir = TempDir::new().unwrap();
-        std::fs::write(dir.path().join("templates.toml"), plan_template_toml()).unwrap();
-        let reg = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
+            plan_template_toml(),
+        )
+        .unwrap();
+        let reg = TemplateRegistry::load(&layout, &HIERARCHY).unwrap();
         assert_eq!(reg.templates.len(), 1);
         assert_eq!(reg.templates[0].name, "plan");
     }
@@ -823,8 +1161,13 @@ applies_to  = ["epic"]
     #[test]
     fn test_malformed_toml_errors() {
         let dir = TempDir::new().unwrap();
-        std::fs::write(dir.path().join("templates.toml"), "[[template").unwrap();
-        let err = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap_err();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
+            "[[template",
+        )
+        .unwrap();
+        let err = TemplateRegistry::load(&layout, &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::Toml(_)));
     }
 
@@ -953,9 +1296,7 @@ role = "ghost"
 
     #[test]
     fn test_unknown_transform_kind_rejected() {
-        // A transform kind the engine cannot dispatch is a static config error:
-        // load fails, naming both the template and the offending kind, so the
-        // apply engine never receives it.
+        // An unknown kind fails load, naming both the template and the kind.
         let toml = r#"
 [[template]]
 name = "weird"
@@ -968,18 +1309,10 @@ kind = "teleport"
 role = "planning"
 "#;
         let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
-        match &err {
-            TemplateConfigError::UnknownTransformKind {
-                template,
-                kind,
-                supported,
-            } => {
-                assert_eq!(template, "weird");
-                assert_eq!(kind, "teleport");
-                assert!(supported.contains("move-upstream-to-role"), "{supported}");
-            }
-            other => panic!("expected UnknownTransformKind, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            TemplateConfigError::InvalidTemplate { ref template, .. } if template == "weird"
+        ));
         let msg = err.to_string();
         assert!(msg.contains("weird"), "{msg}");
         assert!(msg.contains("teleport"), "{msg}");
@@ -989,8 +1322,8 @@ role = "planning"
     fn test_supported_transform_kind_accepted() {
         let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
         assert_eq!(
-            TransformKind::from_kind(&reg.templates[0].transforms[0].kind),
-            Some(TransformKind::MoveUpstreamToRole)
+            reg.templates[0].transforms[0].kind,
+            TransformKind::MoveUpstreamToRole
         );
     }
 
@@ -1104,26 +1437,6 @@ depends_on = ["a"]
 "#;
         let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::CyclicDependsOn { .. }));
-    }
-
-    // REGB-01: this repo's `.jit/templates.toml` round-trips through the loader.
-    // The path is resolved relative to the crate manifest so the test does not
-    // depend on the process working directory or on production issue state.
-
-    #[test]
-    fn test_repo_plan_template_parses() {
-        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(|p| p.parent())
-            .expect("crate is nested two levels under the repo root");
-        let jit_dir = repo_root.join(".jit");
-        let reg = TemplateRegistry::load(&jit_dir, &HIERARCHY).unwrap();
-        let plan = reg
-            .get("plan")
-            .expect("repo .jit/templates.toml declares a `plan` template");
-        assert_eq!(plan.applies_to, vec!["epic"]);
-        assert_eq!(plan.planning_type(&reg.roles), Some("planning"));
-        assert_eq!(plan.breakdown_type(&reg.roles), Some("breakdown"));
     }
 
     // BIND-01: role and anchor bindings parse, and an absent table defaults to

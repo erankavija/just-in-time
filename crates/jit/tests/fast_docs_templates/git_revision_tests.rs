@@ -1,7 +1,8 @@
 use jit::storage::{GitRevisionError, GitRevisionResolver};
+use jit::test_cli::init_git_repository;
 #[cfg(unix)]
 use jit::test_harness::git::GitStandIn;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -16,9 +17,7 @@ impl Repo {
     fn new() -> Self {
         let temp = TempDir::new().unwrap();
         let root = temp.path().to_path_buf();
-        git(&root, &["init"]);
-        git(&root, &["config", "user.name", "Test User"]);
-        git(&root, &["config", "user.email", "test@example.com"]);
+        init_git_repository(&root).unwrap();
         Self { _temp: temp, root }
     }
 
@@ -131,6 +130,7 @@ fn test_inspect_pinned_targets_classifies_tree_modes_without_worktree_fallback()
         resolver
             .inspect_pinned_targets(
                 &[request.clone()].into_iter().collect(),
+                &BTreeSet::new(),
                 &mut BTreeMap::new(),
             )
             .remove(&request)
@@ -211,7 +211,7 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
     let stand_in = GitStandIn::new();
     let batched = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
     let mut cache = BTreeMap::new();
-    let actual = batched.inspect_pinned_targets(&requests, &mut cache);
+    let actual = batched.inspect_pinned_targets(&requests, &BTreeSet::new(), &mut cache);
 
     assert_eq!(actual.len(), requests.len());
     let expected_kinds = [
@@ -329,10 +329,11 @@ fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_co
         &[("HEAD".to_string(), "docs/file-0.md".to_string())]
             .into_iter()
             .collect(),
+        &BTreeSet::new(),
         &mut cache,
     );
     assert_eq!(stand_in.invocations().len(), 3);
-    resolver.inspect_pinned_targets(&requests, &mut cache);
+    resolver.inspect_pinned_targets(&requests, &BTreeSet::new(), &mut cache);
 
     let processes = stand_in.invocations();
     assert_eq!(processes.len(), 6);
@@ -387,7 +388,8 @@ fn test_inspect_pinned_targets_lists_only_requested_paths_of_a_commit_tree() {
     let stand_in = GitStandIn::new();
     let resolver = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
 
-    let results = resolver.inspect_pinned_targets(&requests, &mut BTreeMap::new());
+    let results =
+        resolver.inspect_pinned_targets(&requests, &BTreeSet::new(), &mut BTreeMap::new());
 
     assert!(results.values().all(Result::is_ok));
     let listings = stand_in
@@ -430,7 +432,7 @@ fn test_inspect_pinned_targets_resolves_distinct_revisions_in_one_success_proces
     let stand_in = GitStandIn::new();
     let resolver = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
     let mut cache = BTreeMap::new();
-    let results = resolver.inspect_pinned_targets(&requests, &mut cache);
+    let results = resolver.inspect_pinned_targets(&requests, &BTreeSet::new(), &mut cache);
 
     assert!(results.values().all(Result::is_ok));
     let processes = stand_in.invocations();
@@ -477,7 +479,7 @@ fn test_inspect_pinned_targets_reports_git_unavailable_for_every_request() {
     .into_iter()
     .collect::<std::collections::BTreeSet<_>>();
     let mut cache = BTreeMap::new();
-    let actual = resolver.inspect_pinned_targets(&requests, &mut cache);
+    let actual = resolver.inspect_pinned_targets(&requests, &BTreeSet::new(), &mut cache);
 
     assert_eq!(actual.len(), requests.len());
     requests.iter().for_each(|request| {

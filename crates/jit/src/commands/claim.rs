@@ -2,8 +2,10 @@
 //!
 //! Provides CLI interface to the lease-based claim coordination system.
 
+use super::CommandExecutor;
 use crate::config::JitConfig;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
+use crate::storage::claim_coordinator::{read_leases, LeaseChange};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -63,135 +65,145 @@ fn get_current_branch(worktree_root: &Path) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
-/// Execute `jit claim acquire` command.
-///
-/// Acquires an exclusive lease on an issue for the specified agent.
-///
-/// # Returns
-///
-/// The acquired lease id paired with any non-fatal [`StorageWarning`]s observed
-/// while loading the worktree identity (e.g. a relocation). The caller's output
-/// layer decides how to render the warnings; this function never writes to
-/// stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the issue cannot be resolved or loaded, or if the lease
-/// cannot be acquired (e.g. it is already held by another agent).
-pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-    issue_id: &str,
-    ttl_secs: u64,
-    agent_id: Option<&str>,
-    reason: Option<&str>,
-) -> Result<(String, Vec<StorageWarning>)> {
-    use crate::agent_config::resolve_agent_id;
+/// Claim and recovery operations of a [`CommandExecutor`].
+pub struct ClaimOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
 
-    // Resolve short ID to full ID
-    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+impl<S: IssueStore> CommandExecutor<S> {
+    /// The claim and recovery family.
+    pub fn claims(&self) -> ClaimOps<'_, S> {
+        ClaimOps { exec: self }
+    }
+}
 
-    // Validate issue exists
-    let _issue = storage
-        .load_issue(&full_id)
-        .with_context(|| format!("Issue {} not found", full_id))?;
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
+    /// Execute `jit claim acquire` command.
+    ///
+    /// Acquires an exclusive lease on an issue for the specified agent.
+    ///
+    /// # Returns
+    ///
+    /// The acquired lease id paired with any non-fatal [`StorageWarning`]s observed
+    /// while loading the worktree identity (e.g. a relocation). The caller's output
+    /// layer decides how to render the warnings; this function never writes to
+    /// stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue cannot be loaded, or if the lease
+    /// cannot be acquired (e.g. it is already held by another agent).
+    pub fn acquire(
+        &self,
+        issue_id: &IssueId,
+        ttl_secs: u64,
+        agent_id: Option<&str>,
+        reason: Option<&str>,
+    ) -> Result<(LeaseId, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        let storage = self.exec.storage();
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Resolve short ID to full ID
+        let full_id = issue_id.clone();
 
-    // Load or generate worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Validate issue exists
+        let _issue = storage
+            .load_issue(&full_id)
+            .with_context(|| format!("Issue {} not found", full_id))?;
 
-    // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
-    let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
+        // Get current branch
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load config for policy limits
-    let coord_config = JitConfig::load(&paths.local_jit)?.coordination();
+        // Load or generate worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Create file locker with the default lock-acquisition timeout
-    let locker = FileLocker::with_configured_timeout();
+        // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
+        let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
-    // Create claim coordinator
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id.clone(),
-        agent.clone(),
-    );
+        // Load config for policy limits
+        let coord_config = JitConfig::load(&storage.repository_layout()?)?.coordination();
 
-    // Initialize control plane if needed
-    coordinator.init()?;
+        // Create file locker with the default lock-acquisition timeout
+        let locker = FileLocker::with_configured_timeout();
 
-    // Acquire the lease AND synchronize the repository-side issue/event state
-    // under one held coordinator lock, in the mandatory order coordinator ->
-    // bootstrap -> repository -> events. The coordinator receives the CANONICAL
-    // full id (never the raw user spelling), and the repository transition is
-    // idempotent and convergent over both the captured issue assignment and the
-    // captured event-log tail, so a crash-interrupted prior attempt converges
-    // without emitting a duplicate claim event (@/inv/event-log).
-    let agent_assignee: crate::domain::Assignee = agent.parse()?;
-    let worktree_root = paths.worktree_root.clone();
-    let data_root = storage.root().to_path_buf();
-    let (lease, ()) = coordinator.acquire_claim_synchronized(
-        &full_id,
-        ttl_secs,
-        reason,
-        ClaimAcquireLimits::new(
-            coord_config.max_indefinite_leases_per_agent,
-            coord_config.max_indefinite_leases_per_repo,
-        ),
-        |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
-        |_lease| {
-            synchronize_claim_repository_state(
-                storage,
-                &worktree_root,
-                &data_root,
-                &full_id,
-                &agent_assignee,
-            )
-        },
+        // Create claim coordinator
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            agent.clone(),
+        );
+
+        // Initialize control plane if needed
+        coordinator.init()?;
+
+        // Acquire the lease AND synchronize the repository-side issue/event state
+        // under one held coordinator lock, in the mandatory order coordinator ->
+        // bootstrap -> repository -> events. The coordinator receives the CANONICAL
+        // full id (never the raw user spelling).
+        let worktree_root = paths.worktree_root.clone();
+        let data_root = storage.root().to_path_buf();
+        let (lease, ()) = coordinator.acquire_claim_synchronized(
+            &full_id,
+            ttl_secs,
+            reason,
+            ClaimAcquireLimits::new(
+                coord_config.max_indefinite_leases_per_agent,
+                coord_config.max_indefinite_leases_per_repo,
+            ),
+            |_lease| {
+                synchronize_claim_repository_state(
+                    storage,
+                    &worktree_root,
+                    &data_root,
+                    &full_id,
+                    &agent,
+                )
+            },
+        )?;
+
+        Ok((lease.lease_id, warnings))
+    }
+}
+
+/// The claim reads the issue record and appends at the log's end.
+fn claim_capture_spec(full_id: &IssueId) -> Result<crate::repository_state::CaptureSpec> {
+    use crate::repository_state::{CaptureSpec, VirtualPath};
+    let mut spec = CaptureSpec::new(
+        [VirtualPath::issue_record(full_id)],
+        super::issue_mutation_capture_budget(),
     )?;
-
-    Ok((lease.lease_id, warnings))
+    spec.discover_tail(VirtualPath::EVENTS)?;
+    Ok(spec)
 }
 
 /// Publish the repository-side issue assignment and claim event through one
 /// mutation session.
 ///
 /// Invoked under the held coordinator lock, so the guard order is coordinator ->
-/// bootstrap -> repository -> events. The transition is derived from the captured
-/// image and is convergent: a claim already reflected in both the issue
-/// assignment and the event-log tail is a complete no-op; an issue assigned
-/// without its claim event emits exactly the missing event; a duplicate event is
-/// never emitted, preserving `@/inv/event-log`.
+/// bootstrap -> repository -> events. The captured assignee alone decides: an
+/// issue already assigned to `agent` publishes nothing; any other publishes the
+/// assignment and its `IssueClaimed` (`@/inv/event-log`).
 fn synchronize_claim_repository_state<S>(
     storage: &S,
     worktree_root: &Path,
     data_root: &Path,
-    full_id: &str,
+    full_id: &IssueId,
     agent: &crate::domain::Assignee,
 ) -> Result<()>
 where
     S: IssueStore + crate::storage::RepositoryStateStore,
 {
     use super::{capture_or_retry, with_mutation_session, SessionStep};
-    use crate::repository_state::{finalize, CaptureSpec, MutationIntent, VirtualPath};
+    use crate::repository_state::{finalize, MutationIntent};
     use crate::storage::discover_repository_layout;
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
     let intents = [MutationIntent::ClaimIssue {
-        issue_id: full_id.to_string(),
+        issue_id: full_id.clone(),
         agent: agent.clone(),
     }];
-    let build_spec = || -> Result<CaptureSpec> {
-        Ok(CaptureSpec::new(
-            [
-                VirtualPath::data(format!("issues/{full_id}.json"))?,
-                VirtualPath::EVENTS,
-            ],
-            super::issue_mutation_capture_budget(),
-        )?)
-    };
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
     // transition time stable while opening a fresh mutation session.
     let context = super::production_mutation_context();
@@ -200,64 +212,64 @@ where
         &layout,
         "claim repository synchronization",
         |session| {
-            let Some(image) = capture_or_retry(session.capture(build_spec()?))? else {
+            let Some(image) = capture_or_retry(session.capture(claim_capture_spec(full_id)?))?
+            else {
                 return Ok(SessionStep::Retry);
             };
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             Ok(SessionStep::Apply(plan, ()))
         },
     )
 }
 
-/// Execute `jit claim heartbeat` command.
-///
-/// Sends a heartbeat for an indefinite lease to prevent staleness.
-///
-/// # Returns
-///
-/// Any non-fatal [`StorageWarning`]s observed while loading the worktree
-/// identity (e.g. a relocation), for the caller's output layer to render.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// heartbeat cannot be recorded (e.g. the lease does not exist).
-pub fn execute_claim_heartbeat(
-    paths: &WorktreePaths,
-    lease_id: &str,
-) -> Result<Vec<StorageWarning>> {
-    use crate::agent_config::resolve_agent_id;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Execute `jit claim heartbeat` command.
+    ///
+    /// Sends a heartbeat for the caller's lease on `issue_id` to prevent
+    /// staleness.
+    ///
+    /// # Returns
+    ///
+    /// Any non-fatal [`StorageWarning`]s observed while loading the worktree
+    /// identity (e.g. a relocation), for the caller's output layer to render.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// heartbeat cannot be recorded (e.g. the issue has no active lease).
+    pub fn heartbeat(&self, issue_id: &IssueId) -> Result<(Lease, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Resolve agent ID
-    let agent = resolve_agent_id(None)?;
+        // Resolve agent ID
+        let agent = resolve_agent_id(None)?;
 
-    // Create coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
+        // Create coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
 
-    // Send heartbeat
-    coordinator.heartbeat(lease_id)?;
-
-    Ok(warnings)
+        let lease = coordinator.heartbeat(issue_id)?;
+        Ok((lease, warnings))
+    }
 }
 
 /// Details of a lease released via `jit claim release <issue-id>`.
 ///
-/// Returned by [`execute_claim_release_by_issue`] so the caller can report which
+/// Returned by [`ClaimOps::release_by_issue`] so the caller can report which
 /// lease was released, on which issue, and which identity performed the release
 /// (the actor recorded in the audit trail).
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct ReleasedLeaseInfo {
     /// The lease ID that was released (resolved from the issue, not supplied by the user).
-    pub lease_id: String,
+    pub lease_id: LeaseId,
     /// The full issue ID whose lease was released.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The prior owner of the released lease.
     pub previous_owner: String,
     /// The acting identity recorded in the eviction audit trail.
@@ -282,16 +294,15 @@ fn sanitize_actor(name: Option<&str>) -> Option<String> {
 ///
 /// Prefers the configured agent id (`JIT_AGENT_ID` > `~/.config/jit/agent.toml`,
 /// already validated), falling back to the git `user.name` (sanitized via
-/// [`sanitize_actor`]). The returned string is always a valid
-/// `{type}:{identifier}` agent identity, so it can safely be used as the
-/// `ClaimCoordinator` agent id and recorded in the eviction audit trail.
+/// [`sanitize_actor`]). The returned assignee is valid and can be used by the
+/// `ClaimCoordinator` and recorded in the eviction audit trail.
 ///
 /// # Errors
 ///
 /// Returns an error (see [`crate::errors::no_acting_identity`]) when neither a
 /// configured agent id nor a git `user.name` is available. A release must be
 /// attributable, so no placeholder identity is invented.
-fn resolve_release_actor(worktree_root: &Path) -> Result<String> {
+pub(super) fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domain::Assignee> {
     use crate::agent_config::resolve_agent_id;
 
     if let Ok(agent) = resolve_agent_id(None) {
@@ -308,288 +319,265 @@ fn resolve_release_actor(worktree_root: &Path) -> Result<String> {
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
 
     sanitize_actor(git_name.as_deref())
-        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()))
+        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()))?
+        .parse()
+        .map_err(Into::into)
 }
 
-/// Execute `jit claim release <issue-id>` command.
-///
-/// Resolves the issue's active lease and releases it regardless of the lease
-/// owner, recording the acting identity in the eviction audit trail. Reuses the
-/// admin/owner-bypass [`ClaimCoordinator::force_evict_lease`] path so a non-owner
-/// (or an actor with no configured agent identity) can release the lease.
-///
-/// The positional argument is an ISSUE ID (short ids are resolved), not a lease
-/// UUID. If the issue holds more than one active lease (which should not happen
-/// under exclusive claiming), every active lease is released; the returned
-/// [`ReleasedLeaseInfo`] reports the last one released.
-///
-/// # Errors
-///
-/// Returns an error if the issue id cannot be resolved, if the issue has no
-/// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
-/// eviction fails.
-pub fn execute_claim_release_by_issue<S: IssueStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-    issue_id: &str,
-) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
-    // Resolve short ID to full ID (errors if the issue does not exist).
-    let full_id = storage
-        .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)
-        .with_context(|| format!("Failed to resolve issue id {}", issue_id))?;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Execute `jit claim release <issue-id>` command.
+    ///
+    /// Releases the issue's lease regardless of its owner, under one held
+    /// [`LeaseLock`](crate::storage::claim_coordinator::LeaseLock), recording the
+    /// acting identity in the eviction audit trail.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue does not exist, if it has no
+    /// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
+    /// eviction fails.
+    pub fn release_by_issue(
+        &self,
+        issue_id: &IssueId,
+    ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
+        self.release_by_issue_with_actor(issue_id, resolve_release_actor)
+    }
 
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+    /// [`Self::release_by_issue`] with the acting identity resolved by
+    /// `resolve_actor`, which receives the worktree root.
+    fn release_by_issue_with_actor(
+        &self,
+        issue_id: &IssueId,
+        resolve_actor: impl FnOnce(&Path) -> Result<crate::domain::Assignee>,
+    ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        let storage = self.exec.storage();
+        storage.load_issue(issue_id)?;
+        let full_id = issue_id.clone();
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Resolve the acting identity for the audit trail BEFORE evicting anything,
-    // so a release never happens without an attributable actor. This is
-    // independent of lease ownership: any identified actor may release by issue id.
-    let actor = resolve_release_actor(&paths.worktree_root)
-        .context("Cannot release lease without an attributable acting identity")?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Create file locker and coordinator using the actor as the agent id.
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id.clone(),
-        actor.clone(),
-    );
-    coordinator.init().with_context(|| {
-        format!(
-            "Failed to initialize claim coordinator for issue {}",
-            full_id
-        )
-    })?;
+        // Resolve the acting identity for the audit trail BEFORE evicting anything,
+        // so a release never happens without an attributable actor. This is
+        // independent of lease ownership: any identified actor may release by issue id.
+        let actor = resolve_actor(&paths.worktree_root)
+            .context("Cannot release lease without an attributable acting identity")?;
 
-    // Resolve the issue's active (non-expired) lease(s).
-    let leases = coordinator
-        .get_active_leases(Some(&IssueIdPrefix::of_stored(&full_id)), None)
-        .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?;
+        // Create file locker and coordinator using the actor as the agent id.
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            actor.clone(),
+        );
+        coordinator.init().with_context(|| {
+            format!(
+                "Failed to initialize claim coordinator for issue {}",
+                full_id
+            )
+        })?;
 
-    let released = leases
-        .into_iter()
-        .map(|lease| {
-            let reason = format!("released by {} via claim release", actor);
-            coordinator
-                .force_evict_lease(&lease.lease_id, &reason)
-                .with_context(|| {
-                    format!(
-                        "Failed to release lease {} for issue {}",
-                        lease.lease_id, full_id
-                    )
-                })?;
-            Ok(ReleasedLeaseInfo {
-                lease_id: lease.lease_id,
-                issue_id: lease.issue_id,
-                previous_owner: lease.agent_id,
-                actor: actor.clone(),
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
+        let no_active_lease = || crate::storage::claim_coordinator::no_active_lease(&full_id);
+        let mut lock = coordinator.lock()?;
+        let lease = lock.load(&full_id)?.ok_or_else(no_active_lease)?;
+        let reason = format!("released by {} via claim release", actor);
+        // An expired lease is evicted as expired, and the release then fails.
+        lock.apply(&full_id, |current, _| match current {
+            Some(current) if current.lease_id == lease.lease_id => Ok(LeaseChange::Remove(reason)),
+            _ => Err(no_active_lease()),
+        })?;
 
-    let info = released.into_iter().next_back().ok_or_else(|| {
-        crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id))
-    })?;
-    Ok((info, warnings))
+        let info = ReleasedLeaseInfo {
+            lease_id: lease.lease_id,
+            issue_id: lease.issue_id,
+            previous_owner: lease.agent_id.to_string(),
+            actor: actor.to_string(),
+        };
+        Ok((info, warnings))
+    }
 }
 
-/// Renews an existing lease, extending its expiry time.
-///
-/// # Arguments
-///
-/// * `lease_id` - ID of the lease to renew
-/// * `extension_secs` - How many seconds to extend the lease by
-///
-/// # Returns
-///
-/// The renewed lease with updated expiry time, paired with any non-fatal
-/// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
-/// relocation), for the caller's output layer to render. This function never
-/// writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// lease cannot be renewed (e.g. it does not exist).
-pub fn execute_claim_renew(
-    paths: &WorktreePaths,
-    lease_id: &str,
-    extension_secs: u64,
-) -> Result<(Lease, Vec<StorageWarning>)> {
-    use crate::agent_config::resolve_agent_id;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Renews the caller's lease on `issue_id`, extending its expiry time by
+    /// `extension_secs`.
+    ///
+    /// # Returns
+    ///
+    /// The renewed lease with updated expiry time, paired with any non-fatal
+    /// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
+    /// relocation), for the caller's output layer to render. This function never
+    /// writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// lease cannot be renewed (e.g. the issue has no active lease).
+    pub fn renew(
+        &self,
+        issue_id: &IssueId,
+        extension_secs: u64,
+    ) -> Result<(Lease, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Get current branch
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Resolve agent ID
-    let agent = resolve_agent_id(None)?;
+        // Resolve agent ID
+        let agent = resolve_agent_id(None)?;
 
-    // Create locker and coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id.clone(),
-        agent.clone(),
-    );
+        // Create locker and coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            agent.clone(),
+        );
 
-    // Renew the lease
-    let lease = coordinator.renew_lease(lease_id, extension_secs)?;
-    Ok((lease, warnings))
+        let lease = coordinator.renew_lease(issue_id, extension_secs)?;
+        Ok((lease, warnings))
+    }
 }
 
-/// Shows status of active leases.
-///
-/// # Arguments
-///
-/// * `storage` - Issue storage that resolves `issue_id`
-/// * `issue_id` - Optional filter by issue ID, resolved as
-///   [`resolve_issue_filter`](super::resolve_issue_filter) describes
-/// * `agent_id` - Optional filter by agent ID
-///
-/// # Returns
-///
-/// Vector of active leases matching the filters, paired with any non-fatal
-/// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
-/// relocation), for the caller's output layer to render. This function never
-/// writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// leases cannot be read.
-pub fn execute_claim_status<S: IssueStore>(
-    storage: &S,
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Shows unexpired leases matching `issue` and `agent_id`, stale ones
+    /// marked; with neither filter, the current agent's. Takes no lock and
+    /// writes nothing.
+    ///
+    /// # Errors
+    ///
+    /// The selected worktree is not a git checkout with a commit, or the leases
+    /// cannot be read.
+    pub fn status(
+        &self,
+        issue: Option<&IssueIdPrefix>,
+        agent_id: Option<&str>,
+    ) -> Result<Vec<ListedLease>> {
+        let paths = self.exec.require_worktree_paths()?;
+        use crate::agent_config::resolve_agent_id;
+
+        // Claims require git (`@/charter/D-4`).
+        get_current_branch(&paths.worktree_root)?;
+
+        // Default to the current agent when no filter is given.
+        let filter_agent = match (issue, agent_id) {
+            (None, None) => Some(resolve_agent_id(None)?.to_string()),
+            (_, agent_id) => agent_id.map(str::to_string),
+        };
+
+        unexpired_leases(paths, issue, filter_agent.as_deref())
+    }
+}
+
+/// A lease as `claim list` and `claim status` report it.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ListedLease {
+    #[serde(flatten)]
+    pub lease: Lease,
+    /// Whether the lease was stale ([`Lease::is_stale`]) when it was read.
+    pub stale: bool,
+}
+
+/// Unexpired leases matching the filters, most recently acquired first, read
+/// without the claims lock. A stale lease is kept and marked stale as of now.
+fn unexpired_leases(
     paths: &WorktreePaths,
-    issue_id: Option<&str>,
+    issue: Option<&IssueIdPrefix>,
     agent_id: Option<&str>,
-) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
-    use crate::agent_config::resolve_agent_id;
-
-    let issue = issue_id
-        .map(|id| super::resolve_issue_filter(storage, id))
-        .transpose()?;
-
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
-
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
-
-    // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
-    let current_agent_id = resolve_agent_id(None)?;
-
-    // Create claim coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id,
-        current_agent_id.clone(),
-    );
-    coordinator.init()?;
-
-    // Get active leases (default to current agent if no filters specified)
-    let filter_agent = if agent_id.is_none() && issue_id.is_none() {
-        Some(current_agent_id.as_str())
-    } else {
-        agent_id
-    };
-
-    let leases = coordinator.get_active_leases(issue.as_ref(), filter_agent)?;
-    Ok((leases, warnings))
+) -> Result<Vec<ListedLease>> {
+    let now = chrono::Utc::now();
+    let mut leases = read_leases(paths)?
+        .into_iter()
+        .filter(|lease| !lease.is_expired(now))
+        .filter(|lease| issue.is_none_or(|issue| issue.matches(&lease.issue_id)))
+        .filter(|lease| agent_id.is_none_or(|agent| lease.agent_id.to_string() == agent))
+        .map(|lease| ListedLease {
+            stale: lease.is_stale(now),
+            lease,
+        })
+        .collect::<Vec<_>>();
+    leases.sort_by_key(|listed| std::cmp::Reverse(listed.lease.acquired_at));
+    Ok(leases)
 }
 
-/// Lists all active leases across all agents and worktrees.
-///
-/// # Returns
-///
-/// Vector of all active leases, paired with any non-fatal [`StorageWarning`]s
-/// observed while loading the worktree identity (e.g. a relocation), for the
-/// caller's output layer to render. This function never writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// leases cannot be read.
-pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
-
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
-
-    // We need an agent ID for coordinator, but it doesn't matter which one for listing
-    let agent = "system:list".to_string();
-
-    // Create claim coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
-    coordinator.init()?;
-
-    // Get all active leases (no filters)
-    let leases = coordinator.get_active_leases(None, None)?;
-    Ok((leases, warnings))
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Lists unexpired leases across all agents and worktrees, stale ones
+    /// marked. Takes no lock and writes nothing.
+    ///
+    /// # Errors
+    ///
+    /// The selected worktree is not a git checkout with a commit, or the leases
+    /// cannot be read.
+    pub fn list(&self) -> Result<Vec<ListedLease>> {
+        let paths = self.exec.require_worktree_paths()?;
+        // Claims require git (`@/charter/D-4`).
+        get_current_branch(&paths.worktree_root)?;
+        unexpired_leases(paths, None, None)
+    }
 }
 
-/// Force-evicts a lease (admin operation).
-///
-/// # Arguments
-///
-/// * `lease_id` - ID of the lease to evict
-/// * `reason` - Reason for eviction (for audit trail)
-///
-/// # Returns
-///
-/// Any non-fatal [`StorageWarning`]s observed while loading the worktree
-/// identity (e.g. a relocation), for the caller's output layer to render. This
-/// function never writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// lease cannot be evicted.
-pub fn execute_claim_force_evict(
-    paths: &WorktreePaths,
-    lease_id: &str,
-    reason: &str,
-) -> Result<Vec<StorageWarning>> {
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Force-evicts the lease on the issue among the stored lease records that
+    /// `issue` names (admin operation), recording `reason` in the audit trail.
+    /// The issue store is not consulted, so a lease on a deleted issue stays
+    /// evictable.
+    ///
+    /// # Returns
+    ///
+    /// The evicted lease and any non-fatal [`StorageWarning`]s observed while loading the worktree
+    /// identity (e.g. a relocation), for the caller's output layer to render. This
+    /// function never writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// lease cannot be evicted.
+    pub fn force_evict(
+        &self,
+        issue: &IssueIdPrefix,
+        reason: &str,
+    ) -> Result<(Lease, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // For force-evict, we use a system agent (admin operation)
-    let agent = "system:admin".to_string();
+        // For force-evict, we use a system agent (admin operation)
+        let agent = crate::domain::Assignee::SYSTEM_ADMIN;
 
-    // Create claim coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
-    coordinator.init()?;
+        // Create claim coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
+        coordinator.init()?;
 
-    // Force evict the lease
-    coordinator.force_evict_lease(lease_id, reason)?;
-    Ok(warnings)
+        let lease = coordinator.force_evict_lease(issue, reason)?;
+        Ok((lease, warnings))
+    }
 }
 
 /// Report of recovery actions taken.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
 pub struct RecoveryReport {
+    /// Leftover redo records applied when the repository was opened
+    pub redo_records_applied: usize,
     /// Number of stale locks cleaned up
     pub stale_locks_cleaned: usize,
-    /// Whether the claims index was rebuilt
-    pub index_rebuilt: bool,
     /// Number of expired leases evicted
     pub expired_leases_evicted: usize,
-    /// Number of orphaned temp files removed
+    /// Number of indefinite leases reclaimed for a stale heartbeat
+    pub stale_leases_reclaimed: usize,
+    /// Number of orphaned temp files removed, lease stage files included
     pub temp_files_removed: usize,
     /// Number of derived-state targets repaired during recovery.
     pub derived_state_repaired: usize,
@@ -597,7 +585,9 @@ pub struct RecoveryReport {
     /// requires git.
     pub claims_lease_recovery: RecoveryPhase,
     /// Non-fatal warnings observed during recovery, for the output layer to
-    /// render. Storage returns these instead of writing to stderr directly.
+    /// render as the envelope's warnings. Storage returns these instead of
+    /// writing to stderr directly.
+    #[serde(skip)]
     pub warnings: Vec<StorageWarning>,
 }
 
@@ -638,7 +628,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     report.warnings.extend(identity_warnings);
 
     // Create claim coordinator.
-    let agent = "system:recovery".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_RECOVERY;
     let locker = FileLocker::with_configured_timeout();
     let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
@@ -671,91 +661,96 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
         report.stale_locks_cleaned = locks_before.saturating_sub(locks_after);
     }
 
-    // 2. Rebuild index if corrupted.
-    let (consistent, verify_warnings) = coordinator.verify_index_consistency()?;
-    report.warnings.extend(verify_warnings);
-    if !consistent {
-        report.warnings.push(StorageWarning::IndexRebuilt);
-        let index = coordinator.rebuild_index_from_log()?;
-        report.warnings.extend(index.warnings());
-        coordinator.write_index_atomic(&index)?;
-        report.index_rebuilt = true;
-    }
+    // 2. Evict expired leases and reclaim stale indefinite ones.
+    let lapsed = coordinator.evict_lapsed()?;
+    report.expired_leases_evicted = lapsed.expired;
+    report.stale_leases_reclaimed = lapsed.reclaimed;
 
-    // 3. Evict expired leases.
-    let mut index = coordinator.load_claims_index()?;
-    let leases_before = index.leases.len();
-    coordinator.evict_expired(&mut index)?;
-    coordinator.write_index_atomic(&index)?;
-    report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
+    // 3. Remove interrupted lease operations' stage files; lease records are
+    // not `*.tmp` files.
+    sweep_temp_files(
+        &crate::storage::WorktreePaths::leases_dir(&paths.shared_jit),
+        report,
+    );
 
     Ok(())
 }
 
-/// Run the repair routines of `jit recover`.
-///
-/// Like every mutating command, `jit recover` applies a leftover redo record
-/// when its session opens, before this runs. The routines, in sequence:
-/// - Repairs declaration-derived state through the `jit validate --fix` path
-/// - In a Git repository: cleans up stale claim locks from crashed processes
-///   (PID check), rebuilds a corrupted claims index from its append-only log,
-///   and evicts expired leases; without Git, skips these with a warning
-/// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
-///
-/// Safe to run at any time: it removes only provably stale data and never
-/// the pending redo record.
-pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-) -> Result<RecoveryReport> {
-    use crate::storage::temp_cleanup;
-
-    let mut report = RecoveryReport::default();
-
-    // Derived-state drift is repaired before anything that depends on git.
-    // The git-dependent phase below aborts in a repository whose HEAD does not
-    // resolve, and repairing afterwards would leave that repository's drift
-    // untouched — a core capability made conditional on git history, against
-    // `@/charter/D-4`. Repairing first keeps the repair unconditional while
-    // preserving the git phase's own failure.
-    if paths.local_jit.join("config.toml").is_file() {
-        let layout =
-            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-        let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
-        report.derived_state_repaired = executor.repair_derived_state(false)?.0;
-    }
-
-    if paths.git_repository {
-        execute_git_recovery(paths, &mut report)?;
-    } else {
-        report.claims_lease_recovery = RecoveryPhase::Skipped {
-            reason: RecoverySkipReason::RequiresGit,
-        };
-        report
-            .warnings
-            .push(StorageWarning::ClaimsLeaseRecoverySkipped);
-    }
-
-    // 4. Clean up orphaned temp files. Best-effort: a failure is surfaced as a
-    // warning rather than aborting recovery.
-    let jit_data_dir = &paths.local_jit;
-    match temp_cleanup::cleanup_orphaned_temp_files(
-        jit_data_dir,
+/// Remove orphaned `*.tmp` files under `root` past the cleanup threshold,
+/// counting them in `report`. Best-effort: a failure is surfaced as a warning
+/// rather than aborting recovery.
+fn sweep_temp_files(root: &std::path::Path, report: &mut RecoveryReport) {
+    match crate::storage::temp_cleanup::cleanup_orphaned_temp_files(
+        root,
         crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
     ) {
-        Ok(removed) => report.temp_files_removed = removed,
+        Ok(removed) => report.temp_files_removed += removed,
         Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
             reason: e.to_string(),
         }),
     }
+}
 
-    Ok(report)
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
+    /// Run the repair routines of `jit recover`.
+    ///
+    /// Like every mutating command, `jit recover` applies a leftover redo record
+    /// when its session opens, before this runs. The routines, in sequence:
+    /// - Repairs declaration-derived state through the `jit validate --fix` path
+    /// - With claims coordination: cleans up stale claim locks from crashed processes
+    ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
+    ///   heartbeat is stale, and removes interrupted lease operations' stage
+    ///   files; without Git, skips these with a warning
+    /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
+    ///
+    /// Safe to run at any time: it removes only provably stale data and never
+    /// the pending redo record.
+    pub fn recover(&self) -> Result<RecoveryReport> {
+        let paths = self.exec.require_worktree_paths()?;
+        let storage = self.exec.storage();
+
+        let mut report = RecoveryReport {
+            redo_records_applied: self.exec.recovered_records,
+            ..RecoveryReport::default()
+        };
+
+        // Derived-state drift is repaired before anything that depends on git.
+        // The git-dependent phase below aborts in a repository whose HEAD does not
+        // resolve, and repairing afterwards would leave that repository's drift
+        // untouched — a core capability made conditional on git history, against
+        // `@/charter/D-4`. Repairing first keeps the repair unconditional while
+        // preserving the git phase's own failure.
+        let layout =
+            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+        if layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)?
+            .is_file()
+        {
+            let executor =
+                crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
+            report.derived_state_repaired = executor.validation().repair_derived_state(false)?.0;
+        }
+
+        if paths.has_claims_coordination() {
+            execute_git_recovery(paths, &mut report)?;
+        } else {
+            report.claims_lease_recovery = RecoveryPhase::Skipped {
+                reason: RecoverySkipReason::RequiresGit,
+            };
+            report
+                .warnings
+                .push(StorageWarning::ClaimsLeaseRecoverySkipped);
+        }
+
+        sweep_temp_files(&paths.local_jit, &mut report);
+
+        Ok(report)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::CommandExecutor;
     use crate::storage::claim_coordinator::Lease;
     // Test helpers below load identity with explicit paths and don't surface
     // warnings; the production paths use the `_with_warnings` variant instead.
@@ -768,104 +763,46 @@ mod tests {
 
     // Use shared test utilities
     use crate::test_utils::{
-        create_test_paths, grow_event_log_beyond, setup_test_repo, CurrentDirGuard,
+        create_test_paths, grow_event_log_beyond, setup_test_repo, setup_test_repo_with_config,
     };
 
-    /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
+    /// Production claim entry points resolve the branch through git, so the
+    /// fixture's synthetic `.git` directory becomes a real checkout once.
+    fn ensure_git_checkout(temp: &TempDir) -> Result<()> {
+        if temp.path().join(".git/HEAD").exists() {
+            return Ok(());
+        }
+        crate::test_cli::init_git_repository_with_commit(temp.path())
+    }
+
     fn execute_claim_acquire_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
-        issue_id: &str,
+        issue_id: &IssueId,
         ttl_secs: u64,
         agent_id: &str,
-    ) -> Result<String> {
-        // Resolve short ID to full ID
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-
-        // Validate issue exists
-        let _issue = storage.load_issue(&full_id)?;
-
-        // Get test paths
-        let paths = create_test_paths(temp);
-
-        // Get or create worktree identity
-        let branch = "test-branch".to_string();
-        let identity = load_or_create_worktree_identity(&paths, &branch)?;
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            identity.worktree_id.clone(),
-            agent_id.to_string(),
-        );
-        coordinator.init()?;
-
-        // Acquire claim
-        let lease = coordinator.acquire_claim(issue_id, ttl_secs)?;
-        Ok(lease.lease_id)
+    ) -> Result<LeaseId> {
+        ensure_git_checkout(temp)?;
+        CommandExecutor::new(storage.clone())
+            .with_worktree_paths(create_test_paths(temp))
+            .claims()
+            .acquire(issue_id, ttl_secs, Some(agent_id), Some("test lease"))
+            .map(|(lease_id, _)| lease_id)
     }
 
-    /// Execute claim release with manually constructed paths (for testing)
-    fn execute_claim_release_test(temp: &TempDir, lease_id: &str, agent_id: &str) -> Result<()> {
-        let paths = create_test_paths(temp);
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), agent_id.to_string());
-
-        // Release lease
-        coordinator.release_lease(lease_id)?;
-        Ok(())
-    }
-
-    /// Execute claim release-by-issue with manually constructed paths (for testing).
-    ///
-    /// Mirrors [`execute_claim_release_by_issue`] but takes explicit test paths
-    /// and an explicit actor (simulating the resolved identity) so tests can act
-    /// as an arbitrary identity without touching `JIT_AGENT_ID` / config.
     fn execute_claim_release_by_issue_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
-        issue_id: &str,
+        issue_id: &IssueId,
         actor: &str,
     ) -> Result<ReleasedLeaseInfo> {
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let paths = create_test_paths(temp);
-
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.to_string());
-        coordinator.init()?;
-
-        let leases =
-            coordinator.get_active_leases(Some(&IssueIdPrefix::of_stored(&full_id)), None)?;
-
-        let released = leases
-            .into_iter()
-            .map(|lease| {
-                let reason = format!("released by {} via claim release", actor);
-                coordinator.force_evict_lease(&lease.lease_id, &reason)?;
-                Ok(ReleasedLeaseInfo {
-                    lease_id: lease.lease_id,
-                    issue_id: lease.issue_id,
-                    previous_owner: lease.agent_id,
-                    actor: actor.to_string(),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        released.into_iter().next_back().ok_or_else(|| {
-            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id)).into()
-        })
+        ensure_git_checkout(temp)?;
+        let actor = actor.parse()?;
+        CommandExecutor::new(storage.clone())
+            .with_worktree_paths(create_test_paths(temp))
+            .claims()
+            .release_by_issue_with_actor(issue_id, |_| Ok(actor))
+            .map(|(info, _)| info)
     }
 
     /// Assert a string satisfies the agent-identity invariant: has a `:`,
@@ -929,8 +866,22 @@ mod tests {
 
     #[test]
     fn test_release_by_issue_succeeds_for_different_actor() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Agent A acquires the lease.
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
@@ -952,8 +903,22 @@ mod tests {
 
     #[test]
     fn test_release_by_issue_records_actor_in_audit_trail() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
         execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:auditor")?;
@@ -973,8 +938,22 @@ mod tests {
 
     #[test]
     fn test_release_by_issue_errors_when_no_active_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Unclaimed Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Unclaimed Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         let result = execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:actor");
 
@@ -988,101 +967,50 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_release_by_issue_resolves_short_id() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
-
-        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
-
-        // Use a short prefix of the issue id.
-        let short_id = &issue_id[..8];
-        let released =
-            execute_claim_release_by_issue_test(&temp, &storage, short_id, "agent:actor")?;
-
-        assert_eq!(released.issue_id, issue_id);
-        assert_eq!(execute_claim_list_test(&temp)?.len(), 0);
-        Ok(())
-    }
-
-    /// Execute claim status with manually constructed paths (for testing)
+    /// The leases `jit claim status` reports for explicit filters.
     fn execute_claim_status_test(
         temp: &TempDir,
-        issue_id: Option<&str>,
+        issue_id: Option<&crate::domain::identity::IssueId>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
-        let paths = create_test_paths(temp);
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".to_string(),
-            agent_id.unwrap_or("agent:test").to_string(),
-        );
-
-        // Initialize coordinator (creates directories)
-        coordinator.init()?;
-
-        // Get active leases
-        let leases = coordinator
-            .get_active_leases(issue_id.map(IssueIdPrefix::of_stored).as_ref(), agent_id)?;
-        Ok(leases)
-    }
-
-    /// Helper to create a test issue
-    fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
-        let layout = storage.configured_layout()?;
-        CommandExecutor::new(storage.clone())
-            .with_layout(layout)
-            .issues()
-            .create_issue(
-                title.to_string(),
-                "Test description".to_string(),
-                crate::domain::Priority::Normal,
-                Vec::new(),
-                Vec::new(),
-                None,
-                None,
-                false,
-            )
-            .map(|(id, _)| id)
+        Ok(unexpired_leases(
+            &create_test_paths(temp),
+            issue_id.map(IssueIdPrefix::from).as_ref(),
+            agent_id,
+        )?
+        .into_iter()
+        .map(|listed| listed.lease)
+        .collect())
     }
 
     /// Seed an exact identifier precondition for short-id collision tests.
     fn create_test_issue_with_id(
         storage: &JsonFileStorage,
-        id: &str,
+        id: &IssueId,
         title: &str,
-    ) -> Result<String> {
+    ) -> Result<IssueId> {
         let mut issue =
             crate::test_utils::fixture_issue(title.to_string(), "Test description".to_string());
-        issue.id = id.to_string();
+        issue.id = id.clone();
         let issue_bytes = crate::repository_state::serialize_issue(&issue)?;
-        std::fs::write(
-            storage.root().join("issues").join(format!("{id}.json")),
-            issue_bytes,
-        )?;
-
-        let index_path = storage.root().join("index.json");
-        let mut index =
-            crate::repository_state::RepositoryIndex::parse(&std::fs::read(&index_path)?)?;
-        index.all_ids.push(id.to_string());
-        index.all_ids.sort();
-        index.all_ids.dedup();
-        index.deleted_ids.retain(|deleted| deleted != id);
-        std::fs::write(index_path, index.to_pretty_bytes()?)?;
-        Ok(id.to_string())
+        let issue_path = storage
+            .repository_layout()?
+            .resolve(&crate::repository_state::VirtualPath::issue_record(id))?;
+        std::fs::write(issue_path, issue_bytes)?;
+        Ok(id.clone())
     }
 
     #[test]
     fn test_claim_acquire_fails_when_issue_does_not_exist() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
 
-        let result = execute_claim_acquire_test(&temp, &storage, "nonexistent", 600, "agent:test");
+        let result = execute_claim_acquire_test(
+            &temp,
+            &storage,
+            &crate::test_utils::issue_id(0x96bf_59db_932e_7f49_ee5c_c6bb_5a1f_6645),
+            600,
+            "agent:test",
+        );
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1092,25 +1020,53 @@ mod tests {
 
     #[test]
     fn test_claim_acquire_returns_valid_lease_id() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         let result = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test");
 
         assert!(result.is_ok());
         let lease_id = result.unwrap();
-        assert!(!lease_id.is_empty());
-        assert!(lease_id.len() >= 32);
+        assert!(!lease_id.as_str().is_empty());
+        assert!(lease_id.as_str().len() >= 32);
         Ok(())
     }
 
     #[test]
     fn test_claim_acquire_accepts_different_ttl_values() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
 
         let ttls = [60, 600, 3600, 0];
         for (i, ttl) in ttls.iter().enumerate() {
-            let issue_id = create_test_issue(&storage, &format!("Issue {}", i))?;
+            let issue_id = executor
+                .issues()
+                .create_issue(
+                    format!("Issue {}", i),
+                    "Test description".to_string(),
+                    crate::domain::Priority::Normal,
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    None,
+                    false,
+                )?
+                .issue
+                .id;
             let result = execute_claim_acquire_test(
                 &temp,
                 &storage,
@@ -1125,8 +1081,22 @@ mod tests {
 
     #[test]
     fn test_claim_acquire_fails_when_already_claimed() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // First claim succeeds
         let first = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first");
@@ -1142,8 +1112,22 @@ mod tests {
 
     #[test]
     fn test_claim_acquire_creates_control_plane_structure() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
@@ -1154,8 +1138,22 @@ mod tests {
 
     #[test]
     fn test_claim_acquire_creates_claims_log() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
@@ -1164,14 +1162,28 @@ mod tests {
 
         let content = fs::read_to_string(&claims_log)?;
         assert!(!content.is_empty());
-        assert!(content.contains(&issue_id));
+        assert!(content.contains(issue_id.as_str()));
         Ok(())
     }
 
     #[test]
     fn test_claim_acquire_creates_worktree_identity() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
@@ -1187,7 +1199,7 @@ mod tests {
     /// Helper to execute claim renew in tests
     fn execute_claim_renew_test(
         temp: &TempDir,
-        lease_id: &str,
+        issue_id: &IssueId,
         extension_secs: u64,
         agent_id: &str,
     ) -> Result<Lease> {
@@ -1200,33 +1212,35 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let coordinator =
-            ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.to_string());
+            ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.parse()?);
 
-        coordinator.renew_lease(lease_id, extension_secs)
+        coordinator.renew_lease(issue_id, extension_secs)
     }
 
     // Tests for claim renew command
     #[test]
     fn test_claim_renew_extends_ttl() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire a claim
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
-        // Get original lease
-        let paths = create_test_paths(&temp);
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".to_string(),
-            "agent:test".to_string(),
-        );
-        let original = coordinator
-            .get_active_leases(None, None)?
+        let original = execute_claim_list_test(&temp)?
             .into_iter()
             .find(|l| l.lease_id == lease_id)
             .unwrap();
@@ -1235,7 +1249,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(10));
 
         // Renew with 1200 second extension
-        let renewed = execute_claim_renew_test(&temp, &lease_id, 1200, "agent:test")?;
+        let renewed = execute_claim_renew_test(&temp, &issue_id, 1200, "agent:test")?;
 
         assert_eq!(renewed.lease_id, lease_id);
         // Note: ttl_secs stays the same (original 600), but expires_at is extended by extension_secs
@@ -1253,7 +1267,8 @@ mod tests {
         let control_plane = temp.path().join(".git/jit");
         fs::create_dir_all(control_plane.join("locks"))?;
 
-        let result = execute_claim_renew_test(&temp, "fake-lease-id", 600, "agent:test");
+        let result =
+            execute_claim_renew_test(&temp, &crate::test_utils::issue_id(7), 600, "agent:test");
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1268,14 +1283,28 @@ mod tests {
 
     #[test]
     fn test_claim_renew_fails_for_wrong_agent() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire with agent1
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Try to renew with agent2
-        let result = execute_claim_renew_test(&temp, &lease_id, 600, "agent:second");
+        let result = execute_claim_renew_test(&temp, &issue_id, 600, "agent:second");
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not agent:second"));
@@ -1285,17 +1314,31 @@ mod tests {
 
     #[test]
     fn test_claim_renew_indefinite_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire indefinite lease (TTL=0)
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:test")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:test")?;
 
         // Sleep to ensure heartbeat changes
         std::thread::sleep(Duration::from_millis(10));
 
         // Renew indefinite lease
-        let renewed = execute_claim_renew_test(&temp, &lease_id, 0, "agent:test")?;
+        let renewed = execute_claim_renew_test(&temp, &issue_id, 0, "agent:test")?;
 
         assert_eq!(renewed.ttl_secs, 0);
         assert!(renewed.expires_at.is_none());
@@ -1306,40 +1349,29 @@ mod tests {
 
     // Tests for claim release command
     #[test]
-    fn test_claim_release_fails_with_invalid_lease_id() -> Result<()> {
-        let (temp, _storage) = setup_test_repo()?;
-
-        let result = execute_claim_release_test(&temp, "invalid-lease-id", "agent:test");
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_release_succeeds_for_valid_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
-
-        // Acquire a claim first
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
-
-        // Release it
-        let result = execute_claim_release_test(&temp, &lease_id, "agent:test");
-
-        assert!(result.is_ok(), "Should successfully release valid lease");
-        Ok(())
-    }
-
-    #[test]
     fn test_claim_release_allows_re_acquisition_after_release() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire claim
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Release it
-        execute_claim_release_test(&temp, &lease_id, "agent:first")?;
+        execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:first")?;
 
         // Should be able to acquire again
         let second_lease =
@@ -1363,8 +1395,22 @@ mod tests {
 
     #[test]
     fn test_status_with_active_leases() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire a lease
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
@@ -1381,9 +1427,36 @@ mod tests {
 
     #[test]
     fn test_status_filter_by_issue() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue1 = create_test_issue(&storage, "Issue 1")?;
-        let issue2 = create_test_issue(&storage, "Issue 2")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue1 = executor
+            .issues()
+            .create_issue(
+                "Issue 1".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue2 = executor
+            .issues()
+            .create_issue(
+                "Issue 2".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire leases on both issues
         execute_claim_acquire_test(&temp, &storage, &issue1, 600, "agent:test")?;
@@ -1400,8 +1473,22 @@ mod tests {
 
     #[test]
     fn test_status_filter_by_agent() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire lease with specific agent
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:other-agent")?;
@@ -1417,7 +1504,7 @@ mod tests {
         assert!(result.is_ok());
         let leases = result.unwrap();
         assert_eq!(leases.len(), 1);
-        assert_eq!(leases[0].agent_id, "agent:other-agent");
+        assert_eq!(leases[0].agent_id.to_string(), "agent:other-agent");
         Ok(())
     }
 
@@ -1435,10 +1522,50 @@ mod tests {
 
     #[test]
     fn test_list_shows_all_leases() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue1 = create_test_issue(&storage, "Issue 1")?;
-        let issue2 = create_test_issue(&storage, "Issue 2")?;
-        let issue3 = create_test_issue(&storage, "Issue 3")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue1 = executor
+            .issues()
+            .create_issue(
+                "Issue 1".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue2 = executor
+            .issues()
+            .create_issue(
+                "Issue 2".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue3 = executor
+            .issues()
+            .create_issue(
+                "Issue 3".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire leases with different agents
         execute_claim_acquire_test(&temp, &storage, &issue1, 600, "agent:alice")?;
@@ -1452,7 +1579,7 @@ mod tests {
         assert_eq!(leases.len(), 3);
 
         // Verify all agents are present
-        let agents: Vec<String> = leases.iter().map(|l| l.agent_id.clone()).collect();
+        let agents: Vec<String> = leases.iter().map(|l| l.agent_id.to_string()).collect();
         assert!(agents.contains(&"agent:alice".to_string()));
         assert!(agents.contains(&"agent:bob".to_string()));
         assert!(agents.contains(&"agent:charlie".to_string()));
@@ -1462,9 +1589,36 @@ mod tests {
 
     #[test]
     fn test_list_excludes_expired_leases() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue1 = create_test_issue(&storage, "Issue 1")?;
-        let issue2 = create_test_issue(&storage, "Issue 2")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue1 = executor
+            .issues()
+            .create_issue(
+                "Issue 1".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue2 = executor
+            .issues()
+            .create_issue(
+                "Issue 2".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire one lease with very short TTL (will expire)
         execute_claim_acquire_test(&temp, &storage, &issue1, 0, "agent:expired")?;
@@ -1486,39 +1640,113 @@ mod tests {
         Ok(())
     }
 
-    /// Helper to execute claim list in tests
+    /// The leases `jit claim list` reports.
     fn execute_claim_list_test(temp: &TempDir) -> Result<Vec<Lease>> {
-        let paths = create_test_paths(temp);
+        Ok(unexpired_leases(&create_test_paths(temp), None, None)?
+            .into_iter()
+            .map(|listed| listed.lease)
+            .collect())
+    }
 
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".to_string(),
-            "system:list".to_string(),
+    #[test]
+    fn test_list_and_status_omit_expired_and_mark_stale_leases_without_a_lock_or_a_write(
+    ) -> Result<()> {
+        use crate::storage::clock::FixedClock;
+        use crate::test_lease_store::history_path;
+
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        ensure_git_checkout(&temp)?;
+        let paths = create_test_paths(&temp);
+        let expired_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef77);
+        let stale_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef78);
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
+        let past = ClaimCoordinator::new(
+            paths.clone(),
+            FileLocker::new(Duration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
+            "wt:test".parse()?,
+            "agent:test".parse()?,
+        )
+        .with_clock(std::sync::Arc::new(FixedClock::new(
+            chrono::Utc::now() - chrono::Duration::seconds(threshold + 60),
+        )));
+        let acquire = |issue_id, ttl_secs| {
+            past.acquire_claim_synchronized(
+                issue_id,
+                ttl_secs,
+                Some("test lease"),
+                ClaimAcquireLimits::new(1, 1),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease)
+        };
+        acquire(&expired_id, 60)?;
+        let stale = acquire(&stale_id, 0)?;
+        let store = || -> Result<(Vec<Lease>, Vec<u8>)> {
+            Ok((
+                crate::storage::claim_coordinator::read_leases(&paths)?,
+                fs::read(history_path(&paths.shared_jit))?,
+            ))
+        };
+        let before = store()?;
+        let _held = FileLocker::new(Duration::from_millis(1))
+            .try_lock_exclusive(&paths.shared_jit.join("locks/claims.lock"))?
+            .expect("no claim operation is running");
+        let executor = executor.with_worktree_paths(paths.clone());
+        let status = |issue_id| {
+            executor
+                .claims()
+                .status(Some(&IssueIdPrefix::from(issue_id)), None)
+        };
+        let marked = ListedLease {
+            lease: stale,
+            stale: true,
+        };
+
+        let listed = executor.claims().list()?;
+
+        assert_eq!(listed, vec![marked.clone()]);
+        assert_eq!(status(&stale_id)?, vec![marked]);
+        assert!(status(&expired_id)?.is_empty());
+        assert_eq!(store()?, before);
+        assert_eq!(
+            crate::storage::worktree_identity::read_worktree_id(&paths)?,
+            None,
+            "reads record no worktree identity"
         );
-        coordinator.init()?;
-
-        coordinator.get_active_leases(None, None)
+        Ok(())
     }
 
     // Tests for claim force-evict command
     #[test]
     fn test_force_evict_removes_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire a lease
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
         // Verify lease exists
         let leases_before = execute_claim_list_test(&temp)?;
         assert_eq!(leases_before.len(), 1);
 
         // Force evict it
-        let result = execute_claim_force_evict_test(&temp, &lease_id, "Test eviction");
+        let result = execute_claim_force_evict_test(&temp, &issue_id, "Test eviction");
         assert!(result.is_ok(), "Force evict should succeed");
 
         // Verify lease is gone
@@ -1536,7 +1764,8 @@ mod tests {
         let control_plane = temp.path().join(".git/jit");
         fs::create_dir_all(control_plane.join("locks"))?;
 
-        let result = execute_claim_force_evict_test(&temp, "fake-lease-id", "Test reason");
+        let result =
+            execute_claim_force_evict_test(&temp, &crate::test_utils::issue_id(7), "Test reason");
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1551,14 +1780,28 @@ mod tests {
 
     #[test]
     fn test_force_evict_allows_re_acquisition() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Agent 1 acquires
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Admin evicts
-        execute_claim_force_evict_test(&temp, &lease_id, "Admin intervention")?;
+        execute_claim_force_evict_test(&temp, &issue_id, "Admin intervention")?;
 
         // Agent 2 should be able to acquire
         let result = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:second");
@@ -1570,22 +1813,17 @@ mod tests {
         Ok(())
     }
 
-    /// Helper to execute force evict in tests
-    fn execute_claim_force_evict_test(temp: &TempDir, lease_id: &str, reason: &str) -> Result<()> {
-        let paths = create_test_paths(temp);
-
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".to_string(),
-            "system:admin".to_string(),
-        );
-        coordinator.init()?;
-
-        coordinator.force_evict_lease(lease_id, reason)
+    fn execute_claim_force_evict_test(
+        temp: &TempDir,
+        issue_id: &IssueId,
+        reason: &str,
+    ) -> Result<()> {
+        ensure_git_checkout(temp)?;
+        CommandExecutor::new(JsonFileStorage::new(temp.path().join(".jit")))
+            .with_worktree_paths(create_test_paths(temp))
+            .claims()
+            .force_evict(&IssueIdPrefix::from(issue_id), reason)
+            .map(drop)
     }
 
     #[test]
@@ -1593,13 +1831,8 @@ mod tests {
         // Create a temp directory that's NOT a git repo
         let temp = TempDir::new().unwrap();
 
-        // Change to non-git directory
-        let result = {
-            let _cwd = CurrentDirGuard::new(&temp).unwrap();
-
-            // get_current_branch() should return an error, not "main"
-            get_current_branch(temp.path())
-        };
+        // get_current_branch() should return an error, not "main"
+        let result = get_current_branch(temp.path());
 
         // Should fail, not return "main" as fallback
         assert!(
@@ -1611,74 +1844,12 @@ mod tests {
     // REQ-04's "git repository with no commits" gap is covered at the CLI
     // level in `claim_integration_tests.rs`
     // (`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`
-    // and its `--json` counterpart), not here: those spawn `jit` as a
-    // subprocess with its own `current_dir`, so they don't race with this
-    // module's other tests over the process-wide working directory the way a
-    // unit-level `std::env::set_current_dir` test would.
+    // and its `--json` counterpart), not here: the gap is the CLI's hint.
 
     // --- REQ-02: coordinator-held acquire synchronization + crash convergence -
 
-    /// Acquire through the production synchronized path with explicit test paths,
-    /// exercising the real coordinator-held repository synchronization.
-    fn execute_claim_acquire_synchronized_test(
-        temp: &TempDir,
-        storage: &JsonFileStorage,
-        issue_id: &str,
-        ttl_secs: u64,
-        agent_id: &str,
-    ) -> Result<String> {
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let paths = create_test_paths(temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id.clone(),
-            agent_id.to_string(),
-        );
-        coordinator.init()?;
-        let agent: crate::domain::Assignee = agent_id.parse()?;
-        let worktree_root = paths.worktree_root.clone();
-        let data_root = storage.root().to_path_buf();
-        let (lease, ()) = coordinator.acquire_claim_synchronized(
-            &full_id,
-            ttl_secs,
-            None,
-            ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
-            |_lease| {
-                super::synchronize_claim_repository_state(
-                    storage,
-                    &worktree_root,
-                    &data_root,
-                    &full_id,
-                    &agent,
-                )
-            },
-        )?;
-        Ok(lease.lease_id)
-    }
-
-    fn persist_legacy_claim(temp: &TempDir, issue_id: &str, agent_id: &str) -> Result<Lease> {
-        let paths = create_test_paths(temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            FileLocker::new(Duration::from_secs(
-                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-            )),
-            identity.worktree_id,
-            agent_id.to_string(),
-        );
-        coordinator.init()?;
-        coordinator.acquire_claim(issue_id, 600)
-    }
-
     /// Count claim events for one issue by a given agent in the event log.
-    fn claim_events_for(storage: &JsonFileStorage, full_id: &str, agent: &str) -> usize {
+    fn claim_events_for(storage: &JsonFileStorage, full_id: &IssueId, agent: &str) -> usize {
         let agent: crate::domain::Assignee = agent.parse().unwrap();
         storage
             .read_events()
@@ -1686,8 +1857,8 @@ mod tests {
             .into_iter()
             .filter(|event| {
                 matches!(
-                    event,
-                    crate::domain::Event::IssueClaimed { issue_id, assignee, .. }
+                    event.body(),
+                    crate::domain::EventBody::IssueClaimed { issue_id, assignee, .. }
                         if issue_id == full_id && assignee == &agent
                 )
             })
@@ -1696,17 +1867,25 @@ mod tests {
 
     #[test]
     fn test_claim_acquire_synchronized_publishes_issue_and_event() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Sync Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Sync Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
-        let lease_id = execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &issue_id,
-            600,
-            "agent:worker",
-        )?;
-        assert!(!lease_id.is_empty());
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        assert!(!lease_id.as_str().is_empty());
 
         // Issue is assigned with a stamped claimed_at, and exactly one claim event
         // was appended in the same publication (@/inv/event-log).
@@ -1721,29 +1900,50 @@ mod tests {
     }
 
     #[test]
-    fn test_claim_acquire_idempotent_over_split_and_full_reflection() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Split Issue")?;
+    fn test_claim_acquire_appends_one_event_per_assignee_change() -> Result<()> {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Reclaimed Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let acquire =
+            || execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker");
 
-        // First acquire publishes the assigned issue and its claim event in one
-        // redo record.
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        acquire()?;
+        acquire()?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
-        assert!(storage.load_issue(&issue_id)?.assignee.is_some());
 
-        // Simulate a crash that left the issue assigned but lost its claim event
-        // (the split state the old save-then-append path could produce).
-        std::fs::write(storage.root().join("events.jsonl"), b"")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 0);
+        executor
+            .issues()
+            .unassign_issue(&IssueIdPrefix::from(&issue_id))?;
+        acquire()?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 2);
+        Ok(())
+    }
 
-        // The retry emits EXACTLY the missing event (the issue is already assigned).
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+    #[test]
+    fn test_claim_capture_spec_requests_only_the_issue_record_and_the_log_tail() -> Result<()> {
+        use crate::repository_state::{ReadMode, VirtualPath};
 
-        // A further acquire by the same agent/worktree is a complete no-op: the
-        // convergent transition never emits a duplicate event.
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        let issue_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef12);
+        let record = VirtualPath::issue_record(&issue_id);
+        let spec = super::claim_capture_spec(&issue_id)?;
+
+        assert_eq!(spec.paths().count(), 2);
+        assert_eq!(spec.read_mode(&record), Some(ReadMode::Whole));
+        assert_eq!(spec.read_mode(&VirtualPath::EVENTS), Some(ReadMode::Tail));
         Ok(())
     }
 
@@ -1754,11 +1954,25 @@ mod tests {
     #[test]
     fn test_claim_acquire_synchronized_succeeds_over_an_event_log_past_the_former_ceiling(
     ) -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Long History Issue")?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Long History Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
         grow_event_log_beyond(&storage, 16 * 1024 * 1024)?;
 
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
 
         assert_eq!(
             storage
@@ -1773,137 +1987,21 @@ mod tests {
     }
 
     #[test]
-    fn test_claim_acquire_reuses_uniquely_resolved_legacy_short_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let first_id = create_test_issue_with_id(
-            &storage,
-            "abcdef12-3000-4000-8000-000000000001",
-            "First shared-prefix issue",
-        )?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-4000-4000-8000-000000000002",
-            "Second shared-prefix issue",
-        )?;
-        let legacy = persist_legacy_claim(&temp, "abcdef12-3", "agent:worker")?;
-
-        let acquired = execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &first_id,
-            600,
-            "agent:worker",
-        )?;
-
-        assert_eq!(acquired, legacy.lease_id);
-        assert_eq!(execute_claim_list_test(&temp)?.len(), 1);
-        assert_eq!(claim_events_for(&storage, &first_id, "agent:worker"), 1);
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_acquire_rejects_ambiguous_persisted_short_lease_without_mutation() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let first_id = create_test_issue_with_id(
-            &storage,
-            "abcdef12-3000-4000-8000-000000000001",
-            "First shared-prefix issue",
-        )?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-4000-4000-8000-000000000002",
-            "Second shared-prefix issue",
-        )?;
-
-        persist_legacy_claim(&temp, "abcdef12", "agent:worker")?;
-
-        let paths = create_test_paths(&temp);
-        let log_path = paths.shared_jit.join("claims.jsonl");
-        let index_path = paths.shared_jit.join("claims.index.json");
-        let log_before = fs::read(&log_path)?;
-        let index_before = fs::read(&index_path)?;
-
-        let result = execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &first_id,
-            600,
-            "agent:worker",
-        );
-
-        let error = result.expect_err("ambiguous persisted short lease must reject acquisition");
-        let error_chain = format!("{error:#}");
-        assert!(
-            error_chain.to_lowercase().contains("ambiguous"),
-            "resolution error should be explicit: {error_chain}"
-        );
-        assert_eq!(
-            fs::read(&log_path)?,
-            log_before,
-            "claim log must not change"
-        );
-        assert_eq!(
-            fs::read(&index_path)?,
-            index_before,
-            "claims index must not change"
-        );
-        assert!(storage.load_issue(&first_id)?.assignee.is_none());
-        assert_eq!(claim_events_for(&storage, &first_id, "agent:worker"), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_acquire_ignores_unrelated_ambiguous_persisted_short_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-3000-4000-8000-000000000001",
-            "First shared-prefix issue",
-        )?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-4000-4000-8000-000000000002",
-            "Second shared-prefix issue",
-        )?;
-        let unrelated_id = create_test_issue_with_id(
-            &storage,
-            "12345678-9000-4000-8000-000000000003",
-            "Unrelated issue",
-        )?;
-        persist_legacy_claim(&temp, "abcdef12", "agent:worker")?;
-
-        execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &unrelated_id,
-            600,
-            "agent:worker",
-        )?;
-
-        let leases = execute_claim_list_test(&temp)?;
-        assert_eq!(leases.len(), 2);
-        assert!(leases.iter().any(|lease| lease.issue_id == "abcdef12"));
-        assert!(leases.iter().any(|lease| lease.issue_id == unrelated_id));
-        assert_eq!(claim_events_for(&storage, &unrelated_id, "agent:worker"), 1);
-        Ok(())
-    }
-
-    #[test]
     fn test_claim_acquire_distinguishes_full_ids_with_shared_prefix() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
         let first_id = create_test_issue_with_id(
             &storage,
-            "abcdef12-3000-4000-8000-000000000001",
+            &crate::test_utils::issue_id(0x3000_4000_8000_0000_0000_0001_abcd_ef12),
             "First shared-prefix issue",
         )?;
         let second_id = create_test_issue_with_id(
             &storage,
-            "abcdef12-4000-4000-8000-000000000002",
+            &crate::test_utils::issue_id(0x4000_4000_8000_0000_0000_0002_abcd_ef12),
             "Second shared-prefix issue",
         )?;
-        persist_legacy_claim(&temp, &first_id, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &first_id, 600, "agent:worker")?;
 
-        execute_claim_acquire_synchronized_test(&temp, &storage, &second_id, 600, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &second_id, 600, "agent:worker")?;
 
         let leases = execute_claim_list_test(&temp)?;
         assert_eq!(leases.len(), 2);
@@ -1917,34 +2015,36 @@ mod tests {
     fn test_claim_acquire_rejects_reverse_guard_order() -> Result<()> {
         use crate::storage::{discover_repository_layout, RepositoryStateStore};
 
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Reverse Order")?;
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&issue_id)?)?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Reverse Order".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let full_id = issue_id.clone();
 
+        ensure_git_checkout(&temp)?;
         let paths = create_test_paths(&temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id,
-            "agent:worker".to_string(),
-        );
-        coordinator.init()?;
 
         // Hold a repository mutation session, THEN attempt to coordinate: reverse
         // acquisition is rejected before any coordinator lock is taken.
         let layout = discover_repository_layout(&paths.worktree_root, storage.root()).unwrap();
         let _session = storage.open_mutation_session(layout).unwrap();
-        let result = coordinator.acquire_claim_synchronized(
+        let result = executor.with_worktree_paths(paths).claims().acquire(
             &full_id,
             600,
+            Some("agent:worker"),
             None,
-            ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
-            |_lease| Ok(()),
         );
         assert!(result.is_err(), "reverse guard order must be rejected");
         let message = result.unwrap_err().to_string();
@@ -1957,43 +2057,24 @@ mod tests {
 
     #[test]
     fn test_release_renew_heartbeat_never_touch_repository_state() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Coordinator Only")?;
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&issue_id)?)?;
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        let storage = executor.storage().clone();
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Coordinator Only".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
-        let paths = create_test_paths(&temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id.clone(),
-            "agent:worker".to_string(),
-        );
-        coordinator.init()?;
-        let agent: crate::domain::Assignee = "agent:worker".parse().unwrap();
-        let worktree_root = paths.worktree_root.clone();
-        let data_root = storage.root().to_path_buf();
-
-        // Acquire an indefinite lease (claims the issue via the synchronized path).
-        let (lease, ()) = coordinator.acquire_claim_synchronized(
-            &full_id,
-            0,
-            Some("manual oversight"),
-            ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
-            |_lease| {
-                super::synchronize_claim_repository_state(
-                    &storage,
-                    &worktree_root,
-                    &data_root,
-                    &full_id,
-                    &agent,
-                )
-            },
-        )?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:worker")?;
 
         // Snapshot repository-owned state after the acquire.
         let issue_before = storage.load_issue(&issue_id)?;
@@ -2001,9 +2082,19 @@ mod tests {
 
         // Coordinator-only operations (heartbeat, renew, force-evict/release) never
         // open a repository session, so they cannot mutate the issue or event log.
-        coordinator.heartbeat(&lease.lease_id)?;
-        coordinator.renew_lease(&lease.lease_id, 0)?;
-        coordinator.force_evict_lease(&lease.lease_id, "released")?;
+        let paths = create_test_paths(&temp);
+        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            FileLocker::new(Duration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
+            identity.worktree_id,
+            "agent:worker".parse()?,
+        );
+        coordinator.heartbeat(&issue_id)?;
+        coordinator.renew_lease(&issue_id, 0)?;
+        execute_claim_force_evict_test(&temp, &issue_id, "released")?;
 
         let issue_after = storage.load_issue(&issue_id)?;
         let events_after = storage.read_events()?;
@@ -2014,6 +2105,53 @@ mod tests {
             events_after.len(),
             "coordinator-only operations must not append repository events"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_recover_removes_stale_lease_stage_files_and_keeps_lease_records() -> Result<()> {
+        use crate::storage::WorktreePaths;
+        let (temp, storage) = setup_test_repo()?;
+        ensure_git_checkout(&temp)?;
+        let leased = crate::test_utils::issue_id(1);
+        let shared_jit = create_test_paths(&temp).shared_jit;
+        let now = chrono::Utc::now();
+        crate::test_lease_store::plant_lease(
+            &shared_jit,
+            &Lease {
+                lease_id: "00000000-0000-4000-8000-000000000001".parse()?,
+                issue_id: leased.clone(),
+                agent_id: "agent:holder".parse()?,
+                worktree_id: "wt:holder".parse()?,
+                branch: None,
+                ttl_secs: 600,
+                acquired_at: now,
+                expires_at: Some(now + chrono::Duration::seconds(600)),
+                last_beat: now,
+            },
+        )?;
+        let record = WorktreePaths::lease_path(&shared_jit, &leased);
+        let stale_stage = WorktreePaths::lease_stage_path(&shared_jit, &leased);
+        let fresh_stage =
+            WorktreePaths::lease_stage_path(&shared_jit, &crate::test_utils::issue_id(2));
+        fs::write(&stale_stage, "interrupted")?;
+        fs::write(&fresh_stage, "in flight")?;
+        let past_threshold = std::time::SystemTime::now()
+            - Duration::from_secs(crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS + 60);
+        for aged in [&record, &stale_stage] {
+            fs::File::options()
+                .write(true)
+                .open(aged)?
+                .set_modified(past_threshold)?;
+        }
+
+        let report = CommandExecutor::new(storage.clone())
+            .with_worktree_paths(create_test_paths(&temp))
+            .claims()
+            .recover()?;
+
+        assert!(!stale_stage.exists(), "{report:?}");
+        assert!(fresh_stage.exists() && record.exists(), "{report:?}");
         Ok(())
     }
 }

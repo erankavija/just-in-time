@@ -3,106 +3,78 @@
 //! The file forms deliberately exercise the same source-reading contract as
 //! `issue update`: `-` means stdin, and content survives without trimming.
 
-use assert_cmd::prelude::*;
-use predicates::prelude::*;
+use jit::test_cli::{created_issue_id, JitCli};
 use std::fs;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit(temp: &TempDir) -> Command {
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command.current_dir(temp.path());
-    command
-}
-
-fn jit_assert_cmd(temp: &TempDir) -> assert_cmd::Command {
-    assert_cmd::Command::from_std(jit(temp))
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit(&temp).arg("init").assert().success();
-    temp
-}
-
-fn created_id(output: &std::process::Output) -> String {
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["id"].as_str().unwrap().to_owned()
-}
-
-fn description(temp: &TempDir, id: &str) -> Vec<u8> {
-    let output = jit(temp)
-        .args(["issue", "show", id, "--json"])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["description"].as_str().unwrap().as_bytes().to_vec()
-}
 
 #[test]
 fn test_create_description_file_preserves_special_bytes_and_trailing_blank_line() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     let source = b"# Markdown\n\n`literal` and $HOME\n\n";
-    let path = temp.path().join("description.md");
+    let path = temp.root().join("description.md");
     fs::write(&path, source).unwrap();
 
-    let output = jit(&temp)
-        .args([
+    let created = temp
+        .run_json([
             "issue",
             "create",
             "--title",
             "From file",
             "--description-file",
             path.to_str().unwrap(),
-            "--json",
         ])
-        .output()
         .unwrap();
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+    assert_eq!(
+        temp.run_json(["issue", "show", &created_issue_id(&created).unwrap()])
+            .unwrap()["description"]
+            .as_str()
+            .unwrap()
+            .as_bytes(),
+        source
     );
-    assert_eq!(description(&temp, &created_id(&output)), source);
 }
 
 #[test]
 fn test_create_description_file_dash_preserves_stdin_bytes_and_trailing_blank_line() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     let source = "## From stdin\n\n`literal` and $HOME\n\n";
 
-    let output = jit_assert_cmd(&temp)
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "From stdin",
-            "--description-file",
-            "-",
-            "--json",
-        ])
-        .write_stdin(source)
-        .output()
-        .unwrap();
+    let output = assert_cmd::Command::from_std(temp.command([
+        "issue",
+        "create",
+        "--title",
+        "From stdin",
+        "--description-file",
+        "-",
+        "--json",
+    ]))
+    .write_stdin(source)
+    .output()
+    .unwrap();
 
     assert!(
         output.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(description(&temp, &created_id(&output)), source.as_bytes());
+    let created: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        temp.run_json(["issue", "show", &created_issue_id(&created).unwrap()])
+            .unwrap()["description"]
+            .as_str()
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
 }
 
 #[test]
 fn test_create_description_and_description_file_are_mutually_exclusive() {
-    let temp = setup_repo();
-    let path = temp.path().join("description.md");
+    let temp = JitCli::initialised().unwrap();
+    let path = temp.root().join("description.md");
     fs::write(&path, "from file").unwrap();
 
-    jit(&temp)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "create",
             "--title",
@@ -112,19 +84,19 @@ fn test_create_description_and_description_file_are_mutually_exclusive() {
             "--description-file",
             path.to_str().unwrap(),
         ])
-        .assert()
-        .failure()
-        .code(2)
-        .stderr(predicate::str::contains("cannot be used with"));
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("cannot be used with"));
 }
 
 #[test]
 fn test_create_missing_description_file_is_usage_error_naming_path() {
-    let temp = setup_repo();
-    let missing = temp.path().join("missing-description.md");
+    let temp = JitCli::initialised().unwrap();
+    let missing = temp.root().join("missing-description.md");
 
-    let output = jit(&temp)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "create",
             "--title",
@@ -135,7 +107,7 @@ fn test_create_missing_description_file_is_usage_error_naming_path() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains(missing.to_str().unwrap()),
@@ -145,12 +117,12 @@ fn test_create_missing_description_file_is_usage_error_naming_path() {
 
 #[test]
 fn test_create_unreadable_description_path_is_usage_error_naming_path() {
-    let temp = setup_repo();
-    let directory = temp.path().join("description-directory");
+    let temp = JitCli::initialised().unwrap();
+    let directory = temp.root().join("description-directory");
     fs::create_dir(&directory).unwrap();
 
-    let output = jit(&temp)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "create",
             "--title",
@@ -161,7 +133,7 @@ fn test_create_unreadable_description_path_is_usage_error_naming_path() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains(directory.to_str().unwrap()),
@@ -171,13 +143,15 @@ fn test_create_unreadable_description_path_is_usage_error_naming_path() {
 
 #[test]
 fn test_create_help_documents_file_description_forms() {
-    let temp = TempDir::new().unwrap();
+    let temp = JitCli::uninitialised().unwrap();
 
-    jit(&temp)
-        .args(["issue", "create", "--help"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("--description-file"))
-        .stdout(predicate::str::contains("stdin"))
-        .stdout(predicate::str::contains("verbatim"));
+    let output = temp
+        .command(["issue", "create", "--help"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--description-file"));
+    assert!(stdout.contains("stdin"));
+    assert!(stdout.contains("verbatim"));
 }

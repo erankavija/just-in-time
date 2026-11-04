@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3aa8182c599754b6a290a82f33485449c26adc0b",
+  "completed_at": "2026-11-03T03:07:57.835612239Z",
+  "duration_ms": 207177,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All listed document APIs are on DocumentOps, callers use documents(), and recorded cargo-ci passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "985c2b15-b57f-47d5-b21e-6ca6b979667b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2c937351-2549-41f2-96f7-eaf2df0e5633",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T03:04:30.658163999Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: bcd796cf6 (`refactor(jit:985c2b15): move document methods onto a DocumentOps facade`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (parent issue Markdown); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-03T03:03:00Z\nTruncation recovery: reread document.rs in bounded ranges 450–1180 and the cargo-ci registry range 20–64\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All listed document APIs are on DocumentOps, callers use documents(), and recorded cargo-ci passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

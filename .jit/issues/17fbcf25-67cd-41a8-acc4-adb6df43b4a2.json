@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:46:33.794682986Z",
+  "context": {},
+  "created_at": "2026-11-01T14:46:32.965250606Z",
+  "dependencies": [],
+  "description": "Remove the lease check from the git hooks. Leases are enforced when a mutation is written, so the hook is a second check of the same rule at the wrong moment (`@/charter/D-18`, `@/charter/D-20`).\n\n## Background\n\nTesting `aeafc378` with the real pre-commit hook in a strict repository showed the check refuses another session's leased record and also the lead's own closed issue after its lease is released, so a lead's sync commit fails routinely there. The same test found the hook reads an omitted `enforce_leases` key as `off` while `jit config` reports `strict`.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/hooks/pre-commit` and `scripts/hooks/pre-push` no longer check issue leases. Lease enforcement stays at mutation time, with its existing tests. `jq` and agent-identity handling go with it where nothing else needs them.\n- [hard] REQ-02: A strict repository's sync commit passes the real hook, with other sessions' records and the lead's own closed issue in it.\n- [hard] REQ-03: Whatever remains of the hook, such as the global-config divergence check, gets the enforcement mode from `jit`, so the hook and `jit config` cannot disagree, and an omitted key means the same in both. If nothing remaining needs the mode, drop it.\n- [hard] REQ-04: Docs for `enforce_leases`, `scripts/hooks/README.md`, the hooks command and error text state the new scope, including the limit that a hand edit of a record is no longer caught at commit. Net lines are reported, including the mutation check.\n- [hard] REQ-05: In strict mode every command and code path that writes an issue record checks the lease or is a named exemption. Before the hook check goes, `jit dep add` and `jit dep rm` on another agent's leased issue refuse; they wrote the record with exit 0 when tested.\n- [hard] REQ-06: One owning table-driven test names each mutating command and asserts that another agent's lease refuses the write. Exemptions are listed in the table with their reasons: `issue release` (documented timeout recovery with a required reason, and its event records the acting identity and that reason, which a test proves), `issue claim` on an unleased issue (assignment bookkeeping, and it refuses a leased one), and derived promotions of dependents (no lease to check).\n\n## Notes\n\n- If the hook enforces something mutation-time checks do not cover, beyond hand edits, stop and report it to the epic's invoker.\n- 627fdcc4 is to be rejected once this lands, since it rewrites a check that no longer exists, unless its other criteria still apply to something.\n- The worker's test in a strict repository showed the hook was the only check on `dep add`, `dep rm` and `issue release`, so enforcement lands first, then the hook check and the `pre-push` file go, in the same change or in that order. Check whether one choke point at the issue-mutation publish path can replace the roughly 10 `require_active_lease`-style call sites; a forgotten call site is how this gap arose. Take it if it removes lines. If larger, add the missing checks at the commands and report the figures.\n- Any exemption beyond those named goes to the invoker.\n- Behaviour change: in a strict repository, `dep add` and `dep rm` on another agent's leased issue now refuse. Sweep skills and docs for steps wiring dependencies across issues without a lease, and report it to the invoker before landing if leads would hit it constantly.\n\n\n\n## Rulings\n\n- Strict means one rule everywhere, decided by the user: a mutation is refused only when another agent holds an active lease on the issue. One predicate, renamed for what it now does, serves every check, including the existing `require_active_lease`-style sites, with no second rule and no exception comment. `warn` mode warns under the same condition. A mutation with no lease on an unleased issue succeeds in strict, and the table-driven test owns both directions.\n- `docs/reference/configuration.md`'s `strict` row, `docs/reference/runtime-defaults.md`, error text, remediation hints and skills state the new meaning. Leases remain the way to claim exclusive work, so guidance about claiming stays.\n- A statement of the old rule in `@/inv` or charter text goes to the invoker, not reworded here.\n- `issue update --filter` checks each matched issue and refuses the whole operation before writing, naming the issues.\n- Exemptions, each in the table with its reason and a test: `issue delete`'s cascade over dependents (the named issue itself is not exempt and refuses on another agent's lease); `validate --fix`'s derived repair and transitive reduction (its hierarchy type fix refuses on another agent's lease); `archive --execute` (its targets are terminal, tested, including a leased terminal issue; if it can reach a non-terminal record it is not exempt); `jit recover` (it replays what already committed).\n- `issue release`'s event gains the acting identity, with a test.\n- No choke point: command-level checks plus the table-driven test.\n- REQ-02's real-hook test for the sync commit lives here. `aeafc378` lands ahead of this issue; until this lands, a strict repository with the hook fails loudly on `land.sh`.\n\n\n\n## Net lines\n\nReported by the worker across the `jit:17fbcf25` commits, including the mutation check: production files under `crates/` -455 (this counts in-file unit tests removed), `tests/` directories +980, docs and skills -124.\n",
+  "documents": [],
+  "done_at": "2026-11-01T16:45:32.942533936Z",
+  "first_ready_at": "2026-11-01T14:46:32.965250606Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "656cd89e-5ab5-4260-903f-363364baf2de",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:32:07.215660528Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "25921560-a21d-4963-b70a-27ad233a9cb9",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:45:08.522718184Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "17fbcf25-67cd-41a8-acc4-adb6df43b4a2",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Remove the lease check from the git hooks",
+  "updated_at": "2026-11-01T16:45:32.942533936Z"
+}

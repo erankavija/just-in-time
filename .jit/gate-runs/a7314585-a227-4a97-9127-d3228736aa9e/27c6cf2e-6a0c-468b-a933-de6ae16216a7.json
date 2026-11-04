@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "de62d442a226915b87efee49ec8daaa028ed5892",
+  "completed_at": "2026-11-04T00:12:22.715934870Z",
+  "duration_ms": 203793,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met by the attributable current implementation; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a7314585-a227-4a97-9127-d3228736aa9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "27c6cf2e-6a0c-468b-a933-de6ae16216a7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:08:58.922705739Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: db8b386ac (`jit:a7314585`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-4, @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-06 (issue description); applicable invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T00:07:36Z)\nTruncation recovery: narrowed per-path patches and current source ranges for all six attributable files\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met by the attributable current implementation; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

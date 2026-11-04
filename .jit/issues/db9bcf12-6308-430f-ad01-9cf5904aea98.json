@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:02:41.619771368Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "1630015d-101d-4e1b-bc3a-da1026998588",
+    "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
     "f9bf70a5-80f7-4b10-a452-07e3f507a0e1"
   ],
-  "description": "Write, with each archive execution, a record holding that target's executions, so evidence is addressable by target without the event log.\n\n## Background\n\n`finalize_archive_execution` (`crates/jit/src/repository_state/archive.rs`) merges its own writes with the issue and event actions into one delta, so one more write joins the same redo record. Executions are `domain::artifact_execution::ArchiveExecution` values, and the event `ArtifactArchiveExecuted` wraps one. Execute captures its base through `capture_archive_base` (`commands/validate.rs:343`). A new data-root directory must join `RepositoryLayout::tracker_written_paths` (`repository_state/path.rs:537-560`), whose test lists every tracker-written path (`gate_execution.rs:1122-1135`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each archive execution writes `archive-evidence/<target-key>.json`, holding the target and its ordered `ArchiveExecution` list (the captured prior list plus this execution), in the same redo record as its event. The key is `container/<issue-id>` or `document/<sha256 of the normalized path>`, built by one `VirtualPath` constructor; the record type derives `JsonSchema`; the directory is a tracker-written path; and execute's capture includes the target's record.\n- [hard] REQ-02: Finalizer unit tests show the first execution creating the record and a re-execution appending to it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Write, with each archive execution, a record holding that target's executions, so evidence is addressable by target without the event log.\n\n## Background\n\n`finalize_archive_execution` (`crates/jit/src/repository_state/archive.rs`) merges its own writes with the issue and event actions into one delta, so one more write joins the same redo record. Executions are `domain::artifact_execution::ArchiveExecution` values, and the event `ArtifactArchiveExecuted` wraps one. Targets are `PlanTarget::Container` and `PlanTarget::Document` (`domain/artifact_plan.rs`). Execute captures its base through `capture_archive_base` (`commands/validate.rs`). A new data-root directory must join `VirtualPath::RECORDS`, from which `RepositoryLayout::tracker_written_paths` (`repository_state/path.rs`) is built; tests in `path.rs` and a helper in `gate_execution.rs` pin that set. Whole-repository validation's fidelity pass (`validation/record_fidelity.rs`) is the guard that stored records reproduce.\n\n## Success Criteria\n\n- [hard] REQ-01: Each archive execution writes `archive-evidence/<target-key>.json`, holding the target and its ordered `ArchiveExecution` list (the captured prior list plus this execution), in the same redo record as its event. The key is `container/<issue-id>` or `document/<sha256 of the normalized path>`, built by one `VirtualPath` constructor; the record type derives `JsonSchema`; the directory is a tracker-written path; and execute's capture includes the target's record.\n- [hard] REQ-02: Finalizer unit tests show the first execution creating the record and a re-execution appending to it.\n- [hard] REQ-03: `record_drift` reports an evidence record that does not reproduce.\n",
   "documents": [],
+  "done_at": "2026-11-04T00:51:02.805378977Z",
+  "first_ready_at": "2026-11-04T00:02:18.708219497Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d08581d3-5a8c-4e03-9d7c-706f2cf93662",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:46:20.629748776Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6b300815-b9d4-4f50-943a-6bec7fb0b9ef",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:51:02.350174707Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "db9bcf12-6308-430f-ad01-9cf5904aea98",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "satisfies:f8a6b298/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Archive executions write a per-target evidence record",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T00:51:02.805378977Z"
 }

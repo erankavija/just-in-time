@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T05:16:04.461254892Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Decode label-coverage assertion configuration into a typed form with a compiled pattern when rules load.\n\n## Background\n\nGraph assertions `LabelCoverage`, `LabelReference` and `DependencyShape` hold raw `toml::value::Table` payloads (`crates/jit/src/declarations/rules.rs:577-590,923-927`), and evaluation reads their keys on each call, so a malformed rule surfaces only during evaluation. Typed `Raw*` structs lowered at load are the existing pattern (`rules.rs:940-1089`), and `RuleConfigError::InvalidAssertion` names the rule. Rule serialization renders the tables with `render_config_table` (`repository_state/rule_serialize.rs:267-275,366-396`). Label-coverage keys are read at `validation/graph.rs:855-946`, its regex is compiled at `:869`, and `require_str`/`optional_str` read the table. `commands/graph.rs:404-409` reads `satisfies-namespace` and `container-from-label` from the raw table, and `validation/desugar.rs:60-62,627-635` builds the table. `test_label_coverage_malformed_config_is_config_error` (`graph.rs:2421`) and `test_child_type_exclude_must_be_array_of_strings` (`:2590`) reach evaluation with malformed tables.\n\n## Success Criteria\n\n- [hard] REQ-01: `LabelCoverage` holds a typed configuration with its kind sugar, `child-state` as a `State`, its child link as an enum and its pattern as an `IdPattern`; the raw table, `require_str` and `optional_str` are gone.\n- [hard] REQ-02: A malformed label-coverage assertion fails rule loading with an error naming the rule, and its evaluation compiles no regex.\n- [hard] REQ-03: Readers of label-coverage options outside validation read the typed fields.\n- [hard] REQ-04: Rule serialization emits the same keys for a typed label-coverage assertion.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:32:46.316258837Z",
+  "first_ready_at": "2026-10-25T05:13:23.013188256Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "33050c57-cd35-4bfd-bf40-856530a9e605",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:30:20.838704172Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "91067cfa-bc00-4089-a86f-48fccce71bac",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:32:45.488169844Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7e8f1525-9efc-4c41-97e9-829eb7dc9a25",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Label-coverage assertions are typed and compiled at load",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T05:32:46.316258837Z"
 }

@@ -1,0 +1,56 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07baa8b46c48ab4b0b83c5b3f42106b7710e0a2e",
+  "completed_at": "2026-11-04T01:11:25.579468459Z",
+  "duration_ms": 311167,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/claim_coordinator.rs",
+        "id": "F1",
+        "line": 307,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-19",
+          "@/issue/2f563673/requirement/REQ-02",
+          "@/issue/f8a6b298/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "Renew/heartbeat and force-evict scan the lease directory through find_by_lease_id instead of addressing one issue record."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/TESTING.md",
+        "id": "F2",
+        "line": 515,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose",
+          "@/issue/2f563673/requirement/REQ-07"
+        ],
+        "severity": "low",
+        "summary": "Testing documentation still describes a rebuild test deleted by this issue."
+      }
+    ],
+    "summary": "Lease-ID mutation paths still scan all lease records, violating the per-issue lease-read criterion.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2f563673-82ee-4579-913a-e9d55c9881f1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d57b3b15-b893-4665-a171-90590b9d3d4a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T01:06:14.411503901Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7173 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a417-a1d5-7993-92af-31a285b21896\n--------\nuser\n--- 7160 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0cefff3d8, 460fd08fb, 17d989bac, c03850c61 (all `jit:2f563673`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18,D-19 — dev/vision/9db27a3a-charter.md; @/invariant/atomic-writes,canonical-cutover,essential-code-prose,orthogonal-tests,single-source-prose — .jit/invariants.toml; issue requirements/decision — markdown-first issue descriptions\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T01:01:45Z)\nTruncation recovery: re-read c03850c61 by path and current source line ranges; narrowed identifier searches to crates/, dev/TESTING.md, and affected docs\n\n1. [blocking][issue-impact] Lease-ID operations still scan the whole lease directory. `find_by_lease_id` calls `LeaseLock::list()` at [claim_coordinator.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/claim_coordinator.rs:307); both renew/heartbeat and force-evict use it at lines 855 and 896. This contradicts REQ-02’s requirement that only the limit check and listing read the lease directory.\n\n2. [advisory][issue-impact] [dev/TESTING.md](/home/vkaskivuo/Projects/just-in-time/dev/TESTING.md:515) still describes and benchmarks `test_rebuild_index_filters_expired_leases`, deleted by this issue. The reference became stale when the attributed change removed the test.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Lease-ID mutation paths still scan all lease records, violating the per-issue lease-read criterion.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Renew/heartbeat and force-evict scan the lease directory through find_by_lease_id instead of addressing one issue record.\",\"file\":\"crates/jit/src/storage/claim_coordinator.rs\",\"line\":307,\"references\":[\"@/charter/D-19\",\"@/issue/2f563673/requirement/REQ-02\",\"@/issue/f8a6b298/requirement/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Testing documentation still describes a rebuild test deleted by this issue.\",\"file\":\"dev/TESTING.md\",\"line\":515,\"references\":[\"@/invariant/single-source-prose\",\"@/issue/2f563673/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

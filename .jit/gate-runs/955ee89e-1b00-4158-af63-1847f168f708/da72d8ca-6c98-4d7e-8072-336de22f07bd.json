@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c10ea6a966b8b1c83b7415e300a981c840ccb23a",
+  "completed_at": "2026-11-01T01:36:39.388272328Z",
+  "duration_ms": 93386,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Shared file-backed test constructors replace the retired init/profile helpers without changing test assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "955ee89e-1b00-4158-af63-1847f168f708",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "da72d8ca-6c98-4d7e-8072-336de22f07bd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T01:35:06.002271395Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7b4748c50, 69f1b2ae3 (merge repeats the init/profile patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 (issue Markdown); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci — passed (exit code none; 2026-11-01T01:35:05.244540674+00:00)\nTruncation recovery: re-read both attributable patches in bounded file and line-range chunks; inspected merge-parent diffs separately\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Shared file-backed test constructors replace the retired init/profile helpers without changing test assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

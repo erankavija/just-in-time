@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./.agents/skills/jit-project-lead/scripts/test-standards-scan.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:14:26.891221521Z",
+  "duration_ms": 802,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "standards-scan-test",
+  "inputs_digest": "ada1216fd6ee264bdc5c39b4788cf2afd227449dc53bca204542445ad71a131d",
+  "issue_id": "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e7ced7ee-227f-4c23-aad7-1afd5713cb0c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:14:26.088298354Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "\u001b[0;32m✓\u001b[0m scanner exits 0\n\u001b[0;32m✓\u001b[0m malformed REQ-1 (one digit) -> REQID\n\u001b[0;32m✓\u001b[0m malformed REQ-123 (three digits) -> REQID\n\u001b[0;32m✓\u001b[0m malformed REQ-02 missing colon -> REQID\n\u001b[0;32m✓\u001b[0m marker present but no REQ token -> REQID\n\u001b[0;32m✓\u001b[0m well-formed REQ-03 not flagged (same issue)\n\u001b[0;32m✓\u001b[0m clean issue (well-formed REQ-01) has zero findings\n\u001b[0;32m✓\u001b[0m unmarked criterion -> UNMARKED\n\u001b[0;32m✓\u001b[0m embedded-id title -> TITLE-EMBEDDED-ID\n\u001b[0;32m✓\u001b[0m missing Success Criteria -> SC-MISSING\n\u001b[0;32m✓\u001b[0m leading position code -> TITLE-EMBEDDED-ID\n\u001b[0;32m✓\u001b[0m mid-title position code NOT flagged\n\u001b[0;32m✓\u001b[0m mid-title position-code issue has zero findings\n\u001b[0;32m✓\u001b[0m bare-pronoun opening -> STANDALONE\n\u001b[0;32m✓\u001b[0m no leading summary -> STRUCT-SUMMARY\n\u001b[0;32m✓\u001b[0m summary present -> no STRUCT-SUMMARY\n\u001b[0;32m✓\u001b[0m non-trivial, no Background -> STRUCT-BACKGROUND\n\u001b[0;32m✓\u001b[0m Background present -> no STRUCT-BACKGROUND\n\u001b[0;32m✓\u001b[0m trivial leaf -> no STRUCT-BACKGROUND\n\u001b[0;32m✓\u001b[0m a/b in display math -> MATH-SLASH-FRAC\n\u001b[0;32m✓\u001b[0m bare variable outside math -> MATH-BARE-VAR\n\u001b[0;32m✓\u001b[0m docs/ is in scope\n\u001b[0;32m✓\u001b[0m live dev/active doc scanned\n\u001b[0;32m✓\u001b[0m dev/active owned-by-Done doc exempt (filename prefix)\n\u001b[0;32m✓\u001b[0m dev/active owned-by-Done doc exempt (doc linkage)\n\u001b[0;32m✓\u001b[0m dev/archive out of scope\n\u001b[0;32m✓\u001b[0m dev/studies out of scope\n\u001b[0;32m✓\u001b[0m two runs are byte-identical\n\n========================================\n\u001b[0;32mPassed: 28\u001b[0m\n\u001b[0;32mAll tests passed!\u001b[0m\n"
+}

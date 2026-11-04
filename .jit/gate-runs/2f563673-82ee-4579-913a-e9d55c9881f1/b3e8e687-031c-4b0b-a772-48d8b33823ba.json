@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d5b5aaa489171a9d2208961f954b4ffc52dd97de",
+  "completed_at": "2026-11-04T00:42:54.928259362Z",
+  "duration_ms": 269096,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/claim.rs",
+        "id": "F1",
+        "line": 671,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-19",
+          "@/issue/2f563673/requirement/REQ-01",
+          "@/issue/f8a6b298/requirement/REQ-05",
+          "@/issue/f8a6b298/requirement/REQ-07"
+        ],
+        "severity": "high",
+        "summary": "Legacy claims-index replay remains live through recovery and repository validation."
+      }
+    ],
+    "summary": "Legacy recovery and validation still replay and validate claims.index.json, defeating the per-record lease cutover.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2f563673-82ee-4579-913a-e9d55c9881f1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b3e8e687-031c-4b0b-a772-48d8b33823ba",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:38:25.831264917Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12237 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a3fe-2c4b-7061-9eb0-8cf928a70eb5\n--------\nuser\n--- 12224 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0cefff3d8 feat(jit:2f563673): store each lease as one record under the lease lock\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 — dev/vision/9db27a3a-charter.md; @/invariant/atomic-writes — .jit/invariants.toml; @/issue/2f563673/requirement/REQ-01 and REQ-02 — issue description; @/issue/f8a6b298/requirement/REQ-05 and REQ-07 — parent issue description\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T00:36:46Z)\nTruncation recovery: recovered truncated central, command, and documentation reads through bounded per-file patches and current-file line ranges; read-only sandbox rejected one temporary diff capture\n\n1. [blocking][issue-impact] The legacy claims-index replay remains a live command path. `jit recover` still verifies `claims.index.json`, replays all of `claims.jsonl`, and writes a reconstructed index at [crates/jit/src/commands/claim.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:671). Repository validation also continues to load and reject this obsolete index at [crates/jit/src/commands/validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:2335), with an attributable test explicitly preserving that behavior at [validation_lease_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_item_validate/validation_lease_tests.rs:49). This violates the required cutover: no command may rebuild lease state from claims history, and per-key lease reads must not depend on the aggregate index. It also contradicts the updated storage reference’s claim that no lease read or change reads history. Remove the index/replay subsystem and validate the record-based store directly. References: @/charter/D-19, @/issue/2f563673/requirement/REQ-01, @/issue/f8a6b298/requirement/REQ-05, @/issue/f8a6b298/requirement/REQ-07.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Legacy recovery and validation still replay and validate claims.index.json, defeating the per-record lease cutover.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Legacy claims-index replay remains live through recovery and repository validation.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":671,\"references\":[\"@/charter/D-19\",\"@/issue/2f563673/requirement/REQ-01\",\"@/issue/f8a6b298/requirement/REQ-05\",\"@/issue/f8a6b298/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

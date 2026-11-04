@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fbbaa2ba4312512685cfb065e9e5a143d5b53aeb",
+  "completed_at": "2026-11-03T20:41:28.830130481Z",
+  "duration_ms": 226142,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met; no findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "334c12e7-d454-4a9a-8a4a-5b03a02c3ae7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d076302d-aeb4-4f33-b483-59a2e4f9ed9e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T20:37:42.687464200Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e224da160 `feat(jit:334c12e7): template application returns the created issues`\nPolicy sources: AGENTS.md\nResolved items: @/issue/334c12e7/requirement/REQ-01, REQ-02, REQ-03 and @/issue/df129d9e/requirement/REQ-19 (issue Markdown); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-1 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T20:34:12Z)\nTruncation recovery: recovered initial truncated aggregate output with individual commit patches, focused source ranges, item registries, and output tests\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met; no findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

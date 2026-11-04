@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "541c1ce450491aa65e52593f7f546521ba2480cd",
+  "completed_at": "2026-11-02T23:41:12.652634771Z",
+  "duration_ms": 118600,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed facade move satisfies the issue criteria; callers, tests, bounds, exports, and intra-doc links are consistent.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1002524a-aca3-4837-9c2a-0d0cd285deb4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d5a994e2-67aa-44cf-9ac0-8887886376b2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-02T23:39:14.052193854Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 29a2189a9 `refactor(jit:1002524a): move template methods onto a TemplateOps facade`\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (issue description); @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-02T23:37:09Z); code-review pending/unrun\nTruncation recovery: reread individual changed test patches, current facade/callsite/doc-link ranges, and exact caller scans\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed facade move satisfies the issue criteria; callers, tests, bounds, exports, and intra-doc links are consistent.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

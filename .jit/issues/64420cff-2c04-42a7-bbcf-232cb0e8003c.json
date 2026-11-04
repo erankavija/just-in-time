@@ -1,0 +1,44 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T04:49:59.375284433Z",
+  "context": {},
+  "created_at": "2026-11-01T04:49:58.669133746Z",
+  "dependencies": [],
+  "description": "Parse assignee text once at the CLI and server boundary, so commands and domain filters carry `Assignee`.\n\n## Background\n\n`executor.query_all` takes its assignee filter as `Option<&str>` (`crates/jit/src/main.rs:1399`). `commands/issue.rs` holds `assignee: Option<String>` at `:40`, `assignee_filter: Option<String>` at `:247`, and `assign_issue` and `claim_issue` take `assignee: String` (`:722,750,799`), and `commands/bulk_update.rs:22` holds `assignee: Option<String>`. `Assignee` is the domain type for this identity, and a query assignee filter that is not one lets a malformed filter match nothing silently.\n\n## Success Criteria\n\n- [hard] REQ-01: Every command and domain signature, field and filter under `crates/jit/src` that carries an assignee uses `Assignee`.\n- [hard] REQ-02: CLI and server assignee text is parsed once at the entry point, and a malformed assignee or assignee filter fails with the existing typed error instead of matching nothing.\n- [hard] REQ-03: Serialized issue and event JSON and the CLI's JSON output for valid assignees are unchanged, and `jit --schema` still describes assignees as strings.\n",
+  "documents": [],
+  "done_at": "2026-11-01T05:10:44.266525379Z",
+  "first_ready_at": "2026-11-01T04:49:58.669133746Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cf5b6c20-a638-40b7-b142-ca315d181d9d",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:10:42.214675810Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a7d7fcb1-38b0-4579-b9ae-2612d87e571f",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:07:30.347923117Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "64420cff-2c04-42a7-bbcf-232cb0e8003c",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "satisfies:2195c98f/REQ-11",
+    "satisfies:2195c98f/REQ-17",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Commands carry assignees as Assignee",
+  "updated_at": "2026-11-01T05:10:44.266525379Z"
+}

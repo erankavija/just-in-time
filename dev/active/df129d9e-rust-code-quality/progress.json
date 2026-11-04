@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 3,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -60,7 +60,7 @@
           "short_id": "f7f01654",
           "title": "Introduce the generic ListEnvelope type",
           "classification": "implementation",
-          "status": "done (REQ-04 void per steward ruling, D-25)"
+          "status": "done"
         }
       ]
     },
@@ -73,7 +73,7 @@
           "short_id": "d8176fd3",
           "title": "One global --json flag carried as OutputMode",
           "classification": "implementation",
-          "status": "done (merged f767033dc+78975ecf1; cargo-ci, mcp-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "list-envelope-adoption",
@@ -81,7 +81,7 @@
           "short_id": "650e6a56",
           "title": "Express output-module count structs as ListEnvelope instantiations",
           "classification": "implementation",
-          "status": "done (code-review R1 failed on restating marker rustdoc; lead fix 79713c95a)"
+          "status": "done"
         },
         {
           "key": "schema-omits-hidden",
@@ -102,7 +102,7 @@
           "short_id": "27f0a575",
           "title": "Issue lifecycle methods behind an issues facade",
           "classification": "implementation",
-          "status": "done (merged d144d3d84; doctest fix be0d9ab53 after cargo-ci caught stale doc examples; cargo-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "issue-list-renderer",
@@ -110,7 +110,7 @@
           "short_id": "2f15d48d",
           "title": "Render issue lists through one output renderer",
           "classification": "implementation",
-          "status": "done (merged b1df0b2f4; cargo-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "gate-run-status-renderer",
@@ -118,7 +118,7 @@
           "short_id": "9fa12e75",
           "title": "Render gate run status lines through one output renderer",
           "classification": "implementation",
-          "status": "done (merged 12d718456; code-review R1 failed: JSON never-run used human renderer; lead fix ce437049d; cargo-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "validation-report-renderer",
@@ -126,7 +126,7 @@
           "short_id": "9cc3056a",
           "title": "One output renderer for validation findings",
           "classification": "implementation",
-          "status": "done (merged 145091232; cargo-ci, code-review passed; closed after interrupted-session recovery ee3fcbc84)"
+          "status": "done"
         },
         {
           "key": "serve-foreground-command",
@@ -134,7 +134,7 @@
           "short_id": "d4373d07",
           "title": "Foreground serve as a commands-layer operation",
           "classification": "implementation",
-          "status": "done (merged 8cf19175a + rework 8c6d518bc; REQ-02 exit clause amended by user 9f201b611; code-review R1 failed on stale rustdoc, R2 passed; cargo-ci passed)",
+          "status": "done",
           "model_tier": "opus (rework 1)",
           "tier_reason": "escalated one tier after a failed review attempt"
         },
@@ -144,7 +144,7 @@
           "short_id": "2e7e1348",
           "title": "One output renderer for archive execution summaries",
           "classification": "implementation",
-          "status": "done (merged 10fde232e; cargo-ci, code-review passed)",
+          "status": "done",
           "model_tier": "haiku",
           "tier_reason": "mechanical: byte-identical renderer extraction following three established renderer tasks"
         },
@@ -154,7 +154,7 @@
           "short_id": "a807e699",
           "title": "Library repository bootstrap for the CLI",
           "classification": "implementation",
-          "status": "done (merged 853d1cfc8 + rework b834fcbae; code-review R1 failed on recover mapping left in main.rs, R2 passed; cargo-ci passed)",
+          "status": "done",
           "model_tier": "opus",
           "tier_reason": "storage-coupled: mutation-session retention, recovery ordering and linked-checkout write policy",
           "vendor": "claude"
@@ -165,7 +165,7 @@
           "short_id": "5d0a9a90",
           "title": "Keep stderr empty for --json failures",
           "classification": "implementation",
-          "status": "in_progress (merged 46a747fc2; cargo-ci and code-review failed on stale stderr assertion in cli_gate test_issue_show_errors_on_corrupt_gate_run; codex luna re-dispatch 2, same tier)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-luna xhigh",
           "tier_reason": "well-specified: five exact criteria, narrow footprint in main() and one test file"
@@ -181,7 +181,10 @@
           "short_id": "d84a7bfa",
           "title": "Item, invariant and projection methods behind an items facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-validation",
@@ -189,7 +192,10 @@
           "short_id": "5962427b",
           "title": "Validation methods behind a validation facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-profiles",
@@ -197,7 +203,10 @@
           "short_id": "6f49f3b3",
           "title": "Profile and init methods behind a profiles facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-queries",
@@ -205,7 +214,10 @@
           "short_id": "7a7d0bfe",
           "title": "Query, search and event methods behind a queries facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-gates",
@@ -213,7 +225,10 @@
           "short_id": "fd2073b7",
           "title": "Gate definition and attachment methods behind a gates facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-graph",
@@ -221,7 +236,10 @@
           "short_id": "93aaba24",
           "title": "Graph and dependency methods behind a graph facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-issue-batches",
@@ -229,7 +247,10 @@
           "short_id": "f79d2510",
           "title": "Label and batch issue methods onto the issues facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-gate-checks",
@@ -237,7 +258,10 @@
           "short_id": "a24b11aa",
           "title": "Gate check methods onto the gates facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-documents",
@@ -245,7 +269,10 @@
           "short_id": "985c2b15",
           "title": "Document methods behind a documents facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-config",
@@ -253,7 +280,10 @@
           "short_id": "dbd05242",
           "title": "Config methods behind a config facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "claims-executor-family",
@@ -261,7 +291,10 @@
           "short_id": "083c9a91",
           "title": "Claim and recover operations behind a claims facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "recover session ordering is concurrency-sensitive (plan D-28)"
         },
         {
           "key": "executor-facade-templates",
@@ -269,7 +302,10 @@
           "short_id": "1002524a",
           "title": "Template methods behind a templates facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-archive",
@@ -277,7 +313,10 @@
           "short_id": "a015dcbb",
           "title": "Archive and snapshot methods behind an archive facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         }
       ]
     },
@@ -290,7 +329,10 @@
           "short_id": "1539da29",
           "title": "Derive failure details and suggestions from the error type",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "typed errors across many call sites; moderate design"
         },
         {
           "key": "issue-filter-args",
@@ -298,7 +340,10 @@
           "short_id": "a3a99cf8",
           "title": "Shared IssueFilterArgs group for issue filters",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "CLI contract change over ~14 sites; alternation"
         },
         {
           "key": "create-returns-issue",
@@ -306,7 +351,10 @@
           "short_id": "8b7f2973",
           "title": "Issue creation returns the created issue",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "compiler-driven rewrite of ~900 call sites; needs stamina"
         },
         {
           "key": "apply-returns-created-issues",
@@ -314,7 +362,10 @@
           "short_id": "334c12e7",
           "title": "Template application returns the created issues",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "narrow return-shape change; alternation"
         },
         {
           "key": "search-through-executor",
@@ -322,7 +373,10 @@
           "short_id": "d05b5639",
           "title": "CLI search runs through the executor",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "one executor entry point and one arm"
         }
       ]
     },
@@ -335,7 +389,10 @@
           "short_id": "abe555e9",
           "title": "Library-side command handler contract",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "opus",
+          "tier_reason": "contract-setting: every handler migration copies it"
         },
         {
           "key": "mutations-return-issue",
@@ -343,7 +400,10 @@
           "short_id": "2e0f276b",
           "title": "Issue mutations return the updated issue",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "return-shape change over seven mutations; alternation"
         },
         {
           "key": "path-read-error-codes",
@@ -351,7 +411,10 @@
           "short_id": "22189592",
           "title": "Classify document path-read failures by variant",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "new error code, generated reference, CLI contract change"
         }
       ]
     },
@@ -364,7 +427,7 @@
           "short_id": "10751360",
           "title": "Issue read commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-dep",
@@ -372,7 +435,7 @@
           "short_id": "0fe46027",
           "title": "Dependency commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-graph",
@@ -380,7 +443,7 @@
           "short_id": "20fc3b92",
           "title": "Graph commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-gate-definitions",
@@ -388,7 +451,7 @@
           "short_id": "1ac651c7",
           "title": "Gate definition and preset commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-doc",
@@ -396,7 +459,7 @@
           "short_id": "c9103fcf",
           "title": "Document commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-validate",
@@ -404,7 +467,7 @@
           "short_id": "06ee9b67",
           "title": "Validate command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-config",
@@ -412,7 +475,7 @@
           "short_id": "153c9851",
           "title": "Config commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-hooks",
@@ -420,7 +483,7 @@
           "short_id": "71f5296c",
           "title": "Hooks command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-claim-recover",
@@ -428,7 +491,7 @@
           "short_id": "66790c84",
           "title": "Claim and recover commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-serve",
@@ -436,7 +499,7 @@
           "short_id": "8c46fc85",
           "title": "Serve command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-profile",
@@ -444,7 +507,7 @@
           "short_id": "cc4ea8a9",
           "title": "Profile commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-init-apply",
@@ -452,7 +515,7 @@
           "short_id": "8f297e60",
           "title": "Init and apply commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-label",
@@ -460,7 +523,7 @@
           "short_id": "52110fb4",
           "title": "Label commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-events",
@@ -468,7 +531,7 @@
           "short_id": "b25c2e54",
           "title": "Events commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-snapshot-migrate",
@@ -476,7 +539,7 @@
           "short_id": "182f4c03",
           "title": "Snapshot and migrate commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-archive",
@@ -484,7 +547,7 @@
           "short_id": "3cf69ecf",
           "title": "Archive commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-worktree",
@@ -492,7 +555,7 @@
           "short_id": "cd8e04cc",
           "title": "Worktree commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-item",
@@ -500,7 +563,7 @@
           "short_id": "1a4f2ebd",
           "title": "Item commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-invariant",
@@ -508,7 +571,10 @@
           "short_id": "b23faa59",
           "title": "Invariant command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "opus",
+          "tier_reason": "pathfinder: first real group sets the main.rs glue and registration form the other wave 7 handlers copy"
         },
         {
           "key": "handlers-project",
@@ -516,7 +582,7 @@
           "short_id": "8e91126b",
           "title": "Project command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-search",
@@ -524,7 +590,7 @@
           "short_id": "98cc2097",
           "title": "Top-level search command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-version",
@@ -532,7 +598,7 @@
           "short_id": "f930acf2",
           "title": "Version command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "server-status-from-classification",
@@ -540,7 +606,18 @@
           "short_id": "e5d618ee",
           "title": "Derive server HTTP statuses from the library classification",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
+        },
+        {
+          "key": "test-speed-measure",
+          "id": "1eb949a5",
+          "short_id": "1eb949a5",
+          "title": "Measure per-test durations and derive the per-test limits",
+          "classification": "research",
+          "status": "done",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "measurement and limit derivation; needs judgment, runs under the cargo-ci host lock"
         }
       ]
     },
@@ -553,7 +630,7 @@
           "short_id": "3f816619",
           "title": "Issue write commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-gate-status",
@@ -561,7 +638,7 @@
           "short_id": "f87f9b00",
           "title": "Gate status commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-query-status",
@@ -569,7 +646,15 @@
           "short_id": "24a982b7",
           "title": "Query and status commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
+        },
+        {
+          "key": "test-speed-refactor",
+          "id": "4a01ccba",
+          "short_id": "4a01ccba",
+          "title": "Refactor every test over the per-test limit",
+          "classification": "implementation",
+          "status": "done"
         }
       ]
     },
@@ -582,7 +667,15 @@
           "short_id": "b23b1bf3",
           "title": "Gate evaluation commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
+        },
+        {
+          "key": "test-speed-enforce",
+          "id": "f487aeef",
+          "short_id": "f487aeef",
+          "title": "Enforce the per-test limits and retire the whole-suite budget",
+          "classification": "implementation",
+          "status": "ready"
         }
       ]
     },
@@ -595,7 +688,7 @@
           "short_id": "5687e281",
           "title": "Reduce main.rs to parse, bootstrap, dispatch, render and exit",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "executor-kernel-closure",
@@ -603,7 +696,7 @@
           "short_id": "0bc448fb",
           "title": "Crate-private executor kernel",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "retire-unproduced-error-codes",
@@ -611,7 +704,7 @@
           "short_id": "0eca332a",
           "title": "Retire error codes that nothing produces",
           "classification": "implementation",
-          "status": "pending"
+          "status": "ready"
         },
         {
           "key": "schema-registry-derivation",
@@ -619,7 +712,7 @@
           "short_id": "da30b92a",
           "title": "Derive output schemas from the handler registry",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "command-dispatch",
@@ -627,7 +720,15 @@
           "short_id": "c06daf50",
           "title": "Library-side command dispatch for crates/jit",
           "classification": "story",
-          "status": "pending"
+          "status": "ready"
+        },
+        {
+          "key": "test-speed-ci-lock",
+          "id": "fba8d478",
+          "short_id": "fba8d478",
+          "title": "Decide whether concurrent cargo-ci runs can drop the host lock",
+          "classification": "implementation",
+          "status": "backlog"
         }
       ]
     },
@@ -640,7 +741,7 @@
           "short_id": "f9977efd",
           "title": "Enforce a main.rs production-line ceiling in the budget script",
           "classification": "implementation",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "cli-contract-docs",
@@ -648,7 +749,7 @@
           "short_id": "0546fc82",
           "title": "State the CLI output contract once in the command reference",
           "classification": "documentation",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "error-boundary",
@@ -656,7 +757,7 @@
           "short_id": "fe3ad1b0",
           "title": "One library error boundary for the CLI and the server",
           "classification": "story",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "executor-surface",
@@ -664,7 +765,7 @@
           "short_id": "f35c86de",
           "title": "Narrow executor surface and storage-free CLI entry",
           "classification": "story",
-          "status": "pending"
+          "status": "ready"
         }
       ]
     },
@@ -677,7 +778,7 @@
           "short_id": "a08c4b38",
           "title": "Write the df129d9e completion report",
           "classification": "documentation",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "output-contract",
@@ -685,7 +786,7 @@
           "short_id": "46fe7593",
           "title": "One stated output and schema contract for the CLI",
           "classification": "story",
-          "status": "pending"
+          "status": "backlog"
         }
       ]
     },
@@ -698,12 +799,35 @@
           "short_id": "fb2dc5c3",
           "title": "Build hygiene and measured completion for crates/jit",
           "classification": "story",
-          "status": "pending"
+          "status": "backlog"
         }
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "date": "2026-11-03",
+      "ids": [
+        "1eb949a5",
+        "4a01ccba",
+        "f487aeef",
+        "fba8d478"
+      ],
+      "reason": "user direction: per-test speed limits replace the whole-suite budget (plan D-32)"
+    },
+    {
+      "id": "487f45a9",
+      "why": "steward ruling: one requires-Git error replaces CLAIM_REQUIRES_GIT and the hooks interim mapping"
+    },
+    {
+      "id": "6acd7a05",
+      "why": "steward ruling: validate success response declares no payload warnings; schema test covers enums; waits on 2c8c13b2, 1f24e3e9 (9876a23a) and 06ee9b67"
+    },
+    {
+      "id": "fb38bf1f",
+      "why": "steward ruling: every registered success response is output-owned; depends on all open handler issues"
+    }
+  ],
   "escalations": [
     {
       "date": "2026-10-21",
@@ -718,6 +842,90 @@
       "issue": "f7f01654",
       "summary": "REQ-04 void: ProfileAgreement deleted by 24268b05 (plan D-25)",
       "status": "applied 3778a65fe"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "user-decision",
+      "issue": "wave 4 facades",
+      "summary": "Stale method lists reconciled (plan D-27)",
+      "status": "applied"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "user-decision",
+      "issue": "083c9a91",
+      "summary": "614a6f97 now depends on 083c9a91 (plan D-28)",
+      "status": "applied"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "user-decision",
+      "issue": "df129d9e",
+      "summary": "No disk cleanup by this lead; just-in-time-6a coordinates relocation to /mnt/nvme",
+      "status": "open"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "gate-dispute",
+      "issue": "083c9a91",
+      "summary": "code-review F1 claims cargo-ci evidence predates 2174da3a; ancestry shows otherwise; raised to the user via just-in-time-6a",
+      "status": "resolved: user ruled option A (one rerun with evidence); R2 passed"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "max-rework",
+      "issue": "d952d057",
+      "summary": "code-review F1 after 2 reworks; proposed one more rework moving the run dir before the probe and --cargo",
+      "status": "ruled (a): one extra rework, no further allowance; d952d057 D-01; resolved: done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "review-finding-attribution",
+      "issue": "06ee9b67",
+      "summary": "F1/F2 trace to 9876a23a wave 8 on main; F3 is the uniform findings-stderr rule",
+      "status": "resolved: done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "review-convention",
+      "issue": "1a4f2ebd,8e91126b,66790c84",
+      "summary": "output-owned response convention; conflicting verdicts on 8e91126b; 66790c84 F1 traces to 614a6f97",
+      "status": "ruled: fb38bf1f + D-01s; double runs were lead tooling (first runner did not stop)"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "max-rework",
+      "issue": "1ac651c7",
+      "summary": "warning prefix under uniform warnings rule; proposed D-02",
+      "status": "resolved: D-02; done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "line-target",
+      "issue": "df129d9e REQ-10",
+      "summary": "planned deletions cannot close 721-line gap; options: amend counted modules, survey+deletion task, or survey first",
+      "status": "ruled (c): survey + whole-crate ledger dispatched; target change is the user's decision"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "max-rework",
+      "issue": "9be5b0de",
+      "summary": "-23 vs >=25 after two reworks; proposed target amendment to >=20",
+      "status": "resolved: D-01 (>=20); done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "max-rework",
+      "issue": "4a01ccba",
+      "summary": "quiet evidence predates final change",
+      "status": "resolved: D-01; done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "criterion-vs-invariant",
+      "issue": "10fdad38",
+      "summary": "shared test helper vs REQ-03 direct calls",
+      "status": "resolved: D-01; done"
     }
   ],
   "rework_counts": {
@@ -727,20 +935,91 @@
     "9fa12e75": 1,
     "d4373d07": 1,
     "a807e699": 1,
-    "5d0a9a90": 2
+    "5d0a9a90": 2,
+    "5962427b": 1,
+    "1539da29": 2,
+    "abe555e9": 1,
+    "b23faa59": 2,
+    "e5d618ee": 2,
+    "153c9851": 1,
+    "98cc2097": 2,
+    "20fc3b92": 2,
+    "10751360": 2,
+    "8a14e8e9": 2,
+    "9529b9ac": 1,
+    "06ee9b67": 2,
+    "71f5296c": 1,
+    "66790c84": 2,
+    "d952d057": 3,
+    "b51291e4": 2,
+    "1ac651c7": 2,
+    "cd8e04cc": 2,
+    "cc4ea8a9": 2,
+    "1a4f2ebd": 2,
+    "4a01ccba": 2,
+    "10fdad38": 1,
+    "9be5b0de": 2,
+    "3b696589": 1,
+    "24a982b7": 1,
+    "f87f9b00": 1,
+    "d58f80c9": 1,
+    "01a88d32": 1,
+    "b674382e": 1,
+    "c517b88b": 1,
+    "6acd7a05": 2,
+    "8b3cce62": 1,
+    "635f23c7": 1,
+    "578ed10d": 1,
+    "5f12265a": 1
   },
-  "surfaced_pitfalls": [],
-  "external_blockers": {
-    "083c9a91": [
-      "d759d606"
-    ],
-    "handlers-*": [
-      "2195c98f cli-issue-id-boundary (steward edge, pending)"
-    ],
-    "0eca332a": [
-      "2195c98f error-code-vocabulary (steward edge, pending)"
-    ]
-  },
+  "surfaced_pitfalls": [
+    {
+      "source": "wave 4 workers",
+      "summary": "cargo doc -p jit --no-deps reports unresolved intra-doc links (pre-existing): cli.rs, commands/mod.rs (incl. :2303 RepositoryLayout), bulk_update.rs, document.rs, gate.rs, dependency.rs, config.rs, validate.rs, project.rs:112, profile.rs:441 PackageArchiveError, domain/artifact_discovery.rs:243 private crate::commands::archive, domain/types.rs:129,185,1220,1442",
+      "disposition": "reconcile against REQ-03-type criteria before container gates"
+    },
+    {
+      "source": "wave 5 lead",
+      "summary": "jit caps indefinite leases at 2 per agent; later dispatches use --ttl 86400 and need renewal on long waves",
+      "disposition": "process note"
+    },
+    {
+      "source": "abe555e9 worker",
+      "summary": "jit --schema output order is nondeterministic run to run: CommandSchema.commands, types and subcommands are HashMaps (pre-existing). Schema identity checks must compare with sorted keys; byte-stable output would need BTreeMap.",
+      "disposition": "reconcile against da30b92a / 46fe7593 schema criteria before container gates"
+    },
+    {
+      "id": "inherited-landing-lock",
+      "summary": "A lead landing script holding its serial flock on an inherited fd lost it to the sccache server a child cargo run daemonized, deadlocking b23faa59 and 1eb949a5 for two hours past the 03:30 hold. Take serial locks with `flock -o` so children never inherit them.",
+      "status": "fixed in the lead's scratchpad script"
+    },
+    {
+      "id": "mcp-ci-format-cutover",
+      "summary": "Since format 4 landed (55438f664), a HEAD-built jit cannot read this repository's format-3 tracker, so the mcp-ci PATH workaround fails (REPOSITORY_FORMAT_UNSUPPORTED). Because the digest excludes the binary, the failed verdict is then reused for the installed binary. b23faa59's mcp-ci is held pending the steward's ruling on --force; the workaround has been removed from land-one.sh. Tracked by 26307dfd.",
+      "status": "open"
+    },
+    {
+      "id": "codex-read-only-git",
+      "summary": "Codex's sandbox makes git metadata read-only, so its 'merge main' either fails mid-way (MERGE_HEAD left, index unmerged) or is done out-of-band into the working tree, which also copies main's uncommitted .jit lines. Lead must record a proper merge (commit with MERGE_HEAD, or commit-tree with main's parent) and restore .jit files to the merged parent before landing.",
+      "status": "handled per worktree"
+    },
+    {
+      "id": "pool-runner-timeouts",
+      "summary": "cargo-pool-run waits for a jobserver token inside nextest's per-test timer, so millisecond tests TIMEOUT at 20 s under parallel load. Not content failures; land-one retries TIMEOUT-only failures. f487aeef must not tighten limits until settled (D-43).",
+      "status": "with the user via steward"
+    },
+    "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence.",
+    "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
+    "Some code-review evaluations recorded two runs a minute apart with different verdicts (8e91126b, 1a4f2ebd); cause unknown.",
+    "A for-loop over gate-one.sh continues past a failing issue; the lead assumed it stopped and started a second runner, doubling code-review runs. Break on failure or check ps before starting another runner.",
+    "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers.",
+    "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits.",
+    "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
+    "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it.",
+    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence.",
+    "Two workers ran git checkout to measure the merge-base line count; briefs now say production-lines.py takes a revision and needs no checkout."
+  ],
+  "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
   "line_target": {
     "modules": "main.rs + dispatch/ + output",
@@ -752,7 +1031,864 @@
       "through_9cc3056a": -115,
       "d4373d07": -24,
       "2e7e1348": -4,
-      "a807e699": -158
+      "a807e699": -158,
+      "5d0a9a90": 8,
+      "d84a7bfa": 0,
+      "1002524a": 1,
+      "7a7d0bfe": 10,
+      "93aaba24": 4,
+      "985c2b15": 11,
+      "a015dcbb": 0,
+      "dbd05242": 0,
+      "5962427b": 5,
+      "6f49f3b3": 13,
+      "fd2073b7": 5,
+      "f79d2510": 3,
+      "a24b11aa": 0,
+      "083c9a91": -14,
+      "1539da29": 7,
+      "a3a99cf8": -98,
+      "8b7f2973": 0,
+      "334c12e7": -10,
+      "d05b5639": -1,
+      "abe555e9": 114,
+      "2e0f276b": 1,
+      "22189592": 3,
+      "w7batch": 255
+    },
+    "epic_total": -239,
+    "head_lines": 9111,
+    "head_rev": "b5bd434e8",
+    "head": 9248,
+    "note": "12c0f3fb added +233 (forms); handler moves must pay back",
+    "current_main": 9421,
+    "projection_2026_11_04": "9,350-9,650 after da30b92a (~0, schema.rs uncounted), fb38bf1f (+100..+200), 5687e281 (-100..-200), remaining handler moves (0..+150); gap not closed; escalated with options a/b/c",
+    "whole_crate_ledger": {
+      "baseline": "dc2ea8706",
+      "epic_merges": 76,
+      "epic_net": 1011,
+      "crate_base": 78801,
+      "crate_main": 74130,
+      "file": "ledger-2026-11-04.txt",
+      "since_2026_11_04": {
+        "f82a2e4a": -60,
+        "10fdad38": -221,
+        "9be5b0de": -23,
+        "8fbf8c43": -31,
+        "24a982b7": 27,
+        "f87f9b00": -114,
+        "3f816619": -105,
+        "b23b1bf3": -53,
+        "5687e281": -175,
+        "da30b92a": -8,
+        "ae3f4f8b": -13,
+        "0bc448fb": 31,
+        "8b3cce62": -106,
+        "8b3cce62-r1": -21,
+        "6acd7a05": 4,
+        "6acd7a05-r2": 0
+      },
+      "epic_net_running": 951,
+      "epic_net_latest": 171,
+      "merges_latest": 101,
+      "crate_main_latest": 73631,
+      "file_latest": "ledger-2026-11-05.txt",
+      "projected_end": "+70..+250 (ceiling +375)",
+      "b697a3f7_merges": {
+        "945f9181": 4,
+        "c517b88b": 129,
+        "c517b88b-r1": 1,
+        "b674382e": 21,
+        "eaca3f52": 248,
+        "635f23c7": -99,
+        "578ed10d": 79,
+        "635f23c7-r1": 0,
+        "578ed10d-r1": 4
+      }
+    },
+    "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision.",
+    "net_plan_2026_11_04": {
+      "current_net": 1011,
+      "planned_items": "-876..-195 (central ~-530)",
+      "projected_final": "+135..+816 (central ~+480)",
+      "new_tasks_proposed": {
+        "N1": "unify command_group! entry forms -10..-25",
+        "N2": "compact handler signatures >=-90 (rename caveat)",
+        "N4": "survey dead/duplicate renderers >=-25",
+        "N5": "classifier-driven dep batch envelope + table renderers >=-50"
+      },
+      "gap_candidates": [
+        "derive generate_command_exit_codes (329 lines)",
+        "survey commands/storage/repository_state"
+      ],
+      "status": "sent to 6a for rulings (N6-N9 proposed)",
+      "exit_code_derivation": "scoped -90..-160 (48 rows: 8 universal, 15 restating, 16 typed, 9 findings); after handler moves and 5687e281",
+      "survey_commands_storage_repo": "high -280 (dead bulk preview chain -215, test-only wrappers -64), speculative -190 (archive plan computed twice -150 D-20, coordinator typing -30, doc prologue), contract -60",
+      "revised_projection": "central ~+75 (-100..+450); with archive/coordinator ~-105"
+    },
+    "req10_ceiling_draft": "+375 (measured +1..+736); sent to 6a for confirmation vs +290",
+    "req10_ceiling": 375
+  },
+  "wave_notes": {
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255). Landing queue after batch gating: 182f4c03, 10751360, cd8e04cc, 1ac651c7, cc4ea8a9 (all lead-reviewed; Claude workers could not run whole-tree suites under the shared lock, branch CI is the evidence)."
+  },
+  "post_release_followups": [
+    "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy."
+  ],
+  "issues": {
+    "b23faa59": {
+      "status": "done",
+      "note": "rework 2 passed code-review; cargo-ci rerun after an exit-75 load fault; mcp-ci fresh after 26307dfd"
+    },
+    "1eb949a5": {
+      "status": "done"
+    },
+    "26307dfd": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "steward-assigned standalone task; node/process-spawning tests rule out the Codex sandbox"
+    },
+    "10751360": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "rework 2 of 2: one HumanRender for ItemShowResult; merge main; Claude because every branch conflicts with main and Codex cannot merge",
+      "note": "E0119 duplicate HumanRender for ItemShowResult with 1a4f2ebd; rework 2 of 2 pending",
+      "review": "lead PASS (7c) at c8e1e7ed4; one HumanRender for ItemShowResult (main's); IssueRow duplicate removed; lines +60 vs main Lead merged main (a9e5985da, additive registration lines only). Landed and gated; closed 15643c2e0."
+    },
+    "c9103fcf": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "resumed: merge main after 9529b9ac"
+    },
+    "66790c84": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "code-review cdebd1af: F1 heartbeat/force-evict issue_id = main 614a6f97 (escalated), F2 restating rustdoc (rework) D-01 (614a6f97). F2 rework to Codex gpt-6-astra. F2 rework at 3919dfb3c, lead PASS. Landed; all gates passed; closed 7c7c1edf1."
+    },
+    "8c46fc85": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "8f297e60": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "ran one git checkout in its own worktree to discard its own uncommitted additions; tree clean, nothing committed touched",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "f930acf2": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "e5d618ee": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "on main (4ec8f06cc, fix d735276b5); code-review F1: GateRunId path extractor rejects before classify (REQ-02); rework 2 of 2"
+    },
+    "20fc3b92": {
+      "status": "done",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration",
+      "note": "lead review: top-level rdeps left in legacy table (REQ-01/02); batch boundary-edge human text changed (REQ-06); +162 lines",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "153c9851": {
+      "status": "done",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration",
+      "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
+    },
+    "b25c2e54": {
+      "status": "done",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration",
+      "note": "reviewed; landing paused until e5d618ee's fix restores main",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "3cf69ecf": {
+      "status": "done",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "1a4f2ebd": {
+      "status": "done",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code) D-01 (fb38bf1f). F2 docs rework to Codex gpt-6-astra; code retirement is 0eca332a. F2 docs rework at defce1739, lead PASS. Landed; code-review 7ad092f6 F1: ITEM_COMMAND_FAILED still declared (REQ-13, canonical-cutover). Rework 2 of 2 to Codex gpt-6-luna: retire the code (moves it out of 0eca332a's scope; steward told). Rework 2 at 0aec56091 (lead ran targeted tests; Codex sandbox could not); landing. Landed; code-review passed; closed."
+    },
+    "98cc2097": {
+      "status": "done",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration",
+      "note": "branch CI: two new search exit-code rows (1, 10) lack binding cases; rework 2 of 2",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "0fe46027": {
+      "status": "done",
+      "vendor": "Codex gpt-6.1-sol (high)",
+      "reason": "self-contained migration without sockets",
+      "note": "Codex resume committed by lead as a proper merge; lines -1",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "1ac651c7": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "rework 1: stale rustdoc link; merge main; Claude because every branch conflicts with main and Codex cannot merge",
+      "note": "lead-preserve ac9220229",
+      "review": "lead R1 FAIL (7c), Tier 2.5 only: main.rs:536 rustdoc links [`resolve_gate_key`], which moved to jit::dispatch. Criteria otherwise met on reading. Rework with the main merge after the batch lands. Rework 1 at c269f5554: lead PASS; stale link fixed; PresetsKey converged into collection_keys!; exit-codes.md regenerated by script. Lead merge dede3af31 (union of deleted legacy schema entries). Branch CI failed: lease_enforcement strict-lease test, preset apply's lease refusal became a per-target finding (owner off stderr). Rework 2 of 2 to Claude Sonnet: lease refusal propagates as the classified error. Rework 2 at ac03aa9f1: lead PASS; handler calls the shared refuse_foreign_lease per target before apply (race-window caveat: locked check stays authoritative). Landed; code-review c543e28a F1: preset-apply warning prefix (uniform warnings rule). Reworks exhausted; escalated with proposed D-02. D-02 recorded (uniform warnings rule); code-review rerun running. Code-review rerun passed (D-02); closed b859ed0d7."
+    },
+    "06ee9b67": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets",
+      "note": "Codex resume committed by lead as a proper merge; lines +20",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "landed c5a125d74; cargo-ci, mcp-ci passed; code-review R1 failed (run 8613707b): F1 --fix contract (9876a23a 1f24e3e9 on main), F2 container-pointer tests deleted by 9876a23a eae1c56a2, F3 uniform findings stderr (c9103fcf/1ac651c7 D-01 rule). Escalated to 6a. D-01/D-02 recorded; code-review R2 (run d4f538b0): R1 findings closed; new F1 cli-commands.md:3276 says --rule failures exit 1 (now 4). Rework 2 of 2 to Codex gpt-6-luna. Docs landing collided with b9's 62f836117 rewrite; Claude Haiku re-applying on merge. Landed a5e36ed48; code-review R3 passed; closed ff1c348a2."
+    },
+    "71f5296c": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets",
+      "note": "Codex resume committed by lead as a proper merge; lines -2",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "cc4ea8a9": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "resume after 8f297e60 on main; merge main; Claude because every branch conflicts with main and Codex cannot merge",
+      "review_note": "8f297e60 (2a758ab62) made an unreadable --values-file an InvalidArgumentError: profile apply's plain form now exits 2 (was 3); its --json form still exits 1 via profile_json_error until this issue migrates the arm. On review: both forms should exit 2, with a profile apply row and dual-form binding.",
+      "note": "lead-preserve b7827c17a; waits for 8f297e60 on main",
+      "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT. Lead merged main (additive; unused imports dropped). Branch CI failed: profile add missing archive -> GENERIC_ERROR (untyped anyhow string at commands/profile.rs ~1368, hidden before by profile_json_error). Rework 2 of 2 to Codex gpt-6.1-sol: type it via ProfileResolutionError. Rework 2 at c2d9486f7; landed; all gates passed."
+    },
+    "52110fb4": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets",
+      "note": "Codex resume committed by lead as a proper merge; lines +54",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+    },
+    "182f4c03": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "completion: snapshot export only; reconcile lines; merge main; Claude because every branch conflicts with main and Codex cannot merge",
+      "note": "lead-preserve e1bff4aae; +68 lines to reconcile",
+      "review": "lead PASS (7c) at 8449ca2ac; REQ-03 via ListEnvelope; lines +11 vs main Landing branch CI failed on main's own red test (gate-presets.md hand-edited by 62f836117, b9); held. Landed f1aa105be; all gates passed; closed d85432dad."
+    },
+    "cd8e04cc": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "rework 1: exit-code row bindings, split render line; merge main; Claude because every branch conflicts with main and Codex cannot merge",
+      "note": "lead-preserve 2cb30f0ac",
+      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge). Rework 1 at e69f46779: lead PASS; rows narrowed to worktree info/list with one binding each; WorktreesKey moved into collection_keys!. Whole-tree run left to branch CI (worker's locked run starved behind gate runs). Lead merge eed453f70 (both sides deleted an arm). Landed; code-review R1 (0989acfc) failed: store-divergence omitted from changed exit-code rows (REQ-04). Rework 2 of 2 to Claude Sonnet. Rework 2 at 8d81d1e27: lead PASS; store-divergence row 5 with binding; 3/10 shown unreachable (evidence in worker report). Landed; all gates passed; closed 83da45a5b."
+    },
+    "8e91126b": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets",
+      "note": "Codex resume committed by lead as a proper merge; lines -17",
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "two code-review runs: 1f2dbb8f failed (output-owned), 3f255520 passed; close held for steward ruling D-01 (fb38bf1f); closed f1f60977e."
+    },
+    "12c0f3fb": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "shared handler contract forms (D-38..D-41); one worker, lands before its dependents"
+    },
+    "9529b9ac": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it",
+      "note": "on main f1e434642; code-review F1/F2; rework 1 drops AssetListScope.warnings and the exemption list (D-49)"
+    },
+    "4a01ccba": {
+      "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43).",
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)",
+      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker. Rework 1 at 5e3f82d8b landed; code-review R2 (e973c700) failed only on quiet-host (loads 9-14 vs <4). One rework left; asked 6a for a host-quiet window or a D-01 ruling. Quiet-window evidence ff8a8d1a9 (loads 1.82/3.32/3.94; medians 0.629/0.062/2.131 s). First landing failed on unrelated flaky server test; steward allowed one fresh attempt. Fresh landing passed cargo-ci; code-review R3 (13b970de): 50 ms real deadline in serve test (REQ-02). Rework 2 of 2 (last): injected clock in StartupWatch. Rework 2 at 82745633d: lead PASS; WatchClock seam, stepped test clock, 0.01 s, no real wait. Landed; code-review 2a14530e: quiet evidence predates injected clock (REQ-01). Escalated: proposed single-test locked remeasure + D-01. Evidence landing; code-review rerun passed; closed."
+    },
+    "8a14e8e9": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "ENOSPC classification (D-47)",
+      "note": "follow-up landed 1e2d11ebf; code-review F1 (round 2): same-test assertion plus ENOSPC elsewhere in block exits 75; rework 2 of 2: ENOSPC must be in the panic message"
+    },
+    "d952d057": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "script change with self-test; steward priority",
+      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker. Rework 2 (c8852b99e) passed lead review. Landing attempt failed for host reasons twice (exit 75, then 24/24 TIMEOUT at 20 s under the integrator's advisory run); not landed; relaunch asked of 6a (D-46). Landed e03e459d1 (fresh landing per D-50); cargo-ci and cargo-ci-selftest passed; code-review R1 failed (run 9c1a9f5c): F1 high, wrapper probe and --cargo path run Cargo before the per-run TMPDIR (REQ-01). Reworks exhausted; escalated to 6a with option (a) one more rework. Extra rework f18d5b6df + explicit-wrapper routing; landed 992072bb4; all gates passed (code-review R2); closed 9edb3186f after the format 4 window."
+    },
+    "b51291e4": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained script change without sockets; alternation",
+      "review": "lead R1 PASS; landed f0ed97f2e; worktree-cache-test passed; code-review R1 failed (run efb94dd6): F1 self-test leaks default-root temp dirs. Rework 1 to Claude Haiku. Rework 1 (64a2866c4) passed lead review; re-landing. Re-landed 2283280fa; worktree-cache-test passed; code-review R2 failed (run 19301ebb): new F1, protocol.md:176 hand-maintained config list omits LEAD_WORKTREE_TMP_ROOT (@/inv/single-source-prose); R1 F1 closed. Rework 2 of 2 to Codex gpt-6-astra. Re-landed dbbb1cb8b; code-review R3 passed; closed 35d88652d. Dispatch now makes per-worktree TMPDIRs: this host passes LEAD_WORKTREE_TMP_ROOT=/mnt/nvme/jit/tmp to dispatch and reclaim (steward worker-TMPDIR rule)."
+    },
+    "9be5b0de": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna (high)",
+      "reason": "mechanical renderer dedup",
+      "note": "resumed after quiet window",
+      "review": "lead R1 FAIL: -4 vs >=25; dep.rs helper with two bool flags +26; rework to Option<String> heading helper. Rework 1 to Codex luna. Rework 1: -22 (dep.rs +7, labelled sections not routed through helper). Rework 2 of 2 (last) to Codex. Worker attempted `jit recover` (failed, forbidden). Rework 2 committed by lead; production-lines delta -23 vs >=25. Escalated (options a/b/c)."
+    },
+    "f82a2e4a": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "classifier routing with contract tests",
+      "review": "lead PASS at 2cad00a53: edge codes via classify_code (generic -> DependencyError), render_checker table, with_warnings takes Display; -60 lines"
+    },
+    "10fdad38": {
+      "status": "done",
+      "note": "resumed after quiet window",
+      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate). Landed; code-review 148117fc: add_reducing_edge recreates wrapper vs REQ-03 (helper came from lead's rework-1 review). Escalated. REQ-03 amended + D-01; code-review rerun passed; closed."
+    },
+    "3b696589": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement",
+      "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)",
+      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite Landed; code-review 8f278006: F1 unjoined stderr collector race, F2 no committed 20+20 evidence. Rework 1 to same worker. Rework 1 (cef206e33, 46cc5e1): lead PASS; wait_for_exit joins the collector and returns ExitedServer.log; evidence note dev/active/3b696589/req-04-evidence.md (lead links after landing). Re-landed; all gates passed; evidence linked; closed."
+    },
+    "f7a59f5f": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 storage-only, medium",
+      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
+      "review": "lead PASS: Arc image + token, token-based apply check, conformance test both backends; +42 lines (b697a3f7 ledger)"
+    },
+    "f56bad8d": {
+      "status": "done",
+      "vendor": "Codex gpt-6-astra",
+      "reason": "b697a3f7 one-file domain, small",
+      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
+      "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
+    },
+    "4575a03d": {
+      "status": "done",
+      "epic": "v1-release (taken on per 6a)",
+      "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)",
+      "vendor": "Claude Sonnet",
+      "reason": "v1-release bug blocking b697a3f7 track B",
+      "review": "lead PASS: retains_source_in_place (permanent or outside root), 7 archive copies removed, REQ-06 config commit separate; lead repointed 7 doc links (97af5f750); Notes corrected (2fbfbda6c). Worker briefly ran git checkout --detach (restored)."
+    },
+    "8fbf8c43": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "N2 handler aliases; before f87f9b00/3f816619/24a982b7; no renames",
+      "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
+    },
+    "1ade3e6f": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "reason": "b697a3f7 track B; large config assembler",
+      "epic": "b697a3f7",
+      "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
+    },
+    "f87f9b00": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "gate status handler move; first of the four remaining moves",
+      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114 Lead merged main (8e9b1242e); landed; code-review 3b158db1: F1 RFC 3339 attestation timestamp regression (rework 1), F2 uniform findings-stderr (D-01 asked). Rework 1 at 33459be46: F1 not reproducible (same format string over the same to_rfc3339 String; lead verified GateRunSummary.started_at: String from to_rfc3339); pinning test added. D-01 recorded for F2. Re-landing with one code-review rerun."
+    },
+    "24a982b7": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
+      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker. Rework 1 at 3c9dd70af: lead PASS; StatusSummary restored, From into output; +35 on top of the first landing's -8."
+    },
+    "ceaaf0ab": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 4575a03d; worker checks criteria first",
+      "epic": "b697a3f7",
+      "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored). Landing CI: all tests passed, suite-clock budget failed (38.9 s vs 30 s) from a cold doctest build (25.2 s; cold 20.3 s / warm 3.2 s on rerun). Asked 6a for a fresh landing. Steward approved one fresh landing (D-56); land-one now retries a budget-only overrun with a cold doctest step once."
+    },
+    "3f816619": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "reason": "largest remaining move (~580 main.rs lines, 10 leaves)",
+      "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing.",
+      "note": "worker merged main (551de466c, 55aeef4c7); one listing helper; -105"
+    },
+    "5d09e74b": {
+      "status": "done",
+      "review": "lead PASS at ec563eba2: domain/relative_path.rs, all importers moved, stale comment gone, structural test; +27 (b697a3f7 ledger)",
+      "epic": "b697a3f7"
+    },
+    "d58f80c9": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
+      "epic": "b697a3f7",
+      "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger) Branch CI: archive preview/execute fail beside an unreadable subtree (regression). Rework 1 to same worker. Rework 1 at fd8febcf6: is_permission_denied also matches CapabilityFsError::Io PermissionDenied; lead checked remaining RepositoryStateStoreError downcasts (lock timeout, leftover record) are unaffected. +31 (b697a3f7 ledger)."
+    },
+    "b23b1bf3": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "reason": "last handler move; empties the legacy schema table",
+      "review": "lead PASS on substance at b13b90778: gate evaluate/evaluate-all/evaluate-many/fail leaves, unmigrated clause gone, GateError/GateCheckError unconstructed; -26. Merging main empties the legacy table; worker deletes the obsolete legacy-table test, lookup left to da30b92a.",
+      "note": "merged main 644e7b0f0; legacy table empty (lookup left for da30b92a); dead main.rs gate helpers removed; -53"
+    },
+    "01a88d32": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after d58f80c9; worker checks criteria first",
+      "epic": "b697a3f7",
+      "review": "lead R1 FAIL: deleted the fsync-before-write test leaving the property unowned (orthogonal-tests); rest PASS (DataRoot handle commit, -3). Rework 1 at 41838806d: lead PASS; DataRoot::sync with cfg(test) refusal seam, test owns fsync-before-write; rebind argument sound; -1 (b697a3f7 ledger)."
+    },
+    "945f9181": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "reason": "b697a3f7 track A start (large); after 3f816619",
+      "epic": "b697a3f7"
+    },
+    "c517b88b": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "reason": "b697a3f7 track B; large (plan context, files_published event, both backends); worker checks criteria first",
+      "epic": "b697a3f7",
+      "note": "F1 fixed (context.begin before files_published); gate-run ID overlap checked: all three gate-run plan paths (mod.rs captured issue mutation, precheck error, release) carry gate events, so the generic event never shares a plan with a gate run"
+    },
+    "5687e281": {
+      "status": "done",
+      "vendor": "Claude Opus"
+    },
+    "da30b92a": {
+      "status": "done",
+      "vendor": "Codex gpt-6.1-sol",
+      "reason": "redispatch after 5687e281"
+    },
+    "b674382e": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna",
+      "epic": "b697a3f7"
+    },
+    "ae3f4f8b": {
+      "status": "done",
+      "vendor": "Codex gpt-6-astra"
+    },
+    "eaca3f52": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "epic": "b697a3f7"
+    },
+    "635f23c7": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "epic": "b697a3f7",
+      "note": "merged ce7406bbd; code-review F1 rejection same-session proof, F2 batch first_ready_at/no-demotion assertions"
+    },
+    "8b3cce62": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "note": "merged 87938c3d3 (cargo-ci, mcp-ci passed); code-review F1: admit exempts universal codes from findings declarations"
+    },
+    "0bc448fb": {
+      "status": "done",
+      "vendor": "Codex gpt-6.1-sol"
+    },
+    "6acd7a05": {
+      "status": "done",
+      "vendor": "Codex gpt-6-luna",
+      "note": "merged fad481d3e; code-review F1 stale archive execution field in cli-commands.md:417; lead fixed"
+    },
+    "fb38bf1f": {
+      "status": "in_progress",
+      "note": "rescoped by plan D-59 to commands-import-no-output (REQ-01..03)"
+    },
+    "578ed10d": {
+      "status": "done",
+      "vendor": "Claude Opus",
+      "epic": "b697a3f7",
+      "note": "merged 56626345e; code-review F1 missing ReadSessionOpen race test (REQ-04)"
+    },
+    "5f12265a": {
+      "status": "done",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session",
+      "model": "gpt-6.1-sol",
+      "review": {
+        "verdict": "PASS",
+        "gates": "worktree-cache-test and code-review passed",
+        "criteria": {
+          "REQ-01": "incremental directories excluded and removed",
+          "REQ-02": "general suffix grouping retains newest coherent generation",
+          "REQ-03": "128 passing cache assertions over rsync/cp paths",
+          "REQ-04": "repeat fixture harvest does not grow pool",
+          "REQ-05": "script header and dispatch protocol updated"
+        },
+        "prior_findings": "R1 F1 closed at reclaim-worker-worktree.sh:72 and test-worktree-cache.sh:199/251",
+        "stale_narrative": "protocol current; obsolete growth claim replaced",
+        "deferred_items": "no linked documents",
+        "holistic": "retains fallback and artifact companions; zero Rust production delta"
+      }
+    },
+    "f855d631": {
+      "status": "done",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session",
+      "model": "gpt-6-luna",
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and code-review passed",
+        "criteria": {
+          "REQ-01": "Cargo.toml test incremental=false with reason",
+          "REQ-02": "clean build and one targeted test with override unset; zero incremental file bytes",
+          "REQ-03": "policy test and build budgets pass",
+          "REQ-04": "testing guide and budget README describe manifest policy"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "no live stale policy in changed surfaces; prior benchmark explicitly historical",
+        "deferred_items": "no linked design documents",
+        "holistic": "same manifest policy governs ordinary and gate builds; no production Rust change"
+      }
+    },
+    "75b46be9": {
+      "status": "done",
+      "note": "Landed649d398b3; all gates passed; approved30% floor met",
+      "model": "gpt-6.1-sol",
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and code-review passed",
+        "criteria": {
+          "REQ-01": "both profiles unpacked",
+          "REQ-02": "31.436850% measured reduction, README commands",
+          "REQ-03": "recorded workspace source-line backtrace",
+          "REQ-04": "1234MiB budget,9.935078% headroom",
+          "REQ-05": "policy assertion and5038 tests25doctests passed"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "no stale live references; historical measurements labeled",
+        "deferred_items": "no linked design documents",
+        "holistic": "zero production Rust delta; shared profile policy"
+      }
+    },
+    "b22aabce": {
+      "status": "in_progress",
+      "note": "two-suite consolidation with exact inventory preservation",
+      "model": "gpt-6.1-sol high"
+    },
+    "0546fc82": {
+      "status": "backlog"
+    },
+    "083c9a91": {
+      "status": "done"
+    },
+    "0ba00a6f": {
+      "status": "done"
+    },
+    "0eca332a": {
+      "status": "ready"
+    },
+    "1002524a": {
+      "status": "done"
+    },
+    "1539da29": {
+      "status": "done"
+    },
+    "1874e265": {
+      "status": "done"
+    },
+    "22189592": {
+      "status": "done"
+    },
+    "233f4a09": {
+      "status": "done"
+    },
+    "27387b92": {
+      "status": "done"
+    },
+    "27f0a575": {
+      "status": "done"
+    },
+    "2e0f276b": {
+      "status": "done"
+    },
+    "2e7e1348": {
+      "status": "done"
+    },
+    "2f15d48d": {
+      "status": "done"
+    },
+    "334c12e7": {
+      "status": "done"
+    },
+    "46fe7593": {
+      "status": "backlog"
+    },
+    "487f45a9": {
+      "status": "in_progress"
+    },
+    "5962427b": {
+      "status": "done"
+    },
+    "5d0a9a90": {
+      "status": "done"
+    },
+    "650e6a56": {
+      "status": "done"
+    },
+    "6f49f3b3": {
+      "status": "done"
+    },
+    "719a5501": {
+      "status": "done"
+    },
+    "7a7d0bfe": {
+      "status": "done"
+    },
+    "83e6cb8d": {
+      "status": "done"
+    },
+    "8b7f2973": {
+      "status": "done"
+    },
+    "93aaba24": {
+      "status": "done"
+    },
+    "985c2b15": {
+      "status": "done"
+    },
+    "9ca31c64": {
+      "status": "done"
+    },
+    "9cc3056a": {
+      "status": "done"
+    },
+    "9fa12e75": {
+      "status": "done"
+    },
+    "a015dcbb": {
+      "status": "done"
+    },
+    "a08c4b38": {
+      "status": "backlog"
+    },
+    "a24b11aa": {
+      "status": "done"
+    },
+    "a3a99cf8": {
+      "status": "done"
+    },
+    "a807e699": {
+      "status": "done"
+    },
+    "abe555e9": {
+      "status": "done"
+    },
+    "bc7eb715": {
+      "status": "done"
+    },
+    "c06daf50": {
+      "status": "ready"
+    },
+    "d05b5639": {
+      "status": "done"
+    },
+    "d4373d07": {
+      "status": "done"
+    },
+    "d8176fd3": {
+      "status": "done"
+    },
+    "d84a7bfa": {
+      "status": "done"
+    },
+    "dbd05242": {
+      "status": "done"
+    },
+    "df129d9e": {
+      "status": "backlog"
+    },
+    "ef9897ab": {
+      "status": "done"
+    },
+    "f35c86de": {
+      "status": "ready"
+    },
+    "f487aeef": {
+      "status": "ready"
+    },
+    "f79d2510": {
+      "status": "done"
+    },
+    "f7f01654": {
+      "status": "done"
+    },
+    "f9977efd": {
+      "status": "backlog"
+    },
+    "fb2dc5c3": {
+      "status": "backlog"
+    },
+    "fba8d478": {
+      "status": "backlog"
+    },
+    "fd2073b7": {
+      "status": "done"
+    },
+    "fe3ad1b0": {
+      "status": "backlog"
     }
+  },
+  "handoff": {
+    "file": "handoff-13.md",
+    "from": "Codex session13",
+    "date": "2026-11-04"
+  },
+  "lead": "Codex execution lead (session 13)",
+  "b697a3f7_execution": {
+    "ruling": "user via 6a 2026-11-04: lead executes 693a2fdd, 65aafaba, c0775a83, 19404174 and their b697a3f7 deps as b697a3f7 issues; separate ledger",
+    "track_A_bulk": [
+      "945f9181",
+      "b674382e",
+      "635f23c7",
+      "c2b3cefa",
+      "d2acb105",
+      "fe9147fa",
+      "693a2fdd"
+    ],
+    "track_B_infra": {
+      "parallel_ready": [
+        "1ade3e6f",
+        "f7a59f5f",
+        "f56bad8d"
+      ],
+      "chain": [
+        "ceaaf0ab",
+        "5d09e74b",
+        "d58f80c9",
+        "01a88d32",
+        "c517b88b",
+        "eaca3f52",
+        "578ed10d"
+      ]
+    },
+    "external_blockers": {
+      "4575a03d": "v1-release bug (ceaaf0ab)",
+      "git-cli-module": [
+        "d9ba0029 (65aafaba)",
+        "7cd27db8 (30334066)"
+      ]
+    },
+    "status": "done: f56bad8d, f7a59f5f, 4575a03d, 1ade3e6f, ceaaf0ab; next track B 5d09e74b; track A 945f9181 after 3f816619",
+    "criteria_check_2026_11_04": {
+      "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
+      "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
+      "f7a59f5f": "valid; cites drifted; medium; storage-only",
+      "f56bad8d": "valid; small; one file",
+      "4575a03d": "defect present; REQ-05 partly stale (f2532a2d copies gone); no deps/gates - needs gates added (scope -> 6a)"
+    }
+  },
+  "host_windows": [
+    {
+      "what": "gf2 benchmark",
+      "when": "2026-11-05 04:00 Europe/Helsinki (~15 min)",
+      "rules": "from 03:30 no new dispatch/landing/CI; by 03:55 no cargo/npm/test from lead or workers; hold until 6a releases",
+      "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)",
+      "status": "cancelled by 6a 2026-11-04 (gf2 session closed); 03:30 timer disarmed; full parallelism"
+    }
+  ],
+  "f487aeef_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
+  "notes_for_tasks": {
+    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
+    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
+    "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
+  },
+  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a.",
+  "incidents": [
+    {
+      "date": "2026-11-04",
+      "issue": "c517b88b",
+      "merge": "973bb01b6",
+      "what": "cargo-ci gate suite-build link failure (undefined hidden drop_glue symbol for btree SplitResult<..PinnedTargetRead..>) with sccache in use; branch CI on the same commit passed minutes earlier",
+      "ruling": "6a: one re-evaluation with CARGO_CI_NO_SCCACHE=1 under the same locks; a repeat failure is a content verdict; a recurrence that disappears without sccache goes to 6a (would make authoritative runs sccache-free)"
+    }
+  ],
+  "session_13": {
+    "phase": "critical build footprint",
+    "preference": "Simplify; prefer net negative production lines without weakening criteria",
+    "waves": [
+      [
+        "5f12265a",
+        "f855d631"
+      ],
+      [
+        "75b46be9"
+      ],
+      [
+        "b22aabce"
+      ]
+    ],
+    "models": {
+      "5f12265a": "gpt-6.1-sol high: cache generation selection and shell tests",
+      "f855d631": "gpt-6-luna high: bounded profile policy and documentation",
+      "75b46be9": "gpt-6.1-sol high: measured compiler/debug behavior and budget calibration"
+    },
+    "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
+    "status": "both scope decisions approved; resume split-debug landing",
+    "measurements": {
+      "f855d631": {
+        "merge": "437c7ccfd",
+        "production_delta": 0,
+        "incremental_bytes": 0,
+        "branch_tests": 5037,
+        "branch_doctests": 25
+      },
+      "5f12265a": {
+        "branch_commit": "27f5fa4c6",
+        "shell_assertions_passed": 128,
+        "production_delta": 0,
+        "merges": [
+          "acabe5453",
+          "61cdc4ec4"
+        ]
+      },
+      "75b46be9": {
+        "branch_commit": "1daddafd1",
+        "before_bytes": 1716674768,
+        "after_bytes": 1177006296,
+        "reduction_percent": 31.43685,
+        "budget_bytes": 1293942784,
+        "branch_tests": 5038,
+        "branch_doctests": 25,
+        "backtrace": "workspace source file/line preserved",
+        "criterion": "user-approved30% floor met"
+      }
+    },
+    "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
+    "ownership_reconciliation": "Approved and recorded as epic D-05 and story D-01; plan reconciled",
+    "current_wave": 3,
+    "open_decisions": []
+  },
+  "session_14": {
+    "status": "split-debug done; suite consolidation active",
+    "approvals": [
+      "75b46be9 floor30%",
+      "D-59 ownership wording"
+    ],
+    "timing": "remains deferred; preserve dynamic sharing",
+    "split_debug_merge": "649d398b3",
+    "production_delta": 0,
+    "active_wave": [
+      "b22aabce",
+      "fb38bf1f",
+      "487f45a9"
+    ],
+    "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git."
   }
 }

@@ -1,20 +1,42 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:56.440144180Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
+    "12c0f3fb-fde6-4504-aac0-773b435f0a83",
     "2e7e1348-869e-47dc-af07-29c21b40fdc0",
-    "a015dcbb-a124-4168-872f-16f7dd5f2f7d",
-    "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
+    "a015dcbb-a124-4168-872f-16f7dd5f2f7d"
   ],
-  "description": "The archive arms print bare documents outside the success envelope. This moves the archive group to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ArchiveCommands::Candidates` and the execute and preview paths of `ArchiveCommands::{Document, Container}` print bare serialized documents outside the success envelope, so they lack the `message` the envelope adds. Their human views already use `output::render_archive_plan`, `render_archive_candidates` and the shared archive-execution renderer. The archive leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `archive candidates|document|container` to a handler in `crates/jit/src/dispatch/archive.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: Each archive result prints through the one success emitter as its registered typed response, and a test states the enveloped payload for `archive candidates`.\n- [hard] REQ-03: The schema names a typed response for each archive leaf.\n- [hard] REQ-04: `ArchiveCandidates` and `ArtifactPlan` (`crates/jit/src/domain/artifact_plan.rs`) derive their `count` through `ListEnvelope` instead of storing it, their serialized shape is unchanged, and a test states that shape and the rejection of a mismatched stored `count`.\n- [hard] REQ-05: The handler returns failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-06: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-07: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "The archive arms print bare documents outside the success envelope. This moves the archive group to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ArchiveCommands::Candidates` and the execute and preview paths of `ArchiveCommands::{Document, Container}` print bare serialized documents outside the success envelope, so they lack the `message` the envelope adds. Their human views already use `output::render_archive_plan`, `render_archive_candidates` and the shared archive-execution renderer. The archive leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `archive candidates|document|container` to a handler in `crates/jit/src/dispatch/archive.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: Each archive result prints through the one success emitter as its registered typed response, and a test states the enveloped payload for `archive candidates`.\n- [hard] REQ-03: The schema names a typed response for each archive leaf.\n- [hard] REQ-04: `ArchiveCandidates` and `ArtifactPlan` (`crates/jit/src/domain/artifact_plan.rs`) derive their `count` through `ListEnvelope` instead of storing it, their serialized shape is unchanged, and a test states that shape and the rejection of a mismatched stored `count`.\n- [hard] REQ-05: The handler returns failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-06: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-07: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:38:20.250347331Z",
+  "first_ready_at": "2026-11-03T23:08:01.454187719Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4acbc865-27fa-4c1f-be5d-c7355cc640c9",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.520695600Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "492a1a23-9e79-4b96-a8ed-32e7573d93d6",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:32:53.455380180Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "b13f47e8-6153-4bb0-8c32-50ab8b4774dd",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.648536164Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3cf69ecf-5ec1-4cb1-855f-100aa76f7520",
   "labels": [
     "type:task",
@@ -30,7 +52,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Archive commands move to library handlers",
-  "updated_at": "2026-10-21T10:40:10.777988526Z"
+  "updated_at": "2026-11-04T09:38:20.250347331Z"
 }

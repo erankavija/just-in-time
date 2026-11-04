@@ -207,16 +207,9 @@ enforce several items.
 
 > **Enforcement lives in `.jit/rules.toml`.** The [Validation section of the
 > Configuration Reference](configuration.md#validation) is the canonical
-> statement of the rules a bare repository receives and the workflow package's
-> contributions. The built-in rules described there are `origin = "default"`:
-> they derive their
-> assertion — and the family's membership — from the
-> `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
-> `[namespaces.<name>]` table's `unique` flag and its membership drive them
-> directly (declaring a namespace enforces it on the next command, no
-> regeneration; the next jit-driven config write also syncs the matching
-> rows into `rules.toml` for addressability). To add constraints the defaults do
-> not cover — allowed values,
+> statement of default rules, how config writes and `jit validate --fix`
+> restore their rows in `rules.toml`, and how to disable a default rule.
+> To add constraints the defaults do not cover — allowed values,
 > value patterns, required namespaces — author a custom rule in `rules.toml`,
 > e.g.:
 
@@ -375,9 +368,7 @@ Both accept `--json` and emit the list envelope:
 jit issue update <id> --label "epic:auth"
 # If already present, no error (idempotent)
 
-# Add multiple labels atomically (comma-separated)
-jit issue update <id> --label epic:auth,component:backend
-# Or use repeated flags
+# Add multiple labels atomically (repeat the flag)
 jit issue update <id> --label epic:auth --label component:backend
 # All or nothing - if any invalid, none added
 
@@ -392,7 +383,7 @@ jit issue update <id> --type bug
 ```
 
 `--label` has the alias `--add-label` and the short form `-l`. Both `--label` and
-`--remove-label` are repeatable and accept comma-separated values.
+`--remove-label` are repeatable, one label per flag, and a comma is part of the label's name. `--label epic:a,component:b` names one malformed label, which the format rule blocks unless `--force` is passed. `--remove-label` removes a stored label of that exact name; removing a label the issue lacks fails and removes nothing.
 
 ---
 

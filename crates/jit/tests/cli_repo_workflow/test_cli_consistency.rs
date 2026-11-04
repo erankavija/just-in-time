@@ -5,23 +5,8 @@
 //! 2. Consistent argument order (ID first, then flags)
 //! 3. Predictable output format
 
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(jit_binary())
-        .args(["init"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    temp
-}
 
 // ============================================================================
 // Test: issue create --json
@@ -29,18 +14,11 @@ fn setup_repo() -> TempDir {
 
 #[test]
 fn test_issue_create_supports_json() {
-    let repo = setup_repo();
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test task", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command should succeed");
-
-    // Should return valid JSON
-    let json: Value = serde_json::from_slice(&output.stdout).expect("Output should be valid JSON");
+    let json = cli
+        .run_json(["issue", "create", "-t", "Test task"])
+        .expect("Output should be valid JSON");
 
     // Should contain id field
     assert!(json["id"].is_string(), "Should have 'id' field");
@@ -50,23 +28,15 @@ fn test_issue_create_supports_json() {
 
 #[test]
 fn test_issue_create_without_json_is_human_readable() {
-    let repo = setup_repo();
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test task"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = cli.run(["issue", "create", "-t", "Test task"]).unwrap();
 
     // Should contain human-readable text (not JSON)
     assert!(stdout.contains("Created issue:"));
 
     // Should NOT be valid JSON
-    assert!(serde_json::from_slice::<Value>(&output.stdout).is_err());
+    assert!(serde_json::from_str::<Value>(&stdout).is_err());
 }
 
 // ============================================================================
@@ -75,39 +45,19 @@ fn test_issue_create_without_json_is_human_readable() {
 
 #[test]
 fn test_issue_update_supports_json() {
-    let repo = setup_repo();
-
-    // Create issue first
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let create_json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = create_json["id"].as_str().unwrap();
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Test"]).unwrap();
 
     // Update with JSON output
-    let output = Command::new(jit_binary())
-        .args(["issue", "update", id, "--title", "Updated", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("Output should be valid JSON");
+    let json = cli
+        .run_json(["issue", "update", &id, "--title", "Updated"])
+        .expect("Output should be valid JSON");
 
     // `issue update --json` returns a lean confirmation (id, short_id,
     // state, updated_at). Verify the mutation took effect via `issue show`.
     assert_eq!(json["id"].as_str().unwrap(), id);
 
-    let show = Command::new(jit_binary())
-        .args(["issue", "show", id, "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-    let show_json: Value = serde_json::from_slice(&show.stdout).unwrap();
+    let show_json = cli.run_json(["issue", "show", &id]).unwrap();
     assert_eq!(show_json["title"].as_str().unwrap(), "Updated");
 }
 
@@ -117,38 +67,15 @@ fn test_issue_update_supports_json() {
 
 #[test]
 fn test_issue_claim_takes_id_first() {
-    let repo = setup_repo();
-
-    // Create ready issue
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["id"].as_str().unwrap();
-
-    // Set to ready
-    Command::new(jit_binary())
-        .args(["issue", "update", id, "--state", "ready"])
-        .current_dir(repo.path())
-        .status()
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Task"]).unwrap();
+    cli.run(["issue", "update", &id, "--state", "ready"])
         .unwrap();
 
     // Claim with ID first (NEW ORDER)
-    let output = Command::new(jit_binary())
-        .args(["issue", "claim", id, "agent:test", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "Claim with ID-first order should work"
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("Should return JSON");
+    let json = cli
+        .run_json(["issue", "claim", &id, "agent:test"])
+        .expect("Claim with ID-first order should work");
 
     assert_eq!(json["id"].as_str().unwrap(), id);
     assert_eq!(json["assignee"].as_str().unwrap(), "agent:test");
@@ -156,31 +83,14 @@ fn test_issue_claim_takes_id_first() {
 
 #[test]
 fn test_issue_claim_supports_json() {
-    let repo = setup_repo();
-
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["id"].as_str().unwrap();
-
-    Command::new(jit_binary())
-        .args(["issue", "update", id, "--state", "ready"])
-        .current_dir(repo.path())
-        .status()
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Task"]).unwrap();
+    cli.run(["issue", "update", &id, "--state", "ready"])
         .unwrap();
 
     // Claim without --json should be human-readable
-    let output_text = Command::new(jit_binary())
-        .args(["issue", "claim", id, "agent:test"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
+    let stdout = cli.run(["issue", "claim", &id, "agent:test"]).unwrap();
 
-    let stdout = String::from_utf8_lossy(&output_text.stdout);
     assert!(stdout.contains("Claimed issue:") || stdout.contains("claimed"));
 }
 
@@ -190,21 +100,14 @@ fn test_issue_claim_supports_json() {
 
 #[test]
 fn test_issue_delete_supports_json() {
-    let repo = setup_repo();
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Task"]).unwrap();
 
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["id"].as_str().unwrap();
-
-    let output = Command::new(jit_binary())
-        .args(["issue", "delete", id, "--json"])
-        .env("JIT_ALLOW_DELETION", "1")
-        .current_dir(repo.path())
+    let output = cli
+        .command_with_env(
+            ["issue", "delete", &id, "--json"],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
         .output()
         .unwrap();
 
@@ -222,40 +125,18 @@ fn test_issue_delete_supports_json() {
 
 #[test]
 fn test_issue_release_supports_json() {
-    let repo = setup_repo();
+    let cli = JitCli::initialised().unwrap();
 
     // Create and claim issue
-    let create_output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Task", "--json"])
-        .current_dir(repo.path())
-        .output()
+    let id = cli.create_issue(["-t", "Task"]).unwrap();
+    cli.run(["issue", "update", &id, "--state", "ready"])
         .unwrap();
-
-    let json: Value = serde_json::from_slice(&create_output.stdout).unwrap();
-    let id = json["id"].as_str().unwrap();
-
-    Command::new(jit_binary())
-        .args(["issue", "update", id, "--state", "ready"])
-        .current_dir(repo.path())
-        .status()
-        .unwrap();
-
-    Command::new(jit_binary())
-        .args(["issue", "claim", id, "agent:test"])
-        .current_dir(repo.path())
-        .status()
-        .unwrap();
+    cli.run(["issue", "claim", &id, "agent:test"]).unwrap();
 
     // Release with JSON
-    let output = Command::new(jit_binary())
-        .args(["issue", "release", id, "Test", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("Should return JSON");
+    let json = cli
+        .run_json(["issue", "release", &id, "Test"])
+        .expect("Should return JSON");
 
     assert_eq!(json["id"].as_str().unwrap(), id);
     assert!(json["assignee"].is_null(), "Assignee should be cleared");
@@ -267,19 +148,13 @@ fn test_issue_release_supports_json() {
 
 #[test]
 fn test_json_output_has_consistent_structure() {
-    let repo = setup_repo();
+    let cli = JitCli::initialised().unwrap();
 
     // All mutation commands should return similar structure with at least:
     // - id field
     // - relevant issue data
 
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", "Test", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let json = cli.run_json(["issue", "create", "-t", "Test"]).unwrap();
 
     // Check for expected fields
     assert!(json.is_object(), "Root should be an object");

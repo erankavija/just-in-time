@@ -1,0 +1,53 @@
+{
+  "branch": "worktree-agent-acb38457",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "028b249a29696bda4bd8d483861c3ec92e759e56",
+  "completed_at": "2026-10-25T02:49:30.348496307Z",
+  "duration_ms": 185514,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/graph/hierarchy.rs",
+        "id": "F1",
+        "line": 431,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/acb38457/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "EdgeView changes stored dependency IDs from &[String] to Vec<&str>, violating REQ-02."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/graph/hierarchy.rs",
+        "id": "F2",
+        "line": 428,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The EdgeView comment still claims it borrows an edge slice although it owns a Vec<&str>."
+      }
+    ],
+    "summary": "EdgeView changes its stored dependency-ID representation despite REQ-02; one stale comment is advisory.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a92f7048-6f15-4a56-b878-c7f02fe98163",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T02:46:24.834104981Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2795 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-acb38457\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a170f3-bfe4-79b2-b493-c778e54c08db\n--------\nuser\n--- 2782 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b93356e1a (`jit:acb38457`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/acb38457/requirement/REQ-02 (issue description); @/issue/2195c98f/requirement/REQ-01 (issue description); @/invariant/semantic-types and @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T02:44:50Z); code-review pending\nTruncation recovery: recovered crates/jit/src/graph/mod.rs:353-900 after the aggregated source read truncated\n\n1. **[blocking][issue-impact] F1** — `crates/jit/src/graph/hierarchy.rs:431` changes `EdgeView`’s stored dependency IDs from `&[String]` to `Vec<&str>` (`:447`), violating hard REQ-02’s requirement that each implementor retain the type of IDs it stores. Reference: `@/issue/acb38457/requirement/REQ-02`.\n2. **[advisory][issue-impact] F2** — `crates/jit/src/graph/hierarchy.rs:428` still says `EdgeView` borrows an edge slice, but it now owns a `Vec<&str>` of borrowed IDs. The comment is stale. Reference: `@/invariant/essential-code-prose`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"EdgeView changes its stored dependency-ID representation despite REQ-02; one stale comment is advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"EdgeView changes stored dependency IDs from &[String] to Vec<&str>, violating REQ-02.\",\"file\":\"crates/jit/src/graph/hierarchy.rs\",\"line\":431,\"references\":[\"@/issue/acb38457/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The EdgeView comment still claims it borrows an edge slice although it owns a Vec<&str>.\",\"file\":\"crates/jit/src/graph/hierarchy.rs\",\"line\":428,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

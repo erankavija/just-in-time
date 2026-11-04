@@ -1,11 +1,8 @@
-//! Tests mutate process-wide state only through the shared scoped guards
-//! (`@/inv/orthogonal-tests`).
+//! No code changes the process environment or working directory, so every
+//! test may read them and pass in parallel (`@/inv/orthogonal-tests`); a value
+//! a test varies reaches the code under test explicitly.
 
 use std::path::{Path, PathBuf};
-
-/// The one file defining the guards that serialise and restore the process
-/// environment and working directory.
-const GUARD_SOURCE: &str = "jit/src/test_utils.rs";
 
 const PROCESS_STATE_MUTATORS: [&str; 3] = [
     concat!("set_", "var("),
@@ -46,9 +43,9 @@ fn mutator_lines(source: &str) -> Vec<(usize, &str)> {
 }
 
 #[test]
-fn test_mutator_lines_flags_unguarded_test_mode_mutation_and_skips_comments() {
+fn test_mutator_lines_flags_an_environment_mutation_and_skips_comments() {
     let source = format!(
-        "// std::env::{set}(\"A\", \"1\");\nfn f() {{\n    std::env::{remove}(\"JIT_TEST_MODE\");\n}}\n",
+        "// std::env::{set}(\"A\", \"1\");\nfn f() {{\n    std::env::{remove}(\"JIT_AGENT_ID\");\n}}\n",
         set = concat!("set_", "var"),
         remove = concat!("remove_", "var"),
     );
@@ -58,11 +55,10 @@ fn test_mutator_lines_flags_unguarded_test_mode_mutation_and_skips_comments() {
 }
 
 #[test]
-fn test_workspace_mutates_process_state_only_in_the_shared_guards() {
+fn test_workspace_never_mutates_process_state() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let violations = rust_sources(&workspace.join("crates"))
         .into_iter()
-        .filter(|path| !path.ends_with(GUARD_SOURCE))
         .flat_map(|path| {
             let source = std::fs::read_to_string(&path).unwrap();
             mutator_lines(&source)
@@ -73,8 +69,8 @@ fn test_workspace_mutates_process_state_only_in_the_shared_guards() {
         .collect::<Vec<_>>();
     assert!(
         violations.is_empty(),
-        "process environment and working directory are changed only through the guards in \
-         crates/{GUARD_SOURCE}; JIT_TEST_MODE through jit::test_mode::enable:\n{}",
+        "pass the value explicitly (`Command::env`, `Command::current_dir`, a parameter) instead \
+         of changing the process environment or working directory:\n{}",
         violations.join("\n")
     );
 }

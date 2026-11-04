@@ -1,0 +1,47 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-01T17:31:18.617777413Z",
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "12ecb90c-eb0c-4c4d-8717-f217217eb5c9",
+    "7abcc22d-c931-4da8-94b0-c9c894333540"
+  ],
+  "description": "Add one pure domain function that, given the issues before and after a mutation, returns the readiness corrections the dependency graph demands for the issues that mutation can affect, and give the command layer one helper that turns those corrections into mutation intents. Deletion, dependency edits and template edges derive their dependents' readiness through it inside their own plan.\n\n## Background\n\n- `Issue::derive_readiness_correction` (`crates/jit/src/domain/types.rs:707-716`) decides one issue: a `Backlog` issue nothing blocks is `Promote`, a `Ready` issue with an unmet dependency is `Demote` (`ReadinessCorrection`, `domain/types.rs:598`). `Issue::is_blocked` (`:666`) reads only `is_dependency_met` (`:144`) of each dependency, so a correction (which moves an issue only between the non-terminal `Backlog` and `Ready`) never changes another issue's blockedness: one pass over the projected set is complete.\n- Every caller chooses its own candidate set by hand: deletion walks the deleted issue's dependents (`derive_issue_deletion`, `crates/jit/src/commands/issue.rs:67-150`, promotion at `:103-140`, through `derive_state_transition`), dependency edits look at the edited source only (`crates/jit/src/commands/dependency.rs:605,964`), template edges look at the edge source (`crates/jit/src/commands/template.rs:1281,1342`), `check_auto_transitions` (`commands/issue.rs:889-905`) scans every issue for promotions only, and `jit validate --fix` scans every issue in both directions.\n- `jit dep rm` promotes the edited source through `derive_state_transition` (`derive_dependency_removal`, `dependency.rs:515`, promotion at `:605-639`); `jit dep add` and the reduction demote directly (`derive_reduced_graph_intents`, `dependency.rs:922`, demotion at `:964-974`).\n- Template application demotes directly on edge addition (`add_captured_template_edge`, `template.rs:1209`, `:1281-1291`) and promotes directly on edge removal, bypassing graph rules (`remove_captured_template_edge`, `template.rs:1305`, `:1342-1353`).\n- `derive_state_transition` (`crates/jit/src/commands/mod.rs:1077`) applies graph rules to a promotion and returns `GraphBlocked` with `transition_blocked` events when one refuses it.\n- Nothing states which issues a mutation can affect, so there is no single place to prove that a correction is neither missed nor applied to unrelated drift.\n\n## Success Criteria\n\n- [hard] REQ-01: A pure domain function takes the issues before a mutation, the issues after it and a scope, and returns each correction as an issue id with its `ReadinessCorrection`, ordered by issue id; it reads no storage and uses `Issue::derive_readiness_correction` for each candidate. The `Affected` scope admits exactly the issues that are new, whose dependency list changed, or that directly depend on an issue whose effective terminal state changed or which was removed; the `All` scope admits every projected issue.\n- [hard] REQ-02: Unit tests cover promotion on a blocker reaching `Done` or `Rejected`, demotion on a blocker leaving a terminal state, demotion on an added edge, promotion on a removed edge or a deleted blocker, and no correction for `InProgress`, `Gated`, terminal or archived dependents.\n- [hard] REQ-03: A property test over generated acyclic issue sets and single edits (state change, edge add or remove, deletion) shows that applying the `Affected` corrections leaves no issue whose stored readiness disagrees with the graph, and that no correction falls outside the `Affected` set.\n- [hard] REQ-04: One helper beside `derive_state_transition` in `crates/jit/src/commands/mod.rs` maps the pure corrections over a base and a projected issue set to mutation intents: a promotion goes through `derive_state_transition` (graph rules apply; a refused promotion records its `transition_blocked` events and its error is reported after apply), a demotion is applied directly with its state-change event.\n- [hard] REQ-05: Issue deletion, `dep add`, `dep rm`, dependency reduction and template edge addition and removal obtain their dependent readiness changes only from that helper; none of them calls `derive_readiness_correction` or `should_auto_transition_to_ready` directly.\n- [hard] REQ-06: For each of the three command families (deletion, dependency edits, template application) one harness test shows the dependent's correction published in the same session as the primary change, and a harness test shows that removing a template edge whose promotion a graph rule refuses leaves the dependent in `Backlog` and records `transition_blocked` (it fails on today's code, which promotes directly).\n\n## Notes\n\n- Behaviour change: promotion after template edge removal now passes graph rules, as deletion and `dep rm` already do (REQ-06).\n- Graph-rule gating of promotions stays in the command layer; the pure function only states what the graph demands.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n- cba1bff8 already derives rejection's dependent promotions inside its own plan, through the path deletion uses; that slice is done here. Closing an issue still promotes dependents in a follow-up mutation (`check_auto_transitions`), which breaches `@/inv/derived-state-coherence` today; this issue tracks that gap.\n",
+  "documents": [],
+  "done_at": "2026-11-04T16:23:55.626127636Z",
+  "first_ready_at": "2026-10-24T21:22:37.717854234Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8873a346-394a-4d7f-8fca-7f28df116423",
+      "status": "passed",
+      "updated_at": "2026-11-04T16:19:13.579276483Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "81957feb-9f22-4f6f-9f45-e38404991d5c",
+      "status": "passed",
+      "updated_at": "2026-11-04T16:23:46.719919847Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "945f9181-1066-4c5b-ac0f-5225bd59a6b0",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:session-coherence",
+    "per:@/charter/D-20",
+    "per:@/charter/D-17",
+    "component:core",
+    "satisfies:b697a3f7/REQ-01"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "One readiness derivation carried into graph-editing commands",
+  "updated_at": "2026-11-04T16:23:55.626127636Z"
+}

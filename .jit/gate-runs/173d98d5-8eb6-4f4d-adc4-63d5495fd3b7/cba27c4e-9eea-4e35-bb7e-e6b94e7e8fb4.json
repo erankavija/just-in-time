@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "324bed2bcc021761df95680f51835696de8a44a8",
+  "completed_at": "2026-10-28T21:54:38.562332070Z",
+  "duration_ms": 270292,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The migration removes the scoped local process/repository/id helpers, consistently uses JitCli including per-process environment overrides, and retains the tested behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "173d98d5-8eb6-4f4d-adc4-63d5495fd3b7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cba27c4e-9eea-4e35-bb7e-e6b94e7e8fb4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T21:50:08.269982636Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3fabc17ad, 7985a3918, ff3755054 (all `jit:173d98d5`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T21:49:46Z); code-review pending\nTruncation recovery: re-read all affected patches by individual path and bounded ranges; separately inspected merge-parent and record-only diffs\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The migration removes the scoped local process/repository/id helpers, consistently uses JitCli including per-process environment overrides, and retains the tested behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

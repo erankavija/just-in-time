@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T06:40:22.490854735Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
     "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
     "c400730c-3c42-47e7-8dc4-5c3d60f1e214"
   ],
-  "description": "Parse and resolve every user-supplied issue-id argument once in the CLI entry point, before any executor call.\n\n## Background\n\n`main.rs` passes raw issue-id arguments from `cli.rs` to executor methods, which resolve them internally through `resolve_issue_id`. Internal callers such as template application and batch creation already hold full ids. `main.rs` holds 88 production issue-id references and truncates short ids with a literal length at `main.rs:3369,3769`. The short-hash tests at `crates/jit/tests/fast_issue/short_hash_tests.rs:156-220` drive executor methods with prefixes.\n\n## Success Criteria\n\n- [hard] REQ-01: Each plain issue-id argument that `main.rs` passes to the executor is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the call.\n- [hard] REQ-02: `cli.rs` argument structs keep raw strings only for values `main.rs` parses, and no other module parses a CLI issue-id argument.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found error class and exit code 3.\n- [hard] REQ-04: Short ids rendered by `main.rs` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-05: Tests that exercise short-prefix input exercise it through the CLI entry point or the resolver, not through executor methods.\n- [hard] REQ-06: `main.rs` holds no interim call-site parse: each issue-id argument is parsed exactly once, at the boundary.\n",
+  "description": "Parse and resolve every user-supplied issue-id argument once in the CLI entry point, before any executor call, and retype the executor families that receive those ids so none of them parses or resolves an id again.\n\n## Background\n\n`main.rs` passes raw issue-id arguments from `cli.rs` to executor methods, which resolve them internally through `resolve_issue_id`. Internal callers such as template application and batch creation already hold full ids. `main.rs` holds 88 production issue-id references and truncates short ids with a literal length at `main.rs:3369,3769`. The short-hash tests at `crates/jit/tests/fast_issue/short_hash_tests.rs:156-220` drive executor methods with prefixes.\n\nResolving at the boundary alone leaves each executor method re-parsing the full id it receives, so the executor families that receive CLI ids are retyped here too. Those families hold several hundred production issue-id references and dozens of raw-id signatures, match ids inline (`commands/gate_check.rs`, `commands/validate.rs`), truncate short ids by length (`commands/graph.rs`, `commands/batch_create.rs`, `commands/validate.rs`), and resolve composite arguments inside the executor: `ArchiveTarget::Container` (`commands/archive.rs`), `DocumentScope::Issue` (`document/scope.rs`), `SnapshotScope::Issue` (`snapshot.rs`), and item-address issue segments (`domain/item.rs`, `commands/item.rs`, matched by hand in `validation/repository.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each plain issue-id argument that `main.rs` passes to the executor is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the call, `issue delete` included: it resolves before its deletion-confirmation check, and the failure-lever registry arm for that check seeds the issue it deletes.\n- [hard] REQ-02: `cli.rs` argument structs keep raw strings only for values `main.rs` parses, and no other module parses a CLI issue-id argument.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found error class and exit code 3.\n- [hard] REQ-04: Short ids rendered by `main.rs` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-05: Tests that exercise short-prefix input exercise it through the CLI entry point or the resolver, not through executor methods.\n- [hard] REQ-06: `main.rs` holds no interim call-site parse: each issue-id argument is parsed exactly once, at the boundary.\n- [hard] REQ-07: `ArchiveTarget::Container`, `DocumentScope::Issue` and `SnapshotScope::Issue` hold `IssueId`, resolved once in the CLI entry point before the executor call.\n- [hard] REQ-08: Item-address issue segments hold `IssueIdPrefix`, parsed when an address is parsed from input or decoded from a document, and resolved through the shared resolver; the hand-written `starts_with` match is gone, and each consumer of an item-address issue segment, including the scope comparison at `validation/graph.rs:140`, compares through `IssueIdPrefix`.\n\n- [hard] REQ-09: No struct field, enum field or function parameter in a family file (the family files are listed under Notes) holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`. Template placeholder ids, which are not issue ids, keep their own type.\n- [hard] REQ-10: Executor methods in these families take `&IssueId` and resolve no prefixes; dependency removal takes the source as `&IssueId` and its targets as `&[IssueId]` and compares them exactly with the source issue's own dependency list, so a dangling dependency can still be removed. Callers that hold full ids, such as templates, batch creation and tests, pass them directly.\n- [hard] REQ-11: The CLI resolves each dependency-removal target once, against the source issue's own dependency ids, through the shared resolver, rejecting an ambiguous prefix.\n- [hard] REQ-12: No production `IssueIdPrefix` parse and no production `resolve_issue_id` call remains in a family file, except the item-address resolution in `commands/item.rs`; the issue-id filters of `events query` and `claim status` pass their boundary-parsed prefix so records of a deleted issue still match.\n- [hard] REQ-13: No inline or hand-written id-prefix match remains in a family file, and short ids there come only from `short_id()`; no site truncates an id by length.\n- [hard] REQ-14: Code in these families, their unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\nThe families are: issue lifecycle (`commands/issue.rs`, `commands/claim.rs`, `commands/labels.rs`, `commands/events.rs`, `commands/bulk_update.rs`, `search.rs`, `query_engine/`); dependency (`commands/dependency.rs`, `commands/graph.rs`, `commands/template.rs`, `commands/template_expand.rs`, `commands/batch_create.rs`); gate (`commands/gate.rs`, `commands/gate_check.rs`, `gate_execution.rs`); executor core (`commands/mod.rs`, `commands/test_helpers.rs`); document (`commands/document.rs`, `commands/archive.rs`, `commands/item.rs`, `commands/validate.rs`).\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. The shared integration-test harness is retyped separately; suite callers that hold `String` ids pass them as `&IssueId` unchanged under the alias.\n",
   "documents": [],
+  "done_at": "2026-10-26T22:13:39.072394900Z",
+  "first_ready_at": "2026-10-25T06:38:48.684952354Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4db7e680-e084-4fcc-ae3b-dc13e6946e4b",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:03:48.367521246Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9d27485e-a927-483c-8179-42479c54fa6b",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:00:39.652804676Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
   "labels": [
     "type:task",
@@ -24,10 +40,13 @@
     "satisfies:2195c98f/REQ-03",
     "satisfies:2195c98f/REQ-17",
     "per:@/charter/D-18",
-    "enforces:@/invariant/semantic-types"
+    "enforces:@/invariant/semantic-types",
+    "satisfies:2195c98f/REQ-01",
+    "component:gates",
+    "component:validation"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "The CLI resolves each issue-id argument once at entry",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T22:13:39.072394900Z"
 }

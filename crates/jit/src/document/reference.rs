@@ -54,7 +54,9 @@ pub enum DocumentReferenceError {
 ///
 /// A capturing caller enqueues every request; [`resolve_document_reference`]
 /// then reads exactly those. Requesting less is a capture error at resolution
-/// time rather than a silently different answer.
+/// time rather than a silently different answer. Resolution reads only each
+/// request's kind, so a caller that does not consume the content may request
+/// it as [`ReadMode::Kind`](crate::repository_state::ReadMode::Kind).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentReferenceRequests {
     worktree: Option<VirtualPath>,
@@ -249,25 +251,10 @@ pub fn resolve_document_reference(
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, FileMode, PinnedDocumentEvidence,
-        PinnedSourceClass, RepositoryEntry, RepositoryLayout, RepositoryRootEvidence,
+        EntryIdentity, PinnedDocumentEvidence, PinnedSourceClass, RepositoryEntry,
     };
+    use crate::test_harness::image::ImageBuilder;
     use crate::test_utils::{document_reference, document_reference_at};
-    use std::collections::BTreeMap;
-
-    const BUDGET: CaptureBudget = CaptureBudget {
-        max_listings: 0,
-        max_bytes: 4096,
-        max_depth: 8,
-    };
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "wt", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
 
     fn present_evidence(revision: &str, path: &str) -> PinnedDocumentEvidence {
         let bytes = b"captured".to_vec();
@@ -315,40 +302,6 @@ mod tests {
         .unwrap()
     }
 
-    /// Close an image over exactly the requests `document` declares, with the
-    /// supplied working-tree presence and pinned evidence.
-    fn image(
-        document: &DocumentReference,
-        in_worktree: bool,
-        evidence: Option<PinnedDocumentEvidence>,
-    ) -> RepositoryImage {
-        let requests = DocumentReferenceRequests::for_reference(document).unwrap();
-        let (revision, path) = requests.pinned();
-        let mut spec = CaptureSpec::new(Vec::new(), BUDGET).unwrap();
-        let mut entries = BTreeMap::new();
-        if let Some(worktree) = requests.worktree() {
-            spec.discover_paths([worktree.clone()]).unwrap();
-            let bytes = b"working tree".to_vec();
-            entries.insert(
-                worktree.clone(),
-                if in_worktree {
-                    RepositoryEntry::File {
-                        content: CapturedBytes::new("wt", bytes).unwrap(),
-                        mode: FileMode::Regular,
-                    }
-                } else {
-                    RepositoryEntry::Absent
-                },
-            );
-        }
-        let mut pinned = BTreeMap::new();
-        if let Some(evidence) = evidence {
-            spec.discover_pinned(revision, path).unwrap();
-            pinned.insert((revision.to_string(), path.to_string()), evidence);
-        }
-        RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), pinned).unwrap()
-    }
-
     #[test]
     fn test_for_reference_requests_only_the_pin_for_a_pinned_reference() {
         let pinned = DocumentReferenceRequests::for_reference(&document_reference_at(
@@ -374,24 +327,24 @@ mod tests {
         let commit = "d".repeat(40);
         let document = document_reference_at("docs/design.md", commit.as_str());
 
-        let present = image(
-            &document,
-            false,
-            Some(present_evidence(&commit, "docs/design.md")),
-        );
+        let present = ImageBuilder::new()
+            .pinned(
+                &commit,
+                "docs/design.md",
+                present_evidence(&commit, "docs/design.md"),
+            )
+            .build();
         assert!(resolve_document_reference(&present, &document)
             .unwrap()
             .is_resolved());
 
-        let absent = image(
-            &document,
-            true,
-            Some(absent_evidence(
+        let absent = ImageBuilder::new()
+            .pinned(
                 &commit,
                 "docs/design.md",
-                "path not in tree",
-            )),
-        );
+                absent_evidence(&commit, "docs/design.md", "path not in tree"),
+            )
+            .build();
         assert!(matches!(
             resolve_document_reference(&absent, &document)
                 .unwrap()
@@ -405,11 +358,13 @@ mod tests {
     fn test_resolve_document_reference_reports_pinned_directory_as_unsupported() {
         let commit = "f".repeat(40);
         let document = document_reference_at("docs/studies", commit.as_str());
-        let image = image(
-            &document,
-            true,
-            Some(directory_evidence(&commit, "docs/studies")),
-        );
+        let image = ImageBuilder::new()
+            .pinned(
+                &commit,
+                "docs/studies",
+                directory_evidence(&commit, "docs/studies"),
+            )
+            .build();
 
         assert!(matches!(
             resolve_document_reference(&image, &document)
@@ -425,7 +380,7 @@ mod tests {
         let commit = "e".repeat(40);
         let document = document_reference_at("docs/design.md", commit.as_str());
         assert!(matches!(
-            resolve_document_reference(&image(&document, true, None), &document)
+            resolve_document_reference(&ImageBuilder::new().build(), &document)
                 .unwrap()
                 .unresolved(),
             Some(UnresolvedDocumentReference::PinNotCaptured { .. })
@@ -437,40 +392,41 @@ mod tests {
         let document = document_reference("docs/design.md");
 
         assert!(resolve_document_reference(
-            &image(
-                &document,
-                true,
-                Some(absent_evidence(
+            &ImageBuilder::new()
+                .file("docs/design.md", "working tree")
+                .pinned(
                     UNPINNED_REVISION,
                     "docs/design.md",
-                    "deleted"
-                ))
-            ),
+                    absent_evidence(UNPINNED_REVISION, "docs/design.md", "deleted"),
+                )
+                .build(),
             &document
         )
         .unwrap()
         .is_resolved());
         assert!(resolve_document_reference(
-            &image(
-                &document,
-                false,
-                Some(present_evidence(UNPINNED_REVISION, "docs/design.md"))
-            ),
+            &ImageBuilder::new()
+                .entry("docs/design.md", RepositoryEntry::Absent)
+                .pinned(
+                    UNPINNED_REVISION,
+                    "docs/design.md",
+                    present_evidence(UNPINNED_REVISION, "docs/design.md"),
+                )
+                .build(),
             &document
         )
         .unwrap()
         .is_resolved());
         assert!(matches!(
             resolve_document_reference(
-                &image(
-                    &document,
-                    false,
-                    Some(absent_evidence(
+                &ImageBuilder::new()
+                    .entry("docs/design.md", RepositoryEntry::Absent)
+                    .pinned(
                         UNPINNED_REVISION,
                         "docs/design.md",
-                        "deleted"
-                    ))
-                ),
+                        absent_evidence(UNPINNED_REVISION, "docs/design.md", "deleted"),
+                    )
+                    .build(),
                 &document
             )
             .unwrap()

@@ -1,84 +1,74 @@
-//! Pure codec and structural validation for the repository membership index.
+//! Pure codec for `.jit/index.json` and the issue membership the issue files state.
 
+use super::{canonical_json, RepositoryImage, VirtualPath};
+use crate::domain::identity::IssueId;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
-/// On-disk repository-format version understood by this binary.
-pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
+/// The one on-disk repository-format version this binary accepts.
+pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 4;
 
 /// Typed representation of `.jit/index.json`.
+///
+/// Membership is the issue files; `deleted_ids` lets a store's delete hide a lower
+/// source's file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RepositoryIndex {
     pub(crate) schema_version: u32,
-    pub(crate) all_ids: Vec<String>,
-    #[serde(default)]
-    pub(crate) deleted_ids: Vec<String>,
+    pub(crate) deleted_ids: Vec<IssueId>,
 }
 
 impl Default for RepositoryIndex {
     fn default() -> Self {
         Self {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         }
     }
 }
 
-/// Failure to decode or validate one captured membership index.
+/// Failure to decode or validate one captured membership source.
 #[derive(Debug, thiserror::Error)]
 pub enum RepositoryIndexError {
     /// The index is not valid JSON or does not match the index schema.
     #[error("failed to parse index: {0}")]
     Parse(#[from] serde_json::Error),
-    /// The index was written by a repository format newer than this binary.
+    /// The index is in a repository format other than the one this binary accepts.
     #[error(
-        "repository format version {found} is newer than this binary supports (max {supported})"
+        "repository format version {found} is not the version this binary supports ({supported})"
     )]
     UnsupportedVersion { found: u32, supported: u32 },
-    /// The active membership contains the same issue more than once.
-    #[error("index.json contains duplicate active issue id '{0}'")]
-    DuplicateActive(String),
     /// The deleted membership contains the same issue more than once.
     #[error("index.json contains duplicate deleted issue id '{0}'")]
-    DuplicateDeleted(String),
-    /// One issue is simultaneously classified as active and deleted.
-    #[error("index.json issue id '{0}' is both active and deleted")]
-    ActiveDeletedOverlap(String),
+    DuplicateDeleted(IssueId),
+    /// A `.json` file under `.jit/issues` is not named for an issue id.
+    #[error("issue file '{0}' is not named for an issue id")]
+    IssueFileName(String),
+    /// The image holds no listing of `.jit/issues`.
+    #[error("captured image is missing the .jit/issues listing")]
+    IssuesListingNotCaptured,
 }
 
 impl RepositoryIndex {
     /// Decode and structurally validate one captured index without ambient reads.
     pub(crate) fn parse(bytes: &[u8]) -> Result<Self, RepositoryIndexError> {
-        let index: Self = serde_json::from_slice(bytes)?;
-        index.validate()
+        #[derive(Deserialize)]
+        struct Marker {
+            schema_version: u32,
+        }
+        check_format(serde_json::from_slice::<Marker>(bytes)?.schema_version)?;
+        serde_json::from_slice::<Self>(bytes)?.validate()
     }
 
-    /// Validate version and membership-set invariants.
+    /// Validate version and tombstone-set invariants.
     pub(crate) fn validate(self) -> Result<Self, RepositoryIndexError> {
-        if self.schema_version > SUPPORTED_INDEX_SCHEMA_VERSION {
-            return Err(RepositoryIndexError::UnsupportedVersion {
-                found: self.schema_version,
-                supported: SUPPORTED_INDEX_SCHEMA_VERSION,
-            });
-        }
-
-        let mut active = HashSet::new();
-        for id in &self.all_ids {
-            if !active.insert(id) {
-                return Err(RepositoryIndexError::DuplicateActive(id.clone()));
-            }
-        }
+        check_format(self.schema_version)?;
         let mut deleted = HashSet::new();
-        for id in &self.deleted_ids {
-            if !deleted.insert(id) {
-                return Err(RepositoryIndexError::DuplicateDeleted(id.clone()));
-            }
-            if active.contains(id) {
-                return Err(RepositoryIndexError::ActiveDeletedOverlap(id.clone()));
-            }
+        match self.deleted_ids.iter().find(|id| !deleted.insert(*id)) {
+            Some(id) => Err(RepositoryIndexError::DuplicateDeleted(id.clone())),
+            None => Ok(self),
         }
-        Ok(self)
     }
 
     /// Encode the canonical pretty-printed index used by every publisher.
@@ -86,38 +76,12 @@ impl RepositoryIndex {
         self.clone().validate().map_err(|error| {
             serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
         })?;
-        let fields = BTreeMap::from([
-            ("all_ids", serde_json::to_value(&self.all_ids)?),
-            ("deleted_ids", serde_json::to_value(&self.deleted_ids)?),
-            ("schema_version", serde_json::to_value(self.schema_version)?),
-        ]);
-        serde_json::to_vec_pretty(&fields)
+        canonical_json(self, true)
     }
 
-    /// Add one issue to active membership and remove it from deleted membership.
-    ///
-    /// The canonical active order is lexical and repeated insertion is a no-op.
-    #[allow(dead_code)] // Only called from the test-support-gated fixture seam.
-    pub(crate) fn upsert_active(&mut self, id: String) {
-        if !self.all_ids.contains(&id) {
-            self.all_ids.push(id.clone());
-            self.all_ids.sort();
-        }
-        self.deleted_ids.retain(|deleted| deleted != &id);
-    }
-
-    /// Move one issue from active to deleted membership idempotently.
-    ///
-    /// Reachable under `feature = "test-support"` in addition to `cfg(test)`:
-    /// `commands::test_helpers::with_open_race`'s delete-race fixture calls it,
-    /// and `test_helpers` itself is reachable independent of `cfg(test)` when
-    /// the feature is enabled without a test build (e.g. `cargo clippy
-    /// --features test-support`), a configuration where this method is itself
-    /// unreached.
-    #[cfg(any(test, feature = "test-support"))]
-    #[allow(dead_code)]
-    pub(crate) fn mark_deleted(&mut self, id: String) {
-        self.all_ids.retain(|active| active != &id);
+    /// Record one issue's tombstone idempotently.
+    #[cfg(test)]
+    pub(crate) fn mark_deleted(&mut self, id: IssueId) {
         if !self.deleted_ids.contains(&id) {
             self.deleted_ids.push(id);
             self.deleted_ids.sort();
@@ -125,22 +89,116 @@ impl RepositoryIndex {
     }
 }
 
+fn check_format(found: u32) -> Result<(), RepositoryIndexError> {
+    if found == SUPPORTED_INDEX_SCHEMA_VERSION {
+        return Ok(());
+    }
+    Err(RepositoryIndexError::UnsupportedVersion {
+        found,
+        supported: SUPPORTED_INDEX_SCHEMA_VERSION,
+    })
+}
+
+/// The issue ids `names` of `.jit/issues` entries state, ascending as given.
+/// Only `.json` names are records, which leaves out `*.lock`.
+pub(crate) fn listed_issue_ids<'a>(
+    names: impl IntoIterator<Item = &'a String>,
+) -> Result<Vec<IssueId>, RepositoryIndexError> {
+    names
+        .into_iter()
+        .filter_map(|name| name.strip_suffix(".json").map(|stem| (name, stem)))
+        .map(|(name, stem)| {
+            stem.parse()
+                .map_err(|_| RepositoryIndexError::IssueFileName(name.clone()))
+        })
+        .collect()
+}
+
+/// The issue ids `image`'s captured `.jit/issues` listing states.
+pub(crate) fn captured_issue_ids(
+    image: &RepositoryImage,
+) -> Result<Vec<IssueId>, RepositoryIndexError> {
+    image
+        .directory_listings()
+        .get(&VirtualPath::ISSUES)
+        .ok_or(RepositoryIndexError::IssuesListingNotCaptured)
+        .and_then(|listing| listed_issue_ids(listing.names()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_to_pretty_bytes_rejects_invalid_membership() {
+    fn test_to_pretty_bytes_rejects_duplicate_tombstones() {
+        let id = crate::test_utils::issue_id(1);
         let index = RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: vec!["duplicate".into(), "duplicate".into()],
-            deleted_ids: Vec::new(),
+            deleted_ids: vec![id.clone(), id.clone()],
         };
 
         assert!(index
             .to_pretty_bytes()
             .unwrap_err()
             .to_string()
-            .contains("duplicate active issue id 'duplicate'"));
+            .contains(&format!("duplicate deleted issue id '{id}'")));
+    }
+
+    #[test]
+    fn test_listed_issue_ids_skips_locks_and_rejects_other_json_names() {
+        let id = crate::test_utils::issue_id(1);
+        let lock = format!("{id}.lock");
+        let record = format!("{id}.json");
+        assert_eq!(listed_issue_ids([&lock, &record]).unwrap(), vec![id]);
+
+        let stray = "notes.json".to_string();
+        assert!(matches!(
+            listed_issue_ids([&stray]),
+            Err(RepositoryIndexError::IssueFileName(name)) if name == stray
+        ));
+    }
+
+    #[test]
+    fn test_parse_refuses_every_format_but_the_supported_one() {
+        for found in [
+            SUPPORTED_INDEX_SCHEMA_VERSION - 1,
+            SUPPORTED_INDEX_SCHEMA_VERSION + 1,
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!({
+                "schema_version": found,
+                "all_ids": [],
+            }))
+            .unwrap();
+            assert!(matches!(
+                RepositoryIndex::parse(&bytes),
+                Err(RepositoryIndexError::UnsupportedVersion { found: refused, .. }) if refused == found
+            ));
+        }
+    }
+
+    #[test]
+    fn test_parse_requires_deleted_ids() {
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION,
+        }))
+        .unwrap();
+        assert!(RepositoryIndex::parse(&bytes)
+            .unwrap_err()
+            .to_string()
+            .contains("deleted_ids"));
+    }
+
+    #[test]
+    fn test_parse_rejects_all_ids_in_the_supported_format() {
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION,
+            "all_ids": [],
+            "deleted_ids": [],
+        }))
+        .unwrap();
+        assert!(RepositoryIndex::parse(&bytes)
+            .unwrap_err()
+            .to_string()
+            .contains("all_ids"));
     }
 }

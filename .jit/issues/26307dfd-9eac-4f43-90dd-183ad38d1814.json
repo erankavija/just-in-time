@@ -1,0 +1,39 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:25:55.608566099Z",
+  "context": {},
+  "created_at": "2026-11-04T02:11:28.470668322Z",
+  "dependencies": [],
+  "description": "The `mcp-ci` gate tests whatever `jit` binary is first on PATH, so a passing verdict can vouch for a binary built from a different commit. This makes the gate test the `jit` built from the commit under evaluation.\n\n## Background\n\nThe `mcp-ci` checker in `.jit/gates.toml` runs `cd mcp-server && npm test`. `mcp-server/test-unit.js` reads the schema from `execFileSync('jit', ['--schema'])`, and `mcp-server/test-integration.js` runs `jit` and starts the bridge, which also resolves `jit` from PATH. The gate's `[gates.inputs]` roots already include `crates`, `Cargo.toml` and `Cargo.lock`, so the digest covers the binary's source but not the binary that actually runs. On this host the first `jit` on PATH is the installed dogfood binary, which can trail main by any number of commits or be on a different storage format. `mcp-server/test-integration.js` also runs `jit` in the checkout itself, so since format 4 landed (55438f664) a binary built from main exits 10 (`REPOSITORY_FORMAT_UNSUPPORTED`) against this repository's format-3 tracker, and the verdict that failure records is reused for any other binary because the digest leaves the binary out (b23faa59, runs f6e8d243 and 78a7a267). Steward ruling (2026-11-04) added REQ-03. Leads work around this by building `jit` and prepending `target/debug` to PATH before evaluating the gate (for example the df129d9e lead's landing queue).\n\n## Success Criteria\n\n- [hard] REQ-01: An `mcp-ci` evaluation builds `jit` from the tree under evaluation and runs the mcp-server suites against that binary, whatever `jit` is first on the caller's PATH.\n- [hard] REQ-02: Every input the gate's binary is built from is part of the gate's input digest, so a reused verdict cannot vouch for a binary built from different sources.\n- [hard] REQ-03: The mcp-server integration suite runs over a fixture repository it creates and owns, never the checkout's real data root (`@/inv/orthogonal-tests`), so a binary built from main passes mcp-ci regardless of the checkout's storage format.\n- [hard] REQ-04: The gate's description and the comment above its `[gates.inputs]` state which binary the suites run, and the generated rules-and-gates projection is re-rendered.\n\n## Notes\n\nRequested by the steward session. Once this lands, leads delete their PATH workarounds.\n",
+  "documents": [],
+  "done_at": "2026-11-04T02:38:23.899946568Z",
+  "first_ready_at": "2026-11-04T02:11:28.470668322Z",
+  "gates_required": [
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "run_id": "2c34af75-cdb2-418b-8f74-45a2bff53698",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:38:18.591328649Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "319d2546-15a0-4f73-8c63-7cd2e07004b4",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:34:50.147660657Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "26307dfd-9eac-4f43-90dd-183ad38d1814",
+  "labels": [
+    "type:task",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "mcp-ci tests the jit built from the commit under evaluation",
+  "updated_at": "2026-11-04T02:38:23.899946568Z"
+}

@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T17:47:08.108951950Z",
+  "context": {},
+  "created_at": "2026-11-01T17:47:07.451379929Z",
+  "dependencies": [],
+  "description": "Delete `IssueApi::update_issue_state`, which moves an issue to a terminal state without promoting dependents and has no production caller.\n\n## Background\n\n`IssueApi::update_issue_state` (`crates/jit/src/commands/issue.rs`) is reached only from tests. It reaches `Done` and `Rejected` with no promotion, so it can leave a state `jit validate` refuses.\n\n## Success Criteria\n\n- [hard] REQ-01: `update_issue_state` no longer exists, and its test callers reach the state they need through a production path or a shared fixture.\n- [hard] REQ-02: Net production lines are negative.\n",
+  "documents": [],
+  "done_at": "2026-11-01T18:36:26.536698427Z",
+  "first_ready_at": "2026-11-01T17:47:07.451379929Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e1c53530-d6b6-4937-a930-10c896d0ed62",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:33:04.430323634Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7343a6b7-1bd9-4fb7-8599-2bb60c8f9610",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:36:10.469365255Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "0838348a-2fb7-4a57-a75c-c3a7f1252f42",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Delete the test-only update_issue_state",
+  "updated_at": "2026-11-01T18:36:26.536698427Z"
+}

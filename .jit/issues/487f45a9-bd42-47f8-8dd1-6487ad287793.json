@@ -1,0 +1,30 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T21:46:31.400299600Z",
+  "context": {},
+  "created_at": "2026-11-04T07:35:53.439740031Z",
+  "dependencies": [
+    "71f5296c-7de3-498b-b088-75a2f052014c"
+  ],
+  "description": "Commands that cannot run without Git report that through one typed error and one error code, so claims and hook installation classify the same condition the same way.\n\n## Background\n\nClaim and lease commands report a missing or unusable Git repository through `ClaimRequiresGitError`, classified as `CLAIM_REQUIRES_GIT`. `jit hooks install` needs a Git repository too, but it has no matching code. Its handler reports the condition as `INVALID_ARGUMENT` (exit 2) as an interim mapping, because the failure-probe contract rejects untyped failures. Nothing the user passed is invalid, so that code misclassifies the condition.\n\n## Success Criteria\n\n- [hard] REQ-01: One error type and one error code name a command's requirement for Git, independent of the command family. `ClaimRequiresGitError` and `CLAIM_REQUIRES_GIT` no longer exist, and nothing aliases or maps the old code.\n- [hard] REQ-02: Claim and lease commands that need Git report the new code with the exit status the old code had, and carry the same remediation detail.\n- [hard] REQ-03: `jit hooks install` outside a Git repository reports the new code. The interim `INVALID_ARGUMENT` mapping for that condition is removed from its handler, its exit-code row and the exit-code reference.\n- [hard] REQ-04: The error-code reference, the exit-code reference, the generated command schema and the MCP bridge state the new code, and no document or test names the removed one.\n- [hard] REQ-05: Tests assert the new code and exit status for one claim command and for `hooks install` outside Git, on both the human and the machine-readable path.\n\n## Notes\n\nSteward ruling (2026-11-04): the interim `INVALID_ARGUMENT` mapping for `hooks install` lands with the wave 7 handler batch, and this task ends it. The repository has no backward-compatibility obligation (`@/inv/canonical-cutover`).\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T07:35:53.439740031Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "487f45a9-bd42-47f8-8dd1-6487ad287793",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:error-boundary",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "One requires-Git error for every command family",
+  "updated_at": "2026-11-04T21:46:31.400299600Z"
+}

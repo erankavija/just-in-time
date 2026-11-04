@@ -1,0 +1,55 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T07:12:50.191131359Z",
+  "context": {},
+  "created_at": "2026-11-01T07:12:30.185107287Z",
+  "dependencies": [],
+  "description": "Make every build-lock wait in the repository's scripts say what it waits for and give up after a bound.\n\n## Background\n\nA silent, unbounded wait stalled this epic's landings for about 2.4 hours in an untracked script. `scripts/cargo-ci.sh` already has the right form: it prints the lock and the bound, waits with `flock -w \"$LOCK_TIMEOUT\" -E 75`, and reports the timeout. `CARGO_CI_LOCK_TIMEOUT` overrides the bound. Three scripts wait on the same lock without that form: `scripts/profile-test-suite.sh:328` and `scripts/benchmark-session-cost.sh:184` wait silently with no bound, and `scripts/benchmark-rust-build.sh:194` prints but has no bound.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the three scripts prints the lock path and the bound before waiting on a held build lock, and exits non-zero with a message naming the lock when the bound passes.\n- [hard] REQ-02: All four scripts read the bound from `CARGO_CI_LOCK_TIMEOUT` with one default.\n",
+  "documents": [],
+  "done_at": "2026-11-01T07:51:18.945163573Z",
+  "first_ready_at": "2026-11-01T07:12:30.185107287Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "profile-suite-selftest",
+    "session-cost-benchmark-selftest"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5c517bf2-3f51-428d-bcd9-591922731b39",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:46:03.250302322Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "07832141-ad16-4da7-ba5f-8c917f8e9f4f",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:42:13.205510367Z",
+      "updated_by": "auto:executor"
+    },
+    "profile-suite-selftest": {
+      "run_id": "ecc4ded5-a5d5-4466-8470-15795674bfe5",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:46:15.535855659Z",
+      "updated_by": "auto:executor"
+    },
+    "session-cost-benchmark-selftest": {
+      "run_id": "f7d0f9d7-e662-44ea-beca-21e1634abbb7",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:46:17.719337341Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "d6635a93-822d-4f64-b171-f4485dde4a10",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Build-lock waits in scripts state what they wait for and give up",
+  "updated_at": "2026-11-01T07:51:18.945163573Z"
+}

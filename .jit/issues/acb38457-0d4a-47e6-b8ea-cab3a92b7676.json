@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T02:17:48.074969532Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Let the graph traits yield dependency ids as borrowed string views, so a node can store typed ids without changing the graph algorithms.\n\n## Background\n\n`GraphNode::dependencies(&self) -> &[String]` (`crates/jit/src/graph/mod.rs:45-51`) and `HierarchyNode::dependencies` (`graph/hierarchy.rs:158-168`) force each implementor to store a `Vec<String>`. Implementors are `Issue` (`domain/types.rs:814`), `EdgeView` (`graph/hierarchy.rs:493`), `ProspectiveNode` (`commands/template_expand.rs:457`), whose placeholder ids are `__apply_placeholder__:{role}` (`:435`), and the test nodes `TestNode` (`graph/mod.rs:585`), `PropNode` (`graph/hierarchy.rs:1106`) and `FixtureNode` (`crates/jit/tests/fast_issue/hierarchy_vectors_test.rs:41`), which read non-UUID ids such as `r-t1` from the hierarchy test vectors. Placeholder and vector ids are not issue ids, so the traits stay independent of the issue-id type. The MSRV (1.97) supports return-position `impl Trait` in traits.\n\n## Success Criteria\n\n- [hard] REQ-01: `GraphNode::dependencies` and `HierarchyNode::dependencies` return an iterator of `&str` instead of a slice of `String`.\n- [hard] REQ-02: Each implementor compiles against the new signature without changing the type of the ids it stores, and placeholder and test-vector nodes keep their non-UUID ids.\n- [hard] REQ-03: The existing graph property tests pass with unchanged assertions.\n",
   "documents": [],
+  "done_at": "2026-10-25T06:10:09.673090614Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8d355057-6eb1-42fc-aba8-7a36f9477375",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:10:08.840577788Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a6c0fea5-f76c-47cd-833c-362c4b97886b",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:06:00.684218049Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Graph node traits expose dependency ids as string views",
-  "updated_at": "2026-10-22T19:43:30.807470983Z"
+  "updated_at": "2026-10-25T06:10:09.673090614Z"
 }

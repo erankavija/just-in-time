@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:35:36.022021982Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "0bd2c797-ca80-4f18-8cc9-1df1604dc55d",
     "93b7f1dd-109a-4b89-a0e5-0427b3b645e1"
   ],
-  "description": "Write, with each run that holds a reusable verdict, a record keyed by its gate and inputs digest that names the run, so reuse can later read one record.\n\n## Background\n\nRuns are written by the finalizer's gate-run pass (`crates/jit/src/repository_state/mutation.rs:1052-1095`). A run is a reuse source when it executed its own checker, carries an inputs digest and passed or failed (`domain/types.rs:1020-1028`). Gate keys are lowercase-kebab and digests 64 lowercase hex, so both are safe path components. Everything under `gate-runs/` is already excluded from input digests (`repository_state/path.rs:537-560`). The gate evaluation's record attempt captures its image in a second session (`commands/gate_check.rs:944-1004`), after the digest is known.\n\n## Success Criteria\n\n- [hard] REQ-01: When a recorded run executed its checker, carries an inputs digest and passed or failed, the same redo record that writes the run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming the run's issue and run id, built by one `VirtualPath` constructor. A later such run over the same key replaces the record. The record type derives `JsonSchema`.\n- [hard] REQ-02: The record attempt captures the verdict record's path, so two evaluations racing to replace one record get a retryable conflict, not a lost write.\n- [hard] REQ-03: Finalizer unit tests show which runs write or replace a verdict record and which write none.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Write, with each run that holds a reusable verdict, a record keyed by its gate and inputs digest that names the run, so reuse can later read one record.\n\n## Background\n\nRuns are written by the finalizer's gate-run pass (`crates/jit/src/repository_state/mutation.rs`). `GateRunResult::is_reusable_for` (`domain/types.rs`) states what makes a run a reuse source: it executed its own checker, carries an inputs digest and passed or failed. Only `check_gate_with` sets a digest. Gate keys are lowercase-kebab and digests 64 lowercase hex, so both are safe path components. Everything under `gate-runs/` is already excluded from input digests (`RepositoryLayout::tracker_written_paths`, `repository_state/path.rs`). The evaluation's record attempt captures its image in a second session (`commands/gate_check.rs`), after the digest is known. Whole-repository validation's fidelity pass (`validation/record_fidelity.rs`) is the guard that stored records reproduce, and it covers issues, the index, gate runs and the event log.\n\n## Success Criteria\n\n- [hard] REQ-01: When a recorded run executed its checker, carries an inputs digest and passed or failed, the same redo record that writes the run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming the run's issue and run id, built by one `VirtualPath` constructor. A later such run over the same key replaces the record. The record type derives `JsonSchema`.\n- [hard] REQ-02: The record attempt captures the verdict record's path together with `gate-runs/verdicts` and `gate-runs/verdicts/<gate-key>`, which decide its directory creates, so two evaluations racing to replace one record get a retryable conflict, not a lost write.\n- [hard] REQ-03: Finalizer unit tests show which runs write or replace a verdict record and which write none.\n- [hard] REQ-04: `record_drift` reports a verdict record that does not reproduce, and the run enumeration of the fidelity pass skips `verdicts/`.\n",
   "documents": [],
+  "done_at": "2026-11-04T01:18:45.773133359Z",
+  "first_ready_at": "2026-11-04T00:35:05.408161753Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d0b80638-90ba-4703-a75f-91db2b0eb975",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:14:49.476623644Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d319617b-03a3-4c62-a97b-0b8965f7aad5",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:18:45.327870498Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b33ed7eb-f699-49a1-a998-5ef6b839d394",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "satisfies:f8a6b298/REQ-03"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Recorded runs write their per-key verdict record",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T01:18:45.773133359Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-10ae7776",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "89608dfa5ca7474549bc97c92bfaf44515fb5f80",
+  "completed_at": "2026-10-27T21:55:35.453058359Z",
+  "duration_ms": 289990,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are satisfied; the prior State-list finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "10ae7776-7840-4fbc-937b-ce2cc371e07b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b23dbbfc-a934-481d-97e2-b88e2a253b9b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:50:45.462175741Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f3901c6b5, 6acb8ff99, 586b6903a, f6b20045b, 35bd6de55, 96664cfb0 (`jit:10ae7776`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/10ae7776/requirement/REQ-01, REQ-02, REQ-03 (.jit/issues/10ae7776-7840-4fbc-937b-ce2cc371e07b.json); @/issue/2195c98f/requirement/REQ-10 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/invariant/semantic-types, essential-code-prose, orthogonal-tests, semantic-test-assertions, shared-test-contracts, single-source-prose, architecture-dependency-direction (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci pending, exit code none; code-review failed, exit code 1 (its prior F1 is addressed in the current tree)\nTruncation recovery: reread the truncated refactor patch by individual source/test paths; narrowed macro/debug and literal-collection searches\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are satisfied; the prior State-list finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

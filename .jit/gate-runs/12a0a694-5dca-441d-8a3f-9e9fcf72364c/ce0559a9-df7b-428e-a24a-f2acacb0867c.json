@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-12a0a694",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c0bd5478f78855eaf149dd0890ad212f738eaa1",
+  "completed_at": "2026-11-01T07:28:48.858062750Z",
+  "duration_ms": 121880,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are implemented and the prior ambiguous-target test gap is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "12a0a694-5dca-441d-8a3f-9e9fcf72364c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce0559a9-df7b-428e-a24a-f2acacb0867c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:26:46.977905907Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: bbcf19b7d, 0e1342f03, 55ec2e6f7, 81d1ea731, 0b58c57f5 (`jit:12a0a694`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/12a0a694/requirement/REQ-01..03 (issue Markdown); @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci failed (exit 75; environment-sensitive timeout); docs-mechanical passed (exit 0); prior code-review failed (exit 1; its ambiguous-target test gap is addressed)\nTruncation recovery: reread bounded configuration, resolver, test, projection, and gate-record ranges after the broad evidence read truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are implemented and the prior ambiguous-target test gap is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

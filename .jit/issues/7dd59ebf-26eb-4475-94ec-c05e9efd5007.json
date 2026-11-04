@@ -1,0 +1,39 @@
+{
+  "assignee": "agent:external-root-lead",
+  "claimed_at": "2026-11-02T06:33:00.840742568Z",
+  "context": {},
+  "created_at": "2026-11-01T23:09:57.019989395Z",
+  "dependencies": [],
+  "description": "Worktree identity is stored in the data root, so checkouts sharing an out-of-repo store overwrite one another's identity on every command and report a false relocation.\n\n## Background\n\nThe identity file is `<data root>/worktree.json`, read and rewritten by `crates/jit/src/storage/worktree_identity.rs`. A data root inside a checkout has one owner, so one file is enough. A store outside the checkout can serve many checkouts.\n\nObserved with jit 1.0.0 and one external data root used from a primary checkout and a linked worktree:\n\n- The file holds whichever checkout wrote last. It held the linked worktree's id, branch and root after commands had run from both checkouts.\n- A command run after switching checkout warned `Worktree relocated: <one checkout> -> <the other>`, although neither checkout moved.\n\nThe relocation warning therefore loses its meaning, and a checkout's identity depends on which checkout ran last.\n\n## Success Criteria\n\n- [hard] REQ-01: Each checkout using a shared external data root has one stable worktree id, unchanged by commands run from other checkouts.\n- [hard] REQ-02: Alternating commands between two checkouts on one external data root emit no relocation warning.\n- [hard] REQ-03: Moving a checkout with `git worktree move` still reports one relocation and keeps its id.\n- [hard] REQ-04: A data root inside a checkout keeps its current identity behaviour, including new identity for a copied worktree.\n- [hard] REQ-05: Concurrent commands from two checkouts leave each identity intact.\n- [hard] REQ-06: The storage-format reference states where identity lives for each layout.\n\n## Notes\n\n- The identity location for an external data root is an implementation choice. The checkout's own git directory is the likely home.\n- @/issue/1b7f58ae changes how the identity file is published, so the two changes touch the same code.\n",
+  "documents": [],
+  "done_at": "2026-11-02T06:49:31.645449834Z",
+  "first_ready_at": "2026-11-01T23:09:57.019989395Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1c8f9468-ce20-4313-bae4-36f38c5f270f",
+      "status": "passed",
+      "updated_at": "2026-11-02T06:45:42.650549490Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e2c18220-a0ca-4f90-8732-4af4802adefd",
+      "status": "passed",
+      "updated_at": "2026-11-02T06:49:16.516966831Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "7dd59ebf-26eb-4475-94ec-c05e9efd5007",
+  "labels": [
+    "component:storage",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Checkouts sharing an external data root keep separate worktree identities",
+  "updated_at": "2026-11-02T06:49:31.645449834Z"
+}

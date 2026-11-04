@@ -101,6 +101,9 @@ pub struct Flag {
     /// serialized schema.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The closed set of accepted values, when the flag declares one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<String>,
 }
 
 /// Output schema - contains actual JSON Schema for structured responses
@@ -115,6 +118,76 @@ pub struct OutputSchema {
     pub error: String,
 }
 
+impl OutputSchema {
+    /// This schema with the optional `warnings` property every success
+    /// envelope may carry, declared here once for all commands.
+    fn with_warnings(mut self) -> Self {
+        if let Some(Value::Object(schema)) = &mut self.success_schema {
+            if let Value::Object(properties) = schema
+                .entry("properties")
+                .or_insert_with(|| Value::Object(Default::default()))
+            {
+                properties
+                    .entry(crate::output::WARNINGS_FIELD)
+                    .or_insert_with(Self::warnings_property);
+            }
+        }
+        self
+    }
+
+    /// The optional `warnings` property of success and failure envelopes.
+    fn warnings_property() -> Value {
+        json!({
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Warnings the command reported; present only when non-empty."
+        })
+    }
+
+    /// The output schema of a command whose success response is `T`.
+    pub fn of<T: JsonSchema>() -> Self {
+        Self {
+            success_schema: Some(serde_json::to_value(schema_for!(T)).unwrap_or(json!({}))),
+            success: T::schema_name(),
+            error: "ErrorResponse".to_string(),
+        }
+    }
+
+    /// The output schema of a command whose success is one of several shapes:
+    /// a `oneOf` over `members`, named for the first. Build the members with
+    /// [`UnionMember::of`].
+    pub fn union_of(members: Vec<UnionMember>, description: &str) -> Self {
+        let success = members
+            .first()
+            .map(|member| member.name.clone())
+            .unwrap_or_default();
+        let schemas = members
+            .into_iter()
+            .map(|member| member.schema)
+            .collect::<Vec<_>>();
+        Self {
+            success_schema: Some(json!({ "oneOf": schemas, "description": description })),
+            success,
+            error: "ErrorResponse".to_string(),
+        }
+    }
+}
+
+/// One response shape of a union success schema.
+pub struct UnionMember {
+    name: String,
+    schema: Value,
+}
+
+impl UnionMember {
+    pub fn of<T: JsonSchema>() -> Self {
+        Self {
+            name: T::schema_name(),
+            schema: serde_json::to_value(schema_for!(T)).unwrap_or(json!({})),
+        }
+    }
+}
+
 /// Exit code documentation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExitCodeDoc {
@@ -126,34 +199,19 @@ pub struct ExitCodeDoc {
 
 /// Exit code a command family emits under a named condition.
 ///
-/// The global taxonomy in [`ExitCodeDoc`] states what each code means in
-/// general; this maps the codes back to the command families and conditions
-/// that produce them. `exception` flags a row where the code's meaning here
-/// departs from the global entry — a completed run signalling findings with a
-/// non-zero code, or a pass-through of a subprocess's own code — rather than the
-/// ordinary error classification.
-///
-/// The classification rows derive from the typed-error classifier
-/// ([`classify`](crate::output::failure::classify)); the exception rows derive
-/// from the direct-exit sites in the CLI dispatch. The classifier's unit tests
-/// verify the classification rows against it, and
-/// [`CommandExitCode::code`] is verified against the global taxonomy in
-/// `schema.rs` tests, so this projection cannot silently drift from runtime
-/// behavior (@/inv/single-source-prose).
+/// The `*` rows hold for every command; the others derive from the codes each
+/// leaf declares in its `command_group!` registration.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommandExitCode {
     /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
     /// every command.
     pub command: String,
-    /// Exit code emitted, when the command chooses a fixed code (always a member
-    /// of the global taxonomy in [`CommandSchema::exit_codes`]). `None` marks a
-    /// pass-through, where the command exits with a subprocess's own code rather
-    /// than a jit-assigned one (e.g. `serve`).
-    pub code: Option<i32>,
+    /// Exit code emitted (always a member of the global taxonomy in
+    /// [`CommandSchema::exit_codes`]).
+    pub code: i32,
     /// Condition that produces the code.
     pub condition: String,
-    /// True when the code's meaning here departs from the global taxonomy entry
-    /// for `code` (a completed-run findings signal, or a pass-through).
+    /// True for a declared findings code and for the broken-pipe status.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exception: bool,
 }
@@ -219,6 +277,7 @@ impl CommandSchema {
                     _ => "Print version".to_string(),
                 },
                 aliases: Vec::new(),
+                values: Vec::new(),
             })
             .collect()
     }
@@ -263,6 +322,7 @@ impl CommandSchema {
             "worktree_info",
             "worktree_list",
             "worktree_store-divergence",
+            "worktree_exec",
         ]
         .into_iter()
         .collect()
@@ -344,7 +404,7 @@ impl CommandSchema {
             subcommands,
             args,
             flags,
-            output: Self::get_output_schema_for_command(cmd_path),
+            output: Self::get_output_schema_for_command(cmd_path).map(OutputSchema::with_warnings),
         }
     }
 
@@ -391,6 +451,13 @@ impl CommandSchema {
             .map(|names| names.into_iter().map(|s| s.to_string()).collect())
             .unwrap_or_default();
 
+        let values = arg
+            .get_possible_values()
+            .iter()
+            .filter(|value| !value.is_hide_set())
+            .map(|value| value.get_name().to_string())
+            .collect();
+
         let description = arg
             .get_help()
             .map(|s| s.to_string())
@@ -403,6 +470,7 @@ impl CommandSchema {
             required,
             description,
             aliases,
+            values,
         }
     }
 
@@ -446,300 +514,21 @@ impl CommandSchema {
         }
     }
 
-    /// Get output schema for a specific command path (e.g., "issue_show", "query_available")
-    fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
-        use crate::domain::Issue;
-        use crate::output::*;
-
-        // Helper to convert schemars schema to serde_json Value
-        fn schema_to_value<T: JsonSchema>() -> Value {
-            serde_json::to_value(schema_for!(T)).unwrap_or(json!({}))
-        }
-
-        let (schema, type_name) = match cmd_path {
-            // Repository initialization.
-            "init" => (Some(schema_to_value::<InitResponse>()), "InitResponse"),
-
-            // Version command
-            "version" => (
-                Some(schema_to_value::<crate::build_info::VersionInfo>()),
-                "VersionInfo",
-            ),
-
-            // Status command
-            "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
-
-            // Profile commands.
-            "profile_show" => (
-                Some(schema_to_value::<crate::profile::ProfileShowResult>()),
-                "ProfileShowResult",
-            ),
-            // The difference report is the decision a publication would act on,
-            // so it answers in the preview shape the lifecycle rehearsals do,
-            // with the conflict outcomes a rehearsal fails on instead of
-            // reporting.
-            "profile_diff" => (
-                Some(schema_to_value::<crate::profile::ProfilePlanResult>()),
-                "ProfilePlanResult",
-            ),
-            "profile_pack" => (
-                Some(schema_to_value::<crate::profile::ProfilePackResult>()),
-                "ProfilePackResult",
-            ),
-            "profile_add" => (
-                Some(schema_to_value::<crate::profile::ProfileAddResult>()),
-                "ProfileAddResult",
-            ),
-            "profile_apply" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<crate::profile::ProfileComposedApplyResult>(),
-                        schema_to_value::<crate::profile::ProfilePlanResult>(),
-                    ],
-                    "description": "Normal execution returns ProfileComposedApplyResult, \
-                        per aggregate selection observation. With --dry-run, returns the count-wrapped \
-                        ProfilePlanResult of non-mutating ProfilePlanEntry values. Every \
-                        rehearsal carries the entries its run reports: dependency-only closure \
-                        members before the selected roots, then one entry per root occurrence. \
-                        An entry that \
-                        publishes nothing reports status unchanged and carries no target or \
-                        declaration decisions."
-                });
-                (Some(union), "ProfileComposedApplyResult")
-            }
-
-            // Issue commands
-            //
-            // `issue show --json` returns `IssueShowResponse` by default and
-            // `IssueShowSummaryResponse` when `--summary` is set. Expose both
-            // shapes via a JSON Schema `oneOf` so MCP clients see an honest
-            // contract.
-            "issue_show" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueShowResponse>(),
-                        schema_to_value::<IssueShowSummaryResponse>(),
-                        schema_to_value::<IssueShowListResponse>(),
-                    ],
-                    "description": "Single id: a bare IssueShowResponse \
-                        (IssueShowSummaryResponse with --summary). Multiple ids: \
-                        the {count, issues} envelope of full IssueShowResponse \
-                        objects in argument order."
-                });
-                (Some(union), "IssueShowResponse")
-            }
-            // `issue create --json` returns the same enriched projection as
-            // `issue show`, so its gate list is the `gates` array, not the raw
-            // stored record.
-            "issue_create" => (
-                Some(schema_to_value::<IssueShowResponse>()),
-                "IssueShowResponse",
-            ),
-            // Lifecycle mutation confirmations echo the raw stored record, so the
-            // gate list stays under gates_required / gates_status. `claim` /
-            // `claim-next` add the advisory `warnings` array (ClaimResponse);
-            // `claim`'s `--assign-only` mode omits it, hence the `oneOf`.
-            "issue_assign" | "issue_unassign" | "issue_reject" | "issue_release" => {
-                (Some(schema_to_value::<Issue>()), "Issue")
-            }
-            "issue_claim" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<ClaimResponse>(),
-                        schema_to_value::<Issue>(),
-                    ],
-                    "description": "The claimed issue's complete stored record \
-                        (gate list under gates_required / gates_status). The \
-                        default claim adds an advisory `warnings` array; \
-                        `--assign-only` omits it."
-                });
-                (Some(union), "ClaimResponse")
-            }
-            "issue_claim-next" => (Some(schema_to_value::<ClaimResponse>()), "ClaimResponse"),
-            "issue_update" => (
-                Some(schema_to_value::<IssueUpdateResponse>()),
-                "IssueUpdateResponse",
-            ),
-            // `issue status` projects each issue's gate list under the compact
-            // `gates` array, the same field name `issue show` uses.
-            "issue_status" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueStatusResponse>(),
-                        schema_to_value::<IssueStatusListResponse>(),
-                    ],
-                    "description": "Single id: a bare IssueStatusResponse. \
-                        Multiple ids: the {count, issues} envelope of \
-                        IssueStatusResponse objects in argument order."
-                });
-                (Some(union), "IssueStatusResponse")
-            }
-            // `issue children` wraps one `IssueStatusResponse` per child, so the
-            // same compact `gates` array reaches each entry.
-            "issue_children" => (
-                Some(schema_to_value::<IssueChildrenResponse>()),
-                "IssueChildrenResponse",
-            ),
-
-            // Gate commands
-            "gate_status-all" => (
-                Some(schema_to_value::<GateCheckAllResponse>()),
-                "GateCheckAllResponse",
-            ),
-            "gate_evaluate-many" => (
-                Some(schema_to_value::<GateEvaluateManyResponse>()),
-                "GateEvaluateManyResponse",
-            ),
-
-            // Issue-record LIST surfaces emit two shapes: the default lean summary
-            // (`MinimalIssue` entries, no gate fields) and, under `--full`, the
-            // complete stored records (gate list under `gates_required` /
-            // `gates_status`). Declaring both via `oneOf` lets a consumer attribute
-            // a missing gate field to the summary projection rather than the data.
-            // `issue list` and its top-level `list` alias share the query shape.
-            // Bare `jit query` (no subcommand) is documented as equivalent to
-            // `query all`, so it declares the same contract.
-            "query" | "query_available" | "query_all" | "query_strategic" | "query_closed"
-            | "issue_list" | "list" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueListResponse>(),
-                        schema_to_value::<IssueListFullResponse>(),
-                    ],
-                    "description": "Default shape: lean MinimalIssue entries (id, \
-                        short_id, title, state, priority) with no gate fields. \
-                        With --full: complete stored issue records, whose gate list \
-                        is carried under gates_required / gates_status."
-                });
-                (Some(union), "IssueListResponse")
-            }
-            // `issue search` mirrors the list surfaces, plus an echoed `query`.
-            "issue_search" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueSearchResponse>(),
-                        schema_to_value::<IssueSearchFullResponse>(),
-                    ],
-                    "description": "Default shape: lean MinimalIssue entries with no \
-                        gate fields, plus the echoed query. With --full: complete \
-                        stored issue records, whose gate list is carried under \
-                        gates_required / gates_status."
-                });
-                (Some(union), "IssueSearchResponse")
-            }
-            // `query blocked` is the one query whose --full variant is NOT a
-            // record dump: both shapes build on MinimalIssue and carry no
-            // gate-list fields; a blocking gate appears only as a reason.
-            "query_blocked" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<BlockedListResponse>(),
-                        schema_to_value::<BlockedFullListResponse>(),
-                    ],
-                    "description": "Default shape: MinimalBlockedIssue entries \
-                        (lean fields plus blocked_reasons strings). With --full: \
-                        BlockedIssue entries (lean fields plus structured \
-                        blocked_reasons). Neither shape carries gate-list fields; \
-                        a blocking gate appears only as a reason entry."
-                });
-                (Some(union), "BlockedListResponse")
-            }
-
-            // `jit apply` echoes each created node's raw stored record under
-            // `created_issues`, so their gate lists are carried under
-            // gates_required / gates_status.
-            "apply" => (
-                Some(schema_to_value::<TemplateApplyResponse>()),
-                "TemplateApplyResponse",
-            ),
-
-            // Graph commands
-            "graph_deps" => (
-                Some(schema_to_value::<GraphDepsTreeResponse>()),
-                "GraphDepsTreeResponse",
-            ),
-            "graph_downstream" => (
-                Some(schema_to_value::<GraphDownstreamResponse>()),
-                "GraphDownstreamResponse",
-            ),
-            "graph_roots" => (
-                Some(schema_to_value::<GraphRootsResponse>()),
-                "GraphRootsResponse",
-            ),
-            "graph_tree" => (
-                Some(schema_to_value::<GraphTreeResponse>()),
-                "GraphTreeResponse",
-            ),
-            // `graph export --format json` emits two shapes: the default lean
-            // summary nodes (no gate fields) and, under `--full`, complete stored
-            // issue records (gate list under `gates_required` / `gates_status`)
-            // with the resolved hierarchy flattened on. Declaring both via `oneOf`
-            // makes the gate-free summary distinguishable from the full record.
-            "graph_export" => {
-                use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<GraphExportSummaryResponse>(),
-                        schema_to_value::<GraphExportFullResponse>(),
-                    ],
-                    "description": "Default shape: lean summary nodes (id, short_id, \
-                        title, state, priority, labels) with no gate fields. With \
-                        --full: complete stored issue records, whose gate list is \
-                        carried under gates_required / gates_status, plus the \
-                        resolved-hierarchy fields (parent, children, cluster, rank)."
-                });
-                (Some(union), "GraphExportSummaryResponse")
-            }
-
-            "gate_list" => (
-                Some(schema_to_value::<GateListResponse>()),
-                "GateListResponse",
-            ),
-            // `doc dir` resolves one value, so it declares the flat named object
-            // rather than a list envelope.
-            "doc_dir" => (
-                Some(schema_to_value::<ArtifactDirectoryResponse>()),
-                "ArtifactDirectoryResponse",
-            ),
-            "doc_conformance" => (
-                Some(schema_to_value::<ArtifactConformanceResponse>()),
-                "ArtifactConformanceResponse",
-            ),
-            "label_namespaces" => (
-                Some(schema_to_value::<NamespacesResponse>()),
-                "NamespacesResponse",
-            ),
-            "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
-            "worktree_list" => (
-                Some(schema_to_value::<WorktreeListResponse>()),
-                "WorktreeListResponse",
-            ),
-            "worktree_store-divergence" => (
-                Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
-                "WorktreeStoreDivergenceResponse",
-            ),
-
-            // Default: no specific schema
-            _ => (None, "CommandResponse"),
-        };
-
-        Some(OutputSchema {
-            success_schema: schema,
-            success: type_name.to_string(),
-            error: "ErrorResponse".to_string(),
-        })
+    /// The registered response schema of the executable command at `cmd_path`.
+    pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
+        crate::dispatch::registered_output_schema(cmd_path)
     }
 
     fn generate_types() -> HashMap<String, Value> {
         use crate::declarations::GateChecker;
-        use crate::domain::State;
+        use crate::domain::{Priority, State};
 
         let mut types = HashMap::new();
 
         // Derive the enum from the authoritative `State` enumeration so every
         // real variant (including `rejected`) surfaces and future variants
         // cannot silently drift out of the contract (@/inv/single-source-prose).
-        let state_values: Vec<Value> = State::all()
+        let state_values: Vec<Value> = State::ALL
             .iter()
             .map(|state| Value::String(state.as_str().to_string()))
             .collect();
@@ -752,11 +541,15 @@ impl CommandSchema {
             }),
         );
 
+        let priority_values: Vec<Value> = Priority::ALL
+            .iter()
+            .map(|priority| Value::String(priority.as_str().to_string()))
+            .collect();
         types.insert(
             "Priority".to_string(),
             json!({
                 "type": "enum",
-                "enum": ["low", "normal", "high", "critical"],
+                "enum": priority_values,
                 "description": "Issue priority level"
             }),
         );
@@ -769,6 +562,13 @@ impl CommandSchema {
             "ProfilePackageModel".to_string(),
             serde_json::to_value(crate::profile::profile_package_model_schema())
                 .unwrap_or(json!({})),
+        );
+        types.insert(
+            "ProfileTargetConflictsError".to_string(),
+            serde_json::to_value(schema_for!(
+                crate::repository_state::ProfileTargetConflictsError
+            ))
+            .unwrap_or(json!({})),
         );
 
         types.insert(
@@ -796,6 +596,7 @@ impl CommandSchema {
                 "type": "object",
                 "properties": {
                     "success": { "type": "boolean", "const": false },
+                    "warnings": OutputSchema::warnings_property(),
                     "error": {
                         "type": "object",
                         "properties": {
@@ -821,230 +622,125 @@ impl CommandSchema {
             .collect()
     }
 
-    /// Project the per-command-family exit-code mappings.
-    ///
-    /// The rows are grouped as: universal codes every command can emit, codes
-    /// specific to a command family, and exceptions — codes a completed run
-    /// emits to signal findings, or codes whose meaning departs from the global
-    /// taxonomy. Classification rows mirror the typed-error classifier
-    /// (`output::failure::classify`); exception rows mirror
-    /// the direct process-exit sites in the CLI dispatch. Both are verified by
-    /// test rather than hand-copied (@/inv/single-source-prose).
+    /// Project the per-command exit-code mappings: the universal `*` rows,
+    /// then the rows [`declared_exit_codes`] derives from every registered leaf.
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
-        let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
-            command: command.to_string(),
-            code: Some(code),
+        let universal = |code: ExitCode, condition: &str, exception: bool| CommandExitCode {
+            command: "*".to_string(),
+            code: code.code(),
             condition: condition.to_string(),
             exception,
         };
-        vec![
-            // Universal: any command reaches these — `0` on successful completion,
-            // the failure codes through the shared classifier.
-            row("*", 0, "Command completed successfully.", false),
-            row(
-                "*",
-                1,
-                "No typed classifier matched the failure (generic error).",
+        let declared = declared_exit_codes(
+            crate::dispatch::REGISTERED_GROUPS
+                .iter()
+                .flat_map(|group| group.leaves),
+        );
+        [
+            universal(ExitCode::Success, "Command completed successfully.", false),
+            universal(
+                ExitCode::GenericError,
+                "No typed classifier matched the failure (generic error), or input data \
+                 could not be parsed.",
                 false,
             ),
-            row(
-                "*",
-                2,
+            universal(
+                ExitCode::InvalidArgument,
                 "Invalid arguments or usage error, including an unresolvable, \
                  ambiguous, or too-short id prefix.",
                 false,
             ),
-            row(
-                "*",
-                3,
+            universal(
+                ExitCode::NotFound,
                 "A referenced issue, gate, gate-run, preset, lease, repository, \
                  or file path was not found.",
                 false,
             ),
-            row("*", 5, "A filesystem operation was denied.", false),
-            row(
-                "*",
-                10,
-                "The repository's on-disk format is newer than this binary, or a \
+            universal(
+                ExitCode::PermissionDenied,
+                "A filesystem operation was denied.",
+                false,
+            ),
+            universal(
+                ExitCode::ExternalError,
+                "The repository's on-disk format is not the one this binary accepts, or a \
                  filesystem/subprocess I/O operation failed.",
                 false,
             ),
-            row(
-                "*",
-                11,
+            universal(
+                ExitCode::LockTimeout,
                 "A lock wait expired while another jit process held the lock \
                  (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be \
                  retried.",
                 false,
             ),
-            // Command-family classification (standard taxonomy meaning).
-            row(
-                "any command that writes an issue",
-                4,
-                "An enforcing validation rule rejected the write (the shared \
-                 write-validation path blocks on rule findings).",
-                false,
-            ),
-            row(
-                "dep add",
-                4,
-                "The edge would create a cycle, or a redundant \
-                 (transitively-implied) edge was rejected.",
-                false,
-            ),
-            row(
-                "apply",
-                4,
-                "The template delta would close a dependency cycle through \
-                 existing issues; the apply is rejected before any node is \
-                 created.",
-                false,
-            ),
-            row(
-                "issue update, issue claim, issue claim-next",
-                4,
-                "A state transition is blocked by unmet dependencies or unpassed \
-                 gates.",
-                false,
-            ),
-            row(
-                "gate define",
-                6,
-                "The gate key is already registered.",
-                false,
-            ),
-            row(
-                "issue delete",
-                2,
-                "Deletion was refused for missing operator confirmation \
-                 (JIT_ALLOW_DELETION=1 not set in the process environment).",
-                false,
-            ),
-            row(
-                "issue batch-create",
-                2,
-                "The batch file failed pre-validation; no issues were created.",
-                false,
-            ),
-            row(
-                "snapshot export",
-                6,
-                "The snapshot output path already exists.",
-                false,
-            ),
-            row(
-                "claim",
-                10,
-                "A lease subcommand was run outside a git repository (leases \
-                 require git for worktree identity).",
-                false,
-            ),
-            // Gate evaluation: the code carries the checker's verdict.
-            row(
-                "gate evaluate, gate evaluate-all, gate evaluate-many",
-                4,
-                "A checker ran and its verdict was fail.",
-                true,
-            ),
-            row(
-                "gate evaluate, gate evaluate-all, gate evaluate-many",
-                10,
-                "A checker could not run to a verdict (timeout, crash, command \
-                 not found, or exit status 75).",
-                true,
-            ),
-            // Findings signalled by a completed run via a non-zero exit code.
-            row(
-                "validate",
-                4,
-                "Repository-integrity, scope, or drift validation found \
-                 error-severity findings.",
-                true,
-            ),
-            row(
-                "validate",
-                1,
-                "Rule evaluation reported error-severity findings.",
-                true,
-            ),
-            row(
-                "validate --branch-drift",
-                1,
-                "Branch-drift validation failed: the check reported drift from \
-                 the upstream branch or could not run.",
-                true,
-            ),
-            row(
-                "validate --leases",
-                1,
-                "Lease validation found one or more invalid leases, or the lease \
-                 check could not run.",
-                true,
-            ),
-            row(
-                "gate status-all",
-                4,
-                "One or more required gates have not passed.",
-                true,
-            ),
-            row(
-                "invariant check",
-                4,
-                "Enforcement drift was found (declared enforcement not backed by \
-                 an enforcing rule).",
-                true,
-            ),
-            row(
-                "config validate",
-                4,
-                "The repo or environment-variable configuration failed to \
-                 load or carried an invalid value.",
-                false,
-            ),
-            row(
-                "doc check-links",
-                1,
-                "One or more documents have broken links. Documents with only \
-                 risky-link warnings exit `0`: warnings are reported, never fatal.",
-                true,
-            ),
-            row(
-                "gate preset apply",
-                3,
-                "A preset target was not found, so the application failed.",
-                false,
-            ),
-            // `serve` default (daemon), `--stop`, and `--status` route failures
-            // through the shared classifier. Malformed PID state is the
-            // representative parser failure bound here; other typed failures
-            // use the applicable universal row above.
-            row(
-                "serve, serve --stop, serve --status",
-                1,
-                "The daemon PID state could not be parsed (exits 0 on success).",
-                false,
-            ),
-            // Every command reaches this if its stdout write outlives the
-            // downstream reader (`| head`, etc.): a direct process::exit site
-            // (main's panic hook + catch_unwind), not the typed-error
-            // classifier.
-            row(
-                "*",
-                141,
+            // The renderers return this when stdout outlives its reader
+            // (`| head`), not the typed-error classifier.
+            universal(
+                ExitCode::BrokenPipe,
                 "A downstream reader closed the pipe while jit was still writing.",
                 true,
             ),
-            // `serve --fg` passes the inline server child's own code through.
-            CommandExitCode {
-                command: "serve --fg".to_string(),
-                code: None,
-                condition: "Foreground mode passes through the inline dev-server \
-                            child's own exit code (1 when the child produced none)."
-                    .to_string(),
-                exception: true,
-            },
         ]
+        .into_iter()
+        .chain(declared)
+        .collect()
     }
+}
+
+/// The exit-code rows `leaves` declare: per leaf, one row per exit code, its
+/// condition joining the declared codes' descriptions (or the findings
+/// condition, flagged `exception`); leaves with equal rows share one.
+fn declared_exit_codes<'a>(
+    leaves: impl IntoIterator<Item = &'a crate::dispatch::LeafCodes>,
+) -> Vec<CommandExitCode> {
+    fn merge(
+        mut rows: Vec<CommandExitCode>,
+        row: CommandExitCode,
+        same: fn(&CommandExitCode, &CommandExitCode) -> bool,
+        combine: fn(&mut CommandExitCode, CommandExitCode),
+    ) -> Vec<CommandExitCode> {
+        match rows.iter_mut().find(|existing| same(existing, &row)) {
+            Some(existing) => combine(existing, row),
+            None => rows.push(row),
+        }
+        rows
+    }
+    leaves
+        .into_iter()
+        .flat_map(|leaf| {
+            let command = leaf.path.replace('_', " ");
+            leaf.raises
+                .iter()
+                .map(|code| (*code, code.description(), false))
+                .chain(
+                    leaf.findings
+                        .iter()
+                        .map(|(code, condition)| (*code, *condition, true)),
+                )
+                .map(move |(code, condition, exception)| CommandExitCode {
+                    command: command.clone(),
+                    code: code.exit_code().code(),
+                    condition: condition.to_string(),
+                    exception,
+                })
+                .fold(Vec::new(), |rows, row| {
+                    merge(
+                        rows,
+                        row,
+                        |a, b| a.code == b.code && a.exception == b.exception,
+                        |a, b| a.condition = format!("{} {}", a.condition, b.condition),
+                    )
+                })
+        })
+        .fold(Vec::new(), |rows, row| {
+            merge(
+                rows,
+                row,
+                |a, b| a.code == b.code && a.exception == b.exception && a.condition == b.condition,
+                |a, b| a.command = format!("{}, {}", a.command, b.command),
+            )
+        })
 }
 
 #[cfg(any(test, feature = "test-support"))]
@@ -1079,8 +775,8 @@ pub fn render_exit_code_reference() -> String {
          `jit --schema`. Each emitted mapping is bound by a test to the runtime \
          that produces it: the shared classifier (`classify` in \
          `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
-         command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals and the `serve --fg` pass-through).\n\n",
+         findings envelope a completed run reports (the findings signals). Every \
+         run exits through one exit site with its envelope's code.\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");
@@ -1093,25 +789,20 @@ pub fn render_exit_code_reference() -> String {
     out.push_str("## Command-specific mappings\n\n");
     out.push_str(
         "Most commands draw only from the global taxonomy above. The rows below \
-         identify the codes a specific command family emits. An **exception** is \
-         a code a completed run emits to signal findings, or a code whose meaning \
-         departs from the global entry (for example, `doc check-links` exits `1` \
-         for broken links, not a generic error). A `child` code marks a pass-through, \
-         where the command exits with a subprocess's own code. `*` marks a code \
-         every command can reach: `0` on successful completion, and the failure \
-         codes through the shared classifier.\n\n",
+         identify the codes a specific command family emits, derived from the \
+         codes each command's handler registration declares. An **exception** is \
+         a code a completed run emits to signal findings (for example, \
+         `doc check-links` exits `4` for broken links), or the broken-pipe status. \
+         `*` marks a code every command can reach: `0` on successful completion, \
+         and the failure codes through the shared classifier.\n\n",
     );
     out.push_str("| Command | Code | Condition | Exception |\n");
     out.push_str("|---------|------|-----------|-----------|\n");
     for entry in CommandSchema::generate_command_exit_codes() {
-        let code = match entry.code {
-            Some(c) => format!("`{c}`"),
-            None => "`child`".to_string(),
-        };
         out.push_str(&format!(
-            "| `{}` | {} | {} | {} |\n",
+            "| `{}` | `{}` | {} | {} |\n",
             entry.command,
-            code,
+            entry.code,
             entry.condition,
             if entry.exception { "yes" } else { "" }
         ));
@@ -1128,6 +819,58 @@ pub fn render_exit_code_reference() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::ErrorCode;
+
+    #[test]
+    fn test_get_output_schema_for_command_uses_only_registered_responses() {
+        assert_eq!(
+            CommandSchema::get_output_schema_for_command("graph_rdeps")
+                .unwrap()
+                .success,
+            "GraphDownstreamResponse"
+        );
+        for path in ["unregistered_command", "graph", "graph_downstream"] {
+            assert!(
+                CommandSchema::get_output_schema_for_command(path).is_none(),
+                "{path} has no registered response"
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_registers_every_visible_executable_clap_path() {
+        fn walk(clap: &clap::Command, command: &Command, path: &str) {
+            if !clap.is_subcommand_required_set() {
+                let registered = crate::dispatch::registered_output_schema(path)
+                    .unwrap_or_else(|| panic!("{path} has no registered response"));
+                let output = command
+                    .output
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{path} has no generated response"));
+                assert_ne!(output.success, "CommandResponse", "{path}");
+                assert_eq!(output.success, registered.success, "{path}");
+                assert!(output.success_schema.is_some(), "{path}");
+            }
+            for child in clap
+                .get_subcommands()
+                .filter(|child| !child.is_hide_set() && child.get_name() != "help")
+            {
+                let name = child.get_name();
+                let child_path = format!("{path}_{name}");
+                let child_command = &command.subcommands.as_ref().unwrap()[name];
+                walk(child, child_command, &child_path);
+            }
+        }
+
+        let schema = CommandSchema::generate();
+        for command in crate::cli::Cli::command()
+            .get_subcommands()
+            .filter(|command| !command.is_hide_set() && command.get_name() != "help")
+        {
+            let name = command.get_name();
+            walk(command, &schema.commands[name], name);
+        }
+    }
 
     #[test]
     fn test_hidden_field_set_for_known_commands() {
@@ -1273,23 +1016,51 @@ mod tests {
         assert!(props.get("count").is_some(), "list envelope count");
         assert!(props.get("root").is_some(), "scoping root id");
 
-        // The node shape carries the four resolved-hierarchy fields.
-        let node_schema = serde_json::to_string(
-            schema_val
-                .pointer("/definitions/HierarchyNodeView")
-                .expect("HierarchyNodeView definition"),
-        )
-        .unwrap();
-        for field in ["parent", "children", "cluster", "rank"] {
-            assert!(
-                node_schema.contains(&format!("\"{field}\"")),
-                "node schema should describe the {field} field"
-            );
+        let export_schema = published_output_schema(&["graph", "export"]);
+        let full_schema = &export_schema["oneOf"][1];
+        for (root, node) in [
+            (schema_val, "HierarchyNodeView"),
+            (full_schema, "GraphExportFullNode"),
+        ] {
+            let properties = &root["definitions"][node]["properties"];
+            for field in ["parent", "cluster"] {
+                assert_eq!(
+                    properties[field]["type"],
+                    json!(["string", "null"]),
+                    "{node}.{field} remains a nullable string: {}",
+                    properties[field],
+                );
+            }
+            assert_eq!(properties["children"]["type"], "array");
+            assert_eq!(properties["children"]["items"]["type"], "string");
+            assert_eq!(properties["rank"]["type"], "integer");
         }
     }
 
+    /// `issue update` accepts every state but `rejected`, which only
+    /// `jit issue reject` sets; the schema (and so the MCP tool) lists exactly those.
+    #[test]
+    fn test_schema_issue_update_state_values_exclude_rejected() {
+        use crate::domain::State;
+
+        let schema = CommandSchema::generate();
+        let update = &schema.commands["issue"].subcommands.as_ref().unwrap()["update"];
+        let state = update
+            .flags
+            .iter()
+            .find(|flag| flag.name == "state")
+            .unwrap();
+
+        let expected: Vec<&str> = State::ALL
+            .into_iter()
+            .filter(|state| *state != State::Rejected)
+            .map(State::as_str)
+            .collect();
+        assert_eq!(state.values, expected);
+    }
+
     /// REQ-01: the schema's `State` enum must list every real `State` variant,
-    /// derived from the authoritative `State::all()` enumeration. A hand-copied
+    /// derived from the authoritative `State::ALL` enumeration. A hand-copied
     /// list that drops `rejected` (or any future variant) must fail this test.
     #[test]
     fn test_schema_state_enum_covers_every_state() {
@@ -1312,14 +1083,11 @@ mod tests {
         );
 
         // Guard against drift in either direction: the schema enum must equal
-        // the authoritative `State::all()` enumeration exactly.
-        let expected: Vec<String> = State::all()
-            .iter()
-            .map(|s| s.as_str().to_string())
-            .collect();
+        // the authoritative `State::ALL` enumeration exactly.
+        let expected: Vec<String> = State::ALL.iter().map(|s| s.as_str().to_string()).collect();
         assert_eq!(
             enum_vals, expected,
-            "schema State enum must match State::all() exactly (single source of truth)"
+            "schema State enum must match State::ALL exactly (single source of truth)"
         );
     }
 
@@ -1359,6 +1127,34 @@ mod tests {
         assert!(text.contains("manifest-version"));
         assert!(text.contains("map-entry"));
         assert!(text.contains("projection"));
+    }
+
+    #[test]
+    fn test_schema_publishes_a_profile_origin_as_its_directory_path() {
+        fn profile_origins(value: &Value) -> Vec<&Value> {
+            match value {
+                Value::Array(values) => values.iter().flat_map(profile_origins).collect(),
+                Value::Object(entries) => entries
+                    .iter()
+                    .flat_map(|(key, entry)| {
+                        key.starts_with("Profile")
+                            .then(|| entry.pointer("/properties/origin"))
+                            .flatten()
+                            .into_iter()
+                            .chain(profile_origins(entry))
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            }
+        }
+
+        let schema = serde_json::to_value(CommandSchema::generate()).unwrap();
+        let origins = profile_origins(&schema);
+
+        assert!(!origins.is_empty(), "no profile result publishes an origin");
+        for origin in origins {
+            assert_eq!(origin["type"], "string", "{origin}");
+        }
     }
 
     /// Clap-hidden commands and flags are not advertised in the schema.
@@ -1512,6 +1308,90 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_output_schema_with_warnings_declares_optional_string_array_for_any_shape() {
+        #[derive(JsonSchema)]
+        struct Plain {
+            _name: String,
+        }
+        let union = OutputSchema::union_of(vec![UnionMember::of::<Plain>()], "either");
+
+        for schema in [OutputSchema::of::<Plain>(), union] {
+            let schema = schema.with_warnings().success_schema.unwrap();
+            let warnings = &schema["properties"][crate::output::WARNINGS_FIELD];
+            assert_eq!(warnings["type"], "array");
+            assert_eq!(warnings["items"]["type"], "string");
+            assert!(!schema
+                .get("required")
+                .and_then(Value::as_array)
+                .is_some_and(|r| r.iter().any(|f| f == crate::output::WARNINGS_FIELD)));
+        }
+    }
+
+    #[test]
+    fn test_command_schema_never_declares_payload_warnings_in_any_success_variant() {
+        fn has_payload_warnings(schema: &Value) -> bool {
+            schema
+                .get("properties")
+                .and_then(Value::as_object)
+                .is_some_and(|properties| properties.contains_key(crate::output::WARNINGS_FIELD))
+                || ["oneOf", "anyOf", "allOf"]
+                    .iter()
+                    .filter_map(|key| schema.get(key).and_then(Value::as_array))
+                    .flatten()
+                    .any(has_payload_warnings)
+        }
+
+        fn walk(commands: &HashMap<String, Command>, path: &str, mismatched: &mut Vec<String>) {
+            for (name, command) in commands {
+                let path = if path.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{path}_{name}")
+                };
+                let generated = command
+                    .output
+                    .as_ref()
+                    .and_then(|output| output.success_schema.clone());
+                let mut raw = CommandSchema::get_output_schema_for_command(&path)
+                    .and_then(|output| output.success_schema);
+                if raw.as_ref().is_some_and(has_payload_warnings) {
+                    mismatched.push(format!("{path}: declares its own warnings"));
+                }
+                if let Some(Value::Object(schema)) = &mut raw {
+                    let properties = schema
+                        .entry("properties")
+                        .or_insert_with(|| json!({}))
+                        .as_object_mut()
+                        .unwrap();
+                    properties.insert(
+                        crate::output::WARNINGS_FIELD.to_string(),
+                        generated
+                            .as_ref()
+                            .and_then(|g| g.pointer("/properties/warnings").cloned())
+                            .unwrap_or(Value::Null),
+                    );
+                }
+                if generated != raw
+                    || generated.as_ref().is_some_and(|g| {
+                        g.pointer("/properties/warnings")
+                            .is_none_or(|w| w["type"] != "array")
+                    })
+                {
+                    mismatched.push(path.clone());
+                }
+                if let Some(subcommands) = &command.subcommands {
+                    walk(subcommands, &path, mismatched);
+                }
+            }
+        }
+        let mut mismatched = Vec::new();
+
+        walk(&CommandSchema::generate().commands, "", &mut mismatched);
+
+        assert!(mismatched.is_empty(), "mismatched: {mismatched:?}");
+    }
+
     /// Regression (jit:c505031a): `gate status-all`'s output schema lookup
     /// key must match its canonical clap subcommand path (`gate_status-all`),
     /// not a retired alias spelling (`gate_check-all`). The lookup key is
@@ -1535,26 +1415,6 @@ mod tests {
         assert!(
             output.success_schema.is_some(),
             "gate status-all success_schema should be present"
-        );
-    }
-
-    #[test]
-    fn test_schema_gate_evaluate_many_has_output_schema() {
-        let schema = CommandSchema::generate();
-        let evaluate_many = schema
-            .commands
-            .get("gate")
-            .and_then(|command| command.subcommands.as_ref())
-            .and_then(|commands| commands.get("evaluate-many"))
-            .expect("gate evaluate-many subcommand");
-        let output = evaluate_many
-            .output
-            .as_ref()
-            .expect("gate evaluate-many should have an output schema");
-        assert_eq!(output.success, "GateEvaluateManyResponse");
-        assert!(
-            output.success_schema.is_some(),
-            "gate evaluate-many success_schema should be present"
         );
     }
 
@@ -1614,55 +1474,86 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_command_exit_codes_present_in_schema() {
-        let schema = CommandSchema::generate();
-        assert!(
-            !schema.command_exit_codes.is_empty(),
-            "command_exit_codes projection must be populated"
-        );
-        // A few representative families must surface so the projection stays
-        // discoverable.
-        for command in [
-            "*",
-            "gate evaluate, gate evaluate-all, gate evaluate-many",
-            "validate",
-        ] {
-            assert!(
-                schema
-                    .command_exit_codes
-                    .iter()
-                    .any(|c| c.command == command),
-                "command_exit_codes must document `{command}`"
-            );
+    fn leaf(
+        path: &'static str,
+        raises: &'static [ErrorCode],
+        findings: &'static [(ErrorCode, &'static str)],
+    ) -> crate::dispatch::LeafCodes {
+        crate::dispatch::LeafCodes {
+            path,
+            raises,
+            findings,
         }
     }
 
     #[test]
-    fn test_command_exit_codes_within_global_taxonomy() {
-        // Every projected fixed code must be a defined member of the global
-        // taxonomy, so the per-command surface can never introduce a code the
-        // taxonomy does not explain. Pass-through rows (`code: None`, e.g.
-        // `serve`) carry no jit-assigned code and are exempt.
-        let taxonomy: std::collections::HashSet<i32> = CommandSchema::generate_exit_codes()
-            .iter()
-            .map(|d| d.code)
-            .collect();
-        for entry in CommandSchema::generate_command_exit_codes() {
-            if let Some(code) = entry.code {
-                assert!(
-                    taxonomy.contains(&code),
-                    "command `{}` documents code {code}, which is absent from the global taxonomy",
-                    entry.command,
-                );
-            } else {
-                assert!(
-                    entry.exception,
-                    "pass-through row for `{}` (code: None) must be an exception",
-                    entry.command,
-                );
-            }
+    fn test_declared_exit_codes_merge_one_leafs_codes_sharing_an_exit_status() {
+        let rows = declared_exit_codes(&[leaf(
+            "dep_add",
+            &[ErrorCode::CycleDetected, ErrorCode::ValidationFailed],
+            &[],
+        )]);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].command, "dep add");
+        assert_eq!(rows[0].code, ErrorCode::CycleDetected.exit_code().code());
+        for code in [ErrorCode::CycleDetected, ErrorCode::ValidationFailed] {
+            assert!(rows[0].condition.contains(code.description()), "{code:?}");
         }
+    }
+
+    #[test]
+    fn test_declared_exit_codes_join_leaves_with_equal_rows() {
+        let rows = declared_exit_codes(&[
+            leaf("a_one", &[ErrorCode::AlreadyExists], &[]),
+            leaf("b", &[ErrorCode::Blocked], &[]),
+            leaf("a_two", &[ErrorCode::AlreadyExists], &[]),
+        ]);
+
+        let commands: Vec<_> = rows.iter().map(|row| row.command.as_str()).collect();
+        assert_eq!(commands, ["a one, a two", "b"]);
+    }
+
+    #[test]
+    fn test_declared_exit_codes_flag_exactly_the_findings_rows_as_exceptions() {
+        const CONDITION: &str = "the check found drift";
+        let rows = declared_exit_codes(&[leaf(
+            "check",
+            &[ErrorCode::ValidationFailed],
+            &[(ErrorCode::ValidationFailed, CONDITION)],
+        )]);
+
+        let flagged: Vec<_> = rows
+            .iter()
+            .map(|row| (row.condition.as_str(), row.exception))
+            .collect();
+        assert_eq!(
+            flagged,
+            [
+                (ErrorCode::ValidationFailed.description(), false),
+                (CONDITION, true)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_generate_command_exit_codes_hand_writes_only_universal_rows() {
+        let declared = declared_exit_codes(
+            crate::dispatch::REGISTERED_GROUPS
+                .iter()
+                .flat_map(|group| group.leaves),
+        );
+        let rows = CommandSchema::generate_command_exit_codes();
+        let (universal, derived) = rows.split_at(rows.len() - declared.len());
+
+        assert!(universal.iter().all(|row| row.command == "*"));
+        assert_eq!(
+            serde_json::to_value(derived).unwrap(),
+            serde_json::to_value(&declared).unwrap()
+        );
+        let exceptions: Vec<_> = universal.iter().filter(|row| row.exception).collect();
+        assert_eq!(exceptions.len(), 1);
+        assert_eq!(exceptions[0].code, ExitCode::BrokenPipe.code());
     }
 
     /// The committed reference page is a projection: it must equal the rendered
@@ -1900,6 +1791,27 @@ mod tests {
     }
 
     #[test]
+    fn test_schema_list_results_declare_count_beside_their_collection() {
+        for (path, collection) in [
+            (&["doc", "list"][..], "documents"),
+            (&["doc", "assets", "list"], "assets"),
+            (&["item", "list"], "items"),
+            (&["item", "search"], "items"),
+            (&["invariant", "check"], "findings"),
+            (&["project", "render"], "projections"),
+            (&["archive", "candidates"], "candidates"),
+            (&["archive", "document"], "artifacts"),
+            (&["archive", "container"], "artifacts"),
+        ] {
+            let props = declared_property_names(&published_output_schema(path));
+            assert!(
+                props.contains("count") && props.contains(collection),
+                "{path:?} must declare `count` beside `{collection}`; got {props:?}"
+            );
+        }
+    }
+
+    #[test]
     fn test_profile_show_schema_is_a_count_wrapped_collection() {
         let schema = CommandSchema::generate();
         let command = schema
@@ -1909,7 +1821,10 @@ mod tests {
             .and_then(|commands| commands.get("show"))
             .expect("profile show command");
         let output = command.output.as_ref().expect("profile show output");
-        assert_eq!(output.success, "ProfileShowResult");
+        assert_eq!(
+            output.success,
+            OutputSchema::of::<crate::profile::ProfileShowResult>().success
+        );
 
         let success_schema = output
             .success_schema

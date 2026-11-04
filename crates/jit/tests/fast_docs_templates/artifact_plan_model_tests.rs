@@ -1,9 +1,11 @@
 use jit::config::DocumentationConfig;
 use jit::domain::artifact_plan::{
-    ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion, BlockerCode, ContentIdentity,
-    EvidenceCode, PlanBlocker, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
-    ARCHIVE_PLAN_SCHEMA_VERSION,
+    ArchiveCandidates, ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion,
+    BlockerCode, ContentIdentity, PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus,
+    WarningCode, ARCHIVE_PLAN_SCHEMA_VERSION,
 };
+use jit::domain::identity::IssueId;
+use jit::test_utils::issue_id;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
@@ -15,15 +17,14 @@ fn artifact(source: &str, version: ArtifactVersion) -> ArtifactPlanEntry {
 }
 
 fn configured_plan(
+    id: &IssueId,
     artifacts: Vec<ArtifactPlanEntry>,
     blockers: Vec<PlanBlocker>,
     warnings: Vec<PlanWarning>,
 ) -> ArtifactPlan {
     ArtifactPlan::new(
-        PlanTarget::Container {
-            id: "7d3a3a47-1e1c-466b-992c-b2df7ccae978".to_string(),
-        },
-        "dev/archive/7d3a3a47",
+        PlanTarget::Container { id: id.clone() },
+        format!("dev/archive/{}", id.short_id()),
         PolicyStatus::Configured,
         artifacts,
         blockers,
@@ -43,8 +44,10 @@ fn object_keys(value: &Value) -> BTreeSet<&str> {
 
 #[test]
 fn test_artifact_plan_serialization_is_stable_for_permuted_inputs() {
+    let container_id = issue_id(1);
     let pinned = ArtifactVersion::pinned(FULL_SHA1_OID).unwrap();
     let first = configured_plan(
+        &container_id,
         vec![
             artifact("./dev//z.md", ArtifactVersion::WorkingTree),
             artifact("dev/a.md", ArtifactVersion::WorkingTree),
@@ -61,6 +64,7 @@ fn test_artifact_plan_serialization_is_stable_for_permuted_inputs() {
         ],
     );
     let second = configured_plan(
+        &container_id,
         vec![
             artifact("dev/a.md", pinned),
             artifact("dev/a.md", ArtifactVersion::WorkingTree),
@@ -194,13 +198,13 @@ fn test_policy_status_preserves_three_explicitness_states() {
         .unwrap();
         assert!(!plan.eligible());
         let expected = match status {
-            PolicyStatus::Unconfigured => "policy-unconfigured",
-            PolicyStatus::Incomplete => "policy-incomplete",
+            PolicyStatus::Unconfigured => BlockerCode::PolicyUnconfigured,
+            PolicyStatus::Incomplete => BlockerCode::PolicyIncomplete,
             PolicyStatus::Configured => unreachable!(),
         };
         assert_eq!(
             serde_json::to_value(&plan).unwrap()["blockers"][0]["code"],
-            expected
+            expected.as_str()
         );
         assert!(plan.executable_artifacts().is_err());
     }
@@ -239,6 +243,7 @@ fn test_content_identity_is_derived_from_one_byte_slice() {
 #[test]
 fn test_pinned_artifact_is_non_relocating_historical_entry() {
     let value = serde_json::to_value(configured_plan(
+        &issue_id(1),
         vec![artifact(
             "dev/active/history.md",
             ArtifactVersion::pinned(FULL_SHA1_OID).unwrap(),
@@ -269,6 +274,7 @@ fn test_preview_and_execution_share_the_artifact_plan_type() {
     }
 
     let plan = configured_plan(
+        &issue_id(1),
         vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
         Vec::new(),
         Vec::new(),
@@ -283,8 +289,40 @@ fn test_preview_and_execution_share_the_artifact_plan_type() {
 }
 
 #[test]
-fn test_archive_plan_schema_v1_golden_fields_and_codes() {
+fn test_artifact_plan_decode_rejects_a_non_canonical_plan() {
+    let wire = serde_json::to_value(configured_plan(
+        &issue_id(1),
+        vec![
+            artifact("dev/a.md", ArtifactVersion::WorkingTree),
+            artifact("dev/b.md", ArtifactVersion::WorkingTree),
+        ],
+        Vec::new(),
+        Vec::new(),
+    ))
+    .unwrap();
+    let decoded = |edit: fn(&mut Value)| {
+        let mut value = wire.clone();
+        edit(&mut value);
+        serde_json::from_value::<ArtifactPlan>(value)
+    };
+
+    assert!(decoded(|value| value["count"] = json!(1)).is_err());
+    for edit in [
+        (|value: &mut Value| value["artifacts"].as_array_mut().unwrap().reverse())
+            as fn(&mut Value),
+        |value| value["action_counts"]["retain"] = json!(1),
+    ] {
+        assert_eq!(
+            decoded(edit).unwrap().executable_artifacts(),
+            Err(PlanError::NonCanonicalEnvelope)
+        );
+    }
+}
+
+#[test]
+fn test_archive_plan_schema_v1_golden_fields() {
     let value = serde_json::to_value(configured_plan(
+        &issue_id(1),
         vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
         Vec::new(),
         Vec::new(),
@@ -305,7 +343,7 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "count",
             "artifacts",
             "blockers",
-            "warnings",
+            "plan_warnings",
         ])
     );
     assert_eq!(
@@ -325,7 +363,7 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "pending_deletions",
             "evidence",
             "blockers",
-            "warnings",
+            "plan_warnings",
         ])
     );
     assert_eq!(
@@ -339,48 +377,30 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "pending_deletions",
         ])
     );
+}
+
+#[test]
+fn test_archive_candidates_envelope_derives_count_and_rejects_a_mismatched_count() {
+    let candidates = ArchiveCandidates::new(vec![configured_plan(
+        &issue_id(1),
+        vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
+        Vec::new(),
+        Vec::new(),
+    )]);
+    let wire = serde_json::to_value(&candidates).unwrap();
+
     assert_eq!(
-        EvidenceCode::ALL.map(EvidenceCode::as_str),
-        [
-            "permanent-path",
-            "outside-development-root",
-            "outside-owner",
-            "active-owner",
-            "unmanaged-path",
-            "archived-source",
-            "pinned-historical",
-        ]
+        object_keys(&wire),
+        BTreeSet::from(["count", "candidates", "schema_version"])
     );
+    assert_eq!(wire["count"], 1);
+    assert_eq!(wire["schema_version"], 1);
     assert_eq!(
-        BlockerCode::ALL.map(BlockerCode::as_str),
-        [
-            "policy-unconfigured",
-            "policy-incomplete",
-            "unmanaged-selected-root",
-            "destination-conflict",
-            "document-non-terminal-owner",
-            "pinned-read-failed",
-            "repository-escape",
-            "unresolvable-edge",
-            "unpreservable-layout",
-            "non-terminal-target",
-            "missing-source",
-            "symlink-artifact",
-            "unsupported-artifact-type",
-        ]
+        serde_json::from_value::<ArchiveCandidates>(wire.clone()).unwrap(),
+        candidates
     );
-    assert_eq!(
-        WarningCode::ALL.map(WarningCode::as_str),
-        [
-            "missing-edge-target",
-            "external-edge",
-            "no-owner",
-            "residue-source",
-            "deletion-failed",
-            "not-selected-sibling",
-            "dynamic-loading-suspected",
-            "unsupported-edge-target",
-            "moving-path-citation",
-        ]
-    );
+
+    let mut mismatched = wire;
+    mismatched["count"] = json!(2);
+    assert!(serde_json::from_value::<ArchiveCandidates>(mismatched).is_err());
 }

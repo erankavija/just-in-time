@@ -4,7 +4,8 @@
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "5687e281-d504-4b85-ab4f-c84e603c37e2",
-    "83e6cb8d-e1a5-45d1-a888-071093b74d38"
+    "83e6cb8d-e1a5-45d1-a888-071093b74d38",
+    "f487aeef-e0d4-4334-8843-0c80b0023c2d"
   ],
   "description": "`scripts/rust-build-budget.sh` gains a fourth budget that caps the production code lines of `crates/jit/src/main.rs`, so the thin entry point cannot regrow.\n\n## Background\n\nThe script declares three `readonly` budgets (`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`, `MAX_TEST_SUITE_SECONDS`), accumulates violations in `errors[]`, and on success prints one `rust-build-budget: integration-targets=… suite-duration=…` line. `scripts/cargo-ci.sh` greps `rust-build-budget: integration-targets=.*` and stores the rest in the gate summary. Policy checks read manifests under `--root`, which is how `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives the script against fixture roots. Budgets are declared once in the script and derived in `dev/benchmarks/rust-build-budgets/README.md`. Production lines are defined by the committed counter `scripts/production-lines.py`, which reads files at a git revision. In its default mode it excludes blank lines, doc comments, `#[cfg(test)]` items and test-only modules and files; plain `//` comments and `test-support`-gated code count.\n\n## Success Criteria\n\n- [hard] REQ-01: The script declares `readonly MAX_MAIN_RS_CODE_LINES` beside the other budgets and fails, naming the measured and allowed values, when `$ROOT/crates/jit/src/main.rs` exceeds it.\n- [hard] REQ-02: The count comes from `scripts/production-lines.py` in its default (survey-described) mode, extended with a mode that counts one working-tree file, applied to the file under `--root`; the revision mode's figures are unchanged.\n- [hard] REQ-03: The success line gains a `main-rs-lines=N/MAX` field after its existing fields, and `cargo-ci.sh`'s budget summary still parses it.\n- [hard] REQ-04: Fixture tests in `rust_build_budget_checker_tests.rs` show a fixture under the ceiling passing with the field reported and a fixture over it failing.\n- [hard] REQ-05: `dev/benchmarks/rust-build-budgets/README.md` derives the ceiling as the measured production lines of the consolidated `main.rs` plus at most 10% headroom, naming the commit measured.\n\n## Notes\n\nThe `bounded-rust-build-footprint` invariant names targets and executable bytes; this ceiling sits beside it as gate policy. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
@@ -25,5 +26,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Enforce a main.rs production-line ceiling in the budget script",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T22:39:33.936595049Z"
 }

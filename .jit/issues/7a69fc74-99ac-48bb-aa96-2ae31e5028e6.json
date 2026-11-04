@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:50:20.510629320Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Remove the per-command checks of `count` against collection length from the `cli_query_graph` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_query_graph/search_tests.rs:236`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:03:27.288301577Z",
+  "first_ready_at": "2026-10-31T23:46:36.009151364Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4b404608-510a-4990-b455-7b99a84b3e05",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:56:46.039597170Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ea66b6a1-e804-498b-a692-7e2021f9d35e",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:59:36.210205097Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7a69fc74-99ac-48bb-aa96-2ae31e5028e6",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "cli_query_graph tests stop re-asserting the list-envelope count",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:03:27.288301577Z"
 }

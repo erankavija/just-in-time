@@ -1,0 +1,71 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a8396723cc848e27a18258036fea27cfcbfa47d1",
+  "completed_at": "2026-11-03T21:53:42.859923320Z",
+  "duration_ms": 430870,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/breakdown.json",
+        "id": "F1",
+        "line": 1572,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/b697a3f7/requirement/REQ-17",
+          "@/charter/D-17",
+          "@/inv/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "An externally appended identity-location amendment conflicts with the control-files-publication criteria and shared atomic-publication contract."
+      },
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/d675102c-58c4-4add-bcf8-f9963c0c4f21.json",
+        "id": "F2",
+        "line": 9,
+        "origin": "pre-existing",
+        "references": [
+          "@/inv/convention-convergence"
+        ],
+        "severity": "medium",
+        "summary": "Issue 9a2563fd was added after breakdown creation as an extra configuration-story dependency absent from the authoritative manifest."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/plan.md",
+        "id": "F3",
+        "line": 299,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Five external dependencies described as direct re-homes are represented transitively without loss of execution ordering."
+      },
+      {
+        "disposition": "advisory",
+        "id": "F4",
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Repository validation passes with 70 pre-existing membership-label divergence warnings."
+      }
+    ],
+    "summary": "The 45 manifest issues and 60 internal edges pass all required checks; four non-blocking contract, extra-edge, wording, and repository-wide advisories remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "12ecb90c-eb0c-4c4d-8717-f217217eb5c9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a4508f3b-542c-4e14-a8ca-f28f62da4346",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:46:31.989142401Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "The 45-entry manifest and its 60 internal edges pass structural validation. All mandated checks succeeded: manifest validation with warnings denied and a 50-issue budget, renderer `--check`, native batch dry-run, and `jit validate`. The latter retains 70 repository-wide advisories.\n\nAudit results:\n\n- All 45 creation-map issues exactly match manifest title, description, type, priority, labels, and gates.\n- All 60 intra-manifest edges, seven source→breakdown edges, and six container→sink edges match.\n- `planning` appears in neither stored issues nor batch export.\n- Content standards, blank-workspace roots, contract modes, unique producer reachability, and the issue budget pass.\n- Footprint uncertainty is bounded; same-function overlaps are ordered, while acknowledged independent overlaps require rebasing.\n- The earlier lease-contract, description-fidelity, and behavior-summary findings were corrected.\n- Coverage preview passes. The latest plan review remains failed for finding 1 below, introduced after breakdown creation.\n\n| Key / issue | Coherent change | Observable test boundary | Footprint credible | One focused implementation/review cycle | Not a chain link | Result |\n|---|---|---|---|---|---|---|\n| readiness-derivation / 945f9181 | Yes | Domain, property, harness | Yes | Yes, DEC-26 | Yes | PASS |\n| readiness-in-mutation-plans / 635f23c7 | Yes | Harness/session counts | Yes | Yes, DEC-26 | Yes | PASS |\n| validate-fix-readiness-convergence / b674382e | Yes | Validation harness | Yes | Yes | Yes | PASS |\n| state-derivation-convergence / d2acb105 | Yes | Transition harness | Yes | Yes | Yes | PASS |\n| field-derivation-convergence / fe9147fa | Yes | Property/command tests | Yes | Yes, DEC-26 | Yes | PASS |\n| lease-check-in-session / c2b3cefa | Yes | Lease harness | Yes | Yes, DEC-26 | Yes | PASS |\n| bulk-apply-one-session / 693a2fdd | Yes | Bulk harness | Yes | Yes | Yes | PASS |\n| lease-check-coverage / d3c94dc5 | Yes | Lease harness | Yes | Yes | Yes | PASS |\n| event-per-commit / c517b88b | Yes | Plan/storage/CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| read-session / eaca3f52 | Yes | Storage/contention tests | Yes | Yes, DEC-26 | Yes | PASS |\n| lock-free-read-consumers / 578ed10d | Yes | Command harness | Yes | Yes | Yes | PASS |\n| read-concurrency-benchmark / bb596228 | Yes | Benchmark validator | Yes | Yes | Yes | PASS |\n| cost-evidence / 45d0a971 | Yes | Benchmark validator | Yes | Yes, DEC-26 | Yes | PASS |\n| configuration-assembly / 1ade3e6f | Yes | Unit/repository/command | Yes | Yes, DEC-26 | Yes | PASS |\n| configuration-store / cfc87a55 | Yes | Storage/CLI suites | Yes | Yes, DEC-26 | Yes | PASS |\n| captured-declaration-reads / 030df4b1 | Yes | Harness/CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| executor-config-caches-removal / 42046050 | Yes | Harness/configuration | Yes | Yes, DEC-26 | Yes | PASS |\n| declarations-on-mutation-base / 850eaad3 | Yes | Command/harness | Yes | Yes, DEC-26 | Yes | PASS |\n| gate-preset-catalog / 1a737bb4 | Yes | Catalog/command/template | Yes | Yes, DEC-26 | Yes | PASS |\n| gate-evidence-capture / 700a96dd | Yes | Gate-check harness | Yes | Yes | Yes | PASS |\n| image-identity-token / f7a59f5f | Yes | Storage unit tests | Yes | Yes | Yes | PASS |\n| capability-fs-module / d58f80c9 | Yes | Storage suites | Yes | Yes, DEC-26 | Yes | PASS |\n| leaf-open-once / 4334df62 | Yes | Capability/profile/storage | Yes | Yes, DEC-26 | Yes | PASS |\n| record-commit-through-capabilities / 01a88d32 | Yes | Redo tests | Yes | Yes | Yes | PASS |\n| redo-apply-parents-once / 4d834432 | Yes | Redo conformance | Yes | Yes, DEC-26 | Yes | PASS |\n| atomic-publication-core / 7fefd776 | Yes | Atomic-write tests | Yes | Yes, DEC-26 | Yes | PASS |\n| control-files-publication / 1b7f58ae | Intended change is coherent; contract conflicts | Claim/serve tests | Third target omitted | Yes after correction | Yes | PASS sizing; finding 1 |\n| archive-reference-resolution-once / f56bad8d | Yes | Domain unit tests | Yes | Yes | Yes | PASS |\n| archive-preview-through-execute-planner / 65aafaba | Yes | Preview/execute harness | Yes | Yes, DEC-26 | Yes | PASS |\n| archive-candidates-one-session / c0775a83 | Yes | Command harness | Yes | Yes | Yes | PASS |\n| container-destination-once / 4e2bed35 | Yes | Classifier/command | Yes | Yes, DEC-26 | Yes | PASS |\n| snapshot-from-one-image / 30334066 | Yes | Snapshot CLI | Yes | Yes, DEC-26 | Yes | PASS |\n| archive-destination-no-legacy-fallback / e73ad8bc | Yes | Classifier tests | Yes | Yes | Yes | PASS |\n| domain-typed-errors / ceaaf0ab | Yes | Domain unit tests | Yes | Yes, DEC-26 | Yes | PASS |\n| root-relative-path-in-domain / 5d09e74b | Yes | Domain/structural tests | Yes | Yes, DEC-26 | Yes | PASS |\n| one-safe-path-validator / b2c28ec1 | Yes | Domain/backend tests | Yes | Yes, DEC-26 | Yes | PASS |\n| issue-scope-type / 9623fe6a | Yes | Domain/CLI tests | Yes | Yes, DEC-26 | Yes | PASS |\n| process-liveness-primitive / f6477007 | Yes | Process unit tests | Yes | Yes, DEC-26 | Yes | PASS |\n| type-extraction-exact-values / 12064c7b | Yes | Taxonomy tests | Yes | Yes | Yes | PASS |\n\n1. **F1 — High; advisory; pre-existing.** The externally appended `7dd59ebf` amendment says worktree identity may live under a checkout Git directory, while `control-files-publication` REQ-03 and the `atomic-publication` contract still require a two-value data-root type. Consolidate the amendment into the background, criteria, tests, footprint, and shared contract; remove the appended prose, rerender, and rerun plan review. Location: `dev/active/b697a3f7-one-mutation-path/breakdown.json:1572`. References: `@/issue/b697a3f7/requirement/REQ-17`, `@/charter/D-17`, `@/inv/derived-state-coherence`.\n\n2. **F2 — Medium; advisory; pre-existing.** Issue `9a2563fd` was added after breakdown creation as an extra dependency of manifest story `configuration`, so the current graph contains work absent from the authoritative manifest. Remove/re-home `d675102c → 9a2563fd`; if the work is intentionally adopted here, add it to the manifest and return the changed plan contract to plan review. Location: `.jit/issues/d675102c-58c4-4add-bcf8-f9963c0c4f21.json:9`. Reference: `@/inv/convention-convergence`.\n\n3. **F3 — Low; advisory; issue-impact.** Five dependencies described as direct re-homes are represented transitively: `f8f80eea`, `c1c86312`, `5fac48b8`, `c3e3e2ff`, and `145b4d57`. Execution ordering is preserved; clarify the plan wording rather than adding redundant edges. Location: `dev/active/b697a3f7-one-mutation-path/plan.md:299`.\n\n4. **F4 — Low; advisory; pre-existing.** `jit validate` passes with 70 repository-wide membership labels not backed by the DAG. They are outside this bracket and do not affect its manifest coverage or internal edge fidelity.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The 45 manifest issues and 60 internal edges pass all required checks; four non-blocking contract, extra-edge, wording, and repository-wide advisories remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"An externally appended identity-location amendment conflicts with the control-files-publication criteria and shared atomic-publication contract.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/breakdown.json\",\"line\":1572,\"references\":[\"@/issue/b697a3f7/requirement/REQ-17\",\"@/charter/D-17\",\"@/inv/derived-state-coherence\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Issue 9a2563fd was added after breakdown creation as an extra configuration-story dependency absent from the authoritative manifest.\",\"file\":\".jit/issues/d675102c-58c4-4add-bcf8-f9963c0c4f21.json\",\"line\":9,\"references\":[\"@/inv/convention-convergence\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Five external dependencies described as direct re-homes are represented transitively without loss of execution ordering.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/plan.md\",\"line\":299},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Repository validation passes with 70 pre-existing membership-label divergence warnings.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

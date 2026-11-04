@@ -211,7 +211,7 @@ flowchart LR
     R --> P[in_progress: prechecks pass]
     P --> G[Gated: completion blocked]
     P --> D[Done: gates already passed]
-    G --> D[Done: retry after gates pass]
+    G --> D[Done: last gate passes]
 ```
 
 **1. Creation**
@@ -223,25 +223,28 @@ jit issue create \
   --label "type:task"
 ```
 
-New dependency-free issues are created in `ready`. An issue created carrying a
-dependency that is not yet effectively terminal — a `jit issue batch-create`
-entry with `depends_on`, or a graph-template node wired to a sibling — is created
-in `backlog` instead. Gates do not block `ready`; they are checked when work
-starts or completes.
+A new issue is created in `ready` when no dependency blocks it, and in `backlog`
+when it carries a dependency that is not yet effectively terminal, such as a
+`jit issue batch-create` entry with `depends_on` or a graph-template node wired
+to a sibling. Gates do not block `ready`; they are checked when work starts or
+completes.
 
 **2. Transition to Ready**
 
 An issue in `backlog` becomes `ready` when all dependencies are effectively
-terminal (`done`, `rejected`, or `archived` from one of those). This promotion is automatic: completing or rejecting a dependency
-re-scans its dependents and moves each newly-unblocked issue to `ready` in the
-same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`).
-Prechecks are not a readiness condition: they run when a ready issue is claimed or
-explicitly moved to `in_progress`.
+terminal (`done`, `rejected`, or `archived` from one of those). Readiness
+follows the graph in both directions, and every correction publishes in the same
+redo record as the change that causes it:
 
-The reverse holds too: a `ready` issue that gains a dependency on a non-terminal
-issue returns to `backlog` in the same operation. Stored state therefore always
-agrees with the dependency graph, and an issue reported as `ready` while listing
-unmet dependencies is a repository defect `jit validate` reports.
+- Completing or rejecting a dependency, removing an edge, or deleting a blocker
+  promotes each dependent it leaves unblocked from `backlog` to `ready`.
+- A dependency leaving `done` or `rejected`, or a new edge to a non-terminal
+  issue, demotes each `ready` dependent it blocks to `backlog`.
+
+Stored state therefore always agrees with the dependency graph; a disagreement
+is a repository defect `jit validate` reports. Prechecks are not a readiness
+condition: they run when a ready issue is claimed or explicitly moved to
+`in_progress`.
 
 **3. Work Begins**
 
@@ -257,13 +260,12 @@ jit issue claim $ISSUE agent:worker-1
 jit gate status-all $ISSUE
 jit gate evaluate $ISSUE tests
 
-# Once every required gate is passed, request completion again
+# Once every required gate is passed, request completion
 jit issue update $ISSUE --state done
 ```
 
 An explicit `done` request moves an issue with unpassed gates to `gated`; it does
-not run those checkers. Evaluate the gates, inspect their statuses, then retry
-the `done` request.
+not run those checkers. Passing the last gate of a `gated` issue moves it to `done`.
 
 See [States](#states) for complete state machine details.
 
@@ -624,31 +626,39 @@ jit issue update $ISSUE --state done
 **If any gates not passed:**
 - Issue transitions to `gated` (waiting for gate approval)
 - Clear error message shows which gates are blocking
-- Evaluate the listed gates, inspect `jit gate status-all`, then retry the
-  explicit `done` request
+- Passing the last listed gate moves the issue to `done`
 
 **Example:**
 ```bash
 $ jit issue update abc123 --state done
 Error: Gate validation failed: Cannot transition to 'done': 2 gate(s) not passed
+
+Blockers:
+  - tests [pending]
+  - code-review [pending]
+
+To fix:
+  - jit gate status-all abc123
+  - jit gate evaluate abc123 tests
+  - jit gate status abc123 tests --all  # run history
+  - jit gate evaluate abc123 code-review --by <attestor>
+  - jit gate status abc123 code-review --all  # run history
+
 Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
 
 # Fix and evaluate gates
 $ jit gate evaluate abc123 tests
-✓ tests passed
+Passed gate 'tests' for issue abc123
 
 $ jit gate evaluate abc123 code-review --by human:alice
-✓ code-review passed
-
-# Once every required status is green, retry completion.
-$ jit issue update abc123 --state done
-✓ Issue transitioned to 'done'
+Passed gate 'code-review' for issue abc123
+# The last pass moved the issue to done.
 ```
 
-Passing a manual gate may auto-transition an already `gated` issue when it
-clears the final blocker. Automated `jit gate evaluate` runs and records its
-checker result; use the explicit retry above for a workflow that works for both
-gate modes.
+A failed gate, or a pass on an issue that isn't `gated`, leaves the state
+unchanged. An `in_progress` issue completes with an explicit `done` request once
+its gates have passed; that request succeeds without change on an issue already
+`done`.
 
 ### Gate Bypass for Terminal States
 
@@ -697,7 +707,7 @@ stateDiagram-v2
     Backlog --> Ready: dependencies effectively terminal
     Ready --> in_progress: prechecks pass
     in_progress --> Gated: done requested with unpassed gates
-    Gated --> Done: done retried after gate statuses pass
+    Gated --> Done: last gate passes
     note right of Gated
         Waiting for gates
     end note
@@ -707,8 +717,8 @@ stateDiagram-v2
 - **Prechecks** gate entry to `in_progress`
 - **Postchecks** gate entry to `done`
 - **Gated state** exists specifically for gate waiting
-- **Automated evaluation** records a gate run; completion is retried explicitly
-  after required statuses pass (manual approval may complete a gated issue)
+- **Gate evaluation** records its result, and the pass that clears a gated issue's
+  last gate completes it
 
 ### Design Philosophy
 
@@ -747,7 +757,7 @@ stateDiagram-v2
     Backlog --> Ready: dependencies satisfied
     Ready --> in_progress: claim / prechecks pass
     in_progress --> Gated: completion attempted
-    Gated --> Done: done retried after gates pass
+    Gated --> Done: last gate passes
     Done --> Archived: retire (records origin)
     Rejected --> Archived: retire (records origin)
     Archived --> Done: revive to recorded origin
@@ -774,7 +784,7 @@ stateDiagram-v2
 **in_progress**: Issue is actively being worked on by an assignee.
 
 **Gated**: Issue has attempted to transition to Done, but quality gates have not
-all passed. Evaluate or attest the gates, then retry `jit issue update --state done`.
+all passed. Evaluating or attesting the last unpassed gate moves it to Done.
 
 **Done**: Completion outcome. A `done` request checks dependencies and required
 gate statuses before entering this state.
@@ -782,7 +792,7 @@ gate statuses before entering this state.
 **Rejected**: Closure outcome for work not implemented. It bypasses dependency
 and gate checks. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
-**Archived**: A retired issue, parked out of active views. Reachable from any state, and **terminality-preserving**: it records the state it was entered from (its origin) and keeps whatever that state meant for dependents. An issue archived from a terminal state (`Done`/`Rejected`) stays effectively terminal — it keeps satisfying its dependents and counts toward delivery in container rollups by its origin. An issue archived from a non-terminal state does not satisfy dependents and counts as open. Archived issues are never themselves in the readiness set. Reviving an archived issue restores its recorded origin state exactly (a completed issue archived from `Done` revives only to `Done`), so the archive round-trip cannot move work back into an active state. `Archived` is a lifecycle state and is distinct from `jit archive`, which relocates linked documents on disk (see [Archive planning and execution](../reference/cli-commands.md#archive-planning-and-execution)).
+**Archived**: A retired issue, parked out of active views. Reachable from any state, and **terminality-preserving**: it records the state it was entered from (its origin) and keeps whatever that state meant for dependents. An issue archived from a terminal state (`Done`/`Rejected`) stays effectively terminal — it keeps satisfying its dependents and counts toward delivery in container rollups by its origin. An issue archived from a non-terminal state does not satisfy dependents and counts as open. Archived issues are never themselves in the readiness set. Reviving an archived issue restores its recorded origin state exactly (a completed issue archived from `Done` revives only to `Done`), so the archive round-trip cannot move work back into an active state. `Archived` is a lifecycle state and is distinct from `jit archive`, which relocates linked and location-owned documents on disk (see [Archive planning and execution](../reference/cli-commands.md#archive-planning-and-execution)).
 
 ### Completion and Rejection Outcomes
 
@@ -805,8 +815,8 @@ do not rely on it to prohibit a later explicit state update.
 ### State Transitions
 
 **Auto-transitions:**
-- `Backlog → Ready`: Automatic. When a dependency reaches a terminal state (done or rejected), the completing/rejecting command re-scans dependents and promotes each newly-unblocked issue in the same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`)
-- `Ready → Backlog`: Automatic. The inverse: adding a dependency on a non-terminal issue — through `jit dep add` or through graph-template application — demotes the dependent in the same operation, so stored readiness never contradicts the graph
+- `Backlog → Ready` and `Ready → Backlog`: Automatic. The change that unblocks or blocks a dependent corrects its readiness in the same redo record ([Transition to Ready](#issue-lifecycle))
+- `Gated → Done`: Automatic. `jit gate evaluate` passing the last unpassed gate completes the issue, with its dependents' readiness corrections in the same redo record
 
 **Guarded workflow operations:**
 - `ready → in_progress`: `jit issue claim` attempts this transition and runs prechecks
@@ -853,6 +863,10 @@ When rejecting issues, optionally add `resolution:*` labels to document why:
 jit issue reject $ISSUE --reason "duplicate"
 # Adds label: resolution:duplicate
 ```
+
+The reason becomes a label value, so it must satisfy the label format (a letter or
+digit first, then letters, digits, `.`, `_`, `/`, `-`). A reason with spaces or
+other punctuation is refused before anything is written.
 
 ## Labels
 
@@ -902,9 +916,6 @@ flowchart LR
 Projects add their own types alongside these. This repository, for example,
 declares `bug`, `enhancement`, `planning`, and `breakdown`; the research example
 under `docs/examples/research/` uses `goal` and `experiment` instead.
-
-`--orphan` concerns missing parent membership labels for leaf issues; it is not a
-type-label exception.
 
 ### Common Label Namespaces
 
@@ -1124,8 +1135,8 @@ jit issue claim abc123 agent:worker-1
 ```
 
 Leases are advisory. They coordinate cooperating agents, while
-`[worktree].enforce_leases` controls whether selected write commands require an
-active lease; with enforcement `off`, those write guards do not block writes.
+`[worktree].enforce_leases` controls whether another agent's active lease refuses
+a write; with enforcement `off`, nothing is refused.
 `jit issue claim` separately rejects a conflicting live lease as part of its
 claiming behavior.
 

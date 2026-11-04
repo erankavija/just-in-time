@@ -1,80 +1,40 @@
-//! REQ-02: bind every `command_exit_codes` row to the runtime behavior it
-//! documents, so no mapping in the generated reference is hand-authored.
+//! Bind every `command_exit_codes` row, universal or derived from a leaf's
+//! declared codes, to one case that runs a real subprocess in both public
+//! invocation forms.
 //!
-//! Each projected fixed-code row is bound here by a real subprocess in both
-//! public invocation forms. The classifier tests in `output::failure` remain useful
-//! unit coverage, but cannot substitute for a command-level binding because
-//! they do not exercise parsing, dispatch, or `--json` output selection.
-//!
-//! One row has no fixed projected code: `serve --fg` is a pass-through. Its
-//! public plain and JSON forms are exercised with a deterministic child exit,
-//! while `serve::foreground_exit_code` separately covers the full helper-level
-//! pass-through range and signal-termination fallback.
-//!
-//! `test_command_exit_codes_every_row_is_verified` keeps the set complete: adding
-//! a row without a binding fails the build.
+//! `test_command_exit_codes_every_row_is_verified` compares the projection with
+//! the rows the binding cases declare: a row without a case, or with two, fails.
 
-use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
+use jit::storage::worktree_paths::WorktreePaths;
+use jit::test_cli::{jit_binary, JitCli};
+use jit::test_lease_store::{corrupt_lease, LeaseCorruption};
 use std::fs;
 use std::io::Read;
-use std::process::{Command, Output, Stdio};
+use std::process::{Output, Stdio};
 use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let status = Command::new(jit_binary())
-        .current_dir(&temp)
-        .arg("init")
-        .status()
-        .unwrap();
-    assert!(status.success());
-    temp
-}
-
-fn create_issue(temp: &TempDir, title: &str, extra: &[&str]) -> String {
-    let mut args = vec!["issue", "create", "--title", title, "--json"];
-    args.extend_from_slice(extra);
-    let output = Command::new(jit_binary())
-        .current_dir(temp)
-        .args(&args)
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["id"].as_str().unwrap().to_string()
-}
-
-fn setup_auto_gate_issue(temp: &TempDir, checker_command: &str) -> String {
-    let definition = Command::new(jit_binary())
-        .current_dir(temp)
-        .args([
-            "gate",
-            "define",
-            "projection-gate",
-            "--title",
-            "Projection gate",
-            "--description",
-            "Projection gate",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "10",
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        definition.status.success(),
-        "gate definition failed: {}",
-        String::from_utf8_lossy(&definition.stderr)
-    );
-    create_issue(temp, "Gated projection", &["--gate", "projection-gate"])
+/// Define the auto gate `projection-gate` over `checker_command` and create an
+/// issue requiring it.
+fn setup_auto_gate_issue(cli: &JitCli, checker_command: &str) -> String {
+    cli.run([
+        "gate",
+        "define",
+        "projection-gate",
+        "--title",
+        "Projection gate",
+        "--description",
+        "Projection gate",
+        "--mode",
+        "auto",
+        "--checker-command",
+        checker_command,
+        "--timeout",
+        "10",
+    ])
+    .unwrap();
+    cli.create_issue(["--title", "Gated projection", "--gate", "projection-gate"])
+        .unwrap()
 }
 
 const CYCLIC_APPLY_CONFIG: &str = r#"
@@ -108,318 +68,397 @@ applies_to  = ["epic"]
   role = "planning"
 "#;
 
-fn setup_prospective_cycle(temp: &TempDir) -> (String, String) {
-    fs::write(temp.path().join(".jit/config.toml"), CYCLIC_APPLY_CONFIG).unwrap();
+fn setup_prospective_cycle(cli: &JitCli) -> (String, String) {
+    fs::write(cli.root().join(".jit/config.toml"), CYCLIC_APPLY_CONFIG).unwrap();
     fs::write(
-        temp.path().join(".jit/templates.toml"),
+        cli.root().join(".jit/templates.toml"),
         CYCLIC_APPLY_TEMPLATE,
     )
     .unwrap();
-    let upstream = create_issue(temp, "Upstream", &["--type", "task"]);
-    let container = create_issue(temp, "Container", &["--type", "epic"]);
-    let edge = Command::new(jit_binary())
-        .current_dir(temp)
-        .args(["dep", "add", &container, &upstream])
-        .output()
+    let upstream = cli
+        .create_issue(["--title", "Upstream", "--type", "task"])
         .unwrap();
-    assert!(
-        edge.status.success(),
-        "cycle fixture edge setup failed: {}",
-        String::from_utf8_lossy(&edge.stderr)
-    );
+    let container = cli
+        .create_issue(["--title", "Container", "--type", "epic"])
+        .unwrap();
+    cli.run(["dep", "add", &container, &upstream]).unwrap();
     (container, upstream)
 }
 
-/// Return the projection's exit status for `command` and assert its documented
-/// exception classification. `None` denotes a pass-through row.
-fn documented_exit_code(command: &str, code: Option<i32>, exception: bool) -> Option<i32> {
+/// The projection's exit status for `command`, asserting its exception
+/// classification.
+fn documented_exit_code(command: &str, code: i32, exception: bool) -> i32 {
     let schema = CommandSchema::generate();
     let row = schema
         .command_exit_codes
         .iter()
         .find(|c| c.command == command && c.code == code)
         .unwrap_or_else(|| {
-            panic!("command_exit_codes projection has no row for `{command}` code {code:?}")
+            panic!("command_exit_codes projection has no row for `{command}` code {code}")
         });
     assert_eq!(
         row.exception, exception,
-        "row for `{command}` code {code:?} has wrong exception flag"
+        "row for `{command}` code {code} has wrong exception flag"
     );
     row.code
 }
 
-/// Bind a subprocess-reachable projection row to both public invocation forms.
+/// What a binding case observes in one invocation form: every outcome the row's
+/// condition produces, in a fixed order.
+type Invoke = fn(bool) -> Vec<Output>;
+
+/// Run `args` in `cli`, with `--json` in the machine-readable form.
+fn output_in_form(cli: &JitCli, args: &[&str], json: bool) -> Output {
+    let mut command = cli.command(args);
+    if json {
+        command.arg("--json");
+    }
+    command.output().unwrap()
+}
+
+/// Bind one projected row to both public invocation forms.
 ///
 /// The expected status comes from the generated projection, not a second
 /// hand-authored numeric assertion. Running the same documented condition with
 /// and without `--json` also makes a disagreement between the two forms fail.
-fn assert_projected_exit_status_in_both_forms<F>(
-    command: &str,
-    code: i32,
-    exception: bool,
-    invoke: F,
-) where
-    F: Fn(bool) -> Output,
-{
-    let expected = documented_exit_code(command, Some(code), exception)
-        .expect("subprocess bindings must name a fixed-code projection row");
-    let plain = invoke(false);
-    let json = invoke(true);
-    let plain_status = plain.status.code();
-    let json_status = json.status.code();
-
+fn assert_row_status_in_both_forms(command: &str, code: i32, exception: bool, invoke: Invoke) {
+    let expected = documented_exit_code(command, code, exception);
+    let (plain, json) = (invoke(false), invoke(true));
     assert_eq!(
-        plain_status,
-        Some(expected),
-        "plain `{command}` status must match its projected row; stderr: {}",
-        String::from_utf8_lossy(&plain.stderr)
+        plain.len(),
+        json.len(),
+        "`{command}` observes the same outcomes in both forms"
     );
-    assert_eq!(
-        json_status,
-        Some(expected),
-        "machine-readable `{command}` status must match its projected row; stderr: {}",
-        String::from_utf8_lossy(&json.stderr)
-    );
-    assert_eq!(
-        plain_status, json_status,
-        "plain and machine-readable `{command}` statuses must agree"
-    );
+    plain
+        .iter()
+        .zip(&json)
+        .enumerate()
+        .for_each(|(index, (plain, json))| {
+            let (plain_status, json_status) = (plain.status.code(), json.status.code());
+            assert!(
+                plain_status.is_some(),
+                "plain `{command}` outcome {index} must exit with a status"
+            );
+            assert_eq!(
+                plain_status,
+                Some(expected),
+                "plain `{command}` outcome {index} must match its projected row; stderr: {}",
+                String::from_utf8_lossy(&plain.stderr)
+            );
+            assert_eq!(
+                json_status,
+                Some(expected),
+                "machine-readable `{command}` outcome {index} must match its projected row; \
+                 stderr: {}",
+                String::from_utf8_lossy(&json.stderr)
+            );
+            assert_eq!(
+                plain_status, json_status,
+                "plain and machine-readable `{command}` outcome {index} statuses must agree"
+            );
+        });
 }
 
-/// A missing template is an invalid invocation, covering the universal
-/// invalid-argument row through the public `apply` command.
-#[test]
-fn test_command_exit_codes_unknown_apply_template_emits_2() {
-    let temp = setup();
-    assert_projected_exit_status_in_both_forms("*", 2, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args([
-            "apply",
-            "definitely-missing-template",
-            "0000000000000000",
-        ]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+/// Declare one binding case per projected row: each entry is a test that binds
+/// its row in both invocation forms, and the same entry lists the row in
+/// [`BOUND_ROWS`], which the completeness check compares with the projection.
+macro_rules! row_bindings {
+    ($($(#[$meta:meta])* $test:ident: ($command:expr, $code:expr, $exception:expr) => $invoke:path;)*) => {
+        const BOUND_ROWS: &[(&str, i32)] = &[$($(#[$meta])* ($command, $code),)*];
+        $($(#[$meta])* #[test]
+        fn $test() {
+            assert_row_status_in_both_forms($command, $code, $exception, $invoke);
+        })*
+    };
 }
 
-/// An unreadable index exercises the universal filesystem-permission row through
+/// `*`/0: a healthy `issue list`, and a risky (deep relative) but valid link that
+/// `doc check-links` reports as a warning only.
+fn invoke_success(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let listed = output_in_form(&cli, &["issue", "list"], json);
+
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doc host"]).unwrap();
+    fs::create_dir_all(cli.root().join("docs/subdir")).unwrap();
+    fs::create_dir_all(cli.root().join("assets")).unwrap();
+    fs::write(
+        cli.root().join("docs/subdir/risky.md"),
+        "# Risky\n\n![Asset](../../assets/image.png)\n",
+    )
+    .unwrap();
+    fs::write(cli.root().join("assets/image.png"), b"data").unwrap();
+    cli.run(["doc", "add", &id, "docs/subdir/risky.md", "--label", "Test"])
+        .unwrap();
+    let warned = output_in_form(&cli, &["doc", "check-links", "--scope", "all"], json);
+    vec![listed, warned]
+}
+
+/// `*`/1: a malformed stored record is a parse failure no typed classifier maps
+/// to a more specific status.
+fn invoke_malformed_stored_record(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/index.json"), b"{").unwrap();
+    vec![output_in_form(&cli, &["query", "all"], json)]
+}
+
+/// `*`/2: a missing template and a too-short id prefix are invalid invocations.
+fn invoke_invalid_argument(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let container = cli.create_issue(["--title", "Container"]).unwrap();
+    vec![
+        output_in_form(
+            &cli,
+            &["apply", "definitely-missing-template", container.as_str()],
+            json,
+        ),
+        output_in_form(&cli, &["issue", "show", "ab"], json),
+    ]
+}
+
+/// `*`/3: an id that resolves to nothing, in each namespace that resolves one.
+fn invoke_not_found(json: bool) -> Vec<Output> {
+    const MISSING: &str = "0000000000000000";
+    let cli = JitCli::initialised().unwrap();
+    let existing = cli.create_issue(["--title", "Existing issue"]).unwrap();
+    vec![
+        output_in_form(&cli, &["issue", "show", "0123456789abcdef"], json),
+        output_in_form(&cli, &["dep", "add", &existing, MISSING], json),
+        output_in_form(&cli, &["issue", "claim", MISSING, "agent:parity"], json),
+        output_in_form(&cli, &["gate", "add", MISSING, "cargo-ci"], json),
+    ]
+}
+
+/// `*`/5: an unreadable index exercises the filesystem-permission row through
 /// the top-level query path (rather than a handler-owned mutation response).
-#[test]
 #[cfg(unix)]
-fn test_command_exit_codes_permission_denied_emits_5() {
+fn invoke_permission_denied(json: bool) -> Vec<Output> {
     use std::os::unix::fs::PermissionsExt;
 
-    assert_projected_exit_status_in_both_forms("*", 5, false, |json| {
-        let temp = setup();
-        let index = temp.path().join(".jit/index.json");
-        let mut denied = fs::metadata(&index).unwrap().permissions();
-        denied.set_mode(0o000);
-        fs::set_permissions(&index, denied).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    let index = cli.root().join(".jit/index.json");
+    let mut denied = fs::metadata(&index).unwrap().permissions();
+    denied.set_mode(0o000);
+    fs::set_permissions(&index, denied).unwrap();
 
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["query", "all"]);
-        if json {
-            command.arg("--json");
-        }
-        let output = command.output().unwrap();
+    let output = output_in_form(&cli, &["query", "all"], json);
 
-        let mut restored = fs::metadata(&index).unwrap().permissions();
-        restored.set_mode(0o755);
-        fs::set_permissions(&index, restored).unwrap();
-        output
-    });
+    let mut restored = fs::metadata(&index).unwrap().permissions();
+    restored.set_mode(0o755);
+    fs::set_permissions(&index, restored).unwrap();
+    vec![output]
 }
 
-/// A repository index newer than the binary's supported format reaches the
-/// universal external-error row before command dispatch.
-#[test]
-fn test_command_exit_codes_too_new_format_emits_10() {
-    assert_projected_exit_status_in_both_forms("*", 10, false, |json| {
-        let temp = setup();
-        let index_path = temp.path().join(".jit/index.json");
-        let mut index: serde_json::Value =
-            serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
-        index["schema_version"] = serde_json::json!(9999);
-        fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
-
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["query", "all"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+/// `*`/10: a repository format other than the binary's supported one fails
+/// before command dispatch.
+fn invoke_unsupported_format(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let index_path = cli.root().join(".jit/index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    index["schema_version"] = serde_json::json!(9999);
+    fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+    vec![output_in_form(&cli, &["query", "all"], json)]
 }
 
-/// A mutation queued behind another holder of the repository lock chain, with a
-/// wait shorter than the hold, reaches the universal lock-timeout row.
-#[test]
-fn test_command_exit_codes_expired_lock_wait_emits_11() {
-    let temp = setup();
+/// `*`/11: a mutation queued behind another holder of the repository lock chain,
+/// with a wait shorter than the hold.
+fn invoke_expired_lock_wait(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
     let _held = jit::storage::FileLocker::new(std::time::Duration::from_secs(5))
-        .lock_exclusive(&temp.path().join(".jit-bootstrap.lock"))
+        .lock_exclusive(&cli.root().join(".jit-bootstrap.lock"))
         .unwrap();
-    assert_projected_exit_status_in_both_forms("*", 11, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .env("JIT_LOCK_TIMEOUT", "1")
-            .args(["issue", "create", "Queued"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    let mut command =
+        cli.command_with_env(["issue", "create", "Queued"], [("JIT_LOCK_TIMEOUT", "1")]);
+    if json {
+        command.arg("--json");
+    }
+    vec![command.output().unwrap()]
+}
+
+/// `*`/141: a downstream reader that closes the pipe mid-write (e.g. `| head`)
+/// makes jit exit quietly with the SIGPIPE convention instead of panicking
+/// through std's `print!` machinery (jit:6f881a85). A shown issue with a 2 MiB
+/// description exceeds the maximum pipe capacity in both forms, so the writer is
+/// still active after the reader closes. The file-based update avoids argv's
+/// per-argument size limit.
+fn invoke_broken_pipe(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Pipe payload"]).unwrap();
+    let description_path = cli.root().join("large-description.txt");
+    fs::write(&description_path, "x".repeat(2 * 1024 * 1024)).unwrap();
+    cli.run([
+        "issue",
+        "update",
+        &id,
+        "--description-file",
+        description_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    let mut command = cli.command(["issue", "show", &id]);
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    if json {
+        command.arg("--json");
+    }
+    let mut child = command.spawn().unwrap();
+    let mut stdout = child.stdout.take().unwrap();
+    let mut first_byte = [0u8; 1];
+    stdout
+        .read_exact(&mut first_byte)
+        .expect("child should write at least one byte before the pipe closes");
+    drop(stdout);
+
+    let mut stderr = Vec::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_end(&mut stderr)
+        .unwrap();
+    let text = String::from_utf8_lossy(&stderr);
+    assert!(
+        !text.contains("panicked") && !text.contains("RUST_BACKTRACE"),
+        "broken-pipe exit must not print a panic banner; stderr: {text}"
+    );
+    vec![Output {
+        status: child.wait().unwrap(),
+        stdout: Vec::new(),
+        stderr,
+    }]
 }
 
 /// An enforcing validation rule rejects an issue create before publication,
 /// exercising the shared write-validation row through a real writer.
-#[test]
-fn test_command_exit_codes_enforcing_write_rule_emits_4() {
-    assert_projected_exit_status_in_both_forms(
-        "any command that writes an issue",
-        4,
-        false,
-        |json| {
-            let temp = setup();
-            let rules_path = temp.path().join(".jit/rules.toml");
-            let mut rules = fs::read_to_string(&rules_path).unwrap();
-            rules.push_str(
-                "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
-                 severity = \"error\"\nenforce = true\n\
-                 assert = { require-label = { label = \"req:*\", min = 1 } }\n",
-            );
-            fs::write(rules_path, rules).unwrap();
-
-            let mut command = Command::new(jit_binary());
-            command.current_dir(&temp).args([
-                "issue",
-                "create",
-                "--title",
-                "Unqualified epic",
-                "--type",
-                "epic",
-            ]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
+fn invoke_enforcing_write_rule(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let rules_path = cli.root().join(".jit/rules.toml");
+    let mut rules = fs::read_to_string(&rules_path).unwrap();
+    rules.push_str(
+        "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
+         severity = \"error\"\nenforce = true\n\
+         assert = { require-label = { label = \"req:*\", min = 1 } }\n",
     );
+    fs::write(rules_path, rules).unwrap();
+    vec![output_in_form(
+        &cli,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Unqualified epic",
+            "--type",
+            "epic",
+        ],
+        json,
+    )]
 }
 
 /// A checker that ran and failed is the gate-evaluation verdict-failure row.
-#[test]
-fn test_command_exit_codes_gate_evaluate_failure_emits_4() {
-    let temp = setup();
-    let id = setup_auto_gate_issue(&temp, "false");
-    assert_projected_exit_status_in_both_forms(
-        "gate evaluate, gate evaluate-all, gate evaluate-many",
-        4,
-        true,
-        |json| {
-            let mut command = Command::new(jit_binary());
-            command.current_dir(&temp).args([
-                "gate",
-                "evaluate",
-                &id,
-                "projection-gate",
-                "--force",
-            ]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
-    );
+fn invoke_gate_evaluate_failure(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, "false");
+    vec![output_in_form(
+        &cli,
+        &["gate", "evaluate", &id, "projection-gate", "--force"],
+        json,
+    )]
 }
 
-/// A checker that cannot run to a verdict is the gate-evaluation runner-error
-/// row. The unique command is intentionally absent from the test environment.
-#[test]
-fn test_command_exit_codes_gate_evaluate_runner_error_emits_10() {
-    let temp = setup();
-    let id = setup_auto_gate_issue(&temp, "jit-projection-command-does-not-exist");
-    assert_projected_exit_status_in_both_forms(
-        "gate evaluate, gate evaluate-all, gate evaluate-many",
-        10,
-        true,
-        |json| {
-            let mut command = Command::new(jit_binary());
-            command.current_dir(&temp).args([
-                "gate",
-                "evaluate",
-                &id,
-                "projection-gate",
-                "--force",
-            ]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
-    );
+/// `gate evaluate-many` over `target` (`None`: the issue requiring the gate)
+/// after the gate's checker is set to `checker_command`.
+fn evaluate_many_output(checker_command: &str, target: Option<&str>, json: bool) -> Output {
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, checker_command);
+    let target = match target {
+        Some(target) => target.to_owned(),
+        None => id,
+    };
+    output_in_form(
+        &cli,
+        &[
+            "gate",
+            "evaluate-many",
+            "projection-gate",
+            &target,
+            "--force",
+        ],
+        json,
+    )
 }
 
-/// The prospective-cycle guard rejects template application before it mutates,
-/// binding the `apply`/4 row to both public invocation forms.
-#[test]
-fn test_command_exit_codes_apply_prospective_cycle_emits_4() {
-    let temp = setup();
-    let (container, upstream) = setup_prospective_cycle(&temp);
+/// `gate evaluate-many` over a target whose checker ran and failed.
+fn invoke_gate_evaluate_many_failure(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output("false", None, json)]
+}
+
+/// `gate evaluate-many` over a target whose checker cannot run.
+fn invoke_gate_evaluate_many_runner_error(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output(
+        "jit-projection-command-does-not-exist",
+        None,
+        json,
+    )]
+}
+
+/// `gate evaluate-many` over an id that resolves to no issue.
+fn invoke_gate_evaluate_many_missing_target(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output("true", Some("0000000000000000"), json)]
+}
+
+/// `gate evaluate-many` over a too-short id prefix.
+fn invoke_gate_evaluate_many_invalid_target(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output("true", Some("ab"), json)]
+}
+
+/// The prospective-cycle guard rejects template application before it mutates.
+fn invoke_apply_prospective_cycle(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let (container, upstream) = setup_prospective_cycle(&cli);
     let upstream_binding = format!("upstream={upstream}");
-    assert_projected_exit_status_in_both_forms("apply", 4, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args([
-            "apply",
-            "cyclic",
-            &container,
-            "--anchor",
-            &upstream_binding,
-        ]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    vec![output_in_form(
+        &cli,
+        &["apply", "cyclic", &container, "--anchor", &upstream_binding],
+        json,
+    )]
 }
 
-/// `jit validate` exits 4 on repository-integrity findings — matching `validate`/4.
-#[test]
-fn test_command_exit_codes_validate_integrity_emits_4() {
-    let temp = setup();
-    let id = create_issue(&temp, "Corruptible", &[]);
+/// `jit validate` on repository-integrity findings, error-severity rule
+/// findings, branch drift and invalid leases: the one `validate` row covers all.
+fn invoke_validate(json: bool) -> Vec<Output> {
+    [
+        invoke_validate_integrity,
+        invoke_validate_rule_findings,
+        invoke_validate_branch_drift,
+        invoke_validate_leases,
+    ]
+    .iter()
+    .flat_map(|invoke| invoke(json))
+    .collect()
+}
 
-    let issue_path = temp
-        .path()
+fn invoke_validate_integrity(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Corruptible"]).unwrap();
+
+    let issue_path = cli
+        .root()
         .join(".jit")
         .join("issues")
         .join(format!("{id}.json"));
     let mut issue: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
-    issue["dependencies"] = serde_json::json!(["nonexistent"]);
+    issue["dependencies"] = serde_json::json!(["00000000-0000-4000-8000-00000000dead"]);
     fs::write(&issue_path, serde_json::to_string_pretty(&issue).unwrap()).unwrap();
 
-    assert_projected_exit_status_in_both_forms("validate", 4, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).arg("validate");
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    vec![output_in_form(&cli, &["validate"], json)]
 }
 
-/// Whole-repo `jit validate` exits 1 on an error-severity rule finding —
-/// matching `validate`/1. A non-enforced error rule reports without diverting
-/// through the integrity (exit-4) path.
-#[test]
-fn test_command_exit_codes_validate_rule_findings_emits_1() {
-    let temp = setup();
-    let rules_path = temp.path().join(".jit/rules.toml");
+/// Whole-repo `jit validate` on an error-severity rule finding. A non-enforced
+/// error rule reports without diverting through the integrity (exit-4) path.
+fn invoke_validate_rule_findings(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let rules_path = cli.root().join(".jit/rules.toml");
     let mut rules = fs::read_to_string(&rules_path).unwrap();
     rules.push_str(
         "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
@@ -429,755 +468,454 @@ fn test_command_exit_codes_validate_rule_findings_emits_1() {
     fs::write(rules_path, rules).unwrap();
     // An epic missing its `req:*` label violates the error-severity rule; the
     // `epic:auth` identity label keeps the finding to the rule under test.
-    create_issue(
-        &temp,
-        "An epic",
-        &["--label", "type:epic", "--label", "epic:auth"],
-    );
-
-    assert_projected_exit_status_in_both_forms("validate", 1, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).arg("validate");
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// `jit gate status-all` exits 4 while any required gate is unpassed —
-/// matching `gate status-all`/4.
-#[test]
-fn test_command_exit_codes_gate_status_all_emits_4() {
-    let temp = setup();
-    let status = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args([
-            "gate",
-            "define",
+    let id = cli
+        .create_issue([
             "--title",
-            "Tests",
-            "--description",
-            "Tests",
-            "tests",
+            "An epic",
+            "--label",
+            "type:epic",
+            "--label",
+            "epic:auth",
         ])
-        .status()
         .unwrap();
-    assert!(status.success());
-
-    let id = create_issue(&temp, "Gated", &["--gate", "tests"]);
-
-    assert_projected_exit_status_in_both_forms("gate status-all", 4, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["gate", "status-all", &id]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    vec![
+        output_in_form(&cli, &["validate"], json),
+        output_in_form(&cli, &["validate", &id], json),
+        output_in_form(&cli, &["validate", &id, "--explain"], json),
+    ]
 }
 
-/// `jit invariant check` exits 4 on enforcement drift (an `enforced-by` naming a
-/// missing rule) — matching `invariant check`/4.
-#[test]
-fn test_command_exit_codes_invariant_check_emits_4() {
-    let temp = setup();
+/// `jit validate --branch-drift`; with no git upstream the check cannot succeed.
+fn invoke_validate_branch_drift(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_in_form(&cli, &["validate", "--branch-drift"], json)]
+}
+
+/// `jit validate --leases` over a malformed lease record, so lease validation
+/// cannot produce a clean result.
+fn invoke_validate_leases(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    corrupt_lease(
+        &paths.shared_jit,
+        &jit::test_utils::issue_id(1),
+        LeaseCorruption::MalformedJson,
+    )
+    .unwrap();
+    vec![output_in_form(&cli, &["validate", "--leases"], json)]
+}
+
+/// `jit gate status-all` while a required gate is unpassed.
+fn invoke_gate_status_all(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "--title",
+        "Tests",
+        "--description",
+        "Tests",
+        "tests",
+    ])
+    .unwrap();
+    let id = cli
+        .create_issue(["--title", "Gated", "--gate", "tests"])
+        .unwrap();
+    vec![output_in_form(&cli, &["gate", "status-all", &id], json)]
+}
+
+/// `jit invariant check` on enforcement drift (an `enforced-by` naming a missing
+/// rule).
+fn invoke_invariant_check(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
     fs::write(
-        temp.path().join(".jit/rules.toml"),
+        cli.root().join(".jit/rules.toml"),
         "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
          assert = { require-section = { heading = \"Goal\" } }\n",
     )
     .unwrap();
     fs::write(
-        temp.path().join(".jit/invariants.toml"),
+        cli.root().join(".jit/invariants.toml"),
         "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     )
     .unwrap();
-
-    assert_projected_exit_status_in_both_forms("invariant check", 4, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["invariant", "check"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    vec![output_in_form(&cli, &["invariant", "check"], json)]
 }
 
-/// `jit config validate` classifies an invalid configuration as validation failed.
-#[test]
-fn test_command_exit_codes_config_validate_invalid_value_emits_4() {
-    let temp = setup();
-    fs::write(temp.path().join(".jit/config.toml"), "not = valid = toml").unwrap();
-
-    assert_projected_exit_status_in_both_forms("config validate", 4, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["config", "validate"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+/// `jit config validate` on an invalid configuration.
+fn invoke_config_validate(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), "not = valid = toml").unwrap();
+    vec![output_in_form(&cli, &["config", "validate"], json)]
 }
 
-/// `jit doc check-links` exits 1 on a broken link and 0 on a risky-link
-/// warning alone — matching the `doc check-links` row and the `*`/0 row.
-#[test]
-fn test_command_exit_codes_doc_check_links_emits_1_and_warnings_exit_0() {
-    // Broken link -> exit 1.
-    let temp = setup();
-    let id = create_issue(&temp, "Doc host", &[]);
-    fs::create_dir_all(temp.path().join("docs")).unwrap();
+/// `jit doc check-links` on a broken link.
+fn invoke_doc_check_links(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doc host"]).unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
-        temp.path().join("docs/broken.md"),
+        cli.root().join("docs/broken.md"),
         "# Doc\n\nSee [missing](nonexistent.md).\n",
     )
     .unwrap();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["doc", "add", &id, "docs/broken.md", "--label", "Test"])
-        .status()
-        .unwrap()
-        .success());
-    assert_projected_exit_status_in_both_forms("doc check-links", 1, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["doc", "check-links", "--scope", "all"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-
-    // Risky (deep relative) but valid link -> warning only, exit 0.
-    let temp = setup();
-    let id = create_issue(&temp, "Doc host", &[]);
-    fs::create_dir_all(temp.path().join("docs/subdir")).unwrap();
-    fs::create_dir_all(temp.path().join("assets")).unwrap();
-    fs::write(
-        temp.path().join("docs/subdir/risky.md"),
-        "# Risky\n\n![Asset](../../assets/image.png)\n",
-    )
-    .unwrap();
-    fs::write(temp.path().join("assets/image.png"), b"data").unwrap();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["doc", "add", &id, "docs/subdir/risky.md", "--label", "Test"])
-        .status()
-        .unwrap()
-        .success());
-    assert_projected_exit_status_in_both_forms("*", 0, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["doc", "check-links", "--scope", "all"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    cli.run(["doc", "add", &id, "docs/broken.md", "--label", "Test"])
+        .unwrap();
+    vec![output_in_form(
+        &cli,
+        &["doc", "check-links", "--scope", "all"],
+        json,
+    )]
 }
 
-/// `jit gate preset apply` exits 3 when a preset target is missing — matching
-/// `gate preset apply`/3. A well-formed but nonexistent id fails through the
-/// ordinary not-found classifier.
-#[test]
-fn test_command_exit_codes_gate_preset_apply_missing_target_emits_3() {
-    let temp = setup();
-    assert_projected_exit_status_in_both_forms("gate preset apply", 3, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args([
-            "gate",
-            "preset",
-            "apply",
-            "plan-review",
-            "0000000000000000",
-        ]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// `jit serve --status` (like the daemon start and `--stop`) classifies a
-/// malformed PID file as `PARSE_ERROR`, whose registered status is 1, matching
-/// the `serve, serve --stop, serve --status`/1 row.
-#[test]
-fn test_command_exit_codes_serve_daemon_error_emits_1() {
-    let temp = setup();
-    // A malformed PID file makes `server_status` (via `read_pid_file`) error, so
-    // the `--status` arm routes the typed parser failure through the shared
-    // classifier.
-    fs::write(temp.path().join(".jit/server.pid.json"), "not json").unwrap();
-
-    assert_projected_exit_status_in_both_forms(
-        "serve, serve --stop, serve --status",
-        1,
-        false,
-        |json| {
-            let mut command = Command::new(jit_binary());
-            command.current_dir(&temp).args(["serve", "--status"]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
-    );
-}
-
-/// `jit serve --fg` passes the inline dev-server child's own exit code through,
-/// so the projection models it as a pass-through (`code: None`).
-///
-/// The mapping is owned by `serve::foreground_exit_code`, which the `serve --fg`
-/// dispatch in `crates/jit/src/main.rs` calls to compute the code it exits with.
-/// This helper-level check complements the public dual-form test below: the
-/// child's code is returned verbatim, and a signal-terminated child (no code)
-/// reports `1`.
-#[test]
-fn test_command_exit_codes_serve_foreground_is_passthrough() {
-    assert_eq!(documented_exit_code("serve --fg", None, true), None);
-
-    for child_code in [0, 1, 2, 3, 4, 10, 101, 127] {
-        assert_eq!(
-            foreground_exit_code(Some(child_code)),
-            child_code,
-            "serve --fg must pass the child's exit code {child_code} through verbatim"
-        );
-    }
-    assert_eq!(
-        foreground_exit_code(None),
-        1,
-        "a signal-terminated child carries no code, so serve --fg reports 1"
-    );
+/// `jit gate preset apply` on a well-formed but nonexistent id, which fails
+/// as a preset findings outcome.
+fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_in_form(
+        &cli,
+        &["gate", "preset", "apply", "plan-review", "0000000000000000"],
+        json,
+    )]
 }
 
 /// Copy the real CLI beside a deterministic fake `jit-server` child.
 ///
 /// `find_server_binary` prefers a sibling of the current executable, so this
 /// fixture drives the public foreground dispatch without starting a long-lived
-/// server or relying on PATH. The arbitrary child code is deliberately outside
-/// the documented taxonomy: observing it proves pass-through behavior.
+/// server or relying on PATH.
 #[cfg(unix)]
-fn jit_with_exiting_server(temp: &TempDir, exit_code: i32) -> std::path::PathBuf {
-    use std::os::unix::fs::PermissionsExt;
-
-    let bin_dir = temp.path().join("serve-fg-bin");
+fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
+    let bin_dir = cli.root().join("serve-fg-bin");
     fs::create_dir(&bin_dir).unwrap();
 
     let jit_copy = bin_dir.join("jit");
-    fs::copy(jit_binary(), &jit_copy).unwrap();
-    let mut jit_permissions = fs::metadata(&jit_copy).unwrap().permissions();
-    jit_permissions.set_mode(0o755);
-    fs::set_permissions(&jit_copy, jit_permissions).unwrap();
+    jit::test_utils::write_executable(&jit_copy, fs::read(jit_binary()).unwrap()).unwrap();
 
-    let server = bin_dir.join("jit-server");
-    fs::write(&server, format!("#!/bin/sh\nexit {exit_code}\n")).unwrap();
-    let mut server_permissions = fs::metadata(&server).unwrap().permissions();
-    server_permissions.set_mode(0o755);
-    fs::set_permissions(&server, server_permissions).unwrap();
+    jit::test_utils::write_executable(
+        &bin_dir.join("jit-server"),
+        format!("#!/bin/sh\nexit {exit_code}\n"),
+    )
+    .unwrap();
 
     jit_copy
 }
 
-/// Bind the `serve --fg` pass-through row through both public invocation forms.
+/// `jit serve --fg` reports a failing server child as `SERVER_EXITED`, carrying
+/// the child's status in `error.details`.
 #[cfg(unix)]
-#[test]
-fn test_command_exit_codes_serve_foreground_passthrough_is_dual_form() {
+fn invoke_serve_foreground_exit(json: bool) -> Vec<Output> {
     const CHILD_EXIT: i32 = 42;
 
-    let temp = setup();
-    let jit = jit_with_exiting_server(&temp, CHILD_EXIT);
-    assert_eq!(documented_exit_code("serve --fg", None, true), None);
-
-    let invoke = |json| {
-        let mut command = Command::new(&jit);
-        command
-            .current_dir(&temp)
-            .args(["serve", "--fg", "--port", "0"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    };
-
-    let plain = invoke(false);
-    let json = invoke(true);
-    assert_eq!(
-        plain.status.code(),
-        Some(CHILD_EXIT),
-        "plain stderr: {}",
-        String::from_utf8_lossy(&plain.stderr)
-    );
-    assert_eq!(
-        json.status.code(),
-        Some(CHILD_EXIT),
-        "JSON stderr: {}",
-        String::from_utf8_lossy(&json.stderr)
-    );
-    assert_eq!(
-        plain.status.code(),
-        json.status.code(),
-        "plain and --json serve --fg statuses must agree"
-    );
-
-    let response: serde_json::Value =
-        serde_json::from_slice(&json.stdout).expect("serve --fg --json result");
-    assert_eq!(response["status"], "exited");
-    assert_eq!(response["exit_code"], CHILD_EXIT);
+    let cli = JitCli::initialised().unwrap();
+    let jit = jit_with_exiting_server(&cli, CHILD_EXIT);
+    let mut command = cli.program_command(&jit, ["serve", "--fg", "--port", "0"]);
+    if json {
+        command.arg("--json");
+    }
+    let output = command.output().unwrap();
+    if json {
+        let response: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("serve --fg --json result");
+        assert_eq!(response["error"]["code"], "SERVER_EXITED");
+        assert_eq!(response["error"]["details"]["exit_code"], CHILD_EXIT);
+    }
+    vec![output]
 }
 
-/// `jit validate --branch-drift` exits 1 when the drift check reports drift or
-/// cannot run, matching the projected `validate --branch-drift` row.
-#[test]
-fn test_command_exit_codes_validate_branch_drift_emits_1() {
-    let temp = setup();
-    // No git upstream here, so the branch-drift check cannot succeed.
-    assert_projected_exit_status_in_both_forms("validate --branch-drift", 1, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["validate", "--branch-drift"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// `jit validate --leases` exits 1 when lease validation finds invalid leases or
-/// cannot run, matching the projected `validate --leases` row.
-#[test]
-fn test_command_exit_codes_validate_leases_emits_1() {
-    let temp = setup();
-    // Corrupt the claims index so lease validation cannot produce a clean result.
-    let shared = temp.path().join(".git/jit");
-    fs::create_dir_all(&shared).unwrap();
-    fs::write(shared.join("claims.index.json"), "not json").unwrap();
-
-    assert_projected_exit_status_in_both_forms("validate --leases", 1, true, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["validate", "--leases"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// `jit issue list` on a healthy repository exits 0 — the universal `*`/0 row.
-#[test]
-fn test_command_exit_codes_success_emits_0() {
-    let temp = setup();
-    assert_projected_exit_status_in_both_forms("*", 0, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["issue", "list"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// A too-short id prefix is a usage error — the universal `*`/2 row.
-#[test]
-fn test_command_exit_codes_invalid_argument_emits_2() {
-    let temp = setup();
-    assert_projected_exit_status_in_both_forms("*", 2, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["issue", "show", "ab"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// An unresolvable issue id is a not-found error — the universal `*`/3 row.
-#[test]
-fn test_command_exit_codes_not_found_emits_3() {
-    let temp = setup();
-    assert_projected_exit_status_in_both_forms("*", 3, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["issue", "show", "0123456789abcdef"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// `jit dep add` exits 4 when the edge would close a cycle — matching `dep add`/4.
-#[test]
-fn test_command_exit_codes_dep_add_cycle_emits_4() {
-    let temp = setup();
-    let first = create_issue(&temp, "First", &[]);
-    let second = create_issue(&temp, "Second", &[]);
+/// `jit dep add` when the edge would close a cycle.
+fn invoke_dep_add_cycle(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let first = cli.create_issue(["--title", "First"]).unwrap();
+    let second = cli.create_issue(["--title", "Second"]).unwrap();
 
     // second -> first is fine.
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["dep", "add", &second, &first])
-        .status()
-        .unwrap()
-        .success());
+    cli.run(["dep", "add", &second, &first]).unwrap();
 
     // first -> second closes the cycle.
-    assert_projected_exit_status_in_both_forms("dep add", 4, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["dep", "add", &first, &second]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+    let output = output_in_form(&cli, &["dep", "add", &first, &second], json);
+    if json {
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(envelope["error"]["code"], "CYCLE_DETECTED");
+        assert!(output.stderr.is_empty());
+    }
+    vec![output]
 }
 
 /// Build a dependency-blocked pair: `(dependency, dependent)`, where `dependent`
 /// depends on the still-unmet `dependency`.
-fn blocked_pair(temp: &TempDir) -> (String, String) {
-    let dependency = create_issue(temp, "Dependency", &[]);
-    let dependent = create_issue(temp, "Dependent", &[]);
-    assert!(Command::new(jit_binary())
-        .current_dir(temp)
-        .args(["dep", "add", &dependent, &dependency])
-        .status()
-        .unwrap()
-        .success());
+fn blocked_pair(cli: &JitCli) -> (String, String) {
+    let dependency = cli.create_issue(["--title", "Dependency"]).unwrap();
+    let dependent = cli.create_issue(["--title", "Dependent"]).unwrap();
+    cli.run(["dep", "add", &dependent, &dependency]).unwrap();
     (dependency, dependent)
 }
 
-/// All three commands in the `issue update, issue claim, issue claim-next`/4 row
-/// exit 4 on a blocked transition: `update` and `claim` on unmet dependencies,
-/// `claim-next` on an unpassed precheck gate.
-#[test]
-fn test_command_exit_codes_blocked_transition_emits_4() {
+/// All three commands of the row exit 4 on a blocked transition: `update` and
+/// `claim` on unmet dependencies, `claim-next` on an unpassed precheck gate.
+fn invoke_blocked_transition(json: bool) -> Vec<Output> {
     // `issue update` into `ready`, which the unmet dependency blocks (a dependency
     // must reach a terminal state before its dependent becomes ready).
-    let temp = setup();
-    let (_dependency, dependent) = blocked_pair(&temp);
-    assert_projected_exit_status_in_both_forms(
-        "issue update, issue claim, issue claim-next",
-        4,
-        false,
-        |json| {
-            let mut command = Command::new(jit_binary());
-            command
-                .current_dir(&temp)
-                .args(["issue", "update", &dependent, "--state", "ready"]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
+    let cli = JitCli::initialised().unwrap();
+    let (_dependency, dependent) = blocked_pair(&cli);
+    let update = output_in_form(
+        &cli,
+        &["issue", "update", &dependent, "--state", "ready"],
+        json,
     );
+    let claim = output_in_form(&cli, &["issue", "claim", &dependent, "agent:test"], json);
 
-    // `issue claim` on the same blocked issue.
-    assert_projected_exit_status_in_both_forms(
-        "issue update, issue claim, issue claim-next",
-        4,
-        false,
-        |json| {
-            let mut command = Command::new(jit_binary());
-            command
-                .current_dir(&temp)
-                .args(["issue", "claim", &dependent, "agent:test"]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
-    );
-
-    // `issue claim-next` picking up an issue whose precheck gate has not passed.
-    let temp = setup();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp)
-        .args([
-            "gate",
-            "define",
-            "precheck-gate",
-            "--title",
-            "Precheck",
-            "-d",
-            "Precheck",
-            "--stage",
-            "precheck",
-            "--mode",
-            "manual",
-        ])
-        .status()
-        .unwrap()
-        .success());
-    create_issue(&temp, "Precheck work", &["--gate", "precheck-gate"]);
-    assert_projected_exit_status_in_both_forms(
-        "issue update, issue claim, issue claim-next",
-        4,
-        false,
-        |json| {
-            let mut command = Command::new(jit_binary());
-            command
-                .current_dir(&temp)
-                .args(["issue", "claim-next", "agent:test"]);
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        },
-    );
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "precheck-gate",
+        "--title",
+        "Precheck",
+        "-d",
+        "Precheck",
+        "--stage",
+        "precheck",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
+    cli.create_issue(["--title", "Precheck work", "--gate", "precheck-gate"])
+        .unwrap();
+    let claim_next = output_in_form(&cli, &["issue", "claim-next", "agent:test"], json);
+    vec![update, claim, claim_next]
 }
 
-/// `jit gate define` exits 6 when the key is already registered — matching
-/// `gate define`/6.
-#[test]
-fn test_command_exit_codes_gate_define_duplicate_emits_6() {
-    let temp = setup();
-    let define = |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args([
-            "gate",
-            "define",
-            "--title",
-            "Tests",
-            "--description",
-            "Tests",
-            "tests",
-        ]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    };
-    assert!(define(false).status.success());
-    assert_projected_exit_status_in_both_forms("gate define", 6, false, define);
+/// A gate key, a pack archive and a snapshot output that already exist.
+fn invoke_occupied_target(json: bool) -> Vec<Output> {
+    [
+        invoke_gate_define_duplicate,
+        invoke_profile_pack_occupied_output,
+        invoke_snapshot_export_occupied,
+    ]
+    .iter()
+    .flat_map(|invoke| invoke(json))
+    .collect()
 }
 
-/// `jit issue delete` exits 2 when refused for missing operator confirmation
-/// (`JIT_ALLOW_DELETION=1` not set) — matching `issue delete`/2 (jit:0daba57d).
-#[test]
-fn test_command_exit_codes_issue_delete_unconfirmed_emits_2() {
-    let temp = setup();
-    let id = create_issue(&temp, "Doomed", &[]);
-
-    assert_projected_exit_status_in_both_forms("issue delete", 2, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .env_remove("JIT_ALLOW_DELETION")
-            .args(["issue", "delete", &id]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
+fn invoke_gate_define_duplicate(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let define = [
+        "gate",
+        "define",
+        "--title",
+        "Tests",
+        "--description",
+        "Tests",
+        "tests",
+    ];
+    assert!(output_in_form(&cli, &define, false).status.success());
+    vec![output_in_form(&cli, &define, json)]
 }
 
-/// `jit issue batch-create` exits 2 when pre-validation rejects the file (here an
-/// entry depending on a key the file never defines) — matching
-/// `issue batch-create`/2.
-#[test]
-fn test_command_exit_codes_batch_create_prevalidation_emits_2() {
-    let temp = setup();
-    let batch = temp.path().join("batch.json");
+/// `jit issue delete` refused for missing operator confirmation
+/// (`JIT_ALLOW_DELETION=1` not set; jit:0daba57d).
+fn invoke_issue_delete_unconfirmed(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doomed"]).unwrap();
+    vec![output_in_form(&cli, &["issue", "delete", &id], json)]
+}
+
+fn invoke_snapshot_export_occupied(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    cli.create_issue(["--title", "Snapshot me"]).unwrap();
+    fs::create_dir(cli.root().join("taken")).unwrap();
+    vec![output_in_form(
+        &cli,
+        &["snapshot", "export", "--out", "taken", "--working-tree"],
+        json,
+    )]
+}
+
+/// A lease subcommand run outside a git repository. `JitCli::initialised()`
+/// inits `.jit` without a git repository, which is exactly that case.
+fn invoke_claim_without_git(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_in_form(&cli, &["claim", "status"], json)]
+}
+
+/// `search`/1: ripgrep is not on `PATH`, so the search classifies to
+/// `RIPGREP_NOT_FOUND`, which exits 1.
+fn invoke_search_missing_ripgrep(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let empty_path = TempDir::new().unwrap();
+    let mut command = cli.command_with_env(
+        ["search", "needle"],
+        [("PATH", empty_path.path().as_os_str())],
+    );
+    if json {
+        command.arg("--json");
+    }
+    vec![command.output().unwrap()]
+}
+
+fn invoke_profile_conflict(command: &str, json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/left"));
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/right"));
+    let manifest = cli.root().join("packages/right/manifest.toml");
+    let declared = fs::read_to_string(&manifest).unwrap();
     fs::write(
-        &batch,
-        r#"[{"key": "a", "title": "A", "depends_on": ["ghost"]}]"#,
+        &manifest,
+        declared.replace("id = \"planner-asset-only\"", "id = \"rival\""),
     )
     .unwrap();
-
-    assert_projected_exit_status_in_both_forms("issue batch-create", 2, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args([
-            "issue",
-            "batch-create",
-            "--from-json",
-            batch.to_str().unwrap(),
-        ]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// `jit snapshot export` exits 6 when the output path is already occupied —
-/// matching `snapshot export`/6.
-#[test]
-fn test_command_exit_codes_snapshot_export_occupied_emits_6() {
-    let temp = setup();
-    create_issue(&temp, "Snapshot me", &[]);
-    fs::create_dir(temp.path().join("taken")).unwrap();
-
-    assert_projected_exit_status_in_both_forms("snapshot export", 6, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["snapshot", "export", "--out", "taken", "--working-tree"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// A lease subcommand run outside a git repository exits 10 — matching `claim`/10.
-/// `setup()` inits `.jit` without a git repository, which is exactly that case.
-#[test]
-fn test_command_exit_codes_claim_without_git_emits_10() {
-    let temp = setup();
-    assert_projected_exit_status_in_both_forms("claim", 10, false, |json| {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(&temp).args(["claim", "status"]);
-        if json {
-            command.arg("--json");
-        }
-        command.output().unwrap()
-    });
-}
-
-/// A downstream reader that closes the pipe mid-write (e.g. `| head`) makes jit
-/// exit quietly with the SIGPIPE exit-status convention (`128 + 13 = 141`)
-/// instead of panicking through std's `print!`/`println!` machinery — matching
-/// `*`/141 (jit:6f881a85). A shown issue with a 2 MiB description exceeds the
-/// maximum pipe capacity in both its plain and `--json` forms, so the writer is
-/// still active after the reader closes. The file-based update avoids argv's
-/// per-argument size limit.
-#[test]
-fn test_command_exit_codes_broken_pipe_emits_141() {
-    let temp = setup();
-    let id = create_issue(&temp, "Pipe payload", &[]);
-    let description_path = temp.path().join("large-description.txt");
-    fs::write(&description_path, "x".repeat(2 * 1024 * 1024)).unwrap();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp)
-        .args([
-            "issue",
-            "update",
-            &id,
-            "--description-file",
-            description_path.to_str().unwrap(),
-        ])
-        .status()
-        .unwrap()
-        .success());
-    let expected = documented_exit_code("*", Some(141), true)
-        .expect("broken-pipe row must have a fixed status");
-    let broken_pipe_status = |json| {
-        let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["issue", "show", &id])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        if json {
-            command.arg("--json");
-        }
-        let mut child = command.spawn().unwrap();
-        let mut stdout = child.stdout.take().unwrap();
-        let mut first_byte = [0u8; 1];
-        stdout
-            .read_exact(&mut first_byte)
-            .expect("child should write at least one byte before the pipe closes");
-        drop(stdout);
-
-        let mut stderr = String::new();
-        child
-            .stderr
-            .take()
-            .unwrap()
-            .read_to_string(&mut stderr)
-            .unwrap();
-        (child.wait().unwrap().code(), stderr)
-    };
-
-    let (plain_status, plain_stderr) = broken_pipe_status(false);
-    let (json_status, json_stderr) = broken_pipe_status(true);
-    for (form, status, stderr) in [
-        ("plain", plain_status, plain_stderr),
-        ("machine-readable", json_status, json_stderr),
-    ] {
-        assert_eq!(
-            status,
-            Some(expected),
-            "{form} broken-pipe exit must match its projected row; stderr: {stderr}"
-        );
-        assert!(
-            !stderr.contains("panicked") && !stderr.contains("RUST_BACKTRACE"),
-            "{form} broken-pipe exit must not print a panic banner; stderr: {stderr}"
-        );
-    }
-    assert_eq!(
-        plain_status, json_status,
-        "plain and machine-readable broken-pipe statuses must agree"
+    fs::write(
+        cli.root().join("packages/right/assets/profile.txt"),
+        "different bytes\n",
+    )
+    .unwrap();
+    let output = output_in_form(
+        &cli,
+        &[
+            "profile",
+            command,
+            "--profile",
+            "packages/left",
+            "--profile",
+            "packages/right",
+        ],
+        json,
     );
+    if json {
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            envelope["error"]["code"],
+            if command == "diff" {
+                "VALIDATION_FAILED"
+            } else {
+                "PROFILE_CONFLICT"
+            }
+        );
+        assert!(output.stderr.is_empty(), "{output:?}");
+        if command == "diff" {
+            assert!(envelope["error"]["details"]["profiles"].is_array());
+        }
+    }
+    vec![output]
 }
 
-/// Guard: **every** row in the projection — exception and standard alike — must be
-/// bound to both public invocation forms by a subprocess test in this file.
-/// A row added without a binding fails here, so no mapping in the reference is
-/// hand-authored or left with a machine-readable blind spot.
+fn invoke_profile_apply_conflict(json: bool) -> Vec<Output> {
+    invoke_profile_conflict("apply", json)
+}
+
+fn invoke_profile_diff_conflict(json: bool) -> Vec<Output> {
+    invoke_profile_conflict("diff", json)
+}
+
+fn pack_profile_fixture(cli: &JitCli) {
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
+    cli.run([
+        "profile",
+        "pack",
+        "--source",
+        "packages/profile",
+        "--output",
+        "package.tar",
+    ])
+    .unwrap();
+}
+
+fn invoke_profile_pack_occupied_output(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    pack_profile_fixture(&cli);
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "pack",
+            "--source",
+            "packages/profile",
+            "--output",
+            "package.tar",
+        ],
+        json,
+    )]
+}
+
+fn invoke_profile_add_occupied_destination(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    pack_profile_fixture(&cli);
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "add",
+            "--archive",
+            "package.tar",
+            "--destination",
+            "packages/profile",
+        ],
+        json,
+    )]
+}
+
+row_bindings! {
+    test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
+    test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
+    test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
+    test_command_exit_codes_not_found_emits_3: ("*", 3, false) => invoke_not_found;
+    #[cfg(unix)]
+    test_command_exit_codes_permission_denied_emits_5: ("*", 5, false) => invoke_permission_denied;
+    test_command_exit_codes_unsupported_format_emits_10: ("*", 10, false) => invoke_unsupported_format;
+    test_command_exit_codes_expired_lock_wait_emits_11: ("*", 11, false) => invoke_expired_lock_wait;
+    test_command_exit_codes_broken_pipe_emits_141: ("*", 141, true) => invoke_broken_pipe;
+    test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
+    test_command_exit_codes_claim_without_git_emits_10: ("claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict", 10, false) => invoke_claim_without_git;
+    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, true) => invoke_config_validate;
+    test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", 4, false) => invoke_dep_add_cycle;
+    test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
+    test_command_exit_codes_occupied_target_emits_6: ("gate define, profile pack, snapshot export", 6, false) => invoke_occupied_target;
+    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
+    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all", 4, false) => invoke_gate_evaluate_failure;
+    test_command_exit_codes_gate_evaluate_many_failure_emits_4: ("gate evaluate-many", 4, true) => invoke_gate_evaluate_many_failure;
+    test_command_exit_codes_gate_evaluate_many_runner_error_emits_10: ("gate evaluate-many", 10, true) => invoke_gate_evaluate_many_runner_error;
+    test_command_exit_codes_gate_evaluate_many_missing_target_emits_3: ("gate evaluate-many", 3, true) => invoke_gate_evaluate_many_missing_target;
+    test_command_exit_codes_gate_evaluate_many_invalid_target_emits_2: ("gate evaluate-many", 2, true) => invoke_gate_evaluate_many_invalid_target;
+    test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
+    test_command_exit_codes_profile_diff_conflicting_findings_emit_4: ("profile diff", 4, true) => invoke_profile_diff_conflict;
+    test_command_exit_codes_profile_apply_conflict_emits_4: ("profile apply", 4, false) => invoke_profile_apply_conflict;
+    test_command_exit_codes_profile_add_occupied_destination_emits_4: ("profile add", 4, false) => invoke_profile_add_occupied_destination;
+    test_command_exit_codes_enforcing_write_rule_emits_4: ("issue create", 4, false) => invoke_enforcing_write_rule;
+    test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", 4, false) => invoke_blocked_transition;
+    test_command_exit_codes_issue_delete_unconfirmed_emits_2: ("issue delete", 2, false) => invoke_issue_delete_unconfirmed;
+    test_command_exit_codes_search_missing_ripgrep_emits_1: ("search", 1, false) => invoke_search_missing_ripgrep;
+    #[cfg(unix)]
+    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve", 1, false) => invoke_serve_foreground_exit;
+    test_command_exit_codes_validate_findings_emits_4: ("validate", 4, true) => invoke_validate;
+}
+
+/// Guard: **every** projected row, exception and standard alike, has exactly one
+/// binding case in [`row_bindings!`]. A row added without a binding, or bound
+/// twice, fails here. Unix-only: the `*`/5 and `serve --fg` rows are bound by
+/// cases that need Unix permissions and shell scripts.
+#[cfg(unix)]
 #[test]
 fn test_command_exit_codes_every_row_is_verified() {
-    let verified: std::collections::HashSet<(String, Option<i32>)> = [
-        // Pinned by the subprocess tests in this file.
-        ("*", Some(1)),
-        ("*", Some(5)),
-        ("*", Some(10)),
-        ("*", Some(11)),
-        ("any command that writes an issue", Some(4)),
-        (
-            "gate evaluate, gate evaluate-all, gate evaluate-many",
-            Some(4),
-        ),
-        (
-            "gate evaluate, gate evaluate-all, gate evaluate-many",
-            Some(10),
-        ),
-        ("*", Some(0)),
-        ("*", Some(2)),
-        ("*", Some(3)),
-        ("dep add", Some(4)),
-        ("apply", Some(4)),
-        ("issue update, issue claim, issue claim-next", Some(4)),
-        ("gate define", Some(6)),
-        ("issue delete", Some(2)),
-        ("issue batch-create", Some(2)),
-        ("snapshot export", Some(6)),
-        ("claim", Some(10)),
-        ("validate", Some(4)),
-        ("validate", Some(1)),
-        ("validate --branch-drift", Some(1)),
-        ("validate --leases", Some(1)),
-        ("gate status-all", Some(4)),
-        ("invariant check", Some(4)),
-        ("config validate", Some(4)),
-        ("doc check-links", Some(1)),
-        ("gate preset apply", Some(3)),
-        ("serve, serve --stop, serve --status", Some(1)),
-        ("*", Some(141)),
-        // Pass-through: both public forms use a deterministic child exit;
-        // the sibling helper-level test covers the complete code range.
-        ("serve --fg", None),
-    ]
-    .into_iter()
-    .map(|(c, code)| (c.to_string(), code))
-    .collect();
-
-    let projected: std::collections::HashSet<(String, Option<i32>)> = CommandSchema::generate()
+    let mut bound: Vec<(String, i32)> = BOUND_ROWS
+        .iter()
+        .map(|(command, code)| (command.to_string(), *code))
+        .collect();
+    let mut projected: Vec<(String, i32)> = CommandSchema::generate()
         .command_exit_codes
         .into_iter()
         .map(|c| (c.command, c.code))
         .collect();
+    bound.sort();
+    projected.sort();
 
     assert_eq!(
-        projected, verified,
-        "every projected row must have a verifying binding; \
-         left = projection, right = verified set"
+        projected, bound,
+        "every projected row must have exactly one binding case; \
+         left = projection, right = bound rows"
     );
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:17:58.876423624Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,6 +9,7 @@
   ],
   "description": "Parse the value of a query `assignee:` filter into an `Assignee`, so malformed filters fail instead of silently matching nothing.\n\n## Background\n\n`QueryCondition::Assignee` holds a `String` (`crates/jit/src/query_engine/parser.rs:39,142`), compared as a string by the evaluator (`query_engine/evaluator.rs:56-59,186,189`). A value without a colon, or `*`, parses and matches nothing. The query reference shows `NOT assignee:*` (`docs/reference/cli-commands.md:1227`), which therefore never matches.\n\n## Success Criteria\n\n- [hard] REQ-01: `QueryCondition::Assignee` holds an `Assignee`, and an `assignee:` value that lacks a colon, or is `*`, is a parse error naming the value.\n- [hard] REQ-02: The evaluator compares `Assignee` values.\n- [hard] REQ-03: The query reference shows only working assignee filters, and its `NOT assignee:*` example is replaced by the unassigned filter.\n",
   "documents": [],
+  "done_at": "2026-10-25T00:18:28.144798312Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
@@ -15,7 +17,32 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "000a6da2-8029-459e-b489-4168dae01640",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:13:55.734785660Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ea388f61-6856-4e93-ba38-c1dd9446bc5d",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:05:29.367092359Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "a2eb1220-88ae-48d3-a71b-466fd60eb609",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:06:09.221546677Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "fad76715-bfd9-40ff-beec-e958e122cedb",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:06:12.998380316Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
   "labels": [
     "type:task",
@@ -30,7 +57,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Query assignee filters parse to an Assignee",
-  "updated_at": "2026-10-22T19:43:35.083270092Z"
+  "updated_at": "2026-10-25T00:18:28.144798312Z"
 }

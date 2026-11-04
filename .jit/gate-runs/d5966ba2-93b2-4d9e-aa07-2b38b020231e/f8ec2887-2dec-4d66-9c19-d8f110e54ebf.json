@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "930ecbf1532badc46f8dacadc6bc59b471bc71e3",
+  "completed_at": "2026-11-01T13:28:22.644475644Z",
+  "duration_ms": 272456,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/d5966ba2-93b2-4d9e-aa07-2b38b020231e.json",
+        "id": "F1",
+        "line": 30,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3d9a0ce3/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "The satisfies:3d9a0ce3/REQ-03 claim is unsupported because this change archives documents but does not link worktree artifacts after merge."
+      }
+    ],
+    "summary": "The issue's satisfies claim does not match its archival-only behavior.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f8ec2887-2dec-4d66-9c19-d8f110e54ebf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:23:50.187576591Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9274 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19747-d7f8-79d2-9c1c-fe5e9824316a\n--------\nuser\n--- 9261 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5165747bf, c5815b684 (`jit:d5966ba2`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3d9a0ce3/requirement/REQ-03 (issue description, markdown-first); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T13:22:11Z); code-review pending\nTruncation recovery: Narrowed the truncated broad search to the changed archive modules, evidence acquisition, classifier, tests, and pinned-reference behavior; omitted historical matches outside the impact cone.\n\n1. **[blocking][issue-impact]** The `satisfies:3d9a0ce3/REQ-03` label is unsupported. The target requires a worktree artifact to become linked after merge without a tracker write, while this issue’s implementation and harness test only archive already location-owned/linked files; they do not implement or verify post-merge linking. Remove or correct the coverage claim. [`.jit/issues/d5966ba2-93b2-4d9e-aa07-2b38b020231e.json:30`](@/issue/3d9a0ce3/requirement/REQ-03)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue's satisfies claim does not match its archival-only behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The satisfies:3d9a0ce3/REQ-03 claim is unsupported because this change archives documents but does not link worktree artifacts after merge.\",\"file\":\".jit/issues/d5966ba2-93b2-4d9e-aa07-2b38b020231e.json\",\"line\":30,\"references\":[\"@/issue/3d9a0ce3/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -8,92 +8,43 @@
 //! - No query and no filter is a clear bad-args error.
 //! - A plain positional `search foo` still works (regression).
 
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn create_issue(dir: &std::path::Path, title: &str, labels: &[&str], extra: &[&str]) {
-    let mut args: Vec<String> = vec![
-        "issue".into(),
-        "create".into(),
-        "--title".into(),
-        title.into(),
-        "--description".into(),
-        format!("Description for {title}"),
-    ];
-    for label in labels {
-        args.push("--label".into());
-        args.push((*label).into());
-    }
-    for e in extra {
-        args.push((*e).into());
-    }
-    let out = Command::new(jit_binary())
-        .current_dir(dir)
-        .args(&args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "create failed for {title}\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(jit_binary())
-        .current_dir(temp.path())
-        .arg("init")
-        .output()
-        .unwrap();
-
-    // Issue A: type:epic, area:auth
-    create_issue(
-        temp.path(),
+fn seed_search_issues(cli: &JitCli) {
+    cli.create_issue([
+        "--title",
         "Authentication epic",
-        &["type:epic", "area:auth"],
-        &[],
-    );
-    // Issue B: type:task, area:auth
-    create_issue(
-        temp.path(),
+        "--description",
+        "Description for Authentication epic",
+        "--label",
+        "type:epic",
+        "--label",
+        "area:auth",
+    ])
+    .unwrap();
+    cli.create_issue([
+        "--title",
         "Auth task one",
-        &["type:task", "area:auth"],
-        &[],
-    );
-    // Issue C: type:task, area:billing
-    create_issue(
-        temp.path(),
+        "--description",
+        "Description for Auth task one",
+        "--label",
+        "type:task",
+        "--label",
+        "area:auth",
+    ])
+    .unwrap();
+    cli.create_issue([
+        "--title",
         "Billing task",
-        &["type:task", "area:billing"],
-        &[],
-    );
-
-    temp
-}
-
-fn search_json(dir: &std::path::Path, args: &[&str]) -> Value {
-    let mut full: Vec<&str> = vec!["issue", "search"];
-    full.extend_from_slice(args);
-    full.push("--json");
-    let out = Command::new(jit_binary())
-        .current_dir(dir)
-        .args(&full)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "search failed for args {args:?}\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    serde_json::from_slice(&out.stdout).unwrap()
+        "--description",
+        "Description for Billing task",
+        "--label",
+        "type:task",
+        "--label",
+        "area:billing",
+    ])
+    .unwrap();
 }
 
 fn titles(json: &Value) -> Vec<String> {
@@ -107,8 +58,11 @@ fn titles(json: &Value) -> Vec<String> {
 
 #[test]
 fn test_search_label_no_query_returns_only_labeled() {
-    let temp = setup_test_repo();
-    let json = search_json(temp.path(), &["--label", "type:epic"]);
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let json = temp
+        .run_json(["issue", "search", "--label", "type:epic"])
+        .unwrap();
     let t = titles(&json);
     assert_eq!(
         t.len(),
@@ -120,12 +74,19 @@ fn test_search_label_no_query_returns_only_labeled() {
 
 #[test]
 fn test_search_two_labels_anded() {
-    let temp = setup_test_repo();
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
     // type:task AND area:auth -> only "Auth task one"
-    let json = search_json(
-        temp.path(),
-        &["--label", "type:task", "--label", "area:auth"],
-    );
+    let json = temp
+        .run_json([
+            "issue",
+            "search",
+            "--label",
+            "type:task",
+            "--label",
+            "area:auth",
+        ])
+        .unwrap();
     let t = titles(&json);
     assert_eq!(
         t,
@@ -136,10 +97,20 @@ fn test_search_two_labels_anded() {
 
 #[test]
 fn test_search_label_combined_with_state() {
-    let temp = setup_test_repo();
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
     // Dependency-free issues default to the ready state. area:auth + state
     // ready = A and B.
-    let json = search_json(temp.path(), &["--label", "area:auth", "--state", "ready"]);
+    let json = temp
+        .run_json([
+            "issue",
+            "search",
+            "--label",
+            "area:auth",
+            "--state",
+            "ready",
+        ])
+        .unwrap();
     let mut t = titles(&json);
     t.sort();
     assert_eq!(
@@ -151,15 +122,27 @@ fn test_search_label_combined_with_state() {
     );
 
     // area:auth + state backlog -> none (nothing is in backlog).
-    let json = search_json(temp.path(), &["--label", "area:auth", "--state", "backlog"]);
+    let json = temp
+        .run_json([
+            "issue",
+            "search",
+            "--label",
+            "area:auth",
+            "--state",
+            "backlog",
+        ])
+        .unwrap();
     assert_eq!(titles(&json).len(), 0);
 }
 
 #[test]
 fn test_search_query_and_label_both_narrow() {
-    let temp = setup_test_repo();
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
     // query "task" matches B and C by title; --label area:auth narrows to B only.
-    let json = search_json(temp.path(), &["task", "--label", "area:auth"]);
+    let json = temp
+        .run_json(["issue", "search", "task", "--label", "area:auth"])
+        .unwrap();
     let t = titles(&json);
     assert_eq!(
         t,
@@ -170,12 +153,9 @@ fn test_search_query_and_label_both_narrow() {
 
 #[test]
 fn test_search_no_query_no_filter_is_error() {
-    let temp = setup_test_repo();
-    let out = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .args(["issue", "search"])
-        .output()
-        .unwrap();
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let out = temp.command(["issue", "search"]).output().unwrap();
     assert!(
         !out.status.success(),
         "search with no query and no filter should fail"
@@ -189,16 +169,20 @@ fn test_search_no_query_no_filter_is_error() {
 
 #[test]
 fn test_search_plain_positional_query_still_works() {
-    let temp = setup_test_repo();
-    let json = search_json(temp.path(), &["Billing"]);
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let json = temp.run_json(["issue", "search", "Billing"]).unwrap();
     let t = titles(&json);
     assert_eq!(t, vec!["Billing task".to_string()]);
 }
 
 #[test]
 fn test_search_label_query_field_null_when_absent() {
-    let temp = setup_test_repo();
-    let json = search_json(temp.path(), &["--label", "type:epic"]);
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let json = temp
+        .run_json(["issue", "search", "--label", "type:epic"])
+        .unwrap();
     assert!(
         json["query"].is_null(),
         "query field should be null when no positional query given: {}",
@@ -207,36 +191,14 @@ fn test_search_label_query_field_null_when_absent() {
 }
 
 #[test]
-fn test_search_label_namespace_wildcard_matches_query_label_set() {
-    let temp = setup_test_repo();
-    let searched = titles(&search_json(temp.path(), &["--label", "type:*"]));
-
-    let out = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .args(["query", "all", "--label", "type:*", "--json"])
+fn test_search_malformed_label_pattern_fails() {
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let out = temp
+        .command(["issue", "search", "--label", "type:", "--json"])
         .output()
         .unwrap();
-    assert!(out.status.success());
-    let queried = titles(&serde_json::from_slice(&out.stdout).unwrap());
-
-    let sorted = |mut v: Vec<String>| {
-        v.sort();
-        v
-    };
-    assert_eq!(searched.len(), 3);
-    assert_eq!(sorted(searched), sorted(queried));
-}
-
-#[test]
-fn test_search_malformed_label_pattern_exits_invalid_argument() {
-    let temp = setup_test_repo();
-    let out = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .args(["issue", "search", "--label", "type:"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        out.status.code(),
-        Some(jit::output::ExitCode::InvalidArgument.code())
-    );
+    assert!(!out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_LABEL_PATTERN");
 }

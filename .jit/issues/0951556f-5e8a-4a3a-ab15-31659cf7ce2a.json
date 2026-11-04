@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:24.551824851Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,13 +8,33 @@
   ],
   "description": "Make the `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` self-test pass as the registered gate `standards-scan-test` over the script it tests.\n\n## Background\n\n`.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` is a re-runnable self-test of `.agents/skills/jit-project-lead/scripts/standards-scan.sh`, the content-standards scanner, over a self-contained `jit init` fixture seeded with issues and documents for each asserted finding. It exits 2 when `jit`, `jq` or `gawk` is missing. Until planning, no gate ran it. The gate `standards-scan-test` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `standards-scan-test` runs `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `standards-scan-test` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:19:11.076587234Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "standards-scan-test"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "90227604-dc58-43ad-8b36-0c41e273f8c1",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:45.364544889Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "21cce070-9b3d-4bde-a4d1-cd38af9c7889",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:16:05.717972727Z",
+      "updated_by": "auto:executor"
+    },
+    "standards-scan-test": {
+      "run_id": "e7ced7ee-227f-4c23-aad7-1afd5713cb0c",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:26.898887644Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
   "labels": [
     "type:task",
@@ -29,7 +49,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Standards-scan test suite runs as a declared gate",
-  "updated_at": "2026-10-22T14:44:32.720858898Z"
+  "updated_at": "2026-10-24T23:19:11.076587234Z"
 }

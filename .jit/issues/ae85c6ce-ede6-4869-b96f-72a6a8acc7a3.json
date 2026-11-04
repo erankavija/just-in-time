@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T18:49:05.545516491Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "The adopter reference pages and contributor notes describe profiles as packages that apply once, with no applied-profile records, ownership, remedies or capture.\n\n## Background\n\nCharter decision D-8 replaces the ownership lifecycle with apply-once. Applying composes packages in dependency order with the dependent package winning a key both declare, refuses unrelated packages that declare one key differently, and writes the package value over an existing entry. A selector is a bare package directory path. The diff command shows where a repository differs from a package. The profile lifecycle event records the package id, version and variables applied. The refusal to apply over uncommitted target changes is documented with that behaviour, separately.\n\nPages describing the removed lifecycle (line numbers at the investigation baseline):\n\n- `docs/reference/profiles.md`: intro 7-10, the record 24-26, list/show/validate/capture and `id:` 223-277, conflicts 328-397, the remedy contract 398-450, provenance repair 491-514, publication and records 524-570.\n- Other reference pages: `docs/reference/storage-format.md:27,87-89`, `docs/concepts/guarantees.md:160,661-662`, `docs/reference/worktree-validate.md:319-336,392-395`, `docs/index.md:53`. The events and error-code references are generated from code and follow it.\n- Contributor material: `dev/index.md:112-138` (capturing the workflow package) and `dev/architecture/repository-state-materialization.md:197-214`.\n\n## Success Criteria\n\n- [hard] REQ-01: The profiles reference states apply-once semantics: replacement of existing entries, dependent-wins composition, refusal of unrelated conflicts, and bare-path selectors.\n- [hard] REQ-02: No adopter page describes applied-profile records, ownership claims, fingerprints, remedies, capture, reconfigure, upgrade, list, profile validation or selector tags.\n- [hard] REQ-03: The storage format, guarantees and worktree validation pages match the surviving behaviour.\n- [hard] REQ-04: The contributor index describes producing the workflow package by packing its directory, and the materialization note carries no ownership text.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:02:01.424281934Z",
+  "first_ready_at": "2026-11-01T18:48:08.294822583Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "ee3a05e5-2f4b-4fc1-912a-0d84229c83fe",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:02:00.975914196Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "33fa8d11-5288-4f01-a9a9-4287585c7679",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:00:25.778539096Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ae85c6ce-ede6-4869-b96f-72a6a8acc7a3",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Rewrite the profiles reference around apply-once",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:02:01.424281934Z"
 }

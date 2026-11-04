@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6321325d55f2384f366b3a79f9922966927a0262",
+  "completed_at": "2026-11-01T07:58:47.915798691Z",
+  "duration_ms": 74178,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 580,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/955aaa9a/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "A same-key failed retry can overwrite the original failure record, causing an existing waiter to receive the retry's cause instead."
+      }
+    ],
+    "summary": "A same-key failed retry can replace the original failed build's cause before every original waiter observes it.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "955aaa9a-34f7-4304-bed1-ad8102185253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c5d8e84b-680c-4420-9972-50d435b5fcc3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:57:33.737114812Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9976 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1961d-214c-77d2-a04b-63fc7a6f5ab7\n--------\nuser\n--- 9963 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:955aaa9a commits 61a07d756, 934cf05a8, 81b32fb42, d1d5284f1, 101dd4258, c9cf8f2a0, 8627535f1, dce65bc54, 25515e0f5, 6321325d5; uncommitted JIT metadata excluded\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/955aaa9a/requirement/REQ-01..REQ-03 (.jit issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T07:56:04.227231333+00:00); prior code-review failed (exit 1, 2026-11-01T04:36:39Z)\nTruncation recovery: re-read tagged commits by path, split merge first-parent diffs, and inspected current fixture implementation, tests, and nextest configuration\n1. F1 — blocking, issue-impact, high: A same-key retry that also fails can overwrite the original build failure before an already-blocked waiter reads it. The waiter then receives the retry’s cause rather than the build it waited on: `write_fixture_build_failure` replaces the sole per-key record at `crates/jit/src/test_utils.rs:580`. Existing tests cover a later successful retry and failures across separate keys, but not this same-key double-failure sequence. This violates REQ-02. References: @/issue/955aaa9a/requirement/REQ-02.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A same-key failed retry can replace the original failed build's cause before every original waiter observes it.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A same-key failed retry can overwrite the original failure record, causing an existing waiter to receive the retry's cause instead.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":580,\"references\":[\"@/issue/955aaa9a/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

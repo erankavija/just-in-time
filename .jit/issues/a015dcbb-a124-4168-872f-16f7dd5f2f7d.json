@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T23:27:23.093353912Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Moves the archive and snapshot-export methods onto an `archive()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/archive.rs` (an `IssueStore` block and a `JsonFileStorage` block) and `commands/snapshot.rs`: `archive_candidates`, `preview_archive_document`, `preview_archive_container`, `execute_archive_document`, `execute_archive_container`, `determine_snapshot_source_mode` and `export_snapshot`. Callers: the archive and snapshot arms of `crates/jit/src/main.rs` (or their handler modules) and the archive and snapshot suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::archive()` returns `ArchiveOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `ArchiveOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ArchiveOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `archive()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-11-03T01:57:26.097868004Z",
   "first_ready_at": "2026-10-22T14:01:53.679341048Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fa02aa2b-b12b-4a65-9b6a-a17510334639",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:54:30.424677467Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b4ac053b-1940-46cd-afa6-cc403e760eb0",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:57:19.901281098Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a015dcbb-a124-4168-872f-16f7dd5f2f7d",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Archive and snapshot methods behind an archive facade",
-  "updated_at": "2026-10-22T14:01:53.679341048Z"
+  "updated_at": "2026-11-03T01:57:26.097868004Z"
 }

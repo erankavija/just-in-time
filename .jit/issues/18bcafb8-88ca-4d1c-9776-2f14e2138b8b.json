@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:30:38.677317892Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Route production event matching and identity reads through a body view, so the event type can become an envelope without one large atomic rewrite.\n\n## Background\n\n`Event` repeats `id` and `timestamp` in each of its variants (`crates/jit/src/domain/types.rs:1292-1616`), so `id()` (`:1621`), `assign_identity()` (`:1653`) and `get_issue_id()` (`:1989`) are full-width matches. Variant patterns `Event::<Variant>` occur in production at `domain/event_catalog.rs` (45 lines), `repository_state/mutation.rs`, `domain/queries.rs`, `domain/event_log.rs`, `storage/json.rs`, `storage/mod.rs`, `repository_state/archive.rs`, `domain/artifact_discovery.rs`, `domain/store_divergence.rs` and the commands `mod.rs`, `archive.rs`, `gate.rs`, `gate_check.rs`, `issue.rs`, `events.rs`, `worktree.rs`, `claim.rs` and `bulk_update.rs`. Production code also binds variant `timestamp` fields, for example `domain/queries.rs:79-95` and its doctest at `:54-64`. Replacing the enum with an envelope in one step rewrites about 260 lines in about 35 files at once.\n\n## Success Criteria\n\n- [hard] REQ-01: A temporary `EventBody` alias for `Event`, the accessors `Event::body()`, `Event::into_body()` and `Event::timestamp()` beside `Event::id()`, and a `test_utils` helper that builds a stamped event from a body, an id and a timestamp exist.\n- [hard] REQ-02: No production match outside `domain/types.rs` names `Event::<Variant>`; each matches `EventBody::<Variant>` on the body view.\n- [hard] REQ-03: In production code and its doctests, no pattern binds `id` or `timestamp` from a variant, and no code outside `domain/types.rs` constructs a variant with those fields; constructions use draft constructors or the `test_utils` helper that stamps both.\n- [hard] REQ-04: Event-log bytes and event command output are unchanged.\n\n## Notes\n\nThe alias and accessors are a temporary bridge removed when the envelope lands in this epic (`@/inv/canonical-cutover`).\n",
   "documents": [],
+  "done_at": "2026-10-25T06:12:34.572082645Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3a51e729-a973-43ab-b8f9-f90ebfa6ccfb",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:12:33.727493691Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e3d4605d-e457-4380-ad06-f8c7e882d4b4",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:07:07.059479986Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "18bcafb8-88ca-4d1c-9776-2f14e2138b8b",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Production event matchers read events through a body view",
-  "updated_at": "2026-10-22T19:43:16.424703783Z"
+  "updated_at": "2026-10-25T06:12:34.572082645Z"
 }

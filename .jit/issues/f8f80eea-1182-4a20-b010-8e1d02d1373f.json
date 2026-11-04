@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:55:22.002084003Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Remove the hierarchy wrappers, so each caller propagates the one constructor's error.\n\n## Background\n\n`repository_state::hierarchy_config` is called at `commands/validate.rs:1445,1955,2291`, `commands/gate_check.rs:495,576`, `commands/template.rs:498`, `commands/mod.rs:1153`, `commands/archive.rs:515` and `validation/repository.rs:590`. `config_manager::get_hierarchy_config` is called at `commands/graph.rs:230,310,398,490,578`, `commands/document.rs:155,214`, `commands/archive.rs:159,180`, `commands/validate.rs:1473` and `crates/server/src/routes.rs:178`.\n\n## Success Criteria\n\n- [hard] REQ-01: The silent empty-hierarchy fallback in `repository_state/default_rules.rs` is gone, together with `repository_state::hierarchy_config`, and `get_hierarchy_config` returns the constructor's error unwrapped.\n- [hard] REQ-02: Each listed caller propagates that error, and the server maps it to an error response.\n- [hard] REQ-03: An invalid hierarchy produces the same `ConfigError` through each command family.\n",
   "documents": [],
+  "done_at": "2026-10-25T01:54:44.114947456Z",
+  "first_ready_at": "2026-10-24T23:53:02.682006182Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3f65f1ac-8b6e-4f7a-a07d-babc13b8cfdb",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:54:36.061759666Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8df6320a-3c7f-4a9f-959d-8456b3f78530",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:49:27.358761522Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Hierarchy callers propagate the constructor's error",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T01:54:44.114947456Z"
 }

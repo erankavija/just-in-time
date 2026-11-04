@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f8f80eea",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9cf473f0036945b036d3715e5b43b48a9940f1b1",
+  "completed_at": "2026-10-25T01:49:27.134089762Z",
+  "duration_ms": 158859,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met: fallback removal, unwrapped ConfigError propagation, server error mapping, and focused coverage are present.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8df6320a-3c7f-4a9f-959d-8456b3f78530",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T01:46:48.274723633Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `9c003996d` (`refactor(jit:f8f80eea): propagate the hierarchy constructor's error from every caller`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/f8f80eea/requirement/REQ-01`, `REQ-02`, `REQ-03`, `@/issue/2195c98f/requirement/REQ-16` (issue Markdown); `@/charter/D-18` (`dev/vision/9db27a3a-charter.md`); `@/invariant/semantic-types`, `convention-convergence`, `architecture-dependency-direction`, `orthogonal-tests`, `essential-code-prose` (`.jit/invariants.toml`)\nGate evidence: cargo-ci — passed, exit 0 (2026-10-25T01:45:16Z); code-review — pending, no prior structured run\nTruncation recovery: scoped repository-local `AGENTS.md` discovery, per-path tagged-commit patches, and bounded current-call-site reads recovered the initially broad truncated output\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met: fallback removal, unwrapped ConfigError propagation, server error mapping, and focused coverage are present.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

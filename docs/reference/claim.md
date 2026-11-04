@@ -9,9 +9,13 @@ Complete CLI reference for `jit claim` subcommands used in lease-based claim coo
 
 The `jit claim` command family manages exclusive advisory leases on issues for
 parallel work coordination. Lease acquisition is serialized by the claims
-coordinator, but a lease does not itself prevent writes: whether selected write
-commands require one is controlled by `[worktree].enforce_leases` (and `off`
-does not block writes).
+coordinator. Whether a lease refuses other agents' writes to the issue is
+controlled by `[worktree].enforce_leases`; a write to an unleased issue needs no
+lease, and `off` blocks nothing.
+
+Each lease lives in `.git/jit/leases/<issue-id>.json`, shared across worktrees.
+Lease commands take the issue ID; the lease UUID in output identifies the
+lease in the append-only audit trail, `.git/jit/claims.jsonl`.
 
 ```bash
 jit claim <COMMAND> [OPTIONS]
@@ -83,8 +87,8 @@ jit claim acquire abc123 --json
 
 ### Expiry, assignment, and availability
 
-When a later `jit claim acquire` finds an expired finite lease, the coordinator
-evicts it before deciding whether a new lease can be acquired. Lease expiry does
+When a later `jit claim acquire` finds an expired finite lease on the issue, the
+coordinator evicts it before deciding whether a new lease can be acquired. Lease expiry does
 not clear the issue's assignee, however. `jit query available` selects only
 ready, unassigned issues, so release or unassign the issue separately before
 expecting it in that query:
@@ -194,18 +198,20 @@ Extend the expiry time of an existing lease.
 ### Synopsis
 
 ```bash
-jit claim renew [OPTIONS] <LEASE_ID>
+jit claim renew [OPTIONS] <ISSUE_ID>
 ```
 
 ### Description
 
-Extends the expiry time of an existing lease. For finite leases, adds time to the expiration. For indefinite leases (TTL=0), updates the `last_beat` timestamp.
+Renews your lease on an issue. For finite leases, sets expiration to now plus
+`--extension` seconds. For indefinite leases (TTL=0), updates the `last_beat`
+timestamp.
 
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `<LEASE_ID>` | Lease ID to renew |
+| `<ISSUE_ID>` | Issue whose lease to renew (short or full UUID) |
 
 ### Options
 
@@ -217,21 +223,21 @@ Extends the expiry time of an existing lease. For finite leases, adds time to th
 ### Examples
 
 ```bash
-# Extend by the default TTL
-jit claim renew abc12345-6789-...
+# Renew for the default TTL from now
+jit claim renew abc123
 
-# Extend by 1 hour
-jit claim renew abc12345-6789-... --extension 3600
+# Renew for 1 hour from now
+jit claim renew abc123 --extension 3600
 
 # JSON output
-jit claim renew abc12345-6789-... --json
+jit claim renew abc123 --json
 ```
 
 ### Failure modes
 
-Renewal fails when the lease belongs to a different owner and when the lease
-does not exist. For the code each failure exits with, see the
-[Exit Codes reference](exit-codes.md).
+Renewal fails when the issue does not exist, the lease belongs to a different
+owner, or the lease is absent or expired. For the code each failure exits with,
+see the [Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -242,7 +248,7 @@ Send heartbeat for an indefinite lease to prevent staleness.
 ### Synopsis
 
 ```bash
-jit claim heartbeat [OPTIONS] <LEASE_ID>
+jit claim heartbeat [OPTIONS] <ISSUE_ID>
 ```
 
 ### Description
@@ -253,7 +259,7 @@ Updates the `last_beat` timestamp for an indefinite (TTL=0) lease without changi
 
 | Argument | Description |
 |----------|-------------|
-| `<LEASE_ID>` | Lease ID to heartbeat |
+| `<ISSUE_ID>` | Issue whose lease to heartbeat (short or full UUID) |
 
 ### Options
 
@@ -265,10 +271,10 @@ Updates the `last_beat` timestamp for an indefinite (TTL=0) lease without changi
 
 ```bash
 # Send heartbeat
-jit claim heartbeat abc12345-6789-...
+jit claim heartbeat abc123
 
 # JSON output
-jit claim heartbeat abc12345-6789-... --json
+jit claim heartbeat abc123 --json
 ```
 
 ### Staleness
@@ -282,25 +288,25 @@ The threshold is a built-in constant listed in
 change it.
 
 A stale lease is:
-- Marked stale in `jit claim status`
-- Not counted as active: with `enforce_leases = "strict"` a structural
-  operation on the issue is blocked as if no lease were held
-- A candidate for `jit claim force-evict`
 
-Staleness never auto-evicts the lease. It persists until a heartbeat,
-`jit claim release`, or force-eviction.
+- Marked stale in `jit claim list` and `jit claim status`
+- Not counted as active: with `enforce_leases = "strict"` it no longer refuses
+  other agents' writes to the issue
+- Refreshed by its owner's heartbeat, or reclaimed by `jit recover`
+
+Use `jit claim release` or `jit claim force-evict` to remove it immediately.
 
 ### Failure modes
 
-A heartbeat fails when the lease belongs to a different owner and when the lease
-does not exist. For the code each failure exits with, see the
-[Exit Codes reference](exit-codes.md).
+A heartbeat fails when the issue does not exist, the lease belongs to a different
+owner, or the lease is absent or expired. For the code each failure exits with,
+see the [Exit Codes reference](exit-codes.md).
 
 ---
 
 ## jit claim status
 
-Show active lease status with optional filtering.
+Show unexpired leases with optional filtering.
 
 ### Synopsis
 
@@ -310,7 +316,7 @@ jit claim status [OPTIONS]
 
 ### Description
 
-Shows active leases. By default shows leases for the current agent. Use filters to query specific issues or agents.
+Shows unexpired leases, marking stale ones. By default shows leases for the current agent. Use filters to query specific issues or agents. The read takes no lock and writes nothing, so it never waits on a running claim operation; an expired lease is omitted until a later claim operation on its issue or `jit recover` evicts it.
 
 ### Options
 
@@ -340,7 +346,7 @@ jit claim status --json
 
 For finite leases:
 ```
-Lease: abc12345-6789-...
+Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
   Issue:    01ABC123
   Agent:    agent:copilot-1
   Worktree: wt:a1b2c3
@@ -351,7 +357,7 @@ Lease: abc12345-6789-...
 
 For indefinite leases:
 ```
-Lease: abc12345-6789-...
+Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
   Issue:    01ABC123
   Agent:    agent:copilot-1
   Worktree: wt:a1b2c3
@@ -363,8 +369,8 @@ Lease: abc12345-6789-...
 
 For stale indefinite leases:
 ```
-  ⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
-     Use 'jit claim heartbeat abc12345-6789-...' to refresh
+  STALE: Lease marked stale (no heartbeat for 75 minutes)
+     Use 'jit claim heartbeat abc123' to refresh
 ```
 
 ### Failure modes
@@ -377,7 +383,7 @@ lease query itself cannot run. For the code that failure exits with, see the
 
 ## jit claim list
 
-List all active leases across all agents.
+List all unexpired leases across all agents.
 
 ### Synopsis
 
@@ -387,7 +393,7 @@ jit claim list [OPTIONS]
 
 ### Description
 
-Shows all active leases across all agents and worktrees. Useful for seeing global state of who is working on what.
+Shows all unexpired leases across all agents and worktrees, marking stale ones. Useful for seeing global state of who is working on what. Like `jit claim status`, it takes no lock and writes nothing.
 
 ### Options
 
@@ -407,7 +413,7 @@ jit claim list --json
 
 ### Failure modes
 
-The command fails only when the lease index cannot be read. For the code that
+The command fails when the lease query cannot run. For the code that
 failure exits with, see the [Exit Codes reference](exit-codes.md).
 
 ---
@@ -419,18 +425,22 @@ Force-evict a lease (administrative operation).
 ### Synopsis
 
 ```bash
-jit claim force-evict [OPTIONS] --reason <REASON> <LEASE_ID>
+jit claim force-evict [OPTIONS] --reason <REASON> <ISSUE_ID>
 ```
 
 ### Description
 
 Removes a lease immediately regardless of ownership. This is an administrative operation for handling crashed agents or emergency situations. The eviction is logged with the provided reason for audit trail.
 
+The issue ID is matched against stored leases, so a lease whose issue was
+deleted can still be evicted. Use a full issue UUID or a unique prefix of at
+least four characters among those leases.
+
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `<LEASE_ID>` | Lease ID to evict |
+| `<ISSUE_ID>` | Issue whose lease to evict (short or full UUID) |
 
 ### Options
 
@@ -443,13 +453,13 @@ Removes a lease immediately regardless of ownership. This is an administrative o
 
 ```bash
 # Evict a stale lease from crashed agent
-jit claim force-evict abc12345-6789-... --reason "Agent crashed, no heartbeat for 2 hours"
+jit claim force-evict abc123 --reason "Agent crashed, no heartbeat for 2 hours"
 
 # Emergency override
-jit claim force-evict abc12345-6789-... --reason "Emergency: blocking deployment"
+jit claim force-evict abc123 --reason "Emergency: blocking deployment"
 
 # JSON output
-jit claim force-evict abc12345-6789-... --reason "Stale" --json
+jit claim force-evict abc123 --reason "Stale" --json
 ```
 
 ### Audit Trail
@@ -462,8 +472,10 @@ Force-evictions are logged to the claims audit log with:
 
 ### Failure modes
 
-Eviction fails when `--reason` is omitted and when the lease does not exist. For
-the code each failure exits with, see the [Exit Codes reference](exit-codes.md).
+Eviction fails when `--reason` is omitted, the issue prefix is ambiguous, or the
+lease is absent or expired. An expired lease is removed even though the command
+reports it as not found. For the code each failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ---
 

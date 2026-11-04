@@ -1,19 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:57.152970403Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
     "fd2073b7-d6ff-4617-98ae-826a2573d390"
   ],
-  "description": "The gate definition and preset arms build payloads inline and substitute gate-specific fallback codes. This moves them to library handlers with typed responses.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `GateCommands::{Define, Update, Remove, Add, List, Show}` and `PresetCommands::{List, Show, Apply, Create}` build bodies with `json!` (`define`, `remove`, `add`, `preset list` with an inline count, `preset apply`, `preset create`) or construct `GateListResponse` inline. Under `--json` they report failures with call-site codes: `GATE_ERROR` (exit 6) for `define`, `update`, `list` and `fail`-style paths, `GATE_NOT_FOUND`/`GATE_ERROR` in `add`, `PRESET_ERROR` (exit 3) in the preset arms, and `resolve_gate_key_for` prints `INVALID_ARGUMENT` and exits. `define --env` parse errors call `exit(2)` on the human path only. `preset apply` with per-gate errors builds an inline `JsonError` with a chosen `failure_code` and exits. Most of these leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `gate define|update|remove|add|list|show` and `gate preset list|show|apply|create` to handlers in `crates/jit/src/dispatch/gate.rs`, and `main.rs` keeps no arm body or `resolve_gate_key_for`.\n- [hard] REQ-02: Each leaf returns its registered response type, list payloads are `ListEnvelope` instantiations, and the schema names a typed response for every one of them.\n- [hard] REQ-03: The handlers return failures as errors with no substituted code or `std::process::exit`; tests assert that a `gate define` failure classified as something other than `GATE_ERROR` reports its classified code and exit on both paths, and that an invalid `define --env` reports `INVALID_ARGUMENT` exit 2 on both paths.\n- [hard] REQ-04: `gate preset apply` with per-gate errors returns a findings outcome rendered as the failure envelope with its report in `error.details`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "The gate definition and preset arms build payloads inline and substitute gate-specific fallback codes. This moves them to library handlers with typed responses.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `GateCommands::{Define, Update, Remove, Add, List, Show}` and `PresetCommands::{List, Show, Apply, Create}` build bodies with `json!` (`define`, `remove`, `add`, `preset list` with an inline count, `preset apply`, `preset create`) or construct `GateListResponse` inline. Under `--json` they report failures with call-site codes: `GATE_ERROR` (exit 6) for `define`, `update`, `list` and `fail`-style paths, `GATE_NOT_FOUND`/`GATE_ERROR` in `add`, `PRESET_ERROR` (exit 3) in the preset arms, and `resolve_gate_key_for` prints `INVALID_ARGUMENT` and exits. `define --env` parse errors call `exit(2)` on the human path only. `preset apply` with per-gate errors builds an inline `JsonError` with a chosen `failure_code` and exits. Most of these leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `gate define|update|remove|add|list|show` and `gate preset list|show|apply|create` to handlers in `crates/jit/src/dispatch/gate.rs`, and `main.rs` keeps no arm body or `resolve_gate_key_for`.\n- [hard] REQ-02: Each leaf returns its registered response type, list payloads are `ListEnvelope` instantiations, and the schema names a typed response for every one of them.\n- [hard] REQ-03: The handlers return failures as errors with no substituted code or `std::process::exit`; tests assert that a `gate define` failure classified as something other than `GATE_ERROR` reports its classified code and exit on both paths, and that an invalid `define --env` reports `INVALID_ARGUMENT` exit 2 on both paths.\n- [hard] REQ-04: `gate preset apply` with per-gate errors returns a findings outcome rendered as the failure envelope with its report in `error.details`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-06's unchanged human output excludes the per-gate error list of `gate preset apply`: as a findings outcome (REQ-04) its report prints on stdout and its message on stderr through the uniform emitter, where the old arm printed the list on stderr (steward ruling, 2026-11-04, as for the uniform findings rule).\n- D-02: REQ-06's unchanged human output excludes the prefix of `gate preset apply`'s per-issue success warnings: they pass through the shared emitter, so each line reads `Warning: (<id>): <warning>` where the old arm printed `Warning (<id>): <warning>`, and under `--json` they reach the response's `warnings` (uniform warnings rule, as for 20fc3b92 D-01; steward ruling, 2026-11-04).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T11:59:35.120251279Z",
+  "first_ready_at": "2026-11-03T23:08:01.309023903Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c8a62f20-a593-4a24-9fdb-192f674a29b4",
+      "status": "passed",
+      "updated_at": "2026-11-04T11:03:21.285342766Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9de97f49-519f-4679-9374-6275484e3e3d",
+      "status": "passed",
+      "updated_at": "2026-11-04T11:59:12.110060990Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "b2158bf6-06f4-4f2a-bef4-0e4cdcedfcb6",
+      "status": "passed",
+      "updated_at": "2026-11-04T11:03:38.335330203Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1ac651c7-665b-40a5-b214-9abbc14e0534",
   "labels": [
     "type:task",
@@ -29,7 +51,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate definition and preset commands move to library handlers",
-  "updated_at": "2026-10-21T10:40:10.777988526Z"
+  "updated_at": "2026-11-04T11:59:35.120251279Z"
 }

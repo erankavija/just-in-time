@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T23:10:01.555901749Z",
+  "context": {},
+  "created_at": "2026-11-03T22:39:21.825039029Z",
+  "dependencies": [],
+  "description": "Nothing bounds an individual test except a 20 s hard stop, so a slow test hides inside the suite total. This measures every test's duration on main and derives the per-test limits from the measurement.\n\n## Background\n\n`.config/nextest.toml` sets `slow-timeout = { period = \"10s\", terminate-after = 2 }`, a 20 s hard bound per test. `scripts/rust-build-budget.sh` enforces a whole-suite duration (`MAX_TEST_SUITE_SECONDS=30`) over nextest and doctests together; recent warm runs measure about 22–24 s (`dev/benchmarks/rust-build-budgets/README.md`). The workspace has library unit tests, harness tests over `InMemoryStorage`, and CLI integration tests that spawn the binary, and their natural costs differ.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed benchmark note under `dev/benchmarks/` records each test's duration on main, at a stated commit, from at least three warm runs on a quiet host. The host load at each run's start is stated, and the source is nextest's per-test timing (its JUnit report), not wall-clock estimates.\n- [hard] REQ-02: The note states the distribution per test layer (library unit tests; integration and CLI tests), including the median, p95, p99 and maximum, and lists every test above the proposed limit with its duration.\n- [hard] REQ-03: The note proposes one limit per layer, derived from the measured distribution with the derivation stated, and tight enough that unit tests are bounded well below the current 20 s hard stop.\n\n## Notes\n\nMeasure when no other lead's gates are running, because the measurement and the gates distort each other.\n",
+  "documents": [],
+  "done_at": "2026-11-04T02:25:44.779437225Z",
+  "first_ready_at": "2026-11-03T22:39:21.825039029Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "88c1b728-f274-4311-830a-8413174befcb",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:21:05.288672974Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "626eda2d-7176-4524-942e-59768d6e6909",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:25:34.237986626Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "1eb949a5-7b70-4b32-92f3-aa5e2f703d44",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Measure per-test durations and derive the per-test limits",
+  "updated_at": "2026-11-04T02:25:44.779437225Z"
+}

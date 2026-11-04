@@ -7,9 +7,10 @@ set -euo pipefail
 # Target:
 #   docs/reference/exit-codes.md
 #
-# WHERE THE VALUES COME FROM. The page projects the global taxonomy and the
-# per-command mappings the command schema declares in crates/jit/src/schema.rs —
-# the same declarations `jit --schema` publishes — so a script branching on an
+# WHERE THE VALUES COME FROM. The page projects the global taxonomy, the
+# universal rows in crates/jit/src/schema.rs, and the per-command codes each
+# leaf declares in its `command_group!` registration (crates/jit/src/dispatch/)
+# — the same mappings `jit --schema` publishes — so a script branching on an
 # exit code reads what the binary returns (`@/inv/single-source-prose`). Tests
 # beside the declaration bind each mapping to the runtime and assert the
 # committed page equals the render, naming this script.

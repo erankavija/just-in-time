@@ -320,7 +320,9 @@ See [implementation notes](implementation-notes.md).
 **Validation:**
 ```bash
 $ jit doc check-links --scope issue:<issue-id>
-✅ All documents valid!
+Checking 1 document(s) in scope 'issue:<issue-id>'...
+
+All documents valid
 Summary: 1 document(s) checked, 0 error(s), 0 warning(s)
 ```
 
@@ -339,7 +341,9 @@ Summary: 1 document(s) checked, 0 error(s), 0 warning(s)
 **Validation:**
 ```bash
 $ jit doc check-links --scope issue:<issue-id>
-⚠️  Warnings (2):
+Checking 1 document(s) in scope 'issue:<issue-id>'...
+
+Warnings (2):
   <area>/<issue-directory>/feature.md (risky_asset_path): Deep relative path '../../old-diagrams/diagram.png' may break if document is moved
   <area>/<issue-directory>/feature.md (external_asset): External URL (not validated): https://example.com/reference.png
 
@@ -361,7 +365,9 @@ See [nonexistent](missing.md).
 **Validation:**
 ```bash
 $ jit doc check-links --scope issue:<issue-id>
-❌ Errors found (2):
+Checking 1 document(s) in scope 'issue:<issue-id>'...
+
+Errors found (2):
   <area>/<issue-directory>/broken.md (missing_asset): Asset not found: broken/gone.png
   <area>/<issue-directory>/broken.md (broken_link): Document 'missing.md' not found (resolved to <area>/<issue-directory>/missing.md)
 
@@ -423,7 +429,7 @@ jit doc check-links --scope all --json > validation-results.json
 
 # Fail on errors
 if [ $? -eq 1 ]; then
-  echo "❌ Document validation failed"
+  echo "error: Document validation failed"
   exit 1
 fi
 ```

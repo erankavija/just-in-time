@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-e2eb8862",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "726cc63fc0e4163795b62e12ac66531ba82d9eaa",
+  "completed_at": "2026-10-28T21:52:29.748248211Z",
+  "duration_ms": 64790,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change satisfies both hard criteria without re-proving finalization in storage tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e2eb8862-1622-4a58-9bbc-c77a57a87013",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c6e440a3-1e8f-4140-aae1-5ec982ca4cbd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T21:51:24.957282707Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8b7cc8c7687229d890a788382bf81dae55e05beb; 726cc63fc0e4163795b62e12ac66531ba82d9eaa\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/c780514e/requirement/REQ-03 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci pending, exit code none\nTruncation recovery: reread 726cc63fc patch in individual 1-260, 261-520, and 521-900 line slices; reran policy and item reads separately\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change satisfies both hard criteria without re-proving finalization in storage tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

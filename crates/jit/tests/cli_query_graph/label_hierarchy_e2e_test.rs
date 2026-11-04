@@ -1,422 +1,9 @@
-//! End-to-End Label Hierarchy Workflow Test
-//!
-//! This test validates the complete label hierarchy feature through a realistic workflow:
-//! 1. Create milestone → epic → tasks hierarchy
-//! 2. Add dependencies between levels
-//! 3. Query by labels (exact match and wildcard)
-//! 4. Validate the repository (type labels, membership references)
-//! 5. Use strategic view to filter
-//! 6. Verify event log captures label operations
-//!
-//! This test uses the actual CLI binary to ensure real-world usage patterns work.
+//! CLI wiring of label validation and the `label` subcommands.
 
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
-}
-
-fn run_jit(temp: &TempDir, args: &[&str]) -> std::process::Output {
-    Command::new(jit_binary())
-        .args(args)
-        .current_dir(temp.path())
-        .output()
-        .unwrap()
-}
-
-fn extract_id(output: &str) -> String {
-    output.split_whitespace().last().unwrap().trim().to_string()
-}
-
-// ============================================================================
-// E2E Test: Complete Label Hierarchy Workflow
-// ============================================================================
-
-#[test]
-fn test_label_hierarchy_complete_workflow() {
-    let temp = setup_test_repo();
-    let milestone_type = crate::type_label(&temp.taxonomy, 1);
-    let milestone_label = crate::membership_label(&temp.taxonomy, 1, "v1.0");
-    let epic_type = crate::type_label(&temp.taxonomy, 2);
-    let epic_label = crate::membership_label(&temp.taxonomy, 2, "auth");
-    let component_backend = crate::membership_label(&temp.taxonomy, 3, "backend");
-    let component_frontend = crate::membership_label(&temp.taxonomy, 3, "frontend");
-    let milestone_namespace = crate::membership_namespace(&temp.taxonomy, 1);
-    let epic_namespace = crate::membership_namespace(&temp.taxonomy, 2);
-    let component_namespace = crate::membership_namespace(&temp.taxonomy, 3);
-
-    // ========================================================================
-    // PHASE 1: Create Milestone → Epic → Tasks Hierarchy
-    // ========================================================================
-
-    // Create a milestone for v1.0 release
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "-t",
-            "Release v1.0",
-            "--label",
-            milestone_type.as_str(),
-            "--label",
-            milestone_label.as_str(),
-            "--priority",
-            "critical",
-        ],
-    );
-    assert!(
-        output.status.success(),
-        "Failed to create milestone: {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let milestone_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    // Create an epic for the authentication system
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "-t",
-            "Authentication System",
-            "--label",
-            epic_type.as_str(),
-            "--label",
-            epic_label.as_str(),
-            "--label",
-            milestone_label.as_str(),
-            "--priority",
-            "high",
-        ],
-    );
-    assert!(
-        output.status.success(),
-        "Failed to create epic: {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let epic_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    // Create tasks for the epic
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "-t",
-            "Implement login endpoint",
-            "--label",
-            crate::type_label(&temp.taxonomy, 4).as_str(),
-            "--label",
-            epic_label.as_str(),
-            "--label",
-            component_backend.as_str(),
-            "--priority",
-            "high",
-        ],
-    );
-    assert!(output.status.success());
-    let task1_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "-t",
-            "Add password hashing",
-            "--label",
-            crate::type_label(&temp.taxonomy, 4).as_str(),
-            "--label",
-            epic_label.as_str(),
-            "--label",
-            component_backend.as_str(),
-            "--priority",
-            "high",
-        ],
-    );
-    assert!(output.status.success());
-    let task2_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "-t",
-            "Create login UI",
-            "--label",
-            crate::type_label(&temp.taxonomy, 4).as_str(),
-            "--label",
-            epic_label.as_str(),
-            "--label",
-            component_frontend.as_str(),
-            "--priority",
-            "normal",
-        ],
-    );
-    assert!(output.status.success());
-    let task3_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    // ========================================================================
-    // PHASE 2: Add Dependencies
-    // ========================================================================
-
-    // Epic depends on all tasks
-    run_jit(&temp, &["dep", "add", &epic_id, &task1_id]);
-    run_jit(&temp, &["dep", "add", &epic_id, &task2_id]);
-    run_jit(&temp, &["dep", "add", &epic_id, &task3_id]);
-
-    // Milestone depends on epic
-    run_jit(&temp, &["dep", "add", &milestone_id, &epic_id]);
-
-    // ========================================================================
-    // PHASE 3: Query by Labels
-    // ========================================================================
-
-    // Query exact match: milestone:v1.0
-    let output = run_jit(
-        &temp,
-        &["query", "all", "--label", milestone_label.as_str()],
-    );
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&milestone_id), "Should find milestone");
-    assert!(
-        stdout.contains(&epic_id),
-        "Should find epic with milestone:v1.0"
-    );
-    assert!(
-        !stdout.contains(&task1_id),
-        "Tasks don't have milestone label"
-    );
-
-    // Query wildcard for the level-two membership namespace.
-    let epic_wildcard = format!("{epic_namespace}:*");
-    let output = run_jit(&temp, &["query", "all", "--label", epic_wildcard.as_str()]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&epic_id), "Should find the level-two issue");
-    assert!(
-        stdout.contains(&task1_id),
-        "Should find task with epic:auth"
-    );
-    assert!(
-        stdout.contains(&task2_id),
-        "Should find task with epic:auth"
-    );
-    assert!(
-        stdout.contains(&task3_id),
-        "Should find task with epic:auth"
-    );
-    assert!(
-        !stdout.contains(&milestone_id),
-        "Milestone has no epic:* label"
-    );
-
-    // Query by component
-    let output = run_jit(
-        &temp,
-        &["query", "all", "--label", component_backend.as_str()],
-    );
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&task1_id));
-    assert!(stdout.contains(&task2_id));
-    assert!(!stdout.contains(&task3_id), "Task 3 is frontend");
-
-    // ========================================================================
-    // PHASE 4: Strategic View
-    // ========================================================================
-
-    // Query strategic issues - returns issues with type:X where X is a strategic type
-    // In default hierarchy: milestone (level 1) and epic (level 2) are strategic
-    // Task (level 4) is NOT strategic, even if it has epic:auth labels
-    let output = run_jit(&temp, &["query", "strategic"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Strategic issues (type:milestone and type:epic)
-    assert!(
-        stdout.contains(&milestone_id),
-        "The level-one issue is strategic"
-    );
-    assert!(
-        stdout.contains(&epic_id),
-        "The level-two issue is strategic"
-    );
-
-    // Tasks are NOT strategic (level 4 in hierarchy)
-    assert!(
-        !stdout.contains(&task1_id),
-        "The level-four type is not strategic"
-    );
-    assert!(
-        !stdout.contains(&task2_id),
-        "The level-four type is not strategic"
-    );
-    assert!(
-        !stdout.contains(&task3_id),
-        "The level-four type is not strategic"
-    );
-
-    // Verify namespace configuration exists
-    let output = run_jit(&temp, &["label", "namespaces", "--json"]);
-    let json: serde_json::Value =
-        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
-
-    // Check new structure: namespaces should be array of strings
-    assert!(json["namespaces"].is_array());
-    assert!(json["count"].is_number());
-    let namespaces = json["namespaces"].as_array().unwrap();
-    let namespace_names: Vec<String> = namespaces
-        .iter()
-        .map(|v| v.as_str().unwrap().to_string())
-        .collect();
-    assert!(namespace_names.contains(&component_namespace.to_string()));
-    assert!(namespace_names.contains(&milestone_namespace.to_string()));
-    assert!(namespace_names.contains(&epic_namespace.to_string()));
-
-    // ========================================================================
-    // PHASE 5: Validation
-    // ========================================================================
-
-    // Validate repository (should pass with no errors)
-    let output = run_jit(&temp, &["validate"]);
-    assert!(
-        output.status.success(),
-        "Validation failed: {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains("valid"),
-        "Expected validation success message, got: {}",
-        stdout
-    );
-
-    // ========================================================================
-    // PHASE 6: Label Namespace Operations
-    // ========================================================================
-
-    // List label namespaces
-    let output = run_jit(&temp, &["label", "namespaces"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains(milestone_namespace),
-        "Should have milestone namespace"
-    );
-    assert!(
-        stdout.contains(epic_namespace),
-        "Should have epic namespace"
-    );
-    assert!(
-        stdout.contains(component_namespace),
-        "Should have component namespace"
-    );
-
-    // List values for a namespace
-    let output = run_jit(&temp, &["label", "values", epic_namespace]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("auth"), "Should list auth value");
-
-    // ========================================================================
-    // PHASE 7: Work Flow - Complete Tasks and Check Blocking
-    // ========================================================================
-
-    // Milestone should be blocked (depends on epic)
-    let output = run_jit(&temp, &["query", "blocked"]);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains(&milestone_id),
-        "Milestone should be blocked"
-    );
-
-    // Epic should also be blocked (depends on tasks)
-    assert!(stdout.contains(&epic_id), "Epic should be blocked");
-
-    // Tasks should be ready (no dependencies)
-    let output = run_jit(&temp, &["query", "available"]);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&task1_id), "Task 1 should be ready");
-    assert!(stdout.contains(&task2_id), "Task 2 should be ready");
-    assert!(stdout.contains(&task3_id), "Task 3 should be ready");
-
-    // Complete all tasks
-    run_jit(&temp, &["issue", "update", &task1_id, "--state", "done"]);
-    run_jit(&temp, &["issue", "update", &task2_id, "--state", "done"]);
-    run_jit(&temp, &["issue", "update", &task3_id, "--state", "done"]);
-
-    // Epic should now be unblocked
-    let output = run_jit(&temp, &["query", "available"]);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&epic_id), "Epic should now be ready");
-
-    // Complete epic
-    run_jit(&temp, &["issue", "update", &epic_id, "--state", "done"]);
-
-    // Milestone should now be unblocked
-    let output = run_jit(&temp, &["query", "available"]);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains(&milestone_id),
-        "Milestone should now be ready"
-    );
-
-    // ========================================================================
-    // PHASE 8: Event Log Verification
-    // ========================================================================
-
-    // Check event log contains label operations
-    let output = run_jit(&temp, &["events", "tail"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Should contain issue creation events
-    assert!(
-        stdout.contains(&milestone_id),
-        "Event log should mention milestone"
-    );
-    assert!(stdout.contains(&epic_id), "Event log should mention epic");
-
-    // ========================================================================
-    // PHASE 9: Graph Visualization with Labels
-    // ========================================================================
-
-    // Show dependency graph for epic (graph show removed, use graph deps)
-    let output = run_jit(&temp, &["graph", "deps", &epic_id]);
-    assert!(
-        output.status.success(),
-        "graph deps failed: {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    // Show downstream of milestone (should show issues that depend on milestone)
-    // Note: In the dependency graph, milestone depends on epic and tasks
-    // So milestone has NO downstream dependents (nothing depends on the milestone)
-    // Let's check downstream of a task instead (epic depends on tasks).
-    // Use --depth 0 to opt-in to unbounded traversal and see transitive dependents.
-    let output = run_jit(&temp, &["graph", "downstream", &task1_id, "--depth", "0"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains(&epic_id),
-        "Epic depends on task1, so should be downstream"
-    );
-
-    // Milestone also transitively depends on task1 (milestone -> epic -> task1)
-    assert!(
-        stdout.contains(&milestone_id),
-        "Milestone transitively depends on task1"
-    );
-}
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::{
+    membership_label, membership_namespace, setup_test_repo_with_taxonomy, type_label, TaxonomyRepo,
+};
 
 // ============================================================================
 // E2E Test: Label Validation and Fixing
@@ -424,90 +11,65 @@ fn test_label_hierarchy_complete_workflow() {
 
 #[test]
 fn test_label_validation_workflow() {
-    let temp = setup_test_repo();
-    let task_type = crate::type_label(&temp.taxonomy, 4);
-    let epic_type = crate::type_label(&temp.taxonomy, 2);
-    let epic_membership = crate::membership_label(&temp.taxonomy, 2, "test");
-    let nonexistent_membership = crate::membership_label(&temp.taxonomy, 2, "nonexistent");
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let task_type = type_label(&taxonomy, 4);
+    let epic_type = type_label(&taxonomy, 2);
+    let epic_membership = membership_label(&taxonomy, 2, "test");
+    let nonexistent_membership = membership_label(&taxonomy, 2, "nonexistent");
 
     // Create issue with correct type label
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
+    let task_id = cli
+        .create_issue([
             "-t",
             "Test Task",
             "--label",
             task_type.as_str(),
             "--label",
             epic_membership.as_str(),
-        ],
-    );
-    assert!(output.status.success());
-    let task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+        ])
+        .unwrap();
 
     // Create an actual epic issue that the task references
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
+    let epic_id = cli
+        .create_issue([
             "-t",
             "Test Epic",
             "--label",
             epic_type.as_str(),
             "--label",
             epic_membership.as_str(),
-        ],
-    );
-    assert!(output.status.success());
-    let epic_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+        ])
+        .unwrap();
 
     // Connect the task to the epic via dependency
-    let output = run_jit(&temp, &["dep", "add", &task_id, &epic_id]);
-    assert!(output.status.success());
+    cli.run(["dep", "add", &task_id, &epic_id]).unwrap();
 
     // Validation should pass (correct type, valid membership reference)
-    let output = run_jit(&temp, &["validate"]);
-    assert!(
-        output.status.success(),
-        "Validation should pass: {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    cli.run(["validate"]).expect("Validation should pass");
 
     // Create issue with invalid membership reference (epic:nonexistent)
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
+    let orphan_task_id = cli
+        .create_issue([
             "-t",
             "Orphan Task",
             "--label",
             task_type.as_str(),
             "--label",
             nonexistent_membership.as_str(),
-        ],
-    );
-    assert!(output.status.success());
-    let orphan_task_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+        ])
+        .unwrap();
 
     // Connect the orphan task to the epic to avoid isolated node validation error
-    let output = run_jit(&temp, &["dep", "add", &orphan_task_id, &epic_id]);
-    assert!(output.status.success());
+    cli.run(["dep", "add", &orphan_task_id, &epic_id]).unwrap();
 
     // Note: Validation currently does NOT fail for orphaned membership references
     // This is by design - epic:nonexistent is a valid label format, just no issue with type:epic and epic:nonexistent exists
     // This is a warning-level validation, not an error
     // The test is updated to reflect current behavior
-    let output = run_jit(&temp, &["validate"]);
     // Validation passes (format is correct, orphaned references are warnings not errors)
-    assert!(
-        output.status.success(),
-        "Validation should pass (orphaned references are warnings): {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    cli.run(["validate"])
+        .expect("Validation should pass (orphaned references are warnings)");
 }
 
 // ============================================================================
@@ -516,28 +78,14 @@ fn test_label_validation_workflow() {
 
 #[test]
 fn test_label_operations_json_output() {
-    let temp = setup_test_repo();
-    let task_type = crate::type_label(&temp.taxonomy, 4);
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let task_type = type_label(&taxonomy, 4);
 
     // Create issue with labels and get JSON output
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "-t",
-            "Test",
-            "--label",
-            task_type.as_str(),
-            "--json",
-        ],
-    );
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Should be valid JSON
-    let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output should be valid JSON");
+    let json = cli
+        .run_json(["issue", "create", "-t", "Test", "--label", &task_type])
+        .unwrap();
 
     // Should contain labels field
     assert!(json["labels"].is_array(), "JSON should have labels array");
@@ -547,24 +95,15 @@ fn test_label_operations_json_output() {
     );
 
     // Query with JSON output
-    let output = run_jit(&temp, &["query", "strategic", "--json"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Query output should be valid JSON");
+    let json = cli.run_json(["query", "strategic"]).unwrap();
     assert!(json.is_array() || json.is_object());
 
     // List namespaces with JSON output
-    let output = run_jit(&temp, &["label", "namespaces", "--json"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Namespaces output should be valid JSON");
+    let json = cli.run_json(["label", "namespaces"]).unwrap();
     assert!(
         json["namespaces"].is_array(),
         "Should have namespaces array"
     );
-    assert!(json["count"].is_number(), "Should have count field");
 }
 
 // ============================================================================
@@ -573,23 +112,24 @@ fn test_label_operations_json_output() {
 
 #[test]
 fn test_type_hierarchy_warnings() {
-    let temp = setup_test_repo();
-    let epic_type = crate::type_label(&temp.taxonomy, 2);
-    let task_type = crate::type_label(&temp.taxonomy, 4);
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let epic_type = type_label(&taxonomy, 2);
+    let task_type = type_label(&taxonomy, 4);
 
     // Create a strategic issue (epic) without strategic label
     // This should trigger a warning about missing epic:* label
-    let output = run_jit(
-        &temp,
-        &[
+    let output = cli
+        .command([
             "issue",
             "create",
             "-t",
             "Epic Without Label",
             "--label",
-            epic_type.as_str(),
-        ],
-    );
+            &epic_type,
+        ])
+        .output()
+        .unwrap();
 
     // Should succeed but with warning (unless --force is used)
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -599,39 +139,44 @@ fn test_type_hierarchy_warnings() {
 
     if !output.status.success() {
         // If it fails, try with --force
-        let output = run_jit(
-            &temp,
-            &[
-                "issue",
-                "create",
-                "-t",
-                "Epic Without Label",
-                "--label",
-                epic_type.as_str(),
-                "--force",
-            ],
-        );
-        assert!(output.status.success(), "Should succeed with --force flag");
-    }
-
-    // Create an orphaned task (no epic or milestone label)
-    let output = run_jit(
-        &temp,
-        &[
+        cli.run([
             "issue",
             "create",
             "-t",
-            "Orphaned Task",
+            "Epic Without Label",
             "--label",
-            task_type.as_str(),
-            "--orphan",
-        ],
-    );
+            &epic_type,
+            "--force",
+        ])
+        .expect("Should succeed with --force flag");
+    }
 
-    // Should succeed with --orphan flag
-    assert!(
-        output.status.success(),
-        "Should succeed with --orphan flag: {:?}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    // Create an orphaned task (no epic or milestone label); orphans are allowed.
+    cli.run([
+        "issue",
+        "create",
+        "-t",
+        "Orphaned Task",
+        "--label",
+        &task_type,
+    ])
+    .expect("an orphaned task is created");
+}
+
+#[test]
+fn test_label_values_lists_the_namespace_values_in_use() {
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let namespace = membership_namespace(&taxonomy, 3);
+    cli.create_issue([
+        "-t",
+        "Task",
+        "--label",
+        &membership_label(&taxonomy, 3, "backend"),
+    ])
+    .unwrap();
+
+    let values = cli.run_json(["label", "values", namespace]).unwrap();
+
+    assert_eq!(values["values"], serde_json::json!(["backend"]));
 }

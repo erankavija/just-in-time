@@ -105,6 +105,25 @@ pub fn parse_label(label: &str) -> Result<(String, String)> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
+/// The `resolution:<reason>` label recording why an issue was rejected.
+///
+/// # Errors
+///
+/// Returns [`InvalidArgumentError`](crate::errors::InvalidArgumentError) naming
+/// the label-format constraint when `reason` cannot form a valid label value.
+pub fn resolution_label(reason: &str) -> Result<String> {
+    let label = format!("resolution:{reason}");
+    if label_regex().is_match(&label) {
+        return Ok(label);
+    }
+    Err(crate::errors::InvalidArgumentError::new(format!(
+        "--reason {reason:?} cannot form a valid label ('{label}'): a label value starts \
+         with a letter or digit and contains only letters, digits, '.', '_', '/' and '-' \
+         (@/invariant/label-format)"
+    ))
+    .into())
+}
+
 /// Suggest a corrected label format for common mistakes
 fn suggest_label_fix(label: &str) -> Option<String> {
     // No colon: suggest adding namespace
@@ -233,19 +252,6 @@ pub fn label_matches(label: &str, pattern: &str) -> bool {
     matches_pattern(&[label.to_string()], pattern)
 }
 
-/// Validate assignee format
-///
-/// Assignees must follow the format `type:identifier` (e.g., `agent:copilot`, `user:alice`)
-pub fn validate_assignee_format(assignee: &str) -> Result<()> {
-    // Single source of truth for the `{type}:{identifier}` split lives in
-    // `Assignee::from_str`; this is the thin `anyhow`-returning adapter for
-    // callers that only need to validate (not retain) the parsed value.
-    assignee
-        .parse::<crate::domain::Assignee>()
-        .map(|_| ())
-        .map_err(|e| anyhow!(e.to_string()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,6 +261,21 @@ mod tests {
             e.downcast_ref::<crate::errors::InvalidLabelPatternError>()
                 .is_some()
         })
+    }
+
+    #[test]
+    fn test_resolution_label_accepts_a_token_and_refuses_what_cannot_form_a_label() {
+        assert_eq!(resolution_label("wont-fix").unwrap(), "resolution:wont-fix");
+        for reason in ["", "not needed", "Won't fix: dup.", "-lead", "a:b", "über"] {
+            let error = resolution_label(reason).unwrap_err();
+            assert!(
+                error
+                    .downcast_ref::<crate::errors::InvalidArgumentError>()
+                    .is_some(),
+                "{reason:?} not refused as an invalid argument"
+            );
+            assert!(error.to_string().contains("label-format"));
+        }
     }
 
     #[test]
@@ -435,33 +456,6 @@ mod tests {
         let suggestion = suggest_label_fix("ns:val:extra");
         assert!(suggestion.is_some());
         assert!(suggestion.unwrap().contains("one colon"));
-    }
-
-    #[test]
-    fn test_validate_assignee_format_valid() {
-        assert!(validate_assignee_format("agent:copilot").is_ok());
-        assert!(validate_assignee_format("user:alice").is_ok());
-        assert!(validate_assignee_format("team:platform").is_ok());
-    }
-
-    #[test]
-    fn test_validate_assignee_format_invalid_no_colon() {
-        let result = validate_assignee_format("invalid");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("type:identifier"));
-    }
-
-    #[test]
-    fn test_validate_assignee_format_invalid_empty() {
-        let result = validate_assignee_format("");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("empty"));
-    }
-
-    #[test]
-    fn test_validate_assignee_format_invalid_empty_parts() {
-        assert!(validate_assignee_format(":identifier").is_err());
-        assert!(validate_assignee_format("type:").is_err());
     }
 
     // Tests for is_type_label

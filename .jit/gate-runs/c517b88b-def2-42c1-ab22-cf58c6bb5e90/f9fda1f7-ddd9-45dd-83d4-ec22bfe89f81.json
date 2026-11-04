@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d9dd562476d1c473e76a45a1cbb698e1f4def7b7",
+  "completed_at": "2026-11-04T17:25:19.441775531Z",
+  "duration_ms": 232582,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; the prior retry-stability finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c517b88b-def2-42c1-ab22-cf58c6bb5e90",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f9fda1f7-ddd9-45dd-83d4-ec22bfe89f81",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T17:21:26.859763366Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5c5d4fe2d, 69bc3edec (`jit:c517b88b`)\nPolicy sources: AGENTS.md; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/config.toml\nResolved items: @/charter/D-17, @/charter/D-22, @/invariant/event-log, @/issue/b697a3f7/requirement/REQ-23, @/invariant/orthogonal-tests, @/invariant/essential-code-prose\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T17:19:55Z)\nTruncation recovery: Re-read affected patches, callers, captures, storage paths, tests, and documentation in bounded calls\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; the prior retry-stability finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

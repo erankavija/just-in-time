@@ -230,7 +230,6 @@ impl RepoWriteLock {
             return Ok(RepoWriteGuard {
                 lock: Arc::clone(self),
                 predecessor_guard,
-                outermost: false,
             });
         }
 
@@ -289,7 +288,6 @@ impl RepoWriteLock {
         Ok(RepoWriteGuard {
             lock: Arc::clone(self),
             predecessor_guard,
-            outermost: true,
         })
     }
 
@@ -323,15 +321,6 @@ impl RepoWriteLock {
 pub struct RepoWriteGuard {
     lock: Arc<RepoWriteLock>,
     predecessor_guard: Option<Box<RepoWriteGuard>>,
-    outermost: bool,
-}
-
-impl RepoWriteGuard {
-    /// Whether this acquisition took the underlying file lock rather than
-    /// re-entering a lock already held by this thread.
-    pub fn is_outermost(&self) -> bool {
-        self.outermost
-    }
 }
 
 impl Drop for RepoWriteGuard {
@@ -483,7 +472,12 @@ mod tests {
         );
 
         let guard = dependent.acquire().unwrap();
-        assert!(guard.is_outermost());
+        let competing_repository =
+            RepoWriteLock::for_storage_root(temp.path().join(".jit"), Duration::from_millis(100));
+        assert!(
+            competing_repository.acquire().is_err(),
+            "dependent guard must hold its repository lock"
+        );
         assert!(
             competing_predecessor.acquire().is_err(),
             "dependent guard must retain its predecessor"

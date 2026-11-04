@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "12168d3583305d46cabc9af99edbcb0adbc0cb11",
+  "completed_at": "2026-11-04T03:19:08.369345510Z",
+  "duration_ms": 96789,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue’s per-issue gate-run storage layout is accurately and concisely documented in its canonical references.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "1630015d-101d-4e1b-bc3a-da1026998588",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e7d8b4f7-5007-4b82-8fac-359b90c9cfcf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T03:17:31.579601192Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` (maximum hierarchy level), with no resolved children. Reviewed separately tagged commits `9bd45093a` and `1a0527051`; only the former changes adopter documentation. Current storage references accurately describe the per-issue gate-run layout at [storage-records.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-records.md:61) and [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:26). No documentation-impact defects found.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s per-issue gate-run storage layout is accurately and concisely documented in its canonical references.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

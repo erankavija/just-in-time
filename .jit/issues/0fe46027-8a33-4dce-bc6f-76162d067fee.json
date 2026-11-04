@@ -1,19 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:56.977365702Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "93aaba24-09a4-40b4-993a-de08baf9b4e9",
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
   ],
-  "description": "The dependency arms build payloads inline and label every dependency failure with one fallback code. This moves `dep add` and `dep rm` to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `DepCommands::Add` and `DepCommands::Rm` build success bodies with `json!` and, under `--json`, report any failure as `DEPENDENCY_ERROR` (exit 3) while the human path uses the classifier, so a cycle exits 3 under `--json` and 4 (`CYCLE_DETECTED`) without it. Batch `dep add` routes rejections through `dep_add_batch_json_error` and `dependency_batch_error_code`. Both leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `dep add` and `dep rm` to a handler in `crates/jit/src/dispatch/dep.rs`, and `main.rs` keeps no arm body, `dep_add_batch_json_error` or `dependency_batch_error_code`.\n- [hard] REQ-02: Each leaf returns its registered output-owned response type, and the schema names that type for both leaves.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that a cyclic `dep add` under `--json` reports `CYCLE_DETECTED` with exit 4 where it reported `DEPENDENCY_ERROR` with exit 3, and that batch rejections carry the classifier-derived details.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "The dependency arms build payloads inline and label every dependency failure with one fallback code. This moves `dep add` and `dep rm` to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `DepCommands::Add` and `DepCommands::Rm` build success bodies with `json!` and, under `--json`, report any failure as `DEPENDENCY_ERROR` (exit 3) while the human path uses the classifier, so a cycle exits 3 under `--json` and 4 (`CYCLE_DETECTED`) without it. Batch `dep add` routes rejections through `jit::output::failure::dependency_batch_json_error` and `dependency_batch_error_code` in `crates/jit/src/output/failure.rs`. Both leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `dep add` and `dep rm` to a handler in `crates/jit/src/dispatch/dep.rs`, and `main.rs` keeps no arm body, `dep_add_batch_json_error` or `dependency_batch_error_code`.\n- [hard] REQ-02: Each leaf returns its registered output-owned response type, and the schema names that type for both leaves.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that a cyclic `dep add` under `--json` reports `CYCLE_DETECTED` with exit 4 where it reported `DEPENDENCY_ERROR` with exit 3, and that batch rejections carry the classifier-derived details.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:38:20.573305123Z",
+  "first_ready_at": "2026-11-03T23:08:00.934628873Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cd16c740-3960-4ba4-91fb-69a21140e7e9",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.859614276Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8afebd39-0fb6-4014-a1c8-5427ac610931",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:31:32.963699684Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "82ac2f5d-ce56-431b-b450-035af7429ae0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.989063619Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0fe46027-8a33-4dce-bc6f-76162d067fee",
   "labels": [
     "type:task",
@@ -29,7 +51,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Dependency commands move to library handlers",
-  "updated_at": "2026-10-21T10:40:10.777988526Z"
+  "updated_at": "2026-11-04T09:38:20.573305123Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6e18820676f30f4f4f75322e7fecd5c17b87681c",
+  "completed_at": "2026-10-28T22:09:07.036040293Z",
+  "duration_ms": 148264,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact findings: all scoped tests obtain created IDs through the shared JSON-backed fixture, retain their asserted behaviors, and use isolated temporary repositories.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b305e55e-c4b4-429f-8a0d-b4d0f40e30fc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1ecf7b38-5962-4395-b0ac-35978ae71eae",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:06:38.771316087Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: no reachable `jit:b305e55e` commits; fallback to issue intent and six scoped test files\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-06 (issue criteria); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed at 2026-10-28T22:06:36Z (exit code unavailable)\nTruncation recovery: re-read affected files in bounded path/range calls and re-queried policy items directly\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact findings: all scoped tests obtain created IDs through the shared JSON-backed fixture, retain their asserted behaviors, and use isolated temporary repositories.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

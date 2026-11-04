@@ -51,6 +51,10 @@ what those modules exist to do. When a behavior in `domain/` or `graph/` is hard
 without a filesystem, that is a signal that side effects have leaked out of the storage
 boundary.
 
+A property of the `IssueStore` contract is a case in
+`crates/jit/src/storage/issue_store_conformance.rs`, which runs every case against every
+backend; a backend's own tests cover only what that backend adds.
+
 Run them with `cargo test --lib`.
 
 ### Property-Based Tests
@@ -65,7 +69,7 @@ counterexample across generated inputs.
 | `crates/jit/src/graph/mod.rs` | Unlimited traversal equals the transitive dependency set; cycle detection reports none for DAGs |
 | `crates/jit/src/graph/hierarchy.rs` | Resolution invariants hold on arbitrary DAGs; resolution is order-invariant |
 | `crates/jit/src/domain/type_taxonomy.rs` | Type-name extraction normalizes consistently; invalid labels are rejected |
-| `crates/jit/src/storage/claim_coordinator_proptests.rs` | Index rebuild is idempotent and lossless; lease counts stay consistent; sequence numbers increase monotonically; concurrent claims stay exclusive |
+| `crates/jit/src/storage/claim_coordinator_proptests.rs` | Lease counts stay consistent; sequence numbers increase monotonically; concurrent claims stay exclusive; staleness and recovery agree |
 | `crates/jit/tests/fast_docs_templates/template_apply_tests.rs` | Template application yields an acyclic, transitively reduced graph; force-refresh is idempotent over nodes and edges |
 | `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` | Stored readiness agrees with the graph-derived blocked predicate after any sequence of dependency additions and removals |
 | `crates/jit/tests/fast_issue/short_hash_tests.rs` | Any unique prefix resolves to its issue; shared prefixes are reported as ambiguous |
@@ -78,12 +82,35 @@ suite module that owns the property). Commit them: they are regression tests.
 Write a property test when you can name an invariant that must hold for all inputs. Write an
 example test when you care about one specific input.
 
+### Claim Coordination Coverage
+
+`crates/jit/src/storage/claim_coordinator_proptests.rs` owns these properties:
+
+- `test_lease_count_invariant` and `test_sequence_numbers_monotonic` check stored
+  lease counts and audit sequence order.
+- `test_concurrent_claims_exclusive` and `test_concurrent_different_issues_succeed`
+  check that competing agents get one lease per issue and can claim distinct issues.
+- `test_staleness_consistent_with_threshold`,
+  `test_evict_lapsed_reclaims_an_indefinite_lease_iff_it_is_stale`, and
+  `test_finite_leases_never_stale` check heartbeat staleness and reclamation.
+
+Coordinator tests in `crates/jit/src/storage/claim_coordinator.rs` cover per-issue
+storage (`test_lease_lock_apply_stores_each_lease_as_its_issue_record_only`),
+history-independent reads
+(`test_lease_lock_loads_lists_and_applies_without_the_claims_index_or_log_history`),
+and expiry and reclamation
+(`test_evict_lapsed_logs_one_record_per_lease_and_counts_each_cause_apart`).
+`crates/jit/src/storage/claim_coordinator_interruption_tests.rs` owns the failure
+matrix in `test_lease_lock_apply_interrupted_at_any_step_leaves_the_prior_or_the_next_lease`.
+Listing behavior is covered in `crates/jit/src/commands/claim.rs` by
+`test_list_and_status_omit_expired_and_mark_stale_leases_without_a_lock_or_a_write`.
+
 ## 2. Harness Tests
 
 Location: `crates/jit/src/test_harness.rs` (the harness, a `jit` library module gated on
 `cfg(any(test, feature = "test-support"))` so it compiles once for every target) and the
 in-process suites that use it, such as
-`crates/jit/tests/fast_docs_templates/harness_demo.rs`.
+`crates/jit/tests/fast_issue/test_no_coordinator.rs`.
 
 `TestHarness` backs a real `CommandExecutor` with `InMemoryStorage`, so a test drives command
 logic end to end in the calling process, with issue state held in memory. Each harness gets
@@ -104,29 +131,30 @@ impl TestHarness {
     pub fn with_item_kinds(self) -> Self;
 
     // Issue creation helpers
-    pub fn create_issue(&self, title: &str) -> String;
-    pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> String;
-    pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String;
-    pub fn create_ready_issue(&self, title: &str) -> String;
-    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String;
+    pub fn create_issue(&self, title: &str) -> IssueId;
+    pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> IssueId;
+    pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> IssueId;
+    pub fn create_ready_issue(&self, title: &str) -> IssueId;
+    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<GateKey>) -> IssueId;
 
     // Gate setup
-    pub fn add_gate(&self, key: &str, title: &str, description: &str, mode: GateMode, checker: Option<GateChecker>);
+    pub fn add_gate(&self, key: &GateKey, title: &str, description: &str, mode: GateMode, checker: Option<GateChecker>);
 
     // Queries
     pub fn all_issues(&self) -> Vec<Issue>;
-    pub fn get_issue(&self, id: &str) -> Issue;
+    pub fn get_issue(&self, id: &IssueId) -> Issue;
 }
 
 impl Default for TestHarness { /* delegates to new() */ }
 ```
 
-`new()` initializes the storage and enables test mode. The helpers cover the common
+`new()` initializes the storage. The helpers cover the common
 shapes; anything else goes through `h.executor` (any command) or `h.storage` (direct
 `IssueStore` calls).
 
-`with_item_kinds()` writes the canonical `[item_kinds]` table into the harness repo's
-`config.toml`. The engine bakes in no item kinds (`@/inv/domain-agnostic`), so a test that
+`with_item_kinds()` writes the shipped `[item_kinds]` table into the harness repo's
+`config.toml`, derived from `profiles/jit-default/manifest.toml` by
+`test_utils::shipped_item_kinds_toml()`; a test never restates a shipped kind. The engine bakes in no item kinds (`@/inv/domain-agnostic`), so a test that
 exercises addressable items, item indexing, or link resolution must opt in. Call it on the
 harness before creating issues:
 
@@ -140,30 +168,14 @@ A suite that runs in-process imports the shared harness from the `jit` library:
 
 ```rust
 use jit::test_harness::TestHarness;
-
-#[test]
-fn test_harness_query_ready() {
-    let h = TestHarness::new();
-
-    let ready_id = h.create_ready_issue("Ready task");
-    let assigned_id = h.create_ready_issue("Assigned task");
-    h.executor
-        .claim_issue(&assigned_id, "agent:worker-1".to_string())
-        .unwrap();
-
-    let ready = h.executor.query_ready().unwrap();
-
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, ready_id);
-}
 ```
 
-Harness tests in `fast_docs_templates/harness_demo.rs` cover queries, the issue lifecycle,
-dependency blocking and cycle detection, gates, container rollups, item resolution, response
-projections, and behavior at scale.
+`test_issue_lifecycle_works_without_coordinator` in `fast_issue/test_no_coordinator.rs` is a
+worked example: it creates, updates, claims and releases an issue through `h.executor`, and
+asserts the stored result.
 
-Run the whole suite with `cargo test --test fast_docs_templates`, or just the demo module
-with `cargo test --test fast_docs_templates harness_demo`.
+Run the whole suite with `cargo test --test fast_issue`, or one module with
+`cargo test --test fast_issue test_no_coordinator`.
 
 ## 3. Integration Tests
 
@@ -219,12 +231,19 @@ New and migrated CLI tests spawn `jit` through `jit::test_cli::JitCli`, the one 
 subprocess fixture. It owns a temporary repository (`uninitialised()`, `initialised()` by
 `jit init`, or `with_repository(TempDir)` for one built by shared test support) and removes it
 on drop. `command(args)` yields a `std::process::Command` for the target's `jit` with the
-repository as working directory, test mode on and every inherited `JIT_*` variable removed;
+repository as working directory and every inherited `JIT_*` variable removed;
 `command_with_env` sets a variable for that process alone, so tests keep `assert_cmd`'s
 assertion traits. `run` and `run_json` return stdout or parsed `--json` output,
 `create_issue` returns the created id from `--json`, and `init_git` (backed by
 `init_git_repository`, which in-process tests also call) initialises git with a fixed author
-identity and no dependence on global git configuration. A test that uses the fixture names no binary path,
+identity and no dependence on global git configuration. `git(args)` runs git under that same
+isolation and returns stdout, and `commit(message)` stages the working tree and commits it so
+`HEAD` resolves. `program_command(program, args)` spawns another program, such as a copy of
+the binary `jit_binary()` locates, under the environment `command` gives `jit`.
+`JitCli::linked_checkouts()` answers a `(primary, linked)` pair: a primary checkout
+initialised by git and `jit init` with one base commit and machine-local `.jit/` runtime
+state git-ignored, and a `git worktree add` checkout of it; both share one temporary
+directory, removed when the last of them drops. A test that uses the fixture names no binary path,
 `CARGO_BIN_EXE_jit` or `cargo_bin!`, and scrapes no human-readable output for ids.
 
 ```rust
@@ -242,6 +261,14 @@ fn test_create_and_query() {
 Reserve this layer for what only it can see: user-facing command contracts, `--json` envelope
 shapes, flag combinations, and regression tests for reported CLI bugs. Workflow coverage
 belongs in the harness layer, where it runs faster and fails more legibly.
+
+`crates/jit/tests/cli_query_graph/query_tests.rs` shows the reduced shape: each `query`
+subcommand and flag has one wiring case that proves the command reaches the domain query
+and applies its filter. Selection, priority order and blocked reasons belong to the pure
+functions in `crates/jit/src/domain/queries.rs`, including `query all` filter conjunction
+and readiness with unpassed required gates. The CLI cases use `JitCli`, the shared
+`TaxonomyRepo`, and issue ids from JSON output; alias and flag-placement cases cover parsing
+boundaries. Claim and release commands live in `cli_repo_workflow/claim_integration_tests.rs`.
 
 `crates/server/tests/` holds the equivalent layer for the web UI server crate, organized
 the same way: one `server_integration` suite whose `main.rs` declares the modules, covering
@@ -274,11 +301,11 @@ Test Costs" below attributes what the measured suite duration is spent on.
 
 The measurement is taken over a target the `suite-build` step has already built and read
 into the page cache, so a fresh target directory and a warm one reach the same verdict and
-a duration failure is about the tree (jit:0708d692). Anything the suite runs inside the clock,
-including the setup scripts `.config/nextest.toml` declares, must reuse the workspace build's
-Cargo resolution, or it compiles a second feature-unification variant mid-suite;
-`scratch_build/build_profile_policy_tests.rs` asserts this. What remains state-dependent is
-the suite's own first-run fixture construction, whose margin the budgets README records; see
+a duration failure is about the tree (jit:0708d692). The suite runs no nested Cargo build:
+`.config/nextest.toml` declares no setup script, which `scratch_build/build_profile_policy_tests.rs`
+asserts. Profiled-repository fixtures and the recorded-failure corpus are built inside the suite
+on first use from a cache keyed by their inputs. Their first-run construction contributes to
+the duration margin the budgets README records; see
 [dev/benchmarks/cold-warm-verdict-0708d692/README.md](benchmarks/cold-warm-verdict-0708d692/README.md)
 for the cold and warm figures behind this paragraph. Re-measuring needs `--force`, since
 `jit gate evaluate` reuses a recorded verdict over unchanged declared inputs, `target/` not
@@ -298,7 +325,10 @@ harness that produces both.
 - **Debug info** — `[profile.dev]`/`[profile.test]` in the workspace `Cargo.toml` set
   `debug = "line-tables-only"`: enough for line-number backtraces on a local failure, without
   embedding the full debugger payload (type info, macro expansions) that dominates a test
-  executable's size.
+  executable's size. `split-debuginfo = "unpacked"` moves debug information into separate
+  `.dwo` files; keep the build tree for source-line backtraces. The measured
+  size reduction and a panic reproduction are recorded in
+  [the build-budget derivation](benchmarks/rust-build-budgets/README.md).
 - **Dependency optimization** — `[profile.dev.package."*"]` sets `opt-level = 1`, so third-party
   crates are compiled optimized while workspace crates keep the debug profile's compile times.
   Level 1 is the measured selection over level 2, which ran no faster and cost about twice the
@@ -309,19 +339,18 @@ harness that produces both.
   `overflow-checks` still hold everywhere. The measured build cost of the override, against the
   matched unoptimized arm and both fixed 25% ceilings, is in
   [dev/benchmarks/dependency-profile-6d10e5d4/](benchmarks/dependency-profile-6d10e5d4/).
-- **Incremental compilation** — both profiles state `incremental = true` explicitly rather
-  than leaving Cargo's default undocumented, and that setting governs gate runs too:
-  `scripts/cargo-ci.sh` overrides it nowhere. The premise that it once did — that a gate run
-  compiles once and exits with no later rebuild to amortize against — does not hold for the
-  runs that dominate the repository's build cost. Every agent worktree run and every local
-  re-check reruns the gate against a warm target directory, where one edited crate recompiles
-  instead of the workspace, at no cost to a cold run. What it costs is disk, which the reclaim
-  path in the worktree dispatch protocol prunes. The measurements are under "Provenance" in
+- **Incremental compilation** — `[profile.dev]` keeps incremental compilation enabled for
+  interactive development. `[profile.test]` sets `incremental = false`, so ordinary workspace
+  test builds do not create incremental state under `target`; this policy is enforced by
+  `build_profile_policy_tests.rs` and does not depend on remembering a Cargo environment
+  override. The build-budget measurements and provenance are in
   [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
-- **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
-  `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
-  run that must bypass the cache. Opting an existing target directory into a wrapper changes
-  Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
+- **Shared compiler cache** — when `sccache` is on `PATH` and no wrapper is set,
+  `scripts/cargo-ci.sh` selects it as `RUSTC_WRAPPER`. Every wrapper the run uses, selected or
+  explicit, runs through `scripts/caller-tmpdir-wrapper.sh`, which restores the caller's `TMPDIR`
+  so a daemon it starts outlives the run's temporary directory. Set `CARGO_CI_NO_SCCACHE=1` for a
+  diagnostic run that must bypass the cache. Opting an existing target directory into a wrapper
+  changes Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
 - **Host-wide serialization** — gate and benchmark builds default to the shared
   `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`, allowing Cargo-heavy work in adjacent repositories
   to queue instead of competing for CPU and causing timeout-sensitive tests to become noisy.
@@ -420,13 +449,12 @@ must wait out a real connect-without-accept before it can conclude no one answer
 ### Property-based tests over real production code paths
 
 proptest's default is 256 generated cases per property. `crates/jit/src/storage/claim_coordinator_proptests.rs`
-runs its concurrency and rebuild properties against a real on-disk store, with real file
-locks and real threads per case. It sets `with_fsync(false)`: these properties verify index
-and rebuild invariants rather than crash durability, so the cost is the file and lock work
-itself. Its own comment records that each case creates a temp directory and does several
-real filesystem writes and reads, so the default 256 cases pushed these tests to seconds —
-and to minutes with fsync on — and it caps the file-touching properties at 64 cases while
-leaving the pure-logic ones at the default. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
+runs its coordination properties against a real on-disk store, with real file
+locks and, for concurrency cases, real threads. It sets `with_fsync(false)`:
+these properties verify lease counts, sequence order, exclusivity, and reclamation
+rather than crash durability, so the cost is the file and lock work
+itself. It bounds filesystem work with fewer generated cases while leaving pure-logic
+properties at the default case count. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
 and `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` run each case through a
 fresh in-memory `TestHarness`/`CommandExecutor` pipeline rather than a synthetic
 data structure, and cap at 48 cases for the same reason. Both caps trade case count for
@@ -435,15 +463,14 @@ files' own configuration comments for the exact rationale.
 
 | Test | Warm (ms) |
 | --- | ---: |
-| `storage::claim_coordinator::proptests::prop_concurrent_different_issues_succeed` | 3,008 |
-| `storage::claim_coordinator::proptests::prop_concurrent_claims_exclusive` | 2,931 |
+| `storage::claim_coordinator::proptests::test_concurrent_different_issues_succeed` | 3,008 |
+| `storage::claim_coordinator::proptests::test_concurrent_claims_exclusive` | 2,931 |
 | `template_apply_tests::prop_apply_yields_transitively_reduced_graph` | 2,430 |
 | `template_apply_tests::prop_force_refresh_is_idempotent_on_node_and_edge_set` | 2,420 |
 | `template_apply_tests::prop_apply_always_yields_acyclic_dag` | 2,262 |
 | `readiness_coherence_tests::prop_stored_readiness_agrees_with_the_blocked_predicate_after_dependency_edits` | 1,732 |
-| `storage::claim_coordinator::proptests::prop_sequence_numbers_monotonic` | 1,247 |
-| `storage::claim_coordinator::proptests::prop_lease_count_invariant` | 571 |
-| `storage::claim_coordinator::proptests::prop_no_data_loss_in_rebuild` | 524 |
+| `storage::claim_coordinator::proptests::test_sequence_numbers_monotonic` | 1,247 |
+| `storage::claim_coordinator::proptests::test_lease_count_invariant` | 571 |
 
 ### CLI subprocess publishing durable state
 
@@ -473,8 +500,6 @@ its committed run is [dev/benchmarks/publication-cost-722878d4/](benchmarks/publ
 | `repo_discovery_tests::test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd` | 980 |
 | `repo_discovery_tests::test_nested_profile_init_keeps_data_and_assets_in_child` | 944 |
 | `repo_discovery_tests::test_relative_data_root_override_keeps_worktree_assets_at_discovered_root` | 939 |
-| `label_hierarchy_e2e_test::test_label_hierarchy_complete_workflow` | 824 |
-| `workflow_tests::test_workflow_complex_epic` | 710 |
 | `cross_substrate_generality_tests::test_all_four_kinds_through_one_generic_path` | 621 |
 | `derived_state_repair_tests::test_cli_validate_fix_profile_provenance_failures_are_zero_write` | 543 |
 | `failure_probe_fixture::test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class` | 532 |
@@ -512,9 +537,7 @@ repair correctness across every owned class of a real profile package.
 
 `test_concurrent_fresh_profile_init_publishes_one_coherent_repository` races real threads
 through real initialization; `test_concurrent_writer_observes_failed_apply_preimage_then_publishes`
-does the same across a real write barrier. `test_rebuild_index_filters_expired_leases`
-acquires a lease with a real 1s TTL and sleeps 1.1s past it, because expiry is a real clock
-property, not a mocked one. `test_start_watching_ignores_events_jsonl` starts a real
+does the same across a real write barrier. `test_start_watching_ignores_events_jsonl` starts a real
 filesystem watcher and sleeps past its own real debounce window; it is compiled once into
 the `jit-server` crate's library test target and once into its binary target, so it runs —
 and is measured — twice.
@@ -522,7 +545,6 @@ and is measured — twice.
 | Test | Warm (ms) |
 | --- | ---: |
 | `commands::init::tests::test_concurrent_fresh_profile_init_publishes_one_coherent_repository` | 1,213 |
-| `storage::claim_coordinator::tests::test_rebuild_index_filters_expired_leases` | 1,111 |
 | `template_apply_atomicity_tests::test_concurrent_writer_observes_failed_apply_preimage_then_publishes` | 610 |
 | `watcher::tests::test_start_watching_ignores_events_jsonl` (library target) | 513 |
 | `watcher::tests::test_start_watching_ignores_events_jsonl` (binary target) | 512 |
@@ -540,22 +562,13 @@ and each scenario runs multiple real `jit` subprocess invocations.
 
 ### Deliberate at-scale tests
 
-`test_harness_scales_with_many_issues` is the harness suite's own worked example of
-behavior-at-scale coverage (see "2. Harness Tests" above): 100 real issue creations through
-the full command pipeline. `test_resolve_ambiguous` creates real issues the same way until
+`test_resolve_ambiguous` creates real issues through the full command pipeline until
 two land on the same 4-character id prefix — the property under test, ambiguous-prefix
 rejection, cannot be observed without a real collision.
-`test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` writes 257 real
-gate-run directories to disk, plus a real named pipe via `mkfifo` alongside a stray file and
-symlink, to prove the precheck's history capture holds at a real page-scale size rather than
-a handful of examples, and ignores clutter mixed into the same directory that is not itself
-a run.
 
 | Test | Warm (ms) |
 | --- | ---: |
-| `harness_demo::test_harness_scales_with_many_issues` | 2,154 |
 | `short_hash_tests::test_resolve_ambiguous` | 1,969 |
-| `commands::gate_check::tests::test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` | 517 |
 
 ### Repeated real gate execution
 
@@ -581,16 +594,12 @@ ran rather than what the sources appear to declare.
 
 ## Test Environment
 
-Three environment behaviors matter when writing tests:
+Two environment behaviors matter when writing tests:
 
-- **`JIT_TEST_MODE`** disables the git guards that global operations enforce in a live
-  repository: the branch-drift check against main history (`enforce_main_only_operations`) and the
-  claims-index validation inside `jit validate`. In-process tests call
-  `jit::test_mode::enable()` (`TestHarness::new()` does), which never touches the process
-  environment; tests that spawn the binary pass the variable with `Command::env`.
-- **Process-wide state** (environment variables, working directory) is changed only through
-  `EnvGuard` and `CurrentDirGuard` in `test_utils.rs`, which serialise access and restore the
-  prior value. `scratch_build/process_state_policy_tests.rs` rejects any other call.
+- **Process-wide state** (environment variables, working directory) is never changed, so tests
+  read it and run in parallel without a lock. A test that varies a value passes it explicitly
+  (`Command::env`, `Command::current_dir`, a function parameter, an absolute path).
+  `scratch_build/process_state_policy_tests.rs` rejects any call that changes this state.
 - **Selected doc examples** in `crates/jit/src/` compile and run under `cargo test --doc`.
   Keep them for non-obvious workflows and material contracts, not as one-per-public-API
   coverage: each snippet carries a separate rustdoc compilation cost. When an example is
@@ -605,8 +614,8 @@ cargo test
 # Unit tests only, fastest feedback
 cargo test --lib
 
-# Harness tests
-cargo test --test fast_docs_templates harness_demo
+# Harness tests, one module
+cargo test --test fast_issue test_no_coordinator
 
 # One integration suite, or one module within it
 cargo test --test cli_repo_workflow
@@ -616,7 +625,7 @@ cargo test --test cli_query_graph query_tests
 cargo test --doc
 
 # A single test by name
-cargo test test_harness_query_ready
+cargo test test_issue_lifecycle_works_without_coordinator
 
 # With stdout captured from passing tests
 cargo test -- --nocapture
@@ -662,7 +671,7 @@ cargo fmt --all -- --check
 2. **Start at the cheapest layer.** Unit test the function, harness test the workflow, and
    add an integration test only when the CLI surface itself is the thing under test.
 3. **Reach for a property test when you can state an invariant.** DAG operations, id
-   resolution, and idempotent rebuilds are the recurring candidates.
+   resolution, and lease exclusivity are recurring candidates.
 4. **Assert specifically.** Compare against expected values rather than checking that a
    collection is non-empty.
 
@@ -707,9 +716,10 @@ fn test_defer_issue_returns_issue_to_backlog() {
     // ...assertions on the returned value and on storage...
 }
 
-// 2. Harness test, in crates/jit/tests/fast_docs_templates/harness_demo.rs
+// 2. Harness test, in an in-process workflow suite such as
+//    crates/jit/tests/fast_issue/test_no_coordinator.rs
 #[test]
-fn test_harness_defer_issue() {
+fn test_defer_issue_returns_ready_issue_to_backlog() {
     let h = TestHarness::new();
     let id = h.create_ready_issue("Task");
 
@@ -738,4 +748,4 @@ fn test_cli_defer_issue() {
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md) - TDD guidelines and functional style
 - [docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md) - content standards for docs and issues
 - [crates/jit/src/test_harness.rs](../crates/jit/src/test_harness.rs) - the harness implementation
-- [crates/jit/tests/fast_docs_templates/harness_demo.rs](../crates/jit/tests/fast_docs_templates/harness_demo.rs) - worked harness examples
+- [crates/jit/tests/fast_issue/test_no_coordinator.rs](../crates/jit/tests/fast_issue/test_no_coordinator.rs) - worked harness examples

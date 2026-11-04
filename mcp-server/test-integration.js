@@ -9,14 +9,14 @@
  */
 
 import { execFile, spawn } from 'child_process';
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { promisify } from 'node:util';
 import { strict as assert } from 'node:assert';
 import { CURATION, getCommandByPath } from './lib/tool-generator.js';
 import { loadSchema } from './lib/schema-loader.js';
+import { JIT_BINARY } from './lib/jit-binary.js';
 
 const TIMEOUT = 5000;
 
@@ -24,9 +24,47 @@ const TIMEOUT = 5000;
 // instead of restating command shapes here.
 const { schema } = await loadSchema();
 
+// Repository vocabulary the guards below keep out of the bridge's prose. The
+// suite declares it in a fixture repository it creates and owns, so no
+// checkout's data root is read and the binary under test may be any storage
+// format.
+const FIXTURE_VOCABULARY = `
+[type_hierarchy]
+types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
+
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]", "[aspirational]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.decision]
+section = "decisions"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.risk]
+section = "risks"
+id-pattern = "RISK-[0-9]+"
+markers = []
+link-namespaces = ["mitigates", "resolves"]
+scope = "issue"
+source-of-truth = "markdown-first"
+`;
+
+const fixtureRepository = mkdtempSync(join(tmpdir(), 'jit-mcp-fixture-'));
+process.on('exit', () => rmSync(fixtureRepository, { recursive: true, force: true }));
+await promisify(execFile)(JIT_BINARY, ['init'], { cwd: fixtureRepository, timeout: TIMEOUT });
+appendFileSync(join(fixtureRepository, '.jit', 'config.toml'), FIXTURE_VOCABULARY);
+
 // Item kinds are repository configuration, not MCP vocabulary. Read the
-// repository's declaration so this guard never hardcodes this project's kinds.
-const itemKindsConfig = readFileSync(new URL('../.jit/config.toml', import.meta.url), 'utf8');
+// fixture's declaration so this guard never hardcodes any project's kinds.
+const itemKindsConfig = readFileSync(join(fixtureRepository, '.jit', 'config.toml'), 'utf8');
 const itemKinds = [...itemKindsConfig.matchAll(/^\[item_kinds\.([^\]]+)\]/gm)]
   .map(([, kind]) => kind);
 const itemKindForms = new Map();
@@ -60,8 +98,8 @@ function presentsConfiguredKindVocabulary(text) {
 // from whatever the repository declares instead of naming this project's.
 const declaredHierarchyTypes = Object.keys(
   JSON.parse(
-    (await promisify(execFile)('jit', ['config', 'get', 'type_hierarchy.types', '--json'], {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
+    (await promisify(execFile)(JIT_BINARY, ['config', 'get', 'type_hierarchy.types', '--json'], {
+      cwd: fixtureRepository,
       timeout: TIMEOUT,
     })).stdout
   ).value
@@ -97,20 +135,21 @@ function sourcesPackageFromRepository(text) {
   return /\bpackages?\b/i.test(text) && /\brepositor(?:y|ies)\b/i.test(text);
 }
 
-// Find tagged profile-origin shapes after the bridge has flattened the CLI
-// schema. Requiring both `source` and `location` keeps unrelated source fields
-// outside this lifecycle contract.
-function profileOriginSourceEnums(value) {
+// Find profile-origin schemas after the bridge has flattened the CLI schema.
+// Requiring `package_hash` or `status` beside `origin` keeps unrelated origin
+// fields outside this lifecycle contract.
+function profileOriginSchemas(value) {
   if (Array.isArray(value)) {
-    return value.flatMap(profileOriginSourceEnums);
+    return value.flatMap(profileOriginSchemas);
   }
   if (value === null || typeof value !== 'object') {
     return [];
   }
-  const local = value.properties?.source?.enum && value.properties?.location
-    ? [value.properties.source.enum]
+  const properties = value.properties;
+  const local = properties?.origin && (properties?.package_hash || properties?.status)
+    ? [properties.origin]
     : [];
-  return [...local, ...Object.values(value).flatMap(profileOriginSourceEnums)];
+  return [...local, ...Object.values(value).flatMap(profileOriginSchemas)];
 }
 
 // The checked-in profile-package fixture the profile tools are exercised over.
@@ -151,7 +190,8 @@ function stagePackage(repo, location, id, dependencies = []) {
 // ---------------------------------------------------------------------------
 
 class MCPTester {
-  constructor(responseMode = 'content') {
+  constructor(responseMode = 'content', extraEnv = {}) {
+    this.extraEnv = extraEnv;
     this.server = null;
     this.responseBuffer = '';
     this.pendingRequests = new Map();
@@ -162,8 +202,7 @@ class MCPTester {
   }
 
   async start() {
-    this.testDir = join(tmpdir(), `jit-mcp-integ-${Date.now()}`);
-    mkdirSync(this.testDir, { recursive: true });
+    this.testDir = mkdtempSync(join(tmpdir(), 'jit-mcp-integ-'));
 
     const serverPath = join(process.cwd(), 'index.js');
 
@@ -175,6 +214,7 @@ class MCPTester {
           ...process.env,
           JIT_ALLOW_DELETION: '1',
           JIT_MCP_RESPONSE_MODE: this.responseMode,
+          ...this.extraEnv,
         },
       });
 
@@ -444,19 +484,19 @@ async function main() {
       }
     });
 
-    await runTest('structured tools/list exposes only directory profile origins', async () => {
+    await runTest('structured tools/list publishes profile origins as directory paths', async () => {
       const structured = new MCPTester('structured');
       try {
         await structured.start();
         const listed = await structured.request('tools/list');
-        const profileOriginEnums = listed.result.tools
+        const origins = listed.result.tools
           .filter(tool => tool.name.startsWith('jit_profile_'))
-          .flatMap(tool => profileOriginSourceEnums(tool.outputSchema));
-        assert.ok(profileOriginEnums.length > 0,
+          .flatMap(tool => profileOriginSchemas(tool.outputSchema));
+        assert.ok(origins.length > 0,
           'flattened profile output schemas should expose the generated profile origin contract');
-        for (const sources of profileOriginEnums) {
-          assert.deepStrictEqual(sources, ['directory'],
-            'flattened profile output origins must expose only the repository-directory source');
+        for (const origin of origins) {
+          assert.strictEqual(origin.type, 'string',
+            'a flattened profile output origin must be the directory path string');
         }
       } finally {
         await structured.stop();
@@ -615,18 +655,13 @@ async function main() {
         const shown = await profileCall('jit_profile_show', {
           profile: [workflowLocation],
         });
-        assert.strictEqual(shown.count, 1);
-        assert.strictEqual(shown.profiles.length, shown.count);
+        assert.strictEqual(shown.profiles.length, 1);
         assert.strictEqual(shown.profiles[0].manifest.id, 'workflow');
-        assert.deepStrictEqual(shown.profiles[0].origin, {
-          source: 'directory',
-          location: workflowLocation,
-        });
+        assert.strictEqual(shown.profiles[0].origin, workflowLocation);
 
         const repeatedShown = await profileCall('jit_profile_show', {
           profile: [workflowLocation, workflowLocation],
         });
-        assert.strictEqual(repeatedShown.count, 2);
         assert.deepStrictEqual(
           repeatedShown.profiles.map(profile => profile.manifest.id),
           ['workflow', 'workflow']
@@ -639,8 +674,7 @@ async function main() {
           profile: [baseLocation],
           'dry-run': true,
         });
-        assert.strictEqual(basePreview.count, 1);
-        assert.strictEqual(basePreview.profiles.length, basePreview.count);
+        assert.strictEqual(basePreview.profiles.length, 1);
         assert.strictEqual(basePreview.profiles[0].status, 'would_apply');
 
         // An application reports the aggregate observations: dependency-only
@@ -648,7 +682,6 @@ async function main() {
         const applied = await profileCall('jit_profile_apply', {
           profile: [workflowLocation],
         });
-        assert.strictEqual(applied.count, applied.profiles.length);
         const appliedProfileIds = applied.profiles.map(profile => profile.id);
         const expectedProfileIds = [
           ...shown.profiles[0].manifest.dependency.map(dependency => dependency.id),
@@ -668,7 +701,6 @@ async function main() {
           profile: [workflowLocation],
           'dry-run': true,
         });
-        assert.strictEqual(preview.count, preview.profiles.length);
         const workflowPreview = preview.profiles.find(profile => profile.id === 'workflow');
         assert.ok(workflowPreview.targets.some(target => target.path === 'docs/workflow.txt'));
         assert.ok(preview.profiles.every(profile => profile.status === 'unchanged'));
@@ -686,7 +718,6 @@ async function main() {
           profile: [betaLocation, alphaLocation, betaLocation],
           'dry-run': true,
         });
-        assert.strictEqual(orderedPreview.count, 3);
         assert.deepStrictEqual(
           orderedPreview.profiles.map(profile => profile.id),
           ['beta', 'alpha', 'beta']
@@ -698,6 +729,23 @@ async function main() {
         assert.deepStrictEqual(orderedProfileIds, ['alpha', 'alpha', 'beta']);
       } finally {
         await profileTester.stop();
+      }
+    });
+
+    await runTest('a forbidden tool is neither listed nor callable under JIT_MCP_ALL_TOOLS', async () => {
+      const allTools = new MCPTester('content', { JIT_MCP_ALL_TOOLS: '1' });
+      await allTools.start();
+      try {
+        const listed = (await allTools.request('tools/list')).result.tools.map(t => t.name);
+        assert.ok(listed.length > Object.keys(CURATION.include).length, 'the full set is listed');
+        for (const name of Object.keys(CURATION.forbidden)) {
+          assert.ok(!listed.includes(name), `${name} must not be listed`);
+          const called = await allTools.request('tools/call', { name, arguments: {} });
+          assert.ok(called.result.isError, `${name} must not be callable`);
+          assert.match(called.result.content[0].text, /UNKNOWN_TOOL/);
+        }
+      } finally {
+        await allTools.stop();
       }
     });
 

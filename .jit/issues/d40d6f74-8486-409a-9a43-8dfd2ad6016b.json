@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T21:48:22.187026615Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Move the pure lookup that finds a container's bracket planning node, and the container-label interpolation it depends on, out of `commands` into `crate::templates`, so the validation layer stops importing it from `commands`.\n\n## Background\n\n- `find_planning_node` (`crates/jit/src/commands/validate.rs:2280-2305`), `PLAN_DOC_LABEL` (`:2319`) and `planning_node_plan_path` (`:2328-2334`) are pure functions over issues and a `GraphTemplate`. `commands/mod.rs:96` re-exports the two functions for `crates/jit/src/validation/repository.rs:682-683`, an inverted dependency from the validation layer onto `commands`.\n- `find_planning_node` calls `declared_container_label` (`crates/jit/src/commands/template_expand.rs:626-653`, `pub(super)`), which interpolates container tokens through `InterpolationContext` (`template_expand.rs:528-610`). Template application also uses both (`commands/template.rs:14-15,916`; the `template_expand.rs` tests at `:1221-1303`).\n- `crate::templates` (`crates/jit/src/templates.rs`) already owns `GraphTemplate` (`:279`), `RoleBindings` (`:226`) and `GraphTemplate::plan_doc_location` (`:511`), and imports nothing from `commands`.\n- Callers: `commands/validate.rs:967-968` (`plan_document_paths`), `:1042-1043` (`plan_content_with_issues`), `validation/repository.rs:682-683` (`project_plan_content`), `commands/template.rs:916`, and the unit test `test_find_planning_node_resolves_template_declared_container_label` (`commands/validate.rs:2537`).\n\n## Success Criteria\n\n- [hard] REQ-01: `find_planning_node`, `planning_node_plan_path`, the plan-document label and `declared_container_label`, with the container-token interpolation they use, are defined under `crate::templates`; `commands` defines and re-exports none of them.\n- [hard] REQ-02: `crates/jit/src/validation/repository.rs` resolves planning nodes through `crate::templates`, and no production code under `crates/jit/src/validation/` names a `crate::commands` item for it.\n- [hard] REQ-03: Template application and validation resolve the same planning node and container label as before: the moved unit test passes in the templates module, and the template-application and scope-validation suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-03T22:16:34.381152983Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8ecda69a-15d0-45b6-a614-e6256d8cb425",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:13:15.759294674Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "29cd6f7b-fe6e-465c-88c4-08c097d3c21f",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:16:24.106204339Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d40d6f74-8486-409a-9a43-8dfd2ad6016b",
   "labels": [
     "type:task",
@@ -27,7 +42,7 @@
     "satisfies:9876a23a/REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Planning-node lookup lives in the template module",
-  "updated_at": "2026-10-21T20:31:33.679966059Z"
+  "updated_at": "2026-11-03T22:16:34.381152983Z"
 }

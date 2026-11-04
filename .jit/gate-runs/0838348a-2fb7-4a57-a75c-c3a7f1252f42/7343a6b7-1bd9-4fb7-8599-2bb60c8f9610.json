@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "768493f6d0ec8a3f379c432e71f77d7fecd41b93",
+  "completed_at": "2026-11-01T18:36:10.187913432Z",
+  "duration_ms": 184637,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; prior test-vacuity findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0838348a-2fb7-4a57-a75c-c3a7f1252f42",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7343a6b7-1bd9-4fb7-8599-2bb60c8f9610",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T18:33:05.550825856Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d464fd863, 0e02052c, 6d2ec66e, 768493f6 (all `jit:0838348a`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/gate-semantics, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T18:31:33Z); prior code-review F1/F2 verified resolved\nTruncation recovery: reread d464fd/6d2ec/768493 patches by path; inspected 0e0205 per parent\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; prior test-vacuity findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

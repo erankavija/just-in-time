@@ -1,9 +1,12 @@
 use schemars::{schema::RootSchema, schema_for, JsonSchema};
+use semver::{Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
 
+use crate::domain::identity::{is_lowercase_kebab, ProfileId};
 use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
-use crate::repository_state::Contribution;
+use crate::repository_state::{Contribution, FileMode};
 
 /// The only manifest filename recognized at the root of a profile package.
 pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
@@ -18,41 +21,6 @@ pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
 /// data in the manifest rather than an inventory a reader keeps, and it holds
 /// for every package rather than for one.
 pub const LIVE_ASSET_SOURCE_PREFIX: &str = "assets/live/";
-
-/// Stable lowercase-kebab identifier used to name a profile package.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
-#[serde(transparent)]
-#[schemars(with = "String")]
-pub struct ProfileId(String);
-
-impl ProfileId {
-    /// Borrow the canonical package identifier.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl TryFrom<&str> for ProfileId {
-    type Error = String;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if is_lowercase_kebab(value) {
-            Ok(Self(value.to_string()))
-        } else {
-            Err(format!(
-                "invalid profile id '{value}'; expected lowercase-kebab"
-            ))
-        }
-    }
-}
-
-impl TryFrom<String> for ProfileId {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
-    }
-}
 
 /// Canonical lowercase-kebab marker identity for one managed profile region.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
@@ -100,28 +68,6 @@ impl<'de> Deserialize<'de> for RegionId {
     }
 }
 
-impl fmt::Display for ProfileId {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(formatter)
-    }
-}
-
-impl AsRef<str> for ProfileId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl<'de> Deserialize<'de> for ProfileId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Self::try_from(value).map_err(de::Error::custom)
-    }
-}
-
 /// The single runtime package model produced by every supported manifest wire.
 ///
 /// This type intentionally contains no manifest-version discriminator. Wire
@@ -133,10 +79,12 @@ pub struct ProfilePackageModel {
     /// Stable lowercase-kebab package identity.
     pub id: ProfileId,
     /// Semantic package version.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Semantic range of compatible JIT engine versions.
     #[serde(rename = "compatible-jit")]
-    pub compatible_jit: String,
+    #[schemars(with = "String")]
+    pub compatible_jit: VersionReq,
     /// Ordered dependency requirements.
     #[serde(rename = "dependency")]
     pub dependencies: Vec<ProfileDependencyRequirement>,
@@ -160,13 +108,40 @@ pub struct ProfilePackageModel {
     pub live_sources: Vec<LiveSourceDeclaration>,
 }
 
+impl ProfilePackageModel {
+    /// The mode a package file is published with: its declaration decides, and
+    /// every file no declaration marks executable is regular.
+    pub fn file_mode(&self, source: &str) -> FileMode {
+        if self
+            .assets
+            .iter()
+            .any(|asset| asset.executable && asset.source == source)
+        {
+            FileMode::Executable
+        } else {
+            FileMode::Regular
+        }
+    }
+
+    /// The repository paths this package's contributions, assets and regions write.
+    pub fn targets(&self) -> BTreeSet<String> {
+        self.contributions
+            .iter()
+            .map(|contribution| contribution.registry().path().repository_relative())
+            .chain(self.assets.iter().map(|asset| asset.target.clone()))
+            .chain(self.regions.iter().map(|region| region.target.clone()))
+            .collect()
+    }
+}
+
 /// A package dependency and the version requirement it declares.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileDependencyRequirement {
     /// Stable lowercase-kebab dependency identity.
     pub id: ProfileId,
     /// Semantic version requirement for the dependency.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: VersionReq,
 }
 
 /// A package incompatibility and the version requirement it declares.
@@ -175,7 +150,8 @@ pub struct ProfileIncompatibility {
     /// Stable lowercase-kebab incompatible package identity.
     pub id: ProfileId,
     /// Semantic version requirement for the incompatible package.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: VersionReq,
 }
 
 /// A canonical profile-variable name.
@@ -394,25 +370,19 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-pub(crate) fn is_lowercase_kebab(value: &str) -> bool {
-    let mut segments = value.split('-');
-    segments.next().is_some_and(|first| {
-        !first.is_empty()
-            && first.starts_with(|character: char| character.is_ascii_lowercase())
-            && first
-                .chars()
-                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
-    }) && segments.all(|segment| {
-        !segment.is_empty()
-            && segment
-                .chars()
-                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_region_id_validates_through_the_domain_token_rule() {
+        let canonical = "managed-region-2";
+        assert!(is_lowercase_kebab(canonical));
+        assert_eq!(RegionId::try_from(canonical).unwrap().as_str(), canonical);
+        let invalid = "managed_region";
+        assert!(!is_lowercase_kebab(invalid));
+        assert!(serde_json::from_value::<RegionId>(serde_json::json!(invalid)).is_err());
+    }
 
     /// One manifest whose metadata is fixed and whose body is under test.
     fn manifest_of(body: &str) -> Result<ProfilePackageModel, String> {

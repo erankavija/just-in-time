@@ -5,30 +5,76 @@
 #![cfg(any(test, feature = "test-support"))]
 
 use crate::commands::CommandExecutor;
-use crate::commands::ProfileSelector;
 use crate::config::ItemKindConfig;
-use crate::domain::DocumentReference;
-use crate::profile::{
-    capture_package_tree, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
-};
+use crate::domain::{identity::IssueId, DocumentReference};
+use crate::profile::{capture_package_tree, ProfilePackage, ProfilePackageModel};
 use crate::repository_state::{Contribution, MapEntryTarget};
-use crate::repository_state::{FileMode, VirtualPath};
+use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
+#[cfg(any(test, feature = "test-support"))]
+use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence};
+use crate::storage::lock::LockGuard;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{discover_repository_layout, FileLocker, IssueStore, JsonFileStorage};
+use crate::storage::{
+    discover_repository_layout, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage,
+};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fs;
-use std::io::Read;
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, SystemTime};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tempfile::TempDir;
+
+/// Add one dependency edge, reducing any transitive redundancy.
+#[cfg(any(test, feature = "test-support"))]
+pub fn add_reducing_edge<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    issue_id: &IssueId,
+    dependency_id: &IssueId,
+) -> Result<crate::commands::test_helpers::DependenciesAddResult> {
+    executor.graph().add_dependencies_with_policy(
+        issue_id,
+        std::slice::from_ref(dependency_id),
+        crate::commands::RedundancyPolicy::Reduce,
+    )
+}
+
+/// Give a temporary data root a valid repository layout for loader tests.
+#[cfg(any(test, feature = "test-support"))]
+pub fn repository_layout_for_data_root(data_root: &Path) -> RepositoryLayout {
+    let absolute_data_root = std::fs::canonicalize(data_root).unwrap_or_else(|_error| {
+        let parent = data_root.parent().unwrap_or(data_root);
+        let parent = std::fs::canonicalize(parent)
+            .expect("temporary test worktree root has an absolute path");
+        parent.join(
+            data_root
+                .file_name()
+                .expect("temporary data root has a final component"),
+        )
+    });
+    let worktree_root = absolute_data_root
+        .parent()
+        .expect("temporary data root has a parent");
+    RepositoryLayout::new(
+        RepositoryRootEvidence::new(worktree_root, "test-worktree", true),
+        RepositoryRootEvidence::new(&absolute_data_root, "test-data", true),
+    )
+    .expect("temporary test roots form a valid repository layout")
+}
+
+/// A TOML string array of `values` rendered by `Display`, so a fixture lists
+/// vocabulary values through their wire tokens.
+pub fn toml_string_array<T: std::fmt::Display>(values: &[T]) -> String {
+    let quoted = values
+        .iter()
+        .map(|value| format!("\"{value}\""))
+        .collect::<Vec<_>>();
+    format!("[{}]", quoted.join(", "))
+}
 
 /// A reference to `path` at HEAD with no label, type, format, or assets.
 pub fn document_reference(path: impl Into<String>) -> DocumentReference {
@@ -64,16 +110,79 @@ pub fn document_reference_typed(
     }
 }
 
+/// A deterministic canonical issue id; distinct numeric seeds yield distinct ids.
+pub fn issue_id(seed: u128) -> IssueId {
+    IssueId::from_uuid(uuid::Uuid::from_u128(seed.rotate_left(96)))
+}
+
+/// A deterministic canonical gate-run id; distinct numeric seeds yield distinct
+/// ids.
+pub fn gate_run_id(seed: u128) -> crate::domain::identity::GateRunId {
+    crate::domain::identity::GateRunId::from_uuid(uuid::Uuid::from_u128(seed.rotate_left(96)))
+}
+
 /// A drafted issue carrying a fresh random id.
 pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue {
-    let mut issue = crate::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
+    crate::domain::Issue::draft(issue_id(uuid::Uuid::new_v4().as_u128()), title, description)
+}
+
+/// The event recording `body`, stamped with `id` and `timestamp` as the
+/// mutation finalizer would stamp it.
+pub fn stamped_event(
+    body: crate::domain::EventBody,
+    id: impl Into<String>,
+    timestamp: chrono::DateTime<chrono::Utc>,
+) -> crate::domain::Event {
+    crate::domain::Event::new(id.into(), timestamp, body)
+}
+
+/// A non-reconciling execution of `target` into `root` publishing each
+/// `(source, destination)` pair with identity of the destination's own text.
+pub fn archive_execution(
+    target: crate::domain::artifact_plan::PlanTarget,
+    root: &str,
+    published: &[(&str, &str)],
+) -> crate::domain::artifact_execution::ArchiveExecution {
+    crate::domain::artifact_execution::ArchiveExecution {
+        target,
+        destination_root: root.to_string(),
+        publications: published
+            .iter()
+            .map(
+                |(source, destination)| crate::domain::artifact_execution::ArchivePublication {
+                    source: Some((*source).to_string()),
+                    destination: (*destination).to_string(),
+                    content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                        destination.as_bytes(),
+                    ),
+                    adopted: false,
+                },
+            )
+            .collect(),
+        reference_changes: Vec::new(),
+        planned_deletions: Vec::new(),
+        reconciling: false,
+    }
 }
 
 #[cfg(test)]
 mod fixture_issue_tests {
     use super::fixture_issue;
+
+    proptest::proptest! {
+        #[test]
+        fn test_issue_id_is_canonical_deterministic_and_distinct(
+            first in proptest::prelude::any::<u128>(),
+            second in proptest::prelude::any::<u128>(),
+        ) {
+            use crate::domain::identity::IssueId;
+
+            let id = super::issue_id(first);
+            proptest::prop_assert!(IssueId::try_from(id.as_str()).is_ok());
+            proptest::prop_assert_eq!(&id, &super::issue_id(first));
+            proptest::prop_assert_eq!(id == super::issue_id(second), first == second);
+        }
+    }
 
     #[test]
     fn test_fixture_issue_carries_title_description_and_distinct_ids() {
@@ -87,142 +196,26 @@ mod fixture_issue_tests {
     }
 }
 
-/// Serializes tests that temporarily change the process-wide working directory.
-///
-/// The mutex is recovered after poisoning because a panic while a guard is
-/// alive runs its `Drop` implementation before the mutex guard is released,
-/// so the directory has already been restored when another test acquires it.
-static CURRENT_DIR_LOCK: Mutex<()> = Mutex::new(());
-
-/// Serializes tests that temporarily change the process environment.
-static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
-
-/// Serializes unit-test receipt-environment mutations with in-process fixture
-/// consumers. Nextest setup and its test consumers are separate processes, so
-/// this guard is deliberately absent outside `cfg(test)` builds.
-#[cfg(test)]
-static PROFILED_REPOSITORY_FIXTURE_ENV_LOCK: Mutex<()> = Mutex::new(());
-
-/// Change the process working directory for a scope and restore it on drop.
-///
-/// This guard is intended for tests only. The process-wide lock prevents two
-/// tests from observing or changing the working directory at the same time,
-/// and restoration also occurs while unwinding after a panic.
-#[must_use = "dropping the guard restores the process working directory"]
-pub struct CurrentDirGuard {
-    original: PathBuf,
-    _lock: MutexGuard<'static, ()>,
-}
-
-impl CurrentDirGuard {
-    /// Change the process working directory, retaining the directory to which
-    /// it must be restored when this guard is dropped.
-    pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        let lock = CURRENT_DIR_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let original = std::env::current_dir()?;
-        std::env::set_current_dir(path)?;
-
-        Ok(Self {
-            original,
-            _lock: lock,
-        })
-    }
-}
-
-impl Drop for CurrentDirGuard {
-    fn drop(&mut self) {
-        let _ = std::env::set_current_dir(&self.original);
-    }
-}
-
-/// Change process environment variables for a scope and restore their prior
-/// values on drop.
-///
-/// This guard is intended for tests only. The process-wide lock keeps two
-/// guards from interleaving, so a test that holds one may call code reading the
-/// environment without observing another test's values. Guards do not nest.
-#[must_use = "dropping the guard restores the process environment"]
-pub struct EnvGuard {
-    saved: Vec<(OsString, Option<OsString>)>,
-    _lock: MutexGuard<'static, ()>,
-}
-
-impl EnvGuard {
-    /// Take the environment lock without changing any variable.
-    pub fn acquire() -> Self {
-        let lock = ENVIRONMENT_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        Self {
-            saved: Vec::new(),
-            _lock: lock,
-        }
-    }
-
-    pub fn set(&mut self, name: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> &mut Self {
-        self.remember(name.as_ref());
-        std::env::set_var(name, value);
-        self
-    }
-
-    pub fn remove(&mut self, name: impl AsRef<OsStr>) -> &mut Self {
-        self.remember(name.as_ref());
-        std::env::remove_var(name);
-        self
-    }
-
-    fn remember(&mut self, name: &OsStr) {
-        self.saved
-            .push((name.to_os_string(), std::env::var_os(name)));
-    }
-}
-
-impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        for (name, value) in self.saved.drain(..).rev() {
-            match value {
-                Some(value) => std::env::set_var(name, value),
-                None => std::env::remove_var(name),
-            }
-        }
-    }
-}
-
 /// Repository-relative directory holding the checked-in sources of the profile
 /// packages this repository ships, one directory per package id.
 pub const PROFILE_PACKAGE_SOURCES: &str = "profiles";
 
-const PROFILED_REPOSITORY_FIXTURE_SCHEMA: u32 = 1;
-/// Longest wait on a fixture build lock; below the 20 s per-test timeout in `.config/nextest.toml`.
-const PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND: Duration = Duration::from_secs(12);
-const PROFILED_REPOSITORY_FIXTURE_DIRECTORY: &str = "jit-profiled-repository-fixtures";
+const KEYED_FIXTURE_SCHEMA: u32 = 1;
+const KEYED_FIXTURE_DIRECTORY: &str = "jit-keyed-fixtures";
+const KEYED_FIXTURE_TREE: &str = "tree";
 const PROFILED_REPOSITORY_FIXTURE_SETUP: &str = "command-executor.initialize-fresh-repository.v1";
+const KEYED_FIXTURE_STAGING: &str = ".keyed-fixture-staging-";
+const KEYED_FIXTURE_RETIRED: &str = ".keyed-fixture-retired-";
+/// Digest of the `jit` crate source this setup implementation was compiled from (`build.rs`).
+pub const CRATE_SOURCE_SHA256: &str = env!("JIT_CRATE_SOURCE_SHA256");
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ProfiledRepositoryFixtureManifest {
+struct KeyedFixtureManifest {
     schema_version: u32,
     key: String,
     tree_sha256: String,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ProfiledRepositoryFixtureReceipt {
-    schema_version: u32,
-    run_id: String,
-    entries: BTreeMap<String, PathBuf>,
-}
-
-struct VerifiedFixtureReceipt {
-    path: PathBuf,
-    sha256: String,
-}
-
-const NEXTEST_DEFAULT_REPOSITORY_RECEIPT: &str = "JIT_DEFAULT_REPOSITORY_FIXTURE_RECEIPT";
-const NEXTEST_DOGFOOD_REPOSITORY_RECEIPT: &str = "JIT_DOGFOOD_REPOSITORY_FIXTURE_RECEIPT";
 
 #[derive(Clone, Copy)]
 struct ProfiledRepositoryFixtureSpec {
@@ -241,77 +234,69 @@ const PROFILED_REPOSITORY_FIXTURES: [ProfiledRepositoryFixtureSpec; 2] = [
     },
 ];
 
-#[derive(Default)]
-struct DirectProfiledRepositoryFixtures {
-    entries: BTreeMap<String, PathBuf>,
-    executable_digests: BTreeMap<OrdinaryFileIdentity, String>,
+/// What one fixture profile's entry is built from, captured once per process.
+struct ProfiledRepositoryFixtureInputs {
+    key: String,
+    packages: BTreeMap<String, ProfilePackage>,
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct OrdinaryFileIdentity {
-    canonical_path: PathBuf,
-    length: u64,
-    modified: SystemTime,
-    #[cfg(unix)]
-    device: u64,
-    #[cfg(unix)]
-    inode: u64,
-    #[cfg(unix)]
-    change_seconds: i64,
-    #[cfg(unix)]
-    change_nanoseconds: i64,
+static DIRECT_PROFILED_REPOSITORY_FIXTURES: Mutex<
+    BTreeMap<String, Arc<ProfiledRepositoryFixtureInputs>>,
+> = Mutex::new(BTreeMap::new());
+
+/// A published fixture entry, kept from retirement while the lease lives.
+#[derive(Debug)]
+pub struct KeyedFixtureLease {
+    entry: PathBuf,
+    _family_lock: LockGuard,
 }
 
-struct ExecutableProvenance {
-    canonical_path: PathBuf,
-    sha256: String,
-}
-
-static DIRECT_PROFILED_REPOSITORY_FIXTURES: Mutex<Option<DirectProfiledRepositoryFixtures>> =
-    Mutex::new(None);
-
-/// A freshly initialized repository carrying this checkout's profile package.
-///
-/// The expensive initialization is published once as an immutable baseline in
-/// the Cargo target directory. Its identity includes every captured package
-/// file in the selected dependency closure (path, bytes, and mode), the selected
-/// profile, a setup-contract token, the current test executable that contains
-/// the setup implementation, and an optional scenario executable. Every caller
-/// receives an ordinary deep copy in a fresh temporary directory, so process-
-/// level tests retain real filesystem and CLI boundaries without sharing
-/// mutable repository state.
-///
-/// Publication is serialized across nextest processes and is one atomic
-/// directory rename. An occupied or corrupted entry is an error rather than a
-/// reason to rebuild in place: source or executable changes select a new key,
-/// while damage to an entry with the same key fails closed.
-///
-/// CLI integration tests pass `CARGO_BIN_EXE_jit` as `scenario_executable`;
-/// in-process tests pass `None`.
-pub fn profiled_repository_fixture(
-    id: &str,
-    package_directory: &str,
-    scenario_executable: Option<&Path>,
-) -> Result<TempDir> {
-    #[cfg(test)]
-    let nextest_entry = {
-        let _receipt_environment_lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        nextest_profiled_repository_fixture(id, package_directory)?
-    };
-    #[cfg(not(test))]
-    let nextest_entry = nextest_profiled_repository_fixture(id, package_directory)?;
-    if let Some(entry) = nextest_entry {
-        let clone = TempDir::new()?;
-        copy_tree_exact(&entry.join("repository"), clone.path())?;
-        return Ok(clone);
+impl KeyedFixtureLease {
+    /// The immutable tree the entry's build wrote.
+    pub fn tree(&self) -> PathBuf {
+        self.entry.join(KEYED_FIXTURE_TREE)
     }
+}
 
-    // No receipt: the direct path builds each key once under its lock; later consumers read it.
-    let entry = direct_profiled_repository_fixture(id, package_directory, scenario_executable)?;
+/// Leases `family`'s immutable tree for `key`, built by `build` on first use
+/// under the Cargo target directory. A family keeps only its newest key.
+///
+/// The shared family lock protects readers; the exclusive lock protects
+/// builders and retirement. A builder stages beside the keyed entry and
+/// publishes it with one atomic no-replace rename. If a valid entry wins that
+/// rename race, the builder uses it; corrupt or unrelated occupied entries
+/// fail closed. A waiter waits for as long as the build runs: it fails with the
+/// cause of a build that fails, and builds itself when the holder dies.
+pub fn keyed_fixture(
+    family: &str,
+    key: &str,
+    build: impl FnOnce(&Path) -> Result<()>,
+) -> Result<KeyedFixtureLease> {
+    let fixture_setup = std::env::current_exe().context("resolve fixture setup executable")?;
+    let cache_root = keyed_fixture_cache_root(&fixture_setup)?;
+    ensure_keyed_fixture(&cache_root, family, key, build)
+}
+
+/// The cache key over `fields`, each framed by its length.
+pub fn keyed_fixture_key(fields: &[&[u8]]) -> String {
+    let mut hasher = Sha256::new();
+    fields
+        .iter()
+        .for_each(|field| hash_field(&mut hasher, field));
+    format!("{:x}", hasher.finalize())
+}
+
+/// A fresh repository carrying this checkout's profile package.
+///
+/// Its immutable baseline lives in the [`keyed_fixture`] cache, keyed on every
+/// captured package path, byte, and mode, the `jit` crate source, and the setup
+/// contract. Every caller receives an ordinary deep copy in a fresh temporary
+/// directory, so process-level tests retain real filesystem and CLI boundaries
+/// without sharing mutable repository state.
+pub fn profiled_repository_fixture(id: &str, package_directory: &str) -> Result<TempDir> {
+    let lease = cached_profiled_repository_fixture(id, package_directory)?;
     let clone = TempDir::new()?;
-    copy_tree_exact(&entry.join("repository"), clone.path())?;
+    copy_tree_exact(&lease.tree(), clone.path())?;
     Ok(clone)
 }
 
@@ -327,284 +312,70 @@ pub fn profiled_in_memory_repository_fixture(
         .iter()
         .find(|spec| spec.id == id)
         .with_context(|| format!("unsupported profiled-repository fixture '{id}'"))?;
-    let repository = profiled_repository_fixture(id, spec.package_directory, None)?;
+    let repository = profiled_repository_fixture(id, spec.package_directory)?;
     let storage = crate::storage::InMemoryStorage::rooted_at(repository.path());
     storage.seed_repository_tree_fixture(repository.path())?;
     Ok((repository, storage))
 }
 
-fn direct_profiled_repository_fixture(
+fn cached_profiled_repository_fixture(
     id: &str,
     package_directory: &str,
-    scenario_executable: Option<&Path>,
-) -> Result<PathBuf> {
-    let mut state = DIRECT_PROFILED_REPOSITORY_FIXTURES
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let state = state.get_or_insert_with(DirectProfiledRepositoryFixtures::default);
-    let scenario_provenance = scenario_executable
-        .map(|executable| executable_provenance(executable, &mut state.executable_digests))
-        .transpose()?;
-    let entry_key = direct_entry_key(id, package_directory, scenario_provenance.as_ref());
-    if let Some(entry) = state.entries.get(&entry_key) {
-        return Ok(entry.clone());
-    }
-
-    let packages = capture_profile_package_closure(id)?;
+) -> Result<KeyedFixtureLease> {
+    let profile = fixture_profile(id, package_directory);
+    let inputs = {
+        let mut memo = DIRECT_PROFILED_REPOSITORY_FIXTURES
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match memo.get(&profile) {
+            Some(inputs) => Arc::clone(inputs),
+            None => {
+                let inputs = Arc::new(profiled_repository_fixture_inputs(id)?);
+                memo.insert(profile.clone(), Arc::clone(&inputs));
+                inputs
+            }
+        }
+    };
     let package_root = VirtualPath::worktree(package_directory)?;
-    let fixture_setup = std::env::current_exe().context("resolve fixture setup executable")?;
-    let key = profiled_repository_fixture_key(
-        id,
-        package_root.relative().as_path(),
-        &fixture_setup,
-        scenario_provenance.as_ref(),
-        &packages,
-    )?;
-    let cache_root = profiled_repository_fixture_cache_root(&fixture_setup)?;
-    let entry = ensure_profiled_repository_fixture(&cache_root, &key, |repository| {
+    keyed_fixture(&profile, &inputs.key, |repository| {
         initialize_profiled_repository_fixture(
             repository,
             id,
             package_root.relative().as_path(),
-            &packages,
+            &inputs.packages,
         )
-    })?;
-    state.entries.insert(entry_key, entry.clone());
-    Ok(entry)
-}
-
-fn direct_entry_key(
-    id: &str,
-    package_directory: &str,
-    scenario_executable: Option<&ExecutableProvenance>,
-) -> String {
-    format!(
-        "{}\0{}\0{}",
-        receipt_entry_key(id, package_directory),
-        scenario_executable
-            .map(|provenance| provenance.canonical_path.to_string_lossy())
-            .as_deref()
-            .unwrap_or("<none>"),
-        scenario_executable
-            .map(|provenance| provenance.sha256.as_str())
-            .unwrap_or("<none>")
-    )
-}
-
-fn executable_provenance(
-    executable: &Path,
-    digests: &mut BTreeMap<OrdinaryFileIdentity, String>,
-) -> Result<ExecutableProvenance> {
-    let identity = ordinary_file_identity(executable)?;
-    if let Some(sha256) = digests.get(&identity) {
-        return Ok(ExecutableProvenance {
-            canonical_path: identity.canonical_path,
-            sha256: sha256.clone(),
-        });
-    }
-
-    let mut hasher = Sha256::new();
-    hash_file(&mut hasher, executable)
-        .with_context(|| format!("hash scenario executable {}", executable.display()))?;
-    let after_hash = ordinary_file_identity(executable)?;
-    if identity != after_hash {
-        bail!(
-            "scenario executable {} changed while its provenance was captured",
-            executable.display()
-        );
-    }
-    let sha256 = format!("{:x}", hasher.finalize());
-    digests.insert(identity.clone(), sha256.clone());
-    Ok(ExecutableProvenance {
-        canonical_path: identity.canonical_path,
-        sha256,
     })
 }
 
-fn ordinary_file_identity(path: &Path) -> Result<OrdinaryFileIdentity> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("inspect scenario executable {}", path.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        bail!(
-            "scenario executable {} must be an ordinary file",
-            path.display()
-        );
-    }
-    Ok(OrdinaryFileIdentity {
-        canonical_path: fs::canonicalize(path)
-            .with_context(|| format!("canonicalize scenario executable {}", path.display()))?,
-        length: metadata.len(),
-        modified: metadata
-            .modified()
-            .with_context(|| format!("read modification time for {}", path.display()))?,
-        #[cfg(unix)]
-        device: metadata.dev(),
-        #[cfg(unix)]
-        inode: metadata.ino(),
-        #[cfg(unix)]
-        change_seconds: metadata.ctime(),
-        #[cfg(unix)]
-        change_nanoseconds: metadata.ctime_nsec(),
-    })
-}
-
-/// Prepare the verified immutable repository fixtures for one nextest run.
-///
-/// Nextest executes this once, before any matching test processes. The receipt
-/// is bound to that run's own id and exported through `NEXTEST_ENV`; consumers
-/// therefore skip repeated source and executable hashing but cannot accept a
-/// receipt copied from another run. Direct libtest execution has no receipt and
-/// takes the fully verified builder path above.
-fn prepare_profiled_repository_fixture_receipt(
-    id: &str,
-    run_id: &str,
-    setup_executable: &Path,
-) -> Result<VerifiedFixtureReceipt> {
-    let spec = PROFILED_REPOSITORY_FIXTURES
-        .iter()
-        .find(|spec| spec.id == id)
-        .with_context(|| format!("unsupported profiled-repository fixture '{id}'"))?;
-    let packages = capture_profile_package_closure(spec.id)?;
-    let package_directory = VirtualPath::worktree(spec.package_directory)?;
+fn profiled_repository_fixture_inputs(id: &str) -> Result<ProfiledRepositoryFixtureInputs> {
+    let packages = capture_profile_package_closure(id)?;
     let key = profiled_repository_fixture_key(
-        spec.id,
-        package_directory.relative().as_path(),
-        setup_executable,
-        None,
-        &packages,
-    )?;
-    let cache_root = profiled_repository_fixture_cache_root(setup_executable)?;
-    let entry = ensure_profiled_repository_fixture(&cache_root, &key, |repository| {
-        initialize_profiled_repository_fixture(
-            repository,
-            spec.id,
-            package_directory.relative().as_path(),
-            &packages,
-        )
-    })?;
-    validate_profiled_repository_fixture(&entry, &key)?;
-    let receipt = ProfiledRepositoryFixtureReceipt {
-        schema_version: PROFILED_REPOSITORY_FIXTURE_SCHEMA,
-        run_id: run_id.to_string(),
-        entries: BTreeMap::from([(receipt_entry_key(spec.id, spec.package_directory), entry)]),
-    };
-    let receipt_path = cache_root.join(format!("run-{run_id}-{}.json", spec.id));
-    let receipt_bytes = serde_json::to_vec(&receipt)?;
-    let receipt_sha256 = format!("{:x}", Sha256::digest(&receipt_bytes));
-    let receipt_stage = tempfile::NamedTempFile::new_in(&cache_root)?;
-    fs::write(receipt_stage.path(), receipt_bytes)?;
-    receipt_stage.as_file().sync_all()?;
-    crate::storage::publish_fixture_file_noreplace(receipt_stage.path(), &receipt_path)?;
-    Ok(VerifiedFixtureReceipt {
-        path: receipt_path,
-        sha256: receipt_sha256,
-    })
-}
-
-/// Prepare one selected fixture receipt for nextest.
-#[doc(hidden)]
-pub fn prepare_nextest_profiled_repository_fixture(id: &str) -> Result<()> {
-    let run_id = std::env::var("NEXTEST_RUN_ID").context("nextest setup has no run id")?;
-    let nextest_env = PathBuf::from(
-        std::env::var_os("NEXTEST_ENV").context("nextest setup has no environment output file")?,
+        &package_closure_sha256(packages.iter().flat_map(|(package_id, package)| {
+            package.files().iter().map(move |(relative, bytes)| {
+                (
+                    package_id.as_str(),
+                    relative.as_str(),
+                    package.model().file_mode(relative),
+                    bytes.as_slice(),
+                )
+            })
+        })),
+        CRATE_SOURCE_SHA256,
     );
-    let setup_executable = std::env::current_exe().context("resolve nextest setup executable")?;
-    let receipt = prepare_profiled_repository_fixture_receipt(id, &run_id, &setup_executable)?;
-    use std::io::Write;
-    writeln!(
-        fs::OpenOptions::new().append(true).open(nextest_env)?,
-        "{}={}\n{}_SHA256={}",
-        receipt_environment_name(id).context("fixture id has no receipt environment")?,
-        receipt.path.display(),
-        receipt_environment_name(id).context("fixture id has no receipt environment")?,
-        receipt.sha256,
-    )?;
-    Ok(())
+    Ok(ProfiledRepositoryFixtureInputs { key, packages })
 }
 
-fn nextest_profiled_repository_fixture(
-    id: &str,
-    package_directory: &str,
-) -> Result<Option<PathBuf>> {
-    let runtime_artifact = std::env::current_exe()
-        .context("resolve profiled-repository fixture consumer executable")?;
-    nextest_profiled_repository_fixture_for_artifact(id, package_directory, &runtime_artifact)
-}
-
-fn nextest_profiled_repository_fixture_for_artifact(
-    id: &str,
-    package_directory: &str,
-    runtime_artifact: &Path,
-) -> Result<Option<PathBuf>> {
-    let Some(receipt_environment) = receipt_environment_name(id) else {
-        return Ok(None);
-    };
-    let Some(receipt_path) = std::env::var_os(receipt_environment) else {
-        return Ok(None);
-    };
-    let run_id =
-        std::env::var("NEXTEST_RUN_ID").context("fixture receipt has no nextest run id")?;
-    let receipt_path = PathBuf::from(receipt_path);
-    let metadata = fs::symlink_metadata(&receipt_path)?;
-    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
-        bail!("profiled-repository fixture receipt is not an ordinary file");
-    }
-    let receipt_bytes = fs::read(&receipt_path)?;
-    let expected_sha256 = std::env::var(format!("{receipt_environment}_SHA256"))
-        .context("fixture receipt has no content identity")?;
-    let actual_sha256 = format!("{:x}", Sha256::digest(&receipt_bytes));
-    if actual_sha256 != expected_sha256 {
-        bail!("profiled-repository fixture receipt content mismatch");
-    }
-    let receipt: ProfiledRepositoryFixtureReceipt = serde_json::from_slice(&receipt_bytes)?;
-    if receipt.schema_version != PROFILED_REPOSITORY_FIXTURE_SCHEMA || receipt.run_id != run_id {
-        bail!("profiled-repository fixture receipt does not belong to this nextest run");
-    }
-    let entry = receipt
-        .entries
-        .get(&receipt_entry_key(id, package_directory))
-        .with_context(|| format!("nextest fixture receipt has no {id} at {package_directory}"))?;
-    let cache_root = profiled_repository_fixture_cache_root(runtime_artifact)?;
-    if entry.parent() != Some(cache_root.as_path()) {
-        bail!("profiled-repository fixture receipt names an entry outside its cache");
-    }
-    let entry_metadata = fs::symlink_metadata(entry)?;
-    if !entry_metadata.file_type().is_dir() || entry_metadata.file_type().is_symlink() {
-        bail!("profiled-repository fixture receipt names a non-directory entry");
-    }
-    let manifest_path = entry.join("manifest.json");
-    let manifest_metadata = fs::symlink_metadata(&manifest_path)?;
-    if !manifest_metadata.file_type().is_file() || manifest_metadata.file_type().is_symlink() {
-        bail!("profiled-repository fixture manifest is not an ordinary file");
-    }
-    let manifest: ProfiledRepositoryFixtureManifest =
-        serde_json::from_slice(&fs::read(manifest_path)?)?;
-    if manifest.schema_version != PROFILED_REPOSITORY_FIXTURE_SCHEMA
-        || entry.file_name().and_then(|name| name.to_str()) != Some(manifest.key.as_str())
-        || !entry.join("repository").is_dir()
-    {
-        bail!("profiled-repository fixture receipt names an invalid cache entry");
-    }
-    Ok(Some(entry.clone()))
-}
-
-fn receipt_environment_name(id: &str) -> Option<&'static str> {
-    match id {
-        "jit-default" => Some(NEXTEST_DEFAULT_REPOSITORY_RECEIPT),
-        "jit-dogfood" => Some(NEXTEST_DOGFOOD_REPOSITORY_RECEIPT),
-        _ => None,
-    }
-}
-
-fn receipt_entry_key(id: &str, package_directory: &str) -> String {
-    format!("{id}\0{package_directory}")
+/// The cache directory name of one fixture profile: the package id and the
+/// directory its packages are written to.
+fn fixture_profile(id: &str, package_directory: &str) -> String {
+    format!("{id}@{}", package_directory.replace(['/', '\\'], "+"))
 }
 
 fn initialize_profiled_repository_fixture(
     repository: &Path,
     id: &str,
     package_directory: &Path,
-    packages: &BTreeMap<String, CapturedPackageTree>,
+    packages: &BTreeMap<String, ProfilePackage>,
 ) -> Result<()> {
     let package_root = repository.join(package_directory);
     packages.iter().try_for_each(|(package_id, package)| {
@@ -614,16 +385,42 @@ fn initialize_profiled_repository_fixture(
     if !selected.is_dir() {
         bail!("this repository authors no profile package '{id}'");
     }
-    let jit_root = repository.join(".jit");
-    let storage = JsonFileStorage::new(&jit_root);
-    let layout = discover_repository_layout(repository, &jit_root)?;
-    CommandExecutor::new(storage)
-        .with_layout(layout)
-        .initialize_fresh_repository(repository, Some(&[ProfileSelector::path(&selected)]))?;
-    Ok(())
+    // A rebuildable cache needs no durability: initializing over memory spares the
+    // build the fsyncs that wait on the host's whole writeback backlog.
+    let storage = InMemoryStorage::rooted_at(repository);
+    storage.seed_repository_tree_fixture(repository)?;
+    let layout = storage.repository_layout();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
+    let selection = executor.profiles().select_profiles(
+        &[PathBuf::from(&selected)],
+        &crate::commands::ProfileVariableOptions::default(),
+    )?;
+    executor
+        .profiles()
+        .initialize_fresh_repository(repository, Some(&selection))?;
+    write_repository_entries(&storage, &layout)
 }
 
-fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, CapturedPackageTree>> {
+fn write_repository_entries(storage: &InMemoryStorage, layout: &RepositoryLayout) -> Result<()> {
+    storage
+        .repository_state()
+        .entries
+        .iter()
+        .try_for_each(|(path, entry)| {
+            let target = layout.resolve(path)?;
+            match entry {
+                RepositoryEntry::File { content, mode } => {
+                    fs::create_dir_all(target.parent().context("entry has no parent")?)?;
+                    fs::write(&target, content.bytes())?;
+                    set_captured_mode(&target, *mode)
+                }
+                RepositoryEntry::Directory { .. } => Ok(fs::create_dir_all(&target)?),
+                other => bail!("repository entry {path:?} is not writable: {other:?}"),
+            }
+        })
+}
+
+fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, ProfilePackage>> {
     let checkout = repository_checkout();
     let layout = discover_repository_layout(&checkout, checkout.join(".jit"))?;
     let published = published_package_ids();
@@ -650,53 +447,38 @@ fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, Captured
     Ok(packages)
 }
 
-fn profiled_repository_fixture_key(
-    id: &str,
-    package_directory: &Path,
-    setup_executable: &Path,
-    scenario_executable: Option<&ExecutableProvenance>,
-    packages: &BTreeMap<String, CapturedPackageTree>,
-) -> Result<String> {
+/// Digest of a captured package closure, one `(package id, package-relative path, mode, bytes)`
+/// per file.
+fn package_closure_sha256<'a>(
+    files: impl IntoIterator<Item = (&'a str, &'a str, FileMode, &'a [u8])>,
+) -> String {
     let mut hasher = Sha256::new();
-    hash_field(
-        &mut hasher,
-        &PROFILED_REPOSITORY_FIXTURE_SCHEMA.to_le_bytes(),
-    );
-    hash_field(&mut hasher, PROFILED_REPOSITORY_FIXTURE_SETUP.as_bytes());
-    hash_field(&mut hasher, std::env::consts::OS.as_bytes());
-    hash_field(&mut hasher, id.as_bytes());
-    hash_field(&mut hasher, package_directory.to_string_lossy().as_bytes());
-    hash_file(&mut hasher, setup_executable).with_context(|| {
-        format!(
-            "hash profiled-repository fixture setup executable {}",
-            setup_executable.display()
-        )
-    })?;
-    if let Some(scenario_executable) = scenario_executable {
-        hash_field(
-            &mut hasher,
-            scenario_executable
-                .canonical_path
-                .to_string_lossy()
-                .as_bytes(),
-        );
-        hash_field(&mut hasher, scenario_executable.sha256.as_bytes());
-    }
-    for (package_id, package) in packages {
-        hash_field(&mut hasher, package_id.as_bytes());
-        for (relative, file) in package.files() {
+    files
+        .into_iter()
+        .for_each(|(package_id, relative, mode, bytes)| {
+            hash_field(&mut hasher, package_id.as_bytes());
             hash_field(&mut hasher, relative.as_bytes());
             hash_field(
                 &mut hasher,
-                match file.mode {
+                match mode {
                     FileMode::Regular => b"regular",
                     FileMode::Executable => b"executable",
                 },
             );
-            hash_field(&mut hasher, &file.bytes);
-        }
-    }
-    Ok(format!("{:x}", hasher.finalize()))
+            hash_field(&mut hasher, bytes);
+        });
+    format!("{:x}", hasher.finalize())
+}
+
+fn profiled_repository_fixture_key(
+    package_closure_sha256: &str,
+    crate_source_sha256: &str,
+) -> String {
+    keyed_fixture_key(&[
+        PROFILED_REPOSITORY_FIXTURE_SETUP.as_bytes(),
+        package_closure_sha256.as_bytes(),
+        crate_source_sha256.as_bytes(),
+    ])
 }
 
 /// Derive the cache context Cargo used to place a running artifact.
@@ -707,35 +489,35 @@ fn profiled_repository_fixture_key(
 /// uses the artifact Cargo actually ran, so it stays stable when a reused
 /// executable embeds a different checkout in `CARGO_MANIFEST_DIR` or when a
 /// relative `CARGO_TARGET_DIR` was resolved from a different process directory.
-fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
+fn keyed_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
     let metadata = fs::symlink_metadata(runtime_artifact).with_context(|| {
         format!(
-            "inspect profiled-repository fixture runtime artifact {}",
+            "inspect keyed fixture runtime artifact {}",
             runtime_artifact.display()
         )
     })?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         bail!(
-            "profiled-repository fixture runtime artifact {} must be an ordinary file",
+            "keyed fixture runtime artifact {} must be an ordinary file",
             runtime_artifact.display()
         );
     }
     let artifact = fs::canonicalize(runtime_artifact).with_context(|| {
         format!(
-            "canonicalize profiled-repository fixture runtime artifact {}",
+            "canonicalize keyed fixture runtime artifact {}",
             runtime_artifact.display()
         )
     })?;
     let artifact_directory = artifact.parent().with_context(|| {
         format!(
-            "profiled-repository fixture runtime artifact {} has no parent directory",
+            "keyed fixture runtime artifact {} has no parent directory",
             artifact.display()
         )
     })?;
     let profile_directory = if artifact_directory.file_name() == Some("deps".as_ref()) {
         artifact_directory.parent().with_context(|| {
             format!(
-                "profiled-repository fixture deps directory {} has no profile parent",
+                "keyed fixture deps directory {} has no profile parent",
                 artifact_directory.display()
             )
         })?
@@ -744,84 +526,79 @@ fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<Pat
     };
     let target_context = profile_directory.parent().with_context(|| {
         format!(
-            "profiled-repository fixture profile directory {} has no target parent",
+            "keyed fixture family directory {} has no target parent",
             profile_directory.display()
         )
     })?;
-    Ok(target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY))
+    Ok(target_context.join(KEYED_FIXTURE_DIRECTORY))
 }
 
-fn ensure_profiled_repository_fixture(
-    cache_root: &Path,
-    key: &str,
-    build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<PathBuf> {
-    ensure_profiled_repository_fixture_within(
-        cache_root,
-        key,
-        PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND,
-        build,
-    )
+/// The lock one family's consumers coordinate through.
+fn keyed_fixture_lock(cache_root: &Path, family: &str) -> PathBuf {
+    cache_root.join("locks").join(format!("{family}.lock"))
 }
 
-/// Builds the entry under its lock, or reads the one a concurrent consumer
-/// published. A wait past `bound` fails naming the lock, key and holder.
-fn ensure_profiled_repository_fixture_within(
+/// Leases the family's entry for `key`, building and publishing it under the
+/// exclusive family lock when absent. A consumer fails only with its own build's
+/// cause: a holder that failed or died leaves no entry, so the next consumer to
+/// get the lock builds it. The kernel releases a dead holder's lock, and the
+/// runner's per-test limit ends any wait, so lock waits are unbounded here.
+fn ensure_keyed_fixture(
     cache_root: &Path,
+    family: &str,
     key: &str,
-    bound: Duration,
     build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<PathBuf> {
-    fs::create_dir_all(cache_root)?;
-    let lock_root = cache_root.join("locks");
-    fs::create_dir_all(&lock_root)?;
-    let lock_path = lock_root.join(format!("{key}.lock"));
-    let _lock = FileLocker::new(bound)
-        .lock_exclusive_with_metadata(&lock_path, &format!("fixture-build:{key}"))
-        .map_err(|error| {
-            if !crate::storage::is_lock_timeout(&error) {
-                return error;
-            }
-            let holder = fs::read(lock_path.with_extension("lock.meta"))
-                .ok()
-                .and_then(|bytes| serde_json::from_slice::<crate::storage::LockMetadata>(&bytes).ok())
-                .map_or_else(
-                    || "unknown".to_string(),
-                    |meta| format!("pid {} ({})", meta.pid, meta.agent_id),
-                );
-            error.context(format!(
-                "profiled-repository fixture key {key} is still being built; lock {} held by {holder}",
-                lock_path.display()
-            ))
-        })?;
-    let entry = cache_root.join(key);
-    match fs::symlink_metadata(&entry) {
-        Ok(_) => {
-            validate_profiled_repository_fixture(&entry, key)?;
-            return Ok(entry);
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => {
-            return Err(error).with_context(|| {
-                format!(
-                    "inspect profiled-repository fixture entry {}",
-                    entry.display()
-                )
+) -> Result<KeyedFixtureLease> {
+    let family_root = cache_root.join(family);
+    let lock = keyed_fixture_lock(cache_root, family);
+    fs::create_dir_all(&family_root)?;
+    fs::create_dir_all(lock.parent().context("fixture lock has no parent")?)?;
+    let entry = family_root.join(key);
+    let locker = FileLocker::new(Duration::MAX);
+    loop {
+        let shared = locker.lock_shared(&lock)?;
+        if is_published_fixture(&entry)? {
+            validate_keyed_fixture(&entry, key)?;
+            return Ok(KeyedFixtureLease {
+                entry,
+                _family_lock: shared,
             });
         }
+        drop(shared);
+        let Some(exclusive) = locker.try_lock_exclusive(&lock)? else {
+            std::thread::sleep(Duration::from_millis(
+                crate::runtime_defaults::LOCK_POLL_INTERVAL_MS,
+            ));
+            continue;
+        };
+        if is_published_fixture(&entry)? {
+            continue;
+        }
+        publish_keyed_fixture(&family_root, &entry, key, build)?;
+        return Ok(KeyedFixtureLease {
+            entry,
+            _family_lock: exclusive,
+        });
     }
+}
 
+/// Builds in staging, publishes `entry` and retires the family's older entries.
+fn publish_keyed_fixture(
+    family_root: &Path,
+    entry: &Path,
+    key: &str,
+    build: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
     let staging = tempfile::Builder::new()
-        .prefix(".profiled-repository-staging-")
-        .tempdir_in(cache_root)?;
-    let repository = staging.path().join("repository");
-    fs::create_dir(&repository)?;
-    build(&repository)?;
-    let tree_sha256 = tree_sha256(&repository)?;
-    let manifest = ProfiledRepositoryFixtureManifest {
-        schema_version: PROFILED_REPOSITORY_FIXTURE_SCHEMA,
+        .prefix(KEYED_FIXTURE_STAGING)
+        .tempdir_in(family_root)?;
+    let tree = staging.path().join(KEYED_FIXTURE_TREE);
+    fs::create_dir(&tree)?;
+    build(&tree)?;
+    let manifest = KeyedFixtureManifest {
+        schema_version: KEYED_FIXTURE_SCHEMA,
         key: key.to_string(),
-        tree_sha256,
+        tree_sha256: tree_sha256(&tree)?,
     };
     fs::write(
         staging.path().join("manifest.json"),
@@ -829,47 +606,79 @@ fn ensure_profiled_repository_fixture_within(
     )?;
 
     let staging_path = staging.keep();
-    if let Err(error) = crate::storage::publish_fixture_directory_noreplace(&staging_path, &entry) {
+    if let Err(error) = crate::storage::publish_fixture_directory_noreplace(&staging_path, entry) {
         let _ = fs::remove_dir_all(&staging_path);
-        return Err(error).with_context(|| {
-            format!(
-                "atomically publish profiled-repository fixture {}",
+        if !is_published_fixture(entry)? {
+            return Err(error)
+                .with_context(|| format!("atomically publish keyed fixture {}", entry.display()));
+        }
+        validate_keyed_fixture(entry, key).map_err(|validation_error| {
+            error.context(format!(
+                "atomically publish keyed fixture {}; concurrent entry is invalid: {validation_error:#}",
                 entry.display()
-            )
-        });
+            ))
+        })?;
+    } else {
+        validate_keyed_fixture(entry, key)?;
     }
-    validate_profiled_repository_fixture(&entry, key)?;
-    Ok(entry)
+    retire_older_fixture_entries(family_root, key)
 }
 
-fn validate_profiled_repository_fixture(entry: &Path, expected_key: &str) -> Result<()> {
+fn is_published_fixture(entry: &Path) -> Result<bool> {
+    match fs::symlink_metadata(entry) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => {
+            Err(error).with_context(|| format!("inspect keyed fixture entry {}", entry.display()))
+        }
+    }
+}
+
+/// Removes every family entry but `current`, including abandoned staging and
+/// retirement directories. The caller holds the exclusive family lock, so no
+/// reader is copying a retired entry; each is renamed out of its key before
+/// removal, so an interrupted retirement never leaves a partial entry at a key.
+fn retire_older_fixture_entries(family_root: &Path, current: &str) -> Result<()> {
+    let retired = tempfile::Builder::new()
+        .prefix(KEYED_FIXTURE_RETIRED)
+        .tempdir_in(family_root)?;
+    let retired_name = retired.path().file_name().map(OsStr::to_os_string);
+    fs::read_dir(family_root)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<std::io::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|name| name != current && Some(name) != retired_name.as_ref())
+        .try_for_each(|name| fs::rename(family_root.join(&name), retired.path().join(&name)))
+        .with_context(|| format!("retire older keyed fixtures in {}", family_root.display()))?;
+    retired
+        .close()
+        .with_context(|| format!("remove retired keyed fixtures in {}", family_root.display()))
+}
+
+fn validate_keyed_fixture(entry: &Path, expected_key: &str) -> Result<()> {
     let metadata = fs::symlink_metadata(entry)?;
     if !metadata.file_type().is_dir() {
         bail!(
-            "profiled-repository fixture entry {} is occupied by a non-directory",
+            "keyed fixture entry {} is occupied by a non-directory",
             entry.display()
         );
     }
     let manifest_path = entry.join("manifest.json");
-    let manifest: ProfiledRepositoryFixtureManifest =
-        serde_json::from_slice(&fs::read(&manifest_path).with_context(|| {
-            format!(
-                "read profiled-repository fixture manifest {}",
-                manifest_path.display()
-            )
-        })?)
-        .context("parse profiled-repository fixture manifest")?;
-    if manifest.schema_version != PROFILED_REPOSITORY_FIXTURE_SCHEMA || manifest.key != expected_key
-    {
+    let manifest: KeyedFixtureManifest = serde_json::from_slice(
+        &fs::read(&manifest_path)
+            .with_context(|| format!("read keyed fixture manifest {}", manifest_path.display()))?,
+    )
+    .context("parse keyed fixture manifest")?;
+    if manifest.schema_version != KEYED_FIXTURE_SCHEMA || manifest.key != expected_key {
         bail!(
-            "profiled-repository fixture manifest identity mismatch at {}",
+            "keyed fixture manifest identity mismatch at {}",
             manifest_path.display()
         );
     }
-    let actual = tree_sha256(&entry.join("repository"))?;
+    let actual = tree_sha256(&entry.join(KEYED_FIXTURE_TREE))?;
     if actual != manifest.tree_sha256 {
         bail!(
-            "profiled-repository fixture content mismatch at {}: expected {}, found {}",
+            "keyed fixture content mismatch at {}: expected {}, found {}",
             entry.display(),
             manifest.tree_sha256,
             actual
@@ -878,12 +687,12 @@ fn validate_profiled_repository_fixture(entry: &Path, expected_key: &str) -> Res
     Ok(())
 }
 
-fn write_captured_package(package: &CapturedPackageTree, destination: &Path) -> Result<()> {
-    package.files().iter().try_for_each(|(relative, file)| {
+fn write_captured_package(package: &ProfilePackage, destination: &Path) -> Result<()> {
+    package.files().iter().try_for_each(|(relative, bytes)| {
         let path = destination.join(relative);
         fs::create_dir_all(path.parent().unwrap_or(destination))?;
-        fs::write(&path, &file.bytes)?;
-        set_captured_mode(&path, file.mode)
+        fs::write(&path, bytes)?;
+        set_captured_mode(&path, package.model().file_mode(relative))
     })
 }
 
@@ -960,20 +769,32 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update(bytes);
 }
 
-fn hash_file(hasher: &mut Sha256, path: &Path) -> Result<()> {
-    let mut file = fs::File::open(path)?;
-    hash_field(hasher, &file.metadata()?.len().to_le_bytes());
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            return Ok(());
-        }
-        hasher.update(&buffer[..read]);
-    }
+/// Write an executable a test then runs, while other threads may fork.
+///
+/// A child forked while this process holds a file open for writing keeps a copy
+/// of that descriptor until it execs, and exec of the file fails with `ETXTBSY`
+/// meanwhile. So the file ends up as an inode only a child process ever wrote:
+/// that child has exited, and no descriptor of this process ever named the inode.
+#[cfg(unix)]
+pub fn write_executable(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::write(path, contents)?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755))?;
+    let mut sealed = path.as_os_str().to_owned();
+    sealed.push(".sealed");
+    let copied = std::process::Command::new("cp")
+        .arg("-p")
+        .arg(path)
+        .arg(&sealed)
+        .status()?;
+    anyhow::ensure!(copied.success(), "cp {} failed: {copied}", path.display());
+    fs::rename(&sealed, path)?;
+    Ok(())
 }
 
-fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
+/// Deep-copies the ordinary files and directories under `source` into the
+/// existing `destination`, preserving modes; any other entry is refused.
+pub fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
     for entry in fs::read_dir(source)? {
         let entry = entry?;
         let source_path = entry.path();
@@ -981,7 +802,7 @@ fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
         let metadata = fs::symlink_metadata(&source_path)?;
         if metadata.file_type().is_symlink() {
             bail!(
-                "profiled-repository fixture contains symbolic link {}",
+                "fixture tree contains symbolic link {}",
                 source_path.display()
             );
         }
@@ -993,7 +814,7 @@ fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
             fs::set_permissions(&destination_path, metadata.permissions())?;
         } else {
             bail!(
-                "profiled-repository fixture contains irregular entry {}",
+                "fixture tree contains irregular entry {}",
                 source_path.display()
             );
         }
@@ -1013,6 +834,7 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let layout = discover_repository_layout(temp.path(), &jit_root)?;
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .profiles()
         .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
@@ -1040,20 +862,35 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     use std::io::Write;
 
     let path = storage.root().join("events.jsonl");
-    let mut log = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)?;
+    let mut log = std::io::BufWriter::new(
+        fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?,
+    );
     let mut written = fs::metadata(&path)?.len();
+    // One serialized event is the template; each line differs from it by the
+    // event id and the issue id, so the log grows without per-line serialization.
+    let template_issue = crate::domain::Issue::draft(
+        issue_id(0),
+        "Accumulated history".to_string(),
+        String::new(),
+    );
+    let template_issue_id = template_issue.id.to_string();
+    let template_event_id = "01J00000000000000000000000".to_string();
+    let template = serde_json::to_string(&stamped_event(
+        crate::domain::EventBody::draft_issue_created(&template_issue),
+        template_event_id.clone(),
+        chrono::Utc::now(),
+    ))?;
     let mut ordinal = 0_u64;
     while written <= bytes {
-        let line = serde_json::to_string(&crate::domain::Event::IssueCreated {
-            id: format!("01J0000000000000000000{ordinal:04}"),
-            issue_id: format!("00000000-0000-4000-8000-{ordinal:012}"),
-            timestamp: chrono::Utc::now(),
-            title: format!("Accumulated history {ordinal}"),
-            priority: crate::domain::Priority::Normal,
-        })?;
+        let line = template
+            .replace(&template_issue_id, issue_id(u128::from(ordinal)).as_ref())
+            .replace(
+                &template_event_id,
+                &format!("01J0000000000000000000{ordinal:04}"),
+            );
         writeln!(log, "{line}")?;
         written += line.len() as u64 + 1;
         ordinal += 1;
@@ -1086,12 +923,28 @@ pub fn setup_test_repo_with_config(
     fs::write(temp.path().join(".jit/config.toml"), config)?;
 
     let executor = file_executor(temp.path())?;
-    executor.initialize_fresh_repository(temp.path(), None)?;
+    executor
+        .profiles()
+        .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
 
     Ok((temp, executor))
 }
+
+/// Configuration fragment projecting the gate registry to `docs/gates.md`.
+pub const GATE_PROJECTION_CONFIG: &str = "\n[item_kinds.gate]\nsection = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\n\
+scope = \"project\"\nsource = { toml = \".jit/gates.toml\", table = \"gates\", \
+id-field = \"key\", text-field = \"description\" }\nsource-of-truth = \"registry-first\"\n\n\
+[projection.gates]\nkind = \"gate\"\nmode = \"separate-file\"\n\
+target = \"docs/gates.md\"\nstyle = \"id-anchor\"\n";
+
+/// Package-manifest fragment declaring a gate, which leaves a rendered
+/// [`GATE_PROJECTION_CONFIG`] projection stale.
+pub const NEW_GATE_CONTRIBUTION: &str = "\n[[contribution]]\nkind = \"keyed-array\"\n\
+target = \"gates\"\nidentity = \"new-gate\"\nvalue = { version = 1, key = \"new-gate\", \
+title = \"New\", description = \"New gate\", stage = \"postcheck\", mode = \"manual\" }\n";
 
 /// A temporary directory holding exactly `files`, each a worktree-relative path
 /// (parents created) with its contents.
@@ -1148,7 +1001,13 @@ mod file_setup_tests {
     fn test_setup_test_repo_with_config_yields_an_initialised_repository() {
         let (_temp, executor) = setup_test_repo_with_config(CALLER_CONFIG).unwrap();
 
-        executor.validate_repository_report().unwrap().unwrap();
+        executor
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
+            .unwrap();
     }
 
     #[test]
@@ -1274,12 +1133,7 @@ pub fn capture_repository_package(id: &str, destination: &Path) -> Result<Profil
     if fs::symlink_metadata(destination).is_ok() {
         fs::remove_dir_all(destination)?;
     }
-    for (relative, file) in captured.files() {
-        let path = destination.join(relative);
-        fs::create_dir_all(path.parent().unwrap_or(destination))?;
-        fs::write(&path, &file.bytes)?;
-        set_captured_mode(&path, file.mode)?;
-    }
+    write_captured_package(&captured, destination)?;
     Ok(ProfilePackage::from_directory(destination)?)
 }
 
@@ -1344,17 +1198,39 @@ pub fn shipped_item_kinds() -> BTreeMap<String, ItemKindConfig> {
     item_kinds_contributed_by(&manifest)
 }
 
+/// The shipped declaration of kind `name`.
+///
+/// Panics when the default package ships no such kind.
+pub fn shipped_item_kind(name: &str) -> ItemKindConfig {
+    shipped_item_kinds()
+        .remove(name)
+        .unwrap_or_else(|| panic!("the default package ships no '{name}' kind"))
+}
+
 /// The shipped item kinds as the `[item_kinds.<kind>]` tables of a repository
 /// `config.toml`, serialized from [`shipped_item_kinds`].
 pub fn shipped_item_kinds_toml() -> String {
+    item_kinds_toml(shipped_item_kinds())
+}
+
+/// The `[item_kinds.<kind>]` tables of the named shipped kinds only.
+///
+/// Panics when the default package ships no kind of one of the names.
+pub fn shipped_item_kind_tables(names: &[&str]) -> String {
+    item_kinds_toml(
+        names
+            .iter()
+            .map(|name| (name.to_string(), shipped_item_kind(name)))
+            .collect(),
+    )
+}
+
+fn item_kinds_toml(item_kinds: BTreeMap<String, ItemKindConfig>) -> String {
     #[derive(Serialize)]
     struct ConfigKinds {
         item_kinds: BTreeMap<String, ItemKindConfig>,
     }
-    toml::to_string(&ConfigKinds {
-        item_kinds: shipped_item_kinds(),
-    })
-    .expect("a declared item kind serializes to TOML")
+    toml::to_string(&ConfigKinds { item_kinds }).expect("a declared item kind serializes to TOML")
 }
 
 #[cfg(test)]
@@ -1496,14 +1372,77 @@ pub fn profile_package_fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Copy the profile-package fixture tree at `source` to `root` under a manifest
-/// rewritten to declare `id`, a dependency on each of `dependencies`, and asset
-/// targets named for `id`, and read the package back from there.
-///
-/// No package this repository ships declares a dependency, so every test of
-/// composition authors one. One rewrite serves them all
-/// (`@/invariant/shared-test-contracts`), and renaming the asset targets after
-/// the id is what keeps two authored packages from publishing the same file.
+/// Apply what `selectors` name, with no variable inputs, the way `jit profile
+/// apply` does.
+pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    selectors: &[PathBuf],
+) -> Result<crate::profile::ProfileComposedApplyResult> {
+    executor
+        .profiles()
+        .select_profiles(
+            selectors,
+            &crate::commands::ProfileVariableOptions::default(),
+        )
+        .and_then(|selection| executor.profiles().apply_profiles(&selection))
+}
+
+/// Move `id` to `state` the way `jit issue update --state` does.
+pub fn transition_issue<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    id: &IssueId,
+    state: crate::domain::State,
+) -> Result<Vec<String>> {
+    executor.issues().update_issue(
+        id,
+        None,
+        None,
+        None,
+        Some(state),
+        Vec::new(),
+        Vec::new(),
+        None,
+        None,
+        false,
+    )
+}
+
+/// The selector naming the directory `package` was read from.
+fn selector_of(package: &crate::profile::ProfilePackage) -> PathBuf {
+    package
+        .directory()
+        .expect("the selector names a package read from a directory")
+        .to_path_buf()
+}
+
+/// Apply `package` and the packages it depends on.
+pub fn apply_package<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    package: &crate::profile::ProfilePackage,
+) -> Result<crate::profile::ProfileComposedApplyResult> {
+    apply_selected_packages(executor, &[selector_of(package)])
+}
+
+/// The packages selecting `package` reaches, dependency first.
+pub fn selected_closure<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    package: &crate::profile::ProfilePackage,
+) -> Result<Vec<crate::profile::ProfilePackage>> {
+    executor
+        .profiles()
+        .select_profiles(
+            &[selector_of(package)],
+            &crate::commands::ProfileVariableOptions::default(),
+        )
+        .map(|selection| {
+            selection
+                .members()
+                .iter()
+                .map(|member| member.package().clone())
+                .collect()
+        })
+}
+
 pub fn write_package_declaring(
     source: &Path,
     root: &Path,
@@ -1620,8 +1559,8 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
 /// declared parent, and return `root`.
 ///
 /// A test that applies a package must read it from inside the repository it is
-/// applied to, because profile application records the package's worktree-
-/// relative location.
+/// applied to, because a package is addressed by its worktree-relative
+/// location.
 pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
     fn copy(source: &Path, root: &Path) {
         fs::read_dir(source)
@@ -1646,26 +1585,69 @@ pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
     root.to_path_buf()
 }
 
-/// Create test WorktreePaths from a TempDir
-///
-/// Generates a WorktreePaths structure suitable for testing,
-/// with standard paths relative to the temp directory.
+/// Create test WorktreePaths from a TempDir, as a primary checkout.
 pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
+    primary_checkout_paths(temp.path())
+}
+
+/// The detected paths of a primary checkout at `root`.
+pub fn primary_checkout_paths(root: impl AsRef<Path>) -> WorktreePaths {
+    linked_checkout_paths(&root, &root)
+}
+
+/// The detected paths of the checkout at `checkout`, whose primary is at `primary`.
+pub fn linked_checkout_paths(
+    primary: impl AsRef<Path>,
+    checkout: impl AsRef<Path>,
+) -> WorktreePaths {
+    let (primary, checkout) = (primary.as_ref(), checkout.as_ref());
     WorktreePaths {
         git_repository: true,
-        common_dir: temp.path().join(".git"),
-        worktree_root: temp.path().to_path_buf(),
-        local_jit: temp.path().join(".jit"),
-        shared_jit: temp.path().join(".git/jit"),
+        common_dir: primary.join(".git"),
+        worktree_root: checkout.to_path_buf(),
+        local_jit: checkout.join(".jit"),
+        shared_jit: primary.join(".git/jit"),
+        relocated_worktree_checkout: None,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn test_write_executable_runs_while_other_threads_fork() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let forking = AtomicBool::new(true);
+        let dir = TempDir::new().unwrap();
+        std::thread::scope(|scope| {
+            (0..8).for_each(|_| {
+                scope.spawn(|| {
+                    while forking.load(Ordering::Relaxed) {
+                        std::process::Command::new("true").status().unwrap();
+                    }
+                });
+            });
+            let outcomes = (0..200)
+                .map(|index| {
+                    let script = dir.path().join(format!("script-{index}"));
+                    write_executable(&script, "#!/bin/sh\nexit 0\n").unwrap();
+                    std::process::Command::new(&script).status()
+                })
+                .collect::<Vec<_>>();
+            forking.store(false, Ordering::Relaxed);
+            assert!(
+                outcomes.iter().all(|outcome| outcome.is_ok()),
+                "a script failed to start: {outcomes:?}"
+            );
+        });
+    }
+
     use super::*;
+    use crate::repository_state::{BOOTSTRAP_LOCK_FILE, RECORD_SCRATCH_DIR};
     use crate::storage::IssueStore;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
+    use std::sync::Barrier;
 
     /// The shipped package that carries more than a manifest, which is the one
     /// whose capture actually draws content out of the checkout.
@@ -1691,24 +1673,6 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         assert_eq!(create_test_paths(&temp).worktree_root, temp.path());
-    }
-
-    #[test]
-    fn test_current_dir_guard_restores_after_panic() {
-        let elsewhere = TempDir::new().unwrap();
-        let mut original = None;
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
-            original = Some(_cwd.original.clone());
-            assert_eq!(std::env::current_dir().unwrap(), elsewhere.path());
-            panic!("the guard must restore the directory during unwinding");
-        }));
-
-        assert!(result.is_err());
-        let _verification_lock = CURRENT_DIR_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        assert_eq!(std::env::current_dir().unwrap(), original.unwrap());
     }
 
     /// Every package this repository ships captures under the id its source
@@ -1744,10 +1708,9 @@ mod tests {
     /// The checkout is resolved from the crate's own manifest directory, so the
     /// entry point answers the same from any working directory.
     ///
-    /// Observed the way `storage::json`'s repository-root reads observe theirs:
-    /// the process working directory is moved to an unrelated place for the
-    /// call, so a relative path anywhere in the resolution would find nothing,
-    /// and restored before anything is asserted.
+    /// Tests run in the crate directory, below the checkout root, so a
+    /// resolution relative to the working directory would find no package
+    /// sources there.
     #[test]
     fn test_capture_repository_package_resolves_the_checkout_independently_of_the_working_directory(
     ) {
@@ -1758,16 +1721,12 @@ mod tests {
             checkout.display()
         );
 
-        let elsewhere = TempDir::new().unwrap();
         let workspace = TempDir::new().unwrap();
         let id = package_carrying_drawn_content();
         let destination = workspace.path().join("package");
-        let captured = {
-            let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
-            capture_repository_package(&id, &destination)
-        };
 
-        let package = captured.expect("the package captures from an unrelated working directory");
+        let package = capture_repository_package(&id, &destination)
+            .expect("the package captures from the crate directory");
         assert_eq!(package.model().id.as_str(), id);
         assert!(
             package.file_count() > 1,
@@ -1791,15 +1750,82 @@ mod tests {
         let first = capture_repository_package(&id, &destination).unwrap();
         let second = capture_repository_package(&id, &destination).unwrap();
 
-        assert_eq!(second.hashes(), first.hashes());
+        assert_eq!(second.package_hash(), first.package_hash());
         let reread = ProfilePackage::from_directory(&destination)
             .expect("the republished destination holds a package");
-        assert_eq!(reread.hashes(), second.hashes());
+        assert_eq!(reread.package_hash(), second.package_hash());
         assert_eq!(reread.file_count(), second.file_count());
     }
 
     #[test]
-    fn test_profiled_repository_fixture_publication_is_concurrent_and_corruption_fails_closed() {
+    fn test_profiled_repository_fixture_memory_build_writes_the_tree_a_file_build_writes() {
+        PROFILED_REPOSITORY_FIXTURES.iter().for_each(|spec| {
+            let packages = capture_profile_package_closure(spec.id).unwrap();
+            let package_directory = Path::new(spec.package_directory);
+            let root = TempDir::new().unwrap();
+            let built = root.path().join("built/repository");
+            let reference = root.path().join("reference/repository");
+            fs::create_dir_all(&built).unwrap();
+            fs::create_dir_all(&reference).unwrap();
+            initialize_profiled_repository_fixture(&built, spec.id, package_directory, &packages)
+                .unwrap();
+
+            packages.iter().for_each(|(package_id, package)| {
+                write_captured_package(package, &reference.join(package_directory).join(package_id))
+                    .unwrap()
+            });
+            let jit_root = reference.join(".jit");
+            let executor = CommandExecutor::new(JsonFileStorage::new(&jit_root))
+                .with_layout(discover_repository_layout(&reference, &jit_root).unwrap());
+            let selection = executor
+                .profiles()
+                .select_profiles(
+                    &[reference.join(package_directory).join(spec.id)],
+                    &crate::commands::ProfileVariableOptions::default(),
+                )
+                .unwrap();
+            executor
+                .profiles()
+                .initialize_fresh_repository(&reference, Some(&selection))
+                .unwrap();
+            // Machine-local state the file backend's next session creates on demand.
+            fs::remove_file(reference.join(BOOTSTRAP_LOCK_FILE)).unwrap();
+            let scratch = jit_root.join(RECORD_SCRATCH_DIR);
+            if scratch.exists() {
+                fs::remove_dir(scratch).unwrap();
+            }
+
+            // Each initialization mints its own event ids and timestamps.
+            let events = |repository: &Path| -> Vec<serde_json::Value> {
+                fs::read_to_string(repository.join(".jit/events.jsonl"))
+                    .unwrap()
+                    .lines()
+                    .map(|line| {
+                        let mut event: serde_json::Value = serde_json::from_str(line).unwrap();
+                        let fields = event.as_object_mut().unwrap();
+                        fields.remove("id");
+                        fields.remove("timestamp");
+                        event
+                    })
+                    .collect()
+            };
+            assert_eq!(events(&built), events(&reference), "{}", spec.id);
+            fs::copy(
+                reference.join(".jit/events.jsonl"),
+                built.join(".jit/events.jsonl"),
+            )
+            .unwrap();
+            assert_eq!(
+                tree_sha256(&built).unwrap(),
+                tree_sha256(&reference).unwrap(),
+                "{}",
+                spec.id
+            );
+        });
+    }
+
+    #[test]
+    fn test_keyed_fixture_publication_is_concurrent_and_corruption_fails_closed() {
         let cache = TempDir::new().unwrap();
         let cache_root = cache.path().to_path_buf();
         let builds = Arc::new(AtomicUsize::new(0));
@@ -1811,12 +1837,13 @@ mod tests {
                 let start = Arc::clone(&start);
                 std::thread::spawn(move || {
                     start.wait();
-                    ensure_profiled_repository_fixture(&cache_root, "same-key", |repository| {
+                    ensure_keyed_fixture(&cache_root, "family", "same-key", |repository| {
                         builds.fetch_add(1, Ordering::SeqCst);
                         fs::write(repository.join("state"), b"coherent")?;
                         Ok(())
                     })
                     .unwrap()
+                    .entry
                 })
             })
             .collect::<Vec<_>>();
@@ -1828,23 +1855,24 @@ mod tests {
         assert_eq!(builds.load(Ordering::SeqCst), 1);
         assert_eq!(entries[0], entries[1]);
         assert_eq!(
-            fs::read(entries[0].join("repository/state")).unwrap(),
+            fs::read(entries[0].join("tree/state")).unwrap(),
             b"coherent"
         );
-        let repeated = ensure_profiled_repository_fixture(&cache_root, "same-key", |_| {
+        let repeated = ensure_keyed_fixture(&cache_root, "family", "same-key", |_| {
             builds.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
         .unwrap();
-        assert_eq!(repeated, entries[0]);
+        assert_eq!(repeated.entry, entries[0]);
+        drop(repeated);
         assert_eq!(
             builds.load(Ordering::SeqCst),
             1,
             "an equivalent later consumer must reuse the same publication"
         );
 
-        fs::write(entries[0].join("repository/state"), b"corrupt").unwrap();
-        let error = ensure_profiled_repository_fixture(&cache_root, "same-key", |_| {
+        fs::write(entries[0].join("tree/state"), b"corrupt").unwrap();
+        let error = ensure_keyed_fixture(&cache_root, "family", "same-key", |_| {
             builds.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
@@ -1855,14 +1883,14 @@ mod tests {
         );
         assert_eq!(builds.load(Ordering::SeqCst), 1);
         assert_eq!(
-            fs::read(entries[0].join("repository/state")).unwrap(),
+            fs::read(entries[0].join("tree/state")).unwrap(),
             b"corrupt",
             "a corrupt immutable entry must not be silently replaced"
         );
     }
 
     #[test]
-    fn test_profiled_repository_fixture_cold_concurrent_consumers_build_once_within_budget() {
+    fn test_keyed_fixture_cold_concurrent_consumers_build_once_within_budget() {
         const CONSUMERS: usize = 6;
         let cache = TempDir::new().unwrap();
         let builds = AtomicUsize::new(0);
@@ -1873,13 +1901,14 @@ mod tests {
                 .map(|_| {
                     scope.spawn(|| {
                         start.wait();
-                        ensure_profiled_repository_fixture(cache.path(), "cold-key", |repository| {
+                        ensure_keyed_fixture(cache.path(), "family", "cold-key", |repository| {
                             builds.fetch_add(1, Ordering::SeqCst);
                             std::thread::sleep(Duration::from_millis(200));
                             fs::write(repository.join("state"), b"built")?;
                             Ok(())
                         })
                         .unwrap()
+                        .entry
                     })
                 })
                 .collect::<Vec<_>>()
@@ -1894,52 +1923,104 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_lock_wait_past_the_bound_names_lock_key_and_holder() {
+    fn test_keyed_fixture_failing_builds_each_report_their_own_cause() {
+        const CONSUMERS: usize = 6;
         let cache = TempDir::new().unwrap();
-        let lock_root = cache.path().join("locks");
-        fs::create_dir_all(&lock_root).unwrap();
-        let lock_path = lock_root.join("held-key.lock");
-        let _holder = FileLocker::new(Duration::from_secs(1))
-            .lock_exclusive_with_metadata(&lock_path, "fixture-build:held-key")
+        let start = Barrier::new(CONSUMERS);
+        let builds = AtomicUsize::new(0);
+
+        std::thread::scope(|scope| {
+            (0..CONSUMERS)
+                .map(|consumer| {
+                    let (cache, start, builds) = (&cache, &start, &builds);
+                    scope.spawn(move || {
+                        start.wait();
+                        let error = ensure_keyed_fixture(cache.path(), "family", "key", |_| {
+                            builds.fetch_add(1, Ordering::SeqCst);
+                            bail!("consumer {consumer}'s cause")
+                        })
+                        .unwrap_err();
+                        (consumer, format!("{error:#}"))
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .for_each(|(consumer, error)| {
+                    assert!(
+                        error.contains(&format!("consumer {consumer}'s cause")),
+                        "{error}"
+                    );
+                });
+        });
+
+        assert_eq!(builds.load(Ordering::SeqCst), CONSUMERS);
+    }
+
+    #[test]
+    fn test_keyed_fixture_waiter_builds_after_its_holder_fails() {
+        let cache = TempDir::new().unwrap();
+        let held = Barrier::new(2);
+
+        let lease = std::thread::scope(|scope| {
+            let holder = scope.spawn(|| {
+                ensure_keyed_fixture(cache.path(), "family", "key", |_| {
+                    held.wait();
+                    std::thread::sleep(Duration::from_millis(200));
+                    bail!("the holder's cause")
+                })
+            });
+            held.wait();
+            let waiter = scope.spawn(|| {
+                ensure_keyed_fixture(cache.path(), "family", "key", |repository| {
+                    fs::write(repository.join("state"), b"built")?;
+                    Ok(())
+                })
+            });
+            assert!(holder.join().unwrap().is_err());
+            waiter.join().unwrap().unwrap()
+        });
+
+        assert_eq!(fs::read(lease.entry.join("tree/state")).unwrap(), b"built");
+    }
+
+    #[test]
+    fn test_keyed_fixture_waiter_builds_when_the_holder_dies_without_an_outcome() {
+        let cache = TempDir::new().unwrap();
+        let lock = keyed_fixture_lock(cache.path(), "family");
+        fs::create_dir_all(lock.parent().unwrap()).unwrap();
+        let holder = FileLocker::new(Duration::from_secs(1))
+            .lock_exclusive(&lock)
             .unwrap();
         let built = AtomicUsize::new(0);
 
-        let error = ensure_profiled_repository_fixture_within(
-            cache.path(),
-            "held-key",
-            Duration::from_millis(100),
-            |_| {
-                built.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            },
-        )
-        .unwrap_err();
+        let lease = std::thread::scope(|scope| {
+            let waiter = scope.spawn(|| {
+                ensure_keyed_fixture(cache.path(), "family", "key", |repo| {
+                    built.fetch_add(1, Ordering::SeqCst);
+                    fs::write(repo.join("state"), b"built")?;
+                    Ok(())
+                })
+            });
+            std::thread::sleep(Duration::from_millis(200));
+            assert!(!waiter.is_finished(), "the holder still owns the build");
+            drop(holder);
+            waiter.join().unwrap().unwrap()
+        });
 
-        let message = format!("{error:#}");
-        assert!(
-            message.contains(&lock_path.display().to_string()),
-            "{message}"
-        );
-        assert!(message.contains("held-key"), "{message}");
-        assert!(
-            message.contains(&format!("pid {}", std::process::id())),
-            "{message}"
-        );
-        assert_eq!(built.load(Ordering::SeqCst), 0);
+        assert_eq!(built.load(Ordering::SeqCst), 1);
+        assert!(lease.entry.join("tree/state").is_file());
     }
 
     #[test]
-    fn test_profiled_repository_fixture_lock_bound_is_below_the_per_test_timeout() {
-        assert!(PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND < Duration::from_secs(20));
-    }
-
-    #[test]
-    fn test_profiled_repository_fixture_refuses_an_occupied_publication_path() {
+    fn test_keyed_fixture_refuses_an_occupied_publication_path() {
         let cache = TempDir::new().unwrap();
-        fs::write(cache.path().join("occupied"), b"not a fixture").unwrap();
+        let occupied = cache.path().join("family/occupied");
+        fs::create_dir_all(occupied.parent().unwrap()).unwrap();
+        fs::write(&occupied, b"not a fixture").unwrap();
         let built = AtomicUsize::new(0);
 
-        let error = ensure_profiled_repository_fixture(cache.path(), "occupied", |_| {
+        let error = ensure_keyed_fixture(cache.path(), "family", "occupied", |_| {
             built.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
@@ -1950,18 +2031,16 @@ mod tests {
             "unexpected occupied-path refusal: {error:#}"
         );
         assert_eq!(built.load(Ordering::SeqCst), 0);
-        assert_eq!(
-            fs::read(cache.path().join("occupied")).unwrap(),
-            b"not a fixture"
-        );
+        assert_eq!(fs::read(&occupied).unwrap(), b"not a fixture");
     }
 
     #[test]
-    fn test_profiled_repository_fixture_no_replace_preserves_raced_occupied_directory() {
+    fn test_keyed_fixture_no_replace_preserves_raced_occupied_directory() {
         let cache = TempDir::new().unwrap();
-        let occupied = cache.path().join("raced");
+        let family_root = cache.path().join("family");
+        let occupied = family_root.join("raced");
 
-        let error = ensure_profiled_repository_fixture(cache.path(), "raced", |repository| {
+        let error = ensure_keyed_fixture(cache.path(), "family", "raced", |repository| {
             fs::write(repository.join("state"), b"candidate")?;
             fs::create_dir(&occupied)?;
             fs::write(occupied.join("bystander"), b"wins")?;
@@ -1975,23 +2054,60 @@ mod tests {
         );
         assert_eq!(fs::read(occupied.join("bystander")).unwrap(), b"wins");
         assert!(
-            fs::read_dir(cache.path())
+            fs::read_dir(&family_root)
                 .unwrap()
                 .filter_map(Result::ok)
                 .all(|entry| !entry
                     .file_name()
                     .to_string_lossy()
-                    .starts_with(".profiled-repository-staging-")),
+                    .starts_with(KEYED_FIXTURE_STAGING)),
             "a refused publication must clean its private staging directory"
         );
     }
 
     #[test]
+    fn test_keyed_fixture_uses_a_valid_concurrent_publication() {
+        let cache = TempDir::new().unwrap();
+        let entry = cache.path().join("family/raced-key");
+        let winner = ensure_keyed_fixture(cache.path(), "family", "raced-key", |repository| {
+            fs::write(repository.join("state"), b"candidate")?;
+            let winner_repository = entry.join(KEYED_FIXTURE_TREE);
+            fs::create_dir_all(&winner_repository)?;
+            fs::write(winner_repository.join("state"), b"winner")?;
+            let manifest = KeyedFixtureManifest {
+                schema_version: KEYED_FIXTURE_SCHEMA,
+                key: "raced-key".to_string(),
+                tree_sha256: tree_sha256(&winner_repository)?,
+            };
+            fs::write(
+                entry.join("manifest.json"),
+                serde_json::to_vec_pretty(&manifest)?,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(winner.entry, entry);
+        assert_eq!(
+            fs::read(winner.entry.join("tree/state")).unwrap(),
+            b"winner"
+        );
+        assert!(
+            fs::read_dir(cache.path().join("family"))
+                .unwrap()
+                .filter_map(Result::ok)
+                .all(|entry| !entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(KEYED_FIXTURE_STAGING)),
+            "a losing builder must clean up its private staging directory"
+        );
+    }
+
+    #[test]
     fn test_profiled_repository_fixture_clones_are_isolated_and_profiled() {
-        let first =
-            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
-        let second =
-            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
+        let first = profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap();
+        let second = profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap();
         let profile_asset = Path::new(".agents/skills/jit-manage/SKILL.md");
 
         assert!(first.path().join(profile_asset).is_file());
@@ -2006,8 +2122,7 @@ mod tests {
             "fixture clones must not share mutable files"
         );
 
-        let third =
-            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
+        let third = profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap();
         assert_eq!(
             fs::read(second.path().join("AGENTS.md")).unwrap(),
             fs::read(third.path().join("AGENTS.md")).unwrap(),
@@ -2061,46 +2176,11 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_receipt_rejects_wrong_run_and_content_identity() {
-        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let mut env = EnvGuard::acquire();
-        let cache = TempDir::new().unwrap();
-        let setup_artifact = cache.path().join("debug/jit");
-        fs::create_dir_all(setup_artifact.parent().unwrap()).unwrap();
-        fs::write(&setup_artifact, b"fixture setup artifact").unwrap();
-        let id = "jit-default";
-        let expected_run = "expected-run";
-        let environment = receipt_environment_name(id).unwrap();
-        let receipt =
-            prepare_profiled_repository_fixture_receipt(id, expected_run, &setup_artifact).unwrap();
-        env.set("NEXTEST_RUN_ID", "wrong-run")
-            .set(environment, &receipt.path)
-            .set(format!("{environment}_SHA256"), &receipt.sha256);
-
-        let wrong_run = nextest_profiled_repository_fixture(id, "packages").unwrap_err();
-        assert!(wrong_run.to_string().contains("does not belong"));
-        env.set("NEXTEST_RUN_ID", expected_run)
-            .set(format!("{environment}_SHA256"), "0".repeat(64));
-        let wrong_digest = nextest_profiled_repository_fixture(id, "packages").unwrap_err();
-        assert!(wrong_digest.to_string().contains("content mismatch"));
-    }
-
-    #[test]
-    fn test_profiled_repository_fixture_cache_root_follows_runtime_artifact_layouts() {
-        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+    fn test_keyed_fixture_cache_root_follows_runtime_artifact_layouts() {
         let workspace = TempDir::new().unwrap();
         let default_target = workspace.path().join("default-target");
         let absolute_custom_target = TempDir::new().unwrap();
         let relative_custom_target = workspace.path().join("relative-custom-target");
-        let mut env = EnvGuard::acquire();
-        env.set(
-            "CARGO_TARGET_DIR",
-            "relative-to-a-different-process-directory",
-        );
         let cases = [
             (default_target.join("debug/jit"), default_target.clone()),
             (
@@ -2121,8 +2201,8 @@ mod tests {
             fs::create_dir_all(artifact.parent().unwrap()).unwrap();
             fs::write(&artifact, b"fixture runtime artifact").unwrap();
             assert_eq!(
-                profiled_repository_fixture_cache_root(&artifact).unwrap(),
-                expected_target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY),
+                keyed_fixture_cache_root(&artifact).unwrap(),
+                expected_target_context.join(KEYED_FIXTURE_DIRECTORY),
                 "{} must select the cache context Cargo placed it under",
                 artifact.display()
             );
@@ -2131,7 +2211,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn test_profiled_repository_fixture_cache_root_refuses_non_ordinary_runtime_artifact() {
+    fn test_keyed_fixture_cache_root_refuses_non_ordinary_runtime_artifact() {
         use std::os::unix::fs::symlink;
 
         let workspace = TempDir::new().unwrap();
@@ -2139,136 +2219,143 @@ mod tests {
         fs::create_dir_all(target.parent().unwrap()).unwrap();
         symlink(std::env::current_exe().unwrap(), &target).unwrap();
 
-        let error = profiled_repository_fixture_cache_root(&target).unwrap_err();
+        let error = keyed_fixture_cache_root(&target).unwrap_err();
         assert!(error.to_string().contains("must be an ordinary file"));
     }
 
     #[test]
-    fn test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target()
-    {
-        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let runtime_target = TempDir::new().unwrap();
-        let setup_artifact = runtime_target.path().join("debug/jit");
-        let consumer_artifact = runtime_target.path().join("debug/deps/fixture-consumer");
-        fs::create_dir_all(setup_artifact.parent().unwrap()).unwrap();
-        fs::create_dir_all(consumer_artifact.parent().unwrap()).unwrap();
-        let source = runtime_target.path().join("provenance.rs");
-        fs::write(
-            &source,
-            "fn main() { print!(\"{}\", env!(\"CARGO_MANIFEST_DIR\")); }",
-        )
-        .unwrap();
-        let setup_checkout = runtime_target.path().join("isolated-setup-checkout");
-        let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-        let setup_compile = std::process::Command::new(&rustc)
-            .args(["--edition=2021", source.to_str().unwrap(), "-o"])
-            .arg(&setup_artifact)
-            .env("CARGO_MANIFEST_DIR", &setup_checkout)
-            .output()
-            .unwrap();
-        assert!(
-            setup_compile.status.success(),
-            "compile the isolated setup artifact: {}",
-            String::from_utf8_lossy(&setup_compile.stderr)
-        );
-        let consumer_compile = std::process::Command::new(&rustc)
-            .args(["--edition=2021", source.to_str().unwrap(), "-o"])
-            .arg(&consumer_artifact)
-            .env("CARGO_MANIFEST_DIR", repository_checkout())
-            .output()
-            .unwrap();
-        assert!(
-            consumer_compile.status.success(),
-            "compile the consumer artifact: {}",
-            String::from_utf8_lossy(&consumer_compile.stderr)
-        );
-
-        let setup_provenance = std::process::Command::new(&setup_artifact)
-            .output()
-            .unwrap();
+    fn test_profiled_repository_fixture_key_changes_with_a_package_byte() {
+        let packages = capture_profile_package_closure("jit-dogfood").unwrap();
+        let mut files = packages
+            .iter()
+            .flat_map(|(package_id, package)| {
+                package.files().iter().map(move |(relative, bytes)| {
+                    (
+                        package_id.clone(),
+                        relative.clone(),
+                        package.model().file_mode(relative),
+                        bytes.clone(),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        let key = |files: &[(String, String, FileMode, Vec<u8>)]| {
+            profiled_repository_fixture_key(
+                &package_closure_sha256(files.iter().map(|(package_id, relative, mode, bytes)| {
+                    (
+                        package_id.as_str(),
+                        relative.as_str(),
+                        *mode,
+                        bytes.as_slice(),
+                    )
+                })),
+                CRATE_SOURCE_SHA256,
+            )
+        };
+        let captured = key(&files);
         assert_eq!(
-            String::from_utf8(setup_provenance.stdout).unwrap(),
-            setup_checkout.to_string_lossy(),
-            "the setup artifact must embed the isolated checkout it was compiled from"
-        );
-        let consumer_provenance = std::process::Command::new(&consumer_artifact)
-            .output()
-            .unwrap();
-        assert_eq!(
-            String::from_utf8(consumer_provenance.stdout).unwrap(),
-            repository_checkout().to_string_lossy(),
-            "the consumer artifact must embed this test executable's checkout"
-        );
-        assert_ne!(
-            setup_checkout,
-            repository_checkout(),
-            "setup and consumer artifacts must have differing compile-time checkout provenance"
-        );
-        let mut env = EnvGuard::acquire();
-        env.remove("CARGO_TARGET_DIR");
-        let id = "jit-default";
-        let run_id = "shared-runtime-target";
-        let environment = receipt_environment_name(id).unwrap();
-        let receipt =
-            prepare_profiled_repository_fixture_receipt(id, run_id, &setup_artifact).unwrap();
-
-        let expected_cache_root = runtime_target
-            .path()
-            .join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY);
-        assert_eq!(
-            receipt.path.parent(),
-            Some(expected_cache_root.as_path()),
-            "the setup receipt must be published beside its runtime artifact, not its source checkout"
+            profiled_repository_fixture_inputs("jit-dogfood")
+                .unwrap()
+                .key,
+            captured,
+            "the fixture must key on this closure and the compiled crate source"
         );
 
-        env.set("NEXTEST_RUN_ID", run_id)
-            .set(environment, &receipt.path)
-            .set(format!("{environment}_SHA256"), &receipt.sha256);
-        let entry =
-            nextest_profiled_repository_fixture_for_artifact(id, "packages", &consumer_artifact)
-                .unwrap();
-
-        assert!(
-            entry.is_some_and(|entry| entry.parent() == Some(expected_cache_root.as_path())),
-            "a same-run consumer in the shared runtime target must accept the setup receipt"
-        );
+        files[0].3[0] ^= 1;
+        assert_ne!(key(&files), captured);
     }
 
     #[test]
-    fn test_direct_profiled_repository_fixture_scenario_identity_does_not_alias() {
-        let workspace = TempDir::new().unwrap();
-        let first = workspace.path().join("first");
-        let second = workspace.path().join("second");
-        fs::write(&first, b"same scenario bytes").unwrap();
-        fs::write(&second, b"same scenario bytes").unwrap();
-        let mut digests = BTreeMap::new();
-        let first_provenance = executable_provenance(&first, &mut digests).unwrap();
-        let second_provenance = executable_provenance(&second, &mut digests).unwrap();
+    fn test_profiled_repository_fixture_key_changes_with_a_crate_source_byte() {
+        use crate::crate_source_digest::{crate_source_sha256, CRATE_SOURCE_ROOTS};
 
-        assert_ne!(
-            direct_entry_key("jit-default", "packages", Some(&first_provenance)),
-            direct_entry_key("jit-default", "packages", Some(&second_provenance)),
-            "distinct scenario executables must not alias the process-local memo"
-        );
+        let crate_root = TempDir::new().unwrap();
+        fs::create_dir(crate_root.path().join("src")).unwrap();
+        [
+            ("Cargo.toml", "[package]\n"),
+            ("build.rs", "fn main() {}\n"),
+            ("src/lib.rs", "pub fn setup() {}\n"),
+        ]
+        .iter()
+        .for_each(|(path, contents)| fs::write(crate_root.path().join(path), contents).unwrap());
+        let key = || {
+            profiled_repository_fixture_key(
+                "package-closure",
+                &crate_source_sha256(crate_root.path(), &CRATE_SOURCE_ROOTS).unwrap(),
+            )
+        };
+        let original = key();
+        assert_eq!(key(), original);
 
-        let replacement = workspace.path().join("replacement");
-        fs::write(&replacement, b"different scenario bytes").unwrap();
-        fs::rename(&replacement, &first).unwrap();
-        let replacement_provenance = executable_provenance(&first, &mut digests).unwrap();
+        fs::write(
+            crate_root.path().join("src/lib.rs"),
+            "pub fn setup() {}\n\n",
+        )
+        .unwrap();
+        assert_ne!(key(), original);
+    }
 
-        assert_ne!(
-            direct_entry_key("jit-default", "packages", Some(&first_provenance)),
-            direct_entry_key("jit-default", "packages", Some(&replacement_provenance)),
-            "replacing an executable at the same path must select a new process-local memo entry"
-        );
+    #[test]
+    fn test_keyed_fixture_publication_retires_the_profiles_older_entries() {
+        let cache = TempDir::new().unwrap();
+        let publish = |profile: &str, key: &str| {
+            ensure_keyed_fixture(cache.path(), profile, key, |repository| {
+                fs::write(repository.join("state"), key)?;
+                Ok(())
+            })
+            .unwrap()
+            .entry
+        };
+        publish("family", "first");
+        let neighbour = publish("neighbour", "first");
+        let abandoned = cache
+            .path()
+            .join("family")
+            .join(format!("{KEYED_FIXTURE_STAGING}abandoned"));
+        fs::create_dir(&abandoned).unwrap();
+
+        let current = publish("family", "second");
+
+        let remaining = fs::read_dir(cache.path().join("family"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(remaining, [current]);
+        validate_keyed_fixture(&neighbour, "first").unwrap();
+    }
+
+    #[test]
+    fn test_keyed_fixture_retirement_waits_for_a_concurrent_reader() {
+        let cache = TempDir::new().unwrap();
+        let write_key = |key: &'static str| {
+            move |repository: &Path| -> Result<()> {
+                fs::write(repository.join("state"), key)?;
+                Ok(())
+            }
+        };
+        let reader =
+            ensure_keyed_fixture(cache.path(), "family", "current", write_key("current")).unwrap();
+
+        let current = reader.entry.clone();
+        let next = std::thread::scope(|scope| {
+            let next = scope
+                .spawn(|| ensure_keyed_fixture(cache.path(), "family", "next", write_key("next")));
+            std::thread::sleep(Duration::from_millis(200));
+            assert!(!next.is_finished(), "retirement must wait for the reader");
+            let clone = TempDir::new().unwrap();
+            copy_tree_exact(&reader.entry.join(KEYED_FIXTURE_TREE), clone.path()).unwrap();
+            assert_eq!(fs::read(clone.path().join("state")).unwrap(), b"current");
+            drop(reader);
+            next.join().unwrap().unwrap()
+        });
+        assert_eq!(fs::read(next.entry.join("tree/state")).unwrap(), b"next");
+        assert!(!current.exists(), "the released entry must be retired");
     }
 
     #[test]
     fn test_setup_test_repo_with_taxonomy_declares_and_exposes_exact_vocabulary() {
         let (_temp, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::config::JitConfig::load(storage.root()).unwrap();
+        let config = crate::config::JitConfig::load(&storage.repository_layout().unwrap()).unwrap();
         let hierarchy = config
             .type_hierarchy
             .expect("taxonomy fixture must declare a type hierarchy");

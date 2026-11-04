@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T17:47:08.460597135Z",
+  "context": {},
+  "created_at": "2026-11-01T16:02:49.098565290Z",
+  "dependencies": [],
+  "description": "`jit query all` silently skips records it cannot parse, so a listing can hide issues with no report.\n\n## Background\n\nIn `~/Projects/research`, `query all` shows 52 of 76 issues. The other 24 hold a `gates_status.*.updated_by` that fails identity parsing (`jit validate` reports `PARSE_ERROR`). A reader of the listing cannot tell that anything is missing, which defeats the point of validation.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit query all`, and any other listing built on the same read, either fails loudly on a record it cannot parse, naming it, or reports each skipped record in both human and `--json` output.\n- [hard] REQ-02: A test owns the behaviour on a repository with one malformed record.\n\n## Notes\n\n- Decide one behaviour for every listing path through the same read, rather than one at each command (`@/inv/convention-convergence`).\n",
+  "documents": [],
+  "done_at": "2026-11-01T18:27:57.421171240Z",
+  "first_ready_at": "2026-11-01T16:02:49.098565290Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "77ab6fd3-acc5-4c34-8d18-53a3c3ca1c38",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:16:09.230983934Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e9e14d6e-9e9f-4e69-9bd2-6f8caef0de64",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:18:49.761045722Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "03ce8d2c-98f7-4ab6-bcae-08406bb3b5c1",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Query all silently skips malformed records",
+  "updated_at": "2026-11-01T18:27:57.421171240Z"
+}

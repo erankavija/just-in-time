@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T21:22:17.712982177Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Delete the harness demonstration suite, whose remaining cases re-prove properties owned elsewhere.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/harness_demo.rs` re-proves queries, blocking, cycle rejection and gates, which their domain, graph and gate tests own; its unique cases already have owners. `fast_docs_templates/main.rs` declares it, and `dev/TESTING.md` (`:86`, `:161`, `:166`, `:562`, `:615`, `:716`, `:747`) cites it as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `harness_demo.rs` no longer exists, and `fast_docs_templates/main.rs` does not declare it.\n- [hard] REQ-02: Each property it re-proved has an owning test elsewhere.\n- [hard] REQ-03: `dev/TESTING.md` cites owning tests as worked examples where it cited the demonstration.\n",
   "documents": [],
+  "done_at": "2026-10-27T22:15:39.383622739Z",
+  "first_ready_at": "2026-10-27T22:15:14.487143540Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3fcc657c-f9b3-4289-9510-3866aa7a36b2",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:47:54.388890707Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7304e7df-1893-48ec-9cbf-5d8ccc54166f",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:50:48.574369061Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2d537b7c-d772-49ce-93b6-24ae15f0a92e",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "The harness demonstration suite is deleted",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:15:39.383622739Z"
 }

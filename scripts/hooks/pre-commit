@@ -1,44 +1,32 @@
 #!/usr/bin/env bash
-# Pre-commit hook for JIT: Validate leases and branch drift
+# Pre-commit hook for JIT: shared configuration changes require common history
+# with main.
 #
-# This hook enforces:
-# 1. Global operations (.jit/config.toml, .jit/gates.toml) require common history with main
-# 2. Edits to .jit/issues/<uuid>.json require an active, non-stale lease (strict mode)
+# Leases are enforced when a mutation is written, so this hook does not check
+# them; a hand edit of an issue record is not caught at commit.
 #
 # Installation:
-#   cp scripts/hooks/pre-commit .git/hooks/pre-commit
-#   chmod +x .git/hooks/pre-commit
+#   jit hooks install
 #
 # Skip enforcement (emergency override):
 #   git commit --no-verify
 
 set -euo pipefail
 
-# Get enforcement mode from config
-enforcement_mode="off"
-if [ -f .jit/config.toml ]; then
-  enforcement_mode=$(grep -E '^\s*enforce_leases\s*=' .jit/config.toml | sed -E 's/.*=\s*"([^"]+)".*/\1/' || echo "off")
+if ! enforcement_mode=$(jit config get worktree.enforce_leases 2> /dev/null); then
+  echo "warning: Pre-commit hook: jit could not read the enforcement mode, skipping" >&2
+  exit 0
 fi
-
-# Skip hook if enforcement is off
 if [ "$enforcement_mode" = "off" ]; then
   exit 0
 fi
 
-# Get changed files in this commit
-changed=$(git diff --cached --name-only || true)
-
-if [ -z "$changed" ]; then
-  exit 0
-fi
-
-# 1. Enforce global operations on main-only (when diverged)
-if echo "$changed" | grep -E '^\.jit/(config|gates)\.toml$' >/dev/null; then
+if git diff --cached --name-only | grep -qE '^\.jit/(config|gates)\.toml$'; then
   base=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main 2>/dev/null || echo "")
   main=$(git rev-parse origin/main 2>/dev/null || git rev-parse main 2>/dev/null || echo "")
-  
+
   if [ -n "$base" ] && [ -n "$main" ] && [ "$base" != "$main" ]; then
-    echo "❌ Pre-commit hook: Global .jit/ changes require common history with main" >&2
+    echo "error: Pre-commit hook: Global .jit/ changes require common history with main" >&2
     echo "   Your branch has diverged from origin/main" >&2
     echo "" >&2
     echo "   To proceed:" >&2
@@ -49,75 +37,3 @@ if echo "$changed" | grep -E '^\.jit/(config|gates)\.toml$' >/dev/null; then
     exit 1
   fi
 fi
-
-# 2. Enforce active lease for structural per-issue edits (strict mode only)
-if [ "$enforcement_mode" != "strict" ]; then
-  exit 0
-fi
-
-# Check if jq is available
-if ! command -v jq &> /dev/null; then
-  echo "⚠️  Pre-commit hook: jq not found, skipping lease validation" >&2
-  echo "   Install jq to enable lease checks" >&2
-  exit 0
-fi
-
-# Extract issue IDs from changed files
-for f in $changed; do
-  if echo "$f" | grep -E '^\.jit/issues/[^/]+\.json$' >/dev/null; then
-    issue_id=$(basename "$f" .json)
-    
-    # Get current agent
-    agent_id="${JIT_AGENT_ID:-}"
-    if [ -z "$agent_id" ]; then
-      # Try to get from config
-      if [ -f ~/.config/jit/agent.toml ]; then
-        agent_id=$(grep -E '^\s*id\s*=' ~/.config/jit/agent.toml | sed -E 's/.*=\s*"([^"]+)".*/\1/' || echo "")
-      fi
-    fi
-    
-    if [ -z "$agent_id" ]; then
-      echo "❌ Pre-commit hook: Structural edit to issue $issue_id without agent identity" >&2
-      echo "   Set JIT_AGENT_ID environment variable or configure ~/.config/jit/agent.toml" >&2
-      echo "" >&2
-      echo "   Example:" >&2
-      echo "     export JIT_AGENT_ID='agent:your-name'" >&2
-      echo "" >&2
-      echo "   Or skip this hook (emergency only):" >&2
-      echo "     git commit --no-verify" >&2
-      exit 1
-    fi
-    
-    # Get worktree identity
-    worktree_id=$(jq -r '.worktree_id' .jit/worktree.json 2>/dev/null || echo "")
-    
-    # Check for active, non-stale lease
-    claims_index=".git/jit/claims.index.json"
-    has_claim=""
-    if [ -f "$claims_index" ]; then
-      has_claim=$(jq -r \
-        --arg issue "$issue_id" \
-        --arg agent "$agent_id" \
-        '.leases[] | select(.issue_id==$issue) | select(.agent_id==$agent) | select(.stale != true) | .lease_id' \
-        "$claims_index" 2>/dev/null || echo "")
-    fi
-
-    if [ -z "$has_claim" ]; then
-      echo "❌ Pre-commit hook: Structural edit to issue $issue_id without active lease" >&2
-      echo "   Agent: $agent_id" >&2
-      if [ -n "$worktree_id" ]; then
-        echo "   Worktree: $worktree_id" >&2
-      fi
-      echo "" >&2
-      echo "   Acquire a lease:" >&2
-      echo "     jit claim acquire $issue_id --ttl 600" >&2
-      echo "" >&2
-      echo "   Or skip this hook (emergency only):" >&2
-      echo "     git commit --no-verify" >&2
-      exit 1
-    fi
-  fi
-done
-
-# All checks passed
-exit 0

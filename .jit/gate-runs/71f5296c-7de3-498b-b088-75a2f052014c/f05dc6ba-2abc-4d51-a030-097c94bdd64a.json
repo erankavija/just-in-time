@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:31:53.586060070Z",
+  "duration_ms": 260429,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No attributable issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "71f5296c-7de3-498b-b088-75a2f052014c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f05dc6ba-2abc-4d51-a030-097c94bdd64a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:27:33.156983094Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3c948c5f, a2ce9a709, 17401219, 287c3bbd (`jit:71f5296c`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown); @/issue/71f5296c/decision/D-01 (issue Markdown); @/invariant/architecture-dependency-direction, orthogonal-tests, essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-11-04T09:14:59Z; mcp-ci passed 2026-11-04T09:14:59Z\nTruncation recovery: path-scoped patches, merge-parent diffs, current handler/output/schema/tests, and linked planning documents read separately\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No attributable issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -7,21 +7,23 @@
 //! hierarchy, grouping, and owner association deterministic and independently
 //! testable.
 
+use crate::config::DocumentationConfig;
+use crate::domain::artifact_directory::{derive_issue_documents, owned_artifact_directories};
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactAction, ArtifactPlanEntry, ArtifactProvenance,
     ArtifactVersion, BlockerCode, PlanBlocker, PlanError, PlanTarget, PlanWarning, WarningCode,
 };
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, State};
 use crate::graph::hierarchy::resolve_hierarchy;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
 
 /// One explicit-root inventory target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExplicitRootTarget<'a> {
     /// A container already resolved to its full durable issue id.
-    Container(&'a str),
+    Container(&'a IssueId),
     /// An arbitrary repository-relative working-tree path.
     Document(&'a str),
 }
@@ -64,7 +66,7 @@ pub fn pinned_root_requests(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExplicitRootInventory {
     target: PlanTarget,
-    member_ids: Vec<String>,
+    member_ids: Vec<IssueId>,
     artifacts: Vec<ArtifactPlanEntry>,
     blockers: Vec<PlanBlocker>,
 }
@@ -76,7 +78,7 @@ impl ExplicitRootInventory {
     }
 
     /// Canonically ordered resolved-hierarchy members, including the root.
-    pub fn member_ids(&self) -> &[String] {
+    pub fn member_ids(&self) -> &[IssueId] {
         &self.member_ids
     }
 
@@ -90,6 +92,31 @@ impl ExplicitRootInventory {
         &self.blockers
     }
 
+    /// Add working-tree roots no link names; each is ownerless, the shape a
+    /// document owned by location takes.
+    ///
+    /// A path already inventoried keeps its linked entry, so it is planned once.
+    pub fn with_unlinked_roots(
+        mut self,
+        paths: impl IntoIterator<Item = String>,
+    ) -> Result<Self, InventoryError> {
+        let present = self
+            .artifacts
+            .iter()
+            .filter(|entry| !entry.version().is_pinned())
+            .map(|entry| entry.source().to_string())
+            .collect::<BTreeSet<_>>();
+        for path in paths.into_iter().filter(|path| !present.contains(path)) {
+            let mut entry =
+                ArtifactPlanEntry::new(path, ArtifactVersion::WorkingTree, ArtifactAction::Retain)
+                    .with_provenance(vec![ArtifactProvenance::Explicit]);
+            entry.normalize()?;
+            self.artifacts.push(entry);
+        }
+        self.artifacts.sort_by_key(ArtifactPlanEntry::identity);
+        Ok(self)
+    }
+
     /// Consume the inventory into fields accepted directly by
     /// [`crate::domain::artifact_plan::ArtifactPlan::new`].
     pub fn into_plan_parts(self) -> (PlanTarget, Vec<ArtifactPlanEntry>, Vec<PlanBlocker>) {
@@ -101,7 +128,7 @@ impl ExplicitRootInventory {
         self,
     ) -> (
         PlanTarget,
-        Vec<String>,
+        Vec<IssueId>,
         Vec<ArtifactPlanEntry>,
         Vec<PlanBlocker>,
     ) {
@@ -109,31 +136,62 @@ impl ExplicitRootInventory {
     }
 }
 
+/// Directories whose files may be documents owned by location by the members
+/// of the container `root`'s resolved subtree.
+pub fn member_document_directories(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    root: &IssueId,
+    documentation: &DocumentationConfig,
+) -> BTreeSet<String> {
+    let members = resolved_subtree_members(issues, hierarchy, root);
+    issues
+        .iter()
+        .filter(|issue| members.contains(&issue.id))
+        .flat_map(|issue| owned_artifact_directories(issue, documentation, hierarchy))
+        .collect()
+}
+
+/// The files of `files` that effectively terminal members of the container
+/// `root`'s resolved subtree own by location ([`derive_issue_documents`]).
+///
+/// A file an issue outside the subtree links is left to that issue's link.
+pub fn member_derived_documents(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    root: &IssueId,
+    files: &[String],
+    documentation: &DocumentationConfig,
+) -> BTreeSet<String> {
+    let members = resolved_subtree_members(issues, hierarchy, root);
+    let outside_links = issues
+        .iter()
+        .filter(|issue| !members.contains(&issue.id))
+        .flat_map(|issue| issue.documents.iter())
+        .map(|document| normalize_artifact_path(&document.path))
+        .collect::<BTreeSet<_>>();
+    issues
+        .iter()
+        .filter(|issue| members.contains(&issue.id) && issue.is_effectively_terminal())
+        .flat_map(|issue| derive_issue_documents(issue, files, documentation, hierarchy))
+        .map(|document| document.path)
+        .filter(|path| !outside_links.contains(path))
+        .collect()
+}
+
 /// Failures in deterministic inventory construction itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum InventoryError {
     /// The supplied full container id is absent from the repository-wide input.
-    ContainerNotFound(String),
+    #[error("container not found: {0}")]
+    ContainerNotFound(IssueId),
     /// Captured evidence claimed success with a working-tree or malformed version.
+    #[error("pinned evidence contains a non-pinned version for {revision} at {path}")]
     NonPinnedResolution { revision: String, path: String },
     /// The produced entry violated the artifact-plan model.
+    #[error("{0}")]
     InvalidPlanEntry(PlanError),
 }
-
-impl fmt::Display for InventoryError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ContainerNotFound(id) => write!(formatter, "container not found: {id}"),
-            Self::NonPinnedResolution { revision, path } => write!(
-                formatter,
-                "pinned evidence contains a non-pinned version for {revision} at {path}"
-            ),
-            Self::InvalidPlanEntry(error) => error.fmt(formatter),
-        }
-    }
-}
-
-impl std::error::Error for InventoryError {}
 
 impl From<PlanError> for InventoryError {
     fn from(error: PlanError) -> Self {
@@ -143,7 +201,7 @@ impl From<PlanError> for InventoryError {
 
 #[derive(Debug, Clone)]
 struct DirectOwner {
-    issue: String,
+    issue: IssueId,
     document_index: usize,
     state: State,
     archived_from: Option<State>,
@@ -250,7 +308,7 @@ pub fn inventory_explicit_roots(
             let mut entry = ArtifactPlanEntry::new(path, version, ArtifactAction::Retain)
                 .with_provenance(vec![ArtifactProvenance::Explicit])
                 .with_owners(owners)
-                .with_warnings(warnings);
+                .with_plan_warnings(warnings);
             entry.normalize()?;
             Ok(entry)
         })
@@ -275,11 +333,11 @@ fn inventory_scope(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
     target: ExplicitRootTarget<'_>,
-) -> Result<(PlanTarget, BTreeSet<String>, BTreeSet<String>, bool), InventoryError> {
+) -> Result<(PlanTarget, BTreeSet<IssueId>, BTreeSet<String>, bool), InventoryError> {
     match target {
         ExplicitRootTarget::Container(root) => {
-            if !issues.iter().any(|issue| issue.id == root) {
-                return Err(InventoryError::ContainerNotFound(root.to_string()));
+            if !issues.iter().any(|issue| &issue.id == root) {
+                return Err(InventoryError::ContainerNotFound(root.clone()));
             }
             let members = resolved_subtree_members(issues, hierarchy, root);
             let paths = issues
@@ -289,9 +347,7 @@ fn inventory_scope(
                 .map(|document| normalize_artifact_path(&document.path))
                 .collect();
             Ok((
-                PlanTarget::Container {
-                    id: root.to_string(),
-                },
+                PlanTarget::Container { id: root.clone() },
                 members,
                 paths,
                 false,
@@ -312,12 +368,12 @@ fn inventory_scope(
 fn resolved_subtree_members(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
-    root: &str,
-) -> BTreeSet<String> {
+    root: &IssueId,
+) -> BTreeSet<IssueId> {
     let issue_refs = issues.iter().collect::<Vec<_>>();
     let resolution = resolve_hierarchy(&issue_refs, hierarchy);
     let mut members = BTreeSet::new();
-    let mut pending = vec![root.to_string()];
+    let mut pending = vec![root.clone()];
 
     while let Some(id) = pending.pop() {
         if !members.insert(id.clone()) {

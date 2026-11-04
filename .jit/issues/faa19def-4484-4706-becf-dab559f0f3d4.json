@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:45:22.281417628Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Store the actor of a gate run as an `Assignee`, so it is parsed once at decode.\n\n## Background\n\n`GateRunResult.by` is `Option<String>` (`crates/jit/src/domain/types.rs:982`), re-parsed into an `Assignee` by `gate_state_from_run` (`commands/gate_check.rs:229-236`). Production writers emit only the automated executor (`gate_execution.rs:175,1513`, `commands/gate_check.rs:56,1225`); the output view copies it (`output.rs:2502,2560`). Every recorded gate-run `by` in this repository is `auto:executor`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateRunResult.by` is `Option<Assignee>`, and the re-parse in `gate_state_from_run` is gone.\n- [hard] REQ-02: Gate-run writers use the automated-executor constant.\n- [hard] REQ-03: Recorded gate runs in this repository load and re-serialize byte-identically.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:13:21.954145724Z",
+  "first_ready_at": "2026-10-25T01:43:29.860781475Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dc624c95-1990-42f2-a312-7096793d44d8",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:13:18.543944057Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f7126a33-6dbc-4c7c-b39f-917023da917c",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:09:22.763636919Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "faa19def-4484-4706-becf-dab559f0f3d4",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate-run actors are Assignee values",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T05:13:21.954145724Z"
 }

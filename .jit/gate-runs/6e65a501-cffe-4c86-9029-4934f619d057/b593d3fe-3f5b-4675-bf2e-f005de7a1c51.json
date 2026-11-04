@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9e1ac051e7e6ae631a362560f170de922f2535f",
+  "completed_at": "2026-11-01T19:45:11.161279976Z",
+  "duration_ms": 149728,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable implementation leaves one repository-state canonical JSON serializer, preserves the package-hash algorithm, and includes the preserve_order guard test.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6e65a501-cffe-4c86-9029-4934f619d057",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b593d3fe-3f5b-4675-bf2e-f005de7a1c51",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T19:42:41.432337528Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 03cad0d64c5333e30510412408219033fd85b072; a9e1ac051e7e6ae631a362560f170de922f2535f\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-08 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (reused, 2026-11-01T19:42:39Z); code-review pending\nTruncation recovery: partitioned merge and focused-commit patches; reread canonical-function, profile-hash, and serializer ranges individually\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable implementation leaves one repository-state canonical JSON serializer, preserves the package-hash algorithm, and includes the preserve_order guard test.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

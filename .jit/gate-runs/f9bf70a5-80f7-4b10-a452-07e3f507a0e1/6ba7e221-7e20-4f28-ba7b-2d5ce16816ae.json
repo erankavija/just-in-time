@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a1a0535cb0b76b608aa1a69764c891deed81c94e",
+  "completed_at": "2026-11-03T02:11:13.414060731Z",
+  "duration_ms": 72802,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Archive execution payload extraction, fold integration, serialization shape, and event-reference projection satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f9bf70a5-80f7-4b10-a452-07e3f507a0e1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6ba7e221-7e20-4f28-ba7b-2d5ce16816ae",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T02:10:00.611535653Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f608fcae8, 311cbbd27 (`jit:f9bf70a5`; uncommitted JIT records excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f9bf70a5/requirement/REQ-01, REQ-02 and @/issue/f8a6b298/requirement/REQ-09 (.jit issue descriptions); @/charter/D-19 (dev/vision/9db27a3a-charter.md); applicable invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, current HEAD); prior code-review failed (exit 1, F1), corrected by 311cbbd27\nTruncation recovery: focused per-path reads of the execution type, folds, storage reader, catalog/reference, and tests\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Archive execution payload extraction, fold integration, serialization shape, and event-reference projection satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

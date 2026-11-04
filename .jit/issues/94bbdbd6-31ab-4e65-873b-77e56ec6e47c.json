@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:38:39.255283674Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -9,11 +9,26 @@
   ],
   "description": "Make the in-memory backend's path reads come from its own state, so it passes the shared conformance suite for path reads, decoding and commit-pinned reads.\n\n## Background\n\n`InMemoryStorage::read_path_bytes` (`crates/jit/src/storage/memory.rs:943-990`) ignores its `_at_commit` argument and reads `std::fs::read(root_path.join(path))` from the real disk, so in-memory tests observe whatever the host directory holds. `storage/test_support.rs` (`seed_repository_tree_fixture`) imports a file tree into memory state.\n\n## Success Criteria\n\n- [hard] REQ-01: In-memory path reads return bytes from the store's own state, never from the host filesystem.\n- [hard] REQ-02: A commit-pinned read returns the state recorded for that commit, and a read at an unknown commit fails with the same error class as the JSON backend.\n- [hard] REQ-03: The conformance suite includes path-read, decoding and commit-pinned read cases, and both backends pass them.\n- [hard] REQ-04: A test that relied on the disk fallback seeds the store instead.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:39:13.244704410Z",
+  "first_ready_at": "2026-10-28T22:29:09.888833022Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f5ca6ee8-7afe-4f8e-ae40-ff4a6a723c0f",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:35:05.020550259Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "486d3e21-2183-4ddc-aeb1-dd0074761c61",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:38:46.624031053Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "94bbdbd6-31ab-4e65-873b-77e56ec6e47c",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "In-memory path reads serve the store's own commit-pinned state",
-  "updated_at": "2026-10-22T14:44:28.937675012Z"
+  "updated_at": "2026-11-01T01:39:13.244704410Z"
 }

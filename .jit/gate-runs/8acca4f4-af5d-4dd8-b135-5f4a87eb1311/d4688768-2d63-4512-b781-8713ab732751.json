@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-8acca4f4",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "77f5f7a18df2793052016bc45531968e3f8c4498",
+  "completed_at": "2026-10-27T20:01:53.710670508Z",
+  "duration_ms": 142347,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "7bd25f8875a87665c0bd72f5849428e74bee3c5ce6f4bc376149ad5a2d9b970f",
+  "issue_id": "8acca4f4-af5d-4dd8-b135-5f4a87eb1311",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d4688768-2d63-4512-b781-8713ab732751",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T19:59:31.363388790Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 63123 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 63123 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 45881 ms, warmed 17 executables (1993377776 bytes) in 81 ms.\n  ✓ fmt: ok (1574 ms)\n  ✓ clippy: ok (31478 ms)\n  ✓ suite-build: built in 45881 ms, warmed 17 executables (1993377776 bytes) in 81 ms (45965 ms)\n  ✓ test: 4667 passed, 0 failed, 0 skipped (59704 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (3400 ms)\n  ✓ suite-clock: 63123 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (7 ms)\n  ✗ budget: FAILED (exit 1) (83 ms)\n\ncargo-ci: verdict (exit 1): failing steps (budget) are environment-sensitive but baseline load1=0.37 < threshold 4.08 (0.17 x 24 CPUs); a quiet-host failure is a real regression to investigate\n"
+}

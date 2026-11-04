@@ -1,19 +1,41 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T02:40:55.135946951Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
+    "12c0f3fb-fde6-4504-aac0-773b435f0a83",
     "d4373d07-570c-4968-8fb4-f7cd64e90183"
   ],
-  "description": "`jit serve` prints eight bare JSON documents and runs its foreground server inline, ending in its own `std::process::exit`. This moves it to a library handler over `commands/serve.rs`.\n\n## Background\n\n`Commands::Serve` in `crates/jit/src/main.rs` handles `--stop`, `--status`, daemon start and `--fg`. The stop, status and daemon paths already call `start_server`, `stop_server` and `server_status` in `crates/jit/src/commands/serve.rs`, but print their results as bare `json!` documents outside the success envelope (stop, stop not-running, status, status not-running, already running, started, already running after a race). The foreground path calls `read_pid_file`, `is_process_alive`, `find_available_port`, `find_server_binary` and `spawn_with_listener`, waits on the child, prints an `exited` document and calls `std::process::exit(foreground_exit_code(..))` with the child's code. Before starting, the arm releases the retained mutation session so the child can bootstrap. `serve` falls back to `CommandResponse` in the schema. `commands/serve.rs` now provides a foreground-serve function returning its outcome.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `jit serve` to a handler in `crates/jit/src/dispatch/serve.rs` that calls the foreground-serve function and the existing start, stop and status functions, and `main.rs` makes no serve process call.\n- [hard] REQ-02: Every serve result prints through the one success emitter as a registered typed response, and a test states the new enveloped payload for `--status` and `--stop`.\n- [hard] REQ-03: A foreground server whose child exits non-zero returns a typed `ForegroundServerExited` error carrying the child's status, classified to a new `SERVER_EXITED` code with exit 1 and the status in `error.details`; `foreground_exit_code` and the `serve --fg` pass-through exception are gone, and a test states the new code and exit status.\n- [hard] REQ-04: The retained mutation session is still released before the server starts, and serve failures are classified errors with no `std::process::exit` in the handler.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "`jit serve` prints eight bare JSON documents and runs its foreground server inline, ending in its own `std::process::exit`. This moves it to a library handler over `commands/serve.rs`.\n\n## Background\n\n`Commands::Serve` in `crates/jit/src/main.rs` handles `--stop`, `--status`, daemon start and `--fg`. The stop, status and daemon paths already call `start_server`, `stop_server` and `server_status` in `crates/jit/src/commands/serve.rs`, but print their results as bare `json!` documents outside the success envelope (stop, stop not-running, status, status not-running, already running, started, already running after a race). The foreground path calls `read_pid_file`, `is_process_alive`, `find_available_port`, `find_server_binary` and `spawn_with_listener`, waits on the child, prints an `exited` document and calls `std::process::exit(foreground_exit_code(..))` with the child's code. Before starting, the arm releases the retained mutation session so the child can bootstrap. `serve` falls back to `CommandResponse` in the schema. `commands/serve.rs` now provides a foreground-serve function returning its outcome.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `jit serve` to a handler in `crates/jit/src/dispatch/serve.rs` that calls the foreground-serve function and the existing start, stop and status functions, and `main.rs` makes no serve process call.\n- [hard] REQ-02: Every serve result prints through the one success emitter as a registered typed response, and a test states the new enveloped payload for `--status` and `--stop`.\n- [hard] REQ-03: A foreground server whose child exits non-zero returns a typed `ForegroundServerExited` error carrying the child's status, classified to a new `SERVER_EXITED` code with exit 1 and the status in `error.details`; `foreground_exit_code` and the `serve --fg` pass-through exception are gone, and a test states the new code and exit status.\n- [hard] REQ-04: The retained mutation session is still released before the server starts, and serve failures are classified errors with no `std::process::exit` in the handler.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-06's unchanged human output excludes the three custom error prefixes `Error stopping server:`, `Error starting server:` and `Error checking server status:` (`main.rs`). Serve failures are classified errors printed once by the single error printer, with the context in a typed error's `Display`, so they read `Error: <verb> server: <msg>` (steward ruling, 2026-11-04).\n- D-02: The `serve --fg` startup banner prints from the bound-port callback before any outcome exists, guarded so nothing reaches either stream under `--json`. This is a named exception to the one-emitter rule for `serve --fg` only. Convergence condition: it moves onto a context progress writer when a second leaf needs progress output (steward ruling, 2026-11-04).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:38:19.598435042Z",
+  "first_ready_at": "2026-11-03T23:08:01.745088604Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5aceb5a5-0f3e-4031-8e73-e3be5dbb227c",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.833007402Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e6a7a05f-fcb9-4c6a-bf4e-16b05ed20ef5",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:27:32.972160520Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "290ca41b-9e0b-4aea-9eec-5ac61085ef95",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.974030722Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8c46fc85-284a-4491-aa5c-57a5b22f96db",
   "labels": [
     "type:task",
@@ -31,7 +53,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Serve command moves to a library handler",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T09:38:19.598435042Z"
 }

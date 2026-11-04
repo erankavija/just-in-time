@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/profile-test-suite.sh --self-test",
+  "commit": "4dd509da934dc48a9d965f833ac6100fa08d3f92",
+  "completed_at": "2026-11-01T07:22:04.650091355Z",
+  "duration_ms": 102,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "profile-suite-selftest",
+  "inputs_digest": "54b398b2ac6e6bc9440a3e811fdeb9d74dcc298eb075c6f0c573ead7eaf73078",
+  "issue_id": "d6635a93-822d-4f64-b171-f4485dde4a10",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a9b254fb-7022-41a8-a668-4c09307ccd0f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:22:04.547695700Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "profile-test-suite: self-test passed\n"
+}

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3bc159bf0e39559ca38b10eccbd8794621df7d81",
+  "completed_at": "2026-10-28T23:49:24.781341924Z",
+  "duration_ms": 211053,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/gate_cli_integration_test.rs",
+        "id": "F1",
+        "line": 210,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8f87e366/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "The run-history-suggestion JSON failure test asserts bare failure and suggestions but not the GATE_FAILED error class."
+      }
+    ],
+    "summary": "One JSON gate-failure test still lacks required error-class evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8f87e366-0470-42de-a24a-9262b637bd13",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d3bd09d8-34c4-4a2f-af62-14a2a9049ce5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:45:53.728296660Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6326 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184e7-eb5b-77c2-9a5b-7540afbea0ad\n--------\nuser\n--- 6313 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 221742543, 1bac3f8ce (merge), 31261a8b\nPolicy sources: AGENTS.md\nResolved items: @/issue/8f87e366/requirement/REQ-02 (.jit issue description); @/issue/c780514e/requirement/REQ-01 (.jit issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-10-28T23:45:53Z); prior code-review failed (exit 1, 2026-10-28T23:38:32Z)\nTruncation recovery: Re-read merge per-parent statistics and file lists, then bounded diffs for moved tests; excluded historical .jit records from behavioral judgment.\n\n1. [blocking][issue-impact] `test_gate_evaluate_json_failure_suggests_run_history_view` still invokes a failed checker but asserts only bare failure and the suggestion payload at `crates/jit/tests/cli_gate/gate_cli_integration_test.rs:210`. Its removed exit-code check was its sole proof of the `GATE_FAILED` class; add an assertion for `json[\"error\"][\"code\"] == \"GATE_FAILED\"` to meet REQ-02. References: @/issue/8f87e366/requirement/REQ-02.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One JSON gate-failure test still lacks required error-class evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The run-history-suggestion JSON failure test asserts bare failure and suggestions but not the GATE_FAILED error class.\",\"file\":\"crates/jit/tests/cli_gate/gate_cli_integration_test.rs\",\"line\":210,\"references\":[\"@/issue/8f87e366/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

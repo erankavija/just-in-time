@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:jit-execution-lead",
+  "assignee": null,
   "claimed_at": "2026-10-01T19:32:31.844080913Z",
   "context": {},
   "created_at": "2026-07-29T13:46:37.535084130Z",
@@ -17,6 +17,7 @@
     "c5c324df-662e-45cb-978e-b90d74280c62",
     "c639cfb5-8356-4c54-b45c-860064432560",
     "c780514e-8491-40a7-8844-3974bba91257",
+    "df129d9e-c795-4d92-9ee5-ffd776339252",
     "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
     "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
     "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
@@ -51,5 +52,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Cut the v1.0.0 tag and verify the published release",
-  "updated_at": "2026-10-21T15:51:28.664876239Z"
+  "updated_at": "2026-11-01T14:09:26.304782436Z"
 }

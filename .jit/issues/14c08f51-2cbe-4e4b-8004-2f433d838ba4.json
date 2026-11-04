@@ -1,0 +1,49 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T04:15:20.248787980Z",
+  "context": {},
+  "created_at": "2026-11-01T04:15:19.570262439Z",
+  "dependencies": [],
+  "description": "Check the dogfood package against this repository's declaration registries through a configured gate rather than the Rust test suite, so test verdicts do not depend on `.jit/*.toml`.\n\n## Background\n\nThe contribution and template drift tests in `crates/jit/src/profile/repository_package.rs` compare the package against `.jit/*.toml`. A test here depends on this repository's local policy. A wrong gate-input footprint or exclusion makes a reused gate verdict silently stale, so that check must keep running over this repository. The `repo-validate` command check and the live `dev/archive` layout check are deleted: an edit to either is explicit or visible.\n\n## Success Criteria\n\n- [hard] REQ-01: A configured gate fails when the dogfood package's contributions or templates drift from this repository's `.jit/*.toml` registries, through a dev-only example over the existing test-only drift modules, so no adopter build carries new code.\n- [hard] REQ-02: That gate also fails on an invalid gate-input declaration of this repository, by the smallest check that works.\n- [hard] REQ-03: The drift tests that read `.jit/*.toml` no longer exist in `profile/repository_package.rs`.\n\n\n\n## Evidence\n\nLead run of `package-drift` on a copy of `.jit/*.toml` at `175a7a0cb`: exit 0 on the copy, exit 1 with a seeded contribution edit and with a seeded template edit. Worker runs also exit 1 on a narrowed `cargo-ci` root, `code-review` given inputs, and a dropped `target` or `web/node_modules` exclusion. `scripts/rust-build-budget.sh`: 10/12 targets, 1,699,548,112/2,147,483,648 bytes.\n\n`jit profile diff` agrees with `apply` on seeded drift, since `apply` keeps the differing entries; the disagreements found on the way are filed as 1b0c2b75 and ab797eed.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:13:17.638920245Z",
+  "first_ready_at": "2026-11-01T04:15:19.570262439Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "package-drift"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7754b735-4e94-4ca7-9644-38e19a96c19b",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:07:07.404896162Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ef57bac5-dedc-472a-9743-2cae0b502d25",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:11:15.704906051Z",
+      "updated_by": "auto:executor"
+    },
+    "package-drift": {
+      "run_id": "d8d7efed-12e8-465a-b923-ee227a6a7e39",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:07:43.227939935Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "14c08f51-2cbe-4e4b-8004-2f433d838ba4",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Package drift over the registries runs as a gate",
+  "updated_at": "2026-11-01T08:13:17.638920245Z"
+}

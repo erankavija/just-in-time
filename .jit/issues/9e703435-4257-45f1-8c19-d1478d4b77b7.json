@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T18:28:24.835922045Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Profile conflict and target-subject types serialize through derived implementations, and profile conflict error details publish a derived schema; the hand-written wire mirrors are removed.\n\n## Background\n\nIn `crates/jit/src/repository_state/profile_apply.rs` (line numbers at the investigation baseline):\n\n- `ProfileTargetConflictWire` (810) and the hand-written `Serialize` for `ProfileTargetConflict` (827) exist to inject a computed `remedy` field, which no longer exists.\n- `ProfileTargetSubjectWire` (911) and the hand-written `Serialize` for `ProfileTargetSubject` (916) exist to render a virtual path through `repository_relative()`; a field-level serializer or a path newtype derives the same output.\n- `ProfileTargetConflictsError` (969) and `ProfileTargetConflictEntry` (936) derive `Serialize` but not `JsonSchema`, and reach JSON as error details (`crates/jit/src/main.rs:1290`) with no published schema.\n\n## Success Criteria\n\n- [hard] REQ-01: No hand-written `Serialize` or `JsonSchema` implementation, and no wire mirror type, remains for profile conflict or target-subject types.\n- [hard] REQ-02: Profile conflict error details have a published schema derived from their type.\n- [hard] REQ-03: A target subject serializes as its repository-relative path.\n",
   "documents": [],
+  "done_at": "2026-11-01T18:47:41.403157913Z",
+  "first_ready_at": "2026-11-01T18:27:10.701020661Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "46c171cc-9467-45fb-9775-073f0ef84a96",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:42:45.595721374Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9215759c-d550-493c-bfb4-bd14817318c3",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:46:09.614562644Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9e703435-4257-45f1-8c19-d1478d4b77b7",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Derive profile conflict serialization",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T18:47:41.403157913Z"
 }

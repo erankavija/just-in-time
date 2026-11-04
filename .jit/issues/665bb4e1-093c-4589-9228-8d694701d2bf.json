@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T18:40:55.898200981Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Registry target paths derive from one registry declaration built on the data-root path constants, each registry renderer finds an existing entry through the one presence lookup, and each registry document is parsed once per composition.\n\n## Background\n\nIn `crates/jit/src/repository_state/profile_apply.rs` (line numbers at the investigation baseline):\n\n- Registry target paths are spelled four times: `Contribution::registry_path` (65-72), `ContributionRegistry::path` (149-157), `KeyedArrayTarget::registry_path` (513-520), and the match in `Contribution::semantic_identity` (106-115).\n- The data-root path constants (`crates/jit/src/repository_state/path.rs:288-297`) already declare them, and `crates/jit/src/repository_state/initialize.rs:332-336` spells them again.\n- `contribution_in_registry` (2912) owns the presence lookup, but the scalar, map-entry, set, keyed-array and projection renderers each test presence their own way (3101-3276).\n- `render_composed_contribution` (3066) re-parses the registry through `semantic_document` (3278) per contribution, and `contribution_in_registry` re-parses per identity.\n\n`ContributionRegistry` becomes the one declaration, with its path derived from the path constants. A keyed-array target and a contribution return their registry, and initialization reuses the same constants.\n\n## Success Criteria\n\n- [hard] REQ-01: Each registry's target path is spelled once, in the registry declaration built on the data-root path constants.\n- [hard] REQ-02: Each registry renderer finds an existing entry through the one presence lookup.\n- [hard] REQ-03: A composition parses each registry document once, however many contributions it renders, shown by a parse-count probe.\n- [hard] REQ-04: Composition unit tests own these properties.\n",
   "documents": [],
+  "done_at": "2026-11-01T18:48:35.747322234Z",
+  "first_ready_at": "2026-11-01T18:48:06.551666058Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a688784e-2a3f-4440-b069-16fa316731dc",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:43:13.953597362Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "51cb0349-4b5b-4f75-b97f-58ef9426a1ea",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:46:06.822751046Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "665bb4e1-093c-4589-9228-8d694701d2bf",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:3d9a0ce3/REQ-11"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Derive registry target paths from one registry declaration",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T18:48:35.747322234Z"
 }

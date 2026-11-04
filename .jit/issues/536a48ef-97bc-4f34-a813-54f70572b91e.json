@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:19:54.579523079Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "`profile show` prints the paths a package targets without per-target hash values, and per-target value hashing is removed; the package identity hash stays.\n\n## Background\n\n`ProfilePackageHashes::targets` (`crates/jit/src/profile/package.rs:910-971`) computes a hash per target. Its keys give the target set (`crates/jit/src/commands/profile.rs:2052`), and its values are printed by `profile show` (`crates/jit/src/profile/application.rs:149`), their only consumer. The resolved-content twin (`target_hashes`, `crates/jit/src/profile/variables.rs:466-505`) is read only for key presence (`crates/jit/src/repository_state/profile_apply.rs:1520,1560-1561`; `crates/jit/src/repository_state/initialize.rs:956-957`). Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: `profile show` prints each package's target paths without per-target hash values.\n- [hard] REQ-02: Per-target value hashing is gone from the package and variable-resolution modules, together with the private canonical-JSON helpers that served only that hashing.\n- [hard] REQ-03: Target presence checks read the target set.\n- [hard] REQ-04: The package identity hash of each shipped package is unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:47:58.848265007Z",
+  "first_ready_at": "2026-11-01T19:19:29.633613974Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "34e006de-8575-4bd7-88be-e50c63775bea",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:42:38.745206786Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f7b06b34-151f-4372-89d2-7a03c6350fad",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:46:33.135284467Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "536a48ef-97bc-4f34-a813-54f70572b91e",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Show a package's target set without value hashes",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:47:58.848265007Z"
 }

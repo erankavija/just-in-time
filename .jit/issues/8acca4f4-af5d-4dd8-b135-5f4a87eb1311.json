@@ -1,21 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T22:26:13.472142639Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
-    "75951558-accb-4ee9-be38-e97fee0326ee",
-    "804a8605-267b-4934-a9ef-08422fc3686d",
-    "8e82fa49-1859-4e29-8972-f2da05e90b0a",
-    "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
-    "d50d6976-f978-4900-a218-6bb9d1b3fa52"
+    "91081bd3-9996-4f81-a405-a06c7cdcae8b"
   ],
   "description": "Retype issue ids in error types, output DTOs and the visualization renderer.\n\n## Background\n\n`errors.rs` holds 45 production issue-id references and 9 raw-id signatures; its `short_id` helper (`errors.rs:995`) truncates by length and is called at `errors.rs:949,954` and `output.rs:32,106,134,1276,1283`, and `errors.rs:504,557` truncate directly. `output.rs` declares id-carrying DTO fields (`output.rs:1421,1554,1563,1625,1689,1749,1836,1857,2363,2390,2627,2781,2831`). `visualization.rs:242` truncates with a literal length.\n\n## Success Criteria\n\n- [hard] REQ-01: No error variant, output DTO field or function parameter in `errors.rs`, `output.rs` or `visualization.rs` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: The `errors::short_id` helper is gone, and short ids in these files come only from `short_id()`.\n- [hard] REQ-03: JSON error payloads and command output are byte-identical before and after.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "done_at": "2026-10-27T20:07:00.079975542Z",
+  "first_ready_at": "2026-10-25T21:56:00.504872996Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e13dc4eb-a214-44c0-b96f-b65073a8e9f0",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:06:48.306128223Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "95e331d2-d0fe-403e-8d62-d572492a052e",
+      "status": "passed",
+      "updated_at": "2026-10-27T19:59:20.517100658Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8acca4f4-af5d-4dd8-b135-5f4a87eb1311",
   "labels": [
     "type:task",
@@ -30,7 +42,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Errors and output carry typed issue ids",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-27T20:07:00.079975542Z"
 }

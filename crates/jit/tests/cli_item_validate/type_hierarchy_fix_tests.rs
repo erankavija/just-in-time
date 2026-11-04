@@ -1,231 +1,153 @@
 //! Integration tests for type hierarchy auto-fix functionality
 
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    crate::setup_repo_with_default_vocabulary()
-}
-
-fn run_jit(temp: &TempDir, args: &[&str]) -> std::process::Output {
-    Command::new(jit_binary())
-        .args(args)
-        .current_dir(temp.path())
-        .output()
-        .unwrap()
-}
-
-fn extract_id(output: &str) -> String {
-    output.split_whitespace().last().unwrap().trim().to_string()
-}
+use jit::test_cli::JitCli;
+use jit::test_utils::profiled_repository_fixture;
 
 #[test]
 fn test_fix_unknown_type_with_suggestion() {
-    let temp = setup_test_repo();
-
-    // Create an issue with a typo in the type label
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Fix bug",
-            "--label",
-            "type:taks", // typo: should be "task"
-        ],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    assert!(
-        output.status.success(),
-        "Failed to create issue: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    // A typo in the type label: should be "task".
+    let issue_id = cli
+        .create_issue(["--title", "Fix bug", "--label", "type:taks"])
+        .unwrap();
 
-    let issue_id = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    // Validate should fail with unknown type
-    let output = run_jit(&temp, &["validate"]);
+    let output = cli.command(["validate"]).output().unwrap();
     assert!(
         !output.status.success(),
         "Validation should fail with unknown type"
     );
 
-    // Run validate with --fix --dry-run to preview fix
-    let output = run_jit(&temp, &["validate", "--fix", "--dry-run"]);
-    assert!(
-        output.status.success(),
-        "Dry run should succeed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let preview = cli
+        .command(["validate", "--fix", "--dry-run"])
+        .output()
+        .unwrap();
+    assert!(!preview.status.success());
+    let stdout = String::from_utf8(preview.stdout).unwrap();
     assert!(stdout.contains("taks"));
     assert!(stdout.contains("task"));
     assert!(stdout.contains("Would replace"));
 
-    // Apply the fix
-    let output = run_jit(&temp, &["validate", "--fix"]);
-    assert!(
-        output.status.success(),
-        "Fix should succeed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = cli.run(["validate", "--fix"]).expect("fix succeeds");
     assert!(stdout.contains("Applied") || stdout.contains("fix"));
 
-    // Verify the type was fixed
-    let output = run_jit(&temp, &["issue", "show", &issue_id, "--json"]);
-    assert!(output.status.success());
-    let json: serde_json::Value =
-        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    let json = cli.run_json(["issue", "show", &issue_id]).unwrap();
     let labels = json["labels"].as_array().unwrap();
     assert!(labels.iter().any(|l| l.as_str() == Some("type:task")));
     assert!(!labels.iter().any(|l| l.as_str() == Some("type:taks")));
 
-    // Validation should now pass
-    let output = run_jit(&temp, &["validate"]);
-    assert!(
-        output.status.success(),
-        "Validation should pass after fix: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    cli.run(["validate"])
+        .expect("validation passes after the fix");
 }
 
 #[test]
 fn test_fix_unknown_type_no_suggestion() {
-    let temp = setup_test_repo();
-
-    // Create an issue with a completely unknown type
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Unknown work",
-            "--label",
-            "type:completely_unknown_xyz",
-        ],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    assert!(output.status.success());
+    cli.create_issue([
+        "--title",
+        "Unknown work",
+        "--label",
+        "type:completely_unknown_xyz",
+    ])
+    .unwrap();
 
-    // Run validate with --fix
-    let output = run_jit(&temp, &["validate", "--fix"]);
-    // Should not crash, but won't be able to fix
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("no automatic fixes") || stdout.contains("No fixes"));
+    // Nothing is repairable, so --fix agrees with validate that the repository is invalid.
+    let validate = cli.command(["validate"]).output().unwrap();
+    let fix = cli.command(["validate", "--fix"]).output().unwrap();
+    assert!(!validate.status.success());
+    assert!(!fix.status.success());
+    assert!(String::from_utf8_lossy(&fix.stdout).contains("completely_unknown_xyz"));
+}
+
+#[test]
+fn test_fix_and_validate_agree_on_a_malformed_label_until_it_is_removed() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Prose label"]).unwrap();
+    cli.run(["issue", "update", &id, "--label", "has spaces", "--force"])
+        .unwrap();
+
+    let validate = cli.command(["validate"]).output().unwrap();
+    let fix = cli.command(["validate", "--fix"]).output().unwrap();
+    assert!(!validate.status.success());
+    assert!(!fix.status.success());
+    assert!(String::from_utf8_lossy(&fix.stdout).contains("has spaces"));
+
+    cli.run(["issue", "update", &id, "--remove-label", "has spaces"])
+        .unwrap();
+
+    cli.run(["validate"]).unwrap();
+    cli.run(["validate", "--fix"]).unwrap();
 }
 
 #[test]
 fn test_fix_multiple_issues() {
-    let temp = setup_test_repo();
-
-    // Create multiple issues with typos
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Issue 1",
-            "--label",
-            "type:taks", // typo
-        ],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    assert!(output.status.success());
-    let id1 = extract_id(&String::from_utf8_lossy(&output.stdout));
+    let id1 = cli
+        .create_issue(["--title", "Issue 1", "--label", "type:taks"])
+        .unwrap();
+    let id2 = cli
+        .create_issue(["--title", "Issue 2", "--label", "type:epik"])
+        .unwrap();
+    // Connect the issues to avoid an isolated-node error.
+    cli.run(["dep", "add", &id2, &id1]).unwrap();
 
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Issue 2",
-            "--label",
-            "type:epik", // typo
-        ],
-    );
-    assert!(output.status.success());
-    let id2 = extract_id(&String::from_utf8_lossy(&output.stdout));
-
-    // Connect the issues to avoid isolated node error
-    let output = run_jit(&temp, &["dep", "add", &id2, &id1]);
-    assert!(output.status.success());
-
-    // Run validate with --fix
-    let output = run_jit(&temp, &["validate", "--fix"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = cli.run(["validate", "--fix"]).unwrap();
     assert!(stdout.contains("2") || stdout.contains("Applied"));
 
-    // Validation should pass
-    let output = run_jit(&temp, &["validate"]);
-    assert!(output.status.success());
+    cli.run(["validate"]).unwrap();
 }
 
 #[test]
 fn test_dry_run_doesnt_modify() {
-    let temp = setup_test_repo();
-
-    // Create an issue with a typo
-    let output = run_jit(
-        &temp,
-        &["issue", "create", "--title", "Test", "--label", "type:taks"],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    assert!(output.status.success());
-    let issue_id = extract_id(&String::from_utf8_lossy(&output.stdout));
+    let issue_id = cli
+        .create_issue(["--title", "Test", "--label", "type:taks"])
+        .unwrap();
 
-    // Run --fix --dry-run
-    let output = run_jit(&temp, &["validate", "--fix", "--dry-run"]);
-    assert!(output.status.success());
+    assert!(!cli
+        .command(["validate", "--fix", "--dry-run"])
+        .output()
+        .unwrap()
+        .status
+        .success());
 
-    // Verify nothing was actually changed
-    let output = run_jit(&temp, &["issue", "show", &issue_id, "--json"]);
-    let json: serde_json::Value =
-        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    let json = cli.run_json(["issue", "show", &issue_id]).unwrap();
     let labels = json["labels"].as_array().unwrap();
     assert!(labels.iter().any(|l| l.as_str() == Some("type:taks")));
     assert!(!labels.iter().any(|l| l.as_str() == Some("type:task")));
 
-    // Validation should still fail
-    let output = run_jit(&temp, &["validate"]);
+    let output = cli.command(["validate"]).output().unwrap();
     assert!(!output.status.success());
 }
 
 #[test]
 fn test_fix_json_output() {
-    let temp = setup_test_repo();
-
-    // Create issue with typo
-    let output = run_jit(
-        &temp,
-        &["issue", "create", "--title", "Test", "--label", "type:taks"],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    assert!(output.status.success());
+    cli.create_issue(["--title", "Test", "--label", "type:taks"])
+        .unwrap();
 
-    // Run validate with --fix --json
-    let output = run_jit(&temp, &["validate", "--fix", "--json"]);
-    assert!(output.status.success());
+    let json = cli.run_json(["validate", "--fix"]).unwrap();
 
-    // Parse JSON and verify structure
-    let json: serde_json::Value = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))
-        .expect("Should output valid JSON");
-
-    // success field removed
     assert!(json["fixes_applied"].as_u64().unwrap() > 0);
     assert_eq!(json["dry_run"], false);
 }
 
 #[test]
 fn test_dry_run_requires_fix_flag() {
-    let temp = setup_test_repo();
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
 
-    // Try to use --dry-run without --fix
-    let output = run_jit(&temp, &["validate", "--dry-run"]);
+    let output = cli.command(["validate", "--dry-run"]).output().unwrap();
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("--dry-run requires --fix"));
@@ -233,25 +155,40 @@ fn test_dry_run_requires_fix_flag() {
 
 #[test]
 fn test_fix_with_valid_repository() {
-    let temp = setup_test_repo();
-
-    // Create a valid issue
-    let output = run_jit(
-        &temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Valid issue",
-            "--label",
-            "type:task",
-        ],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    assert!(output.status.success());
+    cli.create_issue(["--title", "Valid issue", "--label", "type:task"])
+        .unwrap();
 
-    // Run --fix on already valid repository
-    let output = run_jit(&temp, &["validate", "--fix"]);
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = cli.run(["validate", "--fix"]).unwrap();
     assert!(stdout.contains("No fixes") || stdout.contains("valid"));
+}
+
+#[test]
+fn test_validate_fix_renders_unrepairable_post_fix_findings_in_human_and_json() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Unrepairable label"]).unwrap();
+    cli.run(["issue", "update", &id, "--label", "has spaces", "--force"])
+        .unwrap();
+    let plain = cli.command(["validate", "--json"]).output().unwrap();
+    let plain: serde_json::Value = serde_json::from_slice(&plain.stdout).unwrap();
+    let fixed = cli
+        .command(["validate", "--fix", "--json"])
+        .output()
+        .unwrap();
+    assert!(!fixed.status.success());
+    let fixed: serde_json::Value = serde_json::from_slice(&fixed.stdout).unwrap();
+    assert_eq!(
+        fixed["error"]["details"]["rule_findings"],
+        plain["error"]["details"]["rule_findings"]
+    );
+    assert!(fixed["error"]["details"]["rule_findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|f| f["message"].as_str().unwrap().contains("has spaces")));
+    let human = cli.command(["validate", "--fix"]).output().unwrap();
+    assert!(!human.status.success());
+    assert!(String::from_utf8_lossy(&human.stdout).contains("has spaces"));
 }

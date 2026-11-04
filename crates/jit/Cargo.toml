@@ -54,12 +54,12 @@ jsonschema = { version = "0.46", default-features = false }
 toml = "0.8"
 toml_edit = "0.22"
 sha2 = "0.10"
-semver = "1.0"
+semver = { version = "1.0", features = ["serde"] }
 tar = "0.4"
 pulldown-cmark = { workspace = true }
 # Remote document access (external-link reachability checks, commands::document)
 # needs exactly one TLS backend (jit:3398bc19), and Rustls is the only reachable
-# one: ureq's `Agent::new_with_defaults()` — the only call site — builds its
+# one: the timed `Agent::config_builder()` uses the default TLS provider, building its
 # `TlsConfig` from `TlsProvider::default()`, which is unconditionally Rustls, and
 # ureq's native-tls provider docs state that choice "is never picked up
 # automatically" (selecting it would take an explicit `.provider(...)` code
@@ -87,17 +87,22 @@ html = ["dep:tl"]
 xml = ["dep:quick-xml"]
 # Compiles the test-only surface into the library: the fixture and
 # interruption entry points (`commands::test_helpers`, `test_harness`,
-# `JsonFileStorage::with_mutation_interruptions`), the test taxonomy, the
-# `__test-fixture-setup` binary entry, and the reference-page renderers with the
-# `generated_artifacts` drift checks that are their only consumer. Only the self
-# dev-dependency below (and `crates/server`'s) turns it on, so `cargo build` and
+# `JsonFileStorage::with_mutation_interruptions`), the test taxonomy, and the
+# reference-page renderers with the `generated_artifacts` drift checks that are
+# their only consumer. The self dev-dependency below (and `crates/server`'s)
+# enables it, so `cargo build` and
 # release builds drop the surface. The vocabulary the interruption entry points
 # take (`MutationPoint`, `RedoPoint`, and their injector traits) is public
 # either way.
 # OFF by default.
 test-support = []
 
+[build-dependencies]
+# Hashes the crate source for the profiled-repository fixture key (`build.rs`).
+sha2 = "0.10"
+
 [dev-dependencies]
+syn = { version = "2", features = ["full", "visit"] }
 # Enables `test-support` for this crate's own test builds (inline `#[cfg(test)]`
 # modules and the `tests/` integration binaries) without making the feature
 # part of the default build. Cargo unifies this self-edge's requested features

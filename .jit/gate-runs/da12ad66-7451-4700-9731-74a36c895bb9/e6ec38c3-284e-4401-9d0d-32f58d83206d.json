@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "56f95bcfb736e2e0c61fbe95a5c70fcc284a358a",
+  "completed_at": "2026-11-01T14:58:41.373163049Z",
+  "duration_ms": 178861,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard criteria are met; the generated schema and MCP enum exclude rejected from issue update state.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "da12ad66-7451-4700-9731-74a36c895bb9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e6ec38c3-284e-4401-9d0d-32f58d83206d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T14:55:42.511958397Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:da12ad66` commits 32a227da1, 868b55b50, ed712116e, f704ec08a, f5cbf389b, 2106b09d6, 56f95bcfb\nPolicy sources: AGENTS.md\nResolved items: @/issue/da12ad66/requirement/REQ-01 and REQ-02 (issue description); @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T14:54:14.843088998+00:00)\nTruncation recovery: Re-read individual tagged patches, merge parent diffs, current CLI/schema/MCP/docs/tests, and generated schema after aggregate output truncation.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard criteria are met; the generated schema and MCP enum exclude rejected from issue update state.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,18 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T01:19:16.576950782Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "803b107c-a651-4e98-bf82-dc8f945ea67d",
     "b33ed7eb-f699-49a1-a998-5ef6b839d394"
   ],
-  "description": "Find a reusable verdict by reading the one verdict record for its gate and digest, so reuse never scans recorded runs.\n\n## Background\n\n`IssueStore::find_reusable_gate_run(gate_key, digest)` (`crates/jit/src/storage/mod.rs:272-291`) scans every recorded run and selects one with `domain::latest_gate_run` (`storage/json.rs:1483-1490`, `storage/memory.rs:938-946`). Gate evaluation calls it on `self.storage` (`commands/gate_check.rs:916`), outside the mutation image; the one-line `reusable_verdict` wrapper (`:1037-1043`) is deleted by the gate dead-code removal 86d3625d. Both integration-test `IssueStore` wrappers forward the method (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\nEach reusable run now writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming its issue and run, and a run loads by `(issue, run)`.\n\n## Success Criteria\n\n- [hard] REQ-01: Reuse reads the verdict record for `(gate, digest)` from the mutation image and loads the run it names. It reads no other run and no other verdict record, and a run that no verdict record names is never a reuse source.\n- [hard] REQ-02: `IssueStore::find_reusable_gate_run` and its implementations, including both test wrappers, no longer exist.\n- [hard] REQ-03: A test proves that reuse succeeds while every other run record and every other verdict record is unparseable.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Find a reusable verdict by reading the one verdict record for its gate and digest, so reuse never scans recorded runs, and delete the run-list selections that nothing calls afterwards.\n\n## Background\n\n`IssueStore::find_reusable_gate_run(gate_key, digest)` (`crates/jit/src/storage/mod.rs`) scans every recorded run and selects one with `domain::latest_gate_run` (`storage/json.rs`, `storage/memory.rs`). `check_gate_with` (`commands/gate_check.rs`) calls it on `self.storage`, between its inputs session and its record session, because `declared_inputs_digest` runs after the inputs session. Both integration-test `IssueStore` wrappers forward the method, and `storage/issue_store_conformance.rs` has a case for it.\n\nEach reusable run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming its issue and run. `GateState::projected_run` (`domain/types.rs`) is a second selection over a run list; its last callers leave with the latest-run accessor and the named-run captures, and because it is `pub` no dead-code warning fires.\n\n## Success Criteria\n\n- [hard] REQ-01: After computing the digest, `check_gate_with` reads the verdict record for `(gate, digest)` and the run it names through a capture of exactly those paths. It reads no other run and no other verdict record, and a run that no verdict record names is never a reuse source.\n- [hard] REQ-02: `IssueStore::find_reusable_gate_run`, its implementations, both test wrappers' forwards and its conformance case no longer exist.\n- [hard] REQ-03: A test proves that reuse succeeds while every other run record and every other verdict record is unparseable.\n- [hard] REQ-04: `domain::latest_gate_run`, `GateState::projected_run` and their tests no longer exist, and no selection of a latest run over a list of runs remains in `domain/types.rs`.\n",
   "documents": [],
+  "done_at": "2026-11-04T01:44:00.178860646Z",
+  "first_ready_at": "2026-11-04T01:18:45.945928996Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "abc49c98-64a3-48b9-bdc3-9abb9cc4f32f",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:40:37.313610049Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "72faedac-685b-4b48-9247-941a0b184171",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:43:59.740879484Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6c0f8739-f103-4b20-91c4-9990fd0473a0",
   "labels": [
     "type:task",
@@ -22,10 +37,13 @@
     "component:gates",
     "component:storage",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-03"
+    "satisfies:f8a6b298/REQ-03",
+    "component:core",
+    "per:@/charter/D-18",
+    "satisfies:f8a6b298/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate reuse reads one verdict record",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T01:44:00.178860646Z"
 }

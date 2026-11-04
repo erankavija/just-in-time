@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0f6fd338e43bf5630e86d10443e41bc996342c75",
+  "completed_at": "2026-11-01T07:49:47.075912058Z",
+  "duration_ms": 208644,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are met and the prior self-test completion finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8ac93475-f327-4665-afc3-fb740fc4601a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f1624afc-2f61-48cf-ac13-2d8578aef376",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:46:18.431712971Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4dd509da, a61918d, 9f1a8256, 73b28fb9, 842d5a3a, 70bf614c, 0f6fd338\nPolicy sources: AGENTS.md\nResolved items: @/issue/8ac93475/requirement/REQ-01–REQ-03 (issue description, markdown-first); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T07:45:09Z); cargo-ci-selftest passed (exit 0, 2026-11-01T07:46:03Z); prior code-review failed (exit 1, 2026-11-01T07:40:14Z), now addressed\nTruncation recovery: Re-read truncated patch/current-file output by commit, file, and line range; a Cargo configuration diagnostic was unavailable because the host cargo shim attempted a blocked `/tmp` write and was not used for judgment.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are met and the prior self-test completion finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

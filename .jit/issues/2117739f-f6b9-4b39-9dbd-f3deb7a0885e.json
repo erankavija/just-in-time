@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T23:30:43.915277971Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "72d89161-39e7-4858-9f16-31deb4ff7505",
-    "bf8df628-e395-42e6-b8b5-8f0894cf12f6"
+    "803b107c-a651-4e98-bf82-dc8f945ea67d"
   ],
-  "description": "Move every reader of an issue's latest run of a gate onto the gate-state accessor, so showing an issue or its gate status opens one run per gate instead of every run of the issue.\n\n## Background\n\nThree readers select an issue's latest run of a gate from a listing of all its runs:\n\n- `get_last_gate_run` (`crates/jit/src/commands/gate_check.rs:1241-1252`, stable sort, last wins), called by `main.rs:4125,4235,4330` (gate status) and `commands/gate.rs:1005`;\n- `get_last_gate_runs_for_issue` (`commands/gate_check.rs:1361-1395`, keeps the first on a tie), called by `main.rs:4373`;\n- `GateView::build` (`output.rs:1710-1725`, `max_by_key`), fed by `IssueShowResponse::from_issue` with every run of the issue from the show and status builders at `main.rs:1267,2573,2821,2872` and `commands/issue.rs:308`.\n\nAn executor accessor returns the run each gate state names. `tests/cli_gate/gate_cli_integration_test.rs:169-200` (`test_issue_show_errors_on_corrupt_gate_run`) plants a corrupt run record that belongs to no issue and requires `issue show` to fail; a show that loads only named runs never opens it.\n\n## Success Criteria\n\n- [hard] REQ-01: `get_last_gate_run`, `get_last_gate_runs_for_issue` and the show, status, create and children responses take latest runs from the gate-state accessor, and none of them lists the issue's runs.\n- [hard] REQ-02: `IssueShowResponse::from_issue` receives the latest run of each gate, and `GateView::build` selects nothing.\n- [hard] REQ-03: History views (`gate status --all` and `--limit`, the server's run list) still list the issue's runs.\n- [hard] REQ-04: `test_issue_show_errors_on_corrupt_gate_run` corrupts the run record that the shown issue's `last_run` names, locating it through the public `VirtualPath::gate_run_record` constructor, and `issue show` still fails on it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make every reader of an issue's latest gate runs load one record per gate through one accessor, so showing an issue opens one run per gate instead of every run of the issue. Because this makes `GateState.run_id` the only route to a latest run, the same change moves the repository format to 4.\n\n## Background\n\n`get_last_gate_run` and `get_last_gate_runs_for_issue` (`crates/jit/src/commands/gate_check.rs`) already load the named run through `projected_gate_run` and list nothing. `IssueShowResponse::from_issue` still receives every run of the issue, from the issue family's show and status responses and from the show arm of `main.rs`, and `GateView::build` (`output.rs`) finds the named run in that list through `GateState::projected_run`.\n\n`tests/cli_gate/gate_cli_integration_test.rs` (`test_issue_show_errors_on_corrupt_gate_run`) plants a corrupt run record that belongs to no issue and requires `issue show` to fail; a show that loads only named runs never opens it.\n\nA redo record's puts follow the plan's action order (`redo_record_for`, `storage/repository_state_store.rs`). The finalizer (`repository_state/mutation.rs`) writes the issue record before the run record, and `load_issue` reads with no redo check. Once a show loads the run the issue names, a reader in the apply window, or after a crash until the next session completes the record, sees a run id with no record and fails with not-found.\n\n`SUPPORTED_INDEX_SCHEMA_VERSION` (`repository_state/index.rs`) is 3, and `docs/reference/storage-format.md` states that the marker changes whenever an on-disk interpretation changes. After this change a gate state without `run_id` has no latest run. Other repositories hold thousands of gate states with runs and no `run_id`, so a binary with this change must refuse them until they are rewritten. `tests/cli_repo_workflow/format_compat_cli_tests.rs` spells format 3 literally.\n\n## Success Criteria\n\n- [hard] REQ-01: `get_last_gate_runs_for_issue` covers every gate state of the issue, one run per gate, loading each by `(issue, run)` and listing no runs. Unit tests show that it returns the named run when older runs of the gate exist, and nothing for a gate whose state has no `run_id` even when runs of it exist.\n- [hard] REQ-02: The show, status, create and children responses take latest runs from that accessor, and none of them lists the issue's runs. `IssueShowResponse::from_issue` receives the latest run of each gate, and `GateView::build` selects nothing.\n- [hard] REQ-03: History views (`gate status --all` and `--limit`, the server's run list) still list the issue's runs.\n- [hard] REQ-04: `test_issue_show_errors_on_corrupt_gate_run` corrupts the run record that the shown issue's `run_id` names and `issue show` still fails on it.\n- [hard] REQ-05: The finalizer orders a run record's write ahead of the issue record that names it, and a unit test pins that order in the composed redo record.\n- [hard] REQ-06: `SUPPORTED_INDEX_SCHEMA_VERSION` is 4, a repository at format 3 is refused with the existing single-line error, and the format sample in `docs/reference/storage-format.md` shows 4. Tests derive the version from the constant, and the format-compatibility test's literal format is the supported one.\n\n## Notes\n\n- From this landing on, a build of main refuses this repository's own tracker, which stays at format 3 until the cutover window. The installed `jit` stays the last format 3 build, so gates, leads and workers are unaffected. Do not run `./scripts/install-jit.sh` from this commit onward until the window.\n",
   "documents": [],
+  "done_at": "2026-11-04T00:02:18.041844210Z",
+  "first_ready_at": "2026-11-02T23:39:52.090129603Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c75ae7d6-758c-489e-bf13-bb9d504bf063",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:58:18.833231549Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d6abfb6f-afa6-4471-ae75-04284da8d22e",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:02:17.170606416Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "satisfies:f8a6b298/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Latest-run readers use the gate-state accessor",
-  "updated_at": "2026-10-21T10:40:10.235823937Z"
+  "updated_at": "2026-11-04T00:02:18.041844210Z"
 }

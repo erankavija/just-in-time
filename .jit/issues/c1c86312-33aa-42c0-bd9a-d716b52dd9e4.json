@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T21:55:40.667260905Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -22,10 +23,11 @@
     "satisfies:2195c98f/REQ-02",
     "satisfies:2195c98f/REQ-17",
     "per:@/charter/D-18",
-    "enforces:@/invariant/semantic-types"
+    "enforces:@/invariant/semantic-types",
+    "resolution:absorbed-into-91081bd3"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Composite arguments carry their issue as a typed id",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T21:56:13.494821814Z"
 }

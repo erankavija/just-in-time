@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-b8506ce7",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "12148655f3587c5043c8a4c0744f2c4293dae200",
+  "completed_at": "2026-10-25T00:42:25.355361499Z",
+  "duration_ms": 139968,
+  "evaluation_stability": "stable",
+  "exit_code": 75,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "d85281906f3b4448456c3695f8280c3aaceab3579d1790e3d00e9201733aa0c5",
+  "issue_id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7a8b02d0-b5e7-47ed-bfa0-cdf998d1aba2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:40:05.386590990Z",
+  "status": "error",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 67334 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 67334 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 43824 ms, warmed 17 executables (1980054808 bytes) in 67 ms.\n  ✓ fmt: ok (1531 ms)\n  ✓ clippy: ok (26702 ms)\n  ✓ suite-build: built in 43824 ms, warmed 17 executables (1980054808 bytes) in 67 ms (43895 ms)\n  ✓ test: 4623 passed, 0 failed, 0 skipped (64714 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2603 ms)\n  ✓ suite-clock: 67334 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (82 ms)\n\ncargo-ci: infrastructure fault (exit 75): failing steps (budget) are environment-sensitive; baseline load1=5.98 >= threshold 4.08 (0.17 x 24 CPUs); rerun when the host is quiet\n"
+}

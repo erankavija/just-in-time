@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1d998db27dc922dc67509008be927e2cb04a53d9",
+  "completed_at": "2026-10-24T19:40:23.718240267Z",
+  "duration_ms": 204912,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The corrected implementation renders propagated JSON failures only to stdout, preserves human-mode diagnostics, updates the affected tests and documentation, and addresses the prior finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5d0a9a90-7038-40f0-b5c1-aeea365d0dd0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fa6fd120-20b2-447a-952a-9d2340fa6a35",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T19:36:58.805510518Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f886d7c47, 1e2f0037a, 46a747fc2, 2a18cc2a6, 8ceb670e1, 1d998db27\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-09 and REQ-12 (issue Markdown); @/invariant/architecture-dependency-direction, canonical-cutover, essential-code-prose, orthogonal-tests, semantic-test-assertions, shared-test-contracts, single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-24T19:35:35Z); prior code-review failed on F1, which 8ceb670e1 addresses\nTruncation recovery: per-commit path-scoped diffs, both merge-parent comparisons, bounded current-file reads, and separate item/gate queries; historical gate stdout excluded as past evidence\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The corrected implementation renders propagated JSON failures only to stdout, preserves human-mode diagnostics, updates the affected tests and documentation, and addresses the prior finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "35d88652deac61d76f265dc90545b73ed06bbf85",
+  "completed_at": "2026-11-04T07:52:39.907418901Z",
+  "duration_ms": 336419,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed per-issue and explain validation refactor meets its issue-scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2c8c13b2-1079-4400-b0b9-deb107ea34b4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "27f86683-6339-45e7-87d7-7951d83fb257",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T07:47:03.488401952Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: eae1c56a21bf65957312e4b3557b74dd8f8a9b9f (`jit:2c8c13b2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/2c8c13b2/decision/D-01 and @/issue/9876a23a/requirement/REQ-02, REQ-08 (markdown-first issue descriptions)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T07:45:18Z\nTruncation recovery: reread bounded per-file patches and current source ranges; inspected later direct-path change\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed per-issue and explain validation refactor meets its issue-scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

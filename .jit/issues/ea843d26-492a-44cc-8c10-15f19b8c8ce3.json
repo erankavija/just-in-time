@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T23:29:21.809077717Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "7eb443b2-3788-45ee-b65e-4d88b5c3c8de"
+    "de9a7557-2061-4b63-9c74-6c18ed840c17"
   ],
-  "description": "Resolve `container-from-label` pointers against an issue-id index built once per graph evaluation, removing the per-pointer scan that dominates validation time.\n\n## Background\n\n- `resolve_container` (`crates/jit/src/validation/graph.rs:1306-1316`) parses the pointer as an `IssueIdPrefix` and tests it against every issue with `IssueIdPrefix::matches`, which normalises (allocates a lowercase, hyphen-free copy of) each candidate id. It runs once per pointer label, from `evaluate_label_coverage` (`:960-1060`) and `graph_rule_plan_source_ids` (`:501-525`), so resolution is O(labels × issues) allocations.\n- A release-build profile of `jit validate` on this repository attributes about 29% of inclusive time to that normalisation (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, C4).\n- The prefix type lives in `domain::identity`. Unique, ambiguous and unresolved outcomes are asserted by the graph tests at `graph.rs:2702,2768,2877`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each graph evaluation builds one index over its resolution issues, and every container pointer resolves through it without normalising candidate ids.\n- [hard] REQ-02: Unique, ambiguous and unresolved pointers resolve exactly as before, the minimum prefix length included; the existing graph tests pass unchanged.\n- [hard] REQ-03: A graph unit test resolves pointers given in different case and hyphenation against one index and shows the unique, ambiguous and unresolved outcomes.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `IssueIdPrefix::matches` compare a prefix against a candidate issue id without allocating, removing the per-candidate allocation that dominates container-pointer and coverage-label resolution.\n\n## Background\n\n- `IssueIdPrefix::matches` (`crates/jit/src/domain/identity.rs:345-347`) normalises the candidate on every call: `normalise` (`:402-407`) allocates a lowercase, hyphen-free copy of the id before the `starts_with` test. The prefix already holds its own normalised form.\n- Graph evaluation calls it once per candidate issue. `resolve_container` (`crates/jit/src/validation/graph.rs:1090-1101`) tests every issue for each `container-from-label` pointer, from `evaluate_label_coverage` (`:743`) and `graph_rule_plan_source_ids` (`:431`), so resolution is O(pointers × issues) allocations; `label_credits_id` (`:122-143`) calls it for every crediting label (`:129,140`). Storage prefix resolution calls it per listed id (`crates/jit/src/storage/mod.rs:110`).\n- A release-build profile of `jit validate` on this repository attributes about 29% of inclusive time to that normalisation (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, C4).\n- Matching is covered by the identity property tests (`identity.rs:863-916`) and the container-pointer graph tests (`graph.rs:2320,2473,2515,2548,2583`).\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueIdPrefix::matches` decides whether the prefix names a candidate id without allocating; `resolve_container`, `label_credits_id` and storage prefix resolution keep calling it, and `GraphEvaluationContext` is unchanged.\n- [hard] REQ-02: Every caller resolves exactly as before: unique, ambiguous and unresolved container pointers, crediting labels and storage prefixes, the minimum prefix length included; the existing identity, graph and storage tests pass unchanged.\n- [hard] REQ-03: A property test shows that `matches` agrees with comparing the normalised candidate, for generated ids and for prefixes in any case and hyphenation.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-03T23:55:03.858175059Z",
+  "first_ready_at": "2026-11-03T22:11:30.530079292Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c972bc1c-ebd8-4098-b9c0-849b2c2fd024",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:51:44.834545785Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "af6c72e8-8de6-44c8-a094-7c622e7cda6a",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:54:47.995942552Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ea843d26-492a-44cc-8c10-15f19b8c8ce3",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:9876a23a/REQ-07"
   ],
   "priority": "high",
-  "state": "backlog",
-  "title": "Container pointers resolve through an index built once per graph evaluation",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "state": "done",
+  "title": "Issue-id prefixes match without allocating",
+  "updated_at": "2026-11-03T23:55:03.858175059Z"
 }

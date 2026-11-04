@@ -60,6 +60,7 @@ const dagreLayout = vi.mocked(dagre.layout);
 const NO_LABEL_FILTERS: string[] = [];
 
 const node = (overrides: Partial<GraphNode> & Pick<GraphNode, 'id'>): GraphNode => ({
+  short_id: overrides.id,
   label: `Issue ${overrides.id}`,
   state: 'ready',
   priority: 'normal',

@@ -1,0 +1,47 @@
+{
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T23:07:30.131691007Z",
+  "context": {},
+  "created_at": "2026-11-01T18:46:25.307243693Z",
+  "dependencies": [],
+  "description": "A `rules.toml` holding only custom rules silently switches off every default rule, so a malformed label is written and `jit validate` still exits 0. Default rules become always in force, derived from the configuration registry; a missing default row means the default applies.\n\n## Background\n\nThe default rules (`label-format`, `namespace-registry`, `namespace-unique-<ns>`, `type-hierarchy-known`, each `origin = \"default\"`) apply in memory when `.jit/rules.toml` is absent. Once the file exists, `reconcile_default_rules_with_config` (`crates/jit/src/repository_state/default_rules.rs:191-240`) re-derives them from the registry only when the file still holds at least one default-origin row (`:195-203`); a file with none is treated as having opted out, and only its rows apply. While one default row remains, the others the registry derives are appended in memory (`:227-237`), so today removing one row changes nothing but removing all of them disables every default.\n\n`docs/reference/labels.md` and `docs/reference/configuration.md` tell adopters to add allowed values, value patterns and required namespaces by authoring custom rules in `rules.toml`. A repository following that advice without copying the default rows loses all of them, with no finding.\n\nReproduction on a fresh `jit init` repository:\n\n```bash\nprintf '[[rules]]\\nname = \"custom\"\\nseverity = \"error\"\\nenforce = false\\nassert = { label-value-pattern = { namespace = \"priority\", regex = \"^(high|low)$\" } }\\n' > .jit/rules.toml\njit issue create --title x --description d --label BAD   # exit 0, label written\njit validate                                             # exit 0, \"Repository validation passed\"\njit config set validation.strictness loose               # exit 0, adds no row\njit validate --fix                                       # \"No fixes needed\", adds no row\n```\n\n`docs/reference/configuration.md` (`:274-283`) says the next jit-driven config write, `jit config set` or re-init, writes the matching rows through to `rules.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: On a repository whose `rules.toml` holds only custom rules, a label violating `label-format` is refused or reported exactly as on a repository holding the default rows, and `jit validate` does not exit 0 over it.\n- [hard] REQ-02: Default rules are always in force, derived from the configuration registry: removing a default row changes no check, and the next config write or `jit validate --fix` restores the row. A present default row keeps its policy fields: its `severity`, `enforce` and selector edits take effect as they do today, and `severity = \"off\"` on the row is the one way to disable that default.\n- [hard] REQ-03: `docs/reference/configuration.md` and `docs/reference/labels.md` state what a config write does to `rules.toml` and how a default rule is disabled (`severity = \"off\"` on its row; `enforce = false` only stops it blocking writes), and `jit config set` does exactly that.\n- [hard] REQ-04: A test owns each of the behaviors above, on a repository built in storage the test owns.\n- [hard] REQ-05: `CHANGELOG.md` records the behaviour change: a repository that disabled a default rule by deleting its row sees that rule in force again.\n\n## Decisions\n\n- **D-01** — Owner ruling 2026-11-04 (option A2): default rules are always in force and a missing default row means the default applies; a present default row's `severity`, `enforce` and selector edits keep working as today, and `severity = \"off\"` on its row disables that default. Rejected: making default rows addressability-only (A1), which would void existing policy edits.\n\n## Notes\n\n- Reconciliation already keeps a default row's policy fields (`default_rules.rs:211-219`), and the header `jit init` writes into `rules.toml` calls them editable; both stay. Both rule evaluators skip a rule whose severity is `off` (`crates/jit/src/validation/local.rs:239`, `validation/graph.rs:153`); `enforce = false` leaves the rule reporting, so `jit validate` still fails on an error-severity finding.\n- Related: `jit validate --fix` refuses a `rules.toml` holding default rows whose schemas are absent (`captured image has no schemas/default-label-format.json`). Converting `research` needed `--fix` with custom rows first, then the full file.\n- Exposure on 2026-11-01: none. gf2, mealie-fi, inflected-messages and just-in-time each hold every default row their config derives. `research` holds them since its format 3 commit `9c581bd`.\n- Reachable by following the shipped docs, so this decides what validation checks for an adopter.",
+  "documents": [],
+  "done_at": "2026-11-03T23:53:05.550169619Z",
+  "first_ready_at": "2026-11-01T18:46:25.307243693Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6cef4ea7-2a06-4d54-8587-3d5c6d037822",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:49:16.946149445Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2e0220d8-6766-4039-b1ef-3880d0b410a9",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:52:42.236023519Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "64199cca-08ec-4096-9e55-353c70296e72",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:49:19.668780365Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "c92f4011-1850-4998-a555-ca899ec45552",
+  "labels": [
+    "type:bug",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Keep default rules in force when rules.toml holds only custom rules",
+  "updated_at": "2026-11-03T23:53:05.550169619Z"
+}

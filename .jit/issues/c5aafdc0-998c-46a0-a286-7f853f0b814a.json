@@ -1,10 +1,11 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:29:44.806618440Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
     "077937f5-ed4c-4a76-be4a-2819bd5f556b",
+    "14c08f51-2cbe-4e4b-8004-2f433d838ba4",
     "155d8c3c-6777-4f60-b26a-1f4c4e10ef7d",
     "2d3c886f-1d79-4490-ab78-c43b130ce6f0",
     "2f95b4f6-9e73-4ad3-bed0-79e63b14101a",
@@ -21,9 +22,12 @@
     "6bd02fa4-c44e-49f4-a729-59eae4edf400",
     "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
     "7801f623-3865-4ee2-8891-16652e443faf",
+    "7984d807-acb1-4c61-bc6d-fa7c2f3a52d0",
+    "87d5fd34-a913-4c6e-bad1-344c2fb3adc3",
     "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
     "8d959c96-0fa7-4a0f-980a-88ddf42a9ab8",
     "8da3f7f5-3551-4111-a68a-4d4d4b093617",
+    "955aaa9a-34f7-4304-bed1-ad8102185253",
     "955ee89e-1b00-4158-af63-1847f168f708",
     "9c3b9da2-bb21-4d02-aead-6d970c71d821",
     "a057a4f5-b33f-4777-8df1-f458826afea5",
@@ -37,6 +41,7 @@
     "b93687b3-9393-4231-84f6-95ba9a607483",
     "c211f14c-7cf9-4015-b1d4-78d8e8ad3bb2",
     "c6cd250d-04d8-433e-8566-6a73dcfc4482",
+    "c882f1f8-623c-46a0-8440-53de6da2b3e9",
     "c9442f7f-cf02-4150-a6c6-69483391d90b",
     "ce097844-5f62-4dce-bd75-2af8159f7920",
     "d49d53db-98e5-4ce3-b3f9-e54ac64c3560",
@@ -47,13 +52,28 @@
     "f0bee761-b2a9-4d61-ac5a-bb40730aec03",
     "f4deb00a-22ae-4505-9bc3-27ed5d816604"
   ],
-  "description": "Aggregate the work that delivers this outcome: CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared fixture spawns `jit` for every CLI test, and no test file defines its own binary locator, repository setup or id scraping from human-readable output.\n- [hard] REQ-02: Issue construction, the taxonomy repository and the memory executor each have one definition in shared test support, and the memory executor is set up by product initialisation.\n- [hard] REQ-03: Tests that need the shipped item kinds derive them from the shipped default package.\n- [hard] REQ-04: Tests reach the working directory and environment only through the shared scoped guards, and every test passes alone, in any order and in parallel.\n",
+  "description": "Aggregate the work that delivers this outcome: CLI and in-process tests use one definition of each fixture and never change process-wide state.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared fixture spawns `jit` for every CLI test, and no test file defines its own binary locator, repository setup or id scraping from human-readable output.\n- [hard] REQ-02: Issue construction, the taxonomy repository and the memory executor each have one definition in shared test support, and the memory executor is set up by product initialisation.\n- [hard] REQ-03: Tests that need the shipped item kinds derive them from the shipped default package.\n- [hard] REQ-04: Tests never change process-wide state (working directory, environment variables); a value a test varies is passed explicitly. Every test passes alone, in any order and in parallel.\n\n\n\n\n\n## Evidence\n\nREQ-04, at `0b4874edf` unless stated. `git grep` finds no `set_current_dir`, `env::set_var` or `env::remove_var` under `crates/`. Each test in its own process under nextest: serial 4632/4632, 32 threads 4632/4632, hash partitions 1-3 (1546, 1524, 1562) each with the rest absent. Tests sharing a process: 20 shuffled runs at `b5f2d9730`, seeds 1-20, all 14 test executables, 92,680 passed (87d5fd34).\n\nThis reaches order within a target, by libtest's unstable shuffle flag, and not order across targets, which never share a process. nextest has no shuffle, so its per-process isolation is what covers order there.\n",
   "documents": [],
+  "done_at": "2026-11-01T09:55:29.186134989Z",
+  "first_ready_at": "2026-11-01T08:55:16.232503177Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ba7c0325-67ee-4db4-9ef4-ff5186fa5d69",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:44:10.710182335Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "949699b2-75d0-484e-a15b-e9749f284bfd",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:45:04.520301494Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c5aafdc0-998c-46a0-a286-7f853f0b814a",
   "labels": [
     "type:story",
@@ -70,7 +90,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
-  "title": "Tests run on shared fixtures and guards",
-  "updated_at": "2026-10-22T14:44:31.376089482Z"
+  "state": "done",
+  "title": "Tests run on shared fixtures",
+  "updated_at": "2026-11-01T09:55:29.186134989Z"
 }

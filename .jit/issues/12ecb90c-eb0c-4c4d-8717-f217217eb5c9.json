@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-b697a3f7",
+  "claimed_at": "2026-10-24T21:25:01.665552977Z",
   "context": {},
   "created_at": "2026-10-21T20:36:56.502609569Z",
   "dependencies": [
@@ -7,20 +8,24 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Converge previews and coupled derivations on the mutation session (b697a3f7) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-24T21:29:30.139405351Z",
+  "first_ready_at": "2026-10-24T21:22:04.574095338Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-10-21T20:36:56.502609569Z",
-      "updated_by": null
+      "run_id": "a4508f3b-542c-4e14-a8ca-f28f62da4346",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:53:43.372380767Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-10-21T20:36:56.502609569Z",
-      "updated_by": null
+      "run_id": "7e0611c5-36e6-4773-a24d-cf9dfb06ab52",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:46:31.562340746Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "12ecb90c-eb0c-4c4d-8717-f217217eb5c9",
@@ -36,7 +41,7 @@
     "brackets:b697a3f7"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "breakdown: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-10-21T20:36:56.502609569Z"
+  "updated_at": "2026-11-03T21:53:43.372380767Z"
 }

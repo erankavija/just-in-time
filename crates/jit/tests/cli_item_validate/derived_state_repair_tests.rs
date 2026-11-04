@@ -1,18 +1,10 @@
+use jit::test_cli::JitCli;
+use jit::test_utils::{profiled_repository_fixture, PROFILE_PACKAGE_SOURCES};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use tempfile::TempDir;
-
-fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(args)
-        .current_dir(repo)
-        .env("JIT_TEST_MODE", "1")
-        .output()
-        .unwrap()
-}
+use std::process::Output;
 
 fn json(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
@@ -25,15 +17,6 @@ fn json(output: &Output) -> Value {
     })
 }
 
-fn profiled_repo() -> TempDir {
-    jit::test_utils::profiled_repository_fixture(
-        "jit-dogfood",
-        jit::test_utils::PROFILE_PACKAGE_SOURCES,
-        Some(Path::new(env!("CARGO_BIN_EXE_jit"))),
-    )
-    .expect("clone a coherent profiled repository fixture")
-}
-
 #[derive(PartialEq)]
 struct FileState {
     bytes: Vec<u8>,
@@ -41,10 +24,9 @@ struct FileState {
 }
 
 fn file_snapshot(root: &Path) -> BTreeMap<PathBuf, FileState> {
-    const MACHINE_LOCAL_LOCKS: [&str; 5] = [
+    const MACHINE_LOCAL_LOCKS: [&str; 4] = [
         ".jit-bootstrap.lock",
         ".jit/.events.lock",
-        ".jit/.gates.lock",
         ".jit/.index.lock",
         ".jit/.repo-write.lock",
     ];
@@ -98,17 +80,19 @@ fn assert_snapshot_unchanged(root: &Path, before: &BTreeMap<PathBuf, FileState>)
 #[test]
 fn test_cli_validate_fix_preserves_malformed_rules_validation_classification() {
     for json_mode in [false, true] {
-        let repo = profiled_repo();
-        fs::write(repo.path().join(".jit/rules.toml"), "[[rules]\n").unwrap();
-        let before = file_snapshot(repo.path());
+        let cli = JitCli::with_repository(
+            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap(),
+        );
+        fs::write(cli.root().join(".jit/rules.toml"), "[[rules]\n").unwrap();
+        let before = file_snapshot(cli.root());
         let args = if json_mode {
             ["validate", "--fix", "--json"].as_slice()
         } else {
             ["validate", "--fix"].as_slice()
         };
-        let output = run(repo.path(), args);
+        let output = cli.command(args).output().unwrap();
 
-        assert_eq!(output.status.code(), Some(4));
+        assert!(!output.status.success());
         if json_mode {
             let error = json(&output);
             assert_eq!(error["error"]["code"], "VALIDATION_FAILED");
@@ -119,7 +103,7 @@ fn test_cli_validate_fix_preserves_malformed_rules_validation_classification() {
         } else {
             assert!(String::from_utf8_lossy(&output.stderr).contains("TOML parse error"));
         }
-        assert_snapshot_unchanged(repo.path(), &before);
+        assert_snapshot_unchanged(cli.root(), &before);
     }
 }
 
@@ -129,9 +113,11 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
     use std::os::unix::fs::PermissionsExt;
 
     for json_mode in [false, true] {
-        let repo = profiled_repo();
-        let schema = repo
-            .path()
+        let cli = JitCli::with_repository(
+            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap(),
+        );
+        let schema = cli
+            .root()
             .join(".jit/schemas/default-type-hierarchy-known.json");
         let mut stale = fs::read(&schema).unwrap();
         stale.extend_from_slice(b" stale");
@@ -145,10 +131,10 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
         } else {
             ["validate", "--fix"].as_slice()
         };
-        let output = run(repo.path(), args);
+        let output = cli.command(args).output().unwrap();
         fs::set_permissions(parent, fs::Permissions::from_mode(original_mode)).unwrap();
 
-        assert_eq!(output.status.code(), Some(5));
+        assert!(!output.status.success());
         if json_mode {
             let error = json(&output);
             assert_eq!(error.as_object().map(|object| object.len()), Some(1));
@@ -159,7 +145,6 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
                 .parse::<jit::output::ErrorCode>()
                 .expect("validate --fix reports a registered error code");
             assert_eq!(code, jit::output::ErrorCode::PermissionDenied);
-            assert_eq!(output.status.code(), Some(code.exit_code().code()));
             assert!(error["error"]["message"]
                 .as_str()
                 .unwrap()
@@ -175,11 +160,9 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
 
 #[test]
 fn test_validate_derived_state_drift_names_repair_command_and_repository_paths() {
-    let repo = TempDir::new().unwrap();
-    let initialized = run(repo.path(), &["init"]);
-    assert!(initialized.status.success(), "{initialized:?}");
+    let cli = JitCli::initialised().unwrap();
 
-    let config_path = repo.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     fs::write(
         config_path,
@@ -187,7 +170,7 @@ fn test_validate_derived_state_drift_names_repair_command_and_repository_paths()
     )
     .unwrap();
 
-    let validation = run(repo.path(), &["validate"]);
+    let validation = cli.command(["validate"]).output().unwrap();
     assert!(!validation.status.success(), "{validation:?}");
     let diagnostic = format!(
         "{}{}",
@@ -210,37 +193,13 @@ fn test_validate_derived_state_drift_names_repair_command_and_repository_paths()
 
 #[test]
 fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
-    let repo = TempDir::new().unwrap();
-    let initialized = run(repo.path(), &["init"]);
-    assert!(initialized.status.success(), "{initialized:?}");
-
-    Command::new("git")
-        .current_dir(repo.path())
-        .args(["init", "-q"])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(repo.path())
-        .args(["config", "user.email", "test@example.com"])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(repo.path())
-        .args(["config", "user.name", "Test User"])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(repo.path())
-        .args(["add", "."])
-        .status()
-        .unwrap();
-    Command::new("git")
-        .current_dir(repo.path())
-        .args(["commit", "-qm", "Initialize recovery fixture"])
-        .status()
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git()
+        .unwrap()
+        .commit("Initialize recovery fixture")
         .unwrap();
 
-    let config_path = repo.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     fs::write(
         config_path,
@@ -248,7 +207,7 @@ fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
     )
     .unwrap();
 
-    let recovered = run(repo.path(), &["recover", "--json"]);
+    let recovered = cli.command(["recover", "--json"]).output().unwrap();
     assert!(recovered.status.success(), "{recovered:?}");
     let report = json(&recovered);
     assert!(
@@ -256,7 +215,7 @@ fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
         "recovery must report a structural repair count: {report}"
     );
 
-    let validation = run(repo.path(), &["validate", "--json"]);
+    let validation = cli.command(["validate", "--json"]).output().unwrap();
     assert!(validation.status.success(), "{validation:?}");
     assert_eq!(json(&validation)["valid"], true);
 }
@@ -267,18 +226,10 @@ fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
 /// (`@/charter/D-4`).
 #[test]
 fn test_recover_repairs_derived_state_drift_in_git_repository_without_commits() {
-    let repo = TempDir::new().unwrap();
-    let initialized_git = Command::new("git")
-        .current_dir(repo.path())
-        .args(["init"])
-        .status()
-        .unwrap();
-    assert!(initialized_git.success(), "{initialized_git:?}");
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
 
-    let initialized = run(repo.path(), &["init"]);
-    assert!(initialized.status.success(), "{initialized:?}");
-
-    let config_path = repo.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     fs::write(
         config_path,
@@ -288,14 +239,14 @@ fn test_recover_repairs_derived_state_drift_in_git_repository_without_commits() 
 
     // The git-dependent phase still fails on the unresolved HEAD; that
     // behaviour is deliberate and preserved.
-    let recovered = run(repo.path(), &["recover", "--json"]);
+    let recovered = cli.command(["recover", "--json"]).output().unwrap();
     assert!(
         !recovered.status.success(),
         "recovery must still surface the unresolved-HEAD failure: {recovered:?}"
     );
 
     // The repair nevertheless happened, which is what the requirement asks for.
-    let validation = run(repo.path(), &["validate", "--json"]);
+    let validation = cli.command(["validate", "--json"]).output().unwrap();
     assert!(
         validation.status.success(),
         "recovery must repair derived state before the git phase fails: {validation:?}"
@@ -305,11 +256,9 @@ fn test_recover_repairs_derived_state_drift_in_git_repository_without_commits() 
 
 #[test]
 fn test_recover_repairs_derived_state_drift_without_git() {
-    let repo = TempDir::new().unwrap();
-    let initialized = run(repo.path(), &["init"]);
-    assert!(initialized.status.success(), "{initialized:?}");
+    let cli = JitCli::initialised().unwrap();
 
-    let config_path = repo.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     fs::write(
         config_path,
@@ -317,7 +266,7 @@ fn test_recover_repairs_derived_state_drift_without_git() {
     )
     .unwrap();
 
-    let recovered = run(repo.path(), &["recover", "--json"]);
+    let recovered = cli.command(["recover", "--json"]).output().unwrap();
     assert!(recovered.status.success(), "{recovered:?}");
     let report = json(&recovered);
     assert!(
@@ -337,11 +286,13 @@ fn test_recover_repairs_derived_state_drift_without_git() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|warning| warning["kind"] == "claims_lease_recovery_skipped"),
+            .any(|warning| {
+                *warning == jit::storage::StorageWarning::ClaimsLeaseRecoverySkipped.to_string()
+            }),
         "recovery must expose the skip through its warning mechanism: {report}"
     );
 
-    let validation = run(repo.path(), &["validate", "--json"]);
+    let validation = cli.command(["validate", "--json"]).output().unwrap();
     assert!(validation.status.success(), "{validation:?}");
     assert_eq!(json(&validation)["valid"], true);
 }

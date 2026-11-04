@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+info: using target runner `/home/vkaskivuo/.dotfiles/bin/cargo-pool-run` defined by environment variable `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER`
+────────────
+ Nextest run ID a2ebfbf9-9532-40e9-a21f-8ab797852619 with nextest profile: default
+    Starting 1 test across 1 binary (3052 tests skipped)
+        PASS [   0.015s] (1/1) jit commands::serve::tests::test_start_server_bounds_a_child_that_neither_serves_nor_exits
+────────────
+     Summary [   0.017s] 1 test run: 1 passed, 3052 skipped

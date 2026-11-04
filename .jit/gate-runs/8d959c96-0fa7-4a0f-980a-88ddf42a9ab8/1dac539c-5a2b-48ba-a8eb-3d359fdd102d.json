@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "101dd4258d80170e6dada0c1a06f6ae2da84eaab",
+  "completed_at": "2026-11-01T01:09:07.245818899Z",
+  "duration_ms": 193370,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared-fixture migration satisfies all three hard criteria without an issue-impact defect.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8d959c96-0fa7-4a0f-980a-88ddf42a9ab8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1dac539c-5a2b-48ba-a8eb-3d359fdd102d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T01:05:53.875232238Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:8d959c96` commits `f0ef0f019`, `2c51377e1`\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/invariants.toml`; `dev/vision/9db27a3a-charter.md`; `.jit/gates.toml`\nResolved items: `@/issue/8d959c96/requirement/REQ-01`–`REQ-03`, `@/issue/c780514e/requirement/REQ-05`–`REQ-06`, `@/charter/D-18`, `@/invariant/shared-test-contracts`, `@/gate/cargo-ci`\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T01:05:34.918663684+00:00); code-review pending\nTruncation recovery: reread each relevant `cli_item_validate` delta separately after a truncated broad patch read, inspected all other first-parent merge deltas in bounded groups, and reread the standalone risk-kind patch\n\n1. No findings. The private setup helpers are removed; all replacements use the shared file-backed fixture with derived shipped-kind declarations ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_item_validate/main.rs:49)). The attributable diffs only change setup and redundant prose, preserving the prior assertions.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared-fixture migration satisfies all three hard criteria without an issue-impact defect.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

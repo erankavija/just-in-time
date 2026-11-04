@@ -1,19 +1,36 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:17:10.883190736Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
     "0973ed93-e516-41fd-8f55-9eef33ab2fa8",
     "1d52a376-a05f-4d7e-87b8-59649dd5900a",
-    "2b49f95b-c99f-4182-bb55-252efa30eea9"
+    "2b49f95b-c99f-4182-bb55-252efa30eea9",
+    "ea5ffaba-f183-46ae-8704-c4a17b5ebc60"
   ],
   "description": "Cut the subprocess query suite to wiring cases, now that the domain owns query semantics.\n\n## Background\n\n`crates/jit/tests/cli_query_graph/query_tests.rs` has 25 subprocess tests (1,422 lines) and 32 `split_whitespace` sites. It re-proves filters and priority order that `crates/jit/src/domain/queries.rs` owns as pure functions. `dev/TESTING.md:619` cites the file as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `query_tests.rs` holds at most one case per `query` subcommand and per flag, each asserting that the command reaches the domain query, for example that a filter is applied, and not the query's semantics.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs` before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n- [hard] REQ-03: The remaining cases spawn `jit` through the shared CLI process fixture, read ids from `--json` output and use the shared `TaxonomyRepo` instead of the suite-root copy.\n- [hard] REQ-04: `dev/TESTING.md` describes the reduced suite.\n",
   "documents": [],
+  "done_at": "2026-10-28T21:39:28.718141026Z",
+  "first_ready_at": "2026-10-27T00:20:33.603402820Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5443b456-7ea3-4903-b829-68388c7d6daa",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:50:53.953676188Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "03f37762-f598-4b5e-8cce-d301dcc40e1e",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:54:09.917838986Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3f15b95c-0a30-4a55-9dc2-489a736fb5be",
   "labels": [
     "type:task",
@@ -28,7 +45,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Query CLI tests assert one wiring case per subcommand and flag",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T21:39:28.718141026Z"
 }

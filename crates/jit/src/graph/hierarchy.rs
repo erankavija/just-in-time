@@ -32,7 +32,7 @@
 //! run yet cannot move a node's parent.
 //!
 //! The reduction is internal. A caller's stored `dependencies` are read, never
-//! rewritten, and the resolver's signature is unchanged.
+//! rewritten.
 //!
 //! # What "container" means
 //!
@@ -104,17 +104,15 @@
 //! ```
 //! use jit::domain::Issue;
 //! use jit::graph::hierarchy::resolve_hierarchy;
+//! use jit::test_utils::issue_id;
 //! use jit::domain::type_taxonomy::HierarchyConfig;
 //!
 //! // milestone → epic → task (each container depends on what it contains)
-//! let mut milestone = Issue::draft("Release".into(), String::new());
-//! milestone.id = "milestone".into();
+//! let mut milestone = Issue::draft(issue_id(56), "Release".into(), String::new());
 //! milestone.labels = vec!["type:milestone".into()];
-//! let mut epic = Issue::draft("Auth".into(), String::new());
-//! epic.id = "epic".into();
+//! let mut epic = Issue::draft(issue_id(57), "Auth".into(), String::new());
 //! epic.labels = vec!["type:epic".into()];
-//! let mut task = Issue::draft("Login".into(), String::new());
-//! task.id = "task".into();
+//! let mut task = Issue::draft(issue_id(58), "Login".into(), String::new());
 //! task.labels = vec!["type:task".into()];
 //!
 //! milestone.dependencies = vec![epic.id.clone()];
@@ -134,33 +132,37 @@
 //! let resolution = resolve_hierarchy(&nodes, &config);
 //!
 //! // The task's nearest container is the epic, not the milestone.
-//! assert_eq!(resolution.parent(&task.id), Some(epic.id.as_str()));
-//! assert_eq!(resolution.parent(&epic.id), Some(milestone.id.as_str()));
+//! assert_eq!(resolution.parent(&task.id), Some(&epic.id));
+//! assert_eq!(resolution.parent(&epic.id), Some(&milestone.id));
 //! assert_eq!(resolution.parent(&milestone.id), None);
 //!
 //! // The whole chain clusters to the strategic root (the milestone).
-//! assert_eq!(resolution.cluster(&task.id), Some(milestone.id.as_str()));
+//! assert_eq!(resolution.cluster(&task.id), Some(&milestone.id));
 //! ```
 
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::graph::{DependencyGraph, GraphNode};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::Hash;
 
 /// A node that can participate in hierarchy resolution.
 ///
 /// Extends the dependency-graph view (`id` + `dependencies`) with the node's
 /// *type name* — the value of its `type:` label — so the resolver can map each
 /// node to a level via the [`HierarchyConfig`]. Implemented for
-/// [`Issue`](crate::domain::Issue); a test double need only return its type
-/// value.
+/// [`Issue`](crate::domain::Issue) and symbolic-id test fixtures.
 pub trait HierarchyNode {
+    /// Identity preserved in resolved facts and graph queries.
+    type Id: Clone + Eq + Hash + Ord;
+
     /// Unique identifier for this node.
-    fn id(&self) -> &str;
+    fn id(&self) -> &Self::Id;
 
     /// IDs of the nodes this node depends on (its outgoing DAG edges).
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> impl Iterator<Item = &Self::Id> + '_;
 
     /// The value of this node's `type:` label (e.g. `"epic"`), or `None` when it
     /// carries no type label. Mapped to a level via the config.
@@ -168,12 +170,14 @@ pub trait HierarchyNode {
 }
 
 impl HierarchyNode for crate::domain::Issue {
-    fn id(&self) -> &str {
+    type Id = IssueId;
+
+    fn id(&self) -> &IssueId {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &IssueId> + '_ {
+        self.dependencies.iter()
     }
 
     fn type_name(&self) -> Option<&str> {
@@ -191,41 +195,65 @@ impl HierarchyNode for crate::domain::Issue {
 /// --full`, and the server's `GET /graph`), so the four fields cannot drift
 /// apart. [`Default`] is the resolution of a node absent from the input: a root
 /// orphan sink.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct NodeHierarchy {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct NodeHierarchy<Id = IssueId> {
     /// The nearest dominating container's id, or `None` for a root node.
-    pub parent: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub parent: Option<Id>,
     /// Ids of nodes whose resolved `parent` is this node, sorted ascending.
-    pub children: Vec<String>,
+    #[schemars(with = "Vec<String>")]
+    pub children: Vec<Id>,
     /// The strategic root container's id, or `None` for an orphan leaf.
-    pub cluster: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub cluster: Option<Id>,
     /// Longest dependency-path length from this node to an in-set sink.
     pub rank: u32,
+}
+
+impl<Id> Default for NodeHierarchy<Id> {
+    fn default() -> Self {
+        Self {
+            parent: None,
+            children: Vec::new(),
+            cluster: None,
+            rank: 0,
+        }
+    }
 }
 
 /// The resolved hierarchy for a whole set of nodes.
 ///
 /// Every input node has an entry (roots and orphans included). Look facts up by
 /// id through the accessors; the map is keyed by node id.
-#[derive(Debug, Clone, Default)]
-pub struct HierarchyResolution {
-    nodes: HashMap<String, NodeHierarchy>,
+#[derive(Debug, Clone)]
+pub struct HierarchyResolution<'a, T: HierarchyNode> {
+    nodes: HashMap<T::Id, NodeHierarchy<T::Id>>,
+    source_nodes: HashMap<&'a T::Id, &'a T>,
 }
 
-impl HierarchyResolution {
+impl<T: HierarchyNode> Default for HierarchyResolution<'_, T> {
+    fn default() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            source_nodes: HashMap::new(),
+        }
+    }
+}
+
+impl<'a, T: HierarchyNode> HierarchyResolution<'a, T> {
     /// The full [`NodeHierarchy`] for `id`, if the node was in the input.
-    pub fn get(&self, id: &str) -> Option<&NodeHierarchy> {
+    pub fn get(&self, id: &T::Id) -> Option<&NodeHierarchy<T::Id>> {
         self.nodes.get(id)
     }
 
     /// The nearest dominating container's id for `id`, or `None` when the node
     /// is a root (or absent).
-    pub fn parent(&self, id: &str) -> Option<&str> {
-        self.nodes.get(id).and_then(|n| n.parent.as_deref())
+    pub fn parent(&self, id: &T::Id) -> Option<&T::Id> {
+        self.nodes.get(id).and_then(|n| n.parent.as_ref())
     }
 
     /// The ids of `id`'s resolved children (empty when it has none, or is absent).
-    pub fn children(&self, id: &str) -> &[String] {
+    pub fn children(&self, id: &T::Id) -> &[T::Id] {
         self.nodes
             .get(id)
             .map(|n| n.children.as_slice())
@@ -234,17 +262,17 @@ impl HierarchyResolution {
 
     /// The strategic root container's id for `id`, or `None` for an orphan leaf
     /// (or absent node).
-    pub fn cluster(&self, id: &str) -> Option<&str> {
-        self.nodes.get(id).and_then(|n| n.cluster.as_deref())
+    pub fn cluster(&self, id: &T::Id) -> Option<&T::Id> {
+        self.nodes.get(id).and_then(|n| n.cluster.as_ref())
     }
 
     /// The longest-path rank for `id`, or `None` when the node is absent.
-    pub fn rank(&self, id: &str) -> Option<u32> {
+    pub fn rank(&self, id: &T::Id) -> Option<u32> {
         self.nodes.get(id).map(|n| n.rank)
     }
 
     /// Iterate over every resolved node as `(id, facts)`.
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &NodeHierarchy)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&T::Id, &NodeHierarchy<T::Id>)> {
         self.nodes.iter()
     }
 
@@ -265,21 +293,26 @@ impl HierarchyResolution {
     /// This is containment membership, not the raw dependency closure: it
     /// follows the resolved parent/child relation, so a dependency that points
     /// into another container's subtree is *not* pulled in (that edge crosses
-    /// the membership boundary). An unknown `root` yields just `{root}`.
-    pub fn membership_closure(&self, root: &str) -> HashSet<String> {
-        let mut included: HashSet<String> = HashSet::new();
-        included.insert(root.to_string());
+    /// the membership boundary). An unknown `root` yields an empty vector.
+    pub fn membership_closure(&self, root: &T::Id) -> Vec<&'a T> {
+        let Some((&root, &node)) = self.source_nodes.get_key_value(root) else {
+            return Vec::new();
+        };
+        let mut included = HashSet::from([root]);
+        let mut members = vec![node];
 
-        let mut queue: VecDeque<String> = VecDeque::new();
-        queue.push_back(root.to_string());
+        let mut queue = VecDeque::from([root]);
         while let Some(current) = queue.pop_front() {
-            for child in self.children(&current) {
-                if included.insert(child.clone()) {
-                    queue.push_back(child.clone());
+            for child in self.children(current) {
+                if included.insert(child) {
+                    if let Some(node) = self.source_nodes.get(child) {
+                        members.push(*node);
+                        queue.push_back(child);
+                    }
                 }
             }
         }
-        included
+        members
     }
 }
 
@@ -290,18 +323,18 @@ impl HierarchyResolution {
 /// configured type levels. Pure and deterministic; membership labels are not
 /// consulted and the input is left untouched. See the [module docs](self) for the
 /// resolution rules and edge-case semantics.
-pub fn resolve_hierarchy<T: HierarchyNode>(
-    nodes: &[&T],
+pub fn resolve_hierarchy<'a, T: HierarchyNode>(
+    nodes: &[&'a T],
     config: &HierarchyConfig,
-) -> HierarchyResolution {
-    let by_id: HashMap<&str, &T> = nodes.iter().map(|n| (n.id(), *n)).collect();
+) -> HierarchyResolution<'a, T> {
+    let by_id: HashMap<&T::Id, &T> = nodes.iter().map(|n| (n.id(), *n)).collect();
     // Canonical edge set: the transitive reduction, computed once for the whole
     // input and read by every step below. Reducing here makes every fact a
     // function of the reachability relation alone.
     let edges = transitively_reduced_edges(nodes);
     let leaf_level = config.types().map(|(_, l)| *l).max();
 
-    let level_of = |id: &str| -> Option<u8> {
+    let level_of = |id: &T::Id| -> Option<u8> {
         by_id
             .get(id)
             .and_then(|n| n.type_name())
@@ -312,17 +345,17 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
     // container-ness together lets the loop below extract the level with no
     // fallible re-lookup — the "container has a level" fact is proven by the
     // `Some` rather than asserted with a panic.
-    let container_level = |id: &str| -> Option<u8> {
+    let container_level = |id: &T::Id| -> Option<u8> {
         match (level_of(id), leaf_level) {
             (Some(l), Some(max)) if l < max => Some(l),
             _ => None,
         }
     };
-    let is_container = |id: &str| -> bool { container_level(id).is_some() };
+    let is_container = |id: &T::Id| -> bool { container_level(id).is_some() };
 
     // Nearest containing container per node: id -> (container level, distance, container id).
     // A higher level, then a shorter distance, then a smaller id wins.
-    let mut best: HashMap<&str, (u8, usize, &str)> = HashMap::new();
+    let mut best: HashMap<&T::Id, (u8, usize, &T::Id)> = HashMap::new();
     for &container in nodes {
         let cid = container.id();
         let Some(clevel) = container_level(cid) else {
@@ -331,9 +364,9 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
 
         // BFS over the container's dependency closure; BFS order gives the
         // shortest hop distance to each reachable node.
-        let mut visited: HashSet<&str> = HashSet::new();
+        let mut visited: HashSet<&T::Id> = HashSet::new();
         visited.insert(cid);
-        let mut queue: VecDeque<(&str, usize)> = VecDeque::new();
+        let mut queue: VecDeque<(&T::Id, usize)> = VecDeque::new();
         queue.push_back((cid, 0));
         while let Some((cur, dist)) = queue.pop_front() {
             let Some(deps) = edges.get(cur) else { continue };
@@ -368,43 +401,43 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
     }
 
     // Parent map and its inverse (children).
-    let parent_of: HashMap<&str, &str> = best.iter().map(|(child, v)| (*child, v.2)).collect();
-    let mut children_of: HashMap<&str, Vec<String>> = HashMap::new();
+    let parent_of: HashMap<&T::Id, &T::Id> = best.iter().map(|(child, v)| (*child, v.2)).collect();
+    let mut children_of: HashMap<&T::Id, Vec<T::Id>> = HashMap::new();
     for (child, (_, _, container)) in &best {
         children_of
             .entry(*container)
             .or_default()
-            .push((*child).to_string());
+            .push((*child).clone());
     }
     for kids in children_of.values_mut() {
         kids.sort();
     }
 
     // Cluster: climb the parent chain to the topmost container.
-    let cluster_of = |start: &str| -> Option<String> {
+    let cluster_of = |start: &T::Id| -> Option<T::Id> {
         let mut cur = start;
-        let mut seen: HashSet<&str> = HashSet::new();
+        let mut seen: HashSet<&T::Id> = HashSet::new();
         while let Some(parent) = parent_of.get(cur) {
             if !seen.insert(cur) {
                 break; // defensive: never loop on malformed data
             }
             cur = parent;
         }
-        is_container(cur).then(|| cur.to_string())
+        is_container(cur).then(|| cur.clone())
     };
 
     // Longest-path rank, memoized across the whole set.
-    let mut rank_memo: HashMap<String, u32> = HashMap::new();
+    let mut rank_memo: HashMap<T::Id, u32> = HashMap::new();
 
-    let mut resolved: HashMap<String, NodeHierarchy> = HashMap::with_capacity(nodes.len());
+    let mut resolved: HashMap<T::Id, NodeHierarchy<T::Id>> = HashMap::with_capacity(nodes.len());
     for &node in nodes {
         let id = node.id();
-        let mut visiting: HashSet<String> = HashSet::new();
+        let mut visiting: HashSet<T::Id> = HashSet::new();
         let rank = longest_path(id, &edges, &mut rank_memo, &mut visiting);
         resolved.insert(
-            id.to_string(),
+            id.clone(),
             NodeHierarchy {
-                parent: parent_of.get(id).map(|p| (*p).to_string()),
+                parent: parent_of.get(id).map(|p| (*p).clone()),
                 children: children_of.remove(id).unwrap_or_default(),
                 cluster: cluster_of(id),
                 rank,
@@ -412,7 +445,10 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
         );
     }
 
-    HierarchyResolution { nodes: resolved }
+    HierarchyResolution {
+        nodes: resolved,
+        source_nodes: by_id,
+    }
 }
 
 /// The transitive reduction of the in-set dependency edges, keyed by node id.
@@ -424,42 +460,31 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
 /// the returned map.
 fn transitively_reduced_edges<'a, T: HierarchyNode>(
     nodes: &[&'a T],
-) -> HashMap<&'a str, Vec<&'a str>> {
-    /// The dependency-graph view of a hierarchy node, borrowing its edge slice.
-    struct EdgeView<'a> {
-        id: &'a str,
-        deps: &'a [String],
+) -> HashMap<&'a T::Id, Vec<&'a T::Id>> {
+    /// The dependency-graph view of a hierarchy node, delegating to the node.
+    struct EdgeView<'a, T>(&'a T);
+
+    impl<T: HierarchyNode> GraphNode for EdgeView<'_, T> {
+        type Id = T::Id;
+
+        fn id(&self) -> &T::Id {
+            self.0.id()
+        }
+        fn dependencies(&self) -> impl Iterator<Item = &T::Id> + '_ {
+            self.0.dependencies()
+        }
     }
 
-    impl GraphNode for EdgeView<'_> {
-        fn id(&self) -> &str {
-            self.id
-        }
-        fn dependencies(&self) -> &[String] {
-            self.deps
-        }
-    }
-
-    let views: Vec<EdgeView<'a>> = nodes
-        .iter()
-        .map(|n| EdgeView {
-            id: n.id(),
-            deps: n.dependencies(),
-        })
-        .collect();
-    let view_refs: Vec<&EdgeView<'a>> = views.iter().collect();
+    let views: Vec<EdgeView<'a, T>> = nodes.iter().map(|n| EdgeView(*n)).collect();
+    let view_refs: Vec<&EdgeView<'a, T>> = views.iter().collect();
     let graph = DependencyGraph::new(&view_refs);
-    let present: HashSet<&str> = nodes.iter().map(|n| n.id()).collect();
-
     nodes
         .iter()
         .map(|node| {
-            let kept = graph.compute_transitive_reduction(node.id());
-            let deps = node
-                .dependencies()
-                .iter()
-                .map(String::as_str)
-                .filter(|dep| present.contains(dep) && kept.contains(*dep))
+            let deps = graph
+                .compute_transitive_reduction(node.id())
+                .into_iter()
+                .map(|view| view.0.id())
                 .collect();
             (node.id(), deps)
         })
@@ -472,7 +497,7 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
 /// container reaches the node by no other route. It outranks a container that
 /// reaches the node through intermediate nodes, whatever their levels. Among
 /// equally-direct candidates: deeper level, then fewer hops, then smaller id.
-fn is_better_parent(a: (u8, usize, &str), b: (u8, usize, &str)) -> bool {
+fn is_better_parent<Id: Ord>(a: (u8, usize, &Id), b: (u8, usize, &Id)) -> bool {
     use std::cmp::Reverse;
     // Key order: direct edge (distance 1) first, then deeper level, then fewer
     // hops, then smaller id.
@@ -480,27 +505,27 @@ fn is_better_parent(a: (u8, usize, &str), b: (u8, usize, &str)) -> bool {
 }
 
 /// Longest path length from `id` to a sink of the reduced graph (memoized).
-fn longest_path(
-    id: &str,
-    edges: &HashMap<&str, Vec<&str>>,
-    memo: &mut HashMap<String, u32>,
-    visiting: &mut HashSet<String>,
+fn longest_path<Id: Clone + Eq + Hash>(
+    id: &Id,
+    edges: &HashMap<&Id, Vec<&Id>>,
+    memo: &mut HashMap<Id, u32>,
+    visiting: &mut HashSet<Id>,
 ) -> u32 {
     if let Some(v) = memo.get(id) {
         return *v;
     }
-    if !visiting.insert(id.to_string()) {
+    if !visiting.insert(id.clone()) {
         return 0; // defensive cycle guard; the DAG invariant forbids this
     }
     let best = edges
         .get(id)
         .into_iter()
         .flatten()
-        .map(|dep| 1 + longest_path(dep, edges, memo, visiting))
+        .map(|dep| 1 + longest_path(*dep, edges, memo, visiting))
         .max()
         .unwrap_or(0);
     visiting.remove(id);
-    memo.insert(id.to_string(), best);
+    memo.insert(id.clone(), best);
     best
 }
 
@@ -513,7 +538,7 @@ fn longest_path(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MembershipDivergence {
     /// The id of the issue carrying the unsupported membership label.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The full `namespace:value` label (e.g. `"epic:auth"`).
     pub label: String,
     /// The label namespace (e.g. `"epic"`).
@@ -544,8 +569,8 @@ pub fn detect_membership_divergences(
 ) -> Vec<MembershipDivergence> {
     use crate::labels::{parse_label, type_label_values};
 
-    let by_id: HashMap<&str, &crate::domain::Issue> =
-        issues.iter().map(|i| (i.id.as_str(), *i)).collect();
+    let by_id: HashMap<&IssueId, &crate::domain::Issue> =
+        issues.iter().map(|i| (&i.id, *i)).collect();
 
     // Membership namespaces declared by the config (e.g. {"epic", "milestone"}).
     let membership_namespaces: HashSet<&str> = config
@@ -555,7 +580,7 @@ pub fn detect_membership_divergences(
 
     // Anchor containers per label: an issue whose type maps to namespace `ns`
     // and that carries label `ns:val` anchors that membership group.
-    let mut anchors: HashMap<String, Vec<&str>> = HashMap::new();
+    let mut anchors: HashMap<String, Vec<&IssueId>> = HashMap::new();
     for issue in issues.iter().copied() {
         for type_value in type_label_values(&issue.labels) {
             let Some(ns) = config.get_membership_namespace(type_value) else {
@@ -564,10 +589,7 @@ pub fn detect_membership_divergences(
             for label in &issue.labels {
                 if let Ok((label_ns, _)) = parse_label(label) {
                     if label_ns == ns {
-                        anchors
-                            .entry(label.clone())
-                            .or_default()
-                            .push(issue.id.as_str());
+                        anchors.entry(label.clone()).or_default().push(&issue.id);
                     }
                 }
             }
@@ -575,7 +597,7 @@ pub fn detect_membership_divergences(
     }
 
     // Dependency closures for anchor containers, computed on demand and cached.
-    let mut closure_cache: HashMap<&str, HashSet<String>> = HashMap::new();
+    let mut closure_cache: HashMap<&IssueId, HashSet<IssueId>> = HashMap::new();
 
     let mut divergences = Vec::new();
     for issue in issues.iter().copied() {
@@ -589,7 +611,7 @@ pub fn detect_membership_divergences(
             let Some(anchor_ids) = anchors.get(label) else {
                 continue; // no anchor container → not a divergence here
             };
-            if anchor_ids.contains(&issue.id.as_str()) {
+            if anchor_ids.contains(&&issue.id) {
                 continue; // the issue is itself the anchor
             }
             let contained = anchor_ids.iter().any(|anchor| {
@@ -620,19 +642,18 @@ pub fn detect_membership_divergences(
 /// The set of ids `start` transitively depends on (its DAG descendants),
 /// excluding `start` itself.
 fn dependency_closure(
-    start: &str,
-    by_id: &HashMap<&str, &crate::domain::Issue>,
-) -> HashSet<String> {
-    let mut result: HashSet<String> = HashSet::new();
-    let mut stack: Vec<&str> = vec![start];
-    let mut visited: HashSet<&str> = HashSet::new();
+    start: &IssueId,
+    by_id: &HashMap<&IssueId, &crate::domain::Issue>,
+) -> HashSet<IssueId> {
+    let mut result: HashSet<IssueId> = HashSet::new();
+    let mut stack: Vec<&IssueId> = vec![start];
+    let mut visited: HashSet<&IssueId> = HashSet::new();
     visited.insert(start);
     while let Some(cur) = stack.pop() {
         if let Some(node) = by_id.get(cur) {
             for dep in &node.dependencies {
-                let dep = dep.as_str();
                 if by_id.contains_key(dep) && visited.insert(dep) {
-                    result.insert(dep.to_string());
+                    result.insert(dep.clone());
                     stack.push(dep);
                 }
             }
@@ -672,11 +693,13 @@ mod tests {
     }
 
     impl HierarchyNode for TestNode {
-        fn id(&self) -> &str {
+        type Id = String;
+
+        fn id(&self) -> &String {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &String> + '_ {
+            self.deps.iter()
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
@@ -688,7 +711,7 @@ mod tests {
     }
 
     fn typed_issue(title: &str, level: u8) -> crate::domain::Issue {
-        let mut issue = crate::domain::fixture_issue(title.into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
         issue.labels = vec![format!(
             "type:{}",
             crate::test_taxonomy::test_taxonomy().type_at_level(level)
@@ -712,16 +735,16 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &s, &t], &default_config());
 
-        assert_eq!(r.parent("t"), Some("s"));
-        assert_eq!(r.parent("s"), Some("e"));
-        assert_eq!(r.parent("e"), Some("m"));
-        assert_eq!(r.parent("m"), None);
+        assert_eq!(r.parent(&t.id), Some(&s.id));
+        assert_eq!(r.parent(&s.id), Some(&e.id));
+        assert_eq!(r.parent(&e.id), Some(&m.id));
+        assert_eq!(r.parent(&m.id), None);
 
         // Every node in the chain clusters to the strategic root.
-        assert_eq!(r.cluster("t"), Some("m"));
-        assert_eq!(r.cluster("s"), Some("m"));
-        assert_eq!(r.cluster("e"), Some("m"));
-        assert_eq!(r.cluster("m"), Some("m"));
+        assert_eq!(r.cluster(&t.id), Some(&m.id));
+        assert_eq!(r.cluster(&s.id), Some(&m.id));
+        assert_eq!(r.cluster(&e.id), Some(&m.id));
+        assert_eq!(r.cluster(&m.id), Some(&m.id));
     }
 
     #[test]
@@ -731,8 +754,18 @@ mod tests {
         let t2 = TestNode::typed("t2", 4, &[]);
         let r = resolve_hierarchy(&[&e, &t1, &t2], &default_config());
 
-        assert_eq!(r.children("e"), ["t1".to_string(), "t2".to_string()]);
-        assert!(r.children("t1").is_empty());
+        assert_eq!(r.children(&e.id), ["t1".to_string(), "t2".to_string()]);
+        assert!(r.children(&t1.id).is_empty());
+    }
+
+    #[test]
+    fn test_membership_closure_returns_no_nodes_for_unknown_root() {
+        let node = TestNode::typed("node", 4, &[]);
+        let resolution = resolve_hierarchy(&[&node], &default_config());
+
+        assert!(resolution
+            .membership_closure(&"missing".to_string())
+            .is_empty());
     }
 
     #[test]
@@ -744,13 +777,21 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &s, &t], &default_config());
 
-        let from_initiative = r.membership_closure("e");
+        let from_initiative = r
+            .membership_closure(&e.id)
+            .into_iter()
+            .map(|node| node.id().to_string())
+            .collect::<HashSet<_>>();
         assert_eq!(
             from_initiative,
             ["e", "s", "t"].iter().map(|s| s.to_string()).collect()
         );
 
-        let from_objective = r.membership_closure("m");
+        let from_objective = r
+            .membership_closure(&m.id)
+            .into_iter()
+            .map(|node| node.id().to_string())
+            .collect::<HashSet<_>>();
         assert_eq!(
             from_objective,
             ["m", "e", "s", "t"].iter().map(|s| s.to_string()).collect()
@@ -758,7 +799,10 @@ mod tests {
 
         // A leaf's closure is just itself.
         assert_eq!(
-            r.membership_closure("t"),
+            r.membership_closure(&t.id)
+                .into_iter()
+                .map(|node| node.id().to_string())
+                .collect::<HashSet<_>>(),
             ["t"].iter().map(|s| s.to_string()).collect()
         );
     }
@@ -773,8 +817,14 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&e1, &e2, &t], &default_config());
 
-        assert!(r.membership_closure("e1").contains("t"));
-        assert!(!r.membership_closure("e2").contains("t"));
+        assert!(r
+            .membership_closure(&e1.id)
+            .iter()
+            .any(|node| node.id() == "t"));
+        assert!(!r
+            .membership_closure(&e2.id)
+            .iter()
+            .any(|node| node.id() == "t"));
     }
 
     #[test]
@@ -786,9 +836,9 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &t], &default_config());
 
-        assert_eq!(r.parent("t"), Some("e"));
-        assert_eq!(r.children("e"), ["t".to_string()]);
-        assert_eq!(r.children("m"), ["e".to_string()]);
+        assert_eq!(r.parent(&t.id), Some(&e.id));
+        assert_eq!(r.children(&e.id), ["t".to_string()]);
+        assert_eq!(r.children(&m.id), ["e".to_string()]);
     }
 
     #[test]
@@ -803,12 +853,12 @@ mod tests {
         let r = resolve_hierarchy(&[&ex, &sy, &ty, &tx], &default_config());
 
         assert_eq!(
-            r.parent("tx"),
-            Some("ex"),
+            r.parent(&tx.id),
+            Some(&ex.id),
             "direct initiative beats transitive deliverable"
         );
-        assert_eq!(r.parent("ty"), Some("sy"));
-        assert_eq!(r.children("ex"), ["tx".to_string()]);
+        assert_eq!(r.parent(&ty.id), Some(&sy.id));
+        assert_eq!(r.children(&ex.id), ["tx".to_string()]);
     }
 
     #[test]
@@ -822,12 +872,12 @@ mod tests {
         let t1 = TestNode::typed("t1", 4, &[]);
         let r = resolve_hierarchy(&[&fe, &fs, &t2, &t1], &default_config());
 
-        assert_eq!(r.parent("t1"), Some("fs"));
-        assert_eq!(r.children("fs"), ["t1".to_string(), "t2".to_string()]);
-        assert_eq!(r.children("fe"), ["fs".to_string()]);
+        assert_eq!(r.parent(&t1.id), Some(&fs.id));
+        assert_eq!(r.children(&fs.id), ["t1".to_string(), "t2".to_string()]);
+        assert_eq!(r.children(&fe.id), ["fs".to_string()]);
         // The redundant edge leaves rank untouched: the longest path still runs
         // through the deliverable.
-        assert_eq!(r.rank("fe"), Some(3));
+        assert_eq!(r.rank(&fe.id), Some(3));
     }
 
     #[test]
@@ -852,9 +902,9 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&a, &b, &t], &default_config());
 
-        assert_eq!(r.parent("t"), Some("aaa"));
-        assert_eq!(r.children("aaa"), ["t".to_string()]);
-        assert!(r.children("bbb").is_empty());
+        assert_eq!(r.parent(&t.id), Some(&a.id));
+        assert_eq!(r.children(&a.id), ["t".to_string()]);
+        assert!(r.children(&b.id).is_empty());
     }
 
     #[test]
@@ -871,17 +921,17 @@ mod tests {
         let r = resolve_hierarchy(&[&m2, &e_late, &m1, &t], &default_config());
 
         // The objective is not captured by the initiative that sequences after it.
-        assert_eq!(r.parent("m1"), None, "objective stays a root");
+        assert_eq!(r.parent(&m1.id), None, "objective stays a root");
         assert!(
-            r.children("e_late").is_empty(),
+            r.children(&e_late.id).is_empty(),
             "the initiative does not adopt the objective"
         );
         // The objective keeps its own subtree, unreached by the initiative.
-        assert_eq!(r.parent("t"), Some("m1"));
-        assert_eq!(r.cluster("t"), Some("m1"));
+        assert_eq!(r.parent(&t.id), Some(&m1.id));
+        assert_eq!(r.cluster(&t.id), Some(&m1.id));
         // The initiative clusters under its own objective, not the one it depends on.
-        assert_eq!(r.parent("e_late"), Some("m2"));
-        assert_eq!(r.cluster("e_late"), Some("m2"));
+        assert_eq!(r.parent(&e_late.id), Some(&m2.id));
+        assert_eq!(r.cluster(&e_late.id), Some(&m2.id));
     }
 
     #[test]
@@ -892,8 +942,8 @@ mod tests {
         let e2 = TestNode::typed("e2", 2, &[]);
         let r = resolve_hierarchy(&[&e1, &e2], &default_config());
 
-        assert_eq!(r.parent("e2"), None);
-        assert!(r.children("e1").is_empty());
+        assert_eq!(r.parent(&e2.id), None);
+        assert!(r.children(&e1.id).is_empty());
     }
 
     #[test]
@@ -901,9 +951,9 @@ mod tests {
         // An action with no container ancestor has no parent and no cluster.
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&t], &default_config());
-        assert_eq!(r.parent("t"), None);
-        assert_eq!(r.cluster("t"), None);
-        assert_eq!(r.rank("t"), Some(0));
+        assert_eq!(r.parent(&t.id), None);
+        assert_eq!(r.cluster(&t.id), None);
+        assert_eq!(r.rank(&t.id), Some(0));
     }
 
     #[test]
@@ -912,8 +962,8 @@ mod tests {
         let untyped = TestNode::new("u", None, &["t"]);
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&untyped, &t], &default_config());
-        assert_eq!(r.parent("t"), None, "an untyped node is not a container");
-        assert_eq!(r.cluster("u"), None);
+        assert_eq!(r.parent(&t.id), None, "an untyped node is not a container");
+        assert_eq!(r.cluster(&untyped.id), None);
     }
 
     #[test]
@@ -923,9 +973,9 @@ mod tests {
         let e = TestNode::typed("e", 2, &["t"]);
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &t], &default_config());
-        assert_eq!(r.rank("t"), Some(0));
-        assert_eq!(r.rank("e"), Some(1));
-        assert_eq!(r.rank("m"), Some(2));
+        assert_eq!(r.rank(&t.id), Some(0));
+        assert_eq!(r.rank(&e.id), Some(1));
+        assert_eq!(r.rank(&m.id), Some(2));
     }
 
     #[test]
@@ -938,7 +988,12 @@ mod tests {
         initiative.dependencies = vec![action.id.clone()];
 
         let r = resolve_hierarchy(&[&initiative, &action], &default_config());
-        assert_eq!(r.parent(&action.id), Some(initiative.id.as_str()));
+        let parent: Option<&IssueId> = r.parent(&action.id);
+        assert_eq!(parent, Some(&initiative.id));
+        let children: &[IssueId] = r.children(&initiative.id);
+        assert_eq!(children, std::slice::from_ref(&action.id));
+        let cluster: Option<&IssueId> = r.cluster(&action.id);
+        assert_eq!(cluster, Some(&initiative.id));
     }
 
     #[test]
@@ -999,6 +1054,7 @@ mod proptests {
     //! Property-based coverage for hierarchy resolution over arbitrary DAGs,
     //! mirroring the graph proptest suite in [`crate::domain::type_taxonomy`].
     use super::*;
+    use crate::test_harness::arbitrary_dag;
     use proptest::prelude::*;
     use std::collections::{HashMap, HashSet};
 
@@ -1010,45 +1066,17 @@ mod proptests {
     }
 
     impl HierarchyNode for PropNode {
-        fn id(&self) -> &str {
+        type Id = String;
+
+        fn id(&self) -> &String {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &String> + '_ {
+            self.deps.iter()
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
         }
-    }
-
-    /// Generate an arbitrary acyclic graph: `n` nodes where node `k` may only
-    /// depend on lower-indexed nodes (guaranteeing acyclicity). Each node gets an
-    /// arbitrary type from the default hierarchy, or none.
-    fn arbitrary_dag() -> impl Strategy<Value = Vec<(Option<u8>, Vec<usize>)>> {
-        (1usize..=7)
-            .prop_flat_map(|n| {
-                (
-                    Just(n),
-                    prop::collection::vec(0u8..5, n),
-                    prop::collection::vec(any::<u8>(), n),
-                )
-            })
-            .prop_map(|(n, types, masks)| {
-                (0..n)
-                    .map(|k| {
-                        let ty = match types[k] {
-                            0 => Some(1),
-                            1 => Some(2),
-                            2 => Some(3),
-                            3 => Some(4),
-                            _ => None,
-                        };
-                        // Depend on a subset of the strictly-lower indices.
-                        let deps = (0..k).filter(|&i| masks[k] & (1u8 << i) != 0).collect();
-                        (ty, deps)
-                    })
-                    .collect()
-            })
     }
 
     fn build(spec: &[(Option<u8>, Vec<usize>)]) -> Vec<PropNode> {
@@ -1108,6 +1136,20 @@ mod proptests {
     }
 
     proptest! {
+        #[test]
+        fn test_membership_closure_borrows_nodes_from_the_input_set(spec in arbitrary_dag()) {
+            let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
+            let nodes = build(&spec);
+            let refs: Vec<&PropNode> = nodes.iter().collect();
+            let resolution = resolve_hierarchy(&refs, &config);
+
+            for root in &nodes {
+                for member in resolution.membership_closure(root.id()) {
+                    prop_assert!(refs.iter().any(|input| std::ptr::eq(*input, member)));
+                }
+            }
+        }
+
         /// Resolution never panics on arbitrary acyclic input, and each resolved
         /// fact satisfies its definition: every parent is a container that
         /// transitively depends on the node; children invert parent; and rank
@@ -1122,7 +1164,7 @@ mod proptests {
             // Every input node is resolved.
             prop_assert_eq!(resolution.len(), nodes.len());
 
-            let by_id: HashMap<&str, &PropNode> = nodes.iter().map(|n| (n.id(), n)).collect();
+            let by_id: HashMap<&str, &PropNode> = nodes.iter().map(|n| (n.id().as_str(), n)).collect();
             let leaf_level = config.types().map(|(_, l)| *l).max().unwrap();
             let is_container = |id: &str| -> bool {
                 matches!(
@@ -1179,7 +1221,7 @@ mod proptests {
 
             // Every closure edge that is not already declared is transitively
             // redundant: adding it preserves both acyclicity and reachability.
-            let by_id: HashMap<&str, &PropNode> = base.iter().map(|n| (n.id(), n)).collect();
+            let by_id: HashMap<&str, &PropNode> = base.iter().map(|n| (n.id().as_str(), n)).collect();
             let mut bit = 0u32;
             let redundant: Vec<PropNode> = base
                 .iter()

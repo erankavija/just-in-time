@@ -19,37 +19,37 @@
 //! (declaration scope), so a single-name render leaves sibling targets untouched.
 
 use super::*;
-use crate::config::JitConfig;
+use crate::config::{JitConfig, ProjectionMode, ProjectionStyle};
 
 /// The result of rendering ONE projection, serialized as an element of
-/// [`ProjectRenderResult::projections`].
-#[derive(Debug, Serialize)]
+/// [`ProjectRenderResult`].
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ProjectionRenderReport {
     /// The projection name (its `[projection.<name>]` table key).
     pub name: String,
     /// The repo-relative documentation target that was written.
     pub target: String,
-    /// The projection mode used, as its config token (`separate-file`|`region`).
-    pub mode: String,
-    /// The render style used, as its config token (`id-anchor`|`full`).
-    pub style: String,
+    /// The projection mode used.
+    pub mode: ProjectionMode,
+    /// The render style used.
+    pub style: ProjectionStyle,
     /// The kind name(s) rendered, in declaration order.
     pub kinds: Vec<String>,
     /// Rows (id-anchor) or registry entries (full) rendered into the target.
     pub count: usize,
 }
 
-/// The result of a `jit project render` run over one or all projections.
-///
-/// Serialized as the `--json` payload with the list envelope
-/// `{"count": N, "projections": [...]}`.
-#[derive(Debug, Serialize)]
-pub struct ProjectRenderResult {
-    /// The number of projections rendered (mirrors `projections.len()`).
-    pub count: usize,
-    /// Per-projection reports, in projection-name order.
-    pub projections: Vec<ProjectionRenderReport>,
+/// Collection key of [`ProjectRenderResult`].
+pub enum ProjectionsKey {}
+
+impl CollectionKey for ProjectionsKey {
+    const KEY: &'static str = "projections";
+    const SCHEMA_NAME: Option<&'static str> = Some("ProjectRenderResult");
 }
+
+/// The result of a `jit project render` run over one or all projections: one
+/// report per projection, in projection-name order.
+pub type ProjectRenderResult = ListEnvelope<ProjectionsKey, ProjectionRenderReport>;
 
 /// Preserve validation-class producer sources at the command's anyhow transport
 /// boundary so callers can downcast the concrete typed error.
@@ -87,7 +87,10 @@ fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<V
         Some(requested) if registry.is_some_and(|entries| entries.contains_key(requested)) => {
             Ok(vec![requested.to_string()])
         }
-        Some(requested) => Err(anyhow!("unknown projection '{requested}'")),
+        Some(requested) => Err(crate::errors::InvalidArgumentError::new(format!(
+            "unknown projection '{requested}'"
+        ))
+        .into()),
         None => Ok(registry
             .into_iter()
             .flat_map(|entries| entries.keys().cloned())
@@ -95,7 +98,7 @@ fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<V
     }
 }
 
-impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// Render every declared projection, or the single `name`d one, into its
     /// configured documentation target through one mutation session.
     ///
@@ -119,7 +122,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         use std::collections::BTreeSet;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let budget = CaptureBudget {
             max_listings: 64,
             max_bytes: 256 * 1024 * 1024,
@@ -136,11 +139,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         // One bounded capture round: the engine registries, then the closure
         // their declarations enumerate.
-        with_mutation_session(self.storage(), &layout, "project render", |session| {
-            let spec = CaptureSpec::new(registries()?, budget)?;
+        let context = super::production_mutation_context();
+        with_mutation_session(self.exec.storage(), &layout, "project render", |session| {
+            let mut spec = CaptureSpec::new(registries()?, budget)?;
+            spec.discover_tail(VirtualPath::EVENTS)?;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
                 let config = assemble_config(image)?;
-                let rules_text = image_repo_bytes(image, ".jit/rules.toml")?
+                let rules_text = super::image_virtual_bytes(image, &VirtualPath::RULES)?
                     .map(String::from_utf8)
                     .transpose()?;
                 let closure = render_capture_closure(
@@ -166,6 +171,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let selected_set: BTreeSet<String> = selected_names.iter().cloned().collect();
             let plan = derive_materialization(
                 &image,
+                &context,
                 MaterializationRequest::RenderConfiguredProjections {
                     declarations: declarations.borrowed(),
                     selected: Some(selected_set),
@@ -190,8 +196,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     Ok(ProjectionRenderReport {
                         name: proj_name.clone(),
                         target,
-                        mode: projection.mode().to_string(),
-                        style: projection.style().to_string(),
+                        mode: projection.mode(),
+                        style: projection.style(),
                         kinds: projection.kinds().to_vec(),
                         count,
                     })
@@ -199,10 +205,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .collect::<Result<Vec<_>>>()?;
             Ok(SessionStep::Apply(
                 plan,
-                ProjectRenderResult {
-                    count: projections.len(),
-                    projections,
-                },
+                ProjectRenderResult::new(projections),
             ))
         })
     }
@@ -211,6 +214,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_projection_render_report_serializes_enum_tokens_to_identical_json() {
+        let report = ProjectionRenderReport {
+            name: "invariants".to_string(),
+            target: ".jit/invariants.md".to_string(),
+            mode: ProjectionMode::Region,
+            style: ProjectionStyle::IdAnchor,
+            kinds: vec!["invariant".to_string()],
+            count: 2,
+        };
+
+        assert_eq!(
+            serde_json::to_string(&report).unwrap(),
+            r#"{"name":"invariants","target":".jit/invariants.md","mode":"region","style":"id-anchor","kinds":["invariant"],"count":2}"#
+        );
+    }
 
     #[test]
     fn test_project_producer_error_preserves_projection_source_for_downcast() {

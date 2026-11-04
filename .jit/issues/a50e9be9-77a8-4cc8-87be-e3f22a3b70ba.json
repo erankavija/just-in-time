@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:45:24.040844266Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Carry the resolved agent identity as an `Assignee` from resolution through the claim coordinator into lease records.\n\n## Background\n\n`resolve_agent_id` returns `Result<String>` (`crates/jit/src/agent_config.rs:88`) after validating through `Assignee` and discarding the result (`:162`). `ClaimCoordinator::new(paths, locker, worktree_id: String, agent_id: String)` (`storage/claim_coordinator.rs:364`) is called at `commands/claim.rs:245,534,580,634,702` and `commands/mod.rs:732`. `ClaimCoordinator` stores the agent as a `String` (`:268`), as does `Lease.agent_id` (`:37`). Each agent id in this checkout's claims log parses as an `Assignee`.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_agent_id` returns `Assignee`.\n- [hard] REQ-02: `ClaimCoordinator`, `Lease` and `ClaimOp` hold the agent as `Assignee`, and system callers pass the named actor constants.\n- [hard] REQ-03: A claims-log entry whose agent is not a valid assignee fails to decode with an error naming the field.\n- [hard] REQ-04: Claims-log lines are byte-identical before and after.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:46:52.629246741Z",
+  "first_ready_at": "2026-10-25T01:43:29.758102752Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e2232086-b57d-4113-97bc-865628c20ca7",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:42:24.014990417Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b362238b-b0a3-4770-aed4-5d1b87180566",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:43:51.198029250Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Resolved agent identity is an Assignee",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T02:46:52.629246741Z"
 }

@@ -3,17 +3,40 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "6b1ed243-4081-4f0b-a7f3-346e11e2f2a7",
-    "6b8bab91-d7c3-4786-8688-a42abe5fee1f",
+    "63de0883-1cfb-4d01-a7d2-b444221783b2",
+    "655273d9-f712-4659-ab68-06bbb17b2d57",
     "f0a5b90a-d717-46cc-8cb4-61e24efb187d"
   ],
-  "description": "Each lease is one record changed by one lock-load-change-publish sequence, and claims decide their event from the issue record, so no lease or claim operation reads the claims log or the event log's records.\n\n## Background\n\nThe claims control plane kept every lease in one index that was a second authority beside a replayed log, repeated its lock and publish steps in each operation, and kept test-only APIs. The claim command parsed the whole event log to decide its event. This story stores one record per lease, runs every lease operation through one held lease lock, addresses every lease command by issue, and makes a claim's event follow the assignee.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading or changing one issue's lease reads only that issue's lease record, and no lease operation reads the claims log.\n- [hard] REQ-02: An interrupted lease operation leaves the prior or the next lease, and nothing rebuilds lease state from the log.\n- [hard] REQ-03: A claim appends its event exactly when the assignee changes and parses no event-log record.\n- [hard] REQ-04: This checkout's leases are carried into lease records, and the lease docs describe them.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
-  "documents": [],
+  "description": "Each lease is one record changed by one lock-load-change-publish sequence, and claims decide their event from the issue record, so no lease or claim operation reads the claims log or the event log's records.\n\n## Background\n\nThe claims control plane keeps every lease in one index that is a second authority beside a replayed log, repeats its lock and publish steps in each operation, and keeps test-only APIs. The claim command parses the whole event log to decide its event. This story stores one record per lease, runs every lease change through one held lease lock, reads listings without that lock, addresses every lease command by issue, and makes a claim's event follow the assignee.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading or changing one issue's lease reads only that issue's lease record, except the indefinite-lease limit check, which reads current lease records (f8a6b298 REQ-05); no lease operation reads the claims log.\n- [hard] REQ-02: An interrupted lease operation leaves the prior or the next lease, and nothing rebuilds lease state from the log.\n- [hard] REQ-03: A claim appends its event exactly when the assignee changes and parses no event-log record.\n- [hard] REQ-04: Checkouts' leases are carried into lease records, and the lease docs describe them.\n\n## Decisions\n\n- D-1: User decision (2026-11-04, relayed by just-in-time-6a): the five-repository format 4 cutover is accepted on the steward's independent post-window verification. The installed jit and jit-server are the format 4 build from a05567fde; `jit validate` returned error_count 0 in just-in-time, gf2, mealie-fi, inflected-messages and research; jit-server restarted with identical arguments and /api/health returned 200. Evidence about repositories outside this checkout is accepted on that verification, not on the committed narrative.\n- D-2 (steward ruling, just-in-time-6a for the user, 2026-11-04; plan DEC-28): REQ-01 names the epic REQ-05 exception. An indefinite acquire reads current lease records for its limit check by design; holistic-review 2528dd8f F1 had read the unqualified criterion as forbidding it. A sweep of every open story criterion against every epic exception (REQ-05, REQ-13) found no other omission.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Format 4 cutover record",
+      "path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/format4-cutover.md"
+    }
+  ],
+  "done_at": "2026-11-04T12:12:58.659591280Z",
+  "first_ready_at": "2026-11-04T08:42:45.397338234Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "500b2b3a-993a-4d63-a42b-a46c54d20cd0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:30:05.724772185Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "66ed30c1-4704-4e3d-919c-7d03aa7c2f13",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:12:48.423654949Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5ee85aed-c152-470f-881c-2b2be7b8ef53",
   "labels": [
     "type:story",
@@ -25,7 +48,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Leases are per-issue records under one lease sequence",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T12:19:53.001700253Z"
 }

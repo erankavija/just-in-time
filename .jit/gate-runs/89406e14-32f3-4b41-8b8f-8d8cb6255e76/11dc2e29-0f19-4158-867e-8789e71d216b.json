@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:18:01.889345413Z",
+  "duration_ms": 181578,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "11dc2e29-0f19-4158-867e-8789e71d216b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:15:00.310867316Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 78c758f294062b360bde7d1608986efdbc6cb103 (`jit:89406e14`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-10 (.jit issue, markdown-first); @/charter/D-2, @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/shipped-policy-regions-selftest, @/gate/jit-validate (.jit/gates.toml); @/invariant/no-ignored-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code unavailable; reused); shipped-policy-regions-selftest passed (exit 0; stable executed run)\nTruncation recovery: none\n\n1. No findings. `.jit/gates.toml:646-672` declares the automatic exec gate and complete fixture roots; the rendered projection at `docs/reference/rules-and-gates.md:61` matches its description.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

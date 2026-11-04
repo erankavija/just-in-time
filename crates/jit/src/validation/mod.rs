@@ -3,9 +3,8 @@
 //! All issue/label validation flows through ONE declarative engine; there is no
 //! longer any hard-coded `IssueValidator`. `.jit/rules.toml` declares the
 //! operative ruleset (DR §8.2/§8.4): `jit init` materializes the FIXED
-//! [`default_ruleset`](crate::repository_state::default_ruleset) into the file, and
-//! [`effective_rules`](crate::commands::CommandExecutor) builds the same defaults
-//! IN MEMORY when the file is absent (no write on the read path). A scaffolded
+//! [`default_ruleset`](crate::repository_state::default_ruleset) into the file.
+//! The same defaults apply when the file is absent. A scaffolded
 //! file's `origin = "default"` rules are reconciled against the `config.toml`
 //! registry at load, so their assertion and the family's membership never
 //! lag a hand edit of the registry.
@@ -26,7 +25,11 @@
 //! - [`drift`] — the enforcement-drift check (declaration consistency between
 //!   invariants and loadable rules/gates), reporting the sole
 //!   declared-but-unenforced direction;
-//! - [`report`] — structured rule reports for `jit validate [--explain]`.
+//! - [`record_fidelity`] — whether stored records decode and reproduce what the
+//!   writer would publish, a verdict of whole-repository validation only;
+//! - [`mod@report`] — report findings with provenance, their wire reports, and
+//!   the selections every validation view computes;
+//! - [`repository`] — the one whole-repository [`fn@report`].
 //!
 //! Rendering a [`RuleSet`](crate::declarations::rules::RuleSet) to `rules.toml` +
 //! schema file CONTENT (no I/O) is `serialize_ruleset` in
@@ -38,11 +41,16 @@ pub mod drift;
 pub mod engine;
 pub mod graph;
 pub mod local;
+pub(crate) mod record_fidelity;
 pub mod report;
 pub mod repository;
 pub mod strictness;
 
+#[cfg(test)]
+mod selection_proptests;
+
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 pub use report::{ExplainReport, ReportedFinding, RuleOutcome, RuleReport};
+pub use repository::{report, CapturedValidation, HistoryVerdicts, ReportInputs, ValidationReport};
 pub use strictness::Strictness;

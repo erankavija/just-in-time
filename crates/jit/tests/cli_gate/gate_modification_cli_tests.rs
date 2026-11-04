@@ -2,51 +2,12 @@
 //!
 //! Tests the `--add-gate` and `--remove-gate` flags for `jit issue update`
 
-use std::process::Command;
-use tempfile::TempDir;
+use crate::create_titled_issue;
+use jit::test_cli::JitCli;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-
-    let output = Command::new(jit)
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-
-    assert!(output.status.success(), "jit init failed");
-    temp
-}
-
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", title])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Failed to create issue");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Extract ID from "Created issue: <ID>"
-    stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .and_then(|l| l.split_whitespace().last())
-        .unwrap()
-        .to_string()
-}
-
-fn define_gate(temp: &TempDir, key: &str, title: &str) {
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args([
+fn define_titled_gate(temp: &JitCli, key: &str, title: &str) {
+    let output = temp
+        .command([
             "gate",
             "define",
             key,
@@ -55,7 +16,6 @@ fn define_gate(temp: &TempDir, key: &str, title: &str) {
             "--description",
             "Test gate",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -66,11 +26,9 @@ fn define_gate(temp: &TempDir, key: &str, title: &str) {
     );
 }
 
-fn get_issue_json(temp: &TempDir, id: &str) -> serde_json::Value {
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args(["issue", "show", id, "--json"])
-        .current_dir(temp.path())
+fn get_issue_json(temp: &JitCli, id: &str) -> serde_json::Value {
+    let output = temp
+        .command(["issue", "show", id, "--json"])
         .output()
         .unwrap();
 
@@ -94,14 +52,12 @@ fn gate_keys(issue: &serde_json::Value) -> Vec<String> {
 
 #[test]
 fn test_add_single_gate() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args(["issue", "update", &id, "--add-gate", "tests"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", &id, "--add-gate", "tests"])
         .output()
         .unwrap();
 
@@ -118,14 +74,13 @@ fn test_add_single_gate() {
 
 #[test]
 fn test_add_multiple_gates_multiple_flags() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    let id = create_issue(&temp, "Test issue");
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             &id,
@@ -134,7 +89,6 @@ fn test_add_multiple_gates_multiple_flags() {
             "--add-gate",
             "clippy",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -151,16 +105,22 @@ fn test_add_multiple_gates_multiple_flags() {
 }
 
 #[test]
-fn test_add_multiple_gates_comma_separated() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    let id = create_issue(&temp, "Test issue");
+fn test_add_multiple_gates_repeated_flags() {
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args(["issue", "update", &id, "--add-gate", "tests,clippy"])
-        .current_dir(temp.path())
+    let output = temp
+        .command([
+            "issue",
+            "update",
+            &id,
+            "--add-gate",
+            "tests",
+            "--add-gate",
+            "clippy",
+        ])
         .output()
         .unwrap();
 
@@ -178,37 +138,17 @@ fn test_add_multiple_gates_comma_separated() {
 
 #[test]
 fn test_remove_gate() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    let jit = jit_binary();
-
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
     // Create issue with gates
-    let output = Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Test issue",
-            "--gate",
-            "tests,clippy",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let id = stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .and_then(|l| l.split_whitespace().last())
+    let id = temp
+        .create_issue(["-t", "Test issue", "--gate", "tests", "--gate", "clippy"])
         .unwrap();
 
     // Remove one gate
-    let output = Command::new(jit)
-        .args(["issue", "update", id, "--remove-gate", "tests"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", &id, "--remove-gate", "tests"])
         .output()
         .unwrap();
 
@@ -218,7 +158,7 @@ fn test_remove_gate() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let issue = get_issue_json(&temp, id);
+    let issue = get_issue_json(&temp, &id);
     let gates = gate_keys(&issue);
     assert!(!gates.contains(&"tests".to_string()));
     assert!(gates.contains(&"clippy".to_string()));
@@ -226,39 +166,28 @@ fn test_remove_gate() {
 
 #[test]
 fn test_add_and_remove_gates_combined() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    define_gate(&temp, "fmt", "Run fmt");
-    let jit = jit_binary();
-
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
+    define_titled_gate(&temp, "fmt", "Run fmt");
     // Create issue with one gate
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", "Test issue", "--gate", "tests"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let id = stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .and_then(|l| l.split_whitespace().last())
+    let id = temp
+        .create_issue(["-t", "Test issue", "--gate", "tests"])
         .unwrap();
 
     // Add clippy and fmt, remove tests
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
-            id,
+            &id,
             "--add-gate",
-            "clippy,fmt",
+            "clippy",
+            "--add-gate",
+            "fmt",
             "--remove-gate",
             "tests",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -268,7 +197,7 @@ fn test_add_and_remove_gates_combined() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let issue = get_issue_json(&temp, id);
+    let issue = get_issue_json(&temp, &id);
     let gates = gate_keys(&issue);
     assert!(!gates.contains(&"tests".to_string()));
     assert!(gates.contains(&"clippy".to_string()));
@@ -277,13 +206,11 @@ fn test_add_and_remove_gates_combined() {
 
 #[test]
 fn test_add_gate_invalid_key_error() {
-    let temp = setup_test_repo();
-    let id = create_issue(&temp, "Test issue");
+    let temp = JitCli::initialised().unwrap();
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args(["issue", "update", &id, "--add-gate", "nonexistent"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", &id, "--add-gate", "nonexistent"])
         .output()
         .unwrap();
 
@@ -298,24 +225,20 @@ fn test_add_gate_invalid_key_error() {
 
 #[test]
 fn test_add_gate_idempotent() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
-
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
     // Add gate first time
-    let output = Command::new(jit)
-        .args(["issue", "update", &id, "--add-gate", "tests"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", &id, "--add-gate", "tests"])
         .output()
         .unwrap();
     assert!(output.status.success());
 
     // Add same gate again (should be no-op)
-    let output = Command::new(jit)
-        .args(["issue", "update", &id, "--add-gate", "tests"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", &id, "--add-gate", "tests"])
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -329,31 +252,28 @@ fn test_add_gate_idempotent() {
 
 #[test]
 fn test_batch_add_gates() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "code-review", "Code review");
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "code-review", "Code review");
 
     // Create multiple issues with same label
-    let _id1 = create_issue(&temp, "Task 1");
-    let _id2 = create_issue(&temp, "Task 2");
+    let _id1 = create_titled_issue(&temp, "Task 1");
+    let _id2 = create_titled_issue(&temp, "Task 2");
 
     // Update issues by setting label first (new issues start in ready state)
-    let jit = jit_binary();
-    Command::new(jit)
-        .args([
-            "issue",
-            "update",
-            "--filter",
-            "state:ready",
-            "--label",
-            "type:task",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    temp.command([
+        "issue",
+        "update",
+        "--filter",
+        "state:ready",
+        "--label",
+        "type:task",
+    ])
+    .output()
+    .unwrap();
 
     // Batch add gate using filter
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -361,7 +281,6 @@ fn test_batch_add_gates() {
             "--add-gate",
             "code-review",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -372,9 +291,8 @@ fn test_batch_add_gates() {
     );
 
     // Verify both issues have the gate
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "type:task", "--full", "--json"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["query", "all", "--label", "type:task", "--full", "--json"])
         .output()
         .unwrap();
 
@@ -390,14 +308,12 @@ fn test_batch_add_gates() {
 
 #[test]
 fn test_gates_in_json_output() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let update = Command::new(jit)
-        .args(["issue", "update", &id, "--add-gate", "tests", "--json"])
-        .current_dir(temp.path())
+    let update = temp
+        .command(["issue", "update", &id, "--add-gate", "tests", "--json"])
         .output()
         .unwrap();
 
@@ -405,9 +321,8 @@ fn test_gates_in_json_output() {
 
     // `issue update --json` returns a lean confirmation; verify the gate was
     // attached by reading it back via `issue show --json`.
-    let show = Command::new(jit)
-        .args(["issue", "show", &id, "--json"])
-        .current_dir(temp.path())
+    let show = temp
+        .command(["issue", "show", &id, "--json"])
         .output()
         .unwrap();
 
@@ -419,13 +334,12 @@ fn test_gates_in_json_output() {
 
 #[test]
 fn test_combine_with_other_updates() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             &id,
@@ -436,7 +350,6 @@ fn test_combine_with_other_updates() {
             "--label",
             "type:task",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -457,14 +370,12 @@ fn test_combine_with_other_updates() {
 
 #[test]
 fn test_remove_nonexistent_gate_is_noop() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
-    let jit = jit_binary();
-    let output = Command::new(jit)
-        .args(["issue", "update", &id, "--remove-gate", "tests"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", &id, "--remove-gate", "tests"])
         .output()
         .unwrap();
 
@@ -480,44 +391,38 @@ fn test_remove_nonexistent_gate_is_noop() {
 
 #[test]
 fn test_batch_remove_gates() {
-    let temp = setup_test_repo();
-    define_gate(&temp, "tests", "Run tests");
-    let jit = jit_binary();
-
+    let temp = JitCli::initialised().unwrap();
+    define_titled_gate(&temp, "tests", "Run tests");
     // Create issues with gates
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task 1",
-            "--gate",
-            "tests",
-            "--label",
-            "type:task",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    temp.command([
+        "issue",
+        "create",
+        "-t",
+        "Task 1",
+        "--gate",
+        "tests",
+        "--label",
+        "type:task",
+    ])
+    .output()
+    .unwrap();
 
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task 2",
-            "--gate",
-            "tests",
-            "--label",
-            "type:task",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    temp.command([
+        "issue",
+        "create",
+        "-t",
+        "Task 2",
+        "--gate",
+        "tests",
+        "--label",
+        "type:task",
+    ])
+    .output()
+    .unwrap();
 
     // Batch remove gate
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -525,7 +430,6 @@ fn test_batch_remove_gates() {
             "--remove-gate",
             "tests",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -536,9 +440,8 @@ fn test_batch_remove_gates() {
     );
 
     // Verify gates removed
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "type:task", "--full", "--json"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["query", "all", "--label", "type:task", "--full", "--json"])
         .output()
         .unwrap();
 
@@ -548,5 +451,57 @@ fn test_batch_remove_gates() {
     for issue in issues {
         let gates = issue["gates_required"].as_array().unwrap();
         assert!(!gates.contains(&serde_json::json!("tests")));
+    }
+}
+
+#[test]
+fn test_gate_key_arguments_reject_malformed_tokens_at_dispatch() {
+    let cli = JitCli::initialised().unwrap();
+    let id = create_titled_issue(&cli, "Malformed gate argument target");
+    for arguments in [
+        vec![
+            "issue",
+            "create",
+            "--title",
+            "Invalid gate",
+            "--gate",
+            "Bad_Key",
+        ],
+        vec!["issue", "update", &id, "--add-gate", "Bad_Key"],
+        vec!["issue", "update", &id, "--remove-gate", "Bad_Key"],
+        vec![
+            "gate",
+            "define",
+            "Bad_Key",
+            "--title",
+            "Invalid gate",
+            "--description",
+            "Invalid gate",
+        ],
+        vec!["gate", "update", "Bad_Key", "--title", "Invalid gate"],
+        vec!["gate", "show", "Bad_Key"],
+        vec!["gate", "remove", "Bad_Key"],
+        vec!["gate", "add", &id, "Bad_Key"],
+        vec!["gate", "evaluate", &id, "Bad_Key"],
+        vec!["gate", "evaluate-many", "Bad_Key", &id],
+        vec!["gate", "fail", &id, "Bad_Key"],
+        vec!["gate", "status", &id, "Bad_Key"],
+        vec!["gate", "status", &id, "--all", "--gate", "Bad_Key"],
+        vec!["gate", "preset", "apply", "ci", &id, "--except", "Bad_Key"],
+    ] {
+        let output = cli
+            .command(arguments.iter().copied().chain(["--json"]))
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{arguments:?}");
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            envelope["error"]["code"], "INVALID_ARGUMENT",
+            "{arguments:?}"
+        );
+        assert!(envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Bad_Key"));
     }
 }

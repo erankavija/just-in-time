@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T08:12:17.644416479Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retype the issue ids that domain structs, event bodies and domain functions carry.\n\n## Background\n\nDomain carriers are `Issue.id` and `dependencies` (`crates/jit/src/domain/types.rs:414,427`), `MinimalIssue.id` (`:670`), `MinimalBlockedIssue.id` (`:758`), `GateRunResult.issue_id` (`:947`), the `issue_id` field of the issue-scoped event variants and `DependencyReduced.removed_deps` (`types.rs:1292-1616`), the artifact-plan issue fields (`domain/artifact_plan.rs:290,352`) and `PlanTarget::Container`, `domain/artifact_classifier.rs:223`, `domain/store_divergence.rs:76`, `domain/type_taxonomy.rs`, the container roots of `domain/artifact_inventory.rs:293,315` and `domain/artifact_discovery.rs:537`, `domain/artifact_conformance.rs:44`, the sample events of `EventTag::sample` (`domain/event_catalog.rs:281-282`), and the domain files `event_log.rs`, `projection.rs` and `item.rs`. About 15 functions in `domain/types.rs` take raw ids. Short ids are truncated by length at `domain/types.rs:551,733,795` and `domain/artifact_classifier.rs:1715`.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter under `crates/jit/src/domain/` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Domain short-id methods delegate to `short_id()` on the id, and no domain site truncates an id by length.\n- [hard] REQ-03: Serialized issue, gate-run and event JSON is byte-identical before and after.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "done_at": "2026-10-29T08:38:49.352769424Z",
+  "first_ready_at": "2026-10-29T08:12:17.226122489Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2f6c020c-9b0f-4030-beda-7d1449d08f34",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:38:40.445637294Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "706410a8-e6fb-433f-a1e6-bd1462a2dd60",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:38:13.605262965Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3ee3a4d1-3e66-4935-ad2c-4df89663cea7",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Domain types carry issue ids as IssueId",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-29T08:38:49.352769424Z"
 }

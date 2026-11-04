@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T23:11:08.347241432Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "a085ca6a-9017-4f08-a937-b0074b0efe86"
+    "dd53527f-818b-4e61-a0de-c2fb1d0d2684"
   ],
-  "description": "Make the lease check inside repository mutations hold one lease lock across the session and read its targets through it, without writing and without locking twice.\n\n## Background\n\nThe repository-mutation guard `lock_claims_for_repository_mutation` (`crates/jit/src/storage/claim_coordinator.rs:413-432`) takes the claims lock and replays the whole claims log into a snapshot. `claims_mutation_guard` (`commands/mod.rs:720-739`) takes it before the repository session opens (`commands/mod.rs:2600-2607`), and `captured_lease_warnings` and `ensure_claim_available` (`commands/mod.rs:741-800`) read the snapshot. `CoordinationOrderGuard::enter` refuses while a repository order guard is held (`storage/guard_order.rs:52-62`). `ClaimCoordinator::lock()` returns a `LeaseLock` with `load`, `list` and `apply`.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository-mutation guard takes one `LeaseLock` before the repository session opens, holds it across the session and reads each target only through `load`; it writes nothing, takes no second claims lock and enters no second coordination guard, and an expired lease counts as inactive.\n- [hard] REQ-02: A test shows that a lease-enforced mutation succeeds for the lease holder, is refused for another agent, and leaves the claims log unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make the lease check inside repository mutations hold one lease lock across the session and read its targets through it, without writing.\n\n## Background\n\n`lock_claims_for_repository_mutation` (`crates/jit/src/storage/claim_coordinator.rs`) takes the claims lock and replays the whole claims log into a `ClaimsMutationGuard`. `claims_mutation_guard` (`commands/mod.rs`) has seven call sites (`commands/dependency.rs`, `commands/gate.rs`, `commands/issue.rs`, `commands/mod.rs`), all before the repository session opens. `refuse_foreign_leases_held` and `ensure_claim_available` (`commands/mod.rs`) read the guard through `ClaimsMutationGuard::conflicting_lease`. The lifecycle path takes a preliminary guard for a claim before prechecks run and drops it before taking the held one. `CoordinationOrderGuard::enter` refuses while a repository order guard is held (`storage/guard_order.rs`). `ClaimCoordinator::lock()` returns a `LeaseLock` with `load`, `list` and `apply`. `tests/cli_repo_workflow/lease_enforcement_tests.rs` owns the holder and other-agent outcomes across every command.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository-mutation guard takes one `LeaseLock` before the repository session opens, holds it across the session and reads each target only through `load`. It writes nothing and nests no second claims lock or coordination guard. A lease that is not `Lease::is_active` conflicts with nobody, and an anonymous writer conflicts with every active lease.\n- [hard] REQ-02: A test in `lease_enforcement_tests.rs` shows that a lease-enforced mutation leaves the claims log unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-03T23:29:21.481874719Z",
+  "first_ready_at": "2026-11-02T23:39:53.232186875Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a69cf207-b8cb-4ab3-b76c-1b01dc1f90f2",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:25:20.474182902Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9234053b-1289-41cb-bfe5-3995d4525180",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:29:20.971441418Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "15009590-fc1a-4777-84f4-fd19a7134eda",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "satisfies:f8a6b298/REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "The repository-mutation lease check reads through the held lease lock",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-03T23:29:21.481874719Z"
 }

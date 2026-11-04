@@ -29,7 +29,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Run the server, web UI and MCP bridge on the core's shared mechanisms",
-  "updated_at": "2026-10-21T01:27:00.106631633Z"
+  "updated_at": "2026-11-01T05:30:04.061016272Z"
 }

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "25515e0f57a80d855c132af37779f4bb6a541ae6",
+  "completed_at": "2026-11-01T04:36:39.551346028Z",
+  "duration_ms": 137384,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 507,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/955aaa9a/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "A family-wide failure record lets a different key overwrite a failed build's cause before every original waiter observes it."
+      }
+    ],
+    "summary": "A failure for one key can be overwritten by another key before all original waiters receive its cause.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "955aaa9a-34f7-4304-bed1-ad8102185253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "00564033-c16f-49fe-8a0b-fdb88bdb726a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T04:34:22.166920571Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 26337 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19563-1a00-7ad1-b3f5-8cf349f21a7b\n--------\nuser\n--- 26324 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 61a07d756, 934cf05a8, 81b32fb42, 101dd4258, d1d5284f1, 25515e0f5 (`jit:955aaa9a`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/955aaa9a/requirement/REQ-01, REQ-02, REQ-03 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T04:32:42.521312393+00:00)\nTruncation recovery: narrowed combined output into per-commit, per-file diffs and bounded current-source/test reads.\n\n1. **F1 — blocking, issue-impact (high):** Failure handoff is stored in one family-wide file, but reads discard a record for another key. If key A fails while its waiters are queued, a later key-B build in the same family can fail and overwrite `family.failure.json`; an A waiter then sees no A record and can build or succeed without receiving A’s original failure cause. The generic keyed fixture intentionally supports multiple keys per family, but the tests cover an unrelated-key failure only without queued waiters. This violates REQ-02. `crates/jit/src/test_utils.rs:507`, `crates/jit/src/test_utils.rs:656`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A failure for one key can be overwritten by another key before all original waiters receive its cause.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A family-wide failure record lets a different key overwrite a failed build's cause before every original waiter observes it.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":507,\"references\":[\"@/issue/955aaa9a/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

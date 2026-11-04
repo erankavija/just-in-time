@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T20:26:36.339918693Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -10,11 +11,26 @@
   ],
   "description": "`jit::output::failure::classify` derives each failure's details and suggestions from the error value, so call sites no longer need to build them.\n\n## Background\n\n`classify(&anyhow::Error) -> JsonError` in `crates/jit/src/output/failure.rs` currently returns only a code and message. The details and suggestions a user sees are built at call sites in `crates/jit/src/main.rs`: `gate_pass_json_error` for `GatePassFailed`, `GateNotRequiredError` and `ManualGateAttestationRequiredError`; `JsonError::issue_not_found(id)` although `IssueNotFoundError` carries the id; `JsonError::transition_blocked` for `TransitionBlockedError`; `emit_top_level_json_error` for the `InvalidLabelPatternError` suggestion and `LinkedCheckoutWriteRefusedError` details; `dep_add_batch_json_error` for `DependencyBatchRejectedError`; `refine_id_error` for `AmbiguousIdError`/`InvalidIdPrefixError`; `profile_json_error` for `RepositoryStateError::ProfileTargetConflicts` and the profile not-found suggestion; and the `Commands::Search` arm for `search::SearchError` (`RipgrepNotInstalled` suggestion), which the classifier does not downcast at all. The transposed-argument guard in `GateCommands::Status`, the profile not-found path and `item show`'s not-found path (its `ITEM_NOT_FOUND` is a call-site substitution in `IssueCommands::Show`) have no distinguishing error type, so no type-only classifier can reproduce them.\n\n## Success Criteria\n\n- [hard] REQ-01: For each error type listed in the Background, `classify` returns the details and suggestions the corresponding call site builds today.\n- [hard] REQ-02: `search::SearchError` is classified by type, to the codes the `Commands::Search` arm chooses today, with the ripgrep-missing suggestion.\n- [hard] REQ-03: The transposed `gate status` arguments, a missing profile and a missing item (`show_item` in `crates/jit/src/commands/item.rs` raises an untyped error today) each have a typed error whose classification yields the code, details and suggestions their call sites produce today.\n- [hard] REQ-04: Library unit tests in `output/failure.rs` own each derivation, asserting the classified code and the presence and meaning of details and suggestions rather than copied strings.\n- [hard] REQ-05: The CLI's observable failures are unchanged; the existing envelope and exit-code suites pass without weakened assertions.\n\n## Notes\n\nCall sites keep their emitters until their command group migrates to a handler. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-11-03T21:26:27.867257778Z",
+  "first_ready_at": "2026-11-03T04:09:22.698977220Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2e3c9bce-807b-4e78-81a2-f5dbe2f619cc",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:22:26.689608860Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7c5de6e5-6751-4880-882e-2d68c1a101d1",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:26:21.088557938Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1539da29-f445-430c-a238-8613da6ae904",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "satisfies:df129d9e/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Derive failure details and suggestions from the error type",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-03T21:26:27.867257778Z"
 }

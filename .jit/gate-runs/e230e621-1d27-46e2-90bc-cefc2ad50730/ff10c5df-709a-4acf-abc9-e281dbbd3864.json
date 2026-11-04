@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "320a12bba300f4d6a1e9b7f1abe40131f4ef95ed",
+  "completed_at": "2026-10-26T23:00:45.926065813Z",
+  "duration_ms": 193513,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six migrated CLI test files use the shared JitCli fixture and retain their assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e230e621-1d27-46e2-90bc-cefc2ad50730",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff10c5df-709a-4acf-abc9-e281dbbd3864",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:57:32.412148789Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f147f4d11 and 320a12bba (the merge carries the same scoped paths; no delta from its second parent)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit issue source), @/charter/D-18 (dev/vision/9db27a3a-charter.md), @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-10-26; reused projection); code-review pending with no prior run\nTruncation recovery: Re-read all six individual migration patches and current files in path/range-bounded calls\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six migrated CLI test files use the shared JitCli fixture and retain their assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

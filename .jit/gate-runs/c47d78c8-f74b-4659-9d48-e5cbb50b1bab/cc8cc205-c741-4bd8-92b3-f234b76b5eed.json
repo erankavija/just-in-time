@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "19f058de9634f2b1e31a44ed4ac080f6f93ef54d",
+  "completed_at": "2026-11-01T16:15:28.413957925Z",
+  "duration_ms": 122695,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/validation/record_fidelity.rs",
+        "id": "F1",
+        "line": 104,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The event-fidelity comment still describes retired-tag acceptance after unknown event tags became errors."
+      }
+    ],
+    "summary": "Hard criteria are satisfied; one advisory stale event-validation comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c47d78c8-f74b-4659-9d48-e5cbb50b1bab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cc8cc205-c741-4bd8-92b3-f234b76b5eed",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:13:25.718952488Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b6968e7c, 3c4db465, 7f274ebc, 8d5048a5, 45192912, eb1bad66, 7adb93dc, 4376939f, d668ba9a, e2124311, 0767c03b, 19f058de (jit:c47d78c8); uncommitted JIT records excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T16:12:00Z); prior code-review failed (F1 verified resolved)\nTruncation recovery: bounded per-commit, merge-parent, source, test, documentation, and policy reads; unrelated merged profile and historical-record paths excluded\n\n1. F1 — advisory, issue-impact (low): [record_fidelity.rs:104](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/record_fidelity.rs:104) still says non-current event lines “carry a retired tag,” but the cutover now rejects unknown tags in `parse_known_events`. Update this stale contract comment. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Hard criteria are satisfied; one advisory stale event-validation comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The event-fidelity comment still describes retired-tag acceptance after unknown event tags became errors.\",\"file\":\"crates/jit/src/validation/record_fidelity.rs\",\"line\":104,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

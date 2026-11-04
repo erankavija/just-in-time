@@ -1,13 +1,15 @@
 //! Typed mutation identity, time authority, and the sole typed-to-byte finalizer.
 //!
-//! Commands submit timestamp-free, identifier-free semantic [`MutationIntent`]s.
+//! Commands submit timestamp-free semantic [`MutationIntent`]s; a created issue
+//! and a gate-run draft carry the id their caller derived from the context, and
+//! every other identifier is the finalizer's.
 //! A [`MutationContext`] — created exactly once per command operation, before
 //! its conflict-retry loop — supplies deterministic identifiers (from a single seed drawn
 //! once on the first allocation) and one mutation timestamp (sampled once, on the
 //! first transition), so retries reuse identical record identities and times while
 //! a no-op mutation samples neither identity nor time. The
 //! finalizer serializes every repository-owned record (issue upserts/deletes,
-//! `index.json` membership, gate-run/audit artifacts, and events) into one exact
+//! `index.json` tombstones, gate-run/audit artifacts, and events) into one exact
 //! [`RepositoryDelta`] published through one redo record, preserving
 //! `@/inv/event-log` and `@/inv/atomic-writes`.
 //!
@@ -16,16 +18,18 @@
 
 use super::{
     CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction,
-    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
-    RootRelativePath, VirtualPath,
+    RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::declarations::GateRegistry;
+use crate::domain::event_catalog::EventTag;
+use crate::domain::identity::{GateKey, GateRunId, IssueId};
 use crate::domain::{
-    Assignee, Event, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
+    Assignee, Event, EventBody, GateRunResult, GateStatus, GateVerdictRecord, Issue,
+    LinkedCheckoutWriteStance, State,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
 
@@ -142,11 +146,13 @@ impl IdAuthority {
 
     /// Derive the hyphenated UUID string for allocation `index`.
     ///
-    /// Exposed to the crate so an orchestrator can pre-derive the identifiers of
-    /// records whose expected-absent paths must enter the `CaptureSpec` before
-    /// capture (new issue and gate-run paths), replaying the same frozen order.
     /// The first call on a production authority draws its seed (see [`Self::random`]).
     pub(crate) fn uuid_at(&self, index: u64) -> String {
+        self.uuid_value_at(index).to_string()
+    }
+
+    /// The UUID for allocation `index`, before rendering.
+    fn uuid_value_at(&self, index: u64) -> uuid::Uuid {
         let mut hasher = Sha256::new();
         hasher.update(b"jit-mutation-id-v1");
         hasher.update(self.seed());
@@ -158,7 +164,7 @@ impl IdAuthority {
         // well-formed random-shaped UUID, matching the format callers expect.
         bytes[6] = (bytes[6] & 0x0f) | 0x40;
         bytes[8] = (bytes[8] & 0x3f) | 0x80;
-        uuid::Uuid::from_bytes(bytes).to_string()
+        uuid::Uuid::from_bytes(bytes)
     }
 }
 
@@ -285,12 +291,18 @@ impl MutationContext {
         self.dispatch_annotation.as_ref()
     }
 
-    /// Derive an identifier at the finalizer's frozen allocation index without
-    /// advancing that order. Command orchestration uses this only to capture the
-    /// expected-absent paths of records whose finalizer-assigned ids are part of
-    /// their path, and to return those ids after publication.
-    pub(crate) fn identifier_at(&self, index: u64) -> String {
-        self.ids.uuid_at(index)
+    /// Derive the id of the issue created at position `index` of a mutation's
+    /// creation order. The finalizer reserves those leading indices, so a draft
+    /// built with this id keeps every later identifier in the frozen order.
+    pub(crate) fn issue_id_at(&self, index: u64) -> IssueId {
+        IssueId::from_uuid(self.ids.uuid_value_at(index))
+    }
+
+    /// Derive the id of the gate run recorded at position `index` of a mutation
+    /// that creates no issue. The finalizer reserves those leading indices, so a
+    /// draft built with this id keeps every later identifier in the frozen order.
+    pub(crate) fn gate_run_id_at(&self, index: u64) -> GateRunId {
+        GateRunId::from_uuid(self.ids.uuid_value_at(index))
     }
 
     /// Restart the frozen allocation order for another finalize pass.
@@ -314,6 +326,12 @@ impl MutationContext {
         }
     }
 
+    /// Skip the `count` indices the mutation's issue creations or gate-run
+    /// drafts derived their ids at.
+    fn reserve(&self, count: usize) {
+        self.next_index.set(self.next_index.get() + count as u64);
+    }
+
     /// Allocate the next identifier in the frozen order.
     fn allocate(&self) -> String {
         let index = self.next_index.get();
@@ -322,38 +340,36 @@ impl MutationContext {
     }
 }
 
-/// One repository-owned semantic mutation, free of identifiers and timestamps.
+/// One repository-owned semantic mutation, free of timestamps.
 ///
-/// The finalizer assigns identity and applies the mutation timestamp; callers
-/// never stamp either. The set is closed: a new record class extends this enum.
+/// The finalizer applies the mutation timestamp and assigns every identifier
+/// except a created issue's and a gate run's, which the caller derives through
+/// [`MutationContext::issue_id_at`] and [`MutationContext::gate_run_id_at`];
+/// callers never stamp time. The set is
+/// closed: a new record class extends this enum.
 #[derive(Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MutationIntent {
-    /// Create a new issue. The finalizer assigns the id and stamps `created_at`,
-    /// `updated_at`, and `first_ready_at` (when initially `Ready`); every other
-    /// field is taken verbatim from `draft`.
+    /// Create a new issue. The finalizer stamps `created_at`, `updated_at`, and
+    /// `first_ready_at` (when initially `Ready`); every other field, the id
+    /// included, is taken verbatim from `draft`.
     CreateIssue {
-        /// Semantic issue whose id/lifecycle timestamps are assigned by the
+        /// Semantic issue whose lifecycle timestamps are stamped by the
         /// finalizer; all other fields are authoritative.
         draft: Box<Issue>,
     },
-    /// Create a prevalidated issue batch and wire all intra-batch dependency
-    /// relationships in the same delta. Dependency pairs are
-    /// `(dependent_index, dependency_index)` into `drafts`; the finalizer
-    /// resolves them after allocating every issue id.
+    /// Create a prevalidated issue batch, with its intra-batch dependencies,
+    /// in the same delta.
     CreateIssueBatch {
-        /// Semantic issue drafts in caller request order.
+        /// Semantic issue drafts in caller request order; the finalizer stamps
+        /// their lifecycle timestamps.
         drafts: Vec<Issue>,
-        /// Prevalidated intra-batch dependency index pairs.
-        dependencies: Vec<(usize, usize)>,
     },
-    /// Convergently claim `issue_id` for `agent`. Idempotent over both the
-    /// captured issue assignment and the captured event-log tail: a fully
-    /// reflected claim is a complete no-op; an issue assigned without its claim
-    /// event emits exactly the missing event; a duplicate event is never emitted.
+    /// Assign `issue_id` to `agent` and append `IssueClaimed`, or do nothing when
+    /// the captured issue is already assigned to `agent`.
     ClaimIssue {
         /// Canonical full issue id (the caller resolves short ids first).
-        issue_id: String,
+        issue_id: IssueId,
         /// Claiming agent identity.
         agent: Assignee,
     },
@@ -386,19 +402,17 @@ pub enum MutationIntent {
         preset: Box<crate::gate_presets::GatePresetDefinition>,
     },
     /// Delete an issue that ALREADY EXISTS in the captured image. The finalizer
-    /// removes the issue record and transfers its id from active to deleted index
-    /// membership in the same delta. Audit events remain explicit intents so the
+    /// removes the issue record and records its tombstone in the same delta. Audit events remain explicit intents so the
     /// caller can compose deletion with dependent-edge repairs atomically.
     DeleteIssue {
         /// Canonical full issue id whose captured record must exist.
-        issue_id: String,
+        issue_id: IssueId,
     },
-    /// Record one gate-run artifact. The finalizer assigns `run_id`, before the
-    /// issue updates that name it, and preserves
-    /// external checker `started_at`/`completed_at` evidence verbatim; an
-    /// attestation, which ran no checker, is stamped with the mutation timestamp.
+    /// Record one gate-run artifact. The finalizer preserves external checker
+    /// `started_at`/`completed_at` evidence verbatim; an attestation, which ran
+    /// no checker, is stamped with the mutation timestamp.
     RecordGateRun {
-        /// Semantic gate-run result whose `run_id` is assigned by the finalizer.
+        /// Semantic gate-run result carrying its pre-derived `run_id`.
         draft: Box<GateRunResult>,
     },
     /// Append one repository-owned provenance/audit event. The finalizer assigns
@@ -406,30 +420,45 @@ pub enum MutationIntent {
     RecordEvent {
         /// Deterministic ordering phase within the mutation.
         phase: u8,
-        /// Event whose id/timestamp are assigned by the finalizer.
-        event: Box<Event>,
+        /// Drafted body the finalizer stamps with an id and timestamp.
+        event: Box<EventBody>,
     },
 }
 
 /// One pending event awaiting deterministic ordering and identity assignment.
 struct PendingEvent {
     phase: u8,
-    tag: String,
-    primary: String,
-    secondary: String,
+    tag: EventTag,
+    primary: Option<IssueId>,
+    secondary: EventSecondaryIdentity,
     ordinal: usize,
-    event: Event,
+    body: EventBody,
+}
+
+enum EventSecondaryIdentity {
+    None,
+    Gate(GateKey),
+    Assignee(Assignee),
+}
+
+impl EventSecondaryIdentity {
+    fn sort_key(&self) -> (Option<&GateKey>, Option<String>) {
+        match self {
+            Self::None => (None, None),
+            Self::Gate(key) => (Some(key), None),
+            Self::Assignee(assignee) => (None, Some(assignee.to_string())),
+        }
+    }
 }
 
 impl PendingEvent {
-    fn sort_key(&self) -> (u8, &str, &str, &str, usize) {
-        (
-            self.phase,
-            self.tag.as_str(),
-            self.primary.as_str(),
-            self.secondary.as_str(),
-            self.ordinal,
-        )
+    fn compare(&self, other: &Self) -> std::cmp::Ordering {
+        self.phase
+            .cmp(&other.phase)
+            .then_with(|| self.tag.as_str().cmp(other.tag.as_str()))
+            .then_with(|| self.primary.cmp(&other.primary))
+            .then_with(|| self.secondary.sort_key().cmp(&other.secondary.sort_key()))
+            .then_with(|| self.ordinal.cmp(&other.ordinal))
     }
 }
 
@@ -461,15 +490,7 @@ pub enum MutationError {
     },
     /// A referenced issue was absent from the captured image.
     #[error("issue {0} is absent from the captured image")]
-    MissingIssue(String),
-    /// The captured `events.jsonl` ends in an uncertified torn tail and this
-    /// mutation carries no profile lifecycle marker to certify it, so appending
-    /// would produce a log the reader rejects.
-    #[error(
-        "captured events.jsonl has an uncertified torn tail and the mutation has no \
-         profile lifecycle marker to certify it; refusing to append (@/inv/event-log)"
-    )]
-    UncertifiedTornTail,
+    MissingIssue(IssueId),
     /// A custom preset failed structural validation; carries the underlying
     /// validator's forwarded message.
     #[error("invalid custom gate preset: {0}")]
@@ -482,80 +503,120 @@ pub enum MutationError {
     GatePresetAlreadyExists(String),
 }
 
-/// Owner identity stamped on finalizer-produced actions.
-const OWNER: &str = "repository-state-mutation";
-
-/// Placeholder timestamp for a finalizer-built event before identity assignment.
-///
-/// Semantic event drafts carry this same empty identity/epoch convention; the
-/// finalizer overwrites it via [`Event::assign_identity`] with the single mutation
-/// timestamp. The sentinel therefore never reaches serialized bytes.
-fn sentinel_time() -> DateTime<Utc> {
-    DateTime::from_timestamp(0, 0).expect("epoch is representable")
+/// The issue directories a captured gate-run root listing names that the image
+/// holds as directories. `verdicts/` and other names that are not issue ids are
+/// ignored.
+pub(crate) fn captured_gate_run_issue_ids(image: &RepositoryImage) -> Option<Vec<IssueId>> {
+    let listing = image.directory_listings().get(&VirtualPath::GATE_RUNS)?;
+    Some(
+        listing
+            .names()
+            .iter()
+            .filter_map(|name| IssueId::try_from(name.as_str()).ok())
+            .filter(|issue| {
+                matches!(
+                    image
+                        .entries()
+                        .get(&VirtualPath::gate_run_issue_directory(issue)),
+                    Some(RepositoryEntry::Directory { .. })
+                )
+            })
+            .collect(),
+    )
 }
 
-/// The canonical path for one issue record.
-fn issue_path(id: &str) -> Result<VirtualPath, RepositoryLayoutError> {
-    VirtualPath::data(format!("issues/{id}.json"))
-}
-
-/// Canonical data-root-relative path for one gate-run result record.
-///
-/// A run id is exactly one path component. Rejecting empty, nested, and lexical
-/// escape spellings here keeps finalization and every storage reader on the same
-/// `gate-runs/<run-id>/result.json` shape.
-pub fn gate_run_result_relative_path(
-    run_id: &str,
-) -> Result<RootRelativePath, RepositoryLayoutError> {
-    let run_id_path = RootRelativePath::parse(run_id)?;
-    if run_id_path.depth() != 1 {
-        return Err(RepositoryLayoutError::LexicalEscape(run_id.to_owned()));
-    }
-    RootRelativePath::parse(format!("gate-runs/{run_id}/result.json"))
-}
-
-/// Exact canonical result leaves for ordinary direct gate-run directories in a
-/// captured root listing. Non-directory clutter is intentionally ignored.
-pub(crate) fn captured_gate_run_result_paths(
-    image: &RepositoryImage,
-) -> Result<Option<Vec<VirtualPath>>, RepositoryLayoutError> {
-    let root = VirtualPath::GATE_RUNS;
-    let Some(listing) = image.directory_listings().get(&root) else {
-        return Ok(None);
-    };
-    listing
-        .names()
-        .iter()
-        .filter_map(|run_id| {
-            let child = VirtualPath::data(format!("gate-runs/{run_id}")).ok()?;
-            matches!(
-                image.entries().get(&child),
-                Some(RepositoryEntry::Directory { .. })
-            )
-            .then_some(run_id)
+/// Each `(issue, run)` a captured listing of a
+/// [`captured_gate_run_issue_ids`] directory names as `<run-id>.json`. Other
+/// names are clutter and ignored.
+pub(crate) fn captured_gate_run_ids(image: &RepositoryImage) -> Vec<(IssueId, GateRunId)> {
+    captured_gate_run_issue_ids(image)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|issue| {
+            image
+                .directory_listings()
+                .get(&VirtualPath::gate_run_issue_directory(&issue))
+                .map(|listing| {
+                    listing
+                        .names()
+                        .iter()
+                        .filter_map(|name| name.strip_suffix(".json"))
+                        .filter_map(|stem| GateRunId::try_from(stem).ok())
+                        .map(|run| (issue.clone(), run))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
         })
-        .map(|run_id| {
-            gate_run_result_relative_path(run_id).and_then(|path| VirtualPath::data(path.as_path()))
+        .collect()
+}
+
+/// The gate key of each directory a captured `gate-runs/verdicts` listing names.
+/// Names that are not gate keys, and occupants not captured as directories, are
+/// ignored.
+pub(crate) fn captured_gate_verdict_keys(image: &RepositoryImage) -> Vec<GateKey> {
+    image
+        .directory_listings()
+        .get(&VirtualPath::GATE_VERDICTS)
+        .map(|listing| {
+            listing
+                .names()
+                .iter()
+                .filter_map(|name| GateKey::try_from(name.as_str()).ok())
+                .filter(|key| {
+                    matches!(
+                        image
+                            .entries()
+                            .get(&VirtualPath::gate_verdict_directory(key)),
+                        Some(RepositoryEntry::Directory { .. })
+                    )
+                })
+                .collect()
         })
-        .collect::<Result<Vec<_>, _>>()
-        .map(Some)
+        .unwrap_or_default()
+}
+
+/// The path of each verdict record the captured listings of
+/// [`captured_gate_verdict_keys`]' directories name. Names not of the form
+/// `<inputs-digest>.json` are ignored.
+pub(crate) fn captured_gate_verdict_records(image: &RepositoryImage) -> Vec<VirtualPath> {
+    captured_gate_verdict_keys(image)
+        .into_iter()
+        .flat_map(|key| {
+            image
+                .directory_listings()
+                .get(&VirtualPath::gate_verdict_directory(&key))
+                .into_iter()
+                .flat_map(|listing| listing.names().iter())
+                .filter_map(|name| {
+                    let digest = name.strip_suffix(".json")?;
+                    crate::domain::repository_inputs::InputsDigest::try_from(digest).ok()
+                })
+                .map(|digest| VirtualPath::gate_verdict_record(&key, &digest))
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 /// Serialize an issue to its exact on-disk bytes (pretty, no trailing newline).
 pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
-    canonical_json(issue, true)
+    Ok(canonical_json(issue, true)?)
 }
 
 /// Serialize a gate-run result to its exact on-disk bytes.
 pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationError> {
-    canonical_json(result, true)
+    Ok(canonical_json(result, true)?)
 }
 
-/// Serialize a fresh (empty) membership index to its exact on-disk bytes.
+/// Serialize a gate verdict record to its exact on-disk bytes.
+pub fn serialize_gate_verdict(record: &GateVerdictRecord) -> Result<Vec<u8>, MutationError> {
+    Ok(canonical_json(record, true)?)
+}
+
+/// Serialize a fresh (empty) index to its exact on-disk bytes.
 ///
 /// The finalizer is the sole authority over `index.json` serialization, so
 /// repository initialization renders its empty index through the same canonical
-/// serializer a later membership update uses; the two never disagree.
+/// serializer a later tombstone write uses; the two never disagree.
 pub fn fresh_index_bytes() -> Result<Vec<u8>, MutationError> {
     super::RepositoryIndex::default()
         .to_pretty_bytes()
@@ -564,83 +625,52 @@ pub fn fresh_index_bytes() -> Result<Vec<u8>, MutationError> {
 
 /// Serialize one event to its exact single-line JSONL representation (no newline).
 pub fn serialize_event(event: &Event) -> Result<Vec<u8>, MutationError> {
-    canonical_json(event, false)
+    Ok(canonical_json(event, false)?)
 }
 
-/// Serialize typed repository state after recursively sorting every JSON object.
-fn canonical_json<T: Serialize + ?Sized>(
+/// Serialize typed repository state with every JSON object's keys sorted.
+///
+/// `to_value` does the sorting: `serde_json::Map` is a sorted map while the
+/// `preserve_order` feature is off, as its owning test pins.
+pub(crate) fn canonical_json<T: Serialize + ?Sized>(
     value: &T,
     pretty: bool,
-) -> Result<Vec<u8>, MutationError> {
-    let canonical = canonicalize_json(serde_json::to_value(value)?);
+) -> Result<Vec<u8>, serde_json::Error> {
+    let canonical = serde_json::to_value(value)?;
     if pretty {
-        Ok(serde_json::to_vec_pretty(&canonical)?)
+        serde_json::to_vec_pretty(&canonical)
     } else {
-        Ok(serde_json::to_vec(&canonical)?)
+        serde_json::to_vec(&canonical)
     }
 }
 
-fn canonicalize_json(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_json).collect()),
-        Value::Object(entries) => {
-            let mut entries = entries
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_json(value)))
-                .collect::<Vec<_>>();
-            entries.sort_by(|left, right| left.0.cmp(&right.0));
-            Value::Object(entries.into_iter().collect())
-        }
-        scalar => scalar,
-    }
+/// Compose the bytes appended at the log's committed length: each event line with
+/// exactly one trailing newline.
+fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
+    lines
+        .iter()
+        .flat_map(|line| [line.as_slice(), b"\n"].concat())
+        .collect()
 }
 
-/// Whether a captured `events.jsonl` prefix ends in a malformed, unterminated
-/// (torn) tail: a non-empty prefix not ending in a newline whose final line is
-/// not valid JSON. The finalizer — not command code — owns this inspection.
-pub fn prefix_has_torn_tail(prefix: &[u8]) -> bool {
-    if prefix.is_empty() || prefix.ends_with(b"\n") {
-        return false;
-    }
-    let final_line = prefix
-        .rsplit(|byte| *byte == b'\n')
-        .next()
-        .unwrap_or(prefix);
-    serde_json::from_slice::<serde_json::Value>(final_line).is_err()
-}
-
-/// Compose the bytes appended at the captured log length: add one separator
-/// newline only when the log ends in an unterminated `final_line`, then append each
-/// event line with exactly one trailing newline.
-fn compose_events(final_line: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
-    let mut out = Vec::new();
-    if !final_line.is_empty() {
-        out.push(b'\n');
-    }
-    for line in lines {
-        out.extend_from_slice(line);
-        out.push(b'\n');
-    }
-    out
-}
-
-/// The captured event log's length and the bytes after its last newline, from
-/// a whole read or a tail that holds that whole line.
+/// The captured event log's committed length, the end of its last
+/// newline-terminated line, from a tail that holds that line.
 ///
 /// # Errors
 ///
 /// [`CaptureError::TailOnlyCapture`] for a tail that holds only part of the
-/// final line, which cannot say whether that line is torn.
-fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
-    if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
-        let final_line = tail
-            .final_line()
-            .ok_or(CaptureError::TailOnlyCapture(VirtualPath::EVENTS))?;
-        return Ok((tail.length(), final_line));
+/// final line, which cannot say where that line starts.
+fn captured_log_end(image: &RepositoryImage) -> Result<u64, MutationError> {
+    match image.entry(&VirtualPath::EVENTS)? {
+        RepositoryEntry::Absent => Ok(0),
+        RepositoryEntry::FileTail { tail, .. } => {
+            let final_line = tail
+                .final_line()
+                .ok_or(CaptureError::TailOnlyCapture(VirtualPath::EVENTS))?;
+            Ok(tail.length() - final_line.len() as u64)
+        }
+        _ => Err(CaptureError::UnsafeCapturedOccupant(VirtualPath::EVENTS).into()),
     }
-    let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
-    let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
-    Ok((log.len() as u64, final_line))
 }
 
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
@@ -652,8 +682,8 @@ fn captured_file_bytes<'a>(
 }
 
 /// Parse the captured issue at `id`, or `None` when the issue file is absent.
-fn captured_issue(image: &RepositoryImage, id: &str) -> Result<Option<Issue>, MutationError> {
-    let path = issue_path(id)?;
+fn captured_issue(image: &RepositoryImage, id: &IssueId) -> Result<Option<Issue>, MutationError> {
+    let path = VirtualPath::issue_record(id);
     match captured_file_bytes(image, &path)? {
         None => Ok(None),
         Some(bytes) => serde_json::from_slice(bytes).map(Some).map_err(|error| {
@@ -665,61 +695,102 @@ fn captured_issue(image: &RepositoryImage, id: &str) -> Result<Option<Issue>, Mu
     }
 }
 
-/// Parse the captured event-log prefix into known events (tolerating one
-/// certified torn tail, matching the read path).
-fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError> {
-    let path = VirtualPath::EVENTS;
-    let Some(bytes) = captured_file_bytes(image, &path)? else {
-        return Ok(Vec::new());
-    };
-    let text = std::str::from_utf8(bytes).map_err(|error| MutationError::MalformedRecord {
-        path: path.clone(),
-        reason: error.to_string(),
-    })?;
-    crate::domain::event_log::parse_known_events(text).map_err(|error| {
-        MutationError::MalformedRecord {
-            path: path.clone(),
-            reason: error.to_string(),
-        }
-    })
-}
-
-/// Whether the captured event tail already reflects `agent`'s claim of `issue_id`
-/// as the current assignment: the most recent assignment-affecting event for the
-/// issue is an `IssueClaimed` by `agent` with no later release.
-fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee) -> bool {
-    events
-        .iter()
-        .rev()
-        .find_map(|event| match event {
-            Event::IssueClaimed {
-                issue_id: id,
-                assignee,
-                ..
-            } if id == issue_id => Some(assignee == agent),
-            Event::IssueReleased { issue_id: id, .. } if id == issue_id => Some(false),
-            _ => None,
-        })
-        .unwrap_or(false)
-}
-
 /// The single typed-to-byte finalizer for repository-owned records.
+/// `preimages`, when supplied, are the issue records already decoded from `image`.
 ///
 /// Given the captured `image`, the reused `context`, and closed semantic
 /// `intents`, it produces one exact [`MaterializationPlan`]. When no transition occurs the plan carries an empty delta having
 /// sampled neither an identifier nor the mutation timestamp, so a no-op emits no
-/// bytes. Identifiers are allocated in the frozen order — new issue ids first
-/// (creation order), gate-run/record ids next, event ids last after canonical
-/// event ordering — and one mutation timestamp is applied to every transition
-/// that occurs.
+/// bytes. Identifiers follow the frozen order — the indices of new issue ids
+/// first (creation order), gate-run ids next, both derived by the caller and
+/// reserved here, event ids last after canonical event ordering — and one mutation
+/// timestamp is applied to every transition that occurs.
 pub fn finalize(
     layout: &RepositoryLayout,
     image: &RepositoryImage,
     context: &MutationContext,
     intents: &[MutationIntent],
+    preimages: Option<&[Issue]>,
 ) -> Result<MaterializationPlan, MutationError> {
-    let delta = finalize_delta(layout, image, context, intents)?;
-    Ok(MaterializationPlan::new(image, delta))
+    let delta = finalize_delta(layout, image, context, intents, preimages)?;
+    MaterializationPlan::new(image, delta, context)
+}
+
+/// The issue as persisted for `draft` created at `now`.
+pub(crate) fn created_issue(draft: &Issue, now: DateTime<Utc>) -> Issue {
+    let mut issue = draft.clone();
+    issue.created_at = now;
+    issue.updated_at = now;
+    issue.first_ready_at = (issue.state == State::Ready).then_some(now);
+    for gate in issue.gates_status.values_mut() {
+        gate.updated_at = now;
+    }
+    issue
+}
+
+/// The issue a mutation persists, or its captured record for a no-op.
+pub(crate) fn mutated_issue(
+    image: &RepositoryImage,
+    id: &IssueId,
+    intents: &[MutationIntent],
+    now: DateTime<Utc>,
+) -> Result<Issue, MutationError> {
+    let preimage =
+        captured_issue(image, id)?.ok_or_else(|| MutationError::MissingIssue(id.clone()))?;
+    let Some(issue) = intents.iter().find_map(|intent| match intent {
+        MutationIntent::UpdateIssue { issue } if &issue.id == id => Some(issue.as_ref()),
+        _ => None,
+    }) else {
+        return Ok(preimage);
+    };
+    Ok(updated_issue(&preimage, issue, intents, now))
+}
+
+fn updated_issue(
+    preimage: &Issue,
+    issue: &Issue,
+    intents: &[MutationIntent],
+    now: DateTime<Utc>,
+) -> Issue {
+    let mut updated = issue.clone();
+    updated.created_at = preimage.created_at;
+    updated.first_ready_at = preimage.first_ready_at;
+    updated.claimed_at = preimage.claimed_at;
+    updated.done_at = preimage.done_at;
+    if preimage.state != State::Ready && updated.state == State::Ready {
+        updated.mark_first_ready(now);
+    }
+    if preimage.assignee.is_none() && updated.assignee.is_some() {
+        updated.mark_claimed(now);
+    }
+    if preimage.state != State::Done && updated.state == State::Done {
+        updated.mark_done(now);
+    }
+    for (key, state) in &mut updated.gates_status {
+        let records_evidence = intents.iter().any(|intent| match intent {
+            MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
+                (
+                    EventBody::GatePassed {
+                        issue_id, gate_key, ..
+                    },
+                    GateStatus::Passed,
+                )
+                | (
+                    EventBody::GateFailed {
+                        issue_id, gate_key, ..
+                    },
+                    GateStatus::Failed,
+                ) => issue_id == &updated.id && gate_key == key,
+                _ => false,
+            },
+            _ => false,
+        });
+        if records_evidence || preimage.gates_status.get(key) != Some(state) {
+            state.updated_at = now;
+        }
+    }
+    updated.updated_at = now;
+    updated
 }
 
 pub(super) fn finalize_delta(
@@ -727,12 +798,12 @@ pub(super) fn finalize_delta(
     image: &RepositoryImage,
     context: &MutationContext,
     intents: &[MutationIntent],
+    preimages: Option<&[Issue]>,
 ) -> Result<RepositoryDelta, MutationError> {
     context.begin();
     let mut actions: Vec<RepositoryAction> = Vec::new();
     let mut pending_events: Vec<PendingEvent> = Vec::new();
-    let mut index_creations: Vec<String> = Vec::new();
-    let mut index_deletions: Vec<String> = Vec::new();
+    let mut index_deletions: Vec<IssueId> = Vec::new();
 
     if intents.iter().any(|intent| {
         matches!(
@@ -747,94 +818,61 @@ pub(super) fn finalize_delta(
         ) {
             actions.push(RepositoryAction::CreateDirectory {
                 path: parent,
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
             });
         }
     }
 
-    // Pass 1: issue creations, in canonical request order, get identifiers first.
+    // Pass 1: issue creations, in canonical request order, hold the leading
+    // indices their callers derived ids at.
+    context.reserve(
+        intents
+            .iter()
+            .map(|intent| match intent {
+                MutationIntent::CreateIssue { .. } => 1,
+                MutationIntent::CreateIssueBatch { drafts } => drafts.len(),
+                _ => 0,
+            })
+            .sum(),
+    );
     for intent in intents {
         if let MutationIntent::CreateIssue { draft } = intent {
-            let id = context.allocate();
-            let now = context.timestamp();
-            let mut issue = (**draft).clone();
-            issue.id = id.clone();
-            issue.created_at = now;
-            issue.updated_at = now;
-            if issue.state == State::Ready {
-                issue.first_ready_at = Some(now);
-            } else {
-                issue.first_ready_at = None;
-            }
-            for gate in issue.gates_status.values_mut() {
-                gate.updated_at = now;
-            }
+            let issue = created_issue(draft, context.timestamp());
+            let id = issue.id.clone();
             actions.push(write_issue_action(image, &issue)?);
-            index_creations.push(id.clone());
             pending_events.push(PendingEvent {
                 phase: 0,
-                tag: "issue_created".to_string(),
-                primary: id.clone(),
-                secondary: String::new(),
+                tag: EventTag::IssueCreated,
+                primary: Some(id.clone()),
+                secondary: EventSecondaryIdentity::None,
                 ordinal: pending_events.len(),
-                event: Event::IssueCreated {
-                    id: String::new(),
-                    issue_id: id.clone(),
-                    timestamp: sentinel_time(),
-                    title: issue.title.clone(),
-                    priority: issue.priority,
-                },
+                body: EventBody::draft_issue_created(&issue),
             });
         }
     }
 
     for intent in intents {
-        if let MutationIntent::CreateIssueBatch {
-            drafts,
-            dependencies,
-        } = intent
-        {
-            let ids = (0..drafts.len())
-                .map(|_| context.allocate())
-                .collect::<Vec<_>>();
-            for (index, draft) in drafts.iter().enumerate() {
-                let now = context.timestamp();
-                let mut issue = draft.clone();
-                issue.id = ids[index].clone();
-                issue.dependencies = dependencies
-                    .iter()
-                    .filter(|(dependent, _)| *dependent == index)
-                    .map(|(_, dependency)| ids[*dependency].clone())
-                    .collect();
-                issue.dependencies.sort();
-                issue.dependencies.dedup();
-                issue.state = if issue.dependencies.is_empty() {
-                    State::Ready
-                } else {
-                    State::Backlog
-                };
-                issue.created_at = now;
-                issue.updated_at = now;
-                issue.first_ready_at = (issue.state == State::Ready).then_some(now);
+        if let MutationIntent::CreateIssueBatch { drafts } = intent {
+            for draft in drafts {
+                let issue = created_issue(draft, context.timestamp());
                 actions.push(write_issue_action(image, &issue)?);
-                index_creations.push(issue.id.clone());
                 pending_events.push(PendingEvent {
                     phase: 0,
-                    tag: "issue_created".to_string(),
-                    primary: issue.id.clone(),
-                    secondary: String::new(),
+                    tag: EventTag::IssueCreated,
+                    primary: Some(issue.id.clone()),
+                    secondary: EventSecondaryIdentity::None,
                     ordinal: pending_events.len(),
-                    event: Event::draft_issue_created(&issue),
+                    body: EventBody::draft_issue_created(&issue),
                 });
                 if !issue.dependencies.is_empty() {
                     pending_events.push(PendingEvent {
                         phase: 1,
-                        tag: "issue_updated".to_string(),
-                        primary: issue.id.clone(),
-                        secondary: String::new(),
+                        tag: EventTag::IssueUpdated,
+                        primary: Some(issue.id.clone()),
+                        secondary: EventSecondaryIdentity::None,
                         ordinal: pending_events.len(),
-                        event: Event::draft_issue_updated(
+                        body: EventBody::draft_issue_updated(
                             issue.id.clone(),
                             "batch-create".to_string(),
                             vec!["dependencies".to_string(), "state".to_string()],
@@ -845,9 +883,8 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Gate-run records get identifiers next, in (issue id, gate key) order. They
-    // are allocated before the issue updates so each gate status published with a
-    // run names that run.
+    // Gate-run drafts hold the next indices, having derived their ids at them.
+    // They publish in (issue id, gate key) order.
     let mut gate_runs: Vec<&GateRunResult> = intents
         .iter()
         .filter_map(|intent| match intent {
@@ -859,43 +896,28 @@ pub(super) fn finalize_delta(
         (left.issue_id.as_str(), left.gate_key.as_str())
             .cmp(&(right.issue_id.as_str(), right.gate_key.as_str()))
     });
-    let gate_runs: Vec<(String, &GateRunResult)> = gate_runs
-        .into_iter()
-        .map(|draft| (context.allocate(), draft))
-        .collect();
+    context.reserve(gate_runs.len());
 
-    // Pass 2: convergent claim upserts (existing issues; no new identifiers).
+    // Pass 2: claims of existing issues; no new identifiers.
     for intent in intents {
         if let MutationIntent::ClaimIssue { issue_id, agent } = intent {
-            let events = captured_events(image)?;
-            let current = captured_issue(image, issue_id)?
+            let mut issue = captured_issue(image, issue_id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue_id.clone()))?;
-            let issue_reflects = current.assignee.as_ref() == Some(agent);
-            let event_reflects = event_tail_reflects_claim(&events, issue_id, agent);
-
-            if !issue_reflects {
+            if issue.assignee.as_ref() != Some(agent) {
                 let now = context.timestamp();
-                let mut issue = current;
                 issue.assignee = Some(agent.clone());
                 if issue.claimed_at.is_none() {
                     issue.claimed_at = Some(now);
                 }
                 issue.updated_at = now;
                 actions.push(write_issue_action(image, &issue)?);
-            }
-            if !event_reflects {
                 pending_events.push(PendingEvent {
                     phase: 1,
-                    tag: "issue_claimed".to_string(),
-                    primary: issue_id.clone(),
-                    secondary: agent.to_string(),
+                    tag: EventTag::IssueClaimed,
+                    primary: Some(issue_id.clone()),
+                    secondary: EventSecondaryIdentity::Assignee(agent.clone()),
                     ordinal: pending_events.len(),
-                    event: Event::IssueClaimed {
-                        id: String::new(),
-                        issue_id: issue_id.clone(),
-                        timestamp: sentinel_time(),
-                        assignee: agent.clone(),
-                    },
+                    body: EventBody::draft_issue_claimed(issue_id.clone(), agent.clone()),
                 });
             }
         }
@@ -908,54 +930,15 @@ pub(super) fn finalize_delta(
     // absent from the captured image is a typed error, never an implicit create.
     for intent in intents {
         if let MutationIntent::UpdateIssue { issue } = intent {
-            let preimage = captured_issue(image, &issue.id)?
-                .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
-            let now = context.timestamp();
-            let mut updated = (**issue).clone();
-            updated.created_at = preimage.created_at;
-            updated.first_ready_at = preimage.first_ready_at;
-            updated.claimed_at = preimage.claimed_at;
-            updated.done_at = preimage.done_at;
-            if preimage.state != State::Ready && updated.state == State::Ready {
-                updated.mark_first_ready(now);
-            }
-            if preimage.assignee.is_none() && updated.assignee.is_some() {
-                updated.mark_claimed(now);
-            }
-            if preimage.state != State::Done && updated.state == State::Done {
-                updated.mark_done(now);
-            }
-            for (key, state) in &mut updated.gates_status {
-                if let Some((run_id, _)) = gate_runs
+            let preimage = match preimages {
+                Some(issues) => issues
                     .iter()
-                    .rev()
-                    .find(|(_, run)| run.issue_id == updated.id && &run.gate_key == key)
-                {
-                    state.run_id = Some(run_id.clone());
-                }
-                let records_evidence = intents.iter().any(|intent| match intent {
-                    MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
-                        (
-                            Event::GatePassed {
-                                issue_id, gate_key, ..
-                            },
-                            GateStatus::Passed,
-                        )
-                        | (
-                            Event::GateFailed {
-                                issue_id, gate_key, ..
-                            },
-                            GateStatus::Failed,
-                        ) => issue_id == &updated.id && gate_key == key,
-                        _ => false,
-                    },
-                    _ => false,
-                });
-                if records_evidence || preimage.gates_status.get(key) != Some(state) {
-                    state.updated_at = now;
-                }
+                    .find(|original| original.id == issue.id)
+                    .cloned(),
+                None => captured_issue(image, &issue.id)?,
             }
-            updated.updated_at = now;
+            .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
+            let updated = updated_issue(&preimage, issue, intents, context.timestamp());
             actions.push(write_issue_action(image, &updated)?);
         }
     }
@@ -967,10 +950,10 @@ pub(super) fn finalize_delta(
         if let MutationIntent::DeleteIssue { issue_id } = intent {
             captured_issue(image, issue_id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue_id.clone()))?;
-            let path = issue_path(issue_id)?;
+            let path = VirtualPath::issue_record(issue_id);
             actions.push(RepositoryAction::DeleteFile {
                 path: path.clone(),
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: expected_of(image, &path)?,
             });
             index_deletions.push(issue_id.clone());
@@ -994,7 +977,7 @@ pub(super) fn finalize_delta(
             ) {
                 actions.push(RepositoryAction::WriteFile {
                     path,
-                    owner: OWNER.to_string(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::of(current),
                     bytes,
                     mode: FileMode::Regular,
@@ -1017,7 +1000,7 @@ pub(super) fn finalize_delta(
                     crate::repository_state::RepositoryEntry::Absent => {
                         actions.push(RepositoryAction::CreateDirectory {
                             path: parent,
-                            owner: OWNER.to_string(),
+                            owner: RepositoryActionOwner::RepositoryStateMutation,
                             expected: ExpectedPreimage::Absent,
                         });
                     }
@@ -1043,7 +1026,7 @@ pub(super) fn finalize_delta(
             }
             actions.push(RepositoryAction::WriteFile {
                 path,
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: canonical_json(&**preset, true)?,
                 mode: FileMode::Regular,
@@ -1051,7 +1034,7 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Pass 3: gate-run records, identified above, are published.
+    // Pass 3: gate-run records are published.
     if !gate_runs.is_empty() {
         let parent = VirtualPath::GATE_RUNS;
         if matches!(
@@ -1060,37 +1043,64 @@ pub(super) fn finalize_delta(
         ) {
             actions.push(RepositoryAction::CreateDirectory {
                 path: parent,
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
             });
         }
     }
-    for (run_id, draft) in gate_runs {
+    for draft in gate_runs {
         let mut result = draft.clone();
-        result.run_id = run_id.clone();
         if result.origin == crate::domain::GateVerdictOrigin::Attested {
             let now = context.timestamp();
             result.started_at = now;
             result.completed_at = Some(now);
         }
-        let result_path = gate_run_result_relative_path(&run_id)?;
-        let dir = VirtualPath::data(result_path.as_path().parent().ok_or_else(|| {
-            RepositoryLayoutError::LexicalEscape(result_path.as_path().display().to_string())
-        })?)?;
-        let file = VirtualPath::data(result_path.as_path())?;
-        // The run directory is freshly named by an allocated id, so it is absent.
-        actions.push(RepositoryAction::CreateDirectory {
-            path: dir,
-            owner: OWNER.to_string(),
-            expected: ExpectedPreimage::Absent,
-        });
+        let directory = VirtualPath::gate_run_issue_directory(&result.issue_id);
+        if matches!(image.entry(&directory)?, RepositoryEntry::Absent)
+            && !actions.iter().any(|action| action.path() == &directory)
+        {
+            actions.push(RepositoryAction::CreateDirectory {
+                path: directory,
+                owner: RepositoryActionOwner::RepositoryStateMutation,
+                expected: ExpectedPreimage::Absent,
+            });
+        }
+        // The record is freshly named by a derived id, so it is absent.
         actions.push(RepositoryAction::WriteFile {
-            path: file,
-            owner: OWNER.to_string(),
+            path: VirtualPath::gate_run_record(&result.issue_id, &result.run_id),
+            owner: RepositoryActionOwner::RepositoryStateMutation,
             expected: ExpectedPreimage::Absent,
             bytes: serialize_gate_run(&result)?,
             mode: FileMode::Regular,
         });
+        // A run holding a reusable verdict becomes its key's reuse source. The
+        // verdict record sorts after the run record it names, so it never names
+        // an unpublished run.
+        if let Some(digest) = result.reusable_digest() {
+            let path = VirtualPath::gate_verdict_record(&result.gate_key, digest);
+            for parent in path.ancestor_directories()? {
+                if matches!(image.entry(&parent)?, RepositoryEntry::Absent)
+                    && !actions.iter().any(|action| action.path() == &parent)
+                {
+                    actions.push(RepositoryAction::CreateDirectory {
+                        path: parent,
+                        owner: RepositoryActionOwner::RepositoryStateMutation,
+                        expected: ExpectedPreimage::Absent,
+                    });
+                }
+            }
+            let record = GateVerdictRecord {
+                issue_id: result.issue_id.clone(),
+                run_id: result.run_id.clone(),
+            };
+            actions.push(RepositoryAction::WriteFile {
+                expected: expected_of(image, &path)?,
+                path,
+                owner: RepositoryActionOwner::RepositoryStateMutation,
+                bytes: serialize_gate_verdict(&record)?,
+                mode: FileMode::Regular,
+            });
+        }
     }
 
     // Explicit provenance/audit events join the pending set.
@@ -1099,11 +1109,11 @@ pub(super) fn finalize_delta(
             let (primary, secondary) = event_identities(event);
             pending_events.push(PendingEvent {
                 phase: *phase,
-                tag: event.get_type().to_string(),
+                tag: event.tag(),
                 primary,
                 secondary,
                 ordinal: pending_events.len(),
-                event: (**event).clone(),
+                body: (**event).clone(),
             });
         }
     }
@@ -1114,14 +1124,9 @@ pub(super) fn finalize_delta(
         actions.push(action);
     }
 
-    // Index membership: creations extend `all_ids` and clear any `deleted_ids`
-    // entry, derived from the captured index preimage in the same delta.
-    if !index_creations.is_empty() || !index_deletions.is_empty() {
-        actions.push(index_membership_action(
-            image,
-            &index_creations,
-            &index_deletions,
-        )?);
+    // Deletions record their tombstones over the captured index preimage.
+    if !index_deletions.is_empty() {
+        actions.push(index_tombstone_action(image, &index_deletions)?);
     }
 
     RepositoryDelta::new(layout, actions).map_err(Into::into)
@@ -1143,37 +1148,35 @@ const ANNOTATION_PHASE: u8 = u8::MAX;
 /// record. Each plan that emits events carries the record, which is what makes the
 /// record and the mutation it explains durable in the same application.
 fn dispatch_annotation_event(context: &MutationContext, ordinal: usize) -> Option<PendingEvent> {
-    let event = match context.dispatch_annotation()? {
+    let body = match context.dispatch_annotation()? {
         MutationContextAnnotation::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
-        } => Event::draft_linked_checkout_write_overridden(
+        } => EventBody::draft_linked_checkout_write_overridden(
             checkout.clone(),
             *declared_stance,
             *invocation_override,
         ),
     };
-    let (primary, secondary) = event_identities(&event);
+    let (primary, secondary) = event_identities(&body);
     Some(PendingEvent {
         phase: ANNOTATION_PHASE,
-        tag: event.get_type().to_string(),
+        tag: body.tag(),
         primary,
         secondary,
         ordinal,
-        event,
+        body,
     })
 }
 
-/// Compose the audit-log append action for a set of pending events over the
-/// captured `events.jsonl` length: admit the record the context's dispatch annotation
+/// Compose the audit-log append action for a set of pending events at the captured
+/// `events.jsonl` committed length: admit the record the context's dispatch annotation
 /// contributes, order them canonically, assign identifiers (via the context, in the
-/// caller's frozen allocation order), stamp the single mutation timestamp, certify a
-/// torn tail (a profile lifecycle marker is required, and the certifier is composed
-/// immediately after the torn partial), and produce the appended bytes. Returns `None`
-/// when there are no events. This is the event pass of [`finalize`], factored out so
-/// [`finalize_audit_append`] can reuse the one torn-tail authority — and so the
-/// annotation record reaches both paths from one place.
+/// caller's frozen allocation order), stamp the single mutation timestamp, and produce
+/// the appended bytes. Returns `None` when there are no events. This is the event pass
+/// of [`finalize`], factored out so [`finalize_audit_append`] positions its append the
+/// same way, and so the annotation record reaches both paths from one place.
 fn compose_event_action(
     image: &RepositoryImage,
     context: &MutationContext,
@@ -1190,64 +1193,33 @@ fn compose_event_action(
     if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
         pending_events.push(record);
     }
-    let (length, final_line) = captured_log_end(image)?;
-    // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
-    // a malformed, unterminated partial line only when the line IMMEDIATELY following
-    // it is a profile lifecycle `{ isolated_torn_tail: true }` certifier. Detect this
-    // before sampling time or allocating identifiers.
-    let torn_tail = prefix_has_torn_tail(final_line);
-    let has_marker = pending_events
-        .iter()
-        .any(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }));
-    if torn_tail && !has_marker {
-        // Appending non-certifying events after an uncertified torn tail would
-        // produce a log the reader rejects; refuse instead of corrupting it.
-        return Err(MutationError::UncertifiedTornTail);
-    }
+    let committed_length = captured_log_end(image)?;
 
     let now = context.timestamp();
-    // Assign identifiers in canonical event order, stamping the single mutation
-    // timestamp and the torn-tail evidence.
-    pending_events.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
-    for pending in &mut pending_events {
-        let id = context.allocate();
-        pending.event.assign_identity(id, now);
-        if let Event::ProfileLifecycle {
-            isolated_torn_tail, ..
-        } = &mut pending.event
-        {
-            *isolated_torn_tail = torn_tail;
-        }
-    }
-    // Over a torn tail, the certifying marker must be composed as the line
-    // immediately following the torn partial; the remaining events keep their
-    // canonical order after it.
-    if torn_tail {
-        let marker = pending_events
-            .iter()
-            .position(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }))
-            .expect("a markerless torn tail was already rejected");
-        let certifier = pending_events.remove(marker);
-        pending_events.insert(0, certifier);
-    }
-    let lines = pending_events
+    // Assign identifiers in canonical event order and stamp the single mutation
+    // timestamp.
+    pending_events.sort_by(PendingEvent::compare);
+    let events = pending_events
+        .into_iter()
+        .map(|pending| Event::new(context.allocate(), now, pending.body))
+        .collect::<Vec<_>>();
+    let lines = events
         .iter()
-        .map(|pending| serialize_event(&pending.event))
+        .map(serialize_event)
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Some(RepositoryAction::AppendEvents {
-        owner: OWNER.to_string(),
+        owner: RepositoryActionOwner::RepositoryStateMutation,
         expected: expected_of(image, &VirtualPath::EVENTS)?,
-        offset: length,
-        bytes: compose_events(final_line, &lines),
+        offset: committed_length,
+        bytes: compose_events(&lines),
     }))
 }
 
 /// Compose the exact `events.jsonl` append action for repository-owned provenance
 /// events emitted by a delta the record finalizer does not otherwise build — the
 /// init/profile finalizers, whose deltas also carry asset/registry/record file
-/// actions. Each `(phase, event)` pair is an inline event variant carrying a
-/// sentinel id/timestamp; this resets the context's frozen allocation order, then
-/// assigns identifiers and the single mutation timestamp and certifies a torn tail
+/// actions. Each `(phase, body)` pair is a drafted event body; this resets the context's frozen allocation order, then
+/// assigns identifiers and the single mutation timestamp and positions the append
 /// exactly as [`finalize`] does. Returns `None` when `events` is empty (no append,
 /// no identity or time sampling).
 ///
@@ -1257,28 +1229,75 @@ fn compose_event_action(
 pub(crate) fn finalize_audit_append(
     image: &RepositoryImage,
     context: &MutationContext,
-    events: Vec<(u8, Event)>,
+    events: Vec<(u8, EventBody)>,
 ) -> Result<Option<RepositoryAction>, MutationError> {
     if events.is_empty() {
         return Ok(None);
     }
     context.begin();
-    let pending = events
+    compose_event_action(image, context, drafted_events(events))
+}
+
+/// Pending events for drafted `(phase, body)` pairs, in drafting order.
+fn drafted_events(events: Vec<(u8, EventBody)>) -> Vec<PendingEvent> {
+    events
         .into_iter()
         .enumerate()
-        .map(|(ordinal, (phase, event))| {
-            let (primary, secondary) = event_identities(&event);
+        .map(|(ordinal, (phase, body))| {
+            let (primary, secondary) = event_identities(&body);
             PendingEvent {
                 phase,
-                tag: event.get_type().to_string(),
+                tag: body.tag(),
                 primary,
                 secondary,
                 ordinal,
-                event,
+                body,
             }
         })
+        .collect()
+}
+
+/// The delta a plan publishes: `delta` plus one `files_published` append when
+/// it writes over a data root `image` shows present and carries no event
+/// append, so every redo record over a present root grows the event log;
+/// otherwise `delta` itself.
+///
+/// A captured data-root entry that exists is the presence evidence: an absent
+/// root captures every data-root path absent.
+pub(super) fn publication_of(
+    image: &RepositoryImage,
+    delta: &RepositoryDelta,
+    context: &MutationContext,
+) -> Result<RepositoryDelta, MutationError> {
+    let appends = delta
+        .actions()
+        .iter()
+        .any(|action| matches!(action, RepositoryAction::AppendEvents { .. }));
+    let root_present = image.entries().iter().any(|(path, entry)| {
+        path.root_class() == RepositoryRootClass::Data && !matches!(entry, RepositoryEntry::Absent)
+    });
+    if delta.actions().is_empty() || appends || !root_present {
+        return Ok(delta.clone());
+    }
+    let paths = delta
+        .actions()
+        .iter()
+        .map(|action| action.path().repository_relative())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
         .collect();
-    compose_event_action(image, context, pending)
+    // Restart the frozen order so a retry over the reused context rebuilds the
+    // same publication.
+    context.begin();
+    let append = compose_event_action(
+        image,
+        context,
+        drafted_events(vec![(0, EventBody::draft_files_published(paths))]),
+    )?;
+    Ok(RepositoryDelta::new(
+        image.layout(),
+        delta.actions().iter().cloned().chain(append).collect(),
+    )?)
 }
 
 /// Build the write action for an issue, using the captured preimage so a create
@@ -1287,10 +1306,10 @@ fn write_issue_action(
     image: &RepositoryImage,
     issue: &Issue,
 ) -> Result<RepositoryAction, MutationError> {
-    let path = issue_path(&issue.id)?;
+    let path = VirtualPath::issue_record(&issue.id);
     Ok(RepositoryAction::WriteFile {
         path: path.clone(),
-        owner: OWNER.to_string(),
+        owner: RepositoryActionOwner::RepositoryStateMutation,
         expected: expected_of(image, &path)?,
         bytes: serialize_issue(issue)?,
         mode: FileMode::Regular,
@@ -1305,38 +1324,31 @@ fn expected_of(
     Ok(ExpectedPreimage::of(image.entry(path)?))
 }
 
-/// Derive the deterministic membership index write from the captured preimage.
-fn index_membership_action(
+/// Derive the deterministic tombstone write from the captured preimage.
+fn index_tombstone_action(
     image: &RepositoryImage,
-    created_ids: &[String],
-    deleted_ids: &[String],
+    deleted_ids: &[IssueId],
 ) -> Result<RepositoryAction, MutationError> {
     let path = VirtualPath::INDEX;
     let expected = expected_of(image, &path)?;
-    let mut index = match captured_file_bytes(image, &path)? {
-        Some(bytes) => super::RepositoryIndex::parse(bytes).map_err(|error| {
-            MutationError::MalformedRecord {
-                path: path.clone(),
-                reason: error.to_string(),
-            }
-        })?,
-        None => super::RepositoryIndex::default(),
-    };
-    for id in created_ids {
-        if !index.all_ids.contains(id) {
-            index.all_ids.push(id.clone());
-        }
-        index.deleted_ids.retain(|deleted| deleted != id);
-    }
+    let bytes =
+        captured_file_bytes(image, &path)?.ok_or_else(|| MutationError::MalformedRecord {
+            path: path.clone(),
+            reason: "the repository has no index".to_string(),
+        })?;
+    let mut index =
+        super::RepositoryIndex::parse(bytes).map_err(|error| MutationError::MalformedRecord {
+            path: path.clone(),
+            reason: error.to_string(),
+        })?;
     for id in deleted_ids {
-        index.all_ids.retain(|active| active != id);
         if !index.deleted_ids.contains(id) {
             index.deleted_ids.push(id.clone());
         }
     }
     Ok(RepositoryAction::WriteFile {
         path,
-        owner: OWNER.to_string(),
+        owner: RepositoryActionOwner::RepositoryStateMutation,
         expected,
         bytes: index.to_pretty_bytes()?,
         mode: FileMode::Regular,
@@ -1344,37 +1356,66 @@ fn index_membership_action(
 }
 
 /// Primary/secondary ordering identities for an event.
-fn event_identities(event: &Event) -> (String, String) {
-    let issue_id = event.get_issue_id().to_string();
-    match event {
-        Event::GatePassed { gate_key, .. }
-        | Event::GateFailed { gate_key, .. }
-        | Event::GateAdded { gate_key, .. }
-        | Event::GateRemoved { gate_key, .. }
-        | Event::GateDefinitionCreated { gate_key, .. }
-        | Event::GateDefinitionUpdated { gate_key, .. }
-        | Event::GateDefinitionRemoved { gate_key, .. } => (issue_id, gate_key.clone()),
-        Event::IssueClaimed { assignee, .. } => (issue_id, assignee.to_string()),
-        _ => (issue_id, String::new()),
+fn event_identities(body: &EventBody) -> (Option<IssueId>, EventSecondaryIdentity) {
+    let issue_id = body.issue_id().cloned();
+    match body {
+        EventBody::GatePassed { gate_key, .. }
+        | EventBody::GateFailed { gate_key, .. }
+        | EventBody::GateAdded { gate_key, .. }
+        | EventBody::GateRemoved { gate_key, .. }
+        | EventBody::GateDefinitionCreated { gate_key, .. }
+        | EventBody::GateDefinitionUpdated { gate_key, .. }
+        | EventBody::GateDefinitionRemoved { gate_key, .. } => {
+            (issue_id, EventSecondaryIdentity::Gate(gate_key.clone()))
+        }
+        EventBody::IssueClaimed { assignee, .. } => {
+            (issue_id, EventSecondaryIdentity::Assignee(assignee.clone()))
+        }
+        _ => (issue_id, EventSecondaryIdentity::None),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{GateState, GateStatus};
+    use crate::domain::{GateRunStatus, GateState, GateStatus};
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, RepositoryEntry, RepositoryImage,
-        RepositoryIndex, RepositoryRootEvidence, SUPPORTED_INDEX_SCHEMA_VERSION,
+        CapturedBytes, RepositoryEntry, RepositoryImage, RepositoryIndex,
+        SUPPORTED_INDEX_SCHEMA_VERSION,
     };
-    use std::collections::{BTreeMap, HashMap};
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
+    use std::collections::HashMap;
 
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "wt", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
+    /// Fails when `serde_json`'s `preserve_order` feature is enabled.
+    #[test]
+    fn test_canonical_json_sorts_keys_a_struct_declares_out_of_order() {
+        #[derive(Serialize)]
+        struct Inner {
+            second: u8,
+            first: u8,
+        }
+        #[derive(Serialize)]
+        struct Outer {
+            zeta: u8,
+            alpha: Inner,
+        }
+
+        let bytes = canonical_json(
+            &Outer {
+                zeta: 0,
+                alpha: Inner {
+                    second: 2,
+                    first: 1,
+                },
+            },
+            false,
         )
-        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            String::from_utf8(bytes).unwrap(),
+            r#"{"alpha":{"first":1,"second":2},"zeta":0}"#
+        );
     }
 
     fn fixed_instant() -> DateTime<Utc> {
@@ -1395,42 +1436,6 @@ mod tests {
         }
     }
 
-    fn budget() -> CaptureBudget {
-        CaptureBudget {
-            max_listings: 2,
-            max_bytes: 1 << 20,
-            max_depth: 6,
-        }
-    }
-
-    #[test]
-    fn test_gate_run_result_relative_path_accepts_exactly_one_run_id_component() {
-        assert_eq!(
-            gate_run_result_relative_path("run-123").unwrap().as_path(),
-            std::path::Path::new("gate-runs/run-123/result.json")
-        );
-        for invalid in ["", ".", "nested/run", "../run", "run\\child"] {
-            assert!(
-                gate_run_result_relative_path(invalid).is_err(),
-                "{invalid:?} must not escape the one-child gate-run layout"
-            );
-        }
-    }
-
-    /// Build an image over a fixed set of `Data(...)` entries.
-    fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
-        let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
-        let spec = CaptureSpec::new(paths, budget()).unwrap();
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
     fn file_entry(bytes: &[u8]) -> RepositoryEntry {
         RepositoryEntry::File {
             content: CapturedBytes::new("obj", bytes.to_vec()).unwrap(),
@@ -1438,9 +1443,8 @@ mod tests {
         }
     }
 
-    fn seeded_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-        let mut issue = crate::domain::fixture_issue("Title".into(), "Body".into());
-        issue.id = id.to_string();
+    fn seeded_issue(id: &IssueId, assignee: Option<Assignee>) -> Issue {
+        let mut issue = Issue::draft(id.clone(), "Title".into(), "Body".into());
         issue.assignee = assignee;
         issue.created_at = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
             .unwrap()
@@ -1449,9 +1453,13 @@ mod tests {
         issue
     }
 
+    /// The id the creation tests' drafts carry.
+    fn created_id() -> IssueId {
+        crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111)
+    }
+
     fn map_order_draft(reverse: bool) -> Issue {
-        let mut issue = crate::domain::fixture_issue("Canonical".into(), "Body".into());
-        issue.id = "11111111-1111-4111-8111-111111111111".into();
+        let mut issue = Issue::draft(created_id(), "Canonical".into(), "Body".into());
         let context_entries = [("alpha", "one"), ("zeta", "two")];
         let gate_entries = [
             (
@@ -1484,7 +1492,7 @@ mod tests {
         issue.gates_status = order
             .iter()
             .map(|index| gate_entries[*index].clone())
-            .map(|(key, value)| (key.to_string(), value))
+            .map(|(key, value)| (key.parse().unwrap(), value))
             .collect::<HashMap<_, _>>();
         issue
     }
@@ -1501,37 +1509,38 @@ mod tests {
         );
 
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
-            schema_version: 2,
-            all_ids: Vec::new(),
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
+        let created_id = created_id();
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&created_id),
                 RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
-        ]);
+            )
+            .build();
         let first = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
                 draft: Box::new(first_draft),
             }],
+            None,
         )
         .unwrap();
         let retry = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
                 draft: Box::new(retry_draft),
             }],
+            None,
         )
         .unwrap();
 
@@ -1566,20 +1575,19 @@ mod tests {
     fn creation_image() -> RepositoryImage {
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-        image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
+        let created_id = created_id();
+        ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&created_id),
                 RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
-        ])
+            )
+            .build()
     }
 
     /// The exact bytes a delta appends to the event log.
@@ -1590,10 +1598,7 @@ mod tests {
     /// The events a delta appends, as the event-log reader recovers them.
     fn appended_events(delta: &RepositoryDelta) -> Vec<Event> {
         appended_event_bytes(delta)
-            .map(|bytes| {
-                crate::domain::event_log::parse_known_events(std::str::from_utf8(&bytes).unwrap())
-                    .unwrap()
-            })
+            .map(|bytes| crate::domain::event_log::parse_known_events(&bytes).unwrap())
             .unwrap_or_default()
     }
 
@@ -1601,7 +1606,12 @@ mod tests {
     fn override_records(events: &[Event]) -> Vec<&Event> {
         events
             .iter()
-            .filter(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+            .filter(|event| {
+                matches!(
+                    event.body(),
+                    EventBody::LinkedCheckoutWriteOverridden { .. }
+                )
+            })
             .collect()
     }
 
@@ -1611,14 +1621,21 @@ mod tests {
         let intents = [MutationIntent::CreateIssue {
             draft: Box::new(map_order_draft(false)),
         }];
-        let plan = finalize(&layout(), &image, &annotated_ctx(), &intents).unwrap();
+        let plan = finalize(
+            &synthetic_layout(),
+            &image,
+            &annotated_ctx(),
+            &intents,
+            None,
+        )
+        .unwrap();
 
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let created_id = created_id();
         assert!(
             plan.delta()
                 .actions()
                 .iter()
-                .any(|action| action.path() == &issue_path(&created_id).unwrap()),
+                .any(|action| action.path() == &VirtualPath::issue_record(&created_id)),
             "the record the override permitted is part of the same finalized plan"
         );
 
@@ -1629,13 +1646,12 @@ mod tests {
             1,
             "the permitted mutation carries exactly one override record; events: {events:?}"
         );
-        let Event::LinkedCheckoutWriteOverridden {
-            id,
-            timestamp,
+        let EventBody::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
-        } = records[0]
+            ..
+        } = records[0].body()
         else {
             unreachable!("the record was selected by its variant");
         };
@@ -1654,24 +1670,30 @@ mod tests {
             "the record names the checkout and the two stances the dispatch site set"
         );
         assert!(
-            !id.is_empty(),
+            !records[0].id().is_empty(),
             "the finalizer assigns the record an identity like any other event"
         );
 
         let creation_timestamp = events
             .iter()
-            .find_map(|event| match event {
-                Event::IssueCreated { timestamp, .. } => Some(timestamp),
+            .find_map(|event| match event.body() {
+                EventBody::IssueCreated { .. } => Some(event.timestamp()),
                 _ => None,
             })
             .expect("the mutation's own event is in the same append");
         assert_eq!(
-            creation_timestamp, timestamp,
+            creation_timestamp,
+            records[0].timestamp(),
             "the record carries the one mutation timestamp, so it belongs to this mutation"
         );
         let record_position = events
             .iter()
-            .position(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+            .position(|event| {
+                matches!(
+                    event.body(),
+                    EventBody::LinkedCheckoutWriteOverridden { .. }
+                )
+            })
             .expect("the record is in the append");
         assert_eq!(
             record_position,
@@ -1687,26 +1709,27 @@ mod tests {
             draft: Box::new(map_order_draft(false)),
         }];
         let unannotated = appended_event_bytes(
-            finalize(&layout(), &image, &ctx(), &intents)
+            finalize(&synthetic_layout(), &image, &ctx(), &intents, None)
                 .unwrap()
                 .delta(),
         )
         .expect("an issue creation appends its own events");
         let annotated = appended_event_bytes(
-            finalize(&layout(), &image, &annotated_ctx(), &intents)
-                .unwrap()
-                .delta(),
+            finalize(
+                &synthetic_layout(),
+                &image,
+                &annotated_ctx(),
+                &intents,
+                None,
+            )
+            .unwrap()
+            .delta(),
         )
         .expect("an issue creation appends its own events");
 
         assert!(
-            override_records(
-                &crate::domain::event_log::parse_known_events(
-                    std::str::from_utf8(&unannotated).unwrap()
-                )
-                .unwrap()
-            )
-            .is_empty(),
+            override_records(&crate::domain::event_log::parse_known_events(&unannotated).unwrap())
+                .is_empty(),
             "an invocation with no override in effect emits no override record"
         );
         assert!(
@@ -1722,32 +1745,32 @@ mod tests {
         // documented no-transition property holds: no delta, no identity, no time,
         // and therefore no override record either.
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("55555555-5555-4555-8555-555555555555", Some(agent.clone()));
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x5555_4555_8555_5555_5555_5555_5555_5555),
+            Some(agent.clone()),
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = Event::IssueClaimed {
-            id: "e".into(),
-            issue_id: issue.id.clone(),
-            timestamp: fixed_instant(),
-            assignee: agent.clone(),
-        };
-        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
-        ]);
+        let image = ImageBuilder::new()
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let context = MutationContext::with_annotation(
             IdAuthority::random(),
             Box::new(PanicMutationClock),
             Some(override_annotation()),
         );
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &context,
             &[MutationIntent::ClaimIssue {
                 issue_id: issue.id.clone(),
                 agent,
             }],
+            None,
         )
         .unwrap();
         assert!(
@@ -1762,25 +1785,25 @@ mod tests {
 
     /// An image holding the event log as `tail`.
     fn tail_image(tail: crate::repository_state::EventLogTail) -> RepositoryImage {
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
         let mode = FileMode::Regular;
-        let entries = BTreeMap::from([(
-            VirtualPath::EVENTS,
-            RepositoryEntry::FileTail { tail, mode },
-        )]);
-        RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
+        ImageBuilder::new()
+            .entry(
+                VirtualPath::EVENTS,
+                RepositoryEntry::FileTail { tail, mode },
+            )
+            .build()
     }
 
-    /// An append over a log read as its tail lands at the log's length and
-    /// expects that tail, with no whole-log digest behind it.
+    /// An audit append over a log read as its tail lands at the log's committed
+    /// length and expects that tail, with no whole-log digest behind it.
     #[test]
-    fn test_event_append_over_a_tail_read_offsets_at_its_length_and_expects_the_tail() {
-        let log = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
+    fn test_event_append_over_a_tail_read_offsets_at_its_committed_length_and_expects_the_tail() {
+        let committed = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
+        let log = [committed.as_slice(), b"{\"parti"].concat();
         let tail = crate::repository_state::EventLogTail::of_bytes(&log);
         let image = tail_image(tail.clone());
 
-        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())])
+        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_event())])
             .unwrap()
             .expect("a non-empty audit append composes an action");
 
@@ -1790,7 +1813,7 @@ mod tests {
         else {
             unreachable!("an audit append appends to the event log");
         };
-        assert_eq!(offset, log.len() as u64);
+        assert_eq!(offset, committed.len() as u64);
         assert_eq!(
             expected,
             ExpectedPreimage::FileTail {
@@ -1800,17 +1823,17 @@ mod tests {
         );
     }
 
-    /// A tail whose window starts inside the final line cannot say whether that
-    /// line is torn, so the composer refuses it rather than guess.
+    /// A tail whose window starts inside the final line cannot determine the
+    /// committed append offset.
     #[test]
-    fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
+    fn test_event_append_requires_a_tail_that_holds_the_final_line() {
         let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW;
         let partial =
             crate::repository_state::EventLogTail::new(2 * window, vec![b'x'; window as usize]);
         let image = tail_image(partial.unwrap());
 
         assert!(matches!(
-            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())]),
+            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_event())]),
             Err(MutationError::Capture(CaptureError::TailOnlyCapture(_)))
         ));
     }
@@ -1819,20 +1842,20 @@ mod tests {
     fn test_finalize_audit_append_publishes_the_dispatch_override_record_with_its_events() {
         // The second finalizer path composes its events through the same event pass,
         // so the dispatch fact reaches it without a second edit.
-        let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let action = finalize_audit_append(
             &image,
             &annotated_ctx(),
-            vec![(2, profile_lifecycle_marker())],
+            vec![(2, profile_lifecycle_event())],
         )
         .unwrap()
         .expect("a non-empty audit append composes an action");
         let RepositoryAction::AppendEvents { bytes, .. } = &action else {
             unreachable!("an audit append appends to the event log");
         };
-        let events =
-            crate::domain::event_log::parse_known_events(std::str::from_utf8(bytes).unwrap())
-                .unwrap();
+        let events = crate::domain::event_log::parse_known_events(bytes).unwrap();
         assert_eq!(
             override_records(&events).len(),
             1,
@@ -1841,7 +1864,7 @@ mod tests {
         assert!(
             events
                 .iter()
-                .any(|event| matches!(event, Event::ProfileLifecycle { .. })),
+                .any(|event| matches!(event.body(), EventBody::ProfileLifecycle { .. })),
             "the caller's own event is in the same append; events: {events:?}"
         );
 
@@ -1863,20 +1886,19 @@ mod tests {
             .collect::<HashMap<_, _>>();
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
+        let created_id = created_id();
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&created_id),
                 RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
-        ]);
+            )
+            .build();
 
         // Deliberately prove the finalizer owns these values rather than accepting
         // caller timestamps embedded in the draft.
@@ -1886,12 +1908,13 @@ mod tests {
                 .with_timezone(&Utc);
         }
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
                 draft: Box::new(draft),
             }],
+            None,
         )
         .unwrap();
         let created: Issue = plan
@@ -1900,7 +1923,7 @@ mod tests {
             .iter()
             .find_map(|action| match action {
                 RepositoryAction::WriteFile { path, bytes, .. }
-                    if path == &issue_path(&created_id).unwrap() =>
+                    if path == &VirtualPath::issue_record(&created_id) =>
                 {
                     serde_json::from_slice(bytes).ok()
                 }
@@ -1919,14 +1942,22 @@ mod tests {
     }
 
     #[test]
+    fn test_serialize_issue_is_byte_identical_over_its_own_output() {
+        let bytes = serialize_issue(&map_order_draft(false)).unwrap();
+        let decoded: Issue = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(serialize_issue(&decoded).unwrap(), bytes);
+    }
+
+    #[test]
     fn test_canonical_serialization_preserves_repository_record_shapes() {
         let issue_bytes = serialize_issue(&map_order_draft(false)).unwrap();
         assert!(issue_bytes.starts_with(b"{\n"));
         assert!(!issue_bytes.ends_with(b"\n"));
 
         let gate_run = GateRunResult::attestation(
-            "issue-1",
-            "cargo-ci",
+            &crate::test_utils::gate_run_id(1),
+            &crate::test_utils::issue_id(7),
+            &"cargo-ci".parse().unwrap(),
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -1940,11 +1971,11 @@ mod tests {
             "gate-run bytes preserve the repository record"
         );
 
-        let event = Event::GateDefinitionCreated {
-            id: "event-1".into(),
-            timestamp: fixed_instant(),
-            gate_key: "cargo-ci".into(),
-        };
+        let event = crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
+            "event-1",
+            fixed_instant(),
+        );
         let event_bytes = serialize_event(&event).unwrap();
         assert!(event_bytes.starts_with(b"{"));
         assert!(!event_bytes.contains(&b'\n'));
@@ -1955,13 +1986,13 @@ mod tests {
 
     #[test]
     fn test_update_issue_stamps_changed_gate_state_from_mutation_context() {
-        let id = "11111111-1111-4111-8111-111111111111";
+        let id = &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111);
         let old_time = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
             .unwrap()
             .with_timezone(&Utc);
         let mut preimage = seeded_issue(id, None);
         preimage.gates_status.insert(
-            "tests".into(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Pending,
                 updated_by: None,
@@ -1971,7 +2002,7 @@ mod tests {
         );
         let mut updated = preimage.clone();
         updated.gates_status.insert(
-            "tests".into(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("agent:reviewer".parse().unwrap()),
@@ -1981,12 +2012,21 @@ mod tests {
             },
         );
         let bytes = serialize_issue(&preimage).unwrap();
-        let image = image_with(vec![(issue_path(id).unwrap(), file_entry(&bytes))]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::issue_record(id), file_entry(&bytes))
+            .build();
         let intent = MutationIntent::UpdateIssue {
             issue: Box::new(updated),
         };
-        let first = finalize(&layout(), &image, &ctx(), std::slice::from_ref(&intent)).unwrap();
-        let retry = finalize(&layout(), &image, &ctx(), &[intent]).unwrap();
+        let first = finalize(
+            &synthetic_layout(),
+            &image,
+            &ctx(),
+            std::slice::from_ref(&intent),
+            None,
+        )
+        .unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &ctx(), &[intent], None).unwrap();
         assert_eq!(first.delta(), retry.delta());
         let written = first
             .delta()
@@ -1994,7 +2034,7 @@ mod tests {
             .iter()
             .find_map(|action| match action {
                 RepositoryAction::WriteFile { path, bytes, .. }
-                    if path == &issue_path(id).unwrap() =>
+                    if path == &VirtualPath::issue_record(id) =>
                 {
                     Some(bytes)
                 }
@@ -2002,64 +2042,11 @@ mod tests {
             })
             .unwrap();
         let persisted: Issue = serde_json::from_slice(written).unwrap();
-        assert_eq!(persisted.gates_status["tests"].updated_at, fixed_instant());
-        assert_eq!(persisted.updated_at, fixed_instant());
-    }
-
-    #[test]
-    fn test_update_issue_gate_state_names_the_run_recorded_with_it() {
-        let id = "11111111-1111-4111-8111-111111111111";
-        let preimage = seeded_issue(id, None);
-        let mut updated = preimage.clone();
-        updated.gates_status.insert(
-            "review".into(),
-            GateState {
-                status: GateStatus::Passed,
-                updated_by: None,
-                updated_at: DateTime::default(),
-                run_id: None,
-            },
+        assert_eq!(
+            persisted.gates_status[&"tests".parse().unwrap()].updated_at,
+            fixed_instant()
         );
-        let bytes = serialize_issue(&preimage).unwrap();
-        let image = image_with(vec![
-            (issue_path(id).unwrap(), file_entry(&bytes)),
-            (VirtualPath::GATE_RUNS, RepositoryEntry::Absent),
-        ]);
-        let intents = [
-            MutationIntent::UpdateIssue {
-                issue: Box::new(updated),
-            },
-            MutationIntent::RecordGateRun {
-                draft: Box::new(GateRunResult::attestation(
-                    id,
-                    "review",
-                    crate::declarations::GateStage::Postcheck,
-                    GateStatus::Passed,
-                    None,
-                )),
-            },
-        ];
-        let plan = finalize(&layout(), &image, &ctx(), &intents).unwrap();
-        let written = |wanted: &dyn Fn(&VirtualPath) -> bool| {
-            plan.delta()
-                .actions()
-                .iter()
-                .find_map(|action| match action {
-                    RepositoryAction::WriteFile { path, bytes, .. } if wanted(path) => {
-                        Some(bytes.clone())
-                    }
-                    _ => None,
-                })
-                .unwrap()
-        };
-        let issue_path = issue_path(id).unwrap();
-        let persisted: Issue =
-            serde_json::from_slice(&written(&|path| path == &issue_path)).unwrap();
-        let run: GateRunResult = serde_json::from_slice(&written(&|path| {
-            path.relative().as_str().starts_with("gate-runs/")
-        }))
-        .unwrap();
-        assert_eq!(persisted.gates_status["review"].run_id, Some(run.run_id));
+        assert_eq!(persisted.updated_at, fixed_instant());
     }
 
     #[test]
@@ -2098,125 +2085,112 @@ mod tests {
         );
     }
 
+    /// An assignment made outside jit leaves no claim event behind, and a claim
+    /// does not repair one.
     #[test]
-    fn test_claim_noop_when_issue_and_event_reflect_claim_samples_nothing() {
+    fn test_finalize_claim_of_issue_already_assigned_outside_jit_appends_nothing() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("11111111-1111-4111-8111-111111111111", Some(agent.clone()));
-        let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = Event::IssueClaimed {
-            id: "e".into(),
-            issue_id: issue.id.clone(),
-            timestamp: fixed_instant(),
-            assignee: agent.clone(),
-        };
-        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
-        ]);
-        // The shared clock proves the no-op samples no time.
-        let context = MutationContext::new(
-            IdAuthority::from_seed([9u8; 32]),
-            Box::new(PanicMutationClock),
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x4444_4444_8444_4444_4444_4444_4444_4444),
+            Some(agent.clone()),
         );
-        let delta = finalize(
-            &layout(),
-            &image,
-            &context,
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent,
-            }],
-        )
-        .unwrap();
-        assert!(
-            delta.delta().actions().is_empty(),
-            "fully reflected claim is a no-op"
-        );
-    }
-
-    #[test]
-    fn test_noop_claim_production_authority_draws_no_id_and_no_time() {
-        // The strongest no-op guarantee: with a real production random authority
-        // and a clock that panics on use, a fully-reflected claim acquire draws
-        // neither the random source (the seed stays undrawn) nor the clock.
-        let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("44444444-4444-4444-8444-444444444444", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = Event::IssueClaimed {
-            id: "e".into(),
-            issue_id: issue.id.clone(),
-            timestamp: fixed_instant(),
-            assignee: agent.clone(),
-        };
-        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
-        ]);
+        let image = ImageBuilder::new()
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &context,
             &[MutationIntent::ClaimIssue {
                 issue_id: issue.id.clone(),
                 agent,
             }],
+            None,
         )
         .unwrap();
-        assert!(
-            plan.delta().actions().is_empty(),
-            "fully reflected claim emits no bytes"
-        );
+        assert!(plan.delta().actions().is_empty());
         assert!(
             context.ids.sampled_seed().is_none(),
-            "a no-op acquire must not draw the production random seed"
+            "a no-op claim draws no identifier"
         );
     }
 
+    /// The decision follows the assignee alone: a tail no parser accepts changes
+    /// neither outcome.
     #[test]
-    fn test_claim_missing_event_only_emits_event() {
+    fn test_finalize_claim_decides_from_the_assignee_over_an_unparseable_log_tail() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        // Issue already assigned but the event log is empty (crash after save).
-        let issue = seeded_issue("22222222-2222-4222-8222-222222222222", Some(agent.clone()));
-        let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
-        let delta = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent,
-            }],
-        )
-        .unwrap();
-        // Exactly one action: the missing events.jsonl append. No issue rewrite.
-        assert_eq!(delta.delta().actions().len(), 1);
-        let action = &delta.delta().actions()[0];
-        assert_eq!(action.path(), &VirtualPath::EVENTS);
+        let tail = crate::repository_state::EventLogTail::of_bytes(b"not an event\n");
+        let claim = |assignee: Option<Assignee>| {
+            let issue = seeded_issue(
+                &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
+                assignee,
+            );
+            let image = ImageBuilder::new()
+                .entry(
+                    VirtualPath::issue_record(&issue.id),
+                    file_entry(&serialize_issue(&issue).unwrap()),
+                )
+                .entry(
+                    VirtualPath::EVENTS,
+                    RepositoryEntry::FileTail {
+                        tail: tail.clone(),
+                        mode: FileMode::Regular,
+                    },
+                )
+                .build();
+            finalize(
+                &synthetic_layout(),
+                &image,
+                &ctx(),
+                &[MutationIntent::ClaimIssue {
+                    issue_id: issue.id,
+                    agent: agent.clone(),
+                }],
+                None,
+            )
+            .unwrap()
+        };
+
+        assert!(claim(Some(agent.clone())).delta().actions().is_empty());
+        assert_eq!(claim(None).delta().actions().len(), 2);
     }
 
     #[test]
     fn test_claim_fresh_emits_issue_and_event() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("33333333-3333-4333-8333-333333333333", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x3333_4333_8333_3333_3333_3333_3333_3333),
+            None,
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
+        let image = ImageBuilder::new()
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let intent = MutationIntent::ClaimIssue {
             issue_id: issue.id.clone(),
             agent: agent.clone(),
         };
         let context = ctx();
-        let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
-        let retry = finalize(&layout(), &image, &context, &[intent]).unwrap();
+        let first = finalize(
+            &synthetic_layout(),
+            &image,
+            &context,
+            std::slice::from_ref(&intent),
+            None,
+        )
+        .unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &[intent], None).unwrap();
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
@@ -2229,7 +2203,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &issue_path(&issue.id).unwrap())
+            .find(|action| action.path() == &VirtualPath::issue_record(&issue.id))
             .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = issue_action else {
             panic!("expected issue write");
@@ -2240,12 +2214,11 @@ mod tests {
         expected_issue.updated_at = fixed_instant();
         assert_eq!(bytes, &serialize_issue(&expected_issue).unwrap());
 
-        let expected_event = Event::IssueClaimed {
-            id: IdAuthority::from_seed([7u8; 32]).uuid_at(0),
-            issue_id: expected_issue.id,
-            timestamp: fixed_instant(),
-            assignee: agent,
-        };
+        let expected_event = crate::test_utils::stamped_event(
+            EventBody::draft_issue_claimed(expected_issue.id, agent),
+            IdAuthority::from_seed([7u8; 32]).uuid_at(0),
+            fixed_instant(),
+        );
         let mut expected_event_line = serialize_event(&expected_event).unwrap();
         expected_event_line.push(b'\n');
         assert_eq!(
@@ -2257,7 +2230,14 @@ mod tests {
     #[test]
     fn test_finalize_empty_intents_samples_neither_time_nor_identity() {
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
-        let plan = finalize(&layout(), &image_with(Vec::new()), &context, &[]).unwrap();
+        let plan = finalize(
+            &synthetic_layout(),
+            &ImageBuilder::new().build(),
+            &context,
+            &[],
+            None,
+        )
+        .unwrap();
 
         assert!(plan.delta().actions().is_empty());
         assert!(
@@ -2268,29 +2248,36 @@ mod tests {
 
     #[test]
     fn test_finalize_record_event_reuses_identity_time_and_bytes_on_retry() {
-        let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let intent = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            }),
+            event: Box::new(EventBody::draft_gate_definition_created(
+                "cargo-ci".parse().unwrap(),
+            )),
         };
         let context = ctx();
-        let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
-        let retry = finalize(&layout(), &image, &context, &[intent]).unwrap();
+        let first = finalize(
+            &synthetic_layout(),
+            &image,
+            &context,
+            std::slice::from_ref(&intent),
+            None,
+        )
+        .unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &[intent], None).unwrap();
 
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
             "the same image and context produce byte-identical provenance plans"
         );
-        let expected_event = Event::GateDefinitionCreated {
-            id: IdAuthority::from_seed([7u8; 32]).uuid_at(0),
-            timestamp: fixed_instant(),
-            gate_key: "cargo-ci".into(),
-        };
+        let expected_event = crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
+            IdAuthority::from_seed([7u8; 32]).uuid_at(0),
+            fixed_instant(),
+        );
         let mut expected_line = serialize_event(&expected_event).unwrap();
         expected_line.push(b'\n');
         assert_eq!(
@@ -2300,15 +2287,22 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_gate_run_assigns_identity_and_serializes_attestation() {
-        let run_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-        let image = image_with(vec![
-            (VirtualPath::GATE_RUNS, RepositoryEntry::Absent),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
+    fn test_finalize_gate_run_reserves_its_derived_id_and_serializes_attestation() {
+        let context = ctx();
+        let run_id = context.gate_run_id_at(0);
+        let issue = crate::test_utils::issue_id(7);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::GATE_RUNS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::gate_run_issue_directory(&issue),
+                RepositoryEntry::Absent,
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let draft = GateRunResult::attestation(
-            "issue-1",
-            "cargo-ci",
+            &run_id,
+            &issue,
+            &"cargo-ci".parse().unwrap(),
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -2318,24 +2312,20 @@ mod tests {
         };
         let provenance = MutationIntent::RecordEvent {
             phase: 5,
-            event: Box::new(Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            }),
+            event: Box::new(EventBody::draft_gate_definition_created(
+                "cargo-ci".parse().unwrap(),
+            )),
         };
         let intents = [intent, provenance];
-        let context = ctx();
-        let first = finalize(&layout(), &image, &context, &intents).unwrap();
-        let retry = finalize(&layout(), &image, &context, &intents).unwrap();
+        let first = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
 
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
-            "a retry keeps the assigned run record bytes"
+            "a retry keeps the run record bytes"
         );
-        let result_path = gate_run_result_relative_path(&run_id).unwrap();
-        let result_path = VirtualPath::data(result_path.as_path()).unwrap();
+        let result_path = VirtualPath::gate_run_record(&issue, &run_id);
         let bytes = first
             .delta()
             .actions()
@@ -2348,16 +2338,15 @@ mod tests {
             })
             .expect("the allocated gate-run record is written");
         let mut expected = draft;
-        expected.run_id = run_id;
         expected.started_at = fixed_instant();
         expected.completed_at = Some(fixed_instant());
         assert_eq!(bytes, &serialize_gate_run(&expected).unwrap());
 
-        let expected_event = Event::GateDefinitionCreated {
-            id: IdAuthority::from_seed([7u8; 32]).uuid_at(1),
-            timestamp: fixed_instant(),
-            gate_key: "cargo-ci".into(),
-        };
+        let expected_event = crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
+            IdAuthority::from_seed([7u8; 32]).uuid_at(1),
+            fixed_instant(),
+        );
         let mut expected_line = serialize_event(&expected_event).unwrap();
         expected_line.push(b'\n');
         assert_eq!(
@@ -2367,10 +2356,269 @@ mod tests {
         );
     }
 
+    fn verdict_digest() -> crate::domain::repository_inputs::InputsDigest {
+        crate::domain::repository_inputs::InputsDigest::try_from("c".repeat(64)).unwrap()
+    }
+
+    /// A run of `cargo-ci` its derived id names, executed over [`verdict_digest`].
+    fn executed_run(context: &MutationContext, status: GateRunStatus) -> GateRunResult {
+        let mut run = GateRunResult::attestation(
+            &context.gate_run_id_at(0),
+            &crate::test_utils::issue_id(7),
+            &"cargo-ci".parse().unwrap(),
+            crate::declarations::GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.origin = crate::domain::GateVerdictOrigin::Executed;
+        run.status = status;
+        run.inputs_digest = Some(verdict_digest());
+        run
+    }
+
+    /// An image holding `gate-runs` and, when `prior` is set, a verdict record
+    /// for `cargo-ci` over [`verdict_digest`] naming `prior`.
+    fn verdict_image(
+        context: &MutationContext,
+        prior: Option<&GateVerdictRecord>,
+    ) -> RepositoryImage {
+        let gate_key = "cargo-ci".parse().unwrap();
+        let run_id = context.gate_run_id_at(0);
+        let directory = || RepositoryEntry::Directory {
+            identity: crate::repository_state::EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let issue = crate::test_utils::issue_id(7);
+        let builder = ImageBuilder::new()
+            .entry(VirtualPath::GATE_RUNS, directory())
+            .entry(
+                VirtualPath::gate_run_issue_directory(&issue),
+                RepositoryEntry::Absent,
+            )
+            .entry(
+                VirtualPath::gate_run_record(&issue, &run_id),
+                RepositoryEntry::Absent,
+            );
+        let record = VirtualPath::gate_verdict_record(&gate_key, &verdict_digest());
+        match prior {
+            None => builder
+                .entry(VirtualPath::GATE_VERDICTS, RepositoryEntry::Absent)
+                .entry(
+                    VirtualPath::gate_verdict_directory(&gate_key),
+                    RepositoryEntry::Absent,
+                )
+                .entry(record, RepositoryEntry::Absent),
+            Some(prior) => builder
+                .entry(VirtualPath::GATE_VERDICTS, directory())
+                .entry(VirtualPath::gate_verdict_directory(&gate_key), directory())
+                .entry(record, file_entry(&serialize_gate_verdict(prior).unwrap())),
+        }
+        .build()
+    }
+
+    /// The delta actions under `gate-runs/verdicts`.
+    fn verdict_actions(delta: &RepositoryDelta) -> Vec<&RepositoryAction> {
+        delta
+            .actions()
+            .iter()
+            .filter(|action| {
+                action
+                    .path()
+                    .relative()
+                    .as_path()
+                    .starts_with(VirtualPath::GATE_VERDICTS.relative().as_path())
+            })
+            .collect()
+    }
+
+    fn record_run(
+        image: &RepositoryImage,
+        context: &MutationContext,
+        run: GateRunResult,
+    ) -> RepositoryDelta {
+        finalize(
+            &synthetic_layout(),
+            image,
+            context,
+            &[MutationIntent::RecordGateRun {
+                draft: Box::new(run),
+            }],
+            None,
+        )
+        .unwrap()
+        .delta()
+        .clone()
+    }
+
+    #[test]
+    fn test_finalize_gate_run_creates_an_issue_directory_only_when_captured_absent() {
+        let context = ctx();
+        let (recorded, fresh) = (
+            crate::test_utils::issue_id(7),
+            crate::test_utils::issue_id(8),
+        );
+        let directory = RepositoryEntry::Directory {
+            identity: crate::repository_state::EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let runs = [(&recorded, 0), (&fresh, 1), (&fresh, 2)].map(|(issue, index)| {
+            GateRunResult::attestation(
+                &context.gate_run_id_at(index),
+                issue,
+                &"cargo-ci".parse().unwrap(),
+                crate::declarations::GateStage::Postcheck,
+                GateStatus::Passed,
+                None,
+            )
+        });
+        let image = runs
+            .iter()
+            .fold(
+                ImageBuilder::new()
+                    .entry(VirtualPath::GATE_RUNS, directory.clone())
+                    .entry(VirtualPath::gate_run_issue_directory(&recorded), directory)
+                    .entry(
+                        VirtualPath::gate_run_issue_directory(&fresh),
+                        RepositoryEntry::Absent,
+                    ),
+                |builder, run| {
+                    builder.entry(
+                        VirtualPath::gate_run_record(&run.issue_id, &run.run_id),
+                        RepositoryEntry::Absent,
+                    )
+                },
+            )
+            .build();
+        let intents = runs
+            .iter()
+            .map(|run| MutationIntent::RecordGateRun {
+                draft: Box::new(run.clone()),
+            })
+            .collect::<Vec<_>>();
+
+        let plan = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
+
+        let created = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                RepositoryAction::CreateDirectory { path, .. } => Some(path.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(created, [VirtualPath::gate_run_issue_directory(&fresh)]);
+        assert!(runs
+            .iter()
+            .all(|run| plan.delta().actions().iter().any(|action| matches!(
+                action,
+                RepositoryAction::WriteFile { path, expected: ExpectedPreimage::Absent, .. }
+                    if *path == VirtualPath::gate_run_record(&run.issue_id, &run.run_id)
+            ))));
+    }
+
+    #[test]
+    fn test_finalize_gate_run_with_a_reusable_verdict_writes_its_verdict_record() {
+        let context = ctx();
+        let image = verdict_image(&context, None);
+        for status in [GateRunStatus::Passed, GateRunStatus::Failed] {
+            let run = executed_run(&context, status);
+            let delta = record_run(&image, &context, run.clone());
+
+            let record = VirtualPath::gate_verdict_record(&run.gate_key, &verdict_digest());
+            let expected = GateVerdictRecord {
+                issue_id: run.issue_id.clone(),
+                run_id: run.run_id.clone(),
+            };
+            assert!(
+                matches!(
+                    verdict_actions(&delta).as_slice(),
+                    [
+                        RepositoryAction::CreateDirectory { path: verdicts, expected: ExpectedPreimage::Absent, .. },
+                        RepositoryAction::CreateDirectory { path: gate, expected: ExpectedPreimage::Absent, .. },
+                        RepositoryAction::WriteFile { path, bytes, expected: ExpectedPreimage::Absent, .. },
+                    ] if *verdicts == VirtualPath::GATE_VERDICTS
+                        && *gate == VirtualPath::gate_verdict_directory(&run.gate_key)
+                        && *path == record
+                        && serde_json::from_slice::<GateVerdictRecord>(bytes).unwrap() == expected
+                ),
+                "{status:?}: {:?}",
+                delta.actions()
+            );
+        }
+    }
+
+    #[test]
+    fn test_finalize_gate_run_with_a_reusable_verdict_replaces_the_keys_prior_record() {
+        let context = ctx();
+        let prior = GateVerdictRecord {
+            issue_id: crate::test_utils::issue_id(3),
+            run_id: crate::test_utils::gate_run_id(9),
+        };
+        let image = verdict_image(&context, Some(&prior));
+        let run = executed_run(&context, GateRunStatus::Passed);
+        let record = VirtualPath::gate_verdict_record(&run.gate_key, &verdict_digest());
+
+        let delta = record_run(&image, &context, run.clone());
+
+        assert!(
+            matches!(
+                verdict_actions(&delta).as_slice(),
+                [RepositoryAction::WriteFile { path, bytes, expected, .. }]
+                    if *path == record
+                        && *expected == ExpectedPreimage::of(image.entry(&record).unwrap())
+                        && serde_json::from_slice::<GateVerdictRecord>(bytes).unwrap().run_id == run.run_id
+            ),
+            "{:?}",
+            delta.actions()
+        );
+    }
+
+    #[test]
+    fn test_finalize_gate_run_without_a_reusable_verdict_writes_no_verdict_record() {
+        let context = ctx();
+        let image = verdict_image(&context, None);
+        let executed = executed_run(&context, GateRunStatus::Passed);
+        let runs = [
+            GateRunResult {
+                inputs_digest: None,
+                ..executed.clone()
+            },
+            GateRunResult {
+                status: GateRunStatus::Error,
+                ..executed.clone()
+            },
+            GateRunResult {
+                origin: crate::domain::GateVerdictOrigin::Reused {
+                    source_issue: crate::test_utils::issue_id(3),
+                    source_run: crate::test_utils::gate_run_id(9),
+                },
+                ..executed.clone()
+            },
+            GateRunResult {
+                origin: crate::domain::GateVerdictOrigin::Attested,
+                ..executed
+            },
+        ];
+        for run in runs {
+            let delta = record_run(&image, &context, run.clone());
+            assert!(
+                verdict_actions(&delta).is_empty(),
+                "{run:?}: {:?}",
+                delta.actions()
+            );
+            assert!(delta
+                .actions()
+                .iter()
+                .any(|action| action.path()
+                    == &VirtualPath::gate_run_record(&run.issue_id, &run.run_id)));
+        }
+    }
+
     #[test]
     fn test_finalize_creation_orders_events_and_assigns_frozen_identity_sequence() {
         let ids = IdAuthority::from_seed([7u8; 32]);
-        let mut draft = crate::domain::fixture_issue("New".into(), "Body".into());
+        let mut draft = Issue::draft(created_id(), "New".into(), "Body".into());
         draft.state = State::Ready;
         let intents = [
             MutationIntent::CreateIssue {
@@ -2378,25 +2626,21 @@ mod tests {
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(Event::GateDefinitionCreated {
-                    id: String::new(),
-                    timestamp: sentinel_time(),
-                    gate_key: "bbb".into(),
-                }),
+                event: Box::new(EventBody::draft_gate_definition_created(
+                    "bbb".parse().unwrap(),
+                )),
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(Event::GateDefinitionCreated {
-                    id: String::new(),
-                    timestamp: sentinel_time(),
-                    gate_key: "aaa".into(),
-                }),
+                event: Box::new(EventBody::draft_gate_definition_created(
+                    "aaa".parse().unwrap(),
+                )),
             },
         ];
         let image = creation_image();
         let context = ctx();
-        let first = finalize(&layout(), &image, &context, &intents).unwrap();
-        let retry = finalize(&layout(), &image, &context, &intents).unwrap();
+        let first = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
@@ -2405,63 +2649,145 @@ mod tests {
         let events = appended_events(first.delta());
 
         assert!(matches!(
-            &events[..],
+            events.iter().map(Event::body).collect::<Vec<_>>().as_slice(),
             [
-                Event::IssueCreated { id, timestamp, .. },
-                Event::GateDefinitionCreated { id: first_id, timestamp: first_time, gate_key: first_key },
-                Event::GateDefinitionCreated { id: second_id, timestamp: second_time, gate_key: second_key },
-            ] if id == &ids.uuid_at(1)
-                && *timestamp == fixed_instant()
-                && first_id == &ids.uuid_at(2)
-                && *first_time == fixed_instant()
-                && first_key == "aaa"
-                && second_id == &ids.uuid_at(3)
-                && *second_time == fixed_instant()
-                && second_key == "bbb"
+                EventBody::IssueCreated { .. },
+                EventBody::GateDefinitionCreated { gate_key: first_key, .. },
+                EventBody::GateDefinitionCreated { gate_key: second_key, .. },
+            ] if events[0].id() == ids.uuid_at(1)
+                && events[0].timestamp() == fixed_instant()
+                && events[1].id() == ids.uuid_at(2)
+                && events[1].timestamp() == fixed_instant()
+                && first_key.as_str() == "aaa"
+                && events[2].id() == ids.uuid_at(3)
+                && events[2].timestamp() == fixed_instant()
+                && second_key.as_str() == "bbb"
         ), "events are canonically ordered before the finalizer allocates their identities: {events:?}");
     }
 
     #[test]
-    fn test_create_issue_stamps_lifecycle_and_membership() {
+    fn test_issue_id_at_derives_the_frozen_creation_sequence_for_the_seed() {
+        let ids = IdAuthority::from_seed([7u8; 32]);
+        let context = ctx();
+        let derived = (0..3).map(|index| context.issue_id_at(index));
+        let repeated = (0..3).map(|index| context.issue_id_at(index));
+
+        assert!(derived.zip(repeated).zip(0..3).all(
+            |((first, second), index)| first == second && first.as_str() == ids.uuid_at(index)
+        ));
+    }
+
+    #[test]
+    fn test_finalize_batch_creation_keeps_draft_ids_and_reserves_their_indices() {
+        let mut drafts = [
+            crate::test_utils::issue_id(61),
+            crate::test_utils::issue_id(62),
+        ]
+        .map(|id| Issue::draft(id, "Batch".into(), "Body".into()))
+        .to_vec();
+        drafts[1].dependencies = vec![drafts[0].id.clone()];
+        let draft_ids = drafts
+            .iter()
+            .map(|draft| draft.id.clone())
+            .collect::<Vec<_>>();
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
-            schema_version: 2,
-            all_ids: Vec::new(),
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+            deleted_ids: Vec::new(),
+        })
+        .unwrap();
+        let image = draft_ids
+            .iter()
+            .fold(
+                ImageBuilder::new()
+                    .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+                    .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+                    .entry(VirtualPath::EVENTS, RepositoryEntry::Absent),
+                |builder, id| builder.entry(VirtualPath::issue_record(id), RepositoryEntry::Absent),
+            )
+            .build();
+        let plan = finalize(
+            &synthetic_layout(),
+            &image,
+            &ctx(),
+            &[MutationIntent::CreateIssueBatch { drafts }],
+            None,
+        )
+        .unwrap();
+
+        assert!(
+            draft_ids.iter().all(|id| {
+                plan.delta()
+                    .actions()
+                    .iter()
+                    .find_map(|action| match action {
+                        RepositoryAction::WriteFile { path, bytes, .. }
+                            if path == &VirtualPath::issue_record(id) =>
+                        {
+                            serde_json::from_slice::<Issue>(bytes).ok()
+                        }
+                        _ => None,
+                    })
+                    .is_some_and(|issue| &issue.id == id)
+            }),
+            "each draft is written at its own id"
+        );
+        let events = appended_events(plan.delta());
+        let created = events
+            .iter()
+            .filter_map(|event| match event.body() {
+                EventBody::IssueCreated { issue_id, .. } => Some(issue_id.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(created, draft_ids, "creation events record the drafts' ids");
+        let ids = IdAuthority::from_seed([7u8; 32]);
+        assert!(
+            events
+                .iter()
+                .zip(2..)
+                .all(|(event, index)| event.id() == ids.uuid_at(index)),
+            "event ids follow the two reserved creation indices: {events:?}"
+        );
+    }
+
+    #[test]
+    fn test_create_issue_stamps_lifecycle_and_writes_no_index() {
+        let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             deleted_ids: Vec::new(),
         })
         .unwrap();
         let draft = {
-            let mut issue = crate::domain::fixture_issue("New".into(), "Body".into());
+            let mut issue = Issue::draft(created_id(), "New".into(), "Body".into());
             issue.state = State::Ready;
             issue
         };
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            // The draft carries its id; seed that id's absent slot.
+            .entry(
+                VirtualPath::issue_record(&created_id()),
                 RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            // The new id is deterministic; precompute it to seed its absent slot.
-            (
-                issue_path(&IdAuthority::from_seed([7u8; 32]).uuid_at(0)).unwrap(),
-                RepositoryEntry::Absent,
-            ),
-        ]);
+            )
+            .build();
         let delta = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
                 draft: Box::new(draft),
             }],
+            None,
         )
         .unwrap();
-        let expected_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let expected_id = created_id();
         let issue_action = delta
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &issue_path(&expected_id).unwrap())
+            .find(|action| action.path() == &VirtualPath::issue_record(&expected_id))
             .expect("issue write present");
         let RepositoryAction::WriteFile { bytes, .. } = issue_action else {
             panic!("expected issue write");
@@ -2470,51 +2796,50 @@ mod tests {
         assert_eq!(written.id, expected_id);
         assert_eq!(written.created_at, fixed_instant());
         assert_eq!(written.first_ready_at, Some(fixed_instant()));
-        // Membership index carries the new id.
-        let index_action = delta
+        assert!(!delta
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &VirtualPath::INDEX)
-            .expect("index write present");
-        let RepositoryAction::WriteFile { bytes, .. } = index_action else {
-            panic!("expected index write");
-        };
-        let index: RepositoryIndex = serde_json::from_slice(bytes).unwrap();
-        assert!(index.all_ids.contains(&expected_id));
+            .any(|action| action.path() == &VirtualPath::INDEX));
     }
 
     #[test]
-    fn test_delete_issue_removes_record_and_moves_index_membership() {
-        let issue = seeded_issue("11111111-1111-4111-8111-111111111111", None);
+    fn test_delete_issue_removes_record_and_records_its_tombstone() {
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
+            None,
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = canonical_json(
             &RepositoryIndex {
-                schema_version: 2,
-                all_ids: vec![issue.id.clone(), "other".to_string()],
+                schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
                 deleted_ids: Vec::new(),
             },
             true,
         )
         .unwrap();
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-        ]);
+        let image = ImageBuilder::new()
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            )
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .build();
 
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::DeleteIssue {
                 issue_id: issue.id.clone(),
             }],
+            None,
         )
         .unwrap();
 
         assert!(plan.delta().actions().iter().any(|action| matches!(
             action,
-            RepositoryAction::DeleteFile { path, .. } if path == &issue_path(&issue.id).unwrap()
+            RepositoryAction::DeleteFile { path, .. } if path == &VirtualPath::issue_record(&issue.id)
         )));
         let index_action = plan
             .delta()
@@ -2526,66 +2851,37 @@ mod tests {
             panic!("expected index write");
         };
         let index: RepositoryIndex = serde_json::from_slice(bytes).unwrap();
-        assert_eq!(index.all_ids, ["other"]);
         assert_eq!(index.deleted_ids, [issue.id]);
     }
 
     #[test]
-    fn test_create_issue_rejects_future_index_without_a_plan() {
-        let draft = crate::domain::fixture_issue("New".into(), "Body".into());
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-        let index_bytes = serde_json::to_vec(&serde_json::json!({
-            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION + 1,
-            "all_ids": [],
-            "deleted_ids": []
-        }))
-        .unwrap();
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
-        ]);
-
-        let error = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::CreateIssue {
-                draft: Box::new(draft),
-            }],
-        )
-        .expect_err("a future index must prevent plan construction");
-        assert!(error
-            .to_string()
-            .contains("newer than this binary supports"));
-    }
-
-    #[test]
     fn test_delete_issue_rejects_duplicate_deleted_index_without_a_plan() {
-        let issue = seeded_issue("11111111-1111-4111-8111-111111111111", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
+            None,
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = serde_json::to_vec(&serde_json::json!({
-            "schema_version": 2,
-            "all_ids": [issue.id],
-            "deleted_ids": ["deleted", "deleted"]
+            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION,
+            "deleted_ids": [crate::test_utils::issue_id(1), crate::test_utils::issue_id(1)]
         }))
         .unwrap();
-        let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-        ]);
+        let image = ImageBuilder::new()
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            )
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .build();
 
         let error = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::DeleteIssue {
                 issue_id: issue.id.clone(),
             }],
+            None,
         )
         .expect_err("duplicate deleted membership must prevent plan construction");
         assert!(error.to_string().contains("duplicate deleted issue id"));
@@ -2593,29 +2889,35 @@ mod tests {
 
     #[test]
     fn test_update_issue_stamps_transition_lifecycle_from_one_mutation_time() {
-        let issue = seeded_issue("22222222-2222-4222-8222-222222222222", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
+            None,
+        );
         let created_at = issue.created_at;
         let mut updated = issue.clone();
         updated.state = State::Done;
         updated.created_at = DateTime::UNIX_EPOCH;
         updated.done_at = Some(DateTime::UNIX_EPOCH);
         let bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![(issue_path(&issue.id).unwrap(), file_entry(&bytes))]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::issue_record(&issue.id), file_entry(&bytes))
+            .build();
 
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::UpdateIssue {
                 issue: Box::new(updated),
             }],
+            None,
         )
         .unwrap();
         let action = plan
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &issue_path(&issue.id).unwrap())
+            .find(|action| action.path() == &VirtualPath::issue_record(&issue.id))
             .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = action else {
             panic!("expected issue write");
@@ -2626,17 +2928,9 @@ mod tests {
         assert_eq!(persisted.done_at, Some(fixed_instant()));
     }
 
-    #[test]
-    fn test_torn_tail_detection() {
-        assert!(!prefix_has_torn_tail(b""));
-        assert!(!prefix_has_torn_tail(b"{\"type\":\"x\"}\n"));
-        assert!(prefix_has_torn_tail(b"{\"type\":\"x\"}\n{\"partial"));
-        assert!(!prefix_has_torn_tail(b"{\"a\":1}"));
-    }
-
     /// The finalizer's event-log action over `image`: its offset and bytes.
     fn event_append(image: &RepositoryImage, intents: &[MutationIntent]) -> (u64, Vec<u8>) {
-        let plan = finalize(&layout(), image, &ctx(), intents).unwrap();
+        let plan = finalize(&synthetic_layout(), image, &ctx(), intents, None).unwrap();
         plan.delta()
             .actions()
             .iter()
@@ -2650,148 +2944,142 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_appends_at_the_captured_log_length_reading_as_the_whole_log_composition() {
-        let prior = serialize_event(&Event::GateDefinitionCreated {
-            id: "e0".into(),
-            timestamp: fixed_instant(),
-            gate_key: "prior".into(),
-        })
+    fn test_finalize_appends_at_the_committed_length_leaving_every_line_terminated() {
+        let prior = serialize_event(&crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created("prior".parse().unwrap()),
+            "e0",
+            fixed_instant(),
+        ))
         .unwrap();
         let terminated = [prior.as_slice(), b"\n"].concat();
-        // A valid final line longer than the tail window, read back to its start.
-        let long = serialize_event(&Event::GateDefinitionCreated {
-            id: "e1".into(),
-            timestamp: fixed_instant(),
-            gate_key: "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize),
-        })
+        let unterminated = [terminated.as_slice(), b"{\"parti"].concat();
+        // Final lines longer than the tail window, read back to their start.
+        let long = serialize_event(&crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created(
+                "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize)
+                    .parse()
+                    .unwrap(),
+            ),
+            "e1",
+            fixed_instant(),
+        ))
         .unwrap();
-        let long_log = [terminated.as_slice(), &long].concat();
-        let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_log));
-        let record = MutationIntent::RecordEvent {
-            phase: 0,
-            event: Box::new(Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            }),
-        };
-        let whole = |log: Vec<u8>| {
-            let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
+        let long_valid = [terminated.as_slice(), &long].concat();
+        let long_unterminated = [
+            terminated.as_slice(),
+            &vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize],
+        ]
+        .concat();
+        let tail = |log: Vec<u8>| {
+            let image = tail_image(crate::repository_state::EventLogTail::of_bytes(&log));
             (log, image)
         };
-        let cases = [Vec::new(), terminated, prior.clone()].map(whole);
-        for (log, image) in cases.into_iter().chain([(long_log, long_image)]) {
+        let captured = |log: Vec<u8>| {
+            let image = ImageBuilder::new()
+                .entry(VirtualPath::EVENTS, file_entry(&log))
+                .build();
+            (log, image)
+        };
+        let record = MutationIntent::RecordEvent {
+            phase: 0,
+            event: Box::new(EventBody::draft_gate_definition_created(
+                "cargo-ci".parse().unwrap(),
+            )),
+        };
+        let cases = [Vec::new(), terminated.clone(), prior.clone(), unterminated]
+            .map(captured)
+            .into_iter()
+            .chain([long_valid, long_unterminated].map(tail));
+        for (log, image) in cases {
             let (offset, appended) = event_append(&image, std::slice::from_ref(&record));
 
-            assert_eq!(
-                offset,
-                log.len() as u64,
-                "the offset is the captured length"
+            let committed = log
+                .iter()
+                .rposition(|byte| *byte == b'\n')
+                .map_or(0, |newline| newline + 1);
+            assert_eq!(offset, committed as u64, "log {log:?}");
+            let result = [&log[..committed], &appended].concat();
+            assert!(
+                result.ends_with(b"\n") && !appended.starts_with(b"\n"),
+                "no separator, and every line is terminated: {result:?}"
             );
-            let unterminated = !log.is_empty() && !log.ends_with(b"\n");
             assert_eq!(
-                appended.first() == Some(&b'\n'),
-                unterminated,
-                "exactly an unterminated final line earns a leading separator"
-            );
-            let whole = [log.as_slice(), &appended].concat();
-            let read =
-                crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
-                    .unwrap();
-            let prior_events =
-                crate::domain::event_log::parse_known_events(std::str::from_utf8(&log).unwrap())
-                    .unwrap();
-            let new_events = crate::domain::event_log::parse_known_events(
-                std::str::from_utf8(&appended).unwrap(),
-            )
-            .unwrap();
-            assert_eq!(
-                read,
-                [prior_events, new_events].concat(),
-                "the log read after the append is the captured events then the appended ones"
+                crate::domain::event_log::parse_known_events(&result).unwrap(),
+                [
+                    crate::domain::event_log::parse_known_events(&log).unwrap(),
+                    crate::domain::event_log::parse_known_events(&appended).unwrap(),
+                ]
+                .concat(),
+                "the log read after the append is the committed events then the appended ones"
             );
         }
     }
 
-    fn profile_lifecycle_marker() -> Event {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: sentinel_time(),
-            operation: crate::domain::ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
+    fn profile_lifecycle_event() -> EventBody {
+        EventBody::draft_profile_lifecycle(
+            crate::domain::ProfileLifecycleOperation::Apply,
+            vec![crate::domain::ProfileLifecycleProfile {
                 id: "example"
                     .try_into()
-                    .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
+                    .expect("the profile event has a canonical identifier"),
+                version: semver::Version::new(1, 0, 0),
                 status: crate::domain::ProfileLifecycleStatus::Installed,
                 variables: Default::default(),
             }],
-            isolated_torn_tail: false,
-        }
+        )
     }
 
-    const TORN_LOG: &[u8] = b"{\"type\":\"issue_completed\",\"id\":\"e0\",\"issue_id\":\"i\",\"timestamp\":\"2020-01-01T00:00:00Z\"}\n{\"parti";
-
-    /// A captured events.jsonl whose final line is a malformed, unterminated tail.
-    fn torn_tail_image() -> RepositoryImage {
-        image_with(vec![(VirtualPath::EVENTS, file_entry(TORN_LOG))])
-    }
-
-    #[test]
-    fn test_finalize_rejects_markerless_append_over_torn_tail() {
-        // A batch with no profile lifecycle certifier appended after an uncertified
-        // torn tail would produce a log the reader rejects, so finalize refuses and
-        // composes nothing, also when the torn line is longer than the tail window.
-        let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize;
-        let long_torn = [TORN_LOG, &vec![b'x'; 2 * window]].concat();
-        let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
-        for image in [torn_tail_image(), long_image] {
-            let event = Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            };
-            let result = finalize(
-                &layout(),
-                &image,
-                &ctx(),
-                &[MutationIntent::RecordEvent {
-                    phase: 0,
-                    event: Box::new(event),
-                }],
-            );
-            assert!(matches!(result, Err(MutationError::UncertifiedTornTail)));
-        }
+    fn log_with_unterminated_fragment() -> Vec<u8> {
+        let event = crate::test_utils::stamped_event(
+            EventBody::draft_issue_completed(crate::test_utils::issue_id(1)),
+            "e0",
+            fixed_instant(),
+        );
+        [serialize_event(&event).unwrap().as_slice(), b"\n{\"parti"].concat()
     }
 
     #[test]
-    fn test_finalize_certifier_over_torn_tail_is_the_first_appended_line() {
-        let (offset, appended) = event_append(
-            &torn_tail_image(),
-            &[MutationIntent::RecordEvent {
-                phase: 0,
-                event: Box::new(profile_lifecycle_marker()),
-            }],
+    fn test_finalize_keeps_canonical_event_order_when_tail_is_unterminated() {
+        let image = ImageBuilder::new()
+            .entry(
+                VirtualPath::EVENTS,
+                file_entry(&log_with_unterminated_fragment()),
+            )
+            .build();
+        let record = |event| MutationIntent::RecordEvent {
+            phase: 0,
+            event: Box::new(event),
+        };
+        let (_, appended) = event_append(
+            &image,
+            &[
+                record(EventBody::draft_gate_definition_created(
+                    "cargo-ci".parse().unwrap(),
+                )),
+                record(profile_lifecycle_event()),
+            ],
         );
 
-        assert_eq!(offset, TORN_LOG.len() as u64);
-        let first_line = std::str::from_utf8(&appended)
-            .unwrap()
-            .strip_prefix('\n')
-            .and_then(|text| text.lines().next())
-            .expect("a separator ends the torn partial, then the certifier follows");
+        let events = crate::domain::event_log::parse_known_events(&appended).unwrap();
         assert!(matches!(
-            serde_json::from_str::<Event>(first_line).unwrap(),
-            Event::ProfileLifecycle {
-                isolated_torn_tail: true,
-                ..
-            }
+            events[0].body(),
+            EventBody::GateDefinitionCreated { .. }
         ));
-        let whole = [TORN_LOG, &appended].concat();
-        assert!(
-            crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
-                .is_ok(),
-            "the reader accepts the certified log"
-        );
+        assert!(matches!(
+            events[1].body(),
+            EventBody::ProfileLifecycle { .. }
+        ));
+    }
+
+    #[test]
+    fn test_event_identities_repository_scoped_event_sorts_before_issue_scoped() {
+        let (repository_scoped, _) = event_identities(&EventBody::draft_gate_definition_created(
+            "g".parse().unwrap(),
+        ));
+        let (issue_scoped, _) = event_identities(&EventBody::draft_issue_deleted(
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c),
+        ));
+
+        assert!(repository_scoped < issue_scoped);
     }
 }

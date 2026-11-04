@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "661c51e71b79177ecc4bebf159be28c3e06fb851",
+  "completed_at": "2026-11-01T15:49:35.902393646Z",
+  "duration_ms": 117421,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged work removes the obsolete public entry points, routes retained entry points through production dispatch, and preserves CLI fresh-initialization coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "56b89d9a-c2c9-4250-bd8f-e4bf059921d5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9c7178cf-4141-4dd8-b73f-997fc87ca795",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:47:38.480583639Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2b4f3f242, 96f8c6693, 661c51e71 (all `jit:56b89d9a`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-13 (issue description); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T15:47:17Z)\nTruncation recovery: recovered combined-output truncation through bounded per-commit, per-path, and line-range patch/current-source reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged work removes the obsolete public entry points, routes retained entry points through production dispatch, and preserves CLI fresh-initialization coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

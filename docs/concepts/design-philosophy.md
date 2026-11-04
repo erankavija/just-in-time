@@ -84,11 +84,11 @@ need shared access; an atomic rename alone does not serialize competing writers.
 ```bash
 # Agent 1
 jit claim acquire $TASK --agent-id agent:worker-1
-# ✓ Acquired lease (atomic via file lock)
+# Acquired lease: <lease-id>
 
 # Agent 2 (simultaneously, same task)
 jit claim acquire $TASK --agent-id agent:worker-2
-# ✗ ERROR: Already claimed by agent:worker-1
+# Error: Issue <task> already claimed by agent:worker-1 until <expiry>
 ```
 
 File locking serializes claim operations, preventing concurrent modification conflicts.
@@ -338,12 +338,16 @@ Gate 'tests' last run: passed (exit code: 0)
 Gate 'clippy' last run: failed (exit code: 1)
 ```
 
-**4. Colored output for terminals**
+**4. Plain-word status output**
 ```bash
 jit status
-✓ 5 done (green)
-→ 3 in_progress (blue)
-⚠ 2 blocked (yellow)
+Status:
+  backlog: 1
+  ready: 2
+  in_progress: 3
+  done: 5
+  rejected: 0
+  blocked: 2
 ```
 
 **5. Helpful error messages**

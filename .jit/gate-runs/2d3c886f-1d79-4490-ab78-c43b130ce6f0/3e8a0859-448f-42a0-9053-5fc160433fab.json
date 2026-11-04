@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e7571bc2d1eceedf030da6912335959b2c3e42ea",
+  "completed_at": "2026-10-31T23:44:59.392468052Z",
+  "duration_ms": 159385,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The suite root no longer defines taxonomy helpers, and suite modules use the shared fixture; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2d3c886f-1d79-4490-ab78-c43b130ce6f0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3e8a0859-448f-42a0-9053-5fc160433fab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:42:20.007233296Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e7571bc2d (jit:2d3c886f)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-06 (issue success criteria)\nGate evidence: cargo-ci passed (2026-10-31; exit code unavailable); code-review pending\nTruncation recovery: Re-read main.rs via parent-specific diff; excluded remaining list-envelope patch as outside the taxonomy-helper impact cone\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The suite root no longer defines taxonomy helpers, and suite modules use the shared fixture; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

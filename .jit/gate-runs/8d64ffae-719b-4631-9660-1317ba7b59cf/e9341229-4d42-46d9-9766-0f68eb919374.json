@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a46eb559b59eee84790c7196f652094dec9f4e71",
+  "completed_at": "2026-11-01T08:03:26.820441584Z",
+  "duration_ms": 95799,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/release-artifacts.yml",
+        "id": "F1",
+        "line": 286,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8d64ffae/requirement/REQ-02",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The release smoke independently proves count equals collection length for profile apply and issue list."
+      },
+      {
+        "disposition": "blocking",
+        "file": "mcp-server/test-integration.js",
+        "id": "F2",
+        "line": 619,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8d64ffae/requirement/REQ-02",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "MCP profile integration tests independently prove count equals profiles length."
+      }
+    ],
+    "summary": "REQ-02 remains violated by release-smoke and MCP integration count re-proofs outside the designated owner.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "8d64ffae-719b-4631-9660-1317ba7b59cf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e9341229-4d42-46d9-9766-0f68eb919374",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:01:51.021025245Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 26113 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19621-0e50-7531-bdde-c166b288fc24\n--------\nuser\n--- 26100 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. [high, blocking] REQ-02 is unmet: the release workflow independently asserts `count == len(collection)` for `profile apply --dry-run` and `issue list`, duplicating the designated list-envelope owner. [`release-artifacts.yml`](/home/vkaskivuo/Projects/just-in-time/.github/workflows/release-artifacts.yml:286)\n\n2. [high, blocking] REQ-02 is unmet: MCP integration tests independently assert profile response counts equal `profiles.length` across `profile show` and `profile apply`, creating additional per-command owners. [`test-integration.js`](/home/vkaskivuo/Projects/just-in-time/mcp-server/test-integration.js:619)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-02 remains violated by release-smoke and MCP integration count re-proofs outside the designated owner.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The release smoke independently proves count equals collection length for profile apply and issue list.\",\"file\":\".github/workflows/release-artifacts.yml\",\"line\":286,\"references\":[\"@/issue/8d64ffae/requirement/REQ-02\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"MCP profile integration tests independently prove count equals profiles length.\",\"file\":\"mcp-server/test-integration.js\",\"line\":619,\"references\":[\"@/issue/8d64ffae/requirement/REQ-02\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

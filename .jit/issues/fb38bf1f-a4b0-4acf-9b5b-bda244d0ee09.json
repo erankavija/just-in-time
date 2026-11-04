@@ -1,0 +1,39 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T15:06:14.398429768Z",
+  "context": {},
+  "created_at": "2026-11-04T09:40:58.219593245Z",
+  "dependencies": [
+    "06ee9b67-07c3-48ad-a938-179a83d12564",
+    "182f4c03-2c8b-431c-9c1e-a208c234a525",
+    "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
+    "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
+    "3f816619-6163-46d4-8549-f988a3de65db",
+    "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
+    "8e91126b-c17b-4274-bccb-13385e40c318",
+    "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
+    "cc4ea8a9-6f24-4dc2-ad6a-fccbe7d79be4",
+    "cd8e04cc-1f52-40a5-935a-b2b77a67240e"
+  ],
+  "description": "No module under `crates/jit/src/commands/` imports from the output layer: commands return command or domain values, and the output layer builds responses from them.\n\n## Background\n\n`@/inv/architecture-dependency-direction` points dependencies inward. The output layer depending on result types that `commands/` defines is that direction; `commands/` importing `crate::output` is the reverse. At this task's filing, `commands/` modules query, graph, validate, issue, document, gate_check and worktree named `crate::output` types, mostly to build responses (`GraphTreeResponse`, `DivergenceResponse`, `StateRollup`, `IssueShowResponse`, `ArtifactDirectoryResponse` and others) or to use `ExitCode`.\n\n## Success Criteria\n\n- [hard] REQ-01: No module under `crates/jit/src/commands/` names any `crate::output` path; commands return command or domain values and the output layer builds responses from them.\n- [hard] REQ-02: A structural test scans `commands/` for `crate::output` and fails naming each offending file.\n- [hard] REQ-03: JSON payloads, schema names, human output and exit codes of every affected leaf are unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: Rescoped by steward ruling (just-in-time-6a, 2026-11-04), correcting the earlier output-ownership ruling. Under `@/inv/architecture-dependency-direction` the output layer depending on command-defined result types is the correct direction, so relocating registered success types into `output/` is not required; at an estimated +280 production lines it is churn without simplification. The former REQ-01 to REQ-03 (relocation, deletion of command-layer response shapes and its registration guard) are dropped, not deferred. The remaining scope is the former REQ-05 and its structural test (now REQ-01 and REQ-02) and the unchanged-output criterion (now REQ-03). Plan D-59.\n\n## Notes\n\nThe estimate that prompted the rescope (about +120 to +500 lines, central +280) came from a read-only survey of registered success types defined outside `output/`. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T09:40:58.219593245Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Commands import nothing from the output layer",
+  "updated_at": "2026-11-04T21:46:31.204948913Z"
+}

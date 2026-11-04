@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-cccfd407",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7967d993e1282b497a89b26ce359536ed783e04b",
+  "completed_at": "2026-10-25T02:53:40.194204371Z",
+  "duration_ms": 52548,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three issue requirements are met by the attributed implementation and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cccfd407-725f-4c09-910a-817fbc35bab2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "583f97e9-cfc3-4f60-a41d-9c40b7cb110a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T02:52:47.646202709Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 172095d01b39335bf663c3e38bcd3719be519afc\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-08 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no prior run)\nTruncation recovery: Targeted reads of configuration, policy sources, implementation, call paths, tests, and gate projection after a broad inspection truncated\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three issue requirements are met by the attributed implementation and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

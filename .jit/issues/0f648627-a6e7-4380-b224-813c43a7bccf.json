@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T18:49:05.012200232Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Each package-graph refusal surfaces as the one graph error type and maps to the profile error code; the command-layer mirror and its field-by-field translator are removed.\n\n## Background\n\n`ProfileDependencyError` (`crates/jit/src/commands/profile.rs:262`) mirrors `ProfileGraphError` (`crates/jit/src/profile/graph.rs:215`) through the translator `profile_graph_error` (`profile.rs:2317`). Its fallback arm (`:2372`) sends `SelectedPackageMissing`, `MissingDependency` and four invalid-version variants to the generic error code, because only the mirror is downcast to the profile code (`crates/jit/src/main.rs:144,1276`). Line numbers are at the investigation baseline.\n\nThe graph error is pure and stays in the graph module. A dependency loading failure that needs I/O context is at most one command-layer variant, which keeps dependencies pointing inward (`@/inv/architecture-dependency-direction`).\n\n## Success Criteria\n\n- [hard] REQ-01: The command-layer dependency error mirror and its translator are gone.\n- [hard] REQ-02: Each graph error variant maps to the profile error code and exit status, shown by a test over the variants.\n- [hard] REQ-03: A dependency loading failure needing I/O context is at most one command-layer error variant.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:15:37.298754418Z",
+  "first_ready_at": "2026-11-01T18:48:35.868515941Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "270ba33e-4129-4f05-ad30-48559e79d510",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:10:29.458158421Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5f460d1d-a27b-4d86-85a8-7eb9f9d4d46f",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:14:10.861948496Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0f648627-a6e7-4380-b224-813c43a7bccf",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Fold the profile dependency error into the graph error",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T19:15:37.298754418Z"
 }

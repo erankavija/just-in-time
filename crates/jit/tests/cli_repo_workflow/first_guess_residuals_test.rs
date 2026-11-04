@@ -8,103 +8,42 @@
 //!   4. A top-level reverse-deps / issue-listing first guess (`jit rdeps`,
 //!      `jit list`) resolves to the canonical command.
 
-use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use std::fs;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit()
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-    temp
-}
-
-/// Create an issue and return its short id (parsed from the "Created issue:" line).
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let output = jit()
-        .current_dir(temp.path())
-        .args(["issue", "create", "--title", title])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&output);
-    s.lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
 
 // 1. `gate define --auto` sets mode to auto.
 #[test]
 fn test_gate_define_auto_sets_mode_auto() {
-    let temp = setup_repo();
+    let cli = JitCli::initialised().unwrap();
 
-    jit()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "auto-gate",
-            "--title",
-            "Auto Gate",
-            "--description",
-            "Defined via --auto",
-            "--auto",
-            "--checker-command",
-            "true",
-        ])
-        .assert()
-        .success();
+    cli.run([
+        "gate",
+        "define",
+        "auto-gate",
+        "--title",
+        "Auto Gate",
+        "--description",
+        "Defined via --auto",
+        "--auto",
+        "--checker-command",
+        "true",
+    ])
+    .unwrap();
 
-    let output = jit()
-        .current_dir(temp.path())
-        .args(["gate", "show", "auto-gate", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let json = cli.run_json(["gate", "show", "auto-gate"]).unwrap();
     assert_eq!(json["mode"], "auto", "expected --auto to record mode=auto");
 }
 
 // 2. `doc add --title X` sets the human label identically to `--label X`.
 #[test]
 fn test_doc_add_title_alias_sets_label() {
-    let temp = setup_repo();
-    let id = create_issue(&temp, "Doc host");
-    fs::write(temp.path().join("design.md"), "# Design\n").unwrap();
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doc host"]).unwrap();
+    fs::write(cli.root().join("design.md"), "# Design\n").unwrap();
 
-    let output = jit()
-        .current_dir(temp.path())
-        .args([
-            "doc",
-            "add",
-            &id,
-            "design.md",
-            "--title",
-            "Design Notes",
-            "--json",
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let json = cli
+        .run_json(["doc", "add", &id, "design.md", "--title", "Design Notes"])
+        .unwrap();
     assert_eq!(
         json["document"]["label"], "Design Notes",
         "--title should populate the human label like --label"
@@ -114,44 +53,38 @@ fn test_doc_add_title_alias_sets_label() {
 // 3. Transposed gate-inspection args yield an actionable did-you-mean (non-zero).
 #[test]
 fn test_gate_status_transposed_args_did_you_mean() {
-    let temp = setup_repo();
-    let id = create_issue(&temp, "Gated issue");
-    jit()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "tests",
-            "--title",
-            "Tests",
-            "--description",
-            "Test gate",
-        ])
-        .assert()
-        .success();
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Gated issue"]).unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "tests",
+        "--title",
+        "Tests",
+        "--description",
+        "Test gate",
+    ])
+    .unwrap();
 
     // Canonical form is `jit gate status <issue> <gate-key>`. Pass them transposed.
-    let assert = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", "tests", &id])
-        .assert()
-        .failure();
-    let stderr = String::from_utf8_lossy(&assert.get_output().stderr).to_lowercase();
+    let output = cli
+        .command(["gate", "status", "tests", &id])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
     assert!(
         stderr.contains("transposed") && stderr.contains("did you mean"),
         "expected an actionable did-you-mean about transposed args, got: {stderr}"
     );
 
     // The --json surface carries the same actionable suggestion and a non-zero exit.
-    let json_out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", "tests", &id, "--json"])
-        .assert()
-        .failure()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&json_out).unwrap();
+    let json_out = cli
+        .command(["gate", "status", "tests", &id, "--json"])
+        .output()
+        .unwrap();
+    assert!(!json_out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&json_out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
     assert_eq!(json["error"]["details"]["transposed"], true);
     let suggestions = json["error"]["suggestions"].as_array().unwrap();
@@ -166,16 +99,11 @@ fn test_gate_status_transposed_args_did_you_mean() {
 
 #[test]
 fn test_invariant_list_rejection_mentions_item_list_route() {
-    let output = jit()
-        .args(["invariant", "list"])
-        .assert()
-        .failure()
-        .get_output()
-        .clone();
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "an unsupported invariant subcommand remains a usage error"
+    let cli = JitCli::uninitialised().unwrap();
+    let output = cli.command(["invariant", "list"]).output().unwrap();
+    assert!(
+        !output.status.success(),
+        "an unsupported invariant subcommand is rejected"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -187,41 +115,21 @@ fn test_invariant_list_rejection_mentions_item_list_route() {
 // 4a. Top-level `jit rdeps` routes to the canonical `jit graph rdeps`.
 #[test]
 fn test_top_level_rdeps_routes_to_graph_rdeps() {
-    let temp = setup_repo();
-    let blocker = create_issue(&temp, "Blocker");
-    let dependent = create_issue(&temp, "Dependent");
+    let cli = JitCli::initialised().unwrap();
+    let blocker = cli.create_issue(["--title", "Blocker"]).unwrap();
+    let dependent = cli.create_issue(["--title", "Dependent"]).unwrap();
     // Dependent depends on blocker => blocker's rdeps includes dependent.
-    jit()
-        .current_dir(temp.path())
-        .args(["dep", "add", &dependent, &blocker])
-        .assert()
-        .success();
+    cli.run(["dep", "add", &dependent, &blocker]).unwrap();
 
-    let via_alias = jit()
-        .current_dir(temp.path())
-        .args(["rdeps", &blocker, "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let via_canonical = jit()
-        .current_dir(temp.path())
-        .args(["graph", "rdeps", &blocker, "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let alias_json: serde_json::Value = serde_json::from_slice(&via_alias).unwrap();
-    let canonical_json: serde_json::Value = serde_json::from_slice(&via_canonical).unwrap();
+    let alias_json = cli.run_json(["rdeps", &blocker]).unwrap();
+    let canonical_json = cli.run_json(["graph", "rdeps", &blocker]).unwrap();
     assert_eq!(
         alias_json, canonical_json,
         "`jit rdeps` must resolve identically to `jit graph rdeps`"
     );
     // And it actually surfaces the dependent.
     assert!(
-        String::from_utf8_lossy(&via_alias).contains(&dependent),
+        alias_json.to_string().contains(&dependent),
         "rdeps output should list the dependent issue"
     );
 }
@@ -231,30 +139,19 @@ fn test_top_level_rdeps_routes_to_graph_rdeps() {
 // Multi-level chain A <- B <- C so bounded and unbounded outputs differ.
 #[test]
 fn test_top_level_rdeps_default_is_bounded_multi_level() {
-    let temp = setup_repo();
-    let a = create_issue(&temp, "A root");
-    let b = create_issue(&temp, "B mid");
-    let c = create_issue(&temp, "C leaf");
+    let cli = JitCli::initialised().unwrap();
+    let a = cli.create_issue(["--title", "A root"]).unwrap();
+    let b = cli.create_issue(["--title", "B mid"]).unwrap();
+    let c = cli.create_issue(["--title", "C leaf"]).unwrap();
     // B depends on A; C depends on B. So A's transitive dependents are B and C,
     // but A's immediate dependent is only B.
     for (dependent, blocker) in [(&b, &a), (&c, &b)] {
-        jit()
-            .current_dir(temp.path())
-            .args(["dep", "add", dependent, blocker])
-            .assert()
-            .success();
+        cli.run(["dep", "add", dependent, blocker]).unwrap();
     }
 
     // Default `jit rdeps A`: immediate dependent B present, transitive C absent.
-    let default_out = jit()
-        .current_dir(temp.path())
-        .args(["rdeps", &a, "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let default_str = String::from_utf8_lossy(&default_out);
+    let default_out = cli.run_json(["rdeps", &a]).unwrap();
+    let default_str = default_out.to_string();
     assert!(
         default_str.contains(&b),
         "bounded default must include the immediate dependent B"
@@ -265,15 +162,8 @@ fn test_top_level_rdeps_default_is_bounded_multi_level() {
     );
 
     // Opt-in `jit rdeps A --depth 0`: both B and C present.
-    let unbounded_out = jit()
-        .current_dir(temp.path())
-        .args(["rdeps", &a, "--depth", "0", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let unbounded_str = String::from_utf8_lossy(&unbounded_out);
+    let unbounded_out = cli.run_json(["rdeps", &a, "--depth", "0"]).unwrap();
+    let unbounded_str = unbounded_out.to_string();
     assert!(
         unbounded_str.contains(&b) && unbounded_str.contains(&c),
         "unbounded opt-in (--depth 0) must include transitive dependent C"
@@ -283,28 +173,12 @@ fn test_top_level_rdeps_default_is_bounded_multi_level() {
 // 4b. Top-level `jit list` routes to the canonical `jit issue list`.
 #[test]
 fn test_top_level_list_routes_to_issue_list() {
-    let temp = setup_repo();
-    create_issue(&temp, "Alpha");
-    create_issue(&temp, "Beta");
+    let cli = JitCli::initialised().unwrap();
+    cli.create_issue(["--title", "Alpha"]).unwrap();
+    cli.create_issue(["--title", "Beta"]).unwrap();
 
-    let via_alias = jit()
-        .current_dir(temp.path())
-        .args(["list", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let via_canonical = jit()
-        .current_dir(temp.path())
-        .args(["issue", "list", "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let alias_json: serde_json::Value = serde_json::from_slice(&via_alias).unwrap();
-    let canonical_json: serde_json::Value = serde_json::from_slice(&via_canonical).unwrap();
+    let alias_json = cli.run_json(["list"]).unwrap();
+    let canonical_json = cli.run_json(["issue", "list"]).unwrap();
     assert_eq!(
         alias_json, canonical_json,
         "`jit list` must resolve identically to `jit issue list`"

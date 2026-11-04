@@ -1,0 +1,350 @@
+# Raw output of the measurement windows reported in README.md, section e2764021, 7721a2a9.
+# load= is the one-minute load average sampled immediately before each command.
+
+## After, de34a0590: ./scripts/cargo-ci.sh runs, budget, per-test profile
+wrapper default; sccache present: /home/vkaskivuo/.cargo/bin/sccache
+waiting for load<4.08 (bound 20 min): 4.81 5.91 5.13 4/1457 876053 10:56:06
+== prime start 10:56:36 load=3.31 5.44 5.00 free=75G head=de34a0590
+== prime rc=0 end 10:56:55
+  ✓ suite-build: built in 556 ms, warmed 18 executables (2097292824 bytes) in 75 ms (633 ms)
+  ✓ test: 4632 passed, 0 failed, 0 skipped (12816 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2946 ms)
+  ✓ suite-clock: 15779 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=15779ms (92 ms)
+sccache daemon 877216 TMPDIR= exists=unset
+waiting for load<4.08 (bound 20 min): 5.92 5.90 5.16 2/1583 915240 10:56:55
+== warm1 start 10:57:25 load=3.98 5.43 5.03 free=75G head=de34a0590
+== warm1 rc=0 end 10:57:52
+  ✓ suite-build: built in 543 ms, warmed 18 executables (2097292824 bytes) in 75 ms (621 ms)
+  ✓ test: 4632 passed, 0 failed, 0 skipped (21123 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2840 ms)
+  ✓ suite-clock: 23981 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=23981ms (92 ms)
+waiting for load<4.08 (bound 20 min): 11.34 6.97 5.54 2/1470 959710 10:57:52
+waiting for load<4.08 (bound 20 min): 7.39 6.43 5.41 2/1576 960346 10:58:22
+waiting for load<4.08 (bound 20 min): 4.93 5.92 5.27 2/1491 960741 10:58:52
+== warm2 start 10:59:22 load=3.09 5.39 5.11 free=75G head=de34a0590
+== warm2 rc=0 end 10:59:39
+  ✓ suite-build: built in 537 ms, warmed 18 executables (2097292824 bytes) in 75 ms (615 ms)
+  ✓ test: 4632 passed, 0 failed, 0 skipped (11958 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2751 ms)
+  ✓ suite-clock: 14726 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14726ms (95 ms)
+waiting for load<4.08 (bound 20 min): 6.77 6.08 5.34 2/1554 1001897 10:59:39
+waiting for load<4.08 (bound 20 min): 4.21 5.52 5.18 1/1536 1002248 11:00:09
+== rebuild1 start 11:00:39 load=2.55 5.00 5.02 free=75G head=de34a0590
+== rebuild1 rc=0 end 11:02:01
+  ✓ suite-build: built in 37677 ms, warmed 18 executables (2097292824 bytes) in 70 ms (37750 ms)
+  ✓ test: 4632 passed, 0 failed, 0 skipped (12011 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2695 ms)
+  ✓ suite-clock: 14724 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14724ms (96 ms)
+waiting for load<4.08 (bound 20 min): 6.09 5.23 5.08 2/1531 1042167 11:02:01
+waiting for load<4.08 (bound 20 min): 4.09 4.83 4.95 1/1528 1042437 11:02:31
+== rebuild2 start 11:03:01 load=2.78 4.44 4.82 free=75G head=de34a0590
+== rebuild2 rc=0 end 11:04:11
+  ✓ suite-build: built in 24754 ms, warmed 18 executables (2097292824 bytes) in 74 ms (24831 ms)
+  ✓ test: 4632 passed, 0 failed, 0 skipped (12351 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (4914 ms)
+  ✓ suite-clock: 17283 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=17283ms (94 ms)
+waiting for load<4.08 (bound 20 min): 7.41 5.28 5.07 1/1479 1082505 11:04:11
+waiting for load<4.08 (bound 20 min): 4.96 4.89 4.94 2/1479 1082807 11:04:41
+== budget start 11:05:11 load=3.11 4.45 4.79 free=75G head=de34a0590
+== budget rc=0 end 11:05:12
+rust-build-budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=skipped
+== warmfinal start 11:05:12 load=3.11 4.45 4.79 free=75G head=de34a0590
+== warmfinal rc=0 end 11:05:29
+  ✓ suite-build: built in 505 ms, warmed 18 executables (2097292824 bytes) in 73 ms (581 ms)
+  ✓ test: 4632 passed, 0 failed, 0 skipped (11942 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2703 ms)
+  ✓ suite-clock: 14663 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1694388096/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14663ms (94 ms)
+waiting for load<4.08 (bound 20 min): 5.86 4.99 4.96 1/1455 1121285 11:05:29
+== profile start 11:05:59 load=3.95 4.61 4.84 free=75G head=de34a0590
+== profile rc=0 end 11:06:24
+3621 jit::jit$commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
+3025 jit::jit$storage::claim_coordinator::proptests::prop_concurrent_claims_exclusive
+2972 jit::jit$storage::claim_coordinator::proptests::prop_concurrent_different_issues_succeed
+2922 jit::cli_repo_workflow$profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op
+2655 jit::cli_repo_workflow$profile_cli_tests::test_profile_add_publishes_a_package_whose_directories_outnumber_its_files
+2580 jit::cli_repo_workflow$profile_cli_tests::test_profile_pack_and_add_carry_a_package_at_the_model_limits
+2107 jit::cli_repo_workflow$lock_contention_tests::test_concurrent_mutations_queue_behind_a_holder_under_the_default_wait
+2105 jit::cli_issue$command_exit_code_projection_tests::test_command_exit_codes_expired_lock_wait_emits_11
+measure rc=0 11:06:24
+
+## Before, 0896fc29b: ./scripts/cargo-ci.sh, where one test hangs through the cargo shim loop
+0896fc29b docs(jit:28ccf9a9): own the pinned-read error and type removal, split the docume
+== prime start 12:03:46 load=0.44 4.47 8.23 free=71G head=0896fc29b
+== prime rc=1 end 12:05:34
+Excluded, and reported by the suite-build step: built in 38611 ms, warmed 17 executables (2051874352 bytes) in 70 ms.
+  ✓ suite-build: built in 38611 ms, warmed 17 executables (2051874352 bytes) in 70 ms (38683 ms)
+  ✗ test: FAILED (exit 100) (35581 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4167 ms)
+  ✓ suite-clock: 39764 ms
+  ✗ budget: FAILED (exit 1) (95 ms)
+waiting for load<4.08 (bound 20 min): 4.91 4.50 7.80 3/1483 541918 12:05:34
+== warm1 start 12:06:04 load=3.16 4.12 7.57 free=69G head=0896fc29b
+== warm1 rc=1 end 12:06:42
+Excluded, and reported by the suite-build step: built in 520 ms, warmed 17 executables (2051874352 bytes) in 66 ms.
+  ✓ suite-build: built in 520 ms, warmed 17 executables (2051874352 bytes) in 66 ms (589 ms)
+  ✗ test: FAILED (exit 100) (31467 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4216 ms)
+  ✓ suite-clock: 35698 ms
+  ✗ budget: FAILED (exit 1) (93 ms)
+waiting for load<4.08 (bound 20 min): 6.68 5.05 7.76 1/1459 590357 12:06:42
+waiting for load<4.08 (bound 20 min): 4.19 4.60 7.52 1/1458 590625 12:07:12
+== warm2 start 12:07:42 load=2.54 4.15 7.28 free=69G head=0896fc29b
+== warm2 rc=1 end 12:08:20
+Excluded, and reported by the suite-build step: built in 522 ms, warmed 17 executables (2051874352 bytes) in 68 ms.
+  ✓ suite-build: built in 522 ms, warmed 17 executables (2051874352 bytes) in 68 ms (593 ms)
+  ✗ test: FAILED (exit 100) (31481 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4177 ms)
+  ✓ suite-clock: 35674 ms
+  ✗ budget: FAILED (exit 1) (92 ms)
+waiting for load<4.08 (bound 20 min): 6.44 4.97 7.42 1/1441 638961 12:08:20
+== warm3 start 12:08:50 load=3.90 4.50 7.19 free=69G head=0896fc29b
+== warm3 rc=1 end 12:09:29
+Excluded, and reported by the suite-build step: built in 518 ms, warmed 17 executables (2051874352 bytes) in 67 ms.
+  ✓ suite-build: built in 518 ms, warmed 17 executables (2051874352 bytes) in 67 ms (588 ms)
+  ✗ test: FAILED (exit 100) (31472 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4164 ms)
+  ✓ suite-clock: 35652 ms
+  ✗ budget: FAILED (exit 1) (97 ms)
+waiting for load<4.08 (bound 20 min): 5.68 4.84 7.18 1/1470 687295 12:09:29
+== rebuild1 start 12:09:59 load=3.44 4.37 6.95 free=69G head=0896fc29b
+== rebuild1 rc=1 end 12:11:29
+Excluded, and reported by the suite-build step: built in 25249 ms, warmed 17 executables (2051874352 bytes) in 67 ms.
+  ✓ suite-build: built in 25249 ms, warmed 17 executables (2051874352 bytes) in 67 ms (25319 ms)
+  ✗ test: FAILED (exit 100) (31745 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4228 ms)
+  ✓ suite-clock: 35988 ms
+  ✗ budget: FAILED (exit 1) (94 ms)
+waiting for load<4.08 (bound 20 min): 5.17 4.40 6.71 1/1467 737090 12:11:29
+== rebuild2 start 12:11:59 load=3.13 3.98 6.49 free=69G head=0896fc29b
+== rebuild2 rc=1 end 12:13:30
+Excluded, and reported by the suite-build step: built in 25029 ms, warmed 17 executables (2051874352 bytes) in 68 ms.
+  ✓ suite-build: built in 25029 ms, warmed 17 executables (2051874352 bytes) in 68 ms (25100 ms)
+  ✗ test: FAILED (exit 100) (31531 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4189 ms)
+  ✓ suite-clock: 35736 ms
+  ✗ budget: FAILED (exit 1) (95 ms)
+waiting for load<4.08 (bound 20 min): 6.86 4.73 6.51 1/1466 786824 12:13:30
+waiting for load<4.08 (bound 20 min): 4.21 4.29 6.30 1/1466 787093 12:14:00
+== profile start 12:14:30 load=2.55 3.88 6.10 free=69G head=0896fc29b
+== profile rc=1 end 12:15:01
+measure-before rc=0 12:15:01
+
+## Before, 0896fc29b: nextest with that test excluded, doctests, profile
+0896fc29b docs(jit:28ccf9a9): own the pinned-read error and 
+== warm1 12:15:38 load=2.93
+nextest rc=0      Summary [  16.898s] 4673 tests run: 4673 passed, 1 skipped
+doctest rc=0 4224 ms test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
+0
+== warm2 12:17:07 load=3.96
+nextest rc=0      Summary [  16.890s] 4673 tests run: 4673 passed, 1 skipped
+doctest rc=0 4221 ms test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
+0
+== warm3 12:18:28 load=2.63
+nextest rc=0      Summary [  16.852s] 4673 tests run: 4673 passed, 1 skipped
+doctest rc=0 4199 ms test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
+0
+rebuild1 build 24821 ms
+== rebuild1 12:20:15 load=3.38
+nextest rc=0      Summary [  16.892s] 4673 tests run: 4673 passed, 1 skipped
+doctest rc=0 4263 ms test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
+0
+rebuild2 build 24929 ms
+== rebuild2 12:22:01 load=2.62
+nextest rc=0      Summary [  16.836s] 4673 tests run: 4673 passed, 1 skipped
+doctest rc=0 4224 ms test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
+0
+profile 12:22:52 load=3.51
+profile rc=0
+4673
+5.324 jit-server::server_integration$graceful_shutdown_tests::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero
+3.442 jit::cli_repo_workflow$profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op
+3.419 jit::cli_repo_workflow$profile_cli_tests::test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_its_files
+3.312 jit::jit$commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
+3.046 jit::jit$storage::claim_coordinator::proptests::prop_concurrent_claims_exclusive
+rc=0 12:23:10
+
+## Final tree, 613a46025, clean checkout: profile recorded in suite-profile.json, doctests
+head 613a46025
+start 12:34:01 load=1.23
+warm rc=0
+profile load=3.15
+profile rc=0
+doctest rc=0 2697 ms load=9.81
+{"source":{"dirty":false,"revision":"613a4602556d8db4b5660b82dd9173b557c8d0d1"},"n":4633,"max":3808,"over5":0}
+3808 jit::jit$commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
+3182 jit::jit$storage::claim_coordinator::proptests::prop_concurrent_different_issues_succeed
+rc=0
+
+## Before, 0896fc29b plus the c882f1f8 fixture fix: ./scripts/cargo-ci.sh
+
+100.00    0.000194           1       123           total
+Applied patch to 'scripts/cargo-ci-selftest.sh' cleanly.
+M  scripts/cargo-ci-selftest.sh
+0896fc29b docs(jit:28ccf9a9): own the pinned-read error and 
+== prime start 12:47:58 load=0.51 0.90 2.30 free=69G
+== prime rc=0 end 12:49:14
+  ✓ suite-build: built in 25115 ms, warmed 17 executables (2051874352 bytes) in 69 ms (25187 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17234 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4239 ms)
+  ✓ suite-clock: 21490 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21490ms (93 ms)
+== warm1 start 12:50:14 load=2.54 1.88 2.48 free=69G
+== warm1 rc=0 end 12:50:38
+  ✓ suite-build: built in 519 ms, warmed 17 executables (2051874352 bytes) in 69 ms (591 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17212 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4246 ms)
+  ✓ suite-clock: 21475 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21475ms (95 ms)
+== warm2 start 12:51:38 load=3.14 2.67 2.73 free=69G
+== warm2 rc=0 end 12:52:02
+  ✓ suite-build: built in 522 ms, warmed 17 executables (2051874352 bytes) in 70 ms (595 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17187 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4199 ms)
+  ✓ suite-clock: 21404 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21404ms (94 ms)
+== warm3 start 12:52:32 load=3.71 3.10 2.89 free=69G
+== warm3 rc=0 end 12:52:56
+  ✓ suite-build: built in 523 ms, warmed 17 executables (2051874352 bytes) in 69 ms (595 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17234 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4206 ms)
+  ✓ suite-clock: 21457 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21457ms (93 ms)
+== rebuild1 start 12:53:56 load=3.18 3.45 3.05 free=69G
+== rebuild1 rc=0 end 12:55:13
+  ✓ suite-build: built in 25608 ms, warmed 17 executables (2051874352 bytes) in 70 ms (25681 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17284 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4217 ms)
+  ✓ suite-clock: 21519 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21519ms (97 ms)
+== rebuild2 start 12:55:43 load=3.87 3.76 3.21 free=69G
+== rebuild2 rc=0 end 12:56:58
+  ✓ suite-build: built in 24846 ms, warmed 17 executables (2051874352 bytes) in 72 ms (24920 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17258 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4213 ms)
+  ✓ suite-clock: 21488 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21488ms (96 ms)
+rc=0 12:56:59
+
+
+## Cold profiled-fixture runs, 955aaa9a: sampler summary, pre-fix
+compile 36
+before rc 100 wall 60 samples 9 load max 25.98 load mean 17.7 dirtyMB max 7495 mean 5906
+8 busy lines
+        FAIL [  12.075s] (3137/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes
+        FAIL [  12.081s] (3138/4648) jit commands::validate::tests::test_validate_fix_leaves_a_drifted_profile_owned_target_unrepaired
+        FAIL [  12.096s] (3140/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs
+        FAIL [  12.105s] (3141/4648) jit commands::validate::tests::test_validate_silent_accepts_a_drifted_profile_owned_target
+        FAIL [  12.784s] (3153/4648) jit commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically
+        FAIL [  12.083s] (3770/4648) jit test_utils::tests::test_profiled_in_memory_repository_fixture_preserves_modes_and_clone_isolation
+        FAIL [  12.076s] (3772/4648) jit test_utils::tests::test_profiled_repository_fixture_clones_are_isolated_and_profiled
+     TIMEOUT [  20.444s] (3813/4648) jit commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged
+        FAIL [  12.099s] (4645/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_permission_error_classification
+     TIMEOUT [  20.197s] (4648/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_malformed_rules_validation_classification
+     Summary [  38.329s] 4648 tests run: 4638 passed, 8 failed, 2 timed out, 0 skipped
+        FAIL [  12.075s] (3137/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes
+        FAIL [  12.081s] (3138/4648) jit commands::validate::tests::test_validate_fix_leaves_a_drifted_profile_owned_target_unrepaired
+        FAIL [  12.096s] (3140/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs
+        FAIL [  12.105s] (3141/4648) jit commands::validate::tests::test_validate_silent_accepts_a_drifted_profile_owned_target
+        FAIL [  12.784s] (3153/4648) jit commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically
+        FAIL [  12.083s] (3770/4648) jit test_utils::tests::test_profiled_in_memory_repository_fixture_preserves_modes_and_clone_isolation
+        FAIL [  12.076s] (3772/4648) jit test_utils::tests::test_profiled_repository_fixture_clones_are_isolated_and_profiled
+     TIMEOUT [  20.444s] (3813/4648) jit commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged
+        FAIL [  12.099s] (4645/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_permission_error_classification
+     TIMEOUT [  20.197s] (4648/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_malformed_rules_validation_classification
+slowest [(4.588, 'est_profile_pack_and_add_carry_a_package_at_the_model_limits'), (5.01, 'dd_publishes_a_package_whose_directories_outnumber_its_files'), (6.128, 'reference_succeeds_over_an_event_log_
+slowest profiled [(0.298, 'rofiled_init_detects_projection_source_outside_final_capture'), (1.016, 'profile_cli_tests::test_profiled_init_publishes_a_valid_repo'), (1.073, '_partial_profiled_init_atom
+
+## Fixed, run 1: summary lines
+     Summary [  26.881s] 4651 tests run: 4651 passed, 0 skipped
+
+## Fixed, run 2: summary lines
+     Summary [  26.233s] 4651 tests run: 4651 passed, 0 skipped
+
+## Fixed, run 3: summary lines
+     Summary [  25.863s] 4651 tests run: 4651 passed, 0 skipped
+
+## Cold-fixture sampling script
+# usage: evidence.py <label> <writers> <mb> <spinners>
+import subprocess,time,os,re,sys,shutil,threading,json
+W='.agents/worktrees/agent-de880d9c'; os.chdir(W)
+S=os.path.dirname(os.path.abspath(__file__)); label,wr,mb,sp=sys.argv[1],int(sys.argv[2]),sys.argv[3],int(sys.argv[4])
+env=dict(os.environ,CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true')
+# the crate-source change: one comment byte, so every fixture key is new
+with open('crates/jit/src/lib.rs','a') as f: f.write(f'// cold-key {time.time()}\n')
+# compile unloaded: the link's dirty pages stay in the page cache for the test window
+s0=time.time(); assert subprocess.run(['cargo','nextest','run','--workspace','--no-run'],env=env,capture_output=True).returncode==0; print('compile',round(time.time()-s0))
+load=[subprocess.Popen(['python3',f'{S}/dirty.py',f'target/tmp/load{i}','100000',mb]) for i in range(wr)]
+load+=[subprocess.Popen(['nice','-n',os.environ.get('SPIN_NICE','0'),'python3','-c','while True: pass']) for _ in range(sp)]
+samples=[]; stop=threading.Event()
+def sample():
+    while not stop.wait(5):
+        d=re.search(r'Dirty:\s+(\d+)',open('/proc/meminfo').read()).group(1)
+        samples.append((float(open('/proc/loadavg').read().split()[0]),int(d)//1024))
+threading.Thread(target=sample,daemon=True).start()
+log=f'{S}/evidence-{label}.log'; t=time.time()
+try:
+    with open(log,'w') as f:
+        rc=subprocess.run(['cargo','nextest','run','--workspace','--no-fail-fast'],stdout=f,stderr=subprocess.STDOUT,env=env).returncode
+finally:
+    stop.set()
+    for p in load: p.terminate()
+    for p in load: p.wait()
+    for i in range(wr): shutil.rmtree(f'target/tmp/load{i}',ignore_errors=True)
+    subprocess.run(['git','checkout','--','crates/jit/src/lib.rs'])
+txt=open(log).read()
+print(label,'rc',rc,'wall',round(time.time()-t),'samples',len(samples),'load max',max(s[0] for s in samples),'load mean',round(sum(s[0] for s in samples)/len(samples),1),'dirtyMB max',max(s[1] for s in samples),'mean',sum(s[1] for s in samples)//len(samples))
+print(txt.count(' is busy'),'busy lines')
+print('\n'.join(l[:170] for l in txt.splitlines() if re.search(r'Summary|^ +(FAIL|TIMEOUT)',l))[-3500:])
+ds=[(float(m.group(1)),m.group(2)) for m in re.finditer(r'PASS \[\s*([\d.]+)s\] \(\s*\d+/\d+\) (.*)',txt)]
+print('slowest',[(d,n[-60:]) for d,n in sorted(ds)[-5:]])
+fx=[(d,n[-60:]) for d,n in ds if 'profiled' in n]
+print('slowest profiled',sorted(fx)[-3:])
+
+## Final tree, 3a1326070, clean checkout: ./scripts/cargo-ci.sh and the profile recorded in suite-profile.json
+head 3a1326070
+== prime start 13:13:27 load=2.59 3.44 2.92
+== prime rc=0 end 13:14:12
+  ✓ suite-build: built in 516 ms, warmed 18 executables (2096874448 bytes) in 71 ms (591 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11894 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2724 ms)
+  ✓ suite-clock: 14635 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14635ms (97 ms)
+== warm1 start 13:14:42 load=3.46 3.58 3.01
+== warm1 rc=0 end 13:14:59
+  ✓ suite-build: built in 514 ms, warmed 18 executables (2096874448 bytes) in 73 ms (590 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11902 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2705 ms)
+  ✓ suite-clock: 14625 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14625ms (97 ms)
+== warm2 start 13:15:29 load=3.12 3.57 3.04
+== warm2 rc=0 end 13:15:46
+  ✓ suite-build: built in 515 ms, warmed 18 executables (2096874448 bytes) in 70 ms (588 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11939 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2726 ms)
+  ✓ suite-clock: 14682 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14682ms (95 ms)
+== rebuild1 start 13:16:16 load=3.76 3.84 3.16
+== rebuild1 rc=0 end 13:17:37
+  ✓ suite-build: built in 37477 ms, warmed 18 executables (2096874448 bytes) in 73 ms (37553 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11960 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2691 ms)
+  ✓ suite-clock: 14668 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14668ms (93 ms)
+== warm3 start 13:18:07 load=3.71 3.88 3.26
+== warm3 rc=0 end 13:18:24
+  ✓ suite-build: built in 513 ms, warmed 18 executables (2096874448 bytes) in 72 ms (588 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11971 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2710 ms)
+  ✓ suite-clock: 14699 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14699ms (96 ms)
+profile load=3.28
+profile rc=0
+{"source":{"dirty":false,"revision":"3a13260701100ef1b20e3c8aa6c4486f84e0165e"},"n":4601,"max":3495,"over5":0}
+3495 jit::jit$commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
+rc=0 13:19:49

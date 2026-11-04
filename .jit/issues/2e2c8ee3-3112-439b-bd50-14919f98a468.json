@@ -1,0 +1,39 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-04T12:01:19.480884506Z",
+  "context": {},
+  "created_at": "2026-11-04T12:01:01.782807190Z",
+  "dependencies": [],
+  "description": "Every AI review prompt treats user decisions recorded on the reviewed issue as binding, so a decision the user made is never re-litigated by one review while another honours it.\n\n## Background\n\nThe code-review and doc-review prompts carry a \"User decisions\" section: `decision` items (`D-NN`) under an issue's `## Decisions` heading bind the review, a blocking finding whose only remedy a decision forecloses is not raised, and a contradicted factual premise is an advisory finding citing the decision's address. The holistic-review prompt has no such section, so a container review re-raised a finding the user had accepted in a recorded decision. The plan-review and breakdown-review prompts bind only decisions the plan or manifest cites, which does not cover a user decision recorded on the container itself. Nothing checks that the prompts carry the section, so it can drift out of any of them unnoticed.\n\n## Success Criteria\n\n- [hard] REQ-01: The holistic-review, plan-review and breakdown-review prompts carry the \"User decisions\" section worded identically to the code-review prompt's.\n- [hard] REQ-02: The repository's mechanical documentation checks fail when any of the five review prompts (code, doc, holistic, plan, breakdown) lacks that section's binding sentence or carries it more than once.\n\n## Notes\n\n- The prompts are repository-local gate configuration, drawn into the dogfood profile package as live assets.\n",
+  "documents": [],
+  "done_at": "2026-11-04T12:09:20.810210317Z",
+  "first_ready_at": "2026-11-04T12:01:01.782807190Z",
+  "gates_required": [
+    "docs-mechanical",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "run_id": "99beba09-912b-40a6-905b-98cc430f96d7",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:09:20.600549268Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "9b6a4069-d5a5-45b1-aa94-7f06832d3898",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:04:41.576153944Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "2e2c8ee3-3112-439b-bd50-14919f98a468",
+  "labels": [
+    "milestone:v1.0",
+    "component:gates",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Every review prompt binds user decisions",
+  "updated_at": "2026-11-04T12:09:20.810210317Z"
+}

@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./.agents/skills/jit-project-lead/scripts/test-standards-fix.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:14:25.937609367Z",
+  "duration_ms": 2103,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "standards-fix-test",
+  "inputs_digest": "757dda6f1cfb19898530fdd0f208c821747cc8b502162df3ea041e74114301ec",
+  "issue_id": "7495521e-8338-4ef8-82b9-cb4ddf182739",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "678dd17d-8ee3-4e04-86f7-5b307ae09e54",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:14:23.833856628Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "\u001b[0;32m✓\u001b[0m fixer exits 0\n\u001b[0;32m✓\u001b[0m REQ-01/02: no fixable mechanical finding remains after fixer\n\u001b[0;32m✓\u001b[0m sanity: REQID present before\n\u001b[0;32m✓\u001b[0m REQ-02: REQID gone after\n\u001b[0;32m✓\u001b[0m REQ-02: no new UNMARKED on fixed MALF\n\u001b[0;32m✓\u001b[0m REQ-02: UNMARKED gone after\n\u001b[0;32m✓\u001b[0m REQ-02: TITLE-EMBEDDED-ID gone after\n\u001b[0;32m✓\u001b[0m sanity: hex+slash title flagged before\n\u001b[0;32m✓\u001b[0m REQ-02: hex+slash TITLE gone after\n\u001b[0;32m✓\u001b[0m sanity: leading position-code flagged before\n\u001b[0;32m✓\u001b[0m REQ-02: leading position-code TITLE gone after\n\u001b[0;32m✓\u001b[0m mid-title position code never flagged\n\u001b[0;32m✓\u001b[0m REQ-02: SC-MISSING gone after\n\u001b[0;32m✓\u001b[0m REQ-02: HEADING-H1 gone after\n\u001b[0;32m✓\u001b[0m REQ-02: HEADING-DEEP gone after\n\u001b[0;32m✓\u001b[0m REQ-02: ANTIPATTERN-SECTION gone after\n\u001b[0;32m✓\u001b[0m REQ-03 well-formed criterion preserved verbatim\n\u001b[0;32m✓\u001b[0m REQ-04: records UNMARKED fix\n\u001b[0;32m✓\u001b[0m REQ-04: records 4 REQID fixes\n\u001b[0;32m✓\u001b[0m REQ-04: records TITLE fix\n\u001b[0;32m✓\u001b[0m REQ-04: records SC-MISSING fix\n\u001b[0;32m✓\u001b[0m REQ-04: records HEADING-H1 fix\n\u001b[0;32m✓\u001b[0m REQ-04: records HEADING-DEEP fix\n\u001b[0;32m✓\u001b[0m REQ-04: records ANTIPATTERN fix\n\u001b[0;32m✓\u001b[0m REQ-04: records exhausted-id skip\n\u001b[0;32m✓\u001b[0m exhausted-id criterion stays unmarked\n\u001b[0;32m✓\u001b[0m REQ-03: judgment LABEL-SLUG not recorded by fixer\n\u001b[0;32m✓\u001b[0m title stripped to clean form\n\u001b[0;32m✓\u001b[0m hex+slash title stripped to clean form\n\u001b[0;32m✓\u001b[0m leading position-code title stripped to clean form\n\u001b[0;32m✓\u001b[0m REQ-03: mid-title position-code title left unchanged\n\u001b[0;32m✓\u001b[0m REQ-03: clean issue left unchanged\n\u001b[0;32m✓\u001b[0m REQ-03: clean issue still reports zero findings\n\u001b[0;32m✓\u001b[0m REQ-03: judgment-only issue left unchanged\n\u001b[0;32m✓\u001b[0m REQ-03: STANDALONE judgment still reported\n\u001b[0;32m✓\u001b[0m REQ-03: mixed UNMARKED corrected\n\u001b[0;32m✓\u001b[0m REQ-03: mixed STANDALONE untouched\n\u001b[0;32m✓\u001b[0m REQ-03: mixed judgment line preserved verbatim\n\u001b[0;32m✓\u001b[0m REQ-03: judgment 8-hex label left unchanged\n\u001b[0;32m✓\u001b[0m REQ-03: judgment-only document left byte-identical\n\u001b[0;32m✓\u001b[0m idempotent: second run applies no correction\n\n========================================\n\u001b[0;32mPassed: 41\u001b[0m\n\u001b[0;32mAll tests passed!\u001b[0m\n"
+}

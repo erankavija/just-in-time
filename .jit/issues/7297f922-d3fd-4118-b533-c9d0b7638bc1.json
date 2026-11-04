@@ -8,6 +8,7 @@
   ],
   "description": "Prove, with a counting stand-in configured as the git executable, that `query available` and `issue show` start at most one git process in a primary checkout and in a linked checkout.\n\n## Background\n\n- Layout detection is one probe process per invocation, and issue reads use the checkout's own data root plus, in a linked checkout, the primary checkout's data root, with no git process.\n- `jit::test_harness` provides a counting stand-in: a `git` file in its own directory that records each invocation and runs the real git. Prepending that directory to the spawned `jit` process's `PATH` configures it as the git executable for that child only, so no process-wide state changes.\n- Before the probe collapsed to one process, both commands started three `git rev-parse` processes in a primary checkout; in a linked checkout they also started one `git show` per issue missing locally.\n- The `cli_repo_workflow` suite gathers its tests as modules listed in `crates/jit/tests/cli_repo_workflow/main.rs`, so a new module adds no test target (`@/inv/bounded-rust-build-footprint`).\n\n## Success Criteria\n\n- [hard] REQ-01: A `cli_repo_workflow` module runs `jit query available --json` and `jit issue show <id> --json` in a primary checkout with the stand-in first on `PATH`, and asserts that each records at most one git invocation.\n- [hard] REQ-02: The module runs both commands in a linked checkout for an issue that only the primary checkout's data root holds, and asserts that each reads the issue and records at most one git invocation.\n- [hard] REQ-03: A failing assertion prints the recorded invocations.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T15:24:28.560623130Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "satisfies:f4d9502a/REQ-07"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "CLI test bounds the git processes of issue reads",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-01T15:24:28.560623130Z"
 }

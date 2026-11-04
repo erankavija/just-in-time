@@ -216,7 +216,8 @@ jit archive container 2f84c930 --execute --json
 Both target forms use the same planner. Without `--execute`, they are read-only.
 A document target
 includes its recursively supported local bundle. A container target includes
-documents attached to the container and its resolved-hierarchy descendants;
+documents attached to the container and its resolved-hierarchy descendants,
+plus the files under their artifact directories, which they own by location;
 ordinary sequencing dependencies do not define membership.
 
 Human output reports the same target, policy status, eligibility, action counts,
@@ -227,7 +228,9 @@ short IDs. JSON retains full durable IDs in owner and target records.
 For a preview, `--json` prints the schema-version-1 artifact-plan object directly. Its top-level
 fields are `schema_version`, `target`, `destination_root`, `eligible`,
 `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
-`warnings`; it does not add a `message` field. Artifact order is deterministic
+`plan_warnings`; each artifact entry also names its structured diagnostics
+`plan_warnings`. Execution results use the same field name. A preview does not
+add a `message` field. Artifact order is deterministic
 by normalized source path and version. Each blocker carries `code` and `path`;
 a blocker caused by lifecycle state (`non-terminal-target`,
 `document-non-terminal-owner`) additionally carries a `guidance` string naming
@@ -248,9 +251,11 @@ carry no action and no blocker, so eligibility, `--execute`, and issue
 transitions all behave as they would with no citation present. Execution
 relocates bytes and relinks document records while rewriting no document
 content, so a citing file survives byte for byte and keeps a stale citation
-until an adopter edits it. Its JSON `warnings` array and human `warning:` lines
+until an adopter edits it. Its JSON `plan_warnings` array and human `warning:` lines
 include the same warning set that a preview computed immediately before the
 unchanged run, so either command reports the stale citations the run leaves.
+The structured JSON field is `plan_warnings` on both preview and execution
+results; human output continues to label them as warnings.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
@@ -268,8 +273,9 @@ The JSON shape is exactly
 `candidates` is the complete schema-version-1 target-plan object described
 above, not a summary: policy status, ownership, action counts, artifacts,
 evidence, warnings, and all blockers (including destination conflicts) remain
-available. Human output renders the identical evaluated list and retains the
-reasons an entry is ineligible. Candidate order is deterministic by full target
+available. The structured diagnostic list is named `plan_warnings` on each
+plan and artifact entry. Human output renders the identical evaluated list and
+retains the reasons an entry is ineligible. Candidate order is deterministic by full target
 ID, while the human view identifies targets by short ID.
 
 An issue-linked path that exists but is not a regular file or symbolic link
@@ -408,7 +414,7 @@ stable no-op rerun appends no event.
 For execution, `--execute --json` prints a distinct schema-version-1 execution
 result. Its top-level fields are `schema_version`, `target`,
 `destination_root`, `publications`, `reference_changes`, `planned_deletions`,
-`deleted_sources`, `warnings`, `event_appended`, and `reconciling`.
+`deleted_sources`, `plan_warnings`, `event_appended`, and `reconciling`.
 `publications` reports each newly published or newly adopted destination with
 its source, SHA-256/byte-size identity, and `adopted` flag. The two deletion
 arrays distinguish removals recorded before
@@ -447,6 +453,7 @@ it from a client; the generation model in brief:
   [`mcp-server/curated-tools.json`](../../mcp-server/curated-tools.json).
 - **Full set on demand.** Setting `JIT_MCP_ALL_TOOLS=1` in the server's
   environment exposes every generated tool, not just the curated subset.
+  `jit worktree exec` generates no tool, flag or no flag.
 
 ### See Also
 
@@ -459,18 +466,13 @@ it from a client; the generation model in brief:
 
 ### Multi-Value Arguments
 
-**Flagged arguments** (e.g., `--label`, `--gate`) support **both** comma-separated and repeated flags:
+**Flagged arguments** (e.g., `--label`, `--gate`) take one value per repetition of the flag:
 
 ```bash
-# Comma-separated (compact)
-jit issue create --title "Task" --label epic:auth,type:task,component:core
-
-# Repeated flags (explicit)
 jit issue create --title "Task" --label epic:auth --label type:task --label component:core
-
-# Mixed (also works)
-jit issue create --title "Task" --label epic:auth,type:task --label component:core
 ```
+
+A comma is part of the value, never a separator: `--label epic:auth,type:task` names one malformed label, which the label-format rule blocks unless `--force` is passed. Gate-key and field flags always fail on a comma. `--remove-label` removes a stored label of that exact name and fails only when the issue lacks it.
 
 **Applies to:** `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`, `--except`, `--fields`
 
@@ -614,9 +616,9 @@ lists it under `modified_paths`; if it already carried the block, neither list
 mentions it.
 
 `repository_id` is `null` outside a git repository. The
-repository-format-too-new startup failure (see **Scripting and Automation
+unsupported-repository-format startup failure (see **Scripting and Automation
 § Exit Codes** below) emits the standard `--json` error envelope
-(`REPOSITORY_FORMAT_TOO_NEW` / exit `10`).
+(`REPOSITORY_FORMAT_UNSUPPORTED` / exit `10`).
 
 When `--profile` is present, `profile` contains the same
 `ProfileComposedApplyResult` returned by `jit profile apply`; dependency-only
@@ -630,8 +632,7 @@ the current JIT repository and applies a leftover redo record before planning or
 writing.
 
 Profile commands that select packages take one or more repeatable `--profile <DIR>` flags,
-each a package directory path relative to the worktree; an `id:` or `path:`
-prefix is refused.
+each a bare package directory path relative to the worktree.
 `jit init` accepts the same ordered selector stream. A selector is confined
 to the worktree, including when the data root is nested there.
 
@@ -653,11 +654,14 @@ jit profile show --profile <DIR>... [--json]
 
 Each repeatable `--profile` selector is a package directory path.
 
-Human output summarizes each package's identity, compatibility, hashes,
-and contribution and asset counts. JSON returns the
+Human output summarizes each package's identity, compatibility, package hash,
+file count and size, and target paths. JSON returns the
 count-wrapped `ProfileShowResult` collection `{"count": N, "profiles": [...]}`;
-each entry carries `id`, `version`, the complete parsed manifest, `origin`, `package_hash`,
-`target_hashes`, `file_count`, and `byte_size`. Entries preserve every `--profile`
+each entry carries `id`, `version`, the complete parsed manifest, `origin` (the package's
+worktree-relative directory path), `package_hash`,
+`targets` (the sorted set of repository paths the package writes), `file_count`,
+and `byte_size`. Version requirements in the manifest render normalized, such
+as `>=1.0.0, <2.0.0`. Entries preserve every `--profile`
 occurrence in order, including repeated selectors. `show` does not compare the
 package with current target bytes; use `jit profile apply --profile <DIR>
 --dry-run` to rehearse one package's application.
@@ -675,11 +679,14 @@ The selection is resolved, closed over the packages it depends on, and planned
 through the same preparation a publication runs, so the report is the decision
 the publication would act on rather than a second opinion about it. For each
 participating profile it states every target that profile decided: the values it
-would `create` or `update`, the ones already `unchanged`, and the targets it
-cannot publish at all (`conflict`), each with its reason. A conflict arises only
-when selected packages define one target or declaration differently, and its
-reason names those packages; the repository's current content is never a party
-to it.
+would `create` or `update`, the derived files it would `remove`, the ones already
+`unchanged`, and the targets it cannot publish at all (`conflict`), each with its
+reason. The targets include every file the publication writes, among them the
+default schemas it derives from a changed registry. The event log is left out:
+a publication only appends its lifecycle event there. A conflict arises only
+when packages with no dependency path between them define one target or
+declaration differently, and its reason names those packages; the repository's
+current content is never a party to it.
 
 Beside those targets it states the registry declarations that profile decided,
 in the same vocabulary and each named by its semantic identity — the registry,
@@ -698,14 +705,16 @@ select its directory to inspect it before applying it.
 
 Human output shows one line per profile with its ID, version, origin, and status, then one line per
 decision with its action — targets first, then declarations — and the
-reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
-`{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
-return, with `status` additionally reporting `would_conflict`.
+reason beneath one that cannot be published. JSON returns the count-wrapped `ProfileComposedApplyResult` collection
+`{"count": N, "profiles": [...]}`, the same shape `jit profile apply` returns,
+with `status` additionally reporting `would_conflict`. A selection whose
+proposed repository fails final validation, such as one leaving a configured
+projection stale, also reports `would_conflict`, with `refusal` stating why on
+each profile that would publish.
 
 The report writes nothing: no target and no audit event.
 It exits `0` when every participating profile can be published and `4` when any
-decided a target or a declaration that cannot be, so it serves as a repository
-check. The report
+cannot be, so it serves as a repository check. The report
 is the answer either way, carried by the shared typed error envelope when the
 command exits `4`.
 
@@ -723,29 +732,48 @@ jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VAL
 ```
 
 `--values-file` and `--set` use the same variable inputs as profiled init.
-`--dry-run` builds and validates the exact plans without writing. JSON returns
-the count-wrapped `ProfilePlanResult` collection
-`{"count": N, "profiles": [...]}`. It reports dependency-only packages once
-before every selected root occurrence in selector order, exactly like the run
-it rehearses. Each entry includes `id`, `version`, `origin`, `status`
-(`would_apply` or `unchanged`), and the sorted target and
-declaration lists in the vocabulary [`jit profile diff`](#jit-profile-diff)
-documents. A repeated root's later observations are `unchanged` and carry no
-decisions. A rehearsal fails where its publication would, so it never reports a
-`conflict`; read `jit profile diff` to see one.
+`--dry-run` runs the same computation without writing, so it fails where the
+application would, final validation included, and so never reports a `conflict`;
+read `jit profile diff` to see one.
 
-Without `--dry-run`, JSON returns `ProfileComposedApplyResult`, the standard
-count-wrapped envelope `{"count": N, "profiles": [...]}` holding one
-`ProfileApplyResult` per corresponding rehearsal observation. Each entry carries
-`id`, `version`, `origin`, `status` (`applied` or `unchanged`), and the target
-and declaration decisions in the shared vocabulary. Exact reapplication of a whole
-set is a successful no-op. Human output uses the same identity, origin, status,
-and per-target decisions. Application
+Both forms return `ProfileComposedApplyResult` as JSON, the count-wrapped envelope
+`{"count": N, "profiles": [...]}`. It reports dependency-only packages once
+before every selected root occurrence in selector order. Each `ProfileApplyResult`
+carries `id`, `version`, `origin`, `status` (`applied`, or `would_apply` under
+`--dry-run`, or `unchanged`), and the sorted target and declaration lists in the
+vocabulary [`jit profile diff`](#jit-profile-diff) documents. A repeated root's
+later observations are `unchanged` and carry no decisions. Exact reapplication
+of a whole set is a successful no-op. Human output renders the same entries.
+Application
 and all coupled derived targets publish through that one redo record, with
 strict managed-region composition as described in
 [Repository Profiles](profiles.md).
 
-Unknown IDs are not-found errors (exit `3`). A dependency that resolves through
+In a git repository, apply refuses with `PROFILE_UNCOMMITTED_TARGETS` (exit
+`4`) while a path it would write differs from HEAD (modified, staged, or
+untracked), and `--dry-run` refuses the same way. Each written path is judged by
+the checkout that holds it, and a path in no checkout is never refused. The
+error's `details.paths` lists each such path and `details.resolution` states
+that committing or discarding those changes lets the apply proceed; the
+repository is left byte-identical. Without git, apply proceeds, so read
+[`jit profile diff`](#jit-profile-diff) first. `jit init --profile` over an
+absent data root is exempt.
+
+```json
+{
+  "error": {
+    "code": "PROFILE_UNCOMMITTED_TARGETS",
+    "message": "profile application would overwrite uncommitted changes in .jit/config.toml; commit or discard those changes and the apply can proceed",
+    "details": {
+      "paths": [".jit/config.toml"],
+      "resolution": "commit or discard those changes and the apply can proceed"
+    }
+  }
+}
+```
+
+A selector naming no readable package directory fails with `PROFILE_ERROR`
+(exit `1`). A dependency that resolves through
 no route fails the application before anything is written, naming the package
 that declared it beside the one that could not be found; declared dependencies
 that close a cycle fail the same way, naming the cycle. Conflicts, invalid
@@ -827,10 +855,10 @@ with ordinary tools still reads.
 
 A refused add publishes nothing and leaves no partially extracted package: the
 archive is read into memory and the whole tree is published through one redo
-record, exactly as a capture is.
+record, like every other repository mutation.
 
 `--dry-run` performs the same archive validation and reports the exact package
-tree publication without writing the destination, provenance, or an event.
+tree publication without writing the destination or an event.
 
 JSON uses the standard `{"count": N, "profiles": [...]}` envelope. Its single
 entry reports `id`, `version`, `origin`, `package_hash`, `archive`, `destination`,
@@ -898,12 +926,11 @@ jit issue create --title <TITLE> [OPTIONS]
 | `--description-file <PATH>` | Read the issue body from `PATH`, or from standard input when `PATH` is `-`; content is stored verbatim, including trailing newlines. Mutually exclusive with `--description`. |
 | `-p`, `--priority <PRIORITY>` | `low`, `normal` (default), `high`, or `critical`. |
 | `--type <KIND>` | Issue type, written as a `type:<kind>` label. Must be declared in `[type_hierarchy]` in `config.toml`. Long-only, because `-t` is `--title`. |
-| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
-| `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable and comma-separated. |
+| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
+| `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
-| `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
-| `--orphan` | Suppress the workflow profile's `orphan-leaf` hint for an issue deliberately created without a container. |
-| `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
+| `--force` | Create the issue despite blocking (`enforce = true`) rule failures; each bypassed failure is recorded as a `local_rule_bypassed` event, not reported in `findings`. Non-blocking findings are reported either way. |
+| `--json` | Emit the created issue as the `issue show` object, plus `findings` and a `message` field. |
 
 ```bash
 jit issue create "Fix login bug"
@@ -920,9 +947,16 @@ afterwards (`jit dep add`) is what moves it back to `Backlog` until the
 dependency becomes effectively terminal (done, rejected, or archived from one
 of those).
 
+**Findings.** Creation reports the rule findings concerning the new issue: the
+non-blocking local-rule findings, then the graph-rule findings over the
+repository with the issue added. Reported findings never block creation; a
+blocking rule failure refuses it unless `--force` bypasses that failure, which is
+then recorded as an event rather than reported. JSON carries the findings as
+`findings`; human output prints one `<severity> [<rule>] <message>` line per
+finding after the created id.
+
 Under `--quiet` the command prints only the new issue's id, which is what
-scripts capture. Validation warnings go to stderr, so they never pollute that
-capture.
+scripts capture.
 
 ### Updating Issues (`jit issue update`)
 
@@ -943,11 +977,11 @@ jit issue update --filter <QUERY> [OPTIONS]
 | `--append-description <TEXT>` | Append `TEXT` to the description. |
 | `--append-description-file <PATH>` | Append the contents of `PATH` (`-` reads stdin) to the description. |
 | `-p`, `--priority <PRIORITY>` | `low`, `normal`, `high`, or `critical`. |
-| `-s`, `--state <STATE>` | Requested lifecycle state. |
+| `-s`, `--state <STATE>` | Requested lifecycle state. `rejected` is refused with exit code `2`; see Rejecting Issues. |
 | `--type <KIND>` | Replace the issue's `type:*` label with `type:<kind>`. Long-only. |
-| `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable and comma-separated; adds to the existing set. |
-| `--remove-label <LABEL>` | Remove labels. Repeatable and comma-separated. |
-| `--add-gate <GATE>` | Require additional registered gates. Repeatable and comma-separated. |
+| `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable; adds to the existing set. |
+| `--remove-label <LABEL>` | Remove labels. Repeatable. Single-issue mode fails, removing nothing, when the issue lacks any named label. |
+| `--add-gate <GATE>` | Require additional registered gates. Repeatable. |
 | `--remove-gate <GATE>` | Drop gates from the issue's requirements. |
 | `--assignee <ASSIGNEE>` | Set the assignee, in `type:identifier` form. |
 | `--unassign` | Clear the assignee. |
@@ -1017,15 +1051,15 @@ jit issue update --filter "assignee:agent:worker-1" --assignee "agent:worker-2"
 jit issue update --filter "label:epic:auth" --priority critical
 
 # Complex queries with AND/OR/NOT
-jit issue update --filter "state:ready AND NOT assignee:* AND priority:high" --assignee "agent:worker-1"
+jit issue update --filter "state:ready AND unassigned AND priority:high" --assignee "agent:worker-1"
 
 # Remove labels from multiple issues
 jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 ```
 
 **Bulk operation semantics:**
-- **Literal updates:** Sets exactly what you specify (no auto-transitions)
-- **Atomic per-issue:** Each issue update publishes its own redo record
+- **Literal updates:** Sets exactly what you specify on each matched issue
+- **Atomic per-issue:** Each issue update publishes its own redo record, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle)
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
 
@@ -1105,11 +1139,11 @@ at the first) and, on any failure, creates **zero** issues and exits with code
 - labels that are not `namespace:value`,
 - gates not present in the gate registry.
 
-On success, issues, index membership, events, and dependency edges publish as one
+On success, issues, events, and dependency edges publish as one
 redo record.
 
 **Dry-run.** `--dry-run` performs the same native validation and preserves exit
-code `2` for validation errors, but allocates no ids and writes no issues, index,
+code `2` for validation errors, but allocates no ids and writes no issues,
 events, or edges. Human output reports counts. JSON returns:
 
 ```json
@@ -1117,14 +1151,16 @@ events, or edges. Human output reports counts. JSON returns:
 ```
 
 **Output.** On success the command returns the `{key: full_id}` map. With
-`--json` the output is EXACTLY that map as the top-level JSON object — every
-entry is a symbolic key mapping to the created issue's full id, with no envelope
-or `message` field (keys are emitted sorted). Human output lists each `key -> id`.
+`--json` the success envelope carries it as `ids`, mapping each symbolic key to
+the created issue's full id. Human output lists each `key -> id`.
 
 ```json
 {
-  "impl": "54a9f64c-7117-483e-b59d-3ccc16c5b55e",
-  "spec": "48453126-9f6b-4f7a-a5a6-cb30ef833f92"
+  "ids": {
+    "impl": "54a9f64c-7117-483e-b59d-3ccc16c5b55e",
+    "spec": "48453126-9f6b-4f7a-a5a6-cb30ef833f92"
+  },
+  "message": "Created 2 issue(s)"
 }
 ```
 
@@ -1181,7 +1217,7 @@ jit issue show abc123 --field state          # -> ready
 jit issue show abc123 --field title          # -> Implement login
 
 # Project several fields as one COMPACT JSON object (requested key order preserved)
-jit issue show abc123 --fields state,title   # -> {"state":"ready","title":"Implement login"}
+jit issue show abc123 --fields state --fields title   # -> {"state":"ready","title":"Implement login"}
 
 # Show multiple issues as the list envelope (argument order preserved)
 jit issue show abc123 def456 --json          # -> {"count":2,"issues":[ {...}, {...} ]}
@@ -1205,7 +1241,7 @@ projection rules and their current members in
 - `--field <name>` prints the field as plain text: string fields print raw
   (unquoted), scalar fields (number/bool/null) print their value, and
   array/object fields fall back to compact JSON for that field.
-- `--fields a,b,c` prints `{"a":...,"b":...,"c":...}` as a single compact JSON
+- `--fields a --fields b --fields c` prints `{"a":...,"b":...,"c":...}` as a single compact JSON
   object, keeping the requested order.
 - An unknown field name (or any unknown name in `--fields`) is a usage error
   (exit code `2`).
@@ -1446,7 +1482,7 @@ use `jit issue assign <id> <assignee>` (or `jit issue claim <id> <assignee>
 
 ### Rejecting Issues
 
-Use `jit issue reject` to close an issue without implementation:
+`jit issue reject` is the only command that rejects an issue, and `jit issue update` refuses the `rejected` state. It closes an issue without implementation:
 
 ```bash
 # Reject with reason
@@ -1463,7 +1499,7 @@ jit issue reject $ISSUE --reason "wont-fix" --quiet
 - **Bypasses gates:** Can reject from any state, even with failing gates
 - **Closure outcome:** Records rejection without dependency or gate checks; do not
   treat it as an enforced no-return source state for later `issue update` calls
-- **Optional reason:** `--reason` adds a `resolution:*` label in the same mutation as the rejection, so a failure leaves neither
+- **Optional reason:** `--reason` adds a `resolution:<reason>` label in the same mutation as the rejection, so a failure leaves neither. A reason that cannot form a valid label (spaces, punctuation, empty) is refused with exit code 2 before anything is written; put prose in the issue description instead
 - **Immediate:** No validation or gate checks
 
 **Common rejection reasons:**
@@ -1544,7 +1580,7 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 ```
 
 **Arguments:**
-- `KEY` - Unique identifier (e.g., `tests`, `code-review`, `security-scan`)
+- `KEY` - Unique lowercase-kebab identifier (e.g., `tests`, `code-review`, `security-scan`); any other spelling is rejected with exit code `2`
 
 **Required Options:**
 - `--title <TITLE>` - Human-readable name
@@ -1606,7 +1642,8 @@ registry file. Only the fields you pass change; every other field keeps its
 current value. The gate KEY is the gate's identity and cannot be changed. This
 edits the registry definition only; per-issue gate status (`gates_status`) is
 left untouched. The registry change and its `gate_definition_updated` event
-publish as one redo record.
+publish as one redo record. Refuses when another agent leases an issue that
+requires the gate.
 
 **Usage:**
 ```bash
@@ -1879,6 +1916,9 @@ jit gate status-all <ISSUE_ID> [--json] [--full]
   / `failed` / `pending`) so a caller can tell a failed gate from a pending one.
   `all_passed` mirrors the exit contract. `--full` includes stdout/stderr for
   passing automated runs (failing runs always include them).
+- When a gate has not passed, `--json` prints the failure envelope with code
+  `GATE_FAILED` and this report under `error.details`; when all gates have passed
+  it prints the report as the success envelope.
 
 The singular [`jit gate status`](#jit-gate-status) carries the history
 (`--all` / `--limit` / `--status`) and flat (`--stdout` / `--stderr` / `--tail`)
@@ -1931,11 +1971,12 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence — a gate-run record carrying the attestor and time, and a new event — including when the same attestor already passed the gate. Verdict reuse never applies to an attestation. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
-- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence — a gate-run record carrying the attestor and time, and a new event — including when the same attestor already passed the gate. Verdict reuse never applies to an attestation.
+- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required.
 - A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
 - The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
-- After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
+- A pass that clears the last unpassed gate of a `gated` issue moves it to `done`, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle); an enforcing `done` rule that blocks the move is reported and leaves it `gated`. A failed gate, or a pass on an issue in any other state, leaves the state unchanged.
+- `jit issue update <id> --state done` completes an `in_progress` issue whose required gates have passed, and succeeds without change on an issue already `done`.
 
 **Verdict reuse over unchanged declared inputs:**
 - A gate that declares the repository files its checker reads
@@ -1947,8 +1988,8 @@ jit gate evaluate abc123 --gate tests --force
   checker's verdict is available to every issue evaluated over that content.
 - `jit gate status <id> <gate> --json` reports the run's `inputs_digest` and an
   `origin` of `{"derivation": "executed"}` or
-  `{"derivation": "reused", "source_run": "<run-id>"}`, so a reused verdict is
-  never counted as an independent verification.
+  `{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}`,
+  so a reused verdict is never counted as an independent verification.
 - A gate declaring no inputs executes its checker on every evaluation.
 - `--force` executes the checker unconditionally.
 
@@ -1981,7 +2022,6 @@ jit gate evaluate abc123 tests --json
 #   "key": "tests",
 #   "status": "passed",
 #   "verdict": "pass",
-#   "warnings": [],
 #   "message": "Passed gate 'tests' for issue abc123"
 # }
 
@@ -2020,7 +2060,8 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
-  per gate (`key`, `status`, `verdict`, `warnings`). On the first
+  per gate (`key`, `status`, `verdict`); each gate's warnings join the
+  envelope's `warnings`, prefixed with `(<gate>): `. On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
   `error.details.key` naming the offending gate, and `error.details.verdict`
   `fail` or `error`).
@@ -2033,8 +2074,8 @@ jit gate evaluate-all abc123 --json
 #   "status": "passed",
 #   "verdict": "pass",
 #   "gates": [
-#     { "key": "tests",  "status": "passed", "verdict": "pass", "warnings": [] },
-#     { "key": "clippy", "status": "passed", "verdict": "pass", "warnings": [] }
+#     { "key": "tests",  "status": "passed", "verdict": "pass" },
+#     { "key": "clippy", "status": "passed", "verdict": "pass" }
 #   ],
 #   "message": "Passed 2 required gate(s) for issue abc123"
 # }
@@ -2064,14 +2105,20 @@ is reusable.
 
 Issues are evaluated in argument order. Evaluation is serialised per issue,
 and the command continues after a checker failure, runner error, lookup error,
-or manual-gate attestation error. Exit `0` means every issue passed; otherwise
+or manual-gate attestation error. Under strict lease enforcement, another
+agent's lease on any requested issue refuses the whole batch before any
+evaluation. Exit `0` means every issue passed; otherwise
 the command returns the first failing issue's code from the [`jit gate
 evaluate`](#jit-gate-evaluate) taxonomy.
 
-With `--json`, the response uses the list envelope `{"count": N,
-"results": [...]}`. Each result contains `issue_id`, `key`, `status`,
-`verdict` when a verdict was produced, `warnings`, and `error` when that issue
-did not pass.
+The report is the list envelope `{"count": N, "results": [...]}`. Each result
+contains `issue_id`, `key`, `status`, `verdict` when a verdict was produced,
+and `error`, the classified error object, when that issue did not pass. Each
+issue's warnings join the envelope's `warnings`, prefixed with `(<issue>): `.
+When every issue passed, `--json` prints the report as the success response.
+Otherwise it prints the failure envelope with the first failing issue's code
+and the report under `error.details`; in human mode the per-issue lines go to
+stdout and a one-line summary to stderr.
 
 ### `jit gate fail`
 
@@ -2534,9 +2581,13 @@ dropped. Put the filter on the subcommand (`jit query available --priority high`
 or drop the subcommand to use the bare form.
 
 `--label`/`-l` (format `namespace:value`, or `namespace:*` for wildcard) is
-repeatable everywhere it appears in the query family — on the bare form and on
-every subcommand below, as well as on `jit issue list`. Repeated occurrences
-are ANDed: an issue is returned only if it matches every pattern given.
+repeatable on the bare form, all filtering query subcommands, `jit list`,
+`jit issue list`, and `jit issue search`. Repeated occurrences are ANDed:
+an issue is returned only if it matches every pattern given. Each of these
+commands accepts `--state`, `--assignee`, `--priority`, and `--label`; every
+filter narrows the command's result by AND. For example, `query available
+--assignee agent:worker-1` returns no issues because available work is unassigned.
+`query divergence` does not take field filters.
 
 ### Subcommands
 
@@ -2548,19 +2599,18 @@ are ANDed: an issue is returned only if it matches every pattern given.
 | `jit query blocked` | — | Blocked issues with blocking reasons |
 | `jit query strategic` | — | Issues carrying labels from strategic namespaces |
 | `jit query closed` | — | Effectively terminal issues (Done, Rejected, or Archived from one of those) |
-| `jit query count` | — | Counts by a dimension over a label bucket, with a done/total rollup |
+| `jit query count` | — | Counts by a dimension over filtered issues, with a done/total rollup |
 | `jit query divergence` | — | Membership labels not backed by the DAG (advisory) |
 
 ### State aggregation (`jit query count`)
 
-`jit query count --by state [--label ns:v ...]` aggregates a **label bucket**
+`jit query count --by state [filters]` aggregates matching issues
 into counts by state plus a done/total delivery rollup — the same rollup
 [`jit issue progress`](#container-progress-jit-issue-progress) produces over a
-container's children, but with membership defined by labels instead of the DAG.
+container's children, but with membership defined by field filters instead of the DAG.
 
-The bucket is every issue matching **all** `--label` patterns (repeatable and
-ANDed, as everywhere in the query family); with no `--label`, the whole
-repository is aggregated. This is the advisory-grouping counterpart to
+The bucket is every issue matching **all** supplied field filters; with no
+filters, the whole repository is aggregated. This is the advisory-grouping counterpart to
 `issue progress`: use `issue progress` when containment is a dependency edge,
 `query count` when it is a shared label.
 
@@ -2830,8 +2880,15 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 
 `--scope` defaults to `all`. The exit code carries the verdict per the
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
-broken, which exits `1`; warnings are reported in the output and the JSON
-result but never change the exit status. JSON reports `valid`, `errors`, `warnings`, and a `summary`.
+broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the output and the JSON
+result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
+with a broken link they arrive as the failure envelope's `error.details`.
+
+An external URL asset is probed with one HTTP `HEAD` request per distinct URL,
+however many documents cite it. A success or redirect status counts as
+reachable; any other status, a transport failure, or no answer within the
+request timeout is an `unreachable_url` error. Probes run concurrently over a
+bounded pool of workers.
 
 The documents in scope include each issue's derived documents, which are also
 tracked link targets. Each reference is checked at the version it names, the same version `jit
@@ -3243,14 +3300,19 @@ jit validate --branch-drift [--leases] [--json]
 
 | Mode | What it does |
 |------|--------------|
-| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence, claims index) plus every local and graph rule. |
-| `<ID>` | The local and graph rules for that issue only. |
-| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
+| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence) plus every local and graph rule. |
+| `<ID>` | The findings concerning that issue. |
+| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`; findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)); invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
-| `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
-| `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. |
+| `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
+| `--fix` | Publish every automatic rule/graph/state fix and derived-state repair through one mutation, then report over the fixed repository as plain `validate` does, exit status included, whether or not a fix applied. `--dry-run` reports what would be fixed and writes nothing. See [repairs](worktree-validate.md#repairs). |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
-| `--leases` | Check that active leases are consistent and not stale. |
+| `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
+
+The per-issue, `--rule`, `--explain`, and `--scope` modes are views: selections
+of the one whole-repository report, with rules evaluated over the whole
+repository. What each view admits and how it fails is specified under
+[views](worktree-validate.md#views).
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
 `--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`. `--rule` requires a
@@ -3269,18 +3331,18 @@ mirrored in this command's advisory `divergence_count`.
 Every successful JSON validation mode emits its normal mode-specific report. A
 failing invocation emits the canonical error envelope and retains that same
 report under `error.details`. This applies to whole-repository, per-issue,
-`--explain`, `--scope`, `--rule`, `--branch-drift`, and `--leases` validation. For example,
+`--explain`, `--scope`, `--rule`, `--fix`, `--branch-drift`, and `--leases` validation. For example,
 a whole-repository rule failure reports:
 
 ```json
 {
   "error": {
-    "code": "GENERIC_ERROR",
+    "code": "VALIDATION_FAILED",
     "message": "Repository validation failed with 1 rule error(s)",
     "details": {
       "valid": false,
       "integrity_error": null,
-      "warnings": [
+      "validation_warnings": [
         { "type": "rule_warning", "issue_id": "...", "rule": "orphan-leaf", "message": "..." }
       ],
       "warning_count": 1,
@@ -3294,12 +3356,11 @@ a whole-repository rule failure reports:
 }
 ```
 
-Whole-repository, per-issue, and `--explain` rule failures keep their established
-exit `1` through the registered `GENERIC_ERROR` mapping, as do failed
-`--branch-drift` and `--leases` checks. A repository-integrity failure or failed
-`--scope` gate check uses `VALIDATION_FAILED` and exits `4`. In every case the
-code's registered mapping, not a separate literal, determines the process
-status.
+Every `jit validate` mode reports error-severity findings, including
+whole-repository rule failures, and repository-integrity failures as
+`VALIDATION_FAILED` with exit code `4`. See the [exit-code
+reference](exit-codes.md#command-specific-mappings). In every case the code's
+registered mapping, not a separate literal, determines the process status.
 
 `divergence_count` and `membership_divergences` mirror
 [`jit query divergence`](#membership-divergence-jit-query-divergence). They are
@@ -3320,9 +3381,10 @@ Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), rebuild the claims index from its
-append-only log, and evict expired leases; and remove orphaned `*.tmp` files
-under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
+left by dead processes (checked by PID), evict expired leases, reclaim indefinite leases whose
+heartbeat is [stale](claim.md#staleness), and remove interrupted lease
+operations' stage files; and remove orphaned `*.tmp` files under `.jit/` and
+under `.git/jit/leases/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
 jit recover [--json]
@@ -3330,6 +3392,8 @@ jit recover [--json]
 
 The report counts the leftover redo records the session open applied
 (`redo_records_applied` in JSON, "Redo records applied" in text), at most one.
+It counts expired leases evicted (`expired_leases_evicted`) apart from stale
+indefinite leases reclaimed (`stale_leases_reclaimed`).
 It removes only provably stale data and never the pending redo record, so it is
 safe to run at any time.
 
@@ -3445,8 +3509,8 @@ jit item search atomic
 jit item search "" --kind requirement
 ```
 
-A failing `jit item` command under `--json` returns the error envelope with code
-`ITEM_COMMAND_FAILED`.
+A failing `jit item` command under `--json` returns the error envelope with the
+[machine-readable error code](error-codes.md) assigned by the shared classifier.
 
 ## Documentation Projection Commands
 
@@ -3483,9 +3547,8 @@ of a whole-`[projection.*]` run — leaves every target byte-identical. All chan
 targets then publish through one redo record. JSON uses
 the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
 mode, style, kinds, count}`. Under `--json` the pre-write guards above surface the
-`VALIDATION_FAILED` envelope; any other command failure (for example, an
-unrecognized `--name`) returns the error envelope with code
-`PROJECT_COMMAND_FAILED`.
+`VALIDATION_FAILED` envelope; an unrecognized `--name` returns the
+`INVALID_ARGUMENT` error envelope and exits `2`.
 
 ### `jit invariant check`
 
@@ -3495,7 +3558,8 @@ jit invariant check [--json]
 
 Reports enforcement drift in the declared-but-unenforced direction: an invariant
 whose `enforced-by` names a rule or gate that does not load. Bindings are
-declarations, and this check never executes them. Exits `4` when any drift is
+declarations, and this check never executes them. An unloadable rule set makes
+every rule binding drift; an unloadable gate registry fails the command. Exits `4` when any drift is
 present (see the [exit-code reference](exit-codes.md#command-specific-mappings)).
 With no drift, JSON uses the list envelope `{"count": 0, "findings": []}`. Drift
 under `--json` returns the `VALIDATION_FAILED` error envelope and preserves the
@@ -3505,8 +3569,10 @@ report as `error.details`, including its `count` and `findings` fields.
 
 ### `jit search`
 
-Grep the `.jit/` data directory: the stored issue records, the event log, and the
-other files jit keeps there. Matching is delegated to
+Grep the `.jit/` data directory: the stored issue records and the other files
+jit keeps there. A search without an explicit file selection excludes the history
+files: the event log, the gate-run records, and the record scratch directory. An
+explicit `--glob` can still select them. Matching is delegated to
 [ripgrep](https://github.com/BurntSushi/ripgrep), which must be on `PATH`.
 
 ```bash
@@ -3674,12 +3740,13 @@ Copy the hook templates into the `hooks/` directory of the selected repository's
 jit hooks install [--json]
 ```
 
-Two hooks are installed: `pre-commit` validates leases and branch divergence
-before a commit, and `pre-push` validates leases before a push. An existing hook
-of the same name is left in place and reported as skipped.
+One hook is installed: `pre-commit` validates branch divergence before a commit.
+An existing hook of the same name is left in place and reported as skipped. No
+hook checks leases; they are enforced when a mutation is written, so a hand edit
+of an issue record is not caught at commit.
 
-JSON returns `{hooks_dir, installed, skipped, message}`. A failure returns the
-error envelope with code `HOOKS_INSTALL_ERROR`.
+JSON returns `{hooks_dir, installed, skipped, message}`. Failures use the shared
+error classifier, which determines the envelope code and process exit status.
 
 Enforcement strictness is configuration, set in `.jit/config.toml`:
 
@@ -3818,7 +3885,7 @@ Use `--quiet` to suppress non-essential output:
 
 ```bash
 # Create issue and capture ID
-ISSUE_ID=$(jit issue create --title "Fix login bug" --orphan --quiet)
+ISSUE_ID=$(jit issue create --title "Fix login bug" --quiet)
 echo "Created issue: $ISSUE_ID"
 
 # Update without confirmation messages
@@ -3838,7 +3905,7 @@ Combine `--quiet` with `--json` for machine-readable output:
 
 ```bash
 # Parse with jq
-ISSUE_ID=$(jit issue create --title "Add feature" --orphan --quiet --json | jq -r '.id')
+ISSUE_ID=$(jit issue create --title "Add feature" --quiet --json | jq -r '.id')
 
 # Extract specific fields
 jit issue show $ISSUE_ID --json --quiet | jq -r '.title'
@@ -3936,7 +4003,6 @@ while IFS=',' read -r title priority component; do
     --title "$title" \
     --priority "$priority" \
     --label "component:$component" \
-    --orphan \
     --quiet)
   echo "Created: $ID - $title"
 done < issues.csv
@@ -3973,16 +4039,16 @@ ISSUE_ID=$1
 
 # tests and clippy are automated gates: evaluate runs their checkers.
 if jit gate evaluate "$ISSUE_ID" tests --quiet; then
-  echo "✓ Tests passed for $ISSUE_ID"
+  echo "ok: Tests passed for $ISSUE_ID"
 else
-  echo "✗ Tests failed for $ISSUE_ID"
+  echo "error: Tests failed for $ISSUE_ID"
   exit 1
 fi
 
 if jit gate evaluate "$ISSUE_ID" clippy --quiet; then
-  echo "✓ Clippy passed for $ISSUE_ID"
+  echo "ok: Clippy passed for $ISSUE_ID"
 else
-  echo "✗ Clippy failed for $ISSUE_ID"
+  echo "error: Clippy failed for $ISSUE_ID"
   exit 1
 fi
 ```

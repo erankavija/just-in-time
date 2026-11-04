@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-a50e9be9",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4eaba2deb19a98f02f0eca5a6f965f5c18891a3d",
+  "completed_at": "2026-10-25T02:43:50.958887607Z",
+  "duration_ms": 86480,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change satisfies all four hard criteria in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b362238b-b0a3-4770-aed4-5d1b87180566",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T02:42:24.478654676Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 884adedf8 `refactor(jit:a50e9be9)`  \nPolicy sources: AGENTS.md  \nResolved items: @/issue/2195c98f/requirement/REQ-06 and REQ-11 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, assignee-format, architecture-dependency-direction, essential-code-prose, orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed, exit 0, recorded for HEAD 4eaba2deb; code-review pending  \nTruncation recovery: narrowly re-read ClaimCoordinator serialization/deserialization, Assignee serialization, affected callers, and focused tests after the combined call-site output truncated\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change satisfies all four hard criteria in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

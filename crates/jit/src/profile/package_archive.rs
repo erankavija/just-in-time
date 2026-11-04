@@ -60,11 +60,11 @@
 //! The result is a value in memory: this module opens nothing, writes nothing,
 //! and leaves the decision of where a package goes to its caller.
 
-use super::manifest::{ProfileId, ProfilePackageModel, MANIFEST_FILE_NAME};
+use super::manifest::MANIFEST_FILE_NAME;
 use super::package::{
     ProfilePackage, ProfilePackageError, MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
-use super::package_capture::{compose_captured_tree, CapturedFile, CapturedPackageTree};
+use crate::domain::identity::ProfileId;
 use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::FileMode;
 use crate::tar_format::reproducible_tar_header;
@@ -303,53 +303,17 @@ pub enum PackageArchiveError {
 /// encoded, and [`PackageArchiveError::Io`] when the in-memory tar writer
 /// fails.
 pub fn pack_package_archive(package: &ProfilePackage) -> Result<Vec<u8>, PackageArchiveError> {
-    pack_archive(
-        package.model(),
-        &package.hashes().package,
-        package
-            .files()
-            .iter()
-            .map(|(source, bytes)| (source.as_str(), bytes.as_slice())),
-    )
-}
-
-/// Pack a package tree assembled from repository authorities into the same
-/// portable archive format as an ordinary package directory.
-///
-/// A captured tree is the complete package for a manifest with live assets:
-/// those assets are intentionally absent from the authored directory and are
-/// drawn from their declared repository targets at capture time. Keeping this
-/// entry point beside [`pack_package_archive`] makes both routes share the
-/// archive wire and its reproducibility rules.
-pub(crate) fn pack_captured_package_archive(
-    package: &CapturedPackageTree,
-) -> Result<Vec<u8>, PackageArchiveError> {
-    pack_archive(
-        package.model(),
-        &package.hashes().package,
-        package
-            .files()
-            .iter()
-            .map(|(source, file)| (source.as_str(), file.bytes.as_slice())),
-    )
-}
-
-fn pack_archive<'a>(
-    model: &ProfilePackageModel,
-    package_hash: &str,
-    files: impl IntoIterator<Item = (&'a str, &'a [u8])>,
-) -> Result<Vec<u8>, PackageArchiveError> {
+    let model = package.model();
     let metadata = toml::to_string(&ArchiveMetadataWire {
         archive: ArchiveMetadata {
             archive_version: ARCHIVE_VERSION,
             id: model.id.clone(),
-            version: model.version.clone(),
-            package_hash: package_hash.to_string(),
+            version: model.version.to_string(),
+            package_hash: package.package_hash().clone(),
         },
     })
     .map_err(PackageArchiveError::MetadataSerialization)?;
 
-    let executable = declared_executable_sources(model);
     let mut builder = tar::Builder::new(Vec::new());
     append_entry(
         &mut builder,
@@ -358,11 +322,11 @@ fn pack_archive<'a>(
         ARCHIVE_METADATA_ENTRY,
         metadata.as_bytes(),
     )?;
-    for (source, bytes) in files {
+    for (source, bytes) in package.files() {
         append_entry(
             &mut builder,
             EntryType::Regular,
-            declared_file_mode(&executable, source),
+            archived_file_mode(model.file_mode(source)),
             &format!("{PACKAGE_ENTRY_PREFIX}/{source}"),
             bytes,
         )?;
@@ -388,7 +352,7 @@ fn pack_archive<'a>(
 /// or states a version this build does not read, content over the package
 /// bounds, content that is not a valid package, and a digest the extracted
 /// content does not reproduce.
-pub fn read_package_archive(bytes: &[u8]) -> Result<CapturedPackageTree, PackageArchiveError> {
+pub fn read_package_archive(bytes: &[u8]) -> Result<ProfilePackage, PackageArchiveError> {
     let extracted = extract_archive_entries(bytes)?;
     let metadata = decode_archive_metadata(&extracted.metadata)?;
     if metadata.archive_version != ARCHIVE_VERSION {
@@ -410,18 +374,16 @@ pub fn read_package_archive(bytes: &[u8]) -> Result<CapturedPackageTree, Package
             ))?;
     let model = ProfilePackage::parse_manifest(&manifest.bytes)
         .map_err(PackageArchiveError::InvalidPackage)?;
-    let executable = declared_executable_sources(&model);
     for (source, file) in &extracted.files {
         require_entry_mode(
             &format!("{PACKAGE_ENTRY_PREFIX}/{source}"),
             file.mode,
-            declared_file_mode(&executable, source),
+            archived_file_mode(model.file_mode(source)),
         )?;
     }
 
     // What the entries carried, which is what lets the shared package
-    // validation refuse an executable no declaration accounts for. The modes
-    // published below are the manifest's declarations, never these.
+    // validation refuse an executable no declaration accounts for.
     let observed_executable = extracted
         .files
         .iter()
@@ -431,48 +393,20 @@ pub fn read_package_archive(bytes: &[u8]) -> Result<CapturedPackageTree, Package
     let files = extracted
         .files
         .into_iter()
-        .map(|(source, file)| {
-            let mode = if executable.contains(source.as_str()) {
-                FileMode::Executable
-            } else {
-                FileMode::Regular
-            };
-            (
-                source,
-                CapturedFile {
-                    bytes: file.bytes,
-                    mode,
-                },
-            )
-        })
+        .map(|(source, file)| (source, file.bytes))
         .collect::<BTreeMap<_, _>>();
 
-    let tree = compose_captured_tree(files, observed_executable)
+    let package = ProfilePackage::from_files_with_modes(files, observed_executable, None)
         .map_err(PackageArchiveError::InvalidPackage)?;
-    require_metadata_agreement(&metadata, &tree)?;
-    Ok(tree)
+    require_metadata_agreement(&metadata, &package)?;
+    Ok(package)
 }
 
-/// The sources a manifest declares executable.
-///
-/// The one derivation of what an archived file's mode is, read by the write
-/// side to set it and by the read side to refuse a mode that disagrees, so the
-/// two sides cannot drift apart.
-fn declared_executable_sources(model: &ProfilePackageModel) -> BTreeSet<&str> {
-    model
-        .assets
-        .iter()
-        .filter(|asset| asset.executable)
-        .map(|asset| asset.source.as_str())
-        .collect()
-}
-
-/// The mode one archived package file carries.
-fn declared_file_mode(executable: &BTreeSet<&str>, source: &str) -> u32 {
-    if executable.contains(source) {
-        EXECUTABLE_FILE_MODE
-    } else {
-        REGULAR_FILE_MODE
+/// The mode an archive entry carries for a file of `mode`.
+fn archived_file_mode(mode: FileMode) -> u32 {
+    match mode {
+        FileMode::Executable => EXECUTABLE_FILE_MODE,
+        FileMode::Regular => REGULAR_FILE_MODE,
     }
 }
 
@@ -692,7 +626,7 @@ fn decode_archive_metadata(bytes: &[u8]) -> Result<ArchiveMetadata, PackageArchi
 /// itself declares and hashes to.
 fn require_metadata_agreement(
     metadata: &ArchiveMetadata,
-    tree: &CapturedPackageTree,
+    tree: &ProfilePackage,
 ) -> Result<(), PackageArchiveError> {
     let disagreement = |field, declared: String, packaged: String| {
         (declared != packaged).then_some(PackageArchiveError::MetadataDisagreement {
@@ -706,16 +640,16 @@ fn require_metadata_agreement(
             disagreement(
                 "version",
                 metadata.version.clone(),
-                tree.model().version.clone(),
+                tree.model().version.to_string(),
             )
         });
     if let Some(error) = mismatch {
         return Err(error);
     }
-    if metadata.package_hash != tree.hashes().package {
+    if metadata.package_hash != *tree.package_hash() {
         return Err(PackageArchiveError::IdentityMismatch {
             declared: metadata.package_hash.clone(),
-            computed: tree.hashes().package.clone(),
+            computed: tree.package_hash().clone(),
         });
     }
     Ok(())
@@ -860,16 +794,13 @@ mod tests {
         assert_eq!(tree.model().id, package.model().id);
         assert_eq!(tree.model().version, package.model().version);
         assert_eq!(
-            tree.hashes().package,
-            package.hashes().package,
+            tree.package_hash(),
+            package.package_hash(),
             "the recomputed identity differs from the packed package's own"
         );
         assert_eq!(
-            tree.files()
-                .iter()
-                .map(|(source, file)| (source.clone(), file.bytes.clone()))
-                .collect::<BTreeMap<_, _>>(),
-            package.files().clone(),
+            tree.files(),
+            package.files(),
             "the archive did not carry the package's own bytes"
         );
         // The fixture declares one executable asset and ships its bytes without
@@ -877,9 +808,9 @@ mod tests {
         // manifest.
         assert_eq!(
             tree.files()
-                .iter()
-                .filter(|(_, file)| file.mode == FileMode::Executable)
-                .map(|(source, _)| source.as_str())
+                .keys()
+                .filter(|source| tree.model().file_mode(source) == FileMode::Executable)
+                .map(String::as_str)
                 .collect::<Vec<_>>(),
             package
                 .model()
@@ -1182,7 +1113,7 @@ mod tests {
         admitted.push(directory_entry(DIRECTORY_MODE));
         let tree = read_package_archive(&archive_of(&admitted))
             .expect("a directory entry at the conventional mode is admitted");
-        assert_eq!(tree.hashes().package, package.hashes().package);
+        assert_eq!(tree.package_hash(), package.package_hash());
         assert_eq!(
             tree.file_count(),
             package.file_count(),
@@ -1253,7 +1184,7 @@ mod tests {
         );
 
         let tree = read_package_archive(&archive).expect("the read accepts what packing wrote");
-        assert_eq!(tree.hashes().package, package.hashes().package);
+        assert_eq!(tree.package_hash(), package.package_hash());
     }
 
     /// A file larger than a package archive may be is refused before it is

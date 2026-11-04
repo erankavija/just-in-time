@@ -1,0 +1,51 @@
+runs=3 tests=4821
+unit         median-of-runs  n= 3157 median=0.015 p95=0.070 p99=0.335 max=3.608
+unit         worst-run       n= 3157 median=0.018 p95=0.082 p99=0.340 max=3.760
+integration  median-of-runs  n= 1664 median=0.055 p95=0.231 p99=1.044 max=6.647
+integration  worst-run       n= 1664 median=0.065 p95=0.266 p99=1.079 max=7.058
+all          median-of-runs  n= 4821 median=0.019 p95=0.164 p99=0.546 max=6.647
+all          worst-run       n= 4821 median=0.023 p95=0.184 p99=0.571 max=7.058
+
+per-run suite times: [270.8, 263.5, 279.1]
+
+top 40 by median-of-runs:
+  6.647   7.058 integration jit::cli_repo_workflow lease_enforcement_tests::test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuses
+  3.608   3.760 unit        jit commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
+  2.848   3.038 integration jit::cli_repo_workflow lease_enforcement_tests::test_strict_lease_exempt_paths_write_for_their_stated_reason
+  2.598   2.759 integration jit::cli_repo_workflow profile_cli_tests::test_profile_add_publishes_a_package_whose_directories_outnumber_its_files
+  2.480   2.722 integration jit::cli_repo_workflow profile_cli_tests::test_profile_pack_and_add_carry_a_package_at_the_model_limits
+  2.102   2.106 integration jit::cli_issue command_exit_code_projection_tests::test_command_exit_codes_expired_lock_wait_emits_11
+  2.090   2.093 integration jit::cli_repo_workflow lock_contention_tests::test_concurrent_mutations_queue_behind_a_holder_under_the_default_wait
+  2.017   2.019 unit        jit commands::serve::tests::test_start_server_bounds_a_child_that_neither_serves_nor_exits
+  1.730   1.832 unit        jit storage::claim_coordinator::proptests::test_sequence_numbers_monotonic
+  1.601   1.691 integration jit::fast_docs_templates template_apply_tests::prop_force_refresh_is_idempotent_on_node_and_edge_set
+  1.504   1.520 integration jit::fast_docs_templates template_apply_tests::prop_apply_yields_transitively_reduced_graph
+  1.476   1.643 integration jit::cli_repo_workflow steering_scenarios::test_all_steering_scenarios
+  1.475   1.526 integration jit::fast_docs_templates template_apply_tests::prop_apply_always_yields_acyclic_dag
+  1.429   1.439 unit        jit commands::claim::tests::test_claim_acquire_synchronized_succeeds_over_an_event_log_past_the_former_ceiling
+  1.321   1.323 integration jit-server::server_integration graceful_shutdown_tests::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero
+  1.263   1.335 unit        jit storage::claim_coordinator::proptests::test_concurrent_claims_exclusive
+  1.206   1.264 unit        jit storage::claim_coordinator::proptests::test_concurrent_different_issues_succeed
+  1.157   1.252 unit        jit output::tests::test_cli_sources_contain_no_pictographic_status_marker
+  1.118   1.118 integration jit-server::server_integration graceful_shutdown_tests::test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop
+  1.117   1.121 unit        jit storage::claim_coordinator::tests::test_rebuild_index_filters_expired_leases
+  1.107   1.305 integration jit::cli_repo_workflow profile_concurrency_tests::test_concurrent_profile_apply_contender_never_publishes_a_stale_capture
+  1.088   1.092 integration jit::cli_repo_workflow lock_contention_tests::test_claim_coordination_lock_honors_configured_wait
+  1.067   1.122 integration jit::cli_repo_workflow worktree_exec_tests::test_worktree_exec_child_jit_mutation_fails_on_its_bounded_lock_wait
+  1.052   1.056 integration jit::cli_gate nested_checker_recovery_test::test_unrelated_process_still_respects_bootstrap_lock
+  1.045   1.109 integration jit::fast_issue readiness_coherence_tests::prop_stored_readiness_agrees_with_the_blocked_predicate_after_dependency_edits
+  1.044   1.046 integration jit::scratch_build repository_state_cutover_tests::test_repository_state_is_written_only_by_the_redo_record_and_the_absent_root_publisher
+  1.043   1.072 integration jit::cli_repo_workflow worktree_exec_tests::test_worktree_exec_lock_wait_expires_as_a_lock_timeout_without_running
+  1.034   1.105 integration jit::cli_repo_workflow profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op
+  1.019   1.022 unit        jit gate_execution::tests::test_execute_command_timeout
+  1.018   1.021 unit        jit gate_execution::tests::test_timeout_kills_process_group_and_does_not_deadlock
+  0.934   0.937 unit        jit commands::gate_check::tests::test_run_history_is_compacted_to_one_latest_run
+  0.795   0.824 integration jit::cli_issue list_envelope_tests::test_list_envelope_count_equals_collection_length_for_every_list_emitting_command
+  0.764   0.820 unit        jit test_utils::tests::test_write_executable_runs_while_other_threads_fork
+  0.727   0.755 integration jit::cli_repo_workflow profile_acceptance_tests::test_offline_public_cli_profile_reaches_implementation_ready_breakdown
+  0.716   0.744 integration jit::cli_issue command_exit_code_projection_tests::test_command_exit_codes_serve_foreground_passthrough_is_dual_form
+  0.705   0.740 integration jit::cli_repo_workflow lease_enforcement_tests::test_mutating_leaves_classified_as_no_record_leave_every_issue_record_alone
+  0.703   0.733 integration jit::cli_repo_workflow profile_cli_tests::test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op
+  0.696   0.712 integration jit::cli_repo_workflow profile_acceptance_tests::test_profile_fresh_init_and_existing_apply_are_equivalent_without_git
+  0.632   0.643 integration jit::cli_repo_workflow profile_acceptance_tests::test_shipped_profile_archive_bootstraps_a_repository_without_jit_state
+  0.609   0.742 unit        jit storage::claim_coordinator::proptests::test_lease_count_invariant

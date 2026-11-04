@@ -16,43 +16,20 @@ mod type_hierarchy_fix_tests;
 mod validate_cli_rule_tests;
 mod validate_document_tests;
 mod validate_drift_builtin_tests;
+mod validate_read_tests;
 mod validation_lease_tests;
-
-fn create_issue(
-    executor: &jit::commands::CommandExecutor<jit::storage::JsonFileStorage>,
-    title: &str,
-    body: &str,
-) -> String {
-    use jit::storage::IssueStore;
-
-    let id = executor
-        .issues()
-        .create_issue(
-            title.to_string(),
-            body.to_string(),
-            jit::domain::Priority::Normal,
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .unwrap()
-        .0;
-    executor.storage().load_issue(&id).unwrap().short_id()
-}
 
 /// The package carrying the generic vocabulary these suites address: the type
 /// hierarchy, the label namespaces, and the addressable item kinds an item is
 /// resolved against.
 pub(crate) const DEFAULT_PACKAGE: &str = "jit-default";
 
-/// A fresh repository carrying the default package's vocabulary.
-pub(crate) fn setup_repo_with_default_vocabulary() -> tempfile::TempDir {
-    jit::test_utils::profiled_repository_fixture(
-        DEFAULT_PACKAGE,
-        "packages",
-        Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
+/// The shared taxonomy configuration plus the shipped declarations of the named
+/// item kinds.
+pub(crate) fn config_with_shipped_kinds(kinds: &[&str]) -> String {
+    format!(
+        "{}\n{}",
+        jit::test_taxonomy::test_taxonomy().config_fragment(),
+        jit::test_utils::shipped_item_kind_tables(kinds)
     )
-    .expect("clone a coherent default-vocabulary repository fixture")
 }

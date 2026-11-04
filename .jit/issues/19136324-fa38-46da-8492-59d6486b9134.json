@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:40:49.599422530Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the domain query, item and output unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `type_taxonomy.rs`, `item.rs`, `visualization.rs`, `output.rs`, `queries.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T01:01:06.864184520Z",
   "first_ready_at": "2026-10-22T15:28:20.866671787Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f0845942-30c0-4290-b399-145da8d951de",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:56:42.537675385Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e23f5515-2280-4dcd-8701-c1dbcb4753d1",
+      "status": "passed",
+      "updated_at": "2026-10-27T01:00:16.182847256Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "19136324-fa38-46da-8492-59d6486b9134",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Domain query, item and output unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:20.866671787Z"
+  "updated_at": "2026-10-27T01:01:06.864184520Z"
 }

@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T17:47:08.285420101Z",
+  "context": {},
+  "created_at": "2026-11-01T15:34:13.037076092Z",
+  "dependencies": [],
+  "description": "`jit validate`, a read, leaves `.jit-bootstrap.lock` at the repository root, so a read writes a file into an adopter's tree.\n\n## Background\n\nFound running a read-only `jit validate` in `~/Projects/research`, which then showed `.jit-bootstrap.lock` as untracked. Reproduced on a fresh `git init` plus `jit init` with the lock removed: `jit validate` creates it and `jit query available` and `jit issue search` do not. This repository lists the file in its own `.gitignore`, but an adopter's does not. Validation's lock acquisition is at `crates/jit/src/storage/json.rs:664-680`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate` without `--fix` creates no file in the repository.\n- [hard] REQ-02: A test owns REQ-01 on a repository with no lock file present.\n\n## Notes\n\n- `@/charter/D-22`: reads never wait on writers. If validation has a real need for the lock, report it before changing it.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T15:34:13.037076092Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "180e7f33-2d61-4e21-8548-fc533e06e400",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug",
+    "resolution:covered-by-578ed10d"
+  ],
+  "priority": "normal",
+  "state": "rejected",
+  "title": "jit validate leaves a bootstrap lock file in the repository",
+  "updated_at": "2026-11-01T18:00:08.639274676Z"
+}

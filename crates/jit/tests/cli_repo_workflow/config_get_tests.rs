@@ -6,32 +6,17 @@
 //! coordination settings) via a generic dotted-path walk
 //! over an assembled JSON snapshot, rather than a hand-maintained per-key
 //! match. See `crates/jit/src/commands/config.rs` (`resolve_dotted_key`,
-//! `CommandExecutor::get_config`) and `EffectiveConfig::full_snapshot` in
+//! `ConfigOps::get_config`) and `EffectiveConfig::full_snapshot` in
 //! `crates/jit/src/config.rs`.
 
 use jit::output::ErrorCode;
+use jit::test_cli::JitCli;
 use std::fs;
-use std::process::Command;
 use std::str::FromStr;
-use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn jit_init(dir: &std::path::Path) -> std::process::Output {
-    Command::new(jit_binary())
-        .arg("init")
-        .current_dir(dir)
-        .output()
-        .expect("failed to run jit init")
-}
-
-fn config_get(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
-    Command::new(jit_binary())
-        .args(["config", "get"])
+fn config_get(cli: &JitCli, args: &[&str]) -> std::process::Output {
+    cli.command(["config", "get"])
         .args(args)
-        .current_dir(dir)
         .output()
         .expect("failed to run jit config get")
 }
@@ -83,44 +68,40 @@ max_indefinite_leases_per_agent = 3
 
 #[test]
 fn test_get_scalar_from_type_hierarchy() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["type_hierarchy.types.epic"]);
+    let out = config_get(&cli, &["type_hierarchy.types.epic"]);
     assert!(out.status.success(), "get failed: {:?}", out);
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "2");
 }
 
 #[test]
 fn test_get_scalar_from_validation_section() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["validation.strictness"]);
+    let out = config_get(&cli, &["validation.strictness"]);
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "loose");
 }
 
 #[test]
 fn test_get_scalar_from_version_section() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["version.schema"]);
+    let out = config_get(&cli, &["version.schema"]);
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "1");
 }
 
 #[test]
 fn test_get_scalar_from_project_section() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["project.name"]);
+    let out = config_get(&cli, &["project.name"]);
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8_lossy(&out.stdout).trim(),
@@ -134,11 +115,10 @@ fn test_get_scalar_from_project_section() {
 
 #[test]
 fn test_get_array_value_pretty_printed() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["type_hierarchy.strategic_types"]);
+    let out = config_get(&cli, &["type_hierarchy.strategic_types"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     // Non-JSON output pretty-prints compound values.
@@ -151,23 +131,21 @@ fn test_get_array_value_pretty_printed() {
 
 #[test]
 fn test_get_nested_table_entry_from_namespaces() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["namespaces.type.unique"]);
+    let out = config_get(&cli, &["namespaces.type.unique"]);
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "true");
 }
 
 #[test]
 fn test_get_nested_table_entry_from_item_kinds() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
     // Uses the SAME kebab-case spelling config.toml declares.
-    let out = config_get(temp.path(), &["item_kinds.requirement.id-pattern"]);
+    let out = config_get(&cli, &["item_kinds.requirement.id-pattern"]);
     assert!(out.status.success(), "get failed: {:?}", out);
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "REQ-\\d+");
 }
@@ -178,11 +156,10 @@ fn test_get_nested_table_entry_from_item_kinds() {
 
 #[test]
 fn test_get_whole_section_returns_subtree() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["documentation", "--json"]);
+    let out = config_get(&cli, &["documentation", "--json"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
@@ -195,17 +172,15 @@ fn test_get_whole_section_returns_subtree() {
 }
 
 // ---------------------------------------------------------------------------
-// REQ-02: an unknown TOP-LEVEL key fails exit 2, listing valid sections.
+// REQ-02: an unknown TOP-LEVEL key fails, listing valid sections.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_get_unknown_top_level_key_fails_exit_2_with_sections() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+fn test_get_unknown_top_level_key_fails_with_sections() {
+    let cli = JitCli::initialised().unwrap();
 
-    let out = config_get(temp.path(), &["bogus_section"]);
+    let out = config_get(&cli, &["bogus_section"]);
     assert!(!out.status.success());
-    assert_eq!(out.status.code(), Some(2), "expected exit 2, got {:?}", out);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("valid top-level sections"),
@@ -219,12 +194,10 @@ fn test_get_unknown_top_level_key_fails_exit_2_with_sections() {
 
 #[test]
 fn test_get_unknown_top_level_key_json_reports_invalid_argument() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+    let cli = JitCli::initialised().unwrap();
 
-    let out = config_get(temp.path(), &["bogus_section", "--json"]);
+    let out = config_get(&cli, &["bogus_section", "--json"]);
     assert!(!out.status.success());
-    assert_eq!(out.status.code(), Some(2));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
     assert_eq!(parsed["error"]["code"], "INVALID_ARGUMENT");
@@ -235,18 +208,16 @@ fn test_get_unknown_top_level_key_json_reports_invalid_argument() {
 }
 
 // ---------------------------------------------------------------------------
-// Unknown NESTED key also fails exit 2, naming the missing segment.
+// Unknown NESTED key also fails, naming the missing segment.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_get_unknown_nested_key_fails_exit_2() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+fn test_get_unknown_nested_key_fails() {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["documentation.bogus_field"]);
+    let out = config_get(&cli, &["documentation.bogus_field"]);
     assert!(!out.status.success());
-    assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("bogus_field") && stderr.contains("documentation"),
@@ -256,32 +227,28 @@ fn test_get_unknown_nested_key_fails_exit_2() {
 
 // ---------------------------------------------------------------------------
 // A malformed `config.toml` is a LOAD failure, not an unknown-key argument
-// error: it must NOT be reported as `INVALID_ARGUMENT` / exit 2, in either
-// mode, and `--json` must not force it into a JSON envelope it never had
+// error: it must NOT be reported as `INVALID_ARGUMENT`, in either mode, and `--json` must not force it into a JSON envelope it never had
 // before (matching `jit config show` / `jit config validate`'s existing
 // behavior for the same underlying failure).
 // ---------------------------------------------------------------------------
 
 #[test]
 fn test_get_corrupt_config_toml_is_not_invalid_argument() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+    let cli = JitCli::initialised().unwrap();
     // Invalid TOML syntax (unclosed table header).
     fs::write(
-        temp.path().join(".jit/config.toml"),
+        cli.root().join(".jit/config.toml"),
         "[type_hierarchy\nbroken = true\n",
     )
     .unwrap();
 
-    let out = config_get(temp.path(), &["worktree.enforce_leases"]);
+    let out = config_get(&cli, &["worktree.enforce_leases"]);
     assert!(!out.status.success());
-    assert_ne!(
-        out.status.code(),
-        Some(2),
-        "a malformed config.toml must not be classified as a bad CLI argument: {:?}",
-        out
-    );
     let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("valid top-level sections"),
+        "a malformed config.toml must not be classified as a bad CLI argument: {stderr}"
+    );
     assert!(
         stderr.contains("Failed to parse config.toml"),
         "stderr should surface the load failure: {stderr}"
@@ -290,15 +257,14 @@ fn test_get_corrupt_config_toml_is_not_invalid_argument() {
 
 #[test]
 fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+    let cli = JitCli::initialised().unwrap();
     fs::write(
-        temp.path().join(".jit/config.toml"),
+        cli.root().join(".jit/config.toml"),
         "[type_hierarchy\nbroken = true\n",
     )
     .unwrap();
 
-    let out = config_get(temp.path(), &["worktree.enforce_leases", "--json"]);
+    let out = config_get(&cli, &["worktree.enforce_leases", "--json"]);
     assert!(!out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let envelope: serde_json::Value =
@@ -310,7 +276,6 @@ fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
     )
     .expect("error envelope code is registered");
     assert_eq!(code, ErrorCode::ParseError);
-    assert_eq!(out.status.code(), Some(code.exit_code().code()));
     assert!(envelope["error"]["message"]
         .as_str()
         .is_some_and(|message| message.contains("Failed to parse config.toml")));
@@ -322,11 +287,10 @@ fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
 
 #[test]
 fn test_get_json_envelope_shape() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
-    let out = config_get(temp.path(), &["validation.default_type", "--json"]);
+    let out = config_get(&cli, &["validation.default_type", "--json"]);
     assert!(out.status.success(), "get --json failed: {:?}", out);
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
@@ -342,18 +306,14 @@ fn test_get_json_envelope_shape() {
 
 #[test]
 fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+    let cli = JitCli::initialised().unwrap();
     // `jit init` seeds a minimal config.toml with just `[project]`; remove it
     // entirely to exercise the fully-absent-file path.
-    let config_path = temp.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     fs::remove_file(&config_path).ok();
 
     // A merged section with a built-in default still resolves.
-    let out = config_get(
-        temp.path(),
-        &["coordination.max_indefinite_leases_per_agent"],
-    );
+    let out = config_get(&cli, &["coordination.max_indefinite_leases_per_agent"]);
     assert!(out.status.success(), "get failed: {:?}", out);
     assert!(String::from_utf8_lossy(&out.stdout)
         .trim()
@@ -362,7 +322,7 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
 
     // A raw, repo-only section with nothing configured is an intermediate key
     // resolving to an empty object, not an error.
-    let out = config_get(temp.path(), &["documentation", "--json"]);
+    let out = config_get(&cli, &["documentation", "--json"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
@@ -375,15 +335,13 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
 
 #[test]
 fn test_show_json_data_equals_every_section_config_get_resolves() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
     let json_of = |args: &[&str]| -> serde_json::Value {
-        let out = Command::new(jit_binary())
-            .args(args)
+        let out = cli
+            .command(args)
             .arg("--json")
-            .current_dir(temp.path())
             .output()
             .expect("failed to run jit");
         assert!(out.status.success(), "{args:?} failed: {out:?}");

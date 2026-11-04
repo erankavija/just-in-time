@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T00:59:08.407843500Z",
   "context": {},
   "created_at": "2026-10-15T11:05:37.998980678Z",
@@ -10,12 +10,26 @@
   ],
   "description": "Give issue rejection one command form.\n\n## Background\n\nAn issue can be rejected through a dedicated reject command, which accepts a reason and records it as a `resolution:` label, or through a state update to `rejected`, which accepts no reason. Two forms of one transition invite inconsistent records and force agents to remember which form takes which flag.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one command form rejects an issue, and it accepts an optional reason recorded the same way in every case.\n- [hard] REQ-02: The removed form is gone from the CLI, schema, MCP tools and documentation.\n",
   "documents": [],
+  "done_at": "2026-11-01T14:59:16.835628631Z",
   "first_ready_at": "2026-10-15T11:05:37.998980678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a1661499-8bd9-40c4-820d-f90509b9ba7e",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:55:42.039041943Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e6ec38c3-284e-4401-9d0d-32f58d83206d",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:58:41.847625991Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "da12ad66-7451-4700-9731-74a36c895bb9",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Give issue rejection one command form",
-  "updated_at": "2026-10-21T01:08:02.651509009Z"
+  "updated_at": "2026-11-01T14:59:16.835628631Z"
 }

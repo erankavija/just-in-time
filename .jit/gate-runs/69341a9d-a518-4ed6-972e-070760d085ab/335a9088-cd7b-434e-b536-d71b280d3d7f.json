@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3c876fd3c26a2e9e8af0874670f9a452f9271f3d",
+  "completed_at": "2026-10-31T23:30:49.333888276Z",
+  "duration_ms": 120103,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributed exit-code re-proof removals preserve their distinct error-class or behavioral evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "69341a9d-a518-4ed6-972e-070760d085ab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "335a9088-cd7b-434e-b536-d71b280d3d7f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:28:49.230152123Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:69341a9d commits 49fd27f89, 7d87deeee, fa8b68007, 86e1870fc\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; issue c780514e description\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-31T23:28:15Z); prior code-review failed (exit 1, 2026-10-31T23:17:18Z), with its stale-comment finding corrected by 86e1870fc\nTruncation recovery: recovered the initially truncated merge inspection with parent-specific diffs limited to affected test paths\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributed exit-code re-proof removals preserve their distinct error-class or behavioral evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -10,7 +10,7 @@
 //! must only own persistence, so `--json` callers would see human-formatted
 //! noise on stderr. Instead, storage now returns [`StorageWarning`] values and
 //! the output layer decides whether and how to render them (see
-//! `OutputWriter::print_warning` and the `recover` command's JSON/text output).
+//! `Outcome::with_warnings` and the `recover` command's JSON/text output).
 //!
 //! [`StorageWarning`] implements [`Display`](std::fmt::Display) so it plugs
 //! straight into the output layer, and [`Serialize`](serde::Serialize) so it
@@ -33,19 +33,6 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StorageWarning {
-    /// A gap was detected in the claims-log sequence numbers during rebuild.
-    SequenceGap {
-        /// The sequence number that was expected but missing.
-        missing: u64,
-    },
-    /// A duplicate active lease was found for an issue while verifying the
-    /// claims index (a sign the index is inconsistent and must be rebuilt).
-    DuplicateLease {
-        /// The issue ID that had more than one active lease.
-        issue_id: String,
-    },
-    /// The claims index was inconsistent and has been rebuilt from the log.
-    IndexRebuilt,
     /// Claims and lease recovery was skipped because the repository is not a
     /// git repository.
     ClaimsLeaseRecoverySkipped,
@@ -95,15 +82,6 @@ pub enum StorageWarning {
 impl fmt::Display for StorageWarning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StorageWarning::SequenceGap { missing } => {
-                write!(f, "Sequence gap detected - missing sequence {}", missing)
-            }
-            StorageWarning::DuplicateLease { issue_id } => {
-                write!(f, "Duplicate active lease for issue: {}", issue_id)
-            }
-            StorageWarning::IndexRebuilt => {
-                write!(f, "Claims index inconsistent, rebuilding from log")
-            }
             StorageWarning::ClaimsLeaseRecoverySkipped => write!(
                 f,
                 "Skipped claims and lease recovery because it requires a git repository"
@@ -152,29 +130,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_display_sequence_gap_matches_legacy_message() {
-        let warning = StorageWarning::SequenceGap { missing: 3 };
-        assert_eq!(
-            warning.to_string(),
-            "Sequence gap detected - missing sequence 3"
-        );
-    }
-
-    #[test]
     fn test_display_omits_warning_prefix() {
         // The output layer adds the "Warning:" framing, so the Display body
         // must not include it (otherwise it would be doubled).
-        let warning = StorageWarning::IndexRebuilt;
+        let warning = StorageWarning::ClaimsLeaseRecoverySkipped;
         assert!(!warning.to_string().starts_with("Warning:"));
     }
 
     #[test]
     fn test_serialize_tags_variant_kind() {
-        let warning = StorageWarning::DuplicateLease {
-            issue_id: "abc".to_string(),
+        let warning = StorageWarning::StaleLockRemoved {
+            path: PathBuf::from("locks/claims.lock"),
         };
         let value = serde_json::to_value(&warning).unwrap();
-        assert_eq!(value["kind"], "duplicate_lease");
-        assert_eq!(value["issue_id"], "abc");
+        assert_eq!(value["kind"], "stale_lock_removed");
+        assert_eq!(value["path"], "locks/claims.lock");
     }
 }

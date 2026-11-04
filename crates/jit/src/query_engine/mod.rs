@@ -13,6 +13,8 @@
 //! 2. **Parser**: Builds abstract syntax tree (AST) from tokens
 //! 3. **Evaluator**: Evaluates AST against Issue objects
 
+#[cfg(test)]
+use crate::domain::identity::IssueId;
 mod error;
 mod evaluator;
 mod lexer;
@@ -64,9 +66,14 @@ mod tests {
     use super::*;
     use crate::domain::{Issue, Priority, State};
 
-    fn create_test_issue(id: &str, state: State, priority: Priority, labels: Vec<&str>) -> Issue {
+    fn create_test_issue(
+        id: &IssueId,
+        state: State,
+        priority: Priority,
+        labels: Vec<&str>,
+    ) -> Issue {
         Issue {
-            id: id.to_string(),
+            id: id.clone(),
             title: format!("Test {}", id),
             description: String::new(),
             state,
@@ -121,30 +128,55 @@ mod tests {
     #[test]
     fn test_filter_by_state() {
         let issues = vec![
-            create_test_issue("1", State::Ready, Priority::Normal, vec![]),
-            create_test_issue("2", State::Done, Priority::Normal, vec![]),
-            create_test_issue("3", State::Ready, Priority::High, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+                State::Ready,
+                Priority::Normal,
+                vec![],
+            ),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+                State::Done,
+                Priority::Normal,
+                vec![],
+            ),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xe93c_56db_9922_c57f_0008_1a4f_b309_dea0),
+                State::Ready,
+                Priority::High,
+                vec![],
+            ),
         ];
 
         let filter = QueryFilter::parse("state:ready").unwrap();
         let matched = filter.filter_issues(&issues).unwrap();
 
         assert_eq!(matched.len(), 2);
-        assert_eq!(matched[0].id, "1");
-        assert_eq!(matched[1].id, "3");
+        assert_eq!(matched[0].id, issues[0].id);
+        assert_eq!(matched[1].id, issues[2].id);
     }
 
     #[test]
     fn test_filter_by_priority() {
         let issues = vec![
-            create_test_issue("1", State::Ready, Priority::High, vec![]),
-            create_test_issue("2", State::Ready, Priority::Normal, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+                State::Ready,
+                Priority::High,
+                vec![],
+            ),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+                State::Ready,
+                Priority::Normal,
+                vec![],
+            ),
         ];
 
         let filter = QueryFilter::parse("priority:high").unwrap();
         let matched = filter.filter_issues(&issues).unwrap();
 
         assert_eq!(matched.len(), 1);
-        assert_eq!(matched[0].id, "1");
+        assert_eq!(matched[0].id, issues[0].id);
     }
 }

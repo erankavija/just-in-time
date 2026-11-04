@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "26530d5a8ab633ac5c36d96a2ef4ac5840525676",
+  "completed_at": "2026-11-01T16:40:01.640679369Z",
+  "duration_ms": 207413,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/17fbcf25-67cd-41a8-acc4-adb6df43b4a2.json",
+        "id": "F1",
+        "line": 7,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "REQ-04's required net-line report appears only in an uncommitted issue-description change, not in any attributable tagged commit or committed affected artifact."
+      }
+    ],
+    "summary": "REQ-04's required net-line report is only uncommitted and is not attributable to this issue's tagged commits.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "17fbcf25-67cd-41a8-acc4-adb6df43b4a2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bb67ea24-212e-4adc-948d-ed1d256bfe58",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:36:34.227259833Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9149 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197f8-4dc1-70e3-99c1-9329b52b6c9d\n--------\nuser\n--- 9136 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2b21efee4, aa555d17f, d643aaa42, c3b503b42, 13e25ab41, f00e71007, ee25baf18, eca1a8108, 26530d5a8 (`jit:17fbcf25`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T16:30:39Z); code-review previously failed (exit 1, 2026-11-01T16:36:00Z)\nTruncation recovery: recovered truncated d643 and table-test output with current-file slices and per-commit path diffs; inspected merge-parent stats\n1. [blocking, issue-impact] REQ-04’s net-line report is not attributable: it exists only as an uncommitted addition to the issue description, while no `jit:17fbcf25` commit or committed affected artifact contains it. The prior F1 therefore remains unresolved under the read-only attribution policy. (`.jit/issues/17fbcf25-67cd-41a8-acc4-adb6df43b4a2.json:7`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04's required net-line report is only uncommitted and is not attributable to this issue's tagged commits.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04's required net-line report appears only in an uncommitted issue-description change, not in any attributable tagged commit or committed affected artifact.\",\"file\":\".jit/issues/17fbcf25-67cd-41a8-acc4-adb6df43b4a2.json\",\"line\":7,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

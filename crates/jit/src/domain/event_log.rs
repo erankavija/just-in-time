@@ -6,8 +6,7 @@ use super::Event;
 /// Structural failure while reading a known event-log record.
 #[derive(Debug, thiserror::Error)]
 pub enum EventLogError {
-    /// A line is not JSON and lacks the immediately following profile marker
-    /// that certifies it as an isolated torn tail.
+    /// A newline-terminated line is not JSON.
     #[error("invalid event JSON on line {line}: {source}")]
     InvalidJson {
         /// One-based physical line number.
@@ -22,6 +21,14 @@ pub enum EventLogError {
         /// One-based physical line number.
         line: usize,
     },
+    /// A record's tag is outside the current vocabulary.
+    #[error("unknown event tag '{tag}' on line {line}")]
+    UnknownTag {
+        /// One-based physical line number.
+        line: usize,
+        /// The tag the record carries.
+        tag: String,
+    },
     /// A current-vocabulary record does not match its typed event shape.
     #[error("invalid known event on line {line}: {source}")]
     InvalidKnownEvent {
@@ -33,114 +40,110 @@ pub enum EventLogError {
     },
 }
 
-/// Parse current-vocabulary events while retaining retired/unknown records.
+/// Parse the event log, skipping blank lines.
 ///
-/// Invalid JSON is rejected except for exactly one physical line immediately
-/// followed by a valid [`Event::ProfileLifecycle`] whose
-/// `isolated_torn_tail` flag is true. That marker is written in the same
-/// append that isolates the preserved prefix, making the exception explicit and
-/// auditable rather than broadly accepting malformed history.
-pub fn parse_known_events(contents: &str) -> Result<Vec<Event>, EventLogError> {
-    let lines = contents.lines().collect::<Vec<_>>();
-    let mut events = Vec::new();
-    for (offset, line) in lines.iter().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let value: serde_json::Value = match serde_json::from_str(line) {
-            Ok(value) => value,
-            Err(_) if certifies_preceding_torn_tail(lines.get(offset + 1)) => continue,
-            Err(source) => {
-                return Err(EventLogError::InvalidJson {
-                    line: offset + 1,
-                    source,
-                })
-            }
-        };
-        let Some(tag) = value
-            .as_object()
-            .and_then(|object| object.get("type"))
-            .and_then(serde_json::Value::as_str)
-        else {
-            return Err(EventLogError::MissingType { line: offset + 1 });
-        };
-        if EventTag::ALL.iter().any(|known| known.as_str() == tag) {
-            events.push(serde_json::from_value(value).map_err(|source| {
-                EventLogError::InvalidKnownEvent {
-                    line: offset + 1,
-                    source,
-                }
-            })?);
-        }
-    }
-    Ok(events)
+/// A final line without a terminating newline is an uncommitted append, which
+/// the next append overwrites, so it is ignored whatever it holds. Every other
+/// line must be a well-formed record of the current vocabulary.
+///
+/// # Errors
+///
+/// Names the first line that is not such a record.
+pub fn parse_known_events(contents: &[u8]) -> Result<Vec<Event>, EventLogError> {
+    contents
+        .split_inclusive(|byte| *byte == b'\n')
+        .enumerate()
+        .filter(|(_, line)| line.ends_with(b"\n") && !line.trim_ascii().is_empty())
+        .map(|(offset, record)| parse_record(offset + 1, record))
+        .collect()
 }
 
-fn certifies_preceding_torn_tail(next_line: Option<&&str>) -> bool {
-    next_line
-        .and_then(|line| serde_json::from_str::<Event>(line).ok())
-        .is_some_and(|event| {
-            matches!(
-                event,
-                Event::ProfileLifecycle {
-                    isolated_torn_tail: true,
-                    ..
-                }
-            )
-        })
+fn parse_record(line: usize, record: &[u8]) -> Result<Event, EventLogError> {
+    let value: serde_json::Value = serde_json::from_slice(record)
+        .map_err(|source| EventLogError::InvalidJson { line, source })?;
+    let tag = value
+        .as_object()
+        .and_then(|object| object.get("type"))
+        .and_then(serde_json::Value::as_str)
+        .ok_or(EventLogError::MissingType { line })?;
+    if !EventTag::ALL.iter().any(|known| known.as_str() == tag) {
+        return Err(EventLogError::UnknownTag {
+            line,
+            tag: tag.to_owned(),
+        });
+    }
+    serde_json::from_value(value)
+        .map_err(|source| EventLogError::InvalidKnownEvent { line, source })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn marker(isolated_torn_tail: bool) -> Event {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            operation: crate::domain::ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
-                id: "example"
-                    .try_into()
-                    .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
-                status: crate::domain::ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-            isolated_torn_tail,
+    fn line(event: &Event) -> String {
+        serde_json::to_string(event).expect("a sample serializes")
+    }
+
+    #[test]
+    fn test_parse_known_events_ignores_an_unterminated_final_line_and_rejects_a_malformed_middle_line(
+    ) {
+        let committed = EventTag::ALL[0].sample();
+        let prefix = format!("{}\n", line(&committed));
+        let complete_record = line(&EventTag::ALL[1].sample());
+        let unterminated_final_lines = [
+            b"{\"torn\":".as_slice(),
+            complete_record.as_bytes(),
+            b"{\"type\":\"retired_event\"}",
+            // A write torn inside a multi-byte character.
+            b"{\"title\":\"\xC3",
+        ];
+        for fragment in unterminated_final_lines {
+            let log = [prefix.as_bytes(), fragment].concat();
+            assert_eq!(
+                parse_known_events(&log).unwrap(),
+                std::slice::from_ref(&committed),
+                "fragment {:?}",
+                String::from_utf8_lossy(fragment)
+            );
+        }
+
+        for fragment in [b"{\"torn\":".as_slice(), b"{\"title\":\"\xC3"] {
+            let log = [fragment, b"\n", prefix.as_bytes()].concat();
+            assert!(
+                matches!(
+                    parse_known_events(&log),
+                    Err(EventLogError::InvalidJson { line: 1, .. })
+                ),
+                "fragment {:?}",
+                String::from_utf8_lossy(fragment)
+            );
         }
     }
 
     #[test]
-    fn test_parser_accepts_only_torn_line_certified_by_immediate_profile_marker() {
-        let certified_marker = marker(true);
-        let certified = format!(
-            "{{\"torn\":\n{}\n",
-            serde_json::to_string(&certified_marker).unwrap()
-        );
-        assert_eq!(
-            parse_known_events(&certified).unwrap(),
-            vec![certified_marker]
-        );
+    fn test_parse_known_events_skips_blank_lines_and_names_the_line_of_a_malformed_record() {
+        let event = line(&EventTag::ALL[0].sample());
+        let log = |bad: &str| format!("\n{event}\n  \n{bad}\n{event}\n").into_bytes();
+        let line_of = |error: EventLogError| match error {
+            EventLogError::InvalidJson { line, .. }
+            | EventLogError::MissingType { line }
+            | EventLogError::UnknownTag { line, .. }
+            | EventLogError::InvalidKnownEvent { line, .. } => line,
+        };
 
-        let unmarked_marker = marker(false);
-        let unmarked = format!(
-            "{{\"torn\":\n{}\n",
-            serde_json::to_string(&unmarked_marker).unwrap()
-        );
-        assert!(matches!(
-            parse_known_events(&unmarked),
-            Err(EventLogError::InvalidJson { line: 1, .. })
-        ));
-        let separated_marker = marker(true);
-        let separated = format!(
-            "{{\"torn\":\n\n{}\n",
-            serde_json::to_string(&separated_marker).unwrap()
-        );
-        assert!(matches!(
-            parse_known_events(&separated),
-            Err(EventLogError::InvalidJson { line: 1, .. })
-        ));
+        assert_eq!(parse_known_events(log("").as_slice()).unwrap().len(), 2);
+        for bad in [
+            "{not-json}",
+            "{}",
+            "{\"type\":\"retired_event\"}",
+            "{\"type\":\"issue_created\"}",
+        ] {
+            assert_eq!(
+                parse_known_events(&log(bad)).map_err(line_of).unwrap_err(),
+                4,
+                "record {bad}"
+            );
+        }
     }
 
     /// REQ-03: the log reader retains every record of the current vocabulary,
@@ -150,14 +153,9 @@ mod tests {
         let samples: Vec<Event> = EventTag::ALL.iter().map(|tag| tag.sample()).collect();
         let log = samples
             .iter()
-            .map(|event| {
-                format!(
-                    "{}\n",
-                    serde_json::to_string(event).expect("a sample serializes")
-                )
-            })
+            .map(|event| format!("{}\n", line(event)))
             .collect::<String>();
 
-        assert_eq!(parse_known_events(&log).unwrap(), samples);
+        assert_eq!(parse_known_events(log.as_bytes()).unwrap(), samples);
     }
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bd07fdf5295774c6abb4b9494eb24b59a2ae770e",
+  "completed_at": "2026-10-25T05:40:03.712964466Z",
+  "duration_ms": 150034,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are supported by typed load-time lowering, hierarchy constructor call paths, focused tests, and the recorded cargo-ci run.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "0461a6f7-cd92-4432-b835-d7d3dd2d9a8f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e42626dd-65fc-42f2-b4a9-47dba8a5eac3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T05:37:33.678240185Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are supported by typed load-time lowering, hierarchy constructor call paths, focused tests, and the recorded cargo-ci run.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

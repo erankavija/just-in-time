@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "95ed1fb574d04940b29fff867f01e80b06c87cdb",
+  "completed_at": "2026-11-01T18:46:09.330285798Z",
+  "duration_ms": 174919,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Derived conflict serialization, schema publication, and repository-relative target paths satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9e703435-4257-45f1-8c19-d1478d4b77b7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9215759c-d550-493c-bfb4-bd14817318c3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T18:43:14.410564248Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f97027ad7, 0a7a9fa8a, 95ed1fb57\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-12 (.jit/issues/3d9a0ce3-de69-4a99-ac98-9cf4d4852194.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T18:41:18Z)\nTruncation recovery: reread bounded target-conflict, schema, serializer, and test hunks; omitted co-tagged merge hunks were outside this issue’s impact cone.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Derived conflict serialization, schema publication, and repository-relative target paths satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

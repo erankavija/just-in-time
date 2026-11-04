@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f0d7a6ed0455553d7335db597d90f80cdaf119d",
+  "completed_at": "2026-10-27T00:45:29.597029915Z",
+  "duration_ms": 280061,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/tests/fast_docs_templates/document_event_log_tests.rs",
+        "id": "F1",
+        "line": 267,
+        "origin": "pre-existing",
+        "references": [
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "low",
+        "summary": "Pre-existing tests directly create file-backed storage and executors, leaving additional shared-fixture cleanup outside this issue's attributable work."
+      }
+    ],
+    "summary": "The three attributed helper migrations are correct; one pre-existing manual file-backed setup remains advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f4deb00a-22ae-4505-9bc3-27ed5d816604",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f9b5f714-0002-448b-afe1-a1e184d48af6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:40:49.535343093Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b09d933d48d4e9878359768b1d1300fabb99496f; 6f0d7a6ed0455553d7335db597d90f80cdaf119d (co-merge scoped to relevant fast_docs_templates paths)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 (.jit issue source); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-10-27T00:40:45Z (exit code not recorded); code-review pending\nTruncation recovery: inspected each named-file patch separately, merge-parent fast-docs patches, current fixtures, and helper searches; unrelated co-merged paths excluded as outside the issue impact cone\n\n1. [advisory][pre-existing] `crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:267` and `:334` still directly construct and initialize file-backed storage/executors inside test functions. These lines predate the attributed commits, so they do not fail this issue, but they leave the literal suite-wide intent of REQ-02 incomplete. `@/invariant/shared-test-contracts`\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The three attributed helper migrations are correct; one pre-existing manual file-backed setup remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Pre-existing tests directly create file-backed storage and executors, leaving additional shared-fixture cleanup outside this issue's attributable work.\",\"file\":\"crates/jit/tests/fast_docs_templates/document_event_log_tests.rs\",\"line\":267,\"references\":[\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

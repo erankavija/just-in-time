@@ -131,14 +131,14 @@ jit graph deps <issue-id> --depth 2
 # View all transitive dependencies (entire chain)
 jit graph deps <issue-id> --depth 0
 
-# Example output with tree structure (○ = not effectively terminal, ✓ = effectively terminal (done, rejected, or archived from one of those)):
+# Example output with tree structure (each issue shows its state in brackets):
 # Dependencies of abc123 (depth 2):
 #   Summary: 2/5 complete
 #
-#   ○ def456 - Implement feature X
-#   ├─ ○ ghi789 - Add tests
-#   └─ ✓ jkl012 - Update docs
-#   ✓ mno345 - Fix bug Y
+#   def456 - Implement feature X [ready]
+#   ├─ ghi789 - Add tests [ready]
+#   └─ jkl012 - Update docs [done]
+#   mno345 - Fix bug Y [done]
 ```
 
 ## Avoid Circular Dependencies
@@ -163,13 +163,17 @@ TASK_B=$(jit issue create --title "Task B" --json | jq -r '.id')
 TASK_C=$(jit issue create --title "Task C" --json | jq -r '.id')
 
 # Build chain: A → B → C
-jit dep add $TASK_A $TASK_B  # ✓ OK
-jit dep add $TASK_B $TASK_C  # ✓ OK
+jit dep add $TASK_A $TASK_B
+# Added 1 dependency:
+#   • <task-a> → <task-b>
+jit dep add $TASK_B $TASK_C
+# Added 1 dependency:
+#   • <task-b> → <task-c>
 
 # Try to create cycle: C → A
 jit dep add $TASK_C $TASK_A
-# ✗ ERROR: Cycle detected
-#   Adding dependency would create a cycle
+# Error: Rejected 1 dependency edge for <task-c>; none were added:
+#   - <task-a>: Cycle detected: adding dependency would create a cycle
 ```
 
 ### How Cycle Detection Works
@@ -213,11 +217,11 @@ Result: CYCLE, reject the add operation.
 jit validate
 
 # On success:
-# ✓ Repository validation passed
+# Repository validation passed
 #
 # On failure each finding prints on its own line, e.g.:
-# ❌ Repository validation failed with 1 rule error(s)
-# ❌ [dangling-item-link] <issue-id>: ...
+# error: Repository validation failed with 1 rule error(s)
+# error [dangling-item-link] <issue-id>: ...
 ```
 
 **Fix validation issues:**
@@ -230,8 +234,8 @@ jit validate --fix
 # - Drops redundant (transitively-implied) dependency edges
 # - Advances a pending state transition that is now unblocked
 #
-# Stale temp files, lock files, and a rebuildable index are NOT --fix's job;
-# run `jit recover` for those.
+# Use `jit recover` to remove stale temp files and locks, evict expired leases,
+# and reclaim stale indefinite leases.
 ```
 
 ### Common Cycle Patterns and Solutions
@@ -400,7 +404,7 @@ jit query blocked --full --json | jq
 unpassed gate):
 ```
 Blocked issues:
-  abc123 | Feature Integration | High
+  abc123 | Feature Integration | high
     - dependency:def456 (Unit Tests:in_progress)
     - dependency:ghi789 (API Documentation:backlog)
 
@@ -417,13 +421,13 @@ jit graph deps <issue-id>
 # Full dependency chain
 jit graph deps <issue-id> --depth 0
 
-# Example output (○ = not effectively terminal, ✓ = effectively terminal (done, rejected, or archived from one of those)):
+# Example output (each issue shows its state in brackets):
 # Dependencies of abc123 (all transitive):
 #   Summary: 1/3 complete
 #
-#   ✓ def456 - Database migration
-#   ○ xyz789 - API implementation
-#   └─ ○ qrs012 - Schema definition
+#   def456 - Database migration [done]
+#   xyz789 - API implementation [ready]
+#   └─ qrs012 - Schema definition [ready]
 ```
 
 ### Identify Downstream Dependents
@@ -552,7 +556,7 @@ The direct edge from A to C is dropped. C stays reachable from A through B.
 # Workflow: Design → Implementation → Testing
 
 # Redundant: 
-# Testing depends on Implementation ✓
+# Testing depends on Implementation
 # Testing depends on Design ← redundant (via Implementation)
 
 # Minimal:

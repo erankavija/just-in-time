@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b5420aa83a3ea0c436060c1ea4da3360e927fc61",
+  "completed_at": "2026-11-01T08:33:52.829567Z",
+  "duration_ms": 164661,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed seed isolation, harvest replacement behavior, focused test coverage, and recorded reproduction evidence satisfy all hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "86f78db2-467e-4b3d-b6a6-279b8c3e9bb4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "38c6aa27-2d23-408c-9bc6-8117a8b8c256",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:31:08.167706957Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d00943ffe, ebbbb12b7, 62ea55da5, 689e329de, 38d02e702, 2d09f45d3, cf257e56f, b5420aa83 (`jit:86f78db2`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/86f78db2/requirement/REQ-01 through REQ-04 (issue success criteria); @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T08:30:49Z); worktree-cache-test passed (exit 0, 2026-11-01T08:31:07Z); code-review pending (no recorded exit code)\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed seed isolation, harvest replacement behavior, focused test coverage, and recorded reproduction evidence satisfy all hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:05:39.066063609Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the item-kind tables in the shared harness and test taxonomy in favour of the package derivation.\n\n## Background\n\n`TestHarness::with_item_kinds` (`crates/jit/src/test_harness.rs`) hand-copies the shipped kinds as `CANONICAL_ITEM_KINDS`, with the `D-[0-9]+` pattern, and `SUITE_TABLES` in `crates/jit/src/test_taxonomy.rs` restates them again. Shared test support derives the shipped kinds from `profiles/jit-default/manifest.toml`. `dev/TESTING.md` documents `with_item_kinds` as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `TestHarness::with_item_kinds` and `test_taxonomy` take shipped kinds from the derivation, and neither holds an item-kind literal.\n- [hard] REQ-02: Harness tests that use item kinds assert what they asserted before.\n- [hard] REQ-03: `dev/TESTING.md` describes the derivation where it describes `with_item_kinds`.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:33:39.656764119Z",
   "first_ready_at": "2026-10-22T16:07:08.984754918Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9fbecc04-96cb-4103-bc82-9f03c838a2b6",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:03.081187266Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ecfe0e52-d3f9-445f-a6a0-d8e708f7fc5d",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:31:36.717742672Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5876e131-02c4-4d66-b5ae-a969dfc78b32",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Harness and test taxonomy take shipped item kinds from the derivation",
-  "updated_at": "2026-10-22T16:07:08.984754918Z"
+  "updated_at": "2026-10-27T00:33:39.656764119Z"
 }

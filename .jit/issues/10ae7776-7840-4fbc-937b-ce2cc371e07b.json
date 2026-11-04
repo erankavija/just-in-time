@@ -1,0 +1,47 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T20:17:12.950526643Z",
+  "context": {},
+  "created_at": "2026-10-27T00:08:56.805282113Z",
+  "dependencies": [
+    "8acca4f4-af5d-4dd8-b135-5f4a87eb1311"
+  ],
+  "description": "Remove the remaining restatements of declared closed vocabularies: handwritten token lists and `Debug`-rendered vocabulary values.\n\n## Background\n\nEach closed vocabulary (for example `State`, `Priority`, `Severity`, `GateMode`) is declared once through the `wire_vocabulary!` macro in `crates/jit/src/domain/vocabulary.rs`, which provides `ALL` and the canonical token method. Two kinds of restatement remain:\n\n- Tests that enumerate a vocabulary's tokens by hand, e.g. the invalid-state test in `crates/jit/src/declarations/rules.rs` (around line 1831) lists all seven `State` tokens literally.\n- Human output that formats vocabulary values with `{:?}`, e.g. the issue-list renderer in `crates/jit/src/output.rs` (around line 254) prints `State` and `Priority` by their Rust variant names (`InProgress`) instead of their wire tokens (`in_progress`).\n\n## Success Criteria\n\n- [hard] REQ-01: No code under `crates/`, test modules, integration tests and doctests included, lists the tokens of a `wire_vocabulary!`-declared vocabulary as a handwritten collection of literals; each such list derives from the vocabulary's `ALL` and its token method. Single literal values used as sample inputs are not lists and may remain.\n- [hard] REQ-02: No human-facing output under `crates/` renders a `wire_vocabulary!`-declared value with `Debug` formatting; it renders the canonical wire token.\n- [hard] REQ-03: JSON output data is byte-identical before and after; only description prose in the `jit --schema` document may change. Tests that asserted `Debug` names in human output assert the wire tokens instead.",
+  "documents": [],
+  "done_at": "2026-10-27T21:58:56.028421339Z",
+  "first_ready_at": "2026-10-27T00:08:56.805282113Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fe046252-a9f6-48f5-8cf2-f3499a039427",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:58:44.306719428Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b23dbbfc-a934-481d-97e2-b88e2a253b9b",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:55:35.685714046Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "10ae7776-7840-4fbc-937b-ce2cc371e07b",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:wire-vocabularies",
+    "component:core",
+    "component:cli",
+    "satisfies:2195c98f/REQ-10",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Declared vocabularies are never restated as token lists or Debug names",
+  "updated_at": "2026-10-27T21:58:56.028421339Z"
+}

@@ -1,9 +1,8 @@
 //! Graph / aggregate rule evaluation (DR §4.2).
 //!
 //! These rule kinds need cross-issue context and therefore run in
-//! `jit validate`, gate checkers, and at state transitions (where enforcing
-//! failures block the transition; see `enforce_transition_graph_rules` in
-//! `commands`). They never run on plain field writes:
+//! `jit validate`, gate checkers, and at state transitions, where enforcing
+//! failures block the transition. They never run on plain field writes:
 //!
 //! - **`label-coverage`** — every canonical criterion id declared in a source
 //!   issue's `## Success Criteria` section is satisfied by at least one related
@@ -27,20 +26,18 @@
 //! context); the evaluation itself is a pure function of the issue set, so it is
 //! trivially testable with constructed [`Issue`] lists.
 //!
-//! # Config interpretation
+//! # Configuration
 //!
-//! Each graph [`Assertion`] carries a raw, unvalidated [`toml::value::Table`].
-//! This module interprets the keys each kind expects and DOCUMENTS them on the
-//! per-kind evaluators below. Malformed or missing required config never panics:
-//! it surfaces as a `config-error` [`Finding`] (attributed to the rule) so the
-//! problem is visible rather than silently swallowed. Optional keys fall back to
-//! documented defaults.
+//! Assertion options are typed and validated at rule load. Unusable runtime
+//! context, such as an unresolved container pointer or an unavailable content
+//! parser, surfaces as a `config-error` finding attributed to the rule.
 //!
 //! # Purity & layering (DR §12)
 //!
 //! Evaluation is a deterministic function of the issue slice. The caller reads
 //! the store; nothing here touches the filesystem.
 
+use crate::domain::identity::GateKey;
 use std::collections::BTreeSet;
 
 use chrono::{DateTime, Utc};
@@ -58,71 +55,20 @@ use crate::graph::DependencyGraph;
 use std::collections::HashMap;
 
 use crate::declarations::rules::{
-    Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
+    Assertion, ChildLink, DependencyShapeConfig, LabelCoverageConfig, LabelReferenceConfig,
+    LabelReferenceScope, Rule, RuleScope, Severity, TypeHierarchyKind,
 };
+use crate::domain::id_pattern::IdPattern;
+use crate::domain::identity::IssueId;
 use crate::validation::engine::Finding;
 
-/// Default label namespace whose values name the criterion a child claims to
-/// satisfy (e.g. `satisfies:<container-short-id>/REQ-01`).
-const DEFAULT_SATISFIES_NAMESPACE: &str = "satisfies";
-
-/// Default projection slug of the section holding success criteria.
-const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
-
-/// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
-const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
-
-/// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
-/// a label value in `crates/jit/src` (excluding tests) falls into one of three
-/// buckets once the value grammar admits `@`-prefixed addresses:
-///
-/// 1. **Colon-split (namespace) sites** — stop at the first colon and never
-///    look at the rest of the value, so the widened value grammar cannot
-///    change their behavior: `labels::parse_label`, `labels::type_value_of`,
-///    [`crate::commands::CommandExecutor::resolve_link_label`],
-///    [`crate::commands::CommandExecutor::dangling_link_findings`],
-///    `validation::desugar::desugar_require_label`,
-///    [`crate::commands::CommandExecutor::query_by_label`],
-///    `snapshot::SnapshotScope::parse`, plus the unrelated-namespace assignee
-///    parsers (`commands::claim::assert_valid_actor`,
-///    `domain::Assignee::from_str` /
-///    `domain::Assignee`'s `PartialEq<str>` — label values never reach
-///    these; they parse `{type}:{identifier}` assignees, a different input
-///    domain per @/inv/assignee-format).
-/// 2. **Slash-decode qualified-id sites** — route through the structural
-///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
-///    [`crate::domain::item::expand_sugar_address`]):
-///    [`crate::commands::CommandExecutor::show_item`] (via
-///    `resolve_item_address`), `resolve_link_label`'s qualified check (now
-///    [`crate::domain::item::is_qualified_reference`]), `dangling_link_findings`,
-///    and [`label_credits_id`] below — which routes an `@`-prefixed value
-///    through [`crate::domain::item::parse_kind_segmented_address`] and keeps
-///    its own two-segment split ONLY for the non-`@` `<short-id>/<self-id>`
-///    sugar shape (its doc comment explains why `expand_sugar_address` is not
-///    used there).
-/// 3. **Slash-splitters unrelated to qualified ids — confirmed OUT OF SCOPE,
-///    no change needed.** These never see a label value:
-///    [`crate::storage::memory::InMemoryStorage`]'s repo-relative path-segment
-///    check, [`crate::storage::path_errors::validate_repo_relative_path`]'s
-///    `..`-traversal check, four JSON-pointer-style instance-path splits in
-///    `validation::engine` (`empty_items_section_slug`,
-///    `render_contains_message`, `contains_subschema_via_schema_path`,
-///    `readable_instance_path`), [`slug_to_heading`] below (splits a section
-///    slug on `_`, not `/` or `:`), and `crates/server/src/routes.rs`'s
-///    `compute_base_href` (an unrelated raw-file route path).
-///
-/// A future reader auditing a new re-split site should re-run
-/// `rg -n "splitn|split_once|\.split\(" crates/jit/src crates/server/src --type rust`
-/// and classify against these three buckets rather than re-deriving them.
-///
-/// Whether a link `label` credits criterion `id` owned by the issue whose short
-/// id is `scope_short_id`.
+/// Whether a link `label` credits criterion `id` owned by `scope_id`.
 ///
 /// The single matcher behind `label-coverage` and `criteria-to-check`. Only a
 /// label that names the criterion's owner credits it:
 ///
-/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff `scope` equals
-///   `scope_short_id` and `self-id` equals `id`.
+/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff `scope` names
+///   `scope_id` by id prefix and `self-id` equals `id`.
 /// - **`@`-address** `<namespace>:@…` — parsed by
 ///   [`parse_kind_segmented_address`]; only the issue form
 ///   `@/issue/<short-id>/<kind>/<self-id>` credits, on scope and self-id alone
@@ -131,14 +77,14 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 ///
 /// An unqualified `<namespace>:<id>` names no owner, so it credits nothing;
 /// validation reports it for migration.
-fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str) -> bool {
+fn label_credits_id(label: &str, namespace: &str, id: &str, scope_id: &IssueId) -> bool {
     let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
         return false;
     };
     if value.starts_with(PROJECT_SCOPE_SENTINEL) {
         return match parse_kind_segmented_address(value) {
             Ok(addr) => match addr.scope {
-                AddressScope::Issue(short_id) => short_id == scope_short_id && addr.self_id == id,
+                AddressScope::Issue(short_id) => short_id.matches(scope_id) && addr.self_id == id,
                 AddressScope::Project | AddressScope::NamedProject(_) => false,
             },
             Err(_) => false,
@@ -146,9 +92,12 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     }
     // `expand_sugar_address` is not used: it needs the configured kind list and
     // would add kind semantics D10 forbids at this crediting site.
-    value
-        .split_once('/')
-        .is_some_and(|(scope, self_id)| scope == scope_short_id && self_id == id)
+    value.split_once('/').is_some_and(|(scope, self_id)| {
+        matches!(
+            crate::domain::item::Scope::parse(scope),
+            Ok(crate::domain::item::Scope::Issue(prefix)) if prefix.matches(scope_id)
+        ) && self_id == id
+    })
 }
 
 /// The label namespaces through which `rules` credit criteria: each active
@@ -161,16 +110,10 @@ pub fn coverage_credit_namespaces<'a>(
         .into_iter()
         .filter(|rule| rule.severity != Severity::Off)
         .filter_map(|rule| match &rule.assert {
-            Assertion::LabelCoverage { config } => Some(
-                config
-                    .get("satisfies-namespace")
-                    .and_then(toml::Value::as_str)
-                    .unwrap_or(DEFAULT_SATISFIES_NAMESPACE)
-                    .to_string(),
-            ),
+            Assertion::LabelCoverage { config } => Some(config.satisfies_namespace().to_string()),
             Assertion::CriteriaToCheck {
                 check_namespace, ..
-            } => check_namespace.clone(),
+            } => Some(check_namespace.clone()),
             _ => None,
         })
         .collect()
@@ -197,19 +140,6 @@ pub fn issue_credit_namespaces<'a>(
 /// can be recognized as a config error structurally.
 const CONFIG_ERROR_PREFIX: &str = "config error: ";
 
-/// How a "child" issue relates to the source issue in `label-coverage`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChildLink {
-    /// Children are issues that depend on the source (the source is in their
-    /// `dependencies`). This is the default.
-    Dependents,
-    /// Children are issues the source depends on (in the source's
-    /// `dependencies`).
-    Dependencies,
-    /// Any issue in the set is a candidate child, regardless of dependency edges.
-    Any,
-}
-
 /// A graph-rule [`Finding`] paired with the issue it pertains to.
 ///
 /// Graph rules are inherently cross-issue, so per-issue reporting needs to know
@@ -220,17 +150,23 @@ pub enum ChildLink {
 /// - `issue_id` is `Some(full_id)` for a violation attributable to one specific
 ///   issue (e.g. the source issue whose criterion is uncovered, or whose
 ///   dependency shape is wrong).
-/// - `issue_id` is `None` for a `config-error` finding: a malformed rule config
+/// - `issue_id` is `None` for a `config-error` finding: unusable runtime context
 ///   pertains to the rule itself, not a single issue, and must never be silently
 ///   dropped from a per-issue view.
+/// - `subject` is the issue whose rule application fired the finding. It
+///   differs from `issue_id` when `container-from-label` attributes a finding to
+///   the resolved container, and when a config error is raised for one firing
+///   issue; it is `None` for repo-wide findings such as `label-uniqueness`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphFinding {
     /// Full id of the issue this finding concerns, or `None` for a config-error
     /// (which pertains to the rule, not a single issue).
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
+    /// Full id of the issue whose rule application fired this finding.
+    pub subject: Option<IssueId>,
     /// The underlying engine finding (rule name, severity, message).
     pub finding: Finding,
-    /// Whether this finding represents a malformed rule configuration. Set only
+    /// Whether this finding represents unusable runtime context. Set only
     /// by the module-internal `config_error()` constructor; never set by
     /// `for_issue()` or `unattributed()`. Guards read this field directly rather
     /// than scanning `finding.message` for a prefix.
@@ -238,10 +174,11 @@ pub struct GraphFinding {
 }
 
 impl GraphFinding {
-    /// A finding attributed to a specific issue id.
-    pub fn for_issue(issue_id: impl Into<String>, finding: Finding) -> Self {
+    /// A finding attributed to, and fired by, a specific issue id.
+    pub fn for_issue(issue_id: IssueId, finding: Finding) -> Self {
         Self {
-            issue_id: Some(issue_id.into()),
+            subject: Some(issue_id.clone()),
+            issue_id: Some(issue_id),
             finding,
             is_config_error: false,
         }
@@ -254,12 +191,13 @@ impl GraphFinding {
     pub fn unattributed(finding: Finding) -> Self {
         Self {
             issue_id: None,
+            subject: None,
             finding,
             is_config_error: false,
         }
     }
 
-    /// Whether this finding is a `config-error` (a malformed rule config).
+    /// Whether this finding is a `config-error` (unusable runtime context).
     ///
     /// Config errors are produced by the module-internal `config_error()`
     /// constructor, which sets the typed `is_config_error` field. Guards read
@@ -271,23 +209,8 @@ impl GraphFinding {
     }
 }
 
-impl ChildLink {
-    /// Parse a `child-link` config value into a [`ChildLink`].
-    ///
-    /// Returns `None` for an unrecognized value so the caller can emit a clear
-    /// config-error finding rather than silently defaulting.
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "dependents" => Some(Self::Dependents),
-            "dependencies" => Some(Self::Dependencies),
-            "any" => Some(Self::Any),
-            _ => None,
-        }
-    }
-}
-
 /// Evaluate all graph rules over the given issue set, returning one [`Finding`]
-/// per violation (and a `config-error` finding per malformed rule config).
+/// per violation (and a `config-error` finding for unusable runtime context).
 ///
 /// Only rules whose [`Rule::scope`] is [`RuleScope::Graph`] are evaluated; any
 /// non-graph rule passed in is ignored (so callers may hand the full rule set).
@@ -317,7 +240,7 @@ impl ChildLink {
 /// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
-/// let mut task = Issue::draft("a task".into(), String::new());
+/// let mut task = Issue::draft(jit::test_utils::issue_id(1), "a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// // No design dependency -> one finding, attributed to the task.
 /// let findings = evaluate_graph(
@@ -366,52 +289,20 @@ pub fn evaluate_graph(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
-    // Whole-repo evaluation: the evaluation slice IS the resolution index, so a
-    // `container-from-label` pointer resolves against the same set it evaluates.
-    evaluate_graph_indexed(
-        rules,
-        issues,
-        issues,
+    let context = GraphEvaluationContext {
+        graph_context: issues,
         hierarchy,
         repo_default_format,
         now,
         plan_content,
-    )
-}
-
-/// Evaluate graph rules over a **partial** issue slice while resolving container
-/// pointers against the **complete** repository index (`--scope`, ef0065ad).
-///
-/// The `evaluation` slice decides which issues fire each rule and which issues
-/// the coverage walk considers as candidates (a bracket subtree). The
-/// `resolution_index` is the whole-repository issue set used ONLY to resolve a
-/// `container-from-label` pointer to a container: a valid pointer to a container
-/// outside the slice therefore resolves cleanly (rather than reading as a
-/// dangling pointer against the partial map), and that container's coverage —
-/// belonging to a different bracket scope — is skipped, so only the requested
-/// bracket's coverage is evaluated. A pointer that resolves to no issue in the
-/// full index is still a genuine config error. When `evaluation` and
-/// `resolution_index` are the same slice this is exactly [`evaluate_graph`].
-pub fn evaluate_graph_scoped(
-    rules: &[&Rule],
-    evaluation: &[Issue],
-    resolution_index: &[Issue],
-    hierarchy: &HierarchyConfig,
-    repo_default_format: ContentFormat,
-    now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
-) -> Vec<GraphFinding> {
-    evaluate_graph_indexed(
-        rules,
-        evaluation,
-        resolution_index,
-        hierarchy,
-        repo_default_format,
-        now,
-        plan_content,
-    )
+    };
+    rules
+        .iter()
+        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
+        .flat_map(|rule| evaluate_one(rule, issues, &context))
+        .collect()
 }
 
 /// Explain why a selected rule cannot be applied to one issue.
@@ -457,49 +348,11 @@ pub fn select_graph_rule<'a>(
     }
 }
 
-/// Return the selected issue and its uniquely resolved coverage container id.
-///
-/// Resolution is deliberately performed against the same pure issue index that
-/// the evaluator receives. Missing or ambiguous pointers intentionally produce
-/// no additional plan source here; the pure evaluator reports those pointer
-/// errors for the selected firing issue.
-pub fn graph_rule_plan_source_ids(
-    rule: &Rule,
-    issue: &Issue,
-    resolution_index: &[Issue],
-) -> Vec<String> {
-    let mut source_ids = vec![issue.id.clone()];
-    if let Assertion::LabelCoverage { config } = &rule.assert {
-        if let Some(toml::Value::String(namespace)) = config.get("container-from-label") {
-            let prefix = format!("{namespace}:");
-            if let Some(value) = issue
-                .labels
-                .iter()
-                .find_map(|label| label.strip_prefix(&prefix))
-            {
-                if let ContainerMatch::Unique(target) = resolve_container(value, resolution_index) {
-                    if !source_ids.iter().any(|source_id| source_id == &target.id) {
-                        source_ids.push(target.id.clone());
-                    }
-                }
-            }
-        }
-    }
-    source_ids
-}
-
-/// Repository context supplied to one pure graph-rule application.
-///
-/// `graph_context` supplies relationship and declaration context, while
-/// `resolution_index` is used only for identifier resolution such as
-/// `container-from-label`. Keeping both separate from the firing slice prevents
-/// a repository-wide read set from silently widening a selected verdict.
+/// Repository context supplied to pure graph evaluation.
 #[derive(Debug, Clone, Copy)]
 pub struct GraphEvaluationContext<'a> {
     /// Issues available to relationship and declaration-aware assertions.
     pub graph_context: &'a [Issue],
-    /// Issues available when resolving identifier or label pointers.
-    pub resolution_index: &'a [Issue],
     /// Repository hierarchy used by type-hierarchy assertions.
     pub hierarchy: &'a HierarchyConfig,
     /// Default content format used for criteria parsing.
@@ -507,58 +360,7 @@ pub struct GraphEvaluationContext<'a> {
     /// Clock supplied to recency assertions.
     pub now: DateTime<Utc>,
     /// Captured external plan content keyed by issue id.
-    pub plan_content: &'a HashMap<String, String>,
-}
-
-/// Evaluate one graph rule with an explicit firing set and separate context.
-///
-/// `firing_issues` is the only set whose matching issues can become rule
-/// subjects. `graph_context` supplies relationship and declaration context for
-/// the rule, while `resolution_index` is used only for identifier resolution
-/// such as `container-from-label`. Keeping these sets separate prevents a
-/// repository-wide read set from silently widening a selected rule's verdict.
-///
-/// This is the pure boundary used by issue-and-rule-scoped checkers. Callers
-/// must validate that the selected rule exists, is enabled, and matches the
-/// selected issue before invoking it; an empty result here means the selected
-/// rule application passed, not that an absent application passed.
-pub fn evaluate_graph_rule(
-    rule: &Rule,
-    firing_issues: &[Issue],
-    context: &GraphEvaluationContext<'_>,
-) -> Vec<GraphFinding> {
-    if rule.scope != RuleScope::Graph || rule.severity == Severity::Off {
-        return Vec::new();
-    }
-
-    evaluate_one(rule, firing_issues, context)
-}
-
-/// Shared driver for [`evaluate_graph`] and [`evaluate_graph_scoped`]: evaluate
-/// each graph rule over the `evaluation` slice, resolving container pointers
-/// against `resolution_index`.
-fn evaluate_graph_indexed(
-    rules: &[&Rule],
-    evaluation: &[Issue],
-    resolution_index: &[Issue],
-    hierarchy: &HierarchyConfig,
-    repo_default_format: ContentFormat,
-    now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
-) -> Vec<GraphFinding> {
-    let context = GraphEvaluationContext {
-        graph_context: evaluation,
-        resolution_index,
-        hierarchy,
-        repo_default_format,
-        now,
-        plan_content,
-    };
-    rules
-        .iter()
-        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, evaluation, &context))
-        .collect()
+    pub plan_content: &'a HashMap<IssueId, String>,
 }
 
 /// Evaluate a single graph rule, dispatching on its assertion kind.
@@ -573,7 +375,6 @@ fn evaluate_one(
             config,
             firing_issues,
             context.graph_context,
-            context.resolution_index,
             context.repo_default_format,
             context.plan_content,
         ),
@@ -609,15 +410,13 @@ fn evaluate_one(
             criteria_section,
             marker,
             id_pattern,
-            gate_prefix,
             check_namespace,
         } => evaluate_criteria_to_check(
             rule,
             criteria_section,
             marker.as_deref(),
             id_pattern,
-            gate_prefix.as_deref(),
-            check_namespace.as_deref(),
+            check_namespace,
             firing_issues,
             context.repo_default_format,
             context.plan_content,
@@ -638,7 +437,7 @@ fn evaluate_one(
 /// is produced per colliding value, naming the value and the short-ids of all
 /// colliding issues.
 ///
-/// The evaluation is a single pass: one `HashMap<value, Vec<short_id>>` is
+/// The evaluation is a single pass: one `HashMap<value, Vec<issue id>>` is
 /// built over the matching issue slice, and groups with length >= 2 are
 /// reported. This is O(n * k) in issues and labels per issue — no N² scan.
 ///
@@ -655,30 +454,26 @@ fn evaluate_one(
 /// the value and the short-ids of all declaring issues (space-separated, in
 /// the order they appear in the issue slice). One finding per colliding value.
 fn evaluate_label_uniqueness(rule: &Rule, namespace: &str, issues: &[Issue]) -> Vec<GraphFinding> {
-    // Single pass: collect the short-ids of every matching issue that carries
-    // each value in the namespace. Using HashMap for O(1) insertion; the
-    // entries are collected into a BTreeMap at the end for deterministic order.
-    let mut value_to_ids: HashMap<String, Vec<String>> = HashMap::new();
+    // Single pass: collect the ids of every matching issue that carries each
+    // value in the namespace.
+    let mut value_to_ids: HashMap<&str, Vec<&IssueId>> = HashMap::new();
 
     for issue in issues {
         if !rule.when.matches(issue) {
             continue;
         }
         for value in values_in_namespace(issue, namespace) {
-            value_to_ids
-                .entry(value.to_string())
-                .or_default()
-                .push(issue.short_id().to_string());
+            value_to_ids.entry(value).or_default().push(&issue.id);
         }
     }
 
     // Report one finding per value owned by 2 or more issues. Sort by value
     // for deterministic output regardless of HashMap iteration order.
-    let mut collisions: Vec<(String, Vec<String>)> = value_to_ids
+    let mut collisions: Vec<(&str, Vec<&IssueId>)> = value_to_ids
         .into_iter()
         .filter(|(_, ids)| ids.len() >= 2)
         .collect();
-    collisions.sort_by(|(a, _), (b, _)| a.cmp(b));
+    collisions.sort_by_key(|(value, _)| *value);
 
     collisions
         .into_iter()
@@ -687,7 +482,10 @@ fn evaluate_label_uniqueness(rule: &Rule, namespace: &str, issues: &[Issue]) -> 
                 rule,
                 format!(
                     "label '{namespace}:{value}' is declared by multiple issues: {}",
-                    ids.join(" ")
+                    ids.iter()
+                        .map(|id| id.short_id())
+                        .collect::<Vec<_>>()
+                        .join(" ")
                 ),
             ))
         })
@@ -704,50 +502,22 @@ fn finding(rule: &Rule, message: String) -> Finding {
 }
 
 /// Build a [`GraphFinding`] attributed to `issue_id` for this rule.
-fn issue_finding(rule: &Rule, issue_id: &str, message: String) -> GraphFinding {
-    GraphFinding::for_issue(issue_id, finding(rule, message))
+fn issue_finding(rule: &Rule, issue_id: &IssueId, message: String) -> GraphFinding {
+    GraphFinding::for_issue(issue_id.clone(), finding(rule, message))
 }
 
-/// Build a `config-error` [`GraphFinding`]: a malformed/missing config key is
-/// always reported (never swallowed, never a panic), attributed to the rule (not
-/// a single issue, so `issue_id` is `None`).
+/// Attribute unusable runtime context, raised while applying the rule to
+/// `subject`, to the rule rather than a single issue.
 ///
 /// This is the only constructor that sets `is_config_error: true` on the result;
 /// guards read that typed field rather than scanning `finding.message` for a
 /// prefix.
-fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
+fn config_error(rule: &Rule, subject: &IssueId, message: impl Into<String>) -> GraphFinding {
     GraphFinding {
         issue_id: None,
+        subject: Some(subject.clone()),
         finding: finding(rule, format!("{CONFIG_ERROR_PREFIX}{}", message.into())),
         is_config_error: true,
-    }
-}
-
-/// Read a required string key from a config table, or `Err(GraphFinding)`.
-fn require_str<'a>(
-    rule: &Rule,
-    config: &'a toml::value::Table,
-    key: &str,
-) -> Result<&'a str, GraphFinding> {
-    match config.get(key) {
-        Some(toml::Value::String(s)) => Ok(s.as_str()),
-        Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
-        None => Err(config_error(rule, format!("missing required key '{key}'"))),
-    }
-}
-
-/// Read an optional string key, defaulting when absent. A present non-string is
-/// a config error.
-fn optional_str<'a>(
-    rule: &Rule,
-    config: &'a toml::value::Table,
-    key: &str,
-    default: &'a str,
-) -> Result<&'a str, GraphFinding> {
-    match config.get(key) {
-        None => Ok(default),
-        Some(toml::Value::String(s)) => Ok(s.as_str()),
-        Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
     }
 }
 
@@ -777,18 +547,17 @@ fn optional_str<'a>(
 ///   projection slug of the section whose list items hold the criteria.
 /// - `marker` (string, optional): when set, only items whose text begins with
 ///   this marker (e.g. `"[hard]"`) are required; others are ignored.
-/// - `id-pattern` (string, optional, default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex
-///   that extracts the criterion id from an item's text.
+/// - `id-pattern` (string, optional, default [`crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN`]):
+///   regex that extracts the criterion id from an item's text.
 /// - `satisfies-namespace` (string, optional, default `"satisfies"`): label
 ///   namespace on children whose value names the satisfied criterion (see
 ///   [`label_credits_id`]).
 /// - `child-state` (string, optional): when set, a satisfying child must be in
-///   this lifecycle state (snake_case, e.g. `"done"`). **Absent means any
-///   state** — there is no `"any"` token.
-/// - `child-link` (string, optional, default `"dependents"`): how a child
-///   relates to the container — `"dependents"`, `"dependencies"`, or `"any"`.
-///   For `"dependents"` / `"dependencies"` the walk is a transitive closure in
-///   that direction.
+///   this lifecycle state (a [`State`](crate::domain::State) token).
+///   **Absent means any state**; there is no wildcard token.
+/// - `child-link` (string, optional, default [`ChildLink::Dependents`]): how a
+///   child relates to the container, as a [`ChildLink`] token. For a
+///   directional link the walk is a transitive closure in that direction.
 /// - `child-type-exclude` (array of strings, optional): bare `type:` names that
 ///   are dropped from coverage candidates AND act as a traversal boundary (the
 ///   walk does not descend through them).
@@ -796,131 +565,37 @@ fn optional_str<'a>(
 ///   firing issue names the criteria-bearing container, so a rule keyed on one
 ///   issue type can evaluate another issue's criteria (container indirection).
 ///
-/// One finding is produced per uncovered criterion id per container. A malformed
-/// config — including a firing issue whose `container-from-label` pointer resolves
-/// to no issue in `resolution_index` — yields a single `config-error` finding.
-///
-/// `resolution_index` is the issue set a `container-from-label` pointer resolves
-/// against; it is the complete repository index even when `issues` is a partial
-/// `--scope` slice (ef0065ad). A pointer that resolves to a container OUTSIDE the
-/// evaluation slice names a different bracket scope, so that firing issue's
-/// coverage is skipped (no finding) rather than evaluated against the partial map.
-/// For whole-repo evaluation the two sets are identical, so every resolved
-/// container is in-slice and nothing is skipped.
+/// One finding is produced per uncovered criterion id per container. An unresolved
+/// `container-from-label` pointer yields a single `config-error` finding.
+/// Malformed assertion configuration is rejected at rule load.
 fn evaluate_label_coverage(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &LabelCoverageConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
-    resolution_index: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
-    // --- Interpret config (any error short-circuits to one config-error). ---
-    let section_slug =
-        match optional_str(rule, config, "criteria-section", DEFAULT_CRITERIA_SECTION) {
-            Ok(v) => v,
-            Err(f) => return vec![f],
-        };
-    let marker = match config.get("marker") {
-        None => None,
-        Some(toml::Value::String(s)) => Some(s.as_str()),
-        Some(_) => return vec![config_error(rule, "key 'marker' must be a string")],
-    };
-    let id_pattern_src = match optional_str(rule, config, "id-pattern", DEFAULT_ID_PATTERN) {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-    let satisfies_ns = match optional_str(
-        rule,
-        config,
-        "satisfies-namespace",
-        DEFAULT_SATISFIES_NAMESPACE,
-    ) {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let child_state = match config.get("child-state") {
-        None => None,
-        Some(toml::Value::String(s)) => Some(s.as_str()),
-        Some(_) => return vec![config_error(rule, "key 'child-state' must be a string")],
-    };
-    let child_link_src = match optional_str(rule, config, "child-link", "dependents") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let child_link = match ChildLink::parse(child_link_src) {
-        Some(c) => c,
-        None => {
-            return vec![config_error(
-                rule,
-                format!(
-                    "key 'child-link' must be one of 'dependents', 'dependencies', 'any', \
-                     got '{child_link_src}'"
-                ),
-            )]
-        }
-    };
-    // `child-type-exclude` (optional, default empty): bare type names dropped
-    // from coverage candidates AND used as the transitive-walk boundary.
-    let exclude_types = match config.get("child-type-exclude") {
-        None => BTreeSet::new(),
-        Some(toml::Value::Array(arr)) => {
-            let mut set = BTreeSet::new();
-            for v in arr {
-                match v {
-                    toml::Value::String(s) => {
-                        set.insert(s.clone());
-                    }
-                    _ => {
-                        return vec![config_error(
-                            rule,
-                            "key 'child-type-exclude' must be an array of strings",
-                        )]
-                    }
-                }
-            }
-            set
-        }
-        Some(_) => {
-            return vec![config_error(
-                rule,
-                "key 'child-type-exclude' must be an array of strings",
-            )]
-        }
-    };
-    // `container-from-label` (optional): when set, the criteria-bearing container
-    // is not the matched (firing) issue itself but the issue named by the firing
-    // issue's `<namespace>:<id>` label. This lets a rule keyed on the breakdown
-    // node evaluate its container's criteria (D13 container indirection).
-    let container_ns = match config.get("container-from-label") {
-        None => None,
-        Some(toml::Value::String(s)) => Some(s.as_str()),
-        Some(_) => {
-            return vec![config_error(
-                rule,
-                "key 'container-from-label' must be a string",
-            )]
-        }
-    };
+    let section_slug = config.criteria_section();
+    let marker = config.marker.as_deref();
+    let id_pattern = config.id_pattern().regex();
+    let satisfies_ns = config.satisfies_namespace();
+    let child_state = config.child_state;
+    let child_link = config.child_link();
+    let exclude_types = config
+        .child_type_exclude
+        .iter()
+        .flatten()
+        .cloned()
+        .collect();
+    let container_ns = config.container_from_label.as_deref();
 
-    // A child satisfies criterion `id` if it carries a `satisfies-ns` label
-    // naming `id` of the container `container_short_id` and (when configured) is
-    // in `child-state`.
-    let state_matcher = child_state.map(|s| Selector {
-        state: Some(StatePredicate::single(s)),
-        ..Selector::default()
-    });
-    let satisfied_id = |child: &Issue, id: &str, container_short_id: &str| -> bool {
+    let satisfied_id = |child: &Issue, id: &str, container_id: &IssueId| -> bool {
         let claims = child
             .labels
             .iter()
-            .any(|l| label_credits_id(l, satisfies_ns, id, container_short_id));
-        let state_ok = state_matcher.as_ref().is_none_or(|sel| sel.matches(child));
+            .any(|l| label_credits_id(l, satisfies_ns, id, container_id));
+        let state_ok = child_state.is_none_or(|state| child.state == state);
         claims && state_ok
     };
 
@@ -935,21 +610,12 @@ fn evaluate_label_coverage(
             let container: &Issue = match container_ns {
                 None => source,
                 Some(ns) => match values_in_namespace(source, ns).next() {
-                    Some(value) => match resolve_container(value, resolution_index) {
-                        ContainerMatch::Unique(c) => {
-                            // A valid pointer to a container outside the evaluation
-                            // slice names a different bracket scope; skip this
-                            // firing issue's coverage (ef0065ad). Whole-repo
-                            // evaluation resolves against the same slice, so the
-                            // container is always in-slice and nothing is skipped.
-                            if !graph_context.iter().any(|i| i.id == c.id) {
-                                return Vec::new();
-                            }
-                            c
-                        }
+                    Some(value) => match resolve_container(value, graph_context) {
+                        ContainerMatch::Unique(c) => c,
                         ContainerMatch::Ambiguous => {
                             return vec![config_error(
                                 rule,
+                                &source.id,
                                 format!(
                                     "issue {} matched the rule but its '{ns}:{value}' container \
                                      pointer is ambiguous (matches multiple issue ids by prefix)",
@@ -960,6 +626,7 @@ fn evaluate_label_coverage(
                         ContainerMatch::None => {
                             return vec![config_error(
                                 rule,
+                                &source.id,
                                 format!(
                                     "issue {} matched the rule but its '{ns}:{value}' container \
                                      pointer names no known issue",
@@ -971,6 +638,7 @@ fn evaluate_label_coverage(
                     None => {
                         return vec![config_error(
                             rule,
+                            &source.id,
                             format!(
                                 "issue {} matched the rule but its '{ns}:<id>' container \
                                  pointer is missing",
@@ -988,25 +656,25 @@ fn evaluate_label_coverage(
                 container,
                 section_slug,
                 marker,
-                &id_pattern,
+                id_pattern,
                 repo_default_format,
                 plan_content,
             ) {
                 Ok(ids) => ids,
-                Err(err) => return vec![config_error(rule, err.to_string())],
+                Err(err) => return vec![config_error(rule, &source.id, err.to_string())],
             };
             let candidates: Vec<&Issue> =
                 children_of(container, graph_context, child_link, &exclude_types);
-            let container_short = container.short_id();
             criteria
                 .into_iter()
                 .filter(move |id| {
                     !candidates
                         .iter()
-                        .any(|child| satisfied_id(child, id, &container_short))
+                        .any(|child| satisfied_id(child, id, &container.id))
                 })
-                .map(move |id| {
-                    issue_finding(
+                .map(move |id| GraphFinding {
+                    subject: Some(source.id.clone()),
+                    ..issue_finding(
                         rule,
                         &container.id,
                         format!(
@@ -1060,7 +728,7 @@ fn criterion_ids(
     marker: Option<&str>,
     id_pattern: &regex::Regex,
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Result<Vec<String>, crate::document::ContentParserError> {
     let parser = content_parser_for(source.content_format, repo_default_format)?;
     // The resolved plan content for this source (external location), else its
@@ -1128,7 +796,7 @@ fn children_of<'a>(
     }
 
     // Index issues by id for O(1) neighbour resolution during the walk.
-    let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+    let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
 
     // Neighbours of `node` in the link's direction.
     let neighbours = |node: &Issue| -> Vec<&'a Issue> {
@@ -1140,19 +808,19 @@ fn children_of<'a>(
             ChildLink::Dependencies => node
                 .dependencies
                 .iter()
-                .filter_map(|dep| by_id.get(dep.as_str()).copied())
+                .filter_map(|dep| by_id.get(dep).copied())
                 .collect(),
             ChildLink::Any => Vec::new(), // handled above
         }
     };
 
-    let mut visited: BTreeSet<&str> = BTreeSet::new();
-    visited.insert(source.id.as_str());
+    let mut visited: BTreeSet<&IssueId> = BTreeSet::new();
+    visited.insert(&source.id);
     let mut frontier: Vec<&Issue> = neighbours(source);
     let mut candidates: Vec<&Issue> = Vec::new();
 
     while let Some(node) = frontier.pop() {
-        if !visited.insert(node.id.as_str()) {
+        if !visited.insert(&node.id) {
             continue;
         }
         // An excluded-type node is neither a candidate nor a path to descend
@@ -1175,48 +843,15 @@ fn children_of<'a>(
 ///
 /// Every issue matching the rule's selector and carrying a `from`-namespace
 /// reference label must have each referenced value declared as a `to`-namespace
-/// source within the configured scope.
-///
-/// # Config keys
-///
-/// - `from` (string, required): namespace of the reference label whose values
-///   must resolve (e.g. `"satisfies"`).
-/// - `to` (string, required): namespace that DECLARES valid source ids (e.g.
-///   `"req"`).
-/// - `scope` (string, optional, default `"global"`): where a declaration may
-///   live — `"global"` (any issue in the set) or `"linked"` (only issues this
-///   issue depends on, or that depend on it).
-///
-/// One finding is produced per dangling reference. A malformed config yields a
-/// single `config-error` finding.
+/// source within the configured scope. One finding is produced per dangling
+/// reference.
 fn evaluate_label_reference(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &LabelReferenceConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    let from_ns = match require_str(rule, config, "from") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let to_ns = match require_str(rule, config, "to") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let scope = match optional_str(rule, config, "scope", "global") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let linked = match scope {
-        "global" => false,
-        "linked" => true,
-        other => {
-            return vec![config_error(
-                rule,
-                format!("key 'scope' must be 'global' or 'linked', got '{other}'"),
-            )]
-        }
-    };
+    let (from_ns, to_ns, scope) = (&config.from, &config.to, config.scope());
 
     // Globally declared source ids (the `to` namespace values across all issues).
     let global_sources: BTreeSet<&str> = graph_context
@@ -1228,7 +863,7 @@ fn evaluate_label_reference(
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
-            let allowed: BTreeSet<&str> = if linked {
+            let allowed: BTreeSet<&str> = if scope == LabelReferenceScope::Linked {
                 linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))
@@ -1265,11 +900,13 @@ enum ContainerMatch<'a> {
 }
 
 /// Resolve a `container-from-label` value against the in-memory `issues` slice
-/// by [`IssueIdPrefix`](crate::domain::issue_id::IssueIdPrefix). Two issues sharing a
+/// as an item address's issue segment
+/// ([`Scope::parse`](crate::domain::item::Scope::parse)). Two issues sharing a
 /// short id are ambiguous: the `brackets:<C-short-id>` convention must surface
 /// a collision, never silently resolve the first match.
 fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
-    let Ok(prefix) = crate::domain::issue_id::IssueIdPrefix::parse(value) else {
+    let Ok(crate::domain::item::Scope::Issue(prefix)) = crate::domain::item::Scope::parse(value)
+    else {
         return ContainerMatch::None;
     };
     let mut matches = issues.iter().filter(|i| prefix.matches(&i.id));
@@ -1311,60 +948,23 @@ fn linked_issues<'a>(issue: &Issue, issues: &'a [Issue]) -> Vec<&'a Issue> {
 /// ought to) depend — directly or transitively, over the dependency DAG — on at
 /// least one issue matching the `target` selector.
 ///
-/// # Config keys
-///
-/// - `target` (table, required): a [`Selector`]-shaped table (`type`/`label`/
-///   `state`/`has_doc_type`) identifying the issues the source must depend on.
-/// - `mode` (string, optional, default `"must"`): `"must"` or `"should"`. This
-///   only shapes the finding message; the finding's blocking weight comes from
-///   the rule's own [`Severity`].
-/// - `transitive` (boolean, optional, default `false`): when `true`, a
-///   transitive dependency satisfies the rule; otherwise only a direct
-///   dependency does.
-///
-/// One finding is produced per source issue lacking a qualifying dependency. A
-/// malformed config yields a single `config-error` finding.
+/// `mode` only shapes the finding message; the finding's blocking weight comes
+/// from the rule's own [`Severity`]. One finding is produced per source issue
+/// lacking a qualifying dependency.
 fn evaluate_dependency_shape(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &DependencyShapeConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    // `target` must be a table we can deserialize into a Selector.
-    let target = match config.get("target") {
-        Some(value @ toml::Value::Table(_)) => match value.clone().try_into::<Selector>() {
-            Ok(sel) => sel,
-            Err(e) => {
-                return vec![config_error(
-                    rule,
-                    format!("invalid 'target' selector: {e}"),
-                )]
-            }
-        },
-        Some(_) => return vec![config_error(rule, "key 'target' must be a table")],
-        None => return vec![config_error(rule, "missing required key 'target'")],
-    };
-    let mode = match optional_str(rule, config, "mode", "must") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    if mode != "must" && mode != "should" {
-        return vec![config_error(
-            rule,
-            format!("key 'mode' must be 'must' or 'should', got '{mode}'"),
-        )];
-    }
-    let transitive = match config.get("transitive") {
-        None => false,
-        Some(toml::Value::Boolean(b)) => *b,
-        Some(_) => return vec![config_error(rule, "key 'transitive' must be a boolean")],
-    };
+    let target = &config.target;
+    let transitive = config.is_transitive();
 
     // Set of issue ids matching the target selector.
-    let target_ids: BTreeSet<&str> = graph_context
+    let target_ids: BTreeSet<&IssueId> = graph_context
         .iter()
         .filter(|i| target.matches(i))
-        .map(|i| i.id.as_str())
+        .map(|i| &i.id)
         .collect();
 
     let node_refs: Vec<&Issue> = graph_context.iter().collect();
@@ -1381,7 +981,7 @@ fn evaluate_dependency_shape(
                 format!(
                     "issue {} {} depend on an issue matching the target selector but does not",
                     source.short_id(),
-                    mode
+                    config.mode().as_str()
                 ),
             )
         })
@@ -1392,15 +992,11 @@ fn evaluate_dependency_shape(
 /// through the dependency DAG.
 fn depends_on_target(
     source: &Issue,
-    target_ids: &BTreeSet<&str>,
+    target_ids: &BTreeSet<&IssueId>,
     transitive: bool,
     graph: &DependencyGraph<'_, Issue>,
 ) -> bool {
-    if source
-        .dependencies
-        .iter()
-        .any(|d| target_ids.contains(d.as_str()))
-    {
+    if source.dependencies.iter().any(|d| target_ids.contains(d)) {
         return true;
     }
     if !transitive {
@@ -1438,7 +1034,7 @@ fn depends_on_target(
 fn evaluate_gate_recency(
     rule: &Rule,
     max_age_hours: u64,
-    gates: &[String],
+    gates: &[GateKey],
     issues: &[Issue],
     now: DateTime<Utc>,
 ) -> Vec<GraphFinding> {
@@ -1472,7 +1068,7 @@ fn evaluate_gate_recency(
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
             // Empty `gates` means "all of the issue's gates_required".
-            let checked: Vec<&String> = if gates.is_empty() {
+            let checked: Vec<&GateKey> = if gates.is_empty() {
                 issue.gates_required.iter().collect()
             } else {
                 gates.iter().collect()
@@ -1516,15 +1112,7 @@ fn evaluate_gate_recency(
 /// Evaluate a `criteria-to-check` rule.
 ///
 /// Every criterion id extracted from the configured section of a matching issue
-/// must map to a verifiable check. "Checked" means the issue has EITHER:
-///
-/// - a `gates_required` entry equal to `"<gate_prefix><id>"` (when `gate_prefix`
-///   is configured), OR
-/// - a label `"<check_namespace>:<id>"` (when `check_namespace` is configured).
-///
-/// Either mechanism alone satisfies the criterion. At least one mechanism must be
-/// configured (enforced at load by the `RawCriteriaToCheck::into_assertion`
-/// validator).
+/// must map to a check label naming that issue and criterion.
 ///
 /// # Config
 ///
@@ -1532,16 +1120,10 @@ fn evaluate_gate_recency(
 ///   section whose list items hold the criteria.
 /// - `marker` (optional): when set, only items starting with this marker
 ///   contribute criterion ids.
-/// - `id_pattern` (default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex extracting the
+/// - `id_pattern` (default [`crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN`]): extracts the
 ///   criterion id from an item's text.
-/// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
-///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
-/// - `check_namespace` (optional): label namespace. A criterion `id` is
-///   label-checked when the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
-///
-/// The finding message names exactly the missing mechanism(s). When only one
-/// mechanism is configured, the message names only that one; when both are
-/// configured, the message names both.
+/// - `check_namespace`: required label namespace. A criterion `id` is checked
+///   when the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
 ///
 /// One finding per unmapped criterion per matching issue. A malformed config
 /// yields a single `config-error` finding.
@@ -1550,20 +1132,12 @@ fn evaluate_criteria_to_check(
     rule: &Rule,
     criteria_section: &str,
     marker: Option<&str>,
-    id_pattern_src: &str,
-    gate_prefix: Option<&str>,
-    check_namespace: Option<&str>,
+    id_pattern: &IdPattern,
+    check_namespace: &str,
     issues: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
-    // Compile the id pattern (already validated at load for user-authored rules;
-    // this compile step is a pure guard for programmatic callers).
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-
     issues
         .iter()
         .filter(|issue| rule.when.matches(issue))
@@ -1572,26 +1146,22 @@ fn evaluate_criteria_to_check(
                 issue,
                 criteria_section,
                 marker,
-                &id_pattern,
+                id_pattern.regex(),
                 repo_default_format,
                 plan_content,
             ) {
                 Ok(ids) => ids,
-                Err(err) => return vec![config_error(rule, err.to_string())],
+                Err(err) => return vec![config_error(rule, &issue.id, err.to_string())],
             };
             ids.into_iter()
-                .filter(|id| !criterion_is_checked(issue, id, gate_prefix, check_namespace))
+                .filter(|id| !criterion_is_checked(issue, id, check_namespace))
                 .map(|id| {
-                    let missing = describe_missing(
-                        id.as_str(),
-                        &issue.short_id(),
-                        gate_prefix,
-                        check_namespace,
-                    );
+                    let expected_label =
+                        format!("{check_namespace}:{}/{}", issue.short_id(), id.as_str());
                     issue_finding(
                         rule,
                         &issue.id,
-                        format!("criterion '{id}' has no verification: {missing}"),
+                        format!("criterion '{id}' has no check: expected label '{expected_label}'"),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -1599,68 +1169,20 @@ fn evaluate_criteria_to_check(
         .collect()
 }
 
-/// Whether criterion `id` is considered "checked" on `issue`.
-///
-/// A criterion is checked when EITHER the issue has a `gates_required` entry
-/// equal to `"<gate_prefix><id>"` (gate-checked) OR the issue carries a label
-/// naming its own criterion, `"<check_namespace>:<own-short-id>/<id>"`
-/// (label-checked). Either mechanism alone satisfies.
-fn criterion_is_checked(
-    issue: &Issue,
-    id: &str,
-    gate_prefix: Option<&str>,
-    check_namespace: Option<&str>,
-) -> bool {
-    let gate_checked = gate_prefix
-        .map(|prefix| {
-            let gate_key = format!("{prefix}{id}");
-            issue.gates_required.iter().any(|g| g == &gate_key)
-        })
-        .unwrap_or(false);
-
-    // The criterion lives on `issue` itself, so the label must name this issue.
-    let label_checked = check_namespace
-        .map(|ns| {
-            let scope = issue.short_id();
-            issue
-                .labels
-                .iter()
-                .any(|l| label_credits_id(l, ns, id, &scope))
-        })
-        .unwrap_or(false);
-
-    gate_checked || label_checked
-}
-
-/// Build the "expected …" clause of an unmapped-criterion finding, naming only
-/// the configured mechanism(s). `scope` is the criterion owner's short id.
-///
-/// - Both configured: `expected gate '<gate_prefix><id>' or label '<ns>:<scope>/<id>'`
-/// - Only gate:       `expected gate '<gate_prefix><id>'`
-/// - Only label:      `expected label '<ns>:<scope>/<id>'`
-fn describe_missing(
-    id: &str,
-    scope: &str,
-    gate_prefix: Option<&str>,
-    check_namespace: Option<&str>,
-) -> String {
-    match (gate_prefix, check_namespace) {
-        (Some(prefix), Some(ns)) => {
-            format!("expected gate '{prefix}{id}' or label '{ns}:{scope}/{id}'")
-        }
-        (Some(prefix), None) => format!("expected gate '{prefix}{id}'"),
-        (None, Some(ns)) => format!("expected label '{ns}:{scope}/{id}'"),
-        // At-least-one is enforced at load; this arm is unreachable in practice.
-        (None, None) => "expected a verification mechanism (none configured)".to_string(),
-    }
+/// Whether criterion `id` has a check label naming its owning issue.
+fn criterion_is_checked(issue: &Issue, id: &str, check_namespace: &str) -> bool {
+    issue
+        .labels
+        .iter()
+        .any(|label| label_credits_id(label, check_namespace, id, &issue.id))
 }
 
 // ---------------------------------------------------------------------------
-// type-hierarchy (orphan-leaf / strategic-consistency)
+// type-hierarchy (`TypeHierarchyKind` checks)
 // ---------------------------------------------------------------------------
 
-/// Evaluate a declarative `type-hierarchy` rule (orphan-leaf or
-/// strategic-consistency) by REUSING the existing
+/// Evaluate a declarative `type-hierarchy` rule (a [`TypeHierarchyKind`]
+/// check) by REUSING the existing
 /// [`crate::domain::type_taxonomy`] domain functions over each issue, converting their
 /// [`ValidationWarning`]s into [`GraphFinding`]s attributed to the issue.
 ///
@@ -1712,10 +1234,9 @@ fn evaluate_type_hierarchy(
 ///
 /// # Config
 ///
-/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields;
-/// this evaluator receives the resolved values directly, so it never produces a
-/// `config-error` finding from missing keys (only from an invalid `id-pattern`
-/// regex, caught at load).
+/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields,
+/// with `id-pattern` compiled; this evaluator receives the resolved values, so
+/// its only `config-error` finding is an unparsable criteria source.
 ///
 /// # Finding text
 ///
@@ -1727,16 +1248,11 @@ fn evaluate_criteria_label_match(
     namespace: &str,
     criteria_section: &str,
     marker: Option<&str>,
-    id_pattern_src: &str,
+    id_pattern: &IdPattern,
     issues: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-
     // The section heading displayed in the finding is the human-readable form of
     // the slug: convert underscores back to spaces and title-case each word so
     // `success_criteria` renders as `Success Criteria` in the message. This is
@@ -1754,12 +1270,12 @@ fn evaluate_criteria_label_match(
                 issue,
                 criteria_section,
                 marker,
-                &id_pattern,
+                id_pattern.regex(),
                 repo_default_format,
                 plan_content,
             ) {
                 Ok(ids) => ids.into_iter().collect(),
-                Err(err) => return vec![config_error(rule, err.to_string())],
+                Err(err) => return vec![config_error(rule, &issue.id, err.to_string())],
             };
 
             values_in_namespace(issue, namespace)
@@ -1836,7 +1352,7 @@ mod tests {
     }
 
     fn issue(title: &str, labels: &[&str]) -> Issue {
-        let mut i = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut i = crate::test_utils::fixture_issue(title.to_string(), String::new());
         i.labels = labels.iter().map(|s| s.to_string()).collect();
         i
     }
@@ -1850,7 +1366,7 @@ mod tests {
     fn typed_issue(title: &str, level: u8, extra_labels: &[&str]) -> Issue {
         let mut labels = vec![format!("type:{}", test_type(level))];
         labels.extend(extra_labels.iter().map(|label| (*label).to_string()));
-        let mut issue = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
         issue.labels = labels;
         issue
     }
@@ -1875,7 +1391,7 @@ mod tests {
             "satisfies:abc12345/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
         // Scope mismatch, self-id mismatch, wrong namespace, no namespace.
         for label in [
@@ -1885,7 +1401,12 @@ mod tests {
             "plainlabel",
         ] {
             assert!(
-                !label_credits_id(label, "satisfies", "REQ-01", "abc12345"),
+                !label_credits_id(
+                    label,
+                    "satisfies",
+                    "REQ-01",
+                    &crate::test_utils::issue_id(0xabc12345)
+                ),
                 "{label}"
             );
         }
@@ -1897,10 +1418,10 @@ mod tests {
         #[test]
         fn test_label_credits_id_unqualified_label_credits_nothing(
             id in "[A-Z][A-Z0-9]{0,3}-[0-9]{1,3}",
-            scope in "[0-9a-f]{8}",
+            scope in proptest::prelude::any::<u128>(),
         ) {
             let label = format!("satisfies:{id}");
-            proptest::prop_assert!(!label_credits_id(&label, "satisfies", &id, &scope));
+            proptest::prop_assert!(!label_credits_id(&label, "satisfies", &id, &crate::test_utils::issue_id(scope)));
         }
     }
 
@@ -1918,13 +1439,13 @@ mod tests {
             "satisfies:@/issue/abc12345/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
         assert!(label_credits_id(
             "satisfies:@/issue/abc12345/rule/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // A non-matching short-id in the issue form does not credit.
@@ -1932,7 +1453,7 @@ mod tests {
             "satisfies:@/issue/deadbeef/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // The project form `@/<kind>/<self-id>` addresses a project-scoped item,
@@ -1941,7 +1462,7 @@ mod tests {
             "satisfies:@/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // The named-project form `@<name>/<kind>/<self-id>` likewise never credits.
@@ -1949,7 +1470,7 @@ mod tests {
             "satisfies:@acme/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // A malformed `@`-address never credits (and, importantly, never panics).
@@ -1957,40 +1478,44 @@ mod tests {
             "satisfies:@/issue/abc12345/requirement",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
         assert!(!label_credits_id(
             "satisfies:@bogus",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
     }
 
     #[test]
     fn test_coverage_credit_namespaces_reads_active_crediting_rules() {
         let set = RuleSet::parse(
-            r#"
+            &format!(
+                r#"
 [[rules]]
 name = "default-ns"
-severity = "error"
-assert = { label-coverage = { } }
+severity = "{error}"
+assert = {{ label-coverage = {{ }} }}
 
 [[rules]]
 name = "custom-ns"
-severity = "error"
-assert = { label-coverage = { satisfies-namespace = "tests" } }
+severity = "{error}"
+assert = {{ label-coverage = {{ satisfies-namespace = "tests" }} }}
 
 [[rules]]
 name = "checks"
-severity = "error"
-assert = { criteria-to-check = { check-namespace = "checks" } }
+severity = "{error}"
+assert = {{ criteria-to-check = {{ check-namespace = "checks" }} }}
 
 [[rules]]
 name = "disabled"
-severity = "off"
-assert = { label-coverage = { satisfies-namespace = "off-ns" } }
+severity = "{off}"
+assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
 "#,
+                error = crate::declarations::rules::Severity::Error,
+                off = crate::declarations::rules::Severity::Off,
+            ),
             None,
             [],
         )
@@ -2026,22 +1551,13 @@ assert = { label-coverage = { satisfies-namespace = "off-ns" } }
         initiative
     }
 
-    /// Load a single rule from `rule_toml` against a config that declares a
-    /// `requirement` item kind matching the coverage defaults, so a
-    /// `kind = "requirement"` rule can expand. The rule carries no schema
-    /// reference, so parse purely over an empty captured schema set with the
-    /// explicit config.
+    /// Load a single rule from `rule_toml` against a config that declares the
+    /// shipped `requirement` item kind, so a `kind = "requirement"` rule can
+    /// expand. The rule carries no schema reference, so parse purely over an
+    /// empty captured schema set with the explicit config.
     fn rule_from_repo(rule_toml: &str) -> Rule {
-        let config_toml = r#"
-[item_kinds.requirement]
-section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
-markers = ["[hard]"]
-link-namespaces = ["satisfies"]
-scope = "issue"
-source-of-truth = "markdown-first"
-"#;
-        let config = toml::from_str::<crate::config::JitConfig>(config_toml).unwrap();
+        let config_toml = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let config = toml::from_str::<crate::config::JitConfig>(&config_toml).unwrap();
         let set = crate::declarations::rules::RuleSet::parse(rule_toml, Some(&config), []).unwrap();
         set.rules.into_iter().next().unwrap()
     }
@@ -2117,7 +1633,7 @@ source-of-truth = "markdown-first"
         let mut container = initiative_with_criteria(&["REQ-01"]);
         // The impl action ALSO has a REQ-01 in its OWN description (action scope) and
         // credits the container's criterion.
-        let mut impl_node = crate::domain::fixture_issue(
+        let mut impl_node = crate::test_utils::fixture_issue(
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );
@@ -2130,19 +1646,9 @@ source-of-truth = "markdown-first"
         // The two qualified ids are distinct by scope even though the self-id is
         // shared, so neither shadows the other in any index.
         let parser = crate::document::MarkdownContentParser;
-        // The canonical `requirement` kind, built from config (no baked defaults).
         let kinds = vec![crate::domain::item::ItemKind::from_config(
             "requirement",
-            &crate::config::ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(crate::config::KindScopeConfig::Issue),
-                source: None,
-                source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
+            &crate::test_utils::shipped_item_kind("requirement"),
         )
         .unwrap()];
         let container_items =
@@ -2213,7 +1719,7 @@ source-of-truth = "markdown-first"
         story.description = criteria.to_string();
         epic.dependencies = vec![story.id.clone()];
 
-        let uncovered = |label: &str| -> Vec<String> {
+        let uncovered = |label: &str| -> Vec<IssueId> {
             let mut task = typed_issue("task", 4, &[label]);
             task.state = State::Done;
             let mut story = story.clone();
@@ -2371,24 +1877,6 @@ source-of-truth = "markdown-first"
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
 
-    #[test]
-    fn test_label_coverage_malformed_config_is_config_error() {
-        let rule = coverage_rule("child-link = \"bogus\"");
-        let initiative = initiative_with_criteria(&["REQ-01"]);
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("child-link"));
-    }
-
     // --- label-coverage: transitive closure (T3) ---------------------------
 
     /// Build a strategic-container issue with `[hard]` criteria but no other labels, so
@@ -2540,31 +2028,6 @@ source-of-truth = "markdown-first"
         );
     }
 
-    #[test]
-    fn test_child_type_exclude_must_be_array_of_strings() {
-        // Loading rejects the mistyped value; a directly built payload reaches the evaluator.
-        let mut rule = coverage_rule("");
-        if let Assertion::LabelCoverage { config } = &mut rule.assert {
-            config.insert(
-                "child-type-exclude".to_string(),
-                toml::Value::String("breakdown".to_string()),
-            );
-        }
-        let initiative = initiative_chain_head(&["REQ-01"]);
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("child-type-exclude"));
-    }
-
     // --- label-coverage: container indirection via brackets: (T3/D13) ------
 
     #[test]
@@ -2694,80 +2157,57 @@ source-of-truth = "markdown-first"
         assert!(findings[0].finding.message.contains("brackets"));
     }
 
-    // --- label-coverage: scoped resolution index (ef0065ad) ----------------
-
     #[test]
-    fn test_scoped_container_pointer_resolves_outside_slice_and_skips() {
-        // REQ-01/REQ-02 at the engine layer: a breakdown fires in the evaluation
-        // slice, but the container it brackets lives only in the full resolution
-        // index (outside the slice). The pointer resolves cleanly against the full
-        // index, so the out-of-scope container's coverage is skipped rather than
-        // reported as a dangling pointer.
+    fn test_container_indirection_finding_is_attributed_to_container_with_breakdown_subject() {
         let rule = rule_from(
             "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
              severity = \"error\"\nassert = { label-coverage = { \
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
-        // The container carries an UNCOVERED criterion: were it evaluated it would
-        // fire a finding, so a clean result proves the coverage was skipped.
         let container = initiative_with_criteria(&["REQ-01"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown
             .labels
             .push(format!("brackets:{}", container.short_id()));
-
-        // The slice holds only the firing breakdown; the container is full-index-only.
-        let slice = vec![breakdown.clone()];
-        let full = vec![container, breakdown];
+        let (container_id, breakdown_id) = (container.id.clone(), breakdown.id.clone());
 
         let rules = vec![&rule];
-        let findings = evaluate_graph_scoped(
+        let findings = evaluate_graph(
             &rules,
-            &slice,
-            &full,
+            &[container, breakdown],
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
         );
-        assert!(
-            findings.is_empty(),
-            "an out-of-slice container must be skipped, not reported: {findings:?}"
-        );
+        assert_eq!(findings.len(), 1, "uncovered criterion: {findings:?}");
+        assert_eq!(findings[0].issue_id, Some(container_id));
+        assert_eq!(findings[0].subject, Some(breakdown_id));
     }
 
     #[test]
-    fn test_scoped_container_pointer_unresolvable_in_full_index_is_config_error() {
-        // REQ-03 at the engine layer: a pointer that resolves to no issue even in
-        // the full resolution index is a genuine config error, not silently skipped.
+    fn test_container_indirection_dangling_pointer_config_error_has_firing_subject() {
         let rule = rule_from(
             "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
              severity = \"error\"\nassert = { label-coverage = { \
-             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+             container-from-label = \"brackets\" } }\n",
         );
-        let mut breakdown = issue("B", &["type:breakdown"]);
-        breakdown.labels.push("brackets:deadbeef".to_string());
-
-        let slice = vec![breakdown.clone()];
-        let full = vec![breakdown];
+        let breakdown = issue("B", &["type:breakdown", "brackets:missing"]);
+        let breakdown_id = breakdown.id.clone();
 
         let rules = vec![&rule];
-        let findings = evaluate_graph_scoped(
+        let findings = evaluate_graph(
             &rules,
-            &slice,
-            &full,
+            &[breakdown],
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
         );
-        assert_eq!(
-            findings.len(),
-            1,
-            "dangling pointer must fail: {findings:?}"
-        );
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("brackets:deadbeef"));
+        assert_eq!(findings.len(), 1, "dangling pointer: {findings:?}");
+        assert!(findings[0].is_config_error());
+        assert_eq!(findings[0].issue_id, None);
+        assert_eq!(findings[0].subject, Some(breakdown_id));
     }
 
     #[test]
@@ -2858,8 +2298,8 @@ source-of-truth = "markdown-first"
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Force two ids sharing a common prefix that is neither a full nor a short
         // id of either issue (so only the prefix branch matches, and matches both).
-        a.id = "abcd1111-0000-0000-0000-000000000000".to_string();
-        b.id = "abcd2222-0000-0000-0000-000000000000".to_string();
+        a.id = crate::test_utils::issue_id(0xabcd_1111);
+        b.id = crate::test_utils::issue_id(0xabcd_2222);
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown.labels.push("brackets:abcd".to_string());
 
@@ -2895,8 +2335,8 @@ source-of-truth = "markdown-first"
         let mut a = initiative_with_criteria(&["REQ-01"]);
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Identical first 8 chars (the short id) but distinct full ids.
-        a.id = "abcd1234-1111-0000-0000-000000000000".to_string();
-        b.id = "abcd1234-2222-0000-0000-000000000000".to_string();
+        a.id = crate::test_utils::issue_id(0x1111_0000_0000_0000_0000_0000_abcd_1234);
+        b.id = crate::test_utils::issue_id(0x2222_0000_0000_0000_0000_0000_abcd_1234);
         assert_eq!(
             a.short_id(),
             b.short_id(),
@@ -2999,27 +2439,6 @@ source-of-truth = "markdown-first"
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
 
-    #[test]
-    fn test_label_reference_missing_key_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = reference_rule("from = \"implements\", to = \"req\"");
-        if let Assertion::LabelReference { config } = &mut rule.assert {
-            config.remove("to");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[issue("x", &["implements:REQ-01"])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("'to'"));
-    }
-
     // --- dependency-shape --------------------------------------------------
 
     fn shape_rule(extra: &str) -> Rule {
@@ -3107,27 +2526,6 @@ source-of-truth = "markdown-first"
         );
     }
 
-    #[test]
-    fn test_dependency_shape_missing_target_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = shape_rule("target = { type = \"design\" }");
-        if let Assertion::DependencyShape { config } = &mut rule.assert {
-            config.remove("target");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[typed_issue(&test_type(4), 4, &[])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("target"));
-    }
-
     // --- gate-recency ------------------------------------------------------
 
     use crate::domain::{GateState, GateStatus};
@@ -3140,12 +2538,12 @@ source-of-truth = "markdown-first"
     }
 
     /// A done issue requiring `gate`, last recorded `hours_ago` before [`fixed_now`].
-    fn issue_with_gate(gate: &str, hours_ago: i64) -> Issue {
+    fn issue_with_gate(gate: &GateKey, hours_ago: i64) -> Issue {
         let mut i = issue("work", &[]);
         i.state = State::Done;
-        i.gates_required = vec![gate.to_string()];
+        i.gates_required = vec![gate.clone()];
         i.gates_status.insert(
-            gate.to_string(),
+            gate.clone(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("ci:x".parse().unwrap()),
@@ -3160,7 +2558,7 @@ source-of-truth = "markdown-first"
     fn test_gate_recency_fresh_result_passes() {
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
         // Recorded 1 day ago — well within 7 days.
-        let i = issue_with_gate("code-review", 24);
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 24);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3177,7 +2575,7 @@ source-of-truth = "markdown-first"
     fn test_gate_recency_stale_result_reports_age_in_days() {
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
         // Recorded 10 days ago — exceeds 7.
-        let i = issue_with_gate("code-review", 10 * 24);
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 10 * 24);
         let id = i.id.clone();
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3189,7 +2587,7 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&id));
         assert_eq!(
             findings[0].finding.message,
             "gate 'code-review' result is 10 days old (max 7)"
@@ -3203,7 +2601,7 @@ source-of-truth = "markdown-first"
         // Issue requires the gate but has no recorded status.
         let mut i = issue("work", &[]);
         i.state = State::Done;
-        i.gates_required = vec!["code-review".to_string()];
+        i.gates_required = vec!["code-review".parse().unwrap()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3224,9 +2622,9 @@ source-of-truth = "markdown-first"
     fn test_gate_recency_default_gates_checks_all_required() {
         // No `gates` filter -> every gate in gates_required is checked.
         let rule = recency_rule("max-age-days = 7");
-        let mut i = issue_with_gate("code-review", 10 * 24); // stale
-                                                             // A second required gate with no recorded result.
-        i.gates_required.push("security".to_string());
+        let mut i = issue_with_gate(&"code-review".parse().unwrap(), 10 * 24); // stale
+                                                                               // A second required gate with no recorded result.
+        i.gates_required.push("security".parse().unwrap());
         let rules = vec![&rule];
         let mut findings = evaluate_graph(
             &rules,
@@ -3273,7 +2671,7 @@ source-of-truth = "markdown-first"
     fn test_gate_recency_hours_unit_in_message() {
         // A sub-day max renders age and limit in hours.
         let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 30); // 30h old > 12h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 30); // 30h old > 12h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3294,7 +2692,7 @@ source-of-truth = "markdown-first"
     fn test_gate_recency_is_deterministic_under_injected_clock() {
         // Same inputs + same `now` -> identical findings (no wall-clock read).
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 10 * 24);
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 10 * 24);
         let rules = vec![&rule];
         let a = evaluate_graph(
             &rules,
@@ -3322,7 +2720,7 @@ source-of-truth = "markdown-first"
         // whose displayed age equals the displayed max. Ceiling division renders
         // the age as 8 so it is strictly greater than the max.
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 180); // 180h > 168h, < 192h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 180); // 180h > 168h, < 192h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3344,7 +2742,7 @@ source-of-truth = "markdown-first"
         // Exact boundary: age == max-age (7 days == 168h) is NOT stale (the check
         // is strictly greater-than), so no finding is produced.
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 7 * 24); // exactly 168h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 7 * 24); // exactly 168h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3365,7 +2763,7 @@ source-of-truth = "markdown-first"
         // Just over the boundary: 169h > 168h is stale, and the rendered age (8)
         // exceeds the rendered max (7).
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 7 * 24 + 1); // 169h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 7 * 24 + 1); // 169h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3386,7 +2784,7 @@ source-of-truth = "markdown-first"
     fn test_gate_recency_exact_max_age_hours_is_fresh() {
         // N3 boundary (hours unit): age == max-age-hours is fresh, no finding.
         let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 12); // exactly 12h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 12); // exactly 12h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3478,11 +2876,11 @@ source-of-truth = "markdown-first"
     }
 
     #[test]
-    fn test_criteria_to_check_gate_mapped_id_passes() {
-        // A criterion satisfied via a gates_required entry must produce no finding.
-        let rule = ctc_rule("gate-prefix = \"verify:\"");
+    fn test_criteria_to_check_gate_requirement_does_not_cover_criterion() {
+        // Required gates do not cover criteria; the rule requires a check label.
+        let rule = ctc_rule("check-namespace = \"checks\"");
         let mut initiative = initiative_with_sc(&["[hard] REQ-01: do the thing"]);
-        initiative.gates_required = vec!["verify:REQ-01".to_string()];
+        initiative.gates_required = vec!["manual-review".parse().unwrap()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3492,10 +2890,11 @@ source-of-truth = "markdown-first"
             fixed_now(),
             &HashMap::new(),
         );
-        assert!(
-            findings.is_empty(),
-            "gate-mapped criterion must produce no finding: {findings:?}"
-        );
+        assert_eq!(findings.len(), 1, "a gate alone must not cover a criterion");
+        assert!(findings[0]
+            .finding
+            .message
+            .contains("expected label 'checks:"));
     }
 
     #[test]
@@ -3548,7 +2947,7 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_criteria_to_check_unmapped_id_reports_finding() {
         // An unmapped criterion must be reported with its id in the message.
-        let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
+        let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let id = initiative.id.clone();
         let short = initiative.short_id();
@@ -3562,15 +2961,11 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "one unmapped criterion: {findings:?}");
-        assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&id));
         let msg = &findings[0].finding.message;
         assert!(
             msg.contains("REQ-01"),
             "finding must name the criterion id: {msg}"
-        );
-        assert!(
-            msg.contains("verify:REQ-01"),
-            "finding must name the expected gate: {msg}"
         );
         assert!(
             msg.contains(&format!("checks:{short}/REQ-01")),
@@ -3581,7 +2976,7 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_criteria_to_check_marker_filtering() {
         // Only [hard] items are required when marker = "[hard]".
-        let rule = ctc_rule("marker = \"[hard]\", gate-prefix = \"verify:\"");
+        let rule = ctc_rule("marker = \"[hard]\", check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&[
             "[hard] REQ-01: must do",
             "[aspirational] REQ-02: nice to have",
@@ -3614,34 +3009,8 @@ source-of-truth = "markdown-first"
     }
 
     #[test]
-    fn test_criteria_to_check_only_gate_mechanism_message() {
-        // When only gate-prefix is configured the finding names only the gate.
-        let rule = ctc_rule("gate-prefix = \"verify:\"");
-        let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        let msg = &findings[0].finding.message;
-        assert!(
-            msg.contains("verify:REQ-01"),
-            "gate-only finding must name the gate: {msg}"
-        );
-        assert!(
-            !msg.contains("or label"),
-            "gate-only finding must not mention label: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_criteria_to_check_only_label_mechanism_message() {
-        // When only check-namespace is configured the finding names only the label.
+    fn test_criteria_to_check_unchecked_message_names_check_label() {
+        // An unchecked criterion names the required issue-scoped check label.
         let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let short = initiative.short_id();
@@ -3657,50 +3026,27 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
         assert!(
-            msg.contains(&format!("checks:{short}/REQ-01")),
-            "label-only finding must name the label: {msg}"
+            msg.contains(&format!(
+                "criterion 'REQ-01' has no check: expected label 'checks:{short}/REQ-01'"
+            )),
+            "finding must name only the expected check label: {msg}"
         );
-        assert!(
-            !msg.contains("or gate"),
-            "label-only finding must not mention gate: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_criteria_to_check_missing_both_mechanisms_is_config_error() {
-        // At least one of gate-prefix / check-namespace is required.
-        // The loader enforces this; we verify it surfaces as a load error.
-        let toml = "[[rules]]\nname = \"bad\"\n\
-                   assert = { criteria-to-check = {} }\n";
-        let err = RuleSet::parse(toml, None, []).unwrap_err();
-        match err {
-            crate::declarations::rules::RuleConfigError::InvalidAssertion { rule, message } => {
-                assert_eq!(rule, "bad");
-                assert!(
-                    message.contains("gate-prefix") && message.contains("check-namespace"),
-                    "error must name both missing fields: {message}"
-                );
-            }
-            other => panic!("expected InvalidAssertion, got {other:?}"),
-        }
     }
 
     #[test]
     fn test_criteria_to_check_stays_per_issue_ignores_children() {
-        // criteria-to-check maps a criterion to the SAME issue's gate/label and
-        // must NOT traverse children. A child carrying the mapping does not
+        // criteria-to-check maps a criterion to the SAME issue's check label and
+        // must NOT traverse children. A child carrying the label does not
         // satisfy the parent's criterion -> the parent still reports.
-        let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
+        let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         // A dependent child carries the would-be mapping; per-issue semantics
         // mean this is irrelevant to the initiative.
-        let mut child = typed_issue(
-            "child",
-            4,
-            &[&format!("checks:{}/REQ-01", initiative.short_id())],
-        );
+        let mut child = typed_issue("child", 4, &[]);
         child.dependencies = vec![initiative.id.clone()];
-        child.gates_required = vec!["verify:REQ-01".to_string()];
+        child
+            .labels
+            .push(format!("checks:{}/REQ-01", initiative.short_id()));
         let initiative_id = initiative.id.clone();
 
         let rules = vec![&rule];
@@ -3715,12 +3061,9 @@ source-of-truth = "markdown-first"
         assert_eq!(
             findings.len(),
             1,
-            "criteria-to-check is per-issue; a child mapping must not cover: {findings:?}"
+            "criteria-to-check is per-issue; a child label must not cover: {findings:?}"
         );
-        assert_eq!(
-            findings[0].issue_id.as_deref(),
-            Some(initiative_id.as_str())
-        );
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&initiative_id));
         assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
@@ -3745,7 +3088,7 @@ source-of-truth = "markdown-first"
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "orphan-leaf-fixture");
-        assert_eq!(findings[0].issue_id.as_deref(), Some(action.id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&action.id));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
     }
 
@@ -3816,8 +3159,8 @@ source-of-truth = "markdown-first"
         );
         assert_eq!(findings[0].finding.severity, Severity::Error);
         assert_eq!(
-            findings[0].issue_id.as_deref(),
-            Some(initiative.id.as_str()),
+            findings[0].issue_id.as_ref(),
+            Some(&initiative.id),
             "finding must be attributed to the initiative"
         );
     }
@@ -3975,10 +3318,7 @@ source-of-truth = "markdown-first"
             1,
             "criteria-label-match is per-issue; a child must not affect it: {findings:?}"
         );
-        assert_eq!(
-            findings[0].issue_id.as_deref(),
-            Some(initiative_id.as_str())
-        );
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&initiative_id));
         assert!(findings[0].finding.message.contains("req:REQ-77"));
     }
 
@@ -3994,13 +3334,11 @@ source-of-truth = "markdown-first"
         // Two unlinked initiatives both declaring req:REQ-01 — one finding naming the
         // value and both short-ids.
         let rule = uniqueness_rule("req");
-        let mut initiative_a = typed_issue("initiative-a", 2, &["req:REQ-01"]);
+        let initiative_a = typed_issue("initiative-a", 2, &["req:REQ-01"]);
         let initiative_b = typed_issue("initiative-b", 2, &["req:REQ-01"]);
         // Deliberately no dependency edge between them.
         let id_a = initiative_a.short_id().to_string();
         let id_b = initiative_b.short_id().to_string();
-        // Set distinct short ids so the message is testable.
-        initiative_a.id = format!("aaa-{}", initiative_a.id);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -4021,6 +3359,24 @@ source-of-truth = "markdown-first"
         // Config errors never have issue_id; uniqueness findings have no specific
         // attributed issue either (they are cross-issue).
         assert!(!findings[0].is_config_error());
+    }
+
+    #[test]
+    fn test_label_uniqueness_finding_has_no_subject() {
+        let rule = uniqueness_rule("req");
+        let findings = evaluate_graph(
+            &[&rule],
+            &[
+                typed_issue("initiative-a", 2, &["req:REQ-01"]),
+                typed_issue("initiative-b", 2, &["req:REQ-01"]),
+            ],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(findings.len(), 1, "one collision: {findings:?}");
+        assert_eq!(findings[0].subject, None);
     }
 
     #[test]
@@ -4082,8 +3438,8 @@ source-of-truth = "markdown-first"
         let mut initiative_a = issue("initiative-a", &["req:REQ-42"]);
         let mut initiative_b = issue("initiative-b", &["req:REQ-42"]);
         // Use deterministic prefixes so we can assert them in the message.
-        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000".to_string();
-        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000".to_string();
+        initiative_a.id = crate::test_utils::issue_id(0xaaaa_0000);
+        initiative_b.id = crate::test_utils::issue_id(0xbbbb_0000);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -4194,10 +3550,17 @@ source-of-truth = "markdown-first"
              kind = \"requirement\", child-state = \"done\" }} }}\n",
             test_type(2)
         ));
-        let inline_rule = coverage_rule(
-            "criteria-section = \"success_criteria\", marker = \"[hard]\", \
-             id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\", child-state = \"done\"",
-        );
+        let registry: HashMap<_, _> = crate::test_utils::shipped_item_kinds()
+            .into_iter()
+            .collect();
+        let triple =
+            crate::domain::item::expand_kind_triple(Some(&registry), "requirement").unwrap();
+        let inline_rule = coverage_rule(&format!(
+            "criteria-section = \"{}\", marker = \"{}\", id-pattern = '{}', child-state = \"done\"",
+            triple.section,
+            triple.marker.unwrap(),
+            triple.id_pattern,
+        ));
 
         let eval = |rule: &Rule, issues: &[Issue]| {
             evaluate_graph(
@@ -4259,26 +3622,15 @@ source-of-truth = "markdown-first"
         //
         // The same assertion is then repeated for `criteria-label-match`.
 
-        use crate::config::{ItemKindConfig, KindScopeConfig};
+        use crate::config::ItemKindConfig;
         use crate::domain::item::expand_kind_triple;
         use std::collections::HashMap;
 
-        // Declare `requirement` in a registry with its full six-tuple, exactly as
-        // a project's config.toml would, then EXPAND it to the consumed triple.
-        let mut registry: HashMap<String, ItemKindConfig> = HashMap::new();
-        registry.insert(
-            "requirement".to_string(),
-            ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
-                source: None,
-                source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
-        );
+        // Declare the shipped kinds in a registry, then EXPAND `requirement` to
+        // the consumed triple.
+        let registry: HashMap<String, ItemKindConfig> = crate::test_utils::shipped_item_kinds()
+            .into_iter()
+            .collect();
         let declared = expand_kind_triple(Some(&registry), "requirement").unwrap();
         let kind_section = declared.section.as_str();
         let kind_marker = declared.marker.as_deref();
@@ -4287,7 +3639,7 @@ source-of-truth = "markdown-first"
         // Build `criteria-to-check` with the inline triple from the declared kind's
         // expansion (section + marker + id-pattern all explicit) and assert match.
         let ctc = ctc_rule(&format!(
-            "gate-prefix = \"verify:\", \
+            "check-namespace = \"checks\", \
              criteria-section = \"{kind_section}\", \
              marker = \"{}\", \
              id-pattern = '{kind_pattern}'",
@@ -4365,7 +3717,8 @@ source-of-truth = "markdown-first"
             severity: Severity::Error,
             message: "criterion uncovered".into(),
         };
-        let gf = GraphFinding::for_issue("abc123", f);
+        let issue_id = crate::test_utils::issue_id(0xe1b3_475c_818d_324f_57dd_716b_1c5d_a41d);
+        let gf = GraphFinding::for_issue(issue_id, f);
         assert!(
             !gf.is_config_error(),
             "for_issue must not be a config error"
@@ -4392,12 +3745,12 @@ source-of-truth = "markdown-first"
     }
 
     /// The `config_error()` constructor (exercised via `evaluate_graph` with a
-    /// malformed rule) produces a finding where `is_config_error()` returns
+    /// missing container pointer) produces a finding where `is_config_error()` returns
     /// `true`. The typed field, not the message prefix, drives this.
     #[test]
     fn test_config_error_constructor_sets_typed_field() {
-        // A coverage rule with an unrecognized `child-link` forces `config_error()`.
-        let rule = coverage_rule("child-link = \"bogus\"");
+        // A missing container pointer forces `config_error()`.
+        let rule = coverage_rule("container-from-label = \"brackets\"");
         let initiative = initiative_with_criteria(&["REQ-01"]);
         let findings = evaluate_graph(
             &[&rule],
@@ -4410,7 +3763,7 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1);
         assert!(
             findings[0].is_config_error(),
-            "malformed config must produce is_config_error() == true via the typed field"
+            "missing container pointer must produce a typed config error"
         );
         // Verify the typed field is not just re-deriving from the message prefix.
         assert!(
@@ -4422,72 +3775,5 @@ source-of-truth = "markdown-first"
             findings[0].is_config_error(),
             "is_config_error reads the field, not the message"
         );
-    }
-
-    #[test]
-    fn test_rule_scoped_evaluation_isolates_firing_issue_from_repository_context() {
-        let rule = rule_from(
-            r#"
-[[rules]]
-name = "coverage-preview"
-when = { type = "breakdown" }
-severity = "error"
-assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", container-from-label = "brackets", child-link = "dependencies" } }
-"#,
-        );
-
-        let mut selected = issue("selected breakdown", &["type:breakdown"]);
-        let mut selected_container = initiative_with_criteria(&["REQ-01"]);
-        let selected_child = issue(
-            "selected child",
-            &[&satisfies(&selected_container, "REQ-01")],
-        );
-        selected
-            .labels
-            .push(format!("brackets:{}", selected_container.short_id()));
-        selected_container.dependencies = vec![selected_child.id.clone()];
-
-        // This historical breakdown is deliberately in the repository context,
-        // but not in the firing set. Its rejected target has an uncovered
-        // criterion; a subtree-wide evaluator would incorrectly fail selected.
-        let mut historical = issue("historical breakdown", &["type:breakdown"]);
-        let mut rejected_target = initiative_with_criteria(&["REQ-99"]);
-        rejected_target.state = State::Rejected;
-        historical
-            .labels
-            .push(format!("brackets:{}", rejected_target.short_id()));
-
-        let context = vec![
-            selected.clone(),
-            selected_container.clone(),
-            selected_child,
-            historical.clone(),
-            rejected_target.clone(),
-        ];
-        let hierarchy = crate::test_taxonomy::test_taxonomy().hierarchy_config();
-        let plan_content = HashMap::new();
-        let evaluation_context = GraphEvaluationContext {
-            graph_context: &context,
-            resolution_index: &context,
-            hierarchy: &hierarchy,
-            repo_default_format: ContentFormat::Markdown,
-            now: fixed_now(),
-            plan_content: &plan_content,
-        };
-        let findings =
-            evaluate_graph_rule(&rule, std::slice::from_ref(&selected), &evaluation_context);
-        assert!(
-            findings.is_empty(),
-            "unrelated firing issues must not affect the selected verdict: {findings:?}"
-        );
-
-        let direct_findings = evaluate_graph_rule(
-            &rule,
-            std::slice::from_ref(&historical),
-            &evaluation_context,
-        );
-        assert_eq!(direct_findings.len(), 1);
-        assert_eq!(direct_findings[0].issue_id, Some(rejected_target.id));
-        assert!(direct_findings[0].finding.message.contains("REQ-99"));
     }
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c10ea6a966b8b1c83b7415e300a981c840ccb23a",
+  "completed_at": "2026-11-01T01:38:46.124154203Z",
+  "duration_ms": 220447,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The in-memory backend now serves current and commit-pinned path reads from its own state, with shared conformance coverage for both backends.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "94bbdbd6-31ab-4e65-873b-77e56ec6e47c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "486d3e21-2183-4ddc-aeb1-dd0074761c61",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T01:35:05.676426439Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 72ba04c36; 69f1b2ae3\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-08 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed, exit 0, 2026-11-01T01:33:35Z\nTruncation recovery: Re-read truncated output through parent-specific merge diffs, per-file patches, current line ranges, and focused call-site searches.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The in-memory backend now serves current and commit-pinned path reads from its own state, with shared conformance coverage for both backends.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

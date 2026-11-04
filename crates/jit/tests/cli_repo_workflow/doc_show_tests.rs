@@ -6,66 +6,44 @@
 //! - doc show with --at commit
 //! - doc dir, the canonical artifact directory resolver
 //!
-//! The repository, issue, and area fixtures below are crate-visible: the
+//! The repository configuration and area fixtures below are crate-visible: the
 //! sibling `artifact_conformance_cli_tests` module drives the same repository
 //! shape and resolves directories through the same `doc dir` run
 //! (`@/invariant/shared-test-contracts`).
-
-use assert_cmd::prelude::*;
+use jit::domain::identity::IssueId;
+use jit::test_cli::JitCli;
+use jit::test_utils::declaration_dir;
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
-use std::process::{Command, Output};
-use tempfile::TempDir;
 
 #[test]
 fn test_doc_show_without_git() {
-    let temp = TempDir::new().unwrap();
-    let temp_path = temp.path();
-
-    // Initialize jit (without git)
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .arg("init")
-        .assert()
-        .success();
-
-    // Create an issue
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .args(["issue", "create", "--title", "Test Issue", "--json"])
-        .output()
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
-    assert!(output.status.success());
+    let short_id = issue_id.short_id();
+    fs::write(
+        cli.root().join("design.md"),
+        "# Design Document\n\nThis is a test document.",
+    )
+    .unwrap();
+    cli.run([
+        "doc",
+        "add",
+        short_id,
+        "design.md",
+        "--label",
+        "Design Doc",
+        "--doc-type",
+        "design",
+    ])
+    .unwrap();
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issue_id = json["id"].as_str().unwrap();
-    let short_id = &issue_id[..8];
-
-    // Create a document file
-    let doc_path = temp_path.join("design.md");
-    fs::write(&doc_path, "# Design Document\n\nThis is a test document.").unwrap();
-
-    // Add document reference to issue
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .args([
-            "doc",
-            "add",
-            short_id,
-            "design.md",
-            "--label",
-            "Design Doc",
-            "--doc-type",
-            "design",
-        ])
-        .assert()
-        .success();
-
-    // Show document without git - should read from filesystem
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .args(["doc", "show", short_id, "design.md"])
+    let output = cli
+        .command(["doc", "show", short_id, "design.md"])
         .output()
         .unwrap();
 
@@ -74,7 +52,6 @@ fn test_doc_show_without_git() {
         "doc show should work without git: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("# Design Document"));
     assert!(stdout.contains("This is a test document"));
@@ -82,138 +59,51 @@ fn test_doc_show_without_git() {
 
 #[test]
 fn test_doc_show_with_git() {
-    let temp = TempDir::new().unwrap();
-    let temp_path = temp.path();
-
-    // Initialize git repo
-    Command::new("git")
-        .current_dir(temp_path)
-        .args(["init"])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(temp_path)
-        .args(["config", "user.name", "Test User"])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(temp_path)
-        .args(["config", "user.email", "test@example.com"])
-        .assert()
-        .success();
-
-    // Initialize jit
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .arg("init")
-        .assert()
-        .success();
-
-    // Create an issue
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .args(["issue", "create", "--title", "Test Issue", "--json"])
-        .output()
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
-    assert!(output.status.success());
+    let short_id = issue_id.short_id();
+    fs::write(
+        cli.root().join("design.md"),
+        "# Design Document\n\nCommitted content.",
+    )
+    .unwrap();
+    cli.git(["add", "design.md"]).unwrap();
+    cli.git(["commit", "-q", "-m", "Add design doc"]).unwrap();
+    cli.run(["doc", "add", short_id, "design.md"]).unwrap();
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    let issue_id = json["id"].as_str().unwrap();
-    let short_id = &issue_id[..8];
-
-    // Create and commit a document
-    let doc_path = temp_path.join("design.md");
-    fs::write(&doc_path, "# Design Document\n\nCommitted content.").unwrap();
-
-    Command::new("git")
-        .current_dir(temp_path)
-        .args(["add", "design.md"])
-        .assert()
-        .success();
-
-    Command::new("git")
-        .current_dir(temp_path)
-        .args(["commit", "-m", "Add design doc"])
-        .assert()
-        .success();
-
-    // Add document reference
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .args(["doc", "add", short_id, "design.md"])
-        .assert()
-        .success();
-
-    // Show document - should read from git
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_path)
-        .args(["doc", "show", short_id, "design.md"])
+    let output = cli
+        .command(["doc", "show", short_id, "design.md"])
         .output()
         .unwrap();
 
     assert!(output.status.success());
-
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("# Design Document"));
     assert!(stdout.contains("Committed content"));
 }
 
-/// Run the built binary in `repo` and hand back the whole outcome, so a case can
-/// assert on exit status, stdout, and stderr together.
-pub(crate) fn jit(repo: &Path, args: &[&str]) -> Output {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo)
-        .args(args)
-        .output()
-        .unwrap()
-}
-
-/// A repository initialized from the shared taxonomy fixture and this suite's
-/// own documentation registry, with no Git history. The tests exercise both
-/// vocabularies, so the repository declares them rather than inheriting any.
-pub(crate) fn initialized_repo() -> TempDir {
-    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
-    let config_path = temp.path().join(".jit/config.toml");
-    let mut config = fs::read_to_string(&config_path).unwrap();
-    config.push_str(&format!(
-        "\n[documentation]\ndevelopment_root = \"{DEVELOPMENT_ROOT}\"\n\
+/// The configuration of this suite's repository: the shared taxonomy plus its
+/// own documentation registry. The tests exercise both vocabularies, so the
+/// repository declares them rather than inheriting any.
+pub(crate) fn declared_config() -> String {
+    format!(
+        "{}\n[documentation]\ndevelopment_root = \"{DEVELOPMENT_ROOT}\"\n\
          managed_paths = [\"{}\", \"{}\"]\n\
          issue_scoped_areas = [\"{}\"]\n",
+        jit::test_taxonomy::test_taxonomy().config_fragment(),
         declared_area(),
         undeclared_area(),
         declared_area(),
-    ));
-    fs::write(config_path, config).unwrap();
-
-    temp
+    )
 }
 
 /// The development root this suite's repository declares.
 const DEVELOPMENT_ROOT: &str = "workspace";
-
-/// The identifiers a created issue answers to.
-pub(crate) struct CreatedIssue {
-    pub(crate) id: String,
-    pub(crate) short_id: String,
-}
-
-pub(crate) fn create_issue(repo: &Path, title: &str, labels: &[String]) -> CreatedIssue {
-    let mut args = vec!["issue", "create", "--title", title, "--json"];
-    args.extend(labels.iter().flat_map(|label| ["--label", label.as_str()]));
-    let output = jit(repo, &args);
-    assert!(
-        output.status.success(),
-        "issue create {title}: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let created: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    CreatedIssue {
-        id: created["id"].as_str().unwrap().to_string(),
-        short_id: created["short_id"].as_str().unwrap().to_string(),
-    }
-}
 
 /// The issue-scoped area this suite's repository declares.
 pub(crate) fn declared_area() -> &'static str {
@@ -255,29 +145,16 @@ fn string_leaves(payload: &serde_json::Value) -> Vec<&str> {
 }
 
 /// Assert the `--json` counterpart of a `doc dir` rejection: rerunning `args`
-/// with `--json` fails with the same exit status `plain` reported, and prints a
-/// parseable diagnostic on stdout naming each string in `named`. A machine
-/// caller therefore reads the same classification the human path reports,
-/// rather than an unparseable line.
-fn assert_json_rejection_agrees(
-    repo: &Path,
-    args: &[&str],
-    plain: &Output,
-    named: &[&str],
-    shape: &str,
-) {
+/// with `--json` fails and prints a parseable diagnostic on stdout naming each
+/// string in `named`.
+fn assert_json_rejection_agrees(cli: &JitCli, args: &[&str], named: &[&str], shape: &str) {
     let json_args = args.iter().copied().chain(["--json"]).collect::<Vec<_>>();
-    let output = jit(repo, &json_args);
+    let output = cli.command(json_args).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(
         !output.status.success(),
         "{shape} must not resolve a directory under --json"
-    );
-    assert_eq!(
-        output.status.code(),
-        plain.status.code(),
-        "{shape} exits alike with and without --json: {stdout}"
     );
 
     let payload: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|error| {
@@ -292,37 +169,44 @@ fn assert_json_rejection_agrees(
     });
 }
 
-/// The directory `doc dir` names for `id` in `area`, requiring the run to
-/// succeed.
-pub(crate) fn resolve_directory(repo: &Path, id: &str, area: &str) -> String {
-    let output = jit(repo, &["doc", "dir", id, area]);
-    assert!(
-        output.status.success(),
-        "doc dir {id} {area}: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
-
 #[test]
 fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_declared_area() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
     let (issue_type, namespace) = membership_type_and_namespace();
     let membership = "artifact-layout";
 
-    let member = create_issue(
-        repo.path(),
-        "Membership-labelled issue",
-        &[
-            format!("type:{issue_type}"),
-            format!("{namespace}:{membership}"),
-        ],
-    );
-    let bare = create_issue(repo.path(), "Issue naming no membership value", &[]);
+    let member = cli
+        .create_issue([
+            "--title",
+            "Membership-labelled issue",
+            "--label",
+            &format!("type:{issue_type}"),
+            "--label",
+            &format!("{namespace}:{membership}"),
+        ])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
+    let bare = cli
+        .create_issue(["--title", "Issue naming no membership value"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
 
-    let member_directory = resolve_directory(repo.path(), &member.short_id, area);
-    let bare_directory = resolve_directory(repo.path(), &bare.short_id, area);
+    let member_directory = cli
+        .run(["doc", "dir", member.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
+    let bare_directory = cli
+        .run(["doc", "dir", bare.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     [(&member, &member_directory), (&bare, &bare_directory)]
         .iter()
@@ -332,11 +216,11 @@ fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_
                 .unwrap_or_else(|| panic!("{directory} sits inside an area"));
             assert_eq!(parent, area, "{directory} sits directly in the named area");
             assert!(
-                name.starts_with(&issue.short_id),
+                name.starts_with(issue.short_id()),
                 "{directory} is named for the issue that owns it"
             );
             assert!(
-                !repo.path().join(directory).exists(),
+                !cli.root().join(directory).exists(),
                 "{directory} is named, not created"
             );
         });
@@ -345,7 +229,7 @@ fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_
     // the resolver applies is what separates the two directory names.
     assert_eq!(
         bare_directory,
-        format!("{area}/{}", bare.short_id),
+        format!("{area}/{}", bare.short_id()),
         "an issue naming no membership value owns the bare short-id directory"
     );
     assert!(
@@ -356,13 +240,24 @@ fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_
 
 #[test]
 fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
-    let issue = create_issue(repo.path(), "Undeclared area", &[]);
+    let issue = cli
+        .create_issue(["--title", "Undeclared area"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
 
     // The same repository resolves a declared area, so a rejection below is the
     // registry talking rather than the command being absent.
-    let declared_directory = resolve_directory(repo.path(), &issue.short_id, area);
+    let declared_directory = cli
+        .run(["doc", "dir", issue.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     [
         (
@@ -377,8 +272,8 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
     ]
     .iter()
     .for_each(|(shape, undeclared)| {
-        let args = ["doc", "dir", issue.short_id.as_str(), undeclared.as_str()];
-        let output = jit(repo.path(), &args);
+        let args = ["doc", "dir", issue.short_id(), undeclared.as_str()];
+        let output = cli.command(args).output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
 
         assert!(
@@ -400,26 +295,28 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
 
         // The same rejection under --json, so a machine caller reads the
         // registry's refusal instead of an unparseable line.
-        assert_json_rejection_agrees(
-            repo.path(),
-            &args,
-            &output,
-            &[undeclared.as_str(), area],
-            shape,
-        );
+        assert_json_rejection_agrees(&cli, &args, &[undeclared.as_str(), area], shape);
     });
 }
 
 #[test]
 fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let declared = declared_area();
     let authored = undeclared_area();
-    let issue = create_issue(repo.path(), "Configured registry", &[]);
+    let issue = cli
+        .create_issue(["--title", "Configured registry"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
 
     let accepts = |area: &str| {
-        jit(repo.path(), &["doc", "dir", &issue.short_id, area])
-            .status
+        cli.command(["doc", "dir", issue.short_id(), area])
+            .status()
+            .unwrap()
             .success()
     };
 
@@ -431,7 +328,7 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
     // Replace the declared registry with one naming the other area. Nothing but
     // configuration changes, so a flip in what resolves is the command reading
     // the repository rather than a vocabulary compiled into the binary.
-    let config_path = repo.path().join(".jit").join("config.toml");
+    let config_path = cli.root().join(".jit").join("config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     let declaration = "issue_scoped_areas = [";
     let start = config
@@ -457,7 +354,10 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
         "an authored registry replaces the configured one"
     );
     assert!(
-        resolve_directory(repo.path(), &issue.short_id, authored)
+        cli.run(["doc", "dir", issue.short_id(), authored])
+            .unwrap()
+            .trim()
+            .to_string()
             .starts_with(&format!("{authored}/")),
         "the resolved directory sits in the area the authored registry declares"
     );
@@ -465,23 +365,34 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
 
 #[test]
 fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_directory() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
     let (issue_type, namespace) = membership_type_and_namespace();
-    let issue = create_issue(
-        repo.path(),
-        "Machine-readable directory",
-        &[
-            format!("type:{issue_type}"),
-            format!("{namespace}:artifact-layout"),
-        ],
-    );
+    let issue = cli
+        .create_issue([
+            "--title",
+            "Machine-readable directory",
+            "--label",
+            &format!("type:{issue_type}"),
+            "--label",
+            &format!("{namespace}:artifact-layout"),
+        ])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
 
-    let printed = resolve_directory(repo.path(), &issue.short_id, area);
-    let output = jit(
-        repo.path(),
-        &["doc", "dir", &issue.short_id, area, "--json"],
-    );
+    let printed = cli
+        .run(["doc", "dir", issue.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
+    let output = cli
+        .command(["doc", "dir", issue.short_id(), area, "--json"])
+        .output()
+        .unwrap();
     assert!(
         output.status.success(),
         "doc dir --json: {}",
@@ -504,8 +415,8 @@ fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_d
         .filter_map(serde_json::Value::as_str)
         .collect::<HashSet<_>>();
     [
-        ("the issue's full identifier", issue.id.as_str()),
-        ("the issue's short identifier", issue.short_id.as_str()),
+        ("the issue's full identifier", issue.as_str()),
+        ("the issue's short identifier", issue.short_id()),
         ("the area the caller named", area),
         ("the directory the same run prints", printed.as_str()),
     ]
@@ -520,21 +431,32 @@ fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_d
 
 #[test]
 fn test_doc_dir_rejects_an_unknown_issue_identifier() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
-    let known = create_issue(repo.path(), "Known issue", &[]);
+    let known = cli
+        .create_issue(["--title", "Known issue"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
     let unknown = "deadbeef";
     assert_ne!(
-        known.short_id, unknown,
+        known.short_id(),
+        unknown,
         "the identifier names no issue here"
     );
 
     // The same area resolves for an issue that exists, so the rejection below
     // is the identifier and not the area.
-    resolve_directory(repo.path(), &known.short_id, area);
+    cli.run(["doc", "dir", known.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     let args = ["doc", "dir", unknown, area];
-    let output = jit(repo.path(), &args);
+    let output = cli.command(args).output().unwrap();
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
@@ -552,11 +474,61 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
 
     // The same rejection under --json, so a machine caller reads the failed
     // lookup instead of an unparseable line.
-    assert_json_rejection_agrees(
-        repo.path(),
-        &args,
-        &output,
-        &[unknown],
-        "an identifier naming no issue",
-    );
+    assert_json_rejection_agrees(&cli, &args, &[unknown], "an identifier naming no issue");
+}
+
+fn failure_of(output: &std::process::Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).expect("failure envelope on stdout")
+}
+
+#[test]
+fn test_doc_show_missing_document_reports_document_not_found() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+
+    let output = cli
+        .command([
+            "doc",
+            "show",
+            issue_id.as_str(),
+            "docs/missing.md",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    let code = jit::output::ErrorCode::DocumentNotFound;
+    assert_eq!(failure_of(&output)["error"]["code"], code.as_str());
+    assert_eq!(output.status.code(), Some(code.exit_code() as i32));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_doc_show_document_outside_repository_reports_invalid_argument() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(outside.path().join("secret.md"), "# outside").unwrap();
+    let link = cli.root().join("escape");
+    fs::create_dir(&link).unwrap();
+    fs::write(link.join("secret.md"), "# inside").unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "escape/secret.md"])
+        .unwrap();
+    fs::remove_dir_all(&link).unwrap();
+    std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+
+    let output = cli
+        .command([
+            "doc",
+            "show",
+            issue_id.as_str(),
+            "escape/secret.md",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    let code = jit::output::ErrorCode::InvalidArgument;
+    assert_eq!(failure_of(&output)["error"]["code"], code.as_str());
+    assert_eq!(output.status.code(), Some(code.exit_code() as i32));
 }

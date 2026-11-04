@@ -5,13 +5,15 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::artifact_plan::PlanTarget;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
 pub mod artifact_planning;
 pub(crate) mod atomic_write;
+pub(crate) mod capability_fs;
 pub mod claim_coordinator;
 pub mod clock;
 #[cfg(test)]
@@ -19,12 +21,15 @@ pub(crate) mod contention_probe;
 pub mod discovery;
 pub mod errors;
 pub(crate) mod external_publish;
+pub(crate) mod gate_run_reader;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git;
 pub mod git_revision;
 pub mod guard_order;
 pub(crate) mod init_publish;
+#[cfg(test)]
+mod issue_store_conformance;
 pub mod json;
 pub mod lock;
 pub mod lock_cleanup;
@@ -51,11 +56,13 @@ pub mod worktree_paths;
 pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
 pub(crate) use artifact_planning::collect_citation_scan_evidence;
 pub use artifact_planning::{collect_artifact_classification_facts, resolve_container_destination};
+pub use capability_fs::DataRoot;
 pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
     AmbiguousIdError, GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError,
-    IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError, RepositoryNotFoundError,
+    IssueNotFoundError, PresetNotFoundError, RepositoryFormatUnsupportedError,
+    RepositoryNotFoundError,
 };
 pub use git_revision::{
     GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
@@ -73,7 +80,8 @@ pub use mutation_interruption::{
 };
 pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use redo_apply::{
-    NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector, RedoPoint,
+    commit_redo_record, NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector,
+    RedoPoint,
 };
 pub use redo_record::{
     EventAppend, PutFile, RedoRecord, RedoRecordError, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
@@ -82,12 +90,13 @@ pub use redo_record::{
 pub use reference::{render_reference_markdown, GateRunField};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use repository_state_store::{
-    discover_repository_layout, RecoveryDispatchReport, RepositoryApplyOutcome,
-    RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
+    discover_repository_layout, OptimisticReadSession, ReadAdmission, RecoveryDispatchReport,
+    RepositoryApplyOutcome, RepositoryMutationSession, RepositoryReadSession, RepositoryStateStore,
+    RepositoryStateStoreError,
 };
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
-pub use test_support::{publish_fixture_directory_noreplace, publish_fixture_file_noreplace};
+pub use test_support::publish_fixture_directory_noreplace;
 pub use warnings::StorageWarning;
 pub use worktree_paths::WorktreePaths;
 
@@ -95,26 +104,51 @@ pub use memory::MemoryRedoApplier;
 
 pub use memory::InMemoryStorage;
 
-/// The one id among `ids` that `prefix` names, else the lookup error naming
-/// it; `describe` renders each candidate of an ambiguous match.
-pub(crate) fn resolve_unique_issue_id<'a>(
+/// The one id among `ids` that `prefix` names, else [`IssueNotFoundError`] or
+/// the error `ambiguous` builds from the several matches.
+fn resolve_unique_id<'a>(
     prefix: &IssueIdPrefix,
-    ids: impl IntoIterator<Item = &'a str>,
-    describe: impl Fn(&str) -> Option<String>,
-) -> Result<String> {
+    ids: impl IntoIterator<Item = &'a IssueId>,
+    ambiguous: impl FnOnce(&[&'a IssueId]) -> AmbiguousIdError,
+) -> Result<IssueId> {
     let matches = ids
         .into_iter()
         .filter(|id| prefix.matches(id))
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [] => Err(IssueNotFoundError::new(prefix.requested()).into()),
-        [id] => Ok(id.to_string()),
-        _ => Err(AmbiguousIdError::issue(
-            prefix.requested(),
+        [] => Err(IssueNotFoundError::by_prefix(prefix.clone()).into()),
+        [id] => Ok((*id).clone()),
+        _ => Err(ambiguous(&matches).into()),
+    }
+}
+
+/// The one id among `ids` that `prefix` names, else the lookup error naming
+/// it; `describe` renders each candidate of an ambiguous match.
+pub(crate) fn resolve_unique_issue_id<'a>(
+    prefix: &IssueIdPrefix,
+    ids: impl IntoIterator<Item = &'a IssueId>,
+    describe: impl Fn(&IssueId) -> Option<String>,
+) -> Result<IssueId> {
+    resolve_unique_id(prefix, ids, |matches| {
+        AmbiguousIdError::issue(
+            prefix.as_str(),
             matches.iter().filter_map(|id| describe(id)),
         )
-        .into()),
-    }
+    })
+}
+
+/// The one of an issue's stored `dependencies` that `prefix` names. Matching
+/// the stored edges rather than the issue files keeps an edge whose target was
+/// deleted resolvable (jit:f847df3f).
+///
+/// # Errors
+///
+/// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError::Dependency`] for
+/// several.
+pub fn resolve_dependency_id(prefix: &IssueIdPrefix, dependencies: &[IssueId]) -> Result<IssueId> {
+    resolve_unique_id(prefix, dependencies.iter(), |matches| {
+        AmbiguousIdError::dependency(prefix.as_str(), matches.iter().map(|id| (*id).clone()))
+    })
 }
 
 /// The id of the one of `issues` that `prefix` names.
@@ -122,11 +156,11 @@ pub(crate) fn resolve_unique_issue_id<'a>(
 /// # Errors
 ///
 /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for several.
-pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<String> {
-    resolve_unique_issue_id(prefix, issues.iter().map(|issue| issue.id.as_str()), |id| {
+pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<IssueId> {
+    resolve_unique_issue_id(prefix, issues.iter().map(|issue| &issue.id), |id| {
         issues
             .iter()
-            .find(|issue| issue.id == id)
+            .find(|issue| &issue.id == id)
             .map(describe_issue)
     })
 }
@@ -197,7 +231,7 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the issue does not exist or cannot be deserialized.
-    fn load_issue(&self, id: &str) -> Result<Issue>;
+    fn load_issue(&self, id: &IssueId) -> Result<Issue>;
 
     /// Load an issue by ID, returning a typed [`PathReadError`].
     ///
@@ -218,7 +252,7 @@ pub trait IssueStore: Clone {
     ///   override to produce this).
     /// - [`PathReadError::Other`] for storage or deserialization failures (and
     ///   for any error from a backend that uses the default implementation).
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
+    fn load_issue_or_not_found(&self, id: &IssueId) -> Result<Issue, PathReadError> {
         // Conservative fallback: map every anyhow error to Other.
         // Backends that can distinguish NotFound structurally must override.
         self.load_issue(id).map_err(PathReadError::Other)
@@ -230,7 +264,7 @@ pub trait IssueStore: Clone {
     ///
     /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for
     /// several.
-    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String>;
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<IssueId>;
 
     /// List all issues in the repository.
     ///
@@ -246,65 +280,47 @@ pub trait IssueStore: Clone {
     /// Returns an error if the registry cannot be loaded.
     fn load_gate_registry(&self) -> Result<GateRegistry>;
 
-    /// Read all events whose tag is in the current event vocabulary.
-    ///
-    /// File storage skips structurally valid records with retired or otherwise
-    /// unknown string tags so append-only history remains readable after a tag
-    /// is removed. Malformed JSON and malformed records for known tags remain
-    /// errors.
+    /// Read all events. Malformed JSON, a malformed record, and a tag outside the
+    /// current event vocabulary are errors.
     ///
     /// # Errors
     ///
     /// Returns an error if events cannot be read.
     fn read_events(&self) -> Result<Vec<Event>>;
 
-    /// Read dependency-aware archive events for reconciliation.
+    /// Read the evidence record addressed by one archive target.
     ///
-    /// File storage overrides this path so an isolated malformed torn-tail line
-    /// cannot prevent a later archive run from repairing and reconciling state.
-    fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
-        Ok(self
-            .read_events()?
-            .into_iter()
-            .filter(|event| matches!(event, Event::ArtifactArchiveExecuted { .. }))
-            .collect())
-    }
-
-    /// Load a gate run result by run ID.
+    /// Returns `None` when the target has no prior executions.
     ///
     /// # Errors
     ///
-    /// Returns an error if the result does not exist or cannot be deserialized.
-    fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult>;
+    /// Returns an error if the record cannot be read or decoded.
+    fn read_archive_evidence_record(
+        &self,
+        target: &PlanTarget,
+    ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>>;
+
+    /// Load a gate run result by issue and run ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns not found if the result is absent or belongs to another issue,
+    /// or an error if it cannot be read or deserialized.
+    fn load_gate_run_result(
+        &self,
+        issue_id: &IssueId,
+        run_id: &crate::domain::identity::GateRunId,
+    ) -> Result<crate::domain::GateRunResult>;
 
     /// List all gate run results for a specific issue.
     ///
     /// # Errors
     ///
     /// Returns an error if results cannot be loaded.
-    fn list_gate_runs_for_issue(&self, issue_id: &str)
-        -> Result<Vec<crate::domain::GateRunResult>>;
-
-    /// The most recent run of `gate_key` whose verdict an evaluation over
-    /// inputs digesting to `digest` may carry.
-    ///
-    /// The search spans every recorded run, not one issue's: a whole-tree
-    /// checker's verdict over an input set belongs to that input set, so the
-    /// issue it was first derived for does not narrow who may cite it.
-    ///
-    /// A run qualifies only when it recorded the same digest, executed its own
-    /// checker ([`GateVerdictOrigin::Executed`](crate::domain::GateVerdictOrigin)),
-    /// and reached a verdict — `passed` or `failed`. A run that errored reached
-    /// none, so it is never a source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if recorded runs cannot be read.
-    fn find_reusable_gate_run(
+    fn list_gate_runs_for_issue(
         &self,
-        gate_key: &str,
-        digest: &crate::domain::repository_inputs::InputsDigest,
-    ) -> Result<Option<crate::domain::GateRunResult>>;
+        issue_id: &IssueId,
+    ) -> Result<Vec<crate::domain::GateRunResult>>;
 
     /// Get the root directory path for this storage backend.
     ///
@@ -398,5 +414,44 @@ pub trait IssueStore: Clone {
     ) -> Result<(String, String), PathReadError> {
         let (bytes, label) = self.read_path_bytes(path, at_commit)?;
         Ok((String::from_utf8_lossy(&bytes).into_owned(), label))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A prefix resolves to the one stored dependency it names, whether or not
+    /// that dependency's issue still exists.
+    #[test]
+    fn test_resolve_dependency_id_matches_the_one_stored_dependency_named() {
+        let dependencies = vec![
+            crate::test_utils::issue_id(0x1_abcd_1234),
+            crate::test_utils::issue_id(0x2_ef01_2345),
+        ];
+        let prefix = "ABCD1234".parse::<IssueIdPrefix>().unwrap();
+
+        assert_eq!(
+            resolve_dependency_id(&prefix, &dependencies).unwrap(),
+            dependencies[0]
+        );
+    }
+
+    #[test]
+    fn test_resolve_dependency_id_reports_not_found_and_ambiguous_dependency() {
+        let dependencies = vec![
+            crate::test_utils::issue_id(0x1_abcd_1234),
+            crate::test_utils::issue_id(0x2_abcd_1234),
+        ];
+        let resolve = |prefix: &str| {
+            resolve_dependency_id(&prefix.parse::<IssueIdPrefix>().unwrap(), &dependencies)
+                .unwrap_err()
+        };
+
+        assert!(resolve("ffff").is::<IssueNotFoundError>());
+        assert!(matches!(
+            resolve("abcd1234").downcast_ref::<AmbiguousIdError>(),
+            Some(AmbiguousIdError::Dependency { matches, .. }) if matches.len() == 2
+        ));
     }
 }

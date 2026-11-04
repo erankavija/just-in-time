@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T05:16:04.814135142Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Build the engine's own gate findings from closed enums, while external checker output stays open on the wire.\n\n## Background\n\nBuilt-in findings spell severity, disposition and origin as literals at `crates/jit/src/commands/gate_check.rs:622-629`, `:662-664`, `:1123-1125` and `:1148-1150`, and the engine branches on `disposition == Some(\"blocking\")` (`:1188`). On the wire, `GateFinding` severity, disposition and origin are checker-defined open strings (`domain/gate_findings.rs:46-66`), because external checkers emit labels such as `medium`.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain/gate_findings.rs` declares closed enums for built-in severity, disposition and origin through the macro.\n- [hard] REQ-02: The four built-in sites build findings through a typed constructor, and the engine's blocking check compares the enum.\n- [hard] REQ-03: Finding wire fields stay strings, and a finding with a checker-defined label still loads.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:34:38.586765804Z",
+  "first_ready_at": "2026-10-24T23:55:25.501110853Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "519912bb-6eeb-45c7-a0e6-4e703cb15fb8",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:34:36.524721606Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9929b23c-3b4f-4c83-9f90-6aaf11ba5bb5",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:33:10.053654660Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Built-in gate findings use closed severity and disposition enums",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T05:34:38.586765804Z"
 }

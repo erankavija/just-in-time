@@ -4,9 +4,10 @@
 
 Repository profiles install a coherent JIT workflow as one explicit operation.
 A profile is a package: a directory holding a manifest, the assets that
-manifest declares, and the managed-region sources it owns. This is the
-canonical adopter reference for the profile lifecycle: authoring,
-offline exchange, composition, variables, and recovery. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
+manifest declares, and the managed-region sources it carries. Applying a
+package renders it into the repository once, and from then on the repository
+holds every value. This is the canonical adopter reference for authoring,
+offline exchange, composition, and variables. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
 to inspect the exact packages a release or a repository currently carries.
 
 ## Obtaining a package
@@ -47,7 +48,7 @@ jit init --profile packages/jit-dogfood
 
 When working from a source checkout rather than a release extraction, first
 make portable archives from the checkout. This matters for `jit-dogfood`, whose
-`assets/live/` files are captured from the checkout's declared repository roots
+`assets/live/` files are drawn from the checkout's declared repository roots
 and are not stored as duplicate authored files:
 
 ```bash
@@ -135,8 +136,8 @@ exclude = ["docs/drafts/**"]
 `[[dependency]]` and `[[incompatibility]]` each require a lowercase-kebab
 `id` and a semantic-version `version` requirement. A package cannot depend on
 itself. Dependencies are resolved before the package that declares them;
-incompatibilities make a selection containing a matching installed or selected
-package fail before publication.
+incompatibilities make a selection containing a matching selected package fail
+before publication.
 
 A `[[variable]]` requires `name`; `default` and `env` are independently
 optional. Both the profile variable name and the optional environment name use
@@ -233,10 +234,13 @@ jit profile apply --profile packages/jit-dogfood --dry-run
 jit profile apply --profile packages/jit-dogfood
 ```
 
+A selector is a bare path to a package directory in the worktree. `--profile`
+repeats to select several packages.
+
 Author a package by creating and editing its manifest and declared sources in
-a worktree directory. The repository owns the values it holds: a package author
-edits the manifest directly, and `jit profile pack` draws each live asset from
-the repository file its declaration targets.
+a worktree directory. A package author edits the manifest directly, and
+`jit profile pack` draws each live asset from the repository file its
+declaration targets.
 
 Pack a package into one portable file to hand to somebody, and place one
 somebody handed you:
@@ -264,11 +268,10 @@ For a declared profile variable, supply a TOML values file containing
 compatibility, and variables](#package-identity-compatibility-and-variables)
 for declaration, reference, and precedence semantics.
 
-The selector syntax and package-resolution contract are defined in [Profile
-Commands](cli-commands.md#profile-commands). This page
-describes the package and its lifecycle; the command reference covers how a
-package obtained from a directory is selected, including where a declared
-dependency is looked for. A directory of obtained
+The package-resolution contract is defined in [Profile
+Commands](cli-commands.md#profile-commands). This page describes the package
+and its composition; the command reference covers where a declared dependency
+is looked for. A directory of obtained
 packages applies as a set: naming one of them reaches its siblings without
 naming them.
 
@@ -281,34 +284,59 @@ package that declared it beside the one that could not be found — so an adopte
 is never left diagnosing a package they did not name. Both refusals are raised
 over the whole set before any of it is applied.
 
-A registry declaration or asset target that two packages being applied state
-differently is refused for the same reason: neither package holds authority over
-the other's declarations. The refusal is taken from the same decision
-[`jit profile diff`](cli-commands.md#jit-profile-diff) reports, so it names the
-package being applied, the declaration or target it carries, and every package
-defining it. Only the packages being applied are parties: the repository's
-current content never conflicts with a package. Identical restatements merge, so
-a package and its dependency may declare the same thing.
+When a package and a package it depends on, directly or transitively, declare
+one registry entry, asset target, or managed region, the dependent package's value
+is composed, so a package depending on two others settles what they disagree on
+by stating a value. Two packages with no dependency path between them that state
+one differently, with no dependent stating a value over them, are refused:
+neither holds authority over the other's declarations. The refusal is taken
+from the same decision [`jit profile diff`](cli-commands.md#jit-profile-diff)
+reports, so it names the package being applied, the declaration or target it
+carries, and every package whose differing definition remains. Only the packages
+being applied are parties: the repository's current content never conflicts with
+a package. Identical restatements merge. The result does not depend on the order
+packages are selected in.
 
-Profile enumeration is defined in [Profile
-Commands](cli-commands.md#profile-commands).
+Applying writes the composed value over an existing entry under the same
+identity, replacing the whole entry; fields the package does not state are
+dropped. A committed local edit to a declared entry or target is replaced by the
+next application, and git keeps the prior version.
 
-## Inspect, recover, and evolve
+In a git repository an application refuses while a path it would write differs
+from HEAD — modified, staged, or untracked — with
+[`PROFILE_UNCOMMITTED_TARGETS`](error-codes.md) naming each such path. Each
+written path is judged by the checkout that holds it, a path in no checkout is
+never refused, and dirty paths the application does not write do not matter.
+Commit or discard the named changes, then apply again; a refusal leaves the
+repository byte-identical. Without git, an application proceeds, so read
+[`jit profile diff`](cli-commands.md#jit-profile-diff) first. Profiled
+`jit init` over an absent data root is exempt, as it has no earlier content to
+protect.
+
+## Inspect and rehearse
 
 Use `jit profile diff` before a change to see every target and semantic
-declaration a selection would create, update, leave unchanged, or conflict on.
+declaration a selection would create, update, leave unchanged, or conflict on. An
+existing declaration whose value differs reports as `update`, because
+publication replaces the whole entry under its identity with the package's value.
+`diff` and `apply` reports list every file the publication writes, with the
+exception of event-log appends and created directories.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
 validation as its corresponding `apply`, `pack`, or `add` command, but writes no target or lifecycle
-event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
-operator can identify each conflicting target or declaration and the packages
-defining it.
+event, so it fails where the command would, including on final validation of
+the proposed repository. Unlike a rehearsal, `jit profile diff` reports all
+conflicts so an operator can identify each conflicting target or declaration and
+the packages defining it, and states a final-validation refusal, such as a
+configured projection left stale, as status `would_conflict` carrying a
+`refusal`.
 
 A refused publication's `PROFILE_CONFLICT` error carries
 `error.details.conflicts[]` in the [standard `--json` error
 envelope](cli-commands.md#cli-json-contracts), one entry per refused target or
 declaration as `{owner, subject, conflict}`; `conflict.owners` names the
-packages defining it differently.
+packages defining it differently. `jit --schema` publishes this shape as
+`types.ProfileTargetConflictsError`.
 
 All profile commands support `--json` and use the standard count-wrapped
 `{"count": N, "profiles": [...]}` collection shape. A show response contains
@@ -317,13 +345,12 @@ selectors. Lifecycle rehearsals and runs report the same ordered observations:
 dependency-only packages once before the selected roots, then every selected
 root occurrence in selector order. A repeated root's later observations are
 `unchanged` and carry no decisions. Each show entry carries the manifest, package
-identity, target hashes, and size. Showing a package does not re-verify current
+identity, target paths, and size. Showing a package does not re-verify current
 target bytes. Use
 `jit profile apply --profile packages/jit-dogfood --dry-run` for exact current-state
 verification of the named package and its dependency closure: it returns every
-package's target and declaration decisions without writing. Successful
-reapplication of an exact installation returns `unchanged` for every package of
-the set.
+package's target and declaration decisions without writing. Applying content the repository already
+holds publishes nothing and returns `unchanged` for every package of the set.
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
 into one validated, recoverable publication. The scaffold and the complete
@@ -340,7 +367,7 @@ tools.
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
 run `jit profile show --profile packages/jit-dogfood --json` for the
-exact version, dependencies, contributions, assets, managed regions, hashes, and
+exact version, dependencies, contributions, assets, managed regions, package hash, and
 executable declarations the resolved package carries. It also declares the repository roots from which
 packaged live assets are drawn, so any repository file under a declared root
 that is neither claimed by a packaged asset nor matched by a declared exclusion
@@ -373,19 +400,19 @@ behavior.
 
 Declared configuration and registries are the authorities for generated
 schemas, default-rule assertions, and configured projections. `jit validate`
-reports an owned target that is missing, stale, or unexpected, and
+reports a derived target that is missing, stale, or unexpected, and
 `jit validate --fix` recomputes the complete final-state plan and publishes it
 through one redo record, as every other mutation publishes.
 It preserves authored rule comments, order, policy, and all unmanaged document
-bytes; it never treats a conventional filename as proof of ownership.
+bytes.
 
 A value a package contributed is repository content: editing it is an ordinary repository change
 that git shows and restores, and `jit validate` neither reports nor repairs it.
 
-Managed regions replace only the package- or projection-owned marked region.
+Managed regions replace only their marked region.
 Distinct regions may nest, but delimiters must form one unambiguous containment
-tree. Duplicate, partial, reversed, crossing, or multiply owned regions fail
-before publication. Ambiguous ownership is likewise non-repairable and leaves
+tree. Duplicate, partial, reversed, crossing, or repeated regions fail
+before publication. Ambiguous structure is likewise non-repairable and leaves
 every target unchanged. Human output and the standard JSON `VALIDATION_FAILED`
 error envelope retain the underlying target or delimiter cause so an operator
 can repair the authority rather than guess;

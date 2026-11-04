@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-24T23:43:55.972557689Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Move the issue-command tests in `crates/jit/tests/cli_issue` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThe issue-command files of `cli_issue` (create, update, show, status, search, batch and bulk commands, aliases and container rollups) each define a binary locator and a local setup, and seven scrape ids with `split_whitespace`.\n\nThis entry covers `issue_show_projection_test.rs`, `issue_show_shape_test.rs`, `issue_show_summary_test.rs`, `issue_status_projection_tests.rs`, `container_rollup_tests.rs`, `main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-03: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n- [hard] REQ-04: Callers in this entry's footprint use the shared `TaxonomyRepo` and its label helpers instead of the suite-root copy, with unchanged assertions; the suite-root copy itself stays until its last caller has moved.\n",
   "documents": [],
+  "done_at": "2026-10-26T23:44:08.768556062Z",
   "first_ready_at": "2026-10-22T15:46:59.963478962Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ca3fc001-1352-4242-954b-b23c08887c5e",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:37:29.969911859Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "16fee45e-a542-42bd-b25f-8cb8cfaf04fa",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:39:34.663486523Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7bf48536-02ba-4fc5-99df-c242ef272368",
   "labels": [
     "type:task",
@@ -28,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "issue show and status tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:46:59.963478962Z"
+  "updated_at": "2026-10-26T23:44:08.768556062Z"
 }

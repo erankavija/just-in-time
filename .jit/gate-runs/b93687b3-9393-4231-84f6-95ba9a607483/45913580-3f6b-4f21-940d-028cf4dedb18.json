@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2a6802d8bb7fe39a53951b1fae5e2aa4151dc5d3",
+  "completed_at": "2026-10-27T20:53:16.088850543Z",
+  "duration_ms": 295451,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The migrated CLI tests use the shared fixture and retain their assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b93687b3-9393-4231-84f6-95ba9a607483",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "45913580-3f6b-4f21-940d-028cf4dedb18",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T20:48:20.637626106Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f78dde422 and 535a3b136 (merge; no combined patch hunks)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-09 (issue description); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci — passed, exit code not recorded, 2026-10-27T20:48:09Z\nTruncation recovery: Read f78dde422 per-file patches and bounded current fixture/test ranges; merge combined patch had no hunks\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The migrated CLI tests use the shared fixture and retain their assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

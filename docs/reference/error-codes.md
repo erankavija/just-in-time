@@ -27,33 +27,25 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `AMBIGUOUS_ID` | The ID prefix matches more than one candidate. | `2` |
 | `INVALID_ID_PREFIX` | The ID prefix is shorter than the accepted minimum. | `2` |
 | `REPOSITORY_NOT_FOUND` | No JIT repository exists at the resolved path. | `3` |
-| `REPOSITORY_FORMAT_TOO_NEW` | The repository format is newer than this binary supports. | `10` |
+| `DOCUMENT_NOT_FOUND` | The requested document or commit does not exist. | `3` |
+| `REPOSITORY_FORMAT_UNSUPPORTED` | The repository format is not the one this binary supports. | `10` |
 | `DELETION_NOT_CONFIRMED` | Issue deletion lacks the required operator confirmation. | `2` |
 | `LINKED_CHECKOUT_WRITE_REFUSED` | The linked checkout's write stance refuses state-mutating commands. | `2` |
-| `PROFILE_NOT_FOUND` | No resolution route found the requested profile. | `3` |
 | `PROFILE_CONFLICT` | Profile planning found packages being applied that define one target or declaration differently. | `4` |
+| `PROFILE_UNCOMMITTED_TARGETS` | A profile application would overwrite paths that differ from HEAD; committing or discarding those changes lets it proceed. | `4` |
 | `DEPENDENCY_ERROR` | A dependency command failed. | `3` |
 | `GATE_ERROR` | A gate command failed. | `6` |
 | `GATE_CHECK_ERROR` | A gate-status check failed. | `3` |
 | `PRESET_ERROR` | A gate-preset command failed. | `3` |
 | `ITEM_NOT_FOUND` | An issue item-address lookup did not resolve an item. | `1` |
-| `ITEM_COMMAND_FAILED` | An item command failed without a more specific classification. | `1` |
 | `INVARIANT_COMMAND_FAILED` | An invariant command failed without a more specific classification. | `1` |
-| `PROJECT_COMMAND_FAILED` | A project command failed without a more specific classification. | `1` |
 | `PROFILE_ERROR` | A profile command failed without a more specific classification. | `1` |
 | `SEARCH_FAILED` | The search backend failed while executing a query. | `1` |
 | `RIPGREP_NOT_FOUND` | The external ripgrep search tool was not found. | `1` |
 | `WORKTREE_INFO_ERROR` | Worktree identity inspection failed. | `1` |
 | `WORKTREE_LIST_ERROR` | Worktree enumeration failed. | `1` |
 | `WORKTREE_STORE_DIVERGENCE_ERROR` | Cross-checkout store comparison failed. | `1` |
-| `HOOKS_INSTALL_ERROR` | Repository hook installation failed. | `1` |
 | `GENERIC_ERROR` | A command failed without a more specific public classification. | `1` |
 | `recovery_failed` | Applying a leftover redo record, or a recovery routine, failed. | `1` |
-| `CLAIM_ACQUIRE_ERROR` | Claim acquisition failed. | `3` |
-| `CLAIM_RELEASE_ERROR` | Claim release failed. | `3` |
-| `CLAIM_RENEW_ERROR` | Claim renewal failed. | `3` |
-| `CLAIM_HEARTBEAT_ERROR` | Claim heartbeat failed. | `3` |
-| `CLAIM_STATUS_ERROR` | Claim status inspection failed without a more specific classification. | `1` |
-| `CLAIM_LIST_ERROR` | Claim enumeration failed without a more specific classification. | `1` |
-| `CLAIM_FORCE_EVICT_ERROR` | Forced claim eviction failed. | `3` |
+| `SERVER_EXITED` | The foreground server process exited with a failure status. | `1` |
 | `LOCK_TIMEOUT` | A lock wait expired while another jit process held the lock; nothing was changed. | `11` |

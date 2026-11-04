@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T06:13:33.445751238Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Move event matching in the integration suites onto the body view.\n\n## Background\n\nIntegration tests match `Event::<Variant>` in `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs` (7 lines), `fast_issue/lifecycle_timestamps_tests.rs` (6), `cli_repo_workflow/linked_checkout_write_policy_tests.rs` (4), `scratch_build/repository_state_cutover_tests.rs` (4) and six further files in the footprint; some build variants with explicit `id` and `timestamp` fields. `jit::test_utils` offers a helper that stamps an id and a timestamp onto a body.\n\n## Success Criteria\n\n- [hard] REQ-01: No integration-test pattern under `crates/jit/tests` matches `Event::<Variant>`; each matches `EventBody::<Variant>` on the body view.\n- [hard] REQ-02: In integration tests, no pattern binds `id` or `timestamp` from a variant, and no code outside `domain/types.rs` constructs a variant with those fields; constructions use draft constructors or the `test_utils` helper that stamps both.\n- [hard] REQ-03: Test assertions are otherwise unchanged.\n",
   "documents": [],
+  "done_at": "2026-10-25T06:59:56.841249906Z",
+  "first_ready_at": "2026-10-25T06:12:34.834793974Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6d8794ce-752e-4bf9-9d17-834fdfba1c0f",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:59:55.963924217Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "47b8ef36-5ad8-4155-ab08-d41b4adf361a",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:58:32.024434041Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Integration tests match events through the body view",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T06:59:56.841249906Z"
 }

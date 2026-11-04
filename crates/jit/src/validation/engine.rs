@@ -196,7 +196,8 @@ impl SchemaEngine {
     /// assert_eq!(engine.registered_keywords(), vec!["x-jit-non-empty".to_string()]);
     ///
     /// let dir = tempfile::tempdir().unwrap();
-    /// let schemas = dir.path().join("schemas");
+    /// let layout = jit::test_utils::repository_layout_for_data_root(dir.path());
+    /// let schemas = layout.resolve(&jit::repository_state::VirtualPath::SCHEMAS).unwrap();
     /// std::fs::create_dir_all(&schemas).unwrap();
     /// std::fs::write(
     ///     schemas.join("t.json"),
@@ -209,9 +210,13 @@ impl SchemaEngine {
     /// name = "title-non-empty"
     /// assert = { json-schema = "schemas/t.json" }
     /// "#;
-    /// std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
+    /// std::fs::write(
+    ///     layout.resolve(&jit::repository_state::VirtualPath::RULES).unwrap(),
+    ///     toml,
+    /// )
+    /// .unwrap();
     /// let set = jit::storage::ruleset_store::load_ruleset(
-    ///     dir.path(),
+    ///     &layout,
     ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     /// )
     /// .unwrap();
@@ -783,7 +788,7 @@ pub(crate) const SECTION_HEADING_ANNOTATION: &str = "x-jit-section-heading";
 mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
-    use crate::domain::State;
+    use crate::domain::{Priority, State};
     use tempfile::TempDir;
 
     /// Build a `RuleSet` from a single `json-schema` rule whose schema file holds
@@ -798,7 +803,7 @@ mod tests {
         );
         std::fs::write(dir.path().join("rules.toml"), &toml).unwrap();
         let set = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
@@ -872,9 +877,13 @@ mod tests {
         // core JSON Pointer resolution, not gated by those features, so
         // compiling and validating against a schema shaped that way must
         // keep working unchanged.
-        let states: Vec<serde_json::Value> = State::all()
+        let states: Vec<serde_json::Value> = State::ALL
             .iter()
             .map(|s| serde_json::Value::String(s.as_str().to_string()))
+            .collect();
+        let priorities: Vec<serde_json::Value> = Priority::ALL
+            .iter()
+            .map(|p| serde_json::Value::String(p.as_str().to_string()))
             .collect();
         let schema_json = serde_json::json!({
             "type": "object",
@@ -885,7 +894,7 @@ mod tests {
             "required": ["state", "priority"],
             "$defs": {
                 "State": { "enum": states },
-                "Priority": { "enum": ["low", "normal", "high", "critical"] }
+                "Priority": { "enum": priorities }
             }
         })
         .to_string();
@@ -998,7 +1007,7 @@ assert = { json-schema = "schemas/b.json" }
 "#;
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
         let set = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
@@ -1030,7 +1039,7 @@ assert = { json-schema = "schemas/b.json" }
 "#;
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
         let set = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();

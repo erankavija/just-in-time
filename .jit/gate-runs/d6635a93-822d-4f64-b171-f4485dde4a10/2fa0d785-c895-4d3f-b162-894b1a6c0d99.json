@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/benchmark-session-cost-selftest.sh",
+  "commit": "9f1a825626d299b9f0ce24a44667263bad7142e4",
+  "completed_at": "2026-11-01T07:26:43.660438934Z",
+  "duration_ms": 2003,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "session-cost-benchmark-selftest",
+  "inputs_digest": "08aae7f3dcf3e32cfd6ef10e967e2301949feeb0fcb0ee343ee5f80994c38cae",
+  "issue_id": "d6635a93-822d-4f64-b171-f4485dde4a10",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2fa0d785-c895-4d3f-b162-894b1a6c0d99",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:26:41.656610082Z",
+  "status": "passed",
+  "stderr": "[session-bench] self-test binary override: /tmp/jit-session-bench-selftest.2v99Oe/jit\n[session-bench] generating pristine fixture of 2 issues (1 bulk-labeled, 0 of those needing change) at /tmp/jit-session-bench-selftest.2v99Oe/work/jit-session-bench.oF9sXU/pristine (tmpfs)\n[session-bench] fixture target id: fixture-0\n[session-bench] timing scenarios (warmup=3, samples=20)\n[session-bench] wrote /tmp/jit-session-bench-selftest.2v99Oe/out/session-cost-9f1a8256.json\n",
+  "stdout": "benchmark-session-cost collision: PASS (existing bytes preserved, no staged leak)\nbenchmark-session-cost selftest: PASS\n"
+}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:56:38.754883266Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Declare rule severity and rule scope through the vocabulary macro.\n\n## Background\n\n`Severity::token` and `RuleScope::token` (`crates/jit/src/declarations/rules.rs:180-215`) hand-write the spellings their serde forms already state.\n\n## Success Criteria\n\n- [hard] REQ-01: `Severity` and `RuleScope` are declared through the macro, and both `token` functions are gone.\n- [hard] REQ-02: Rule declarations and rule messages spell severity and scope as before.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:35:15.239853070Z",
+  "first_ready_at": "2026-10-25T01:51:09.323506663Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c8bcad4-2397-4a67-8504-bef67ccfed0e",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:33:55.342742811Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "db595e1b-af45-42ad-b317-a1b5050bdb37",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:34:36.365391757Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6826f966-461c-4668-ae5a-92d10f75c5cf",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Rule severity and scope tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T02:35:15.239853070Z"
 }

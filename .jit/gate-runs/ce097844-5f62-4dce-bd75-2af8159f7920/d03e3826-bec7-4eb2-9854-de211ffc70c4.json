@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c92938d6b5c4436615ad5bb893177bd6441958e",
+  "completed_at": "2026-10-28T23:30:58.754356287Z",
+  "duration_ms": 70553,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met; no attributable defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ce097844-5f62-4dce-bd75-2af8159f7920",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d03e3826-bec7-4eb2-9854-de211ffc70c4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:29:48.200450244Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6fe08339c, b6c25d1d\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-07 (issue description); @/charter/D-18, @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, @/invariant/shared-test-contracts, @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:29:29Z)\nTruncation recovery: Re-read the affected patch, current harness, helper, manifest, and item sources in bounded ranges; excluded the merge’s separately tagged b58ea1e2 label-test changes and historical .jit records as outside this issue’s impact cone.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met; no attributable defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

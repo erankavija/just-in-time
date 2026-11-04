@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "88e7e8dfb173923faf24e29bdbd2c4d285220a59",
+  "completed_at": "2026-10-28T23:41:41.224501404Z",
+  "duration_ms": 188423,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/exit_code_tests.rs",
+        "id": "F1",
+        "line": 1032,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests",
+          "@/issue/c780514e/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "Stale comment falsely states the exit-code suite locks the moved gate-preset case to exit code 3."
+      }
+    ],
+    "summary": "A stale exit-code-suite comment falsely claims ownership of the moved gate-preset case.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e5166159-fecd-4bab-a3fd-c1c4c80aa0af",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bea46484-b390-4b65-a8eb-0e5ceb7b0ebf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:38:32.800946134Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6539 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184e1-3086-7221-ab54-de58bf871887\n--------\nuser\n--- 6526 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c2243c7e9, 1bac3f8ce\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-01 (issue c780514e description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:38:06Z); code-review pending\nTruncation recovery: re-read each affected merge-test patch separately and narrowed exit-code projection reads\n\n1. **F1 — blocking, issue-impact (medium):** `exit_code_tests.rs` still says the following tests lock the missing-registry-gate preset command to exit code 3, but its test was moved and no longer asserts that code. This leaves a false ownership statement in the exit-code suite, conflicting with the intended single-owner boundary. Update or remove the stale comment. [crates/jit/tests/cli_issue/exit_code_tests.rs:1032] (`@/invariant/orthogonal-tests`, `@/issue/c780514e/requirement/REQ-01`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A stale exit-code-suite comment falsely claims ownership of the moved gate-preset case.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Stale comment falsely states the exit-code suite locks the moved gate-preset case to exit code 3.\",\"file\":\"crates/jit/tests/cli_issue/exit_code_tests.rs\",\"line\":1032,\"references\":[\"@/invariant/orthogonal-tests\",\"@/issue/c780514e/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

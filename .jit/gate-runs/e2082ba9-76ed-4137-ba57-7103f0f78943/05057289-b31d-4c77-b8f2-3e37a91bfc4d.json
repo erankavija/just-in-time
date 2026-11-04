@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "b67342fecd483b6ae0ff41cc394a10b7c072c86a",
+  "completed_at": "2026-11-04T03:02:31.487741659Z",
+  "duration_ms": 287866,
+  "evaluation_stability": "stable",
+  "exit_code": 75,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "48881b8e736d2f06907830bd23b0d3a1f67bfabef7254d9966ccc4500ad8b882",
+  "issue_id": "e2082ba9-76ed-4137-ba57-7103f0f78943",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "05057289-b31d-4c77-b8f2-3e37a91bfc4d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:57:43.621360879Z",
+  "status": "error",
+  "stderr": "cargo-ci: another build holds /tmp/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE   PATH\nbash             585862 WRITE  /tmp/cargo-ci.lock\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 56210 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 56210 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 30620 ms, warmed 18 executables (2111934944 bytes) in 103 ms.\n  ✓ fmt: ok (2677 ms)\n  ✓ clippy: ok (32223 ms)\n  ✓ suite-build: built in 30620 ms, warmed 18 executables (2111934944 bytes) in 103 ms (30728 ms)\n  ✓ test: 4869 passed, 0 failed, 0 skipped (47956 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (8210 ms)\n  ✓ suite-clock: 56210 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (21 ms)\n  ✗ budget: FAILED (exit 1) (404 ms)\n\ncargo-ci: infrastructure fault (exit 75): failing steps (budget) are environment-sensitive; baseline load1=29.85 >= threshold 4.08 (0.17 x 24 CPUs); rerun when the host is quiet\n"
+}

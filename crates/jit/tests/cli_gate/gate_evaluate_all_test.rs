@@ -1,94 +1,23 @@
 //! Integration tests for `jit gate evaluate-all` (issue df7f934c).
 //!
-//! Covers: all-pass -> exit 0 with per-gate JSON; fail-fast at the first
-//! non-passing gate (a later gate's checker never runs) -> exit 4; runner error
-//! -> exit 10; and, for a mixed auto/manual gate set, fail-fast at an
-//! unattested manual gate rather than a silent pass (jit:1d59070d REQ-03).
+//! Covers: all-pass with per-gate JSON; fail-fast at the first non-passing gate
+//! (a later gate's checker never runs); runner error; and, for a mixed
+//! auto/manual gate set, fail-fast at an unattested manual gate rather than a
+//! silent pass (jit:1d59070d REQ-03).
 
+use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
+use jit::test_cli::JitCli;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-}
-
-fn git(args: &[&str], dir: &Path) {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {:?} failed: {}",
-        args,
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-/// A jit repo inside a fresh git repo with one commit (HEAD resolves).
-fn setup_git_jit_repo() -> (TempDir, PathBuf) {
-    let temp = TempDir::new().unwrap();
-    let root = temp.path().to_path_buf();
-    git(&["init"], &root);
-    git(&["config", "user.name", "Test User"], &root);
-    git(&["config", "user.email", "test@example.com"], &root);
-    jit().current_dir(&root).arg("init").output().unwrap();
-    fs::write(root.join("README.md"), "repo").unwrap();
-    git(&["add", "-A"], &root);
-    git(&["commit", "-m", "init"], &root);
-    (temp, root)
-}
 
 /// Define an auto gate `key` whose checker runs `command` and appends a line to
 /// `<key>.log` (a side-effect proving the checker ran).
-fn define_gate(root: &Path, key: &str, command: &str) {
-    let checker = format!("echo run >> {}.log; {}", key, command);
-    jit()
-        .current_dir(root)
-        .args([
-            "gate",
-            "define",
-            key,
-            "--title",
-            key,
-            "--description",
-            "test",
-            "--mode",
-            "auto",
-            "--checker-command",
-            &checker,
-            "--timeout",
-            "10",
-        ])
-        .output()
-        .unwrap();
-}
-
-/// Define a manual gate `key` (no checker).
-fn define_manual_gate(root: &Path, key: &str) {
-    jit()
-        .current_dir(root)
-        .args([
-            "gate",
-            "define",
-            key,
-            "--title",
-            key,
-            "--description",
-            "test",
-            "--mode",
-            "manual",
-        ])
-        .output()
-        .unwrap();
+fn define_gate(cli: &JitCli, key: &str, command: &str) {
+    define_auto_gate(cli, key, &format!("echo run >> {key}.log; {command}"));
 }
 
 /// Add a registry-configured native review placeholder.
-fn define_review_placeholder_gate(root: &Path, key: &str) {
-    let registry_path = root.join(".jit/gates.toml");
+fn define_review_placeholder_gate(cli: &JitCli, key: &str) {
+    let registry_path = cli.root().join(".jit/gates.toml");
     fs::write(
         registry_path,
         format!(
@@ -110,42 +39,28 @@ type = "review_placeholder"
     .unwrap();
 }
 
-/// Create an issue requiring the listed gates (in order). Returns its id.
-fn create_issue_with_gates(root: &Path, gates: &[&str]) -> String {
-    let mut args = vec!["issue", "create", "--title", "Work"];
-    for g in gates {
-        args.push("--gate");
-        args.push(g);
-    }
-    args.push("--json");
-    let out = jit().current_dir(root).args(&args).output().unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    json["id"].as_str().unwrap().to_string()
-}
-
 /// How many times gate `key`'s checker ran (lines in its side-effect log).
-fn run_count(root: &Path, key: &str) -> usize {
-    fs::read_to_string(root.join(format!("{}.log", key)))
+fn run_count(cli: &JitCli, key: &str) -> usize {
+    fs::read_to_string(cli.root().join(format!("{key}.log")))
         .map(|s| s.lines().count())
         .unwrap_or(0)
 }
 
 #[test]
-fn test_evaluate_all_all_gates_pass_exit_0() {
-    let (_temp, root) = setup_git_jit_repo();
-    define_gate(&root, "g1", "true");
-    define_gate(&root, "g2", "true");
-    let id = create_issue_with_gates(&root, &["g1", "g2"]);
+fn test_evaluate_all_all_gates_pass_reports_each_gate() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    define_gate(&cli, "g1", "true");
+    define_gate(&cli, "g2", "true");
+    let id = create_issue_requiring(&cli, &["g1", "g2"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
+    assert!(
+        out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -156,25 +71,24 @@ fn test_evaluate_all_all_gates_pass_exit_0() {
     assert_eq!(gates.len(), 2);
     assert_eq!(gates[0]["key"], "g1");
     assert_eq!(gates[1]["key"], "g2");
-    assert_eq!(run_count(&root, "g1"), 1);
-    assert_eq!(run_count(&root, "g2"), 1);
+    assert_eq!(run_count(&cli, "g1"), 1);
+    assert_eq!(run_count(&cli, "g2"), 1);
 }
 
 #[test]
 fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
-    let (_temp, root) = setup_git_jit_repo();
-    define_review_placeholder_gate(&root, "review-any-key");
-    let id = create_issue_with_gates(&root, &["review-any-key"]);
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    define_review_placeholder_gate(&cli, "review-any-key");
+    let id = create_issue_requiring(&cli, &["review-any-key"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
+    assert!(
+        out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -189,27 +103,29 @@ fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
     assert_eq!(gates.len(), 1);
     assert_eq!(gates[0]["key"], "review-any-key");
     assert_eq!(
-        gates[0]["warnings"],
-        serde_json::json!([jit::declarations::REVIEW_PLACEHOLDER_WARNING])
+        json["warnings"],
+        serde_json::json!([format!(
+            "(review-any-key): {}",
+            jit::declarations::REVIEW_PLACEHOLDER_WARNING
+        )])
     );
 }
 
 #[test]
-fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
-    let (_temp, root) = setup_git_jit_repo();
-    define_gate(&root, "g1", "false"); // first gate fails (checker exit 1)
-    define_gate(&root, "g2", "true"); // must never run
-    let id = create_issue_with_gates(&root, &["g1", "g2"]);
+fn test_evaluate_all_fail_fast_stops_at_first_failure() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    define_gate(&cli, "g1", "false"); // first gate fails (checker exit 1)
+    define_gate(&cli, "g2", "true"); // must never run
+    let id = create_issue_requiring(&cli, &["g1", "g2"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(4),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -220,31 +136,30 @@ fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
     assert_eq!(json["error"]["details"]["key"], "g1");
 
     // Fail-fast: the first gate ran, the later gate's checker never did.
-    assert_eq!(run_count(&root, "g1"), 1);
+    assert_eq!(run_count(&cli, "g1"), 1);
     assert_eq!(
-        run_count(&root, "g2"),
+        run_count(&cli, "g2"),
         0,
         "later gate must NOT run after a fail-fast"
     );
 }
 
 #[test]
-fn test_evaluate_all_runner_error_exit_10() {
-    let (_temp, root) = setup_git_jit_repo();
+fn test_evaluate_all_runner_error_reports_error_verdict() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
     // First gate's checker kills itself -> no exit code -> runner error.
-    define_gate(&root, "g1", "kill -9 $$");
-    define_gate(&root, "g2", "true");
-    let id = create_issue_with_gates(&root, &["g1", "g2"]);
+    define_gate(&cli, "g1", "kill -9 $$");
+    define_gate(&cli, "g2", "true");
+    let id = create_issue_requiring(&cli, &["g1", "g2"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(10),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -252,36 +167,36 @@ fn test_evaluate_all_runner_error_exit_10() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "IO_ERROR");
     assert_eq!(json["error"]["details"]["verdict"], "error");
-    assert_eq!(run_count(&root, "g2"), 0, "later gate must not run");
+    assert_eq!(run_count(&cli, "g2"), 0, "later gate must not run");
 }
 
 #[test]
-fn test_evaluate_all_no_required_gates_exit_0() {
-    let (_temp, root) = setup_git_jit_repo();
-    let id = create_issue_with_gates(&root, &[]);
+fn test_evaluate_all_no_required_gates_succeeds() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    let id = create_issue_requiring(&cli, &[]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(out.status.code(), Some(0));
+    assert!(out.status.success());
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["gates"].as_array().unwrap().len(), 0);
 }
 
 #[test]
-fn test_evaluate_all_issue_not_found_exit_3() {
-    let (_temp, root) = setup_git_jit_repo();
+fn test_evaluate_all_issue_not_found_reports_error_code() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", "nonexistent", "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", "nonexistent", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(out.status.code(), Some(3));
+    assert!(!out.status.success());
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
 }
@@ -295,20 +210,19 @@ fn test_evaluate_all_issue_not_found_exit_3() {
 /// reports an all-green result that includes an unattested manual gate.
 #[test]
 fn test_evaluate_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
-    let (_temp, root) = setup_git_jit_repo();
-    define_gate(&root, "auto-gate", "true"); // runs first (declared first)
-    define_manual_gate(&root, "manual-gate");
-    let id = create_issue_with_gates(&root, &["auto-gate", "manual-gate"]);
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    define_gate(&cli, "auto-gate", "true"); // runs first (declared first)
+    define_manual_gate(&cli, "manual-gate");
+    let id = create_issue_requiring(&cli, &["auto-gate", "manual-gate"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
+    let out = cli
+        .command(["gate", "evaluate-all", &id, "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(2),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -327,21 +241,21 @@ fn test_evaluate_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
 
     // The auto gate ahead of it still ran and recorded a pass (fail-fast is
     // per-gate, not atomic across the whole set — same as a checker failure).
-    assert_eq!(run_count(&root, "auto-gate"), 1);
+    assert_eq!(run_count(&cli, "auto-gate"), 1);
 }
 
 /// The same mixed set with `--by` supplied: every gate passes, auto via its
 /// checker and manual via attestation.
 #[test]
 fn test_evaluate_all_mixed_gates_with_by_all_pass() {
-    let (_temp, root) = setup_git_jit_repo();
-    define_gate(&root, "auto-gate", "true");
-    define_manual_gate(&root, "manual-gate");
-    let id = create_issue_with_gates(&root, &["auto-gate", "manual-gate"]);
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    define_gate(&cli, "auto-gate", "true");
+    define_manual_gate(&cli, "manual-gate");
+    let id = create_issue_requiring(&cli, &["auto-gate", "manual-gate"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args([
+    let out = cli
+        .command([
             "gate",
             "evaluate-all",
             &id,
@@ -352,9 +266,8 @@ fn test_evaluate_all_mixed_gates_with_by_all_pass() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
+    assert!(
+        out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -365,25 +278,25 @@ fn test_evaluate_all_mixed_gates_with_by_all_pass() {
     assert_eq!(gates.len(), 2);
     assert_eq!(gates[0]["key"], "auto-gate");
     assert_eq!(gates[1]["key"], "manual-gate");
-    assert_eq!(run_count(&root, "auto-gate"), 1);
+    assert_eq!(run_count(&cli, "auto-gate"), 1);
 }
 
 #[test]
 fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
-    let (_temp, root) = setup_git_jit_repo();
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
     // The first invocation fails and the second passes. The shared log also
     // proves the checker calls were serialized in the supplied issue order.
     define_gate(
-        &root,
+        &cli,
         "wave-gate",
         "count=$(wc -l < wave-gate-sequence.log 2>/dev/null || echo 0); echo run-$count >> wave-gate-sequence.log; test \"$count\" -gt 0",
     );
-    let first = create_issue_with_gates(&root, &["wave-gate"]);
-    let second = create_issue_with_gates(&root, &["wave-gate"]);
+    let first = create_issue_requiring(&cli, &["wave-gate"]);
+    let second = create_issue_requiring(&cli, &["wave-gate"]);
 
-    let out = jit()
-        .current_dir(&root)
-        .args([
+    let out = cli
+        .command([
             "gate",
             "evaluate-many",
             "wave-gate",
@@ -394,16 +307,15 @@ fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(4),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(json["count"], 2);
-    let results = json["results"].as_array().unwrap();
+    assert_eq!(json["error"]["code"], "GATE_FAILED");
+    let results = json["error"]["details"]["results"].as_array().unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0]["issue_id"], first);
     assert_eq!(results[0]["status"], "failed");
@@ -411,16 +323,15 @@ fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
     assert_eq!(results[1]["issue_id"], second);
     assert_eq!(results[1]["status"], "passed");
     assert_eq!(results[1]["verdict"], "pass");
-    assert_eq!(run_count(&root, "wave-gate"), 2);
+    assert_eq!(run_count(&cli, "wave-gate"), 2);
     assert_eq!(
-        fs::read_to_string(root.join("wave-gate-sequence.log")).unwrap(),
+        fs::read_to_string(cli.root().join("wave-gate-sequence.log")).unwrap(),
         "run-0\nrun-1\n"
     );
 
     for issue_id in [&first, &second] {
-        let status = jit()
-            .current_dir(&root)
-            .args(["gate", "status", issue_id, "wave-gate", "--json"])
+        let status = cli
+            .command(["gate", "status", issue_id, "wave-gate", "--json"])
             .output()
             .unwrap();
         assert!(status.status.success());

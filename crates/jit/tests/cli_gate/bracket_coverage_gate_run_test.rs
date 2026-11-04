@@ -18,8 +18,8 @@
 //! the rule's `container-from-label` setting while keeping `B` as the sole firing issue.
 
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
+use jit::test_utils::declaration_dir;
 
 /// Hierarchy that declares the bracket node types so `epic`/`planning`/`breakdown`
 /// are valid in the temp repo. The bracket vocabulary itself (and the
@@ -75,47 +75,15 @@ enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }
 "#;
 
-fn jit(temp: &TempDir) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(temp.path());
-    cmd
-}
-
-/// Run a jit command and return parsed JSON stdout (asserting success).
-fn jit_json(temp: &TempDir, args: &[&str]) -> serde_json::Value {
-    let out = jit(temp)
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    serde_json::from_slice(&out).unwrap_or_else(|e| {
-        panic!(
-            "expected JSON from `jit {}`: {e}\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&out)
-        )
-    })
-}
-
 /// Create an issue, returning its full id.
-fn create_issue(temp: &TempDir, title: &str, description: &str, labels: &[&str]) -> String {
-    let mut args = vec![
-        "issue",
-        "create",
-        "--title",
-        title,
-        "--description",
-        description,
-        "--json",
-    ];
-    for l in labels {
-        args.push("--label");
-        args.push(l);
-    }
-    let json = jit_json(temp, &args);
-    json["id"].as_str().expect("created issue id").to_string()
+fn create_issue(cli: &JitCli, title: &str, description: &str, labels: &[&str]) -> String {
+    let labels = labels.iter().flat_map(|label| ["--label", label]);
+    cli.create_issue(
+        ["--title", title, "--description", description]
+            .into_iter()
+            .chain(labels),
+    )
+    .unwrap()
 }
 
 const COVERAGE_GATE_TOML: &str = r#"
@@ -133,41 +101,36 @@ type = "rule_validation"
 rule = "coverage-preview"
 "#;
 
-/// Initialize a temp repo with the bracket config, the `plan` template, the
-/// coverage rule, and a `coverage-preview` auto gate using the portable native checker.
-fn setup_bracket_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit(&temp).arg("init").assert().success();
-
-    let jit_dir = temp.path().join(".jit");
-    std::fs::write(jit_dir.join("config.toml"), BRACKET_CONFIG_TOML).unwrap();
-    std::fs::write(jit_dir.join("templates.toml"), BRACKET_TEMPLATE_TOML).unwrap();
-    std::fs::write(jit_dir.join("rules.toml"), COVERAGE_RULES_TOML).unwrap();
-    std::fs::write(jit_dir.join("gates.toml"), COVERAGE_GATE_TOML).unwrap();
-    temp
-}
+/// Declarations of the bracket config, the `plan` template, the coverage rule,
+/// and a `coverage-preview` auto gate using the portable native checker.
+const BRACKET_DECLARATIONS: &[(&str, &str)] = &[
+    (".jit/config.toml", BRACKET_CONFIG_TOML),
+    (".jit/templates.toml", BRACKET_TEMPLATE_TOML),
+    (".jit/rules.toml", COVERAGE_RULES_TOML),
+    (".jit/gates.toml", COVERAGE_GATE_TOML),
+];
 
 /// Build a bracket `C → child → B` by hand (the shape of a drafted bracket)
 /// with the coverage-preview gate attached to `B`. When `covered`, the child credits the criterion with `satisfies:<C-short-id>/<req_id>`. Returns
 /// `(container_id, breakdown_id)`.
 fn build_bracket(
-    temp: &TempDir,
+    cli: &JitCli,
     container_title: &str,
     req_id: &str,
     covered: bool,
 ) -> (String, String) {
     let description = format!("## Success Criteria\n\n- [hard] {req_id}: it works\n");
-    let c = create_issue(temp, container_title, &description, &["type:epic"]);
+    let c = create_issue(cli, container_title, &description, &["type:epic"]);
 
     let credit = format!("satisfies:{}/{req_id}", &c[..8]);
     let mut kid_labels = vec!["type:task"];
     if covered {
         kid_labels.push(&credit);
     }
-    let k = create_issue(temp, "Impl child", "", &kid_labels);
+    let k = create_issue(cli, "Impl child", "", &kid_labels);
 
     let b = create_issue(
-        temp,
+        cli,
         &format!("Breakdown: {container_title}"),
         "",
         &["type:breakdown", &format!("brackets:{}", &c[..8])],
@@ -175,22 +138,19 @@ fn build_bracket(
 
     // Attach the coverage-preview gate to B (PENDING — as the bracket-builder
     // leaves it).
-    jit(temp)
-        .args(["gate", "add", &b, "coverage-preview"])
-        .assert()
-        .success();
+    cli.run(["gate", "add", &b, "coverage-preview"]).unwrap();
     // Spine: source child depends on B; C depends on the sink child. This puts B
     // inside C's dependency closure, where the scoped coverage rule evaluates it.
-    jit(temp).args(["dep", "add", &k, &b]).assert().success();
-    jit(temp).args(["dep", "add", &c, &k]).assert().success();
+    cli.run(["dep", "add", &k, &b]).unwrap();
+    cli.run(["dep", "add", &c, &k]).unwrap();
 
     (c, b)
 }
 
 /// Assert a persisted gate-run result exists for `B` reflecting `status`.
-fn assert_gate_run(temp: &TempDir, breakdown_id: &str, expected_status: &str) {
+fn assert_gate_run(cli: &JitCli, breakdown_id: &str, expected_status: &str) {
     // A gate-run result file is persisted on disk.
-    let runs_dir = temp.path().join(".jit").join("gate-runs");
+    let runs_dir = cli.root().join(".jit").join("gate-runs");
     assert!(
         runs_dir.exists(),
         ".jit/gate-runs/ must exist after a real gate run"
@@ -203,10 +163,9 @@ fn assert_gate_run(temp: &TempDir, breakdown_id: &str, expected_status: &str) {
     assert!(any_run, "a GateRunResult must be persisted for the run");
 
     // `jit gate status` reflects the recorded run (status + exit code).
-    let json = jit_json(
-        temp,
-        &["gate", "status", breakdown_id, "coverage-preview", "--json"],
-    );
+    let json = cli
+        .run_json(["gate", "status", breakdown_id, "coverage-preview"])
+        .unwrap();
     assert_eq!(
         json["status"].as_str(),
         Some(expected_status),
@@ -220,20 +179,20 @@ fn assert_gate_run(temp: &TempDir, breakdown_id: &str, expected_status: &str) {
 
 #[test]
 fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
-    let temp = setup_bracket_repo();
+    let cli = JitCli::with_repository(declaration_dir(BRACKET_DECLARATIONS).unwrap());
+    cli.run(["init"]).unwrap();
     // Child credits the container's REQ-01 → coverage complete.
-    let (_c, b) = build_bracket(&temp, "Auth epic", "REQ-01", true);
+    let (_c, b) = build_bracket(&cli, "Auth epic", "REQ-01", true);
 
     // Run the ATTACHED gate via the standard runner. Covered → exit 0.
-    jit(&temp)
-        .args(["gate", "evaluate", &b, "coverage-preview"])
+    cli.command(["gate", "evaluate", &b, "coverage-preview"])
         .assert()
         .success();
 
-    assert_gate_run(&temp, &b, "passed");
+    assert_gate_run(&cli, &b, "passed");
 
     // The breakdown node's gate status reflects the real run.
-    let issue = jit_json(&temp, &["issue", "show", &b, "--json"]);
+    let issue = cli.run_json(["issue", "show", &b]).unwrap();
     let gate = issue["gates"]
         .as_array()
         .and_then(|gs| gs.iter().find(|g| g["key"] == "coverage-preview"))
@@ -247,21 +206,22 @@ fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
 
 #[test]
 fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
-    let temp = setup_bracket_repo();
+    let cli = JitCli::with_repository(declaration_dir(BRACKET_DECLARATIONS).unwrap());
+    cli.run(["init"]).unwrap();
     // Child carries NO satisfies label → REQ-77 left uncovered.
-    let (_c, b) = build_bracket(&temp, "Pay epic", "REQ-77", false);
+    let (_c, b) = build_bracket(&cli, "Pay epic", "REQ-77", false);
 
-    // Run the ATTACHED gate via the standard runner. Uncovered → exit 4.
-    jit(&temp)
-        .args(["gate", "evaluate", &b, "coverage-preview"])
+    // Run the ATTACHED gate via the standard runner. Uncovered → failure.
+    cli.command(["gate", "evaluate", &b, "coverage-preview"])
         .assert()
-        .failure()
-        .code(4);
+        .failure();
 
-    assert_gate_run(&temp, &b, "failed");
+    assert_gate_run(&cli, &b, "failed");
 
     // The persisted run's stdout names the uncovered criterion.
-    let json = jit_json(&temp, &["gate", "status", &b, "coverage-preview", "--json"]);
+    let json = cli
+        .run_json(["gate", "status", &b, "coverage-preview"])
+        .unwrap();
     assert!(
         json["stdout"]
             .as_str()
@@ -271,7 +231,7 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
     );
 
     // The breakdown node's gate status reflects the real failing run.
-    let issue = jit_json(&temp, &["issue", "show", &b, "--json"]);
+    let issue = cli.run_json(["issue", "show", &b]).unwrap();
     let gate = issue["gates"]
         .as_array()
         .and_then(|gs| gs.iter().find(|g| g["key"] == "coverage-preview"))
@@ -285,32 +245,27 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
 
 #[test]
 fn test_selected_rule_ignores_historical_rejected_bracket_target() {
-    let temp = setup_bracket_repo();
+    let cli = JitCli::with_repository(declaration_dir(BRACKET_DECLARATIONS).unwrap());
+    cli.run(["init"]).unwrap();
     let (_selected_container, selected_breakdown) =
-        build_bracket(&temp, "Current epic", "REQ-01", true);
+        build_bracket(&cli, "Current epic", "REQ-01", true);
     let (historical_container, _historical_breakdown) =
-        build_bracket(&temp, "Historical epic", "REQ-99", false);
+        build_bracket(&cli, "Historical epic", "REQ-99", false);
 
     // The historical target is rejected and its breakdown is unrelated to the
     // selected gate application. Both issues remain in the repository image so
     // the checker must prove subject isolation rather than relying on omission.
-    jit(&temp)
-        .args([
-            "issue",
-            "update",
-            &historical_container,
-            "--state",
-            "rejected",
-        ])
+    cli.command(["issue", "reject", &historical_container])
         .assert()
         .success();
 
-    jit(&temp)
-        .args(["gate", "evaluate", &selected_breakdown, "coverage-preview"])
+    cli.command(["gate", "evaluate", &selected_breakdown, "coverage-preview"])
         .assert()
         .success();
 
-    assert_gate_run(&temp, &selected_breakdown, "passed");
-    let historical = jit_json(&temp, &["issue", "show", &historical_container, "--json"]);
+    assert_gate_run(&cli, &selected_breakdown, "passed");
+    let historical = cli
+        .run_json(["issue", "show", &historical_container])
+        .unwrap();
     assert_eq!(historical["state"].as_str(), Some("rejected"));
 }

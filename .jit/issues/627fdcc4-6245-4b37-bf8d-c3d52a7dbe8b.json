@@ -1,9 +1,11 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T16:46:03.474178535Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "1a2e905c-f5ed-4c80-a751-6221cf58c1d8"
+    "1a2e905c-f5ed-4c80-a751-6221cf58c1d8",
+    "cc6ef886-17a2-48e6-acff-0c206dcd664b"
   ],
   "description": "Make the shipped pre-commit and pre-push hooks ask `jit claim status` whether an issue's lease is held, so they depend on no claims file layout.\n\n## Background\n\nThe strict-mode lease checks in `scripts/hooks/pre-commit:94-102` and `scripts/hooks/pre-push:76-89` read `.git/jit/claims.index.json` with `jq` and test its stored `stale` field; pre-push matches the issue by prefix (`startswith`). The scripts are embedded through `include_str!` (`crates/jit/src/commands/hooks.rs:7-8`). Their tests (`commands/hooks.rs:284-325`) plant an index file by hand (`grant_lease`) and run the hook in a scratch git repository; they run inside the library's unit tests, where no built binary is on the path. `jit claim status --issue <id> --json` reports one issue's leases with `stale` computed at read time. The CLI suite `crates/jit/tests/cli_repo_workflow/` runs the built binary. Kept as one change for a test reason: once the hooks call `jit`, the in-crate hook tests cannot pass, so they move to the CLI suite with the hooks.\n\n## Success Criteria\n\n- [hard] REQ-01: The pre-commit and pre-push hooks decide lease ownership from `jit claim status --issue <id> --json` and read no file under `.git/jit/`.\n- [hard] REQ-02: A held, non-stale lease of the committing agent allows the commit; no lease, another agent's lease or a stale lease blocks it.\n- [hard] REQ-03: The hook lease tests run in the CLI suite against the built binary and acquire the lease through `jit claim acquire`; `commands/hooks.rs` holds no lease test and plants no claims file.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
@@ -21,10 +23,11 @@
     "component:cli",
     "per:@/charter/D-19",
     "per:@/charter/D-20",
-    "satisfies:f8a6b298/REQ-12"
+    "satisfies:f8a6b298/REQ-12",
+    "resolution:obsolete"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Git hooks check leases through the claim status command",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:55.570796344Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7487595a99443263727a803a8242361b2d099078",
+  "completed_at": "2026-11-04T00:35:04.590301983Z",
+  "duration_ms": 199360,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change satisfies the scoped gate-run capture criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0bd2c797-ca80-4f18-8cc9-1df1604dc55d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "94943e7e-8400-4fec-9e65-e220240fd0f4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:31:45.230138258Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ea6781e23 (`jit:0bd2c797`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17, @/charter/D-19, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-01, REQ-02, REQ-04, REQ-13 (issue Markdown); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T00:29:15Z); code-review pending\nTruncation recovery: recovered with per-file zero-context patches and focused current-source reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change satisfies the scoped gate-run capture criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -276,10 +276,11 @@ mod tests {
     use axum::{routing::get, Router};
     use std::io;
     use std::net::SocketAddr;
+    use std::sync::Arc;
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
-    use tokio::sync::{mpsc, oneshot};
+    use tokio::sync::{mpsc, oneshot, Notify};
     use tokio::task::JoinHandle;
     use tokio::time::timeout;
     use tokio_util::sync::CancellationToken;
@@ -305,26 +306,34 @@ mod tests {
         (addr, serving)
     }
 
-    /// Serves requests that report handler entry and then remain in flight.
+    /// Serves requests that report handler entry and then remain in flight until
+    /// the returned `Notify` releases one of them.
     async fn serve_stalling_on_loopback(
         handle: &ServerHandle,
     ) -> (
         SocketAddr,
         JoinHandle<io::Result<()>>,
         mpsc::UnboundedReceiver<()>,
+        Arc<Notify>,
     ) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind loopback");
         listener
             .set_nonblocking(true)
             .expect("non-blocking listener");
         let (started, started_requests) = mpsc::unbounded_channel();
+        let release = Arc::new(Notify::new());
         let app = Router::new().route(
             "/stall",
-            get(move || {
-                let started = started.clone();
-                async move {
-                    started.send(()).expect("the test observes handler entry");
-                    std::future::pending::<&'static str>().await
+            get({
+                let release = release.clone();
+                move || {
+                    let started = started.clone();
+                    let release = release.clone();
+                    async move {
+                        started.send(()).expect("the test observes handler entry");
+                        release.notified().await;
+                        "released"
+                    }
                 }
             }),
         );
@@ -336,21 +345,7 @@ mod tests {
             .await
             .expect("the server binds within the test budget")
             .expect("the server reports its bound address");
-        (addr, serving, started_requests)
-    }
-
-    /// Opens a connection whose request never completes: the request line and a
-    /// header are sent, the terminating blank line never is. Hyper stays mid
-    /// message, so a graceful shutdown cannot retire the connection and only
-    /// the drain deadline can close it.
-    async fn open_stalled_connection(addr: SocketAddr) -> TcpStream {
-        let mut stream = TcpStream::connect(addr).await.expect("connect");
-        stream
-            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\n")
-            .await
-            .expect("send a partial request");
-        stream.flush().await.expect("flush the partial request");
-        stream
+        (addr, serving, started_requests, release)
     }
 
     /// Opens a complete request whose handler remains in flight.
@@ -362,6 +357,16 @@ mod tests {
             .expect("send a request to the stalling handler");
         stream.flush().await.expect("flush the stalling request");
         stream
+    }
+
+    /// Waits until a handler has been entered, which proves the server read the
+    /// request: a graceful notice reaching a connection before that closes it at
+    /// once, and resets the peer whose request it never read.
+    async fn wait_for_handler_entry(started_requests: &mut mpsc::UnboundedReceiver<()>) {
+        timeout(TEST_BUDGET, started_requests.recv())
+            .await
+            .expect("each stalling handler starts within the test budget")
+            .expect("the handler-entry channel remains open");
     }
 
     /// Opens a connection, completes one request/response exchange on it, and
@@ -407,9 +412,10 @@ mod tests {
     #[tokio::test]
     async fn test_run_shutdown_sequence_force_closes_connections_that_outlive_the_deadline() {
         let handle = ServerHandle::new();
-        let (addr, serving) = serve_on_loopback(&handle).await;
-        let mut stalled = open_stalled_connection(addr).await;
-        wait_for_connection_count(&handle, 1).await;
+        let (addr, serving, mut started_requests, _release) =
+            serve_stalling_on_loopback(&handle).await;
+        let mut stalled = open_stalling_request(addr).await;
+        wait_for_handler_entry(&mut started_requests).await;
         let shutdown = CancellationToken::new();
 
         let outcome = run_shutdown_sequence(
@@ -451,9 +457,10 @@ mod tests {
     {
         let deadline = Duration::from_millis(300);
         let handle = ServerHandle::new();
-        let (addr, _serving) = serve_on_loopback(&handle).await;
-        let mut stalled = open_stalled_connection(addr).await;
-        wait_for_connection_count(&handle, 1).await;
+        let (addr, _serving, mut started_requests, _release) =
+            serve_stalling_on_loopback(&handle).await;
+        let mut stalled = open_stalling_request(addr).await;
+        wait_for_handler_entry(&mut started_requests).await;
 
         // `sleep` never completes early, so load can lengthen the measured
         // interval but never shorten it below the deadline.
@@ -484,15 +491,12 @@ mod tests {
     async fn test_drain_connections_force_closes_exact_survivors_when_graceful_notice_is_observed_late(
     ) {
         let handle = ServerHandle::new();
-        let (addr, serving, mut started_requests) = serve_stalling_on_loopback(&handle).await;
+        let (addr, serving, mut started_requests, _release) =
+            serve_stalling_on_loopback(&handle).await;
         let mut first_stalled = open_stalling_request(addr).await;
         let mut second_stalled = open_stalling_request(addr).await;
-        for _ in 0..2 {
-            timeout(TEST_BUDGET, started_requests.recv())
-                .await
-                .expect("each stalling handler starts within the test budget")
-                .expect("the handler-entry channel remains open");
-        }
+        wait_for_handler_entry(&mut started_requests).await;
+        wait_for_handler_entry(&mut started_requests).await;
         wait_for_connection_count(&handle, 2).await;
 
         // Leave the accepted connection tasks alive while preventing the main
@@ -569,9 +573,10 @@ mod tests {
     #[tokio::test]
     async fn test_drain_connections_reports_drained_when_the_boundary_finds_the_survivor_retired() {
         let handle = ServerHandle::new();
-        let (addr, serving) = serve_on_loopback(&handle).await;
-        let mut completing = open_stalled_connection(addr).await;
-        wait_for_connection_count(&handle, 1).await;
+        let (addr, serving, mut started_requests, release) =
+            serve_stalling_on_loopback(&handle).await;
+        let _completing = open_stalling_request(addr).await;
+        wait_for_handler_entry(&mut started_requests).await;
         let (sampled, first_sample) = oneshot::channel();
         let (expire, boundary) = oneshot::channel();
         let shutdown = CancellationToken::new();
@@ -603,17 +608,10 @@ mod tests {
             .expect("the drain samples the live connection within the test budget")
             .expect("the drain reaches its boundary with a connection still live");
 
-        // Completing the request is the peer's half of the retirement; the count
-        // reaching zero is the server's, and the test waits for that rather than
-        // for a duration in which it might happen.
-        completing
-            .write_all(b"\r\n")
-            .await
-            .expect("complete the request the drain is waiting on");
-        completing
-            .flush()
-            .await
-            .expect("flush the completed request");
+        // Answering the request retires the connection the drain is waiting on;
+        // the test waits for the count reaching zero rather than for a duration
+        // in which it might happen.
+        release.notify_one();
         wait_for_connection_count(&handle, 0).await;
 
         expire

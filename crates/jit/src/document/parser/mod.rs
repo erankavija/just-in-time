@@ -131,8 +131,8 @@ pub trait ContentParser {
 }
 
 /// Error returned when a requested [`ContentFormat`](crate::domain::ContentFormat)
-/// cannot be served because its parser was not compiled in (the `html`/`xml`
-/// cargo features).
+/// cannot be served because its parser was not compiled in (the format's cargo
+/// feature).
 ///
 /// The selector NEVER silently falls back to Markdown for an explicitly
 /// requested format: a build that lacks the feature must surface a clear error

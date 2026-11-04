@@ -4,9 +4,10 @@
 //! intends to hold, optionally bound to the rule or gate that enforces it. This
 //! module is the registry-first SOURCE for those entries: it owns only the pure
 //! parse/load step (read the file if present, parse with serde + toml, return a
-//! typed error on malformed/invalid content). Wiring the loaded registry into
-//! [`JitConfig::load`](crate::config::JitConfig::load) is the job of [`crate::config`],
-//! and indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
+//! typed error on malformed/invalid content). Wiring the registry into the
+//! configuration is the job of
+//! [`assemble_configuration`](crate::declarations::assemble_configuration), and
+//! indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
 //! is built on top of this registry by a later layer.
 //!
 //! The loader mirrors the production rules filesystem boundary:
@@ -14,9 +15,10 @@
 //! is keyed by its `id` field — the entry's SELF-ID, from which the project-scoped
 //! qualified id `@/invariant/<self-id>` is derived.
 
+use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 
 /// Errors that can occur while loading and parsing `.jit/invariants.toml`.
@@ -26,6 +28,10 @@ use thiserror::Error;
 /// [`RuleConfigError`](crate::declarations::rules::RuleConfigError).
 #[derive(Debug, Error)]
 pub enum InvariantConfigError {
+    /// The repository layout could not resolve the invariants path.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+
     /// The invariants file could not be read from disk.
     #[error("failed to read invariants file '{path}': {source}")]
     Io {
@@ -141,8 +147,8 @@ impl InvariantRegistry {
     /// Returns an empty [`InvariantRegistry`] when the file does not exist
     /// (graceful, NOT an error), mirroring
     /// the production rules filesystem boundary.
-    pub fn load(jit_root: &Path) -> Result<Self, InvariantConfigError> {
-        let path = jit_root.join("invariants.toml");
+    pub fn load(layout: &RepositoryLayout) -> Result<Self, InvariantConfigError> {
+        let path = layout.resolve(&VirtualPath::INVARIANTS)?;
         if !path.exists() {
             return Ok(Self::empty());
         }
@@ -309,19 +315,23 @@ kind = "advisory"
     #[test]
     fn test_load_absent_file_is_empty_registry() {
         let dir = tempfile::tempdir().unwrap();
-        let reg = InvariantRegistry::load(dir.path()).unwrap();
+        let reg = InvariantRegistry::load(&crate::test_utils::repository_layout_for_data_root(
+            dir.path(),
+        ))
+        .unwrap();
         assert!(reg.invariants.is_empty());
     }
 
     #[test]
     fn test_load_reads_present_file() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("invariants.toml"),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             "[[invariants]]\nid = \"ninth-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n",
         )
         .unwrap();
-        let reg = InvariantRegistry::load(dir.path()).unwrap();
+        let reg = InvariantRegistry::load(&layout).unwrap();
         assert_eq!(reg.invariants.len(), 1);
         assert_eq!(reg.invariants[0].id, "ninth-invariant");
         assert_eq!(reg.invariants[0].kind, InvariantKind::Enforced);
@@ -330,8 +340,13 @@ kind = "advisory"
     #[test]
     fn test_load_malformed_file_is_typed_error() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("invariants.toml"), "not = valid = toml").unwrap();
-        let err = InvariantRegistry::load(dir.path()).unwrap_err();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
+            "not = valid = toml",
+        )
+        .unwrap();
+        let err = InvariantRegistry::load(&layout).unwrap_err();
         assert!(matches!(err, InvariantConfigError::Toml(_)));
     }
 }

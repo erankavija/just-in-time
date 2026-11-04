@@ -104,10 +104,9 @@ This shows issues that are:
 - In "ready" state
 - Not blocked by dependencies
 
-The issue visibility works through a 3-tier fallback:
-1. **Local `.jit/`** — Issues you've modified in this worktree
-2. **Git HEAD** — Committed issues (canonical state)
-3. **Main worktree `.jit/`** — Uncommitted issues from main
+Issue reads come from two sources, in order:
+1. **This checkout's `.jit/`** — Everything this checkout holds, including its uncommitted changes
+2. **Primary checkout's `.jit/`** — Issues only the primary holds, committed or not
 
 ## Step 4: Claim an Issue
 
@@ -124,7 +123,7 @@ jit claim acquire <issue-id>
 You should see:
 
 ```
-✓ Acquired lease: abc123-def456...
+Acquired lease: abc123-def456...
   Issue: <issue-id>
   TTL: <seconds> seconds
 ```
@@ -138,7 +137,7 @@ The claim creates a **lease** that:
 - Expires after its TTL (see the [default claim lease TTL](../reference/runtime-defaults.md))
 - Can be renewed if you need more time
 
-A lease is advisory work coordination: it signals intent and hands out exclusive *ownership of the lease*, but by default it does not lock the issue's files against an agent that skips claiming. Whether write operations require a lease is configurable — see `enforce_leases` in the [Configuration Reference](../reference/configuration.md#enforce_leases).
+A lease is advisory work coordination: it signals intent and hands out exclusive *ownership of the lease*, but by default it does not lock the issue's files against an agent that skips claiming. Whether another agent's lease refuses a write is configurable — see `enforce_leases` in the [Configuration Reference](../reference/configuration.md#enforce_leases).
 
 View active claims:
 
@@ -211,7 +210,7 @@ flowchart LR
     subgraph Secondary["Secondary worktree"]
         SI[".jit/issues/ (reads from main)"]
     end
-    CP[".git/jit/<br/>claims.jsonl<br/>claims.index.json"]
+    CP[".git/jit/<br/>leases/{issue-id}.json<br/>claims.jsonl"]
     MI -->|shared| CP
     SI -->|shared| CP
 ```
@@ -243,7 +242,7 @@ If an agent crashes or the lease expires:
 jit claim list
 
 # Force evict if needed (admin operation)
-jit claim force-evict <lease-id> --reason "agent crashed"
+jit claim force-evict <issue-id> --reason "agent crashed"
 ```
 
 ### Scenario: Need More Time
@@ -251,7 +250,7 @@ jit claim force-evict <lease-id> --reason "agent crashed"
 Renew your lease before it expires:
 
 ```bash
-jit claim renew <lease-id> --extension 600
+jit claim renew <issue-id> --extension 600
 ```
 
 ### Scenario: Check Dependencies

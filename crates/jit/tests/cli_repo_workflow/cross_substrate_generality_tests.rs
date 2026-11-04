@@ -31,103 +31,14 @@
 //!   this explicit.
 //! - REQ-03: the test passes under `cargo test`.
 
+use jit::domain::identity::IssueId;
+use jit::test_cli::JitCli;
+use jit::test_utils::profiled_repository_fixture;
 use serde_json::Value;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// Bootstrap a repository carrying the `jit-default` package's `[item_kinds]`
-/// table, which declares this fixture's four kinds among the six it carries,
-/// and return the temp dir so the caller owns the lifetime.
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let location = "packages/jit-default";
-    jit::test_utils::capture_repository_package("jit-default", &temp.path().join(location))
-        .expect("this repository's default package captures");
-    let output = Command::new(jit_binary())
-        .args(["init", "--profile", location])
-        .current_dir(temp.path())
-        .output()
-        .expect("failed to run jit init");
-    assert!(
-        output.status.success(),
-        "jit init --profile jit-default failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    temp
-}
-
-/// Create an issue through the real CLI and return its 8-char short id.
-fn create_issue(repo: &Path, title: &str, body: &str) -> String {
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-d", body, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue create failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let full_id = json["id"].as_str().expect("created issue has an id");
-    full_id.chars().take(8).collect()
-}
-
-/// Write `content` to `.jit/<filename>` inside `repo`.
-fn write_jit_file(repo: &Path, filename: &str, content: &str) {
-    std::fs::write(repo.join(".jit").join(filename), content).unwrap();
-}
-
-/// Run `jit item list [--kind <kind>] --json` and return the parsed JSON.
-fn item_list(repo: &Path, kind: Option<&str>) -> Value {
-    let mut cmd = Command::new(jit_binary());
-    cmd.arg("item").arg("list");
-    if let Some(k) = kind {
-        cmd.arg("--kind").arg(k);
-    }
-    cmd.arg("--json");
-    let output = cmd.current_dir(repo).output().unwrap();
-    assert!(
-        output.status.success(),
-        "jit item list failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).unwrap()
-}
-
-/// Run `jit item show <qualified_id> --json` and return the parsed JSON.
-fn item_show(repo: &Path, qualified_id: &str) -> Value {
-    let output = Command::new(jit_binary())
-        .args(["item", "show", qualified_id, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "jit item show {qualified_id} failed: {}",
-        String::from_utf8_lossy(&output.stdout)
-    );
-    serde_json::from_slice(&output.stdout).unwrap()
-}
-
-/// Run `jit item search <query> --json` and return the parsed JSON.
-fn item_search(repo: &Path, query: &str) -> Value {
-    let output = Command::new(jit_binary())
-        .args(["item", "search", query, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "jit item search {query} failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).unwrap()
+/// Write `content` to `.jit/<filename>` inside the repository.
+fn write_jit_file(cli: &JitCli, filename: &str, content: &str) {
+    std::fs::write(cli.root().join(".jit").join(filename), content).unwrap();
 }
 
 /// Extract the `qualified_id` strings from a `jit item list/search` JSON result.
@@ -174,7 +85,10 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 /// no separate command exists for either substrate.
 #[test]
 fn test_all_four_kinds_through_one_generic_path() {
-    let temp = setup_test_repo();
+    // A repository carrying the `jit-default` package's `[item_kinds]` table,
+    // which declares this fixture's four kinds among the six it carries.
+    let cli =
+        JitCli::with_repository(profiled_repository_fixture("jit-default", "packages").unwrap());
 
     // --- Fixture: one issue with all three issue-scope kinds ---
     let issue_body = "\
@@ -184,11 +98,16 @@ fn test_all_four_kinds_through_one_generic_path() {
 - D-01: store issues as plain JSON files\n\n\
 ## Risks\n\n\
 - RISK-01: concurrent writers may corrupt state\n";
-    let short = create_issue(temp.path(), "Cross-substrate fixture", issue_body);
+    let issue: IssueId = cli
+        .create_issue(["-t", "Cross-substrate fixture", "-d", issue_body])
+        .unwrap()
+        .parse()
+        .expect("the binary prints a canonical issue id");
+    let short = issue.short_id();
 
     // --- Fixture: one project-scope, registry-first invariant ---
     write_jit_file(
-        temp.path(),
+        &cli,
         "invariants.toml",
         "[[invariants]]\n\
          id = \"sample-invariant\"\n\
@@ -206,7 +125,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     // the project-scope invariant (registry-first, scoped `@`) appear in the
     // SAME unfiltered output. Neither substrate requires a separate command.
     // -----------------------------------------------------------------------
-    let all = item_list(temp.path(), None);
+    let all = cli.run_json(["item", "list"]).unwrap();
     let all_qids = qualified_ids(&all);
 
     // Issue-scope, markdown-first items mint the uniform kind-segmented address
@@ -267,7 +186,9 @@ fn test_all_four_kinds_through_one_generic_path() {
     // that kind — the same generic path with a filter, for each of the four.
     // -----------------------------------------------------------------------
 
-    let reqs = item_list(temp.path(), Some("requirement"));
+    let reqs = cli
+        .run_json(["item", "list", "--kind", "requirement"])
+        .unwrap();
     let req_qids = qualified_ids(&reqs);
     assert!(
         req_qids.contains(&req_qid.as_str()),
@@ -280,7 +201,9 @@ fn test_all_four_kinds_through_one_generic_path() {
         "--kind requirement must not return decisions, risks, or invariants: {req_qids:?}"
     );
 
-    let decs = item_list(temp.path(), Some("decision"));
+    let decs = cli
+        .run_json(["item", "list", "--kind", "decision"])
+        .unwrap();
     let dec_qids = qualified_ids(&decs);
     assert!(
         dec_qids.contains(&dec_qid.as_str()),
@@ -293,7 +216,7 @@ fn test_all_four_kinds_through_one_generic_path() {
         "--kind decision must not return requirements, risks, or invariants: {dec_qids:?}"
     );
 
-    let risks = item_list(temp.path(), Some("risk"));
+    let risks = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
     let risk_qids = qualified_ids(&risks);
     assert!(
         risk_qids.contains(&risk_qid.as_str()),
@@ -308,7 +231,9 @@ fn test_all_four_kinds_through_one_generic_path() {
         "--kind risk must not return requirements, decisions, or invariants: {risk_qids:?}"
     );
 
-    let invs = item_list(temp.path(), Some("invariant"));
+    let invs = cli
+        .run_json(["item", "list", "--kind", "invariant"])
+        .unwrap();
     let inv_qids = qualified_ids(&invs);
     assert!(
         inv_qids.contains(&"@/invariant/sample-invariant"),
@@ -333,7 +258,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     // -----------------------------------------------------------------------
 
     // requirement (issue-scope, markdown-first)
-    let shown_req = item_show(temp.path(), &req_qid);
+    let shown_req = cli.run_json(["item", "show", &req_qid]).unwrap();
     assert_eq!(shown_req["item"]["self_id"].as_str(), Some("REQ-01"));
     assert_eq!(shown_req["item"]["kind"].as_str(), Some("requirement"));
     assert_eq!(
@@ -354,7 +279,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     );
 
     // decision (issue-scope, markdown-first)
-    let shown_dec = item_show(temp.path(), &dec_qid);
+    let shown_dec = cli.run_json(["item", "show", &dec_qid]).unwrap();
     assert_eq!(shown_dec["item"]["self_id"].as_str(), Some("D-01"));
     assert_eq!(shown_dec["item"]["kind"].as_str(), Some("decision"));
     assert_eq!(
@@ -371,7 +296,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     );
 
     // risk (issue-scope, markdown-first)
-    let shown_risk = item_show(temp.path(), &risk_qid);
+    let shown_risk = cli.run_json(["item", "show", &risk_qid]).unwrap();
     assert_eq!(shown_risk["item"]["self_id"].as_str(), Some("RISK-01"));
     assert_eq!(shown_risk["item"]["kind"].as_str(), Some("risk"));
     assert_eq!(
@@ -392,7 +317,9 @@ fn test_all_four_kinds_through_one_generic_path() {
 
     // invariant (project-scope, registry-first) — the same `jit item show`
     // command resolves it; no separate command exists for registry items.
-    let shown_inv = item_show(temp.path(), "@/invariant/sample-invariant");
+    let shown_inv = cli
+        .run_json(["item", "show", "@/invariant/sample-invariant"])
+        .unwrap();
     assert_eq!(
         shown_inv["item"]["self_id"].as_str(),
         Some("sample-invariant")
@@ -428,7 +355,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     // -----------------------------------------------------------------------
 
     // Search for a term unique to the requirement.
-    let hits_atomic = item_search(temp.path(), "atomic");
+    let hits_atomic = cli.run_json(["item", "search", "atomic"]).unwrap();
     let atomic_qids = qualified_ids(&hits_atomic);
     assert!(
         atomic_qids.contains(&req_qid.as_str()),
@@ -440,7 +367,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     );
 
     // Search for a term unique to the decision.
-    let hits_json = item_search(temp.path(), "JSON");
+    let hits_json = cli.run_json(["item", "search", "JSON"]).unwrap();
     let json_qids = qualified_ids(&hits_json);
     assert!(
         json_qids.contains(&dec_qid.as_str()),
@@ -448,7 +375,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     );
 
     // Search for a term unique to the risk.
-    let hits_corrupt = item_search(temp.path(), "corrupt");
+    let hits_corrupt = cli.run_json(["item", "search", "corrupt"]).unwrap();
     let corrupt_qids = qualified_ids(&hits_corrupt);
     assert!(
         corrupt_qids.contains(&risk_qid.as_str()),
@@ -458,7 +385,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     // Search for a term unique to the invariant (registry-first) — the same
     // `search_items` that found issue-scope items above also reaches the
     // invariant registry, confirming the one-code-path claim (REQ-02).
-    let hits_acyclic = item_search(temp.path(), "acyclic");
+    let hits_acyclic = cli.run_json(["item", "search", "acyclic"]).unwrap();
     let acyclic_qids = qualified_ids(&hits_acyclic);
     assert!(
         acyclic_qids.contains(&"@/invariant/sample-invariant"),
@@ -472,14 +399,16 @@ fn test_all_four_kinds_through_one_generic_path() {
     );
 
     // Search by self-id across substrates confirms both are reachable.
-    let hits_inv01 = item_search(temp.path(), "sample-invariant");
+    let hits_inv01 = cli
+        .run_json(["item", "search", "sample-invariant"])
+        .unwrap();
     assert!(
         qualified_ids(&hits_inv01).contains(&"@/invariant/sample-invariant"),
         "searching by self-id 'sample-invariant' must find the invariant: {:?}",
         qualified_ids(&hits_inv01)
     );
 
-    let hits_req01 = item_search(temp.path(), "REQ-01");
+    let hits_req01 = cli.run_json(["item", "search", "REQ-01"]).unwrap();
     assert!(
         qualified_ids(&hits_req01).contains(&req_qid.as_str()),
         "searching by self-id 'REQ-01' must find the requirement: {:?}",

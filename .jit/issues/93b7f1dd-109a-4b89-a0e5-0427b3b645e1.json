@@ -1,21 +1,54 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:02:41.194047695Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
-    "b06cee74-7635-49c0-bc13-448bcfa28324"
+    "2117739f-f6b9-4b39-9dbd-f3deb7a0885e"
   ],
-  "description": "Make a reused gate verdict name the issue its source run belongs to as well as the run, so the source record is addressable without searching.\n\n## Background\n\n`GateVerdictOrigin::Reused(String)` (`crates/jit/src/domain/types.rs:1046-1063`, accessor `source_run()` at `:1085-1090`) names the source run by id alone and serializes adjacently tagged as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`. Under per-issue run records the id alone does not locate the record.\n\nProducers and readers: `reused_gate_run` (`commands/gate_check.rs:36-60`, called at `:921`); the human render at `main.rs:1190-1191`; the generated storage-record reference (`storage/reference.rs:264` prose and `:363` sample), whose committed output `docs/reference/storage-records.md:100-101,142` is checked by `test_committed_reference_matches_projection` (`reference.rs:817`); tests at `commands/gate_check.rs:2334-2491`. This repository holds 123 reused run records in the old shape. Kept as one change for a golden-test reason: the reference sample constructs the variant, so the committed reference is regenerated in the same commit.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateVerdictOrigin::Reused` carries `source_issue: IssueId` and `source_run: GateRunId` and serializes as `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \"source_run\": \"<run-id>\"}`. A record without `source_issue` fails to decode.\n- [hard] REQ-02: Reuse sets `source_issue` to the issue the source run belongs to, and the human gate-status render names both.\n- [hard] REQ-03: The reference sample and its prose show the new shape, and the committed reference matches the projection.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Stored reused records in the old shape are rewritten by the repository's one-time gate-run rewrite, which lands with this change.\n",
+  "description": "Make a reused gate verdict name the issue its source run belongs to as well as the run, in the stored record and in the web client's type, so the source record is addressable without searching.\n\n## Background\n\n`GateVerdictOrigin` (`crates/jit/src/domain/types.rs`) has three variants. `Reused(GateRunId)` names the source run by id alone and serializes adjacently tagged as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`; `Executed` and `Attested` serialize as the tag alone, and a record without `origin` decodes as executed. Under per-issue run records the id alone does not locate the record.\n\nProducer and readers: `reused_gate_run` (`commands/gate_check.rs`); the human render in `main.rs`; the generated storage-record reference (`storage/reference.rs` prose and sample), whose committed output `docs/reference/storage-records.md` is checked by `test_committed_reference_matches_projection`; the rustdoc of the provenance shape in `output.rs`. The web client's hand-written `GateVerdictOrigin` type (`web/src/types/models.ts`) declares `{ derivation: 'reused'; source_run: string }`; no web code reads `source_run` beyond the type.\n\nStored reused records in the old shape are rewritten by the format cutover. A repository at the old shape is refused by the format marker, which is already at 4 when this lands.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateVerdictOrigin` is internally tagged on `derivation`. `Reused` carries `source_issue: IssueId` and `source_run: GateRunId` and serializes as `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \"source_run\": \"<run-id>\"}`; a record without `source_issue` fails to decode. `Executed` and `Attested` stay tag-only, and a record with no `origin` still decodes as executed.\n- [hard] REQ-02: Reuse sets `source_issue` to the issue the source run belongs to, and the human gate-status render names both.\n- [hard] REQ-03: The reference sample and prose and the `output.rs` rustdoc show the new shape, and the committed reference matches the projection.\n- [hard] REQ-04: The web client's `GateVerdictOrigin` type carries `source_issue` beside `source_run`, and the web tests, lint and build pass.\n",
   "documents": [],
+  "done_at": "2026-11-04T00:28:32.071721829Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "doc-review",
-    "docs-mechanical"
+    "docs-mechanical",
+    "npm-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2172f3f4-0496-42b1-9036-df2e35c8f785",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:19:37.439074826Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c39e01cf-01d3-4272-86e4-8e3902ab4dbf",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:28:20.831029049Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "a583d949-467a-4bdc-a46a-01fd6e8c7b2c",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:24:58.348538077Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "f0cf9296-db1f-4e08-a4ef-3d86731eda1d",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:25:00.583961195Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "47fe7f38-994c-4542-8b02-d8c8bbef7571",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:25:16.379250496Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "93b7f1dd-109a-4b89-a0e5-0427b3b645e1",
   "labels": [
     "type:task",
@@ -25,10 +58,11 @@
     "component:gates",
     "component:core",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-01"
+    "satisfies:f8a6b298/REQ-01",
+    "component:web"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Reused verdicts name their source issue and source run",
-  "updated_at": "2026-10-21T10:40:06.137184343Z"
+  "updated_at": "2026-11-04T00:28:32.071721829Z"
 }

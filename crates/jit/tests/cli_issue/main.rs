@@ -2,25 +2,21 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
-use std::ops::Deref;
-use tempfile::TempDir;
-
 mod batch_create_tests;
 mod bulk_update_cli_tests;
 mod command_alias_tests;
 mod command_exit_code_projection_tests;
 mod container_rollup_tests;
 mod error_json_tests;
-mod exit_code_tests;
 mod failure_envelope_contract_tests;
 mod failure_lever_registry;
 mod failure_probe_coverage_tests;
 mod failure_probe_fixture;
 mod gate_field_contract_test;
-mod invocation_exit_status_parity_tests;
 mod issue_create_description_file_tests;
 mod issue_create_json_contract_test;
 mod issue_create_positional_type_tests;
+mod issue_read_failure_tests;
 mod issue_search_json_tests;
 mod issue_search_label_filter_tests;
 mod issue_show_projection_test;
@@ -30,7 +26,9 @@ mod issue_status_projection_tests;
 mod issue_update_atomicity_tests;
 mod issue_update_description_ops_tests;
 mod issue_update_lean_response_test;
+mod issue_update_rejected_state_tests;
 mod list_envelope_tests;
+mod list_flag_tests;
 mod payload_stream_purity_tests;
 mod quiet_mode_tests;
 mod recover_command_tests;
@@ -40,29 +38,3 @@ mod snapshot_export_tests;
 mod stored_record_classification_tests;
 mod top_level_failure_envelope_tests;
 mod verb_hint_tests;
-
-/// A repository initialized from the shared test taxonomy, together with the
-/// declaration that authored its vocabulary.
-///
-/// A repository declares its own type vocabulary, so a subprocess case that
-/// names a type reads it from the declaration this fixture wrote rather than
-/// from a literal the engine no longer supplies.
-pub(crate) struct TaxonomyRepo {
-    pub(crate) temp: TempDir,
-    pub(crate) taxonomy: jit::test_taxonomy::TestTaxonomy,
-}
-
-impl Deref for TaxonomyRepo {
-    type Target = TempDir;
-
-    fn deref(&self) -> &Self::Target {
-        &self.temp
-    }
-}
-
-/// Build a subprocess-test repository from the one shared vocabulary fixture.
-pub(crate) fn setup_test_repo_with_taxonomy() -> TaxonomyRepo {
-    let (temp, _storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy()
-        .expect("shared taxonomy repository setup succeeds");
-    TaxonomyRepo { temp, taxonomy }
-}

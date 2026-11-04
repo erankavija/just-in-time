@@ -40,11 +40,11 @@ jit issue create --title "Task B"  # → d4e5f6
 jit issue create --title "Task C"  # → g7h8i9
 
 # Build dependency chain: A ← B ← C
-jit dep add a1b2c3 d4e5f6  # A depends on B ✓
-jit dep add d4e5f6 g7h8i9  # B depends on C ✓
+jit dep add a1b2c3 d4e5f6  # A depends on B
+jit dep add d4e5f6 g7h8i9  # B depends on C
 
 # Try to create a cycle: C ← A
-jit dep add g7h8i9 a1b2c3  # ✗ ERROR: Cycle detected
+jit dep add g7h8i9 a1b2c3  # fails: Cycle detected
 ```
 
 **Why this matters:**
@@ -59,8 +59,8 @@ JIT keeps the dependency graph transitively reduced. When `A→B→C` already ho
 
 ### Atomic Operations
 
-**Guarantee:** A mutation is published through one durable redo record over the
-files it writes. The record extends the event log, and it replaces each other
+**Guarantee:** A repository mutation is published through one durable redo record
+over the files it writes. The record extends the event log, and it replaces each other
 file by temp-file-and-rename.
 (`@/invariant/atomic-writes`, `@/invariant/derived-state-coherence`,
 `@/charter/D-17`)
@@ -103,7 +103,8 @@ partially written replacement (`crates/jit/src/storage/atomic_write.rs`).
 replacing it, as the
 [storage format reference](../reference/storage-format.md#publication-and-recovery)
 specifies. The record is applied under the repository
-write lock and `.events.lock`; event readers take the same lock shared
+write lock and `.events.lock`; reading events takes no lock, since a final line
+still being written is ignored
 (`crates/jit/src/storage/json.rs`).
 
 **Multi-agent safety:**
@@ -113,6 +114,11 @@ state. The locks are released with their guards and work only among cooperating
 processes; they serialize competing writers rather than joining unrelated
 commands into one operation. Advisory work-lease coordination uses
 `.git/jit/locks/claims.lock` (`crates/jit/src/storage/lock.rs`).
+
+Leases use a separate publication boundary: renaming a staged lease file onto
+`.git/jit/leases/<issue-id>.json`, or unlinking that file, commits the lease
+change. The sequence counter and claim-history append follow it. An interrupted
+operation can lose history lines while retaining its committed lease change.
 
 **Example - Two agents claiming simultaneously:**
 
@@ -125,12 +131,12 @@ sequenceDiagram
     A2->>L: jit claim acquire abc123
     L-->>A1: lock acquired
     Note over A2: blocked waiting for lock
-    A1->>A1: read claims index
+    A1->>A1: read the issue's lease record
     A1->>A1: verify no active lease
     A1->>A1: write new claim
     A1->>L: release lock
     L-->>A2: lock acquired
-    A2->>A2: read claims index
+    A2->>A2: read the issue's lease record
     A2->>A2: verify no active lease
     Note over A2: ERROR: Already claimed
 ```
@@ -157,8 +163,7 @@ half-applied profile becomes a fully applied one.
 
 This guarantee covers the files JIT publishes under its own locks and recovery
 protocol; writes another process makes to those files stay outside it. The
-canonical command, conflict, record-location, provenance, and lifecycle contract
-is in [Repository Profiles](../reference/profiles.md).
+canonical package, composition, and lifecycle-event contract is in [Repository Profiles](../reference/profiles.md).
 
 ### Event Logging
 
@@ -171,11 +176,9 @@ mutation is recorded or that it reconstructs complete repository history.
 
 **Event types:**
 
-Each event is tagged by a snake-case `type` field. The authoritative and
-evolving set of event variants is the `Event` enum in
-`crates/jit/src/domain/types.rs`, including the `issue_state_changed` variant
-used for lifecycle transitions. Consult that enum rather than relying on a
-hand-maintained list in prose.
+Each event is tagged by a snake-case `type` field, including
+`issue_state_changed` for lifecycle transitions. The generated
+[Event Log Tags](../reference/events.md) catalog defines the vocabulary.
 
 **Log format:**
 
@@ -192,6 +195,15 @@ Events are stored as newline-delimited JSON (JSONL):
 - **Append-only:** Events are appended to the log.
 - **State-transition evidence:** The state-change invariant is recorded as
   `issue_state_changed` events.
+
+Issue operations read only the log's length and final line, without parsing
+event records. An unknown tag or malformed middle line therefore does not block
+them. History readers report these errors with their line number and ignore an
+unterminated final line. Whole-repository `jit validate` and the
+`repository_validation` checker read the whole event log and every gate-run
+record for fidelity; per-issue validation does not. The
+[history-files reference](../reference/storage-format.md#history-files) lists
+the readers and paths. No file is derived from history.
 
 **Benefits:**
 
@@ -258,21 +270,21 @@ jit issue create --title "Task 2"
 jit dep add <task1> <task2>
 jit query available
 jit issue claim <task2> agent:worker-1
-# ✓ All basic operations and issue assignment work (task2 has no unmet dependencies)
+# All basic operations and issue assignment work (task2 has no unmet dependencies)
 
 jit claim acquire <task2> --agent-id agent:worker-1
-# ✗ Error: Claims and leases require a git repository (exit code 10)
+# fails with exit code 10: Claims and leases require a git repository
 
 # git init alone is not enough - HEAD must resolve to a commit
 git init
 git config user.email "you@example.com"
 git config user.name "Your Name"
 jit claim acquire <task2> --agent-id agent:worker-1
-# ✗ Error: Claims and leases require a git repository (exit code 10) - no commits yet
+# fails with exit code 10: HEAD has no commit yet
 
 git commit --allow-empty -m "Initial commit"
 jit claim acquire <task2> --agent-id agent:worker-1
-# ✓ Advisory lease acquired
+# Acquired lease: <lease-id>
 
 mkdir -p path/to
 echo "Initial design notes" > path/to/design.md
@@ -281,7 +293,7 @@ git add -A && git commit -m "Add design doc"
 echo "Revised notes" >> path/to/design.md
 git add -A && git commit -m "Revise design doc"
 jit doc show <task2> path/to/design.md --at HEAD~1
-# ✓ Shows the version from before the revision
+# Shows the version from before the revision
 ```
 
 **Design rationale:**
@@ -306,7 +318,7 @@ A process always sees its own updates immediately:
 # Same process (shell session)
 jit issue update abc123 --state in_progress
 jit issue show abc123
-# ✓ Shows in_progress immediately
+# Shows in_progress immediately
 ```
 
 **2. Scoped atomic operations**
@@ -330,7 +342,7 @@ Different processes see updates after file operations complete:
 # Terminal 1                     # Terminal 2
 jit issue update abc --state done
                                  jit query available
-                                 # ✓ Sees updated state (file reread)
+                                 # Sees updated state (file reread)
 ```
 
 ### What JIT Does NOT Guarantee
@@ -385,7 +397,7 @@ done
 ```bash
 # Assuming state without claiming
 state=$(jit issue show abc123 --json | jq -r '.state')
-# ✗ State may change before next operation
+# State may change before next operation
 jit issue update abc123 --state in_progress  # Race condition!
 
 # Better: claim to record ownership; for guaranteed exclusivity acquire a lease
@@ -404,17 +416,28 @@ worktree of the repository.
 ```
 .jit/
 ├── issues/{id}.json          # Issue data
-├── index.json                # Issue index
+├── index.json                # Format version and deletion tombstones
 ├── gates.toml                # Gate registry
+├── gate-runs/
+│   ├── <issue-id>/<run-id>.json
+│   └── verdicts/<gate-key>/<inputs-digest>.json
+├── archive-evidence/<target-key>.json
 ├── tmp/                      # Scratch space; git-ignored
 │   └── redo.record           # A pending mutation's commit point
 └── events.jsonl              # Append-only event log
 
 .git/jit/
-├── claims.jsonl              # Claim log (append-only); `jit claim heartbeat` appends here and updates the index
-├── claims.index.json         # Active claims (exclusive lock)
-└── locks/claims.lock         # Advisory lock guarding claim-log operations
+├── leases/{issue-id}.json    # The issue's lease (changed under the lock)
+├── claims.seq                # Last claim-log sequence number
+├── claims.jsonl              # Claim history (append-only)
+└── locks/claims.lock         # Advisory lock serializing lease changes
 ```
+
+Latest gate views load the run named by the issue's gate state; verdict reuse
+loads the record for that gate and inputs. Archive operations read evidence by
+target. These reads address records directly rather than reconstructing state
+from history. The [storage-format reference](../reference/storage-format.md)
+defines their paths and publication boundaries.
 
 **Synchronization points:**
 
@@ -533,34 +556,39 @@ generated source of that value.
 
 ```bash
 jit claim list
-Lease: lease-001
-  Issue: abc123
-  Agent: agent:worker-1
-  Expires: <timestamp in the past> ⚠️ STALE
+Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
+  Issue:    abc123
+  Agent:    agent:worker-1
+  TTL:      indefinite
+  Last beat: <timestamp before the stale threshold>
+  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
+
+Listings omit expired finite leases and mark stale indefinite ones.
 
 **Recovery:**
 
 ```bash
-# An expired lease is evicted during a later lease acquisition, so another agent
-# can acquire a new lease. The issue assignee is stored separately: a Ready issue
-# with any assignee is still excluded from `jit query available`.
-jit claim acquire abc123 --agent-id agent:worker-2
+# Evict expired leases and reclaim stale indefinite ones
+jit recover
+
+# Or evict one issue's lease immediately
+jit claim force-evict abc123 --reason "agent crashed"
 
 # Clear the current assignee before looking for unassigned ready work.
 jit issue release abc123 "return to the available pool"
 # Or: jit issue unassign abc123
 jit query available
-
-# Manual eviction if needed
-jit claim force-evict lease-001 --reason "agent crashed"
 ```
 
-**Prevention:** Use heartbeats to renew leases:
+**Prevention:** Renew finite leases before expiry; heartbeat indefinite leases:
 
 ```bash
 # Renew lease before expiry
-jit claim renew lease-001 --extension 600
+jit claim renew abc123 --extension 600
+
+# Refresh an indefinite lease
+jit claim heartbeat abc123
 ```
 
 ### Missing File Handling
@@ -605,16 +633,16 @@ Error: Issue not found: abc123
 
 **Scenario:** Document references external URL, but network is unavailable.
 
-**Impact:** Document operations fail, but core issue tracking unaffected.
+**Impact:** Link checking reports the URL unreachable, but core issue tracking unaffected.
 
 ```bash
 jit doc check-links --scope all
-Warning: External URL not validated: https://example.com/diagram.png
-  Referenced in: dev/design.md
+# reports an unreachable_url error for https://example.com/diagram.png
+# (referenced in dev/design.md) after the request timeout, and exits 4
 
 # Core functionality still works
-jit query available  # ✓ Works
-jit issue update abc123 --state done  # ✓ Works
+jit query available  # succeeds
+jit issue update abc123 --state done  # succeeds
 ```
 
 **Mitigation:** Download critical assets locally using per-document asset pattern.
@@ -630,10 +658,10 @@ JIT is designed with isolation and fault tolerance:
   still work; leases, document history/diff, and commit-specific document reads
   are unavailable
 - Expired finite lease → evicted during a later lease acquisition; a stale
-  indefinite lease is not auto-evicted and remains until a heartbeat,
-  `jit claim release`, or `jit claim force-evict`. Either way the issue stays
+  indefinite lease remains until a heartbeat, `jit claim release`,
+  `jit claim force-evict`, or `jit recover` reclaims it. Either way the issue stays
   assigned until `jit issue release` or `jit issue unassign` clears its assignee
-- Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which read only the log's length and final line, keep working, while a claim, which parses the log to reflect it, fails with a malformed-record error
+- Malformed newline-terminated `events.jsonl` line or unknown event tag → history reads and whole-repository validation fail with an error naming the line; an unterminated final line is ignored. Issue operations and claims keep working
 
 **✓ No cascading failures:**
 
@@ -656,8 +684,9 @@ jit validate --leases
 
 # Auto-fix what is mechanically fixable
 jit validate --fix
-# ✓ Applies repairable rule/graph/state fixes and derived-state repairs
-# ✓ Publishes derived repairs recoverably; ambiguous ownership writes nothing
+# Applies repairable rule/graph/state fixes and derived-state repairs
+# Publishes every fix in one recoverable mutation, then validates the result;
+# an ambiguous target writes nothing
 ```
 
 ## See Also

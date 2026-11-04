@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f0f8b20995826b9033d65e473d7a83624728f2ce",
+  "completed_at": "2026-11-04T01:22:49.462439559Z",
+  "duration_ms": 242501,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable hard criteria are satisfied; the prior atomic-writes finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "97f5f2b7-5c95-441f-ae03-d8feeedc8420",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6d04c438-8040-4afc-bbb9-90b2ee0377c6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T01:18:46.961240347Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 83fda90dc, f0f8b209 (`jit:97f5f2b7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/97f5f2b7/requirement/REQ-01, REQ-02, REQ-03, decision/D-1; @/issue/f8a6b298/requirement/REQ-10 (.jit issue sources); @/charter/D-17, D-18 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, canonical-cutover, single-source-prose, essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (0, 2026-11-04T00:52:51Z); doc-review passed (0, 2026-11-04T00:54:12Z); docs-mechanical passed (0, 2026-11-04T00:56:05Z)\nTruncation recovery: narrowed the initially truncated repository-wide historical-text search to live affected code, documentation, generated references, and event-log checks; inspected both tagged patches per path\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable hard criteria are satisfied; the prior atomic-writes finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -12,26 +12,21 @@
 //! and a real `config.toml`, so the full load-validate path runs.
 
 use jit::commands::CommandExecutor;
+use jit::domain::identity::IssueId;
 use jit::domain::Priority;
-use jit::storage::{IssueStore, JsonFileStorage};
-use std::fs;
-use tempfile::TempDir;
+use jit::storage::JsonFileStorage;
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::{
+    membership_namespace, setup_test_repo_with_taxonomy, type_label, TaxonomyRepo,
+};
+use jit::test_utils::setup_test_repo_with_config;
 
-fn setup_repo(config_toml: &str) -> (TempDir, CommandExecutor<JsonFileStorage>) {
-    jit::test_mode::enable();
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    fs::create_dir(&jit_dir).unwrap();
-    fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-    jit::test_utils::seed_data_root_ignore(&jit_dir).unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
-    (temp, executor)
-}
-
-fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: &[&str]) -> String {
-    let (id, _) = exec
+fn create_labeled(
+    exec: &CommandExecutor<JsonFileStorage>,
+    title: &str,
+    labels: &[&str],
+) -> IssueId {
+    let id = exec
         .issues()
         .create_issue(
             title.to_string(),
@@ -43,7 +38,9 @@ fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: 
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     id
 }
 
@@ -62,13 +59,13 @@ unique = true
 description = "Component"
 unique = false
 "#;
-    let (_tmp, exec) = setup_repo(cfg);
+    let (_tmp, exec) = setup_test_repo_with_config(cfg).unwrap();
     create_labeled(&exec, "typo", &["typo:foo"]);
 
     // An unregistered namespace is caught by the `namespace-registry` rule
     // (origin = "default"). It fails `jit validate` but does NOT block the
     // write (enforce=false).
-    let err = exec.validate_silent().unwrap_err().to_string();
+    let err = exec.validation().validate_silent().unwrap_err().to_string();
     assert!(err.contains("namespace-registry"), "{}", err);
     assert!(err.contains("typo:foo"), "{}", err);
 }
@@ -80,9 +77,11 @@ fn test_validate_accepts_registered_namespace() {
 description = "Issue type"
 unique = true
 "#;
-    let (_tmp, exec) = setup_repo(cfg);
+    let (_tmp, exec) = setup_test_repo_with_config(cfg).unwrap();
     create_labeled(&exec, "ok", &["type:task"]);
-    exec.validate_silent().expect("validate should pass");
+    exec.validation()
+        .validate_silent()
+        .expect("validate should pass");
 }
 
 // ------------------------------------------------------------------
@@ -96,7 +95,7 @@ fn test_unique_namespace_blocks_duplicate_on_write() {
 description = "Priority"
 unique = true
 "#;
-    let (_tmp, exec) = setup_repo(cfg);
+    let (_tmp, exec) = setup_test_repo_with_config(cfg).unwrap();
 
     let result = exec.issues().create_issue(
         "dup".to_string(),
@@ -123,45 +122,31 @@ unique = true
 
 #[test]
 fn test_config_show_json_includes_namespace_registry() {
-    // CARGO_BIN_EXE_jit is set by Cargo for integration tests and guarantees
-    // we're exercising the just-built binary — no silent skip path.
-    let jit_bin = std::path::PathBuf::from(env!("CARGO_BIN_EXE_jit"));
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
 
-    let temp = crate::setup_test_repo_with_taxonomy();
-
-    let show = std::process::Command::new(&jit_bin)
-        .args(["config", "show", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        show.status.success(),
-        "jit config show --json failed: stderr={}",
-        String::from_utf8_lossy(&show.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&show.stdout);
-    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON");
+    let parsed = cli.run_json(["config", "show"]).unwrap();
     let namespaces = parsed
         .get("namespaces")
         .expect("namespaces key present in config show --json output");
     // The registry is still exposed (description/unique stay in config.toml).
-    let type_label = crate::type_label(&temp.taxonomy, 4);
+    let type_label = type_label(&taxonomy, 4);
     let type_namespace = type_label
         .split_once(':')
         .map(|(namespace, _)| namespace)
         .expect("type label has a namespace");
-    let membership_namespace = crate::membership_namespace(&temp.taxonomy, 1);
+    let membership = membership_namespace(&taxonomy, 1);
     let type_ns = namespaces
         .get(type_namespace)
         .expect("type namespace exposed");
     assert_eq!(type_ns["unique"], serde_json::json!(true));
-    assert!(namespaces.get(membership_namespace).is_some());
+    assert!(namespaces.get(membership).is_some());
 
     // The applied taxonomy fixture's rules.toml carries the FIXED default rules:
     // canonical format, the namespace registry, type-hierarchy-known, the
     // per-unique-namespace uniqueness rules, and the two graph warnings. The
     // removed `values` / `pattern` / `required` rules are NOT present.
-    let rules_toml = std::fs::read_to_string(temp.path().join(".jit/rules.toml"))
+    let rules_toml = std::fs::read_to_string(cli.root().join(".jit/rules.toml"))
         .expect("rules.toml written by the fixture");
     assert!(
         rules_toml.contains("namespace-unique-type"),

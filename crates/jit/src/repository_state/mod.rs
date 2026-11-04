@@ -5,12 +5,14 @@
 //! It performs no filesystem I/O and imports no validation, storage, command, or
 //! profile modules.
 
+use crate::domain::identity::ProfileId;
 mod archive;
 mod default_rules;
 mod export;
 mod image;
 mod index;
 mod initialize;
+mod issue_record;
 mod managed_document;
 mod materialize;
 mod mutation;
@@ -24,29 +26,33 @@ mod rule_serialize;
 mod rules_document;
 mod rules_gates_projection;
 
-pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
-    default_ruleset, hierarchy_config, reconcile_default_rules_with_config,
-    type_hierarchy_known_schema, TYPE_HIERARCHY_SCHEMA_FILE,
+    default_ruleset, reconcile_default_rules_with_config, type_hierarchy_known_schema,
+    TYPE_HIERARCHY_SCHEMA_FILE,
 };
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
     RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
 };
-pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, DirectoryListing,
     EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, PinnedDocumentEvidence,
-    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
+    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
+pub(crate) use image::{CapturedAnswers, ImageToken};
 pub use index::RepositoryIndexError;
-pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
+#[cfg(test)]
+pub(crate) use index::SUPPORTED_INDEX_SCHEMA_VERSION;
+pub(crate) use index::{captured_issue_ids, listed_issue_ids, RepositoryIndex};
 pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
+};
+pub use issue_record::{
+    decode_issue_record, parse_issue_records, IssueRecordsError, MalformedIssueRecordError,
 };
 pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
@@ -56,16 +62,18 @@ pub use materialize::{
     assemble_config, render_capture_closure, render_data_root_ignore, validate_capture_closure,
     ValidationCaptureClosure,
 };
-pub(crate) use mutation::captured_gate_run_result_paths;
 pub(crate) use mutation::MutationContextFactory;
+pub(crate) use mutation::{
+    canonical_json, captured_gate_run_ids, captured_gate_run_issue_ids, captured_gate_verdict_keys,
+    captured_gate_verdict_records, created_issue, mutated_issue,
+};
 pub use mutation::{
-    finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
-    serialize_event, serialize_gate_run, serialize_issue, IdAuthority, MutationClock,
-    MutationContext, MutationContextAnnotation, MutationError, MutationIntent, SystemMutationClock,
+    finalize, fresh_index_bytes, serialize_event, serialize_gate_run, serialize_gate_verdict,
+    serialize_issue, IdAuthority, MutationClock, MutationContext, MutationContextAnnotation,
+    MutationError, MutationIntent, SystemMutationClock,
 };
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
-    TreeFileDisposition, TreeFileOutcome,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled
@@ -102,7 +110,7 @@ pub fn finalize_gate_registry_edit(
     }
 
     let record_plan =
-        finalize(layout, base, context, intents).map_err(GateRegistryEditError::Mutation)?;
+        finalize(layout, base, context, intents, None).map_err(GateRegistryEditError::Mutation)?;
     let gate_path = VirtualPath::GATES;
     let gate_bytes = crate::declarations::serialize_gate_registry(registry)
         .map_err(GateRegistryEditError::GateDeclaration)?;
@@ -111,7 +119,8 @@ pub fn finalize_gate_registry_edit(
     let mut actions = record_plan.delta().actions().to_vec();
     actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(layout, actions)?;
-    Ok(MaterializationPlan::new(base, delta))
+    MaterializationPlan::new(base, delta, context)
+        .map_err(|error| GateRegistryEditError::Mutation(error).into())
 }
 
 /// A typed failure raised while finalizing a gate-registry edit.
@@ -141,29 +150,25 @@ pub enum GateRegistryEditError {
     #[error(transparent)]
     Overlay(#[from] OverlayError),
 }
+pub(crate) use overlay::overlaid_issue_ids;
 pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath, BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
-    GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
-    WORKTREE_IDENTITY_FILE,
+    RepositoryRootEvidence, VirtualPath, BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
+    RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
 };
 pub use profile_apply::{
     compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,
-    ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
-    ContributionOutcome, ContributionRegistry, KeyedArrayTarget, MapEntryTarget,
-    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim,
-    ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict, ProfileTargetConflictEntry,
-    ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
+    ContributionIdentity, ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
+    KeyedArrayTarget, MapEntryTarget, ProfileApplicationInput, ProfileAssetClaim, ProfileClaims,
+    ProfileContributionClaim, ProfileRegionClaim, ProfileTargetConflict,
+    ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget,
+    SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
+    drop_overridden_claims, profile_capture_closure, profile_contribution_overrides,
+    profile_contribution_target_paths,
 };
-// The declared value of one contribution as JSON: the packaged-carrier
-// comparison in `profile::contribution_drift` — a repository-local check seam —
-// is its only caller.
-#[cfg(any(test, feature = "test-support"))]
-pub(crate) use profile_apply::contributed_json_value;
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };
@@ -174,7 +179,7 @@ pub use rules_document::{parse_rule_identities, splice_default_membership, Rules
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
-use crate::declarations::{ConfigurationDeclarationError, ConfigurationDeclarations, GateRegistry};
+use crate::declarations::{ConfigurationAssemblyError, GateRegistry};
 
 /// A typed failure raised while deriving materialized repository state.
 ///
@@ -182,9 +187,6 @@ use crate::declarations::{ConfigurationDeclarationError, ConfigurationDeclaratio
 /// rendering belongs to this type rather than to producer call sites.
 #[derive(Debug, thiserror::Error)]
 pub enum ProducerError {
-    /// A required declaration was absent from the captured repository image.
-    #[error("captured image has no {0}")]
-    MissingCapture(&'static str),
     /// Captured bytes were not valid UTF-8.
     #[error(transparent)]
     MalformedUtf8(#[from] std::string::FromUtf8Error),
@@ -194,24 +196,21 @@ pub enum ProducerError {
     /// A projection references an item kind that is not declared.
     #[error("projection '{projection}' references unknown kind '{kind}'")]
     UnknownKind { projection: String, kind: String },
-    /// An authored config edit could not be parsed.
-    #[error("invalid config.toml edit: {0}")]
-    ConfigParse(#[source] ConfigurationDeclarationError),
     /// Closed-image capture failed.
     #[error(transparent)]
     Capture(#[from] CaptureError),
     /// A producer path was invalid for the repository layout.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
-    /// Captured configuration declarations were invalid.
+    /// Captured configuration declarations failed assembly.
     #[error(transparent)]
-    ConfigurationDeclaration(#[from] ConfigurationDeclarationError),
+    Configuration(#[from] ConfigurationAssemblyError),
     /// Captured invariant declarations were invalid.
     #[error(transparent)]
     InvariantConfig(#[from] crate::declarations::invariants::InvariantConfigError),
     /// Addressable item declarations or source content were invalid.
     #[error(transparent)]
-    Item(#[from] crate::domain::item::ItemError),
+    Item(#[from] std::sync::Arc<crate::domain::item::ItemError>),
     /// Captured rule declarations were invalid.
     #[error(transparent)]
     RuleConfig(#[from] crate::declarations::rules::RuleConfigError),
@@ -224,11 +223,6 @@ pub enum ProducerError {
     /// A selected content parser is not available in this build.
     #[error(transparent)]
     ContentParser(#[from] crate::document::ContentParserError),
-    /// The repository-level content format is invalid.
-    #[error(
-        "invalid [validation].content_format in .jit/config.toml: '{0}': Invalid content format: '{0}' (expected markdown, html, or xml)"
-    )]
-    InvalidContentFormat(String),
     /// A rules document could not be parsed or safely spliced.
     #[error(transparent)]
     RulesDocument(#[from] RulesDocumentError),
@@ -245,20 +239,9 @@ pub enum ProducerError {
         #[source]
         source: Box<ProfileRegistryParseError>,
     },
-    /// A supported archive edge target is absent from the proposed plan.
-    #[error("supported archive edge target is absent from plan: {target}")]
-    ProposedLayoutTargetAbsent { target: String },
-    /// A supported archive edge does not resolve after the proposed move.
-    #[error(
-        "supported edge {reference} from {parent} resolves to {resolved} in the proposed layout, not an available target location ({available})",
-        available = .available.join(", ")
-    )]
-    ProposedLayoutEdgeUnavailable {
-        reference: String,
-        parent: String,
-        resolved: String,
-        available: Vec<String>,
-    },
+    /// The proposed archive layout leaves a supported edge unresolvable.
+    #[error(transparent)]
+    ProposedLayout(#[from] crate::domain::artifact_classifier::ProposedLayoutViolation),
 }
 
 /// Typed parse failures for a profile-owned TOML registry.
@@ -300,6 +283,12 @@ pub enum ProfileRegistryParseError {
     ValueNotTable,
 }
 
+impl From<crate::domain::item::ItemError> for ProducerError {
+    fn from(error: crate::domain::item::ItemError) -> Self {
+        Self::Item(std::sync::Arc::new(error))
+    }
+}
+
 /// A typed failure raised while parsing captured declaration files into the
 /// canonical bundle ([`declarations_from_image`] /
 /// [`validation_declarations_from_image`]).
@@ -321,27 +310,34 @@ pub enum DeclarationParseError {
     /// Captured bytes were not valid UTF-8.
     #[error(transparent)]
     Utf8(#[from] std::str::Utf8Error),
-    /// The repository configuration could not be parsed.
-    #[error(transparent)]
-    Configuration(#[from] ConfigurationDeclarationError),
-    /// The captured configuration could not be assembled into the effective config.
+    /// The captured configuration could not be assembled.
     #[error(transparent)]
     Producer(#[from] ProducerError),
-    /// The template registry could not be parsed.
-    #[error(transparent)]
-    Template(#[from] crate::templates::TemplateConfigError),
     /// The gate registry could not be parsed.
-    #[error(transparent)]
+    #[error(".jit/gates.toml: {0}")]
     Gate(#[from] crate::declarations::GateDeclarationError),
     /// The rule set could not be parsed.
     #[error(transparent)]
     Rule(#[from] crate::declarations::rules::RuleConfigError),
 }
 
+type ResolvedItemKinds = Result<
+    std::sync::Arc<[crate::domain::item::ItemKind]>,
+    std::sync::Arc<crate::domain::item::ItemError>,
+>;
+
+fn resolved_item_kinds(config: &crate::config::JitConfig) -> ResolvedItemKinds {
+    crate::domain::item::resolve_item_kinds(config.item_kinds.as_ref())
+        .map(std::sync::Arc::from)
+        .map_err(std::sync::Arc::new)
+}
+
 /// Explicit declaration bundle consumed by the closed producer call graph.
 pub struct RepositoryDeclarations<'a> {
-    /// Parsed repository configuration.
-    pub configuration: &'a ConfigurationDeclarations,
+    /// Resolved kinds, retaining errors for the effective-configuration pass.
+    pub item_kinds: ResolvedItemKinds,
+    /// Assembled repository configuration.
+    pub config: &'a crate::config::JitConfig,
     /// Authored gate registry.
     pub gates: &'a GateRegistry,
     /// Authored rule registry.
@@ -351,7 +347,7 @@ pub struct RepositoryDeclarations<'a> {
 /// One owned parse of every captured declaration consumed by materialization or
 /// validation.
 pub(crate) struct CapturedRepositoryDeclarations {
-    pub(crate) configuration: ConfigurationDeclarations,
+    item_kinds: ResolvedItemKinds,
     pub(crate) config: crate::config::JitConfig,
     pub(crate) gates: GateRegistry,
     pub(crate) rules: RuleSet,
@@ -360,13 +356,12 @@ pub(crate) struct CapturedRepositoryDeclarations {
 
 impl CapturedRepositoryDeclarations {
     pub(crate) fn from_parts(
-        configuration: ConfigurationDeclarations,
         config: crate::config::JitConfig,
         gates: GateRegistry,
         rules: RuleSet,
     ) -> Self {
         Self {
-            configuration,
+            item_kinds: resolved_item_kinds(&config),
             config,
             gates,
             rules,
@@ -376,7 +371,8 @@ impl CapturedRepositoryDeclarations {
 
     pub(crate) fn borrowed(&self) -> RepositoryDeclarations<'_> {
         RepositoryDeclarations {
-            configuration: &self.configuration,
+            item_kinds: self.item_kinds.clone(),
+            config: &self.config,
             gates: &self.gates,
             rules: &self.rules,
         }
@@ -384,6 +380,12 @@ impl CapturedRepositoryDeclarations {
 
     pub(crate) fn config(&self) -> &crate::config::JitConfig {
         &self.config
+    }
+
+    pub(crate) fn item_kinds(&self) -> Result<&[crate::domain::item::ItemKind], ProducerError> {
+        self.item_kinds
+            .as_deref()
+            .map_err(|error| error.clone().into())
     }
 
     pub(crate) fn rules(&self) -> &RuleSet {
@@ -425,32 +427,7 @@ pub(crate) fn declarations_from_image(
 pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let config_bytes = image
-        .file_bytes(&VirtualPath::CONFIG)?
-        .ok_or_else(|| DeclarationParseError::MissingCapture(".jit/config.toml".to_string()))?;
-    let configuration = crate::declarations::parse_configuration(config_bytes)?;
-    let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
-    let hierarchy_types = config
-        .type_hierarchy
-        .as_ref()
-        .map(|hierarchy| {
-            hierarchy
-                .types
-                .keys()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    config.templates = match image.file_bytes(&VirtualPath::TEMPLATES) {
-        Ok(Some(bytes)) => crate::templates::TemplateRegistry::from_toml_str(
-            std::str::from_utf8(bytes)?,
-            &hierarchy_types,
-        )?,
-        Ok(None) | Err(CaptureError::UndiscoveredRepositoryPath(_)) => {
-            crate::templates::TemplateRegistry::empty()
-        }
-        Err(error) => return Err(error.into()),
-    };
+    let config = materialize::assemble_config(image)?;
     let namespaces = crate::config_manager::namespaces_from_config(&config);
     let gates = match image.file_bytes(&VirtualPath::GATES)? {
         Some(bytes) => crate::declarations::parse_gate_registry(bytes)?,
@@ -462,7 +439,7 @@ pub(crate) fn validation_declarations_from_image(
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| -> Result<_, DeclarationParseError> {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         DeclarationParseError::MissingCapture(request.reference.clone())
                     })?;
@@ -470,7 +447,7 @@ pub(crate) fn validation_declarations_from_image(
                 })
                 .collect::<Result<Vec<_>, DeclarationParseError>>()?;
             let parsed = RuleSet::parse(content, Some(&config), schemas)?;
-            Ok(reconcile_default_rules_with_config(parsed, &namespaces))
+            Ok(reconcile_default_rules_with_config(parsed, &namespaces)?)
         })(),
         None => Ok(default_ruleset(&namespaces)),
     };
@@ -478,13 +455,9 @@ pub(crate) fn validation_declarations_from_image(
         Ok(rules) => (rules, None),
         Err(error) => (RuleSet { rules: Vec::new() }, Some(error)),
     };
-    Ok(CapturedRepositoryDeclarations {
-        configuration,
-        config,
-        gates,
-        rules,
-        rules_load_error,
-    })
+    let mut declarations = CapturedRepositoryDeclarations::from_parts(config, gates, rules);
+    declarations.rules_load_error = rules_load_error;
+    Ok(declarations)
 }
 
 /// Complete deterministic pure materialization result.
@@ -494,11 +467,14 @@ pub struct MaterializationPlan {
     image: RepositoryImage,
     /// Exact normalized delta.
     delta: RepositoryDelta,
+    /// The delta storage publishes: `delta`, plus the generic event append an
+    /// event-less write over a present data root carries.
+    publication: RepositoryDelta,
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
-    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    applied_profiles: std::collections::BTreeSet<ProfileId>,
 }
 
 /// What one profile decided about one target it participates in.
@@ -515,6 +491,8 @@ pub(crate) enum ProfileTargetDisposition {
     Create,
     /// The target holds another value this profile replaces.
     Update,
+    /// The target is a derived file the profile's composition no longer yields.
+    Remove,
     /// The target cannot be published, for the reason it carries.
     Conflict(ProfileTargetConflict),
 }
@@ -527,7 +505,7 @@ pub(crate) struct ProfileTargetMaterialization {
     /// reader that reports per profile needs each decision to name the profile
     /// that made it. A target two packages both contribute is decided by each
     /// of them and therefore appears once per contributing owner.
-    pub(crate) owner: crate::profile::ProfileId,
+    pub(crate) owner: ProfileId,
     pub(crate) path: VirtualPath,
     pub(crate) disposition: ProfileTargetDisposition,
     pub(crate) mode: FileMode,
@@ -542,7 +520,7 @@ pub(crate) struct ProfileTargetMaterialization {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProfileContributionMaterialization {
     /// Package whose composed claims decided this declaration.
-    pub(crate) owner: crate::profile::ProfileId,
+    pub(crate) owner: ProfileId,
     /// Canonical semantic identity the decision is about.
     pub(crate) identity: ContributionIdentity,
     pub(crate) disposition: ProfileTargetDisposition,
@@ -553,7 +531,7 @@ struct MaterializationDerivation {
     delta: RepositoryDelta,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
-    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    applied_profiles: std::collections::BTreeSet<ProfileId>,
 }
 
 impl MaterializationDerivation {
@@ -580,10 +558,7 @@ impl MaterializationDerivation {
     }
 
     /// Record packages whose candidate derivations have a non-event effect.
-    fn with_applied_profiles(
-        mut self,
-        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
-    ) -> Self {
+    fn with_applied_profiles(mut self, profiles: std::collections::BTreeSet<ProfileId>) -> Self {
         self.applied_profiles = profiles;
         self
     }
@@ -600,6 +575,11 @@ impl MaterializationPlan {
         &self.delta
     }
 
+    /// The delta storage publishes; reports read [`Self::delta`].
+    pub fn publication(&self) -> &RepositoryDelta {
+        &self.publication
+    }
+
     /// Return the count produced for one configured projection in this plan.
     pub(crate) fn projection_count(&self, name: &str) -> Option<usize> {
         self.projection_counts.get(name).copied()
@@ -614,22 +594,32 @@ impl MaterializationPlan {
     }
 
     /// Package identities responsible for a non-event effect in this plan.
-    pub(crate) fn applied_profiles(
-        &self,
-    ) -> &std::collections::BTreeSet<crate::profile::ProfileId> {
+    pub(crate) fn applied_profiles(&self) -> &std::collections::BTreeSet<ProfileId> {
         &self.applied_profiles
     }
 
-    /// Close a delta over the image it was derived from.
-    pub(crate) fn new(image: &RepositoryImage, delta: RepositoryDelta) -> Self {
-        Self {
+    /// Close a delta over the image it was derived from, composing its
+    /// publication with `context`'s event identity and timestamp.
+    ///
+    /// # Errors
+    ///
+    /// [`MutationError::Capture`] when the publication needs the generic event
+    /// and `image` did not capture the event log's tail.
+    pub(crate) fn new(
+        image: &RepositoryImage,
+        delta: RepositoryDelta,
+        context: &MutationContext,
+    ) -> Result<Self, MutationError> {
+        let publication = mutation::publication_of(image, &delta, context)?;
+        Ok(Self {
             image: image.clone(),
             delta,
+            publication,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
             profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
-        }
+        })
     }
 
     fn with_projection_counts(mut self, counts: std::collections::BTreeMap<String, usize>) -> Self {
@@ -650,10 +640,7 @@ impl MaterializationPlan {
         self
     }
 
-    fn with_applied_profiles(
-        mut self,
-        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
-    ) -> Self {
+    fn with_applied_profiles(mut self, profiles: std::collections::BTreeSet<ProfileId>) -> Self {
         self.applied_profiles = profiles;
         self
     }
@@ -687,8 +674,6 @@ pub enum MaterializationRequest<'a> {
     Initialize {
         /// Fully rendered semantic scaffold contribution.
         scaffold: &'a InitializationScaffold,
-        /// Stable mutation identity and time authority.
-        context: &'a MutationContext,
     },
     /// Derive one complete profile-selection application over an existing
     /// repository. The collection is dependency-first and unique; selector
@@ -696,22 +681,22 @@ pub enum MaterializationRequest<'a> {
     ApplyProfileSelection {
         /// Parsed package metadata and neutral canonical claims for the whole
         /// selected closure.
-        profiles: Vec<ProfileApplicationInput>,
-        /// Stable mutation identity and time authority.
-        context: &'a MutationContext,
+        profiles: &'a [ProfileApplicationInput],
         /// Requested lifecycle operation recorded when this selection changes
         /// repository-owned state.
         operation: crate::domain::ProfileLifecycleOperation,
     },
 }
 
-/// Invoke the constrained closed producer graph for one typed request.
+/// Invoke the constrained closed producer graph for one typed request;
+/// `context` stamps the events the plan publishes.
 ///
 /// The direct request match is deliberately closed: callers cannot register
 /// callbacks or choose individual producer families. Adding a family requires
 /// extending this function.
 pub fn derive_materialization(
     image: &RepositoryImage,
+    context: &MutationContext,
     request: MaterializationRequest<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     let (derivation, projection_counts) = match request {
@@ -730,18 +715,17 @@ pub fn derive_materialization(
             let delta = derive_repair(image, &declarations)?;
             (MaterializationDerivation::new(delta), Default::default())
         }
-        MaterializationRequest::Initialize { scaffold, context } => (
+        MaterializationRequest::Initialize { scaffold } => (
             initialize::derive_initialization(image, scaffold, context)?,
             Default::default(),
         ),
         MaterializationRequest::ApplyProfileSelection {
             profiles,
-            context,
             operation,
         } => (
             initialize::derive_profile_applications(
                 image,
-                &profiles,
+                profiles,
                 context,
                 operation,
                 std::collections::BTreeSet::new(),
@@ -755,7 +739,7 @@ pub fn derive_materialization(
         profile_contributions,
         applied_profiles,
     } = derivation;
-    Ok(MaterializationPlan::new(image, delta)
+    Ok(MaterializationPlan::new(image, delta, context)?
         .with_projection_counts(projection_counts)
         .with_profile_targets(profile_targets)
         .with_profile_contributions(profile_contributions)
@@ -766,12 +750,14 @@ pub fn derive_materialization(
 /// as one plan — the single-declaration config-mutation session entry.
 ///
 /// The command supplies the edited, preservation-safe `config.toml` bytes; this
-/// parses them through the pure configuration parser first, so a malformed edit is
-/// a typed planning error and never a published file. It then overlays the edited
-/// bytes onto the captured `base` and derives the complete owned-materialization
-/// set — default rules and their schemas, plus every configured projection — from
-/// that edited configuration, exactly as [`derive_semantic_mutation`] does. The
-/// authored `config.toml` write carries the captured base preimage, and every
+/// overlays them onto the captured `base` and assembles the edited configuration
+/// first, so an edit that fails assembly is a typed planning error and never a
+/// published file. It then derives the complete owned-materialization set —
+/// default rules and their schemas, plus every configured projection — from that
+/// edited configuration, with `declarations` supplying the gates and rules,
+/// exactly as [`derive_semantic_mutation`] does. The
+/// authored `config.toml` write, emitted only when the edit changes its bytes,
+/// carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
 /// exactly what was captured.
 ///
@@ -780,38 +766,47 @@ pub fn derive_materialization(
 /// authored-declaration edits adopt this same pattern per caller.
 pub fn finalize_config_edit(
     base: &RepositoryImage,
+    context: &MutationContext,
     edited_config_bytes: &[u8],
     declarations: RepositoryDeclarations<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
-    // The edit must parse before any planning: a malformed config is a typed
-    // planning error, not a published file.
-    let edited_configuration = crate::declarations::parse_configuration(edited_config_bytes)
-        .map_err(ProducerError::ConfigParse)?;
-
     let config_path = VirtualPath::CONFIG;
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
     let overlaid = apply_overlay(base, overlay)?;
+    // The edit must assemble before any planning: an invalid config is a typed
+    // planning error, not a published file.
+    let edited_config = materialize::assemble_config(&overlaid)?;
 
     // The authored config write carries the base preimage; the complete producer
     // set derives the coupled schemas/rule-membership/projections from the edited
     // configuration over the overlaid image (their targets keep their base
     // preimages, since only `config.toml` is overlaid).
-    let mut actions = vec![RepositoryAction::WriteFile {
-        path: config_path.clone(),
-        owner: "authored-config".to_string(),
-        expected: ExpectedPreimage::of(base.entry(&config_path).map_err(ProducerError::from)?),
-        bytes: edited_config_bytes.to_vec(),
-        mode: FileMode::Regular,
-    }];
+    // An unchanged edit writes nothing, so a no-op publishes no record.
+    let base_entry = base.entry(&config_path).map_err(ProducerError::from)?;
+    let unchanged = base
+        .file_bytes(&config_path)
+        .map_err(ProducerError::from)?
+        .is_some_and(|bytes| bytes == edited_config_bytes);
+    let mut actions = (!unchanged)
+        .then(|| RepositoryAction::WriteFile {
+            path: config_path.clone(),
+            owner: RepositoryActionOwner::AuthoredConfig,
+            expected: ExpectedPreimage::of(base_entry),
+            bytes: edited_config_bytes.to_vec(),
+            mode: FileMode::Regular,
+        })
+        .into_iter()
+        .collect::<Vec<_>>();
     let edited_declarations = RepositoryDeclarations {
-        configuration: &edited_configuration,
+        item_kinds: resolved_item_kinds(&edited_config),
+        config: &edited_config,
         gates: declarations.gates,
         rules: declarations.rules,
     };
     actions.extend(compose_complete(&overlaid, &edited_declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    Ok(MaterializationPlan::new(base, delta))
+    Ok(MaterializationPlan::new(base, delta, context)?)
 }
 
 /// Pure derivation failure.
@@ -841,6 +836,9 @@ pub enum RepositoryStateError {
     /// A producer read an uncaptured path or malformed captured bytes.
     #[error("materialization producer failed: {0}")]
     Producer(#[from] ProducerError),
+    /// Composing the plan's event append failed.
+    #[error(transparent)]
+    Mutation(#[from] MutationError),
     /// A gate-registry edit finalization failed.
     #[error(transparent)]
     GateRegistryEdit(#[from] GateRegistryEditError),
@@ -880,12 +878,11 @@ fn compose_complete(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
-    let mut actions = materialize::compose_default_ruleset(image, &config)?;
+    let mut actions = materialize::compose_default_ruleset(image, declarations.config)?;
     actions.extend(materialize::compose_data_root_ignore(image)?);
     actions.extend(
         // A semantic mutation is complete over EVERY declared projection.
-        materialize::compose_configured_projections(image, &config, declarations, None)?.actions,
+        materialize::compose_configured_projections(image, declarations, None)?.actions,
     );
     Ok(actions)
 }
@@ -911,9 +908,7 @@ fn derive_project_render(
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<(RepositoryDelta, std::collections::BTreeMap<String, usize>), RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
-    let rendered =
-        materialize::compose_configured_projections(image, &config, declarations, selected)?;
+    let rendered = materialize::compose_configured_projections(image, declarations, selected)?;
     Ok((
         RepositoryDelta::new(image.layout(), rendered.actions)?,
         rendered.counts,
@@ -969,7 +964,7 @@ pub fn repair_target_paths(
     image: &RepositoryImage,
     declarations: RepositoryDeclarations<'_>,
 ) -> Result<std::collections::BTreeSet<VirtualPath>, RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
+    let config = declarations.config;
     let mut targets = std::collections::BTreeSet::new();
 
     // Default-ruleset family: rules.toml, guarded by capture-spec containment and
@@ -983,8 +978,8 @@ pub fn repair_target_paths(
             .is_some()
     {
         targets.insert(rules_path);
-        for schema in materialize::serialized_default_ruleset(&config).schema_files {
-            let vpath = VirtualPath::data(format!("schemas/{}", schema.name))?;
+        for schema in materialize::serialized_default_ruleset(config)?.schema_files {
+            let vpath = VirtualPath::schema(&schema.name)?;
             if image.capture_spec().contains_path(&vpath) {
                 targets.insert(vpath);
             }
@@ -1085,60 +1080,38 @@ pub fn compare_materializations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
-
-    fn budget() -> CaptureBudget {
-        CaptureBudget {
-            max_listings: 0,
-            max_bytes: 128,
-            max_depth: 4,
-        }
-    }
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
 
     fn plan(image: &RepositoryImage, actions: Vec<RepositoryAction>) -> MaterializationPlan {
         MaterializationPlan::new(
             image,
             RepositoryDelta::new(image.layout(), actions).unwrap(),
+            &MutationContext::preview(),
         )
+        .unwrap()
     }
 
     #[test]
     fn test_compare_materializations_propagates_undiscovered_for_every_action() {
-        let layout = layout();
-        let image = RepositoryImage::close(
-            layout.clone(),
-            CaptureSpec::new(Vec::<VirtualPath>::new(), budget()).unwrap(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+        let image = ImageBuilder::new().build();
         let target = VirtualPath::data("unrequested.json").unwrap();
         let occupant = EntryIdentity::for_bytes("occupant", b"captured").unwrap();
         let actions = [
             RepositoryAction::CreateDirectory {
                 path: target.clone(),
-                owner: "directory".into(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             },
             RepositoryAction::WriteFile {
                 path: target.clone(),
-                owner: "writer".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: b"expected".to_vec(),
                 mode: FileMode::Regular,
             },
             RepositoryAction::SetMode {
                 path: target.clone(),
-                owner: "mode".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity: occupant.clone(),
                     mode: FileMode::Regular,
@@ -1147,7 +1120,7 @@ mod tests {
             },
             RepositoryAction::DeleteFile {
                 path: target.clone(),
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity: occupant,
                     mode: FileMode::Regular,
@@ -1165,67 +1138,43 @@ mod tests {
 
     #[test]
     fn test_compare_materializations_classifies_captured_mismatches() {
-        let layout = layout();
         let create = VirtualPath::data("create").unwrap();
         let delete = VirtualPath::data("delete").unwrap();
         let set_mode = VirtualPath::data("set-mode").unwrap();
         let write = VirtualPath::data("write").unwrap();
-        let write_bytes = b"old".to_vec();
         let delete_content = CapturedBytes::new("delete", b"delete me".to_vec()).unwrap();
         let mode_content = CapturedBytes::new("mode", b"mode".to_vec()).unwrap();
         let delete_identity = delete_content.identity().clone();
         let mode_identity = mode_content.identity().clone();
-        let image = RepositoryImage::close(
-            layout.clone(),
-            CaptureSpec::new(
-                [
-                    create.clone(),
-                    delete.clone(),
-                    set_mode.clone(),
-                    write.clone(),
-                ],
-                budget(),
+        let image = ImageBuilder::new()
+            .entry(create.clone(), RepositoryEntry::Absent)
+            .entry(
+                delete.clone(),
+                RepositoryEntry::File {
+                    content: delete_content,
+                    mode: FileMode::Regular,
+                },
             )
-            .unwrap(),
-            BTreeMap::from([
-                (create.clone(), RepositoryEntry::Absent),
-                (
-                    delete.clone(),
-                    RepositoryEntry::File {
-                        content: delete_content,
-                        mode: FileMode::Regular,
-                    },
-                ),
-                (
-                    set_mode.clone(),
-                    RepositoryEntry::File {
-                        content: mode_content,
-                        mode: FileMode::Regular,
-                    },
-                ),
-                (
-                    write.clone(),
-                    RepositoryEntry::File {
-                        content: CapturedBytes::new("write", write_bytes).unwrap(),
-                        mode: FileMode::Regular,
-                    },
-                ),
-            ]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+            .entry(
+                set_mode.clone(),
+                RepositoryEntry::File {
+                    content: mode_content,
+                    mode: FileMode::Regular,
+                },
+            )
+            .file(write.clone(), b"old")
+            .build();
         let expected = plan(
             &image,
             vec![
                 RepositoryAction::CreateDirectory {
                     path: create.clone(),
-                    owner: "directory".into(),
+                    owner: RepositoryActionOwner::RepositoryInit,
                     expected: ExpectedPreimage::Absent,
                 },
                 RepositoryAction::DeleteFile {
                     path: delete.clone(),
-                    owner: "delete".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: delete_identity,
                         mode: FileMode::Regular,
@@ -1233,7 +1182,7 @@ mod tests {
                 },
                 RepositoryAction::SetMode {
                     path: set_mode.clone(),
-                    owner: "mode".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: mode_identity,
                         mode: FileMode::Regular,
@@ -1242,7 +1191,7 @@ mod tests {
                 },
                 RepositoryAction::WriteFile {
                     path: write.clone(),
-                    owner: "writer".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"new".to_vec(),
                     mode: FileMode::Regular,
@@ -1273,32 +1222,9 @@ mod tests {
         );
     }
 
-    fn empty_image() -> RepositoryImage {
-        RepositoryImage::close(
-            layout(),
-            CaptureSpec::new(Vec::<VirtualPath>::new(), budget()).unwrap(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
-    fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
-        let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
-        RepositoryImage::close(
-            layout(),
-            CaptureSpec::new(paths, budget()).unwrap(),
-            entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
-    fn empty_declarations() -> (ConfigurationDeclarations, GateRegistry, RuleSet) {
+    fn empty_declarations() -> (crate::config::JitConfig, GateRegistry, RuleSet) {
         (
-            crate::declarations::parse_configuration(b"").unwrap(),
+            crate::declarations::assemble_configuration(None, None, None).unwrap(),
             GateRegistry::default(),
             RuleSet { rules: Vec::new() },
         )
@@ -1307,7 +1233,7 @@ mod tests {
     fn gate_definition(key: &str) -> crate::declarations::GateDefinition {
         crate::declarations::GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: String::new(),
             stage: crate::declarations::GateStage::Postcheck,
@@ -1321,16 +1247,18 @@ mod tests {
 
     #[test]
     fn test_finalize_gate_registry_edit_missing_edit_intent_is_typed() {
-        let image = empty_image();
+        let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
-        let (configuration, gates, rules) = empty_declarations();
+        let (config, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
-            configuration: &configuration,
+            item_kinds: Ok(std::sync::Arc::from([])),
+            config: &config,
             gates: &gates,
             rules: &rules,
         };
-        let error = finalize_gate_registry_edit(&layout(), &image, &context, &[], declarations)
-            .unwrap_err();
+        let error =
+            finalize_gate_registry_edit(&synthetic_layout(), &image, &context, &[], declarations)
+                .unwrap_err();
         assert!(matches!(
             error,
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MissingEdit)
@@ -1339,11 +1267,12 @@ mod tests {
 
     #[test]
     fn test_finalize_gate_registry_edit_multiple_edit_intents_is_typed() {
-        let image = empty_image();
+        let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
-        let (configuration, gates, rules) = empty_declarations();
+        let (config, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
-            configuration: &configuration,
+            item_kinds: Ok(std::sync::Arc::from([])),
+            config: &config,
             gates: &gates,
             rules: &rules,
         };
@@ -1355,9 +1284,14 @@ mod tests {
                 registry: Box::new(GateRegistry::default()),
             },
         ];
-        let error =
-            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
-                .unwrap_err();
+        let error = finalize_gate_registry_edit(
+            &synthetic_layout(),
+            &image,
+            &context,
+            &intents,
+            declarations,
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MultipleEdits)
@@ -1366,24 +1300,30 @@ mod tests {
 
     #[test]
     fn test_finalize_gate_registry_edit_declaration_mismatch_is_typed() {
-        let image = empty_image();
+        let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
-        let (configuration, _default_gates, rules) = empty_declarations();
+        let (config, _default_gates, rules) = empty_declarations();
         let mut mismatched = GateRegistry::default();
         mismatched
             .gates
-            .insert("distinct".to_string(), gate_definition("distinct"));
+            .insert("distinct".parse().unwrap(), gate_definition("distinct"));
         let declarations = RepositoryDeclarations {
-            configuration: &configuration,
+            item_kinds: Ok(std::sync::Arc::from([])),
+            config: &config,
             gates: &mismatched,
             rules: &rules,
         };
         let intents = vec![MutationIntent::EditGateRegistry {
             registry: Box::new(GateRegistry::default()),
         }];
-        let error =
-            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
-                .unwrap_err();
+        let error = finalize_gate_registry_edit(
+            &synthetic_layout(),
+            &image,
+            &context,
+            &intents,
+            declarations,
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::DeclarationMismatch)
@@ -1397,20 +1337,18 @@ mod tests {
         // `MutationError::MissingIssue` must surface through
         // `GateRegistryEditError::Mutation`, short-circuiting before the
         // declaration-derived producer set is ever composed.
-        let image = image_with(vec![
-            (
-                VirtualPath::data("events.jsonl").unwrap(),
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(75)),
                 RepositoryEntry::Absent,
-            ),
-            (
-                VirtualPath::data("issues/missing.json").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-        ]);
+            )
+            .build();
         let context = MutationContext::preview();
-        let (configuration, gates, rules) = empty_declarations();
+        let (config, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
-            configuration: &configuration,
+            item_kinds: Ok(std::sync::Arc::from([])),
+            config: &config,
             gates: &gates,
             rules: &rules,
         };
@@ -1419,18 +1357,220 @@ mod tests {
                 registry: Box::new(GateRegistry::default()),
             },
             MutationIntent::ClaimIssue {
-                issue_id: "missing".to_string(),
+                issue_id: crate::test_utils::issue_id(75),
                 agent: "agent:tester".parse().unwrap(),
             },
         ];
-        let error =
-            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
-                .unwrap_err();
+        let error = finalize_gate_registry_edit(
+            &synthetic_layout(),
+            &image,
+            &context,
+            &intents,
+            declarations,
+        )
+        .unwrap_err();
         match error {
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::Mutation(
                 MutationError::MissingIssue(id),
-            )) => assert_eq!(id, "missing"),
+            )) => assert_eq!(id, crate::test_utils::issue_id(75)),
             other => panic!("expected a typed missing-issue mutation error, got {other:?}"),
         }
+    }
+
+    const MALFORMED_ITEM_KINDS: &str = "[item_kinds.custom]\nsection = \"Items\"\n";
+
+    #[test]
+    fn test_validation_declarations_from_image_rejects_malformed_item_kinds() {
+        let image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(MALFORMED_ITEM_KINDS)),
+                (".jit/gates.toml", None),
+                (".jit/rules.toml", None),
+            ])
+            .build();
+        assert!(matches!(
+            validation_declarations_from_image(&image),
+            Err(DeclarationParseError::Producer(
+                ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
+            ))
+        ));
+    }
+
+    #[test]
+    fn test_finalize_config_edit_refuses_edit_that_fails_assembly() {
+        let base = ImageBuilder::new()
+            .files(&[(".jit/config.toml", Some(""))])
+            .build();
+        let (config, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            item_kinds: Ok(std::sync::Arc::from([])),
+            config: &config,
+            gates: &gates,
+            rules: &rules,
+        };
+        assert!(matches!(
+            finalize_config_edit(
+                &base,
+                &MutationContext::preview(),
+                MALFORMED_ITEM_KINDS.as_bytes(),
+                declarations
+            ),
+            Err(RepositoryStateError::Producer(
+                ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
+            ))
+        ));
+    }
+
+    fn write(path: &VirtualPath, bytes: &[u8]) -> RepositoryAction {
+        RepositoryAction::WriteFile {
+            path: path.clone(),
+            owner: RepositoryActionOwner::RepositoryStateMutation,
+            expected: ExpectedPreimage::Absent,
+            bytes: bytes.to_vec(),
+            mode: FileMode::Regular,
+        }
+    }
+
+    /// The events a publication appends, decoded.
+    fn published_events(plan: &MaterializationPlan) -> Vec<crate::domain::Event> {
+        plan.publication()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                RepositoryAction::AppendEvents { bytes, .. } => Some(bytes),
+                _ => None,
+            })
+            .flat_map(|bytes| {
+                bytes
+                    .split(|byte| *byte == b'\n')
+                    .filter(|line| !line.is_empty())
+                    .map(|line| serde_json::from_slice(line).unwrap())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_materialization_plan_new_publishes_an_event_less_write_with_one_files_published_event()
+    {
+        let (config, note) = (
+            VirtualPath::CONFIG,
+            VirtualPath::worktree("note.md").unwrap(),
+        );
+        let image = ImageBuilder::new()
+            .file(config.clone(), b"old")
+            .entry(note.clone(), RepositoryEntry::Absent)
+            .build();
+        let delta = RepositoryDelta::new(
+            image.layout(),
+            vec![write(&note, b"note"), write(&config, b"new")],
+        )
+        .unwrap();
+
+        let plan =
+            MaterializationPlan::new(&image, delta.clone(), &MutationContext::preview()).unwrap();
+
+        assert_eq!(
+            plan.delta(),
+            &delta,
+            "reports keep reading the derived delta"
+        );
+        let events = published_events(&plan);
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].body(),
+            &crate::domain::EventBody::draft_files_published(vec![
+                config.repository_relative(),
+                note.repository_relative(),
+            ])
+        );
+        assert_eq!(
+            plan.publication().file_writes().collect::<Vec<_>>(),
+            delta.file_writes().collect::<Vec<_>>(),
+            "the publication adds only the append"
+        );
+    }
+
+    #[test]
+    fn test_materialization_plan_new_rebuilds_the_same_publication_from_a_reused_context() {
+        let config = VirtualPath::CONFIG;
+        let image = ImageBuilder::new().file(config.clone(), b"old").build();
+        let delta = RepositoryDelta::new(image.layout(), vec![write(&config, b"new")]).unwrap();
+        let context = MutationContext::deterministic(
+            [7; 32],
+            chrono::DateTime::from_timestamp(1, 0).unwrap(),
+        );
+
+        let first = MaterializationPlan::new(&image, delta.clone(), &context).unwrap();
+        let retried = MaterializationPlan::new(&image, delta, &context).unwrap();
+
+        assert_eq!(first.publication(), retried.publication());
+    }
+
+    #[test]
+    fn test_materialization_plan_new_publishes_the_derived_delta_when_no_generic_event_is_due() {
+        let config = VirtualPath::CONFIG;
+        let present = ImageBuilder::new().file(config.clone(), b"old").build();
+        let absent_root = ImageBuilder::new()
+            .entry(config.clone(), RepositoryEntry::Absent)
+            .build();
+        let appending = finalize(
+            present.layout(),
+            &present,
+            &MutationContext::preview(),
+            &[MutationIntent::RecordEvent {
+                phase: 0,
+                event: Box::new(crate::domain::EventBody::draft_files_published(Vec::new())),
+            }],
+            None,
+        )
+        .unwrap()
+        .delta()
+        .clone();
+        let cases = [
+            (
+                "empty delta",
+                &present,
+                RepositoryDelta::new(present.layout(), Vec::new()),
+            ),
+            ("domain event", &present, Ok(appending)),
+            (
+                "absent data root",
+                &absent_root,
+                RepositoryDelta::new(absent_root.layout(), vec![write(&config, b"new")]),
+            ),
+        ];
+
+        for (case, image, delta) in cases {
+            let delta = delta.unwrap();
+            let plan = MaterializationPlan::new(image, delta.clone(), &MutationContext::preview())
+                .unwrap();
+            assert_eq!(plan.publication(), &delta, "{case}");
+        }
+    }
+
+    #[test]
+    fn test_materialization_plan_new_refuses_a_generic_event_over_an_image_without_the_event_log() {
+        let config = VirtualPath::CONFIG;
+        let spec = CaptureSpec::new(
+            [config.clone()],
+            CaptureBudget {
+                max_listings: 0,
+                max_bytes: u64::MAX,
+                max_depth: usize::MAX,
+            },
+        )
+        .unwrap();
+        let image = ImageBuilder::new()
+            .with_spec(spec)
+            .file(config.clone(), b"old")
+            .build();
+        let delta = RepositoryDelta::new(image.layout(), vec![write(&config, b"new")]).unwrap();
+
+        assert!(matches!(
+            MaterializationPlan::new(&image, delta, &MutationContext::preview()),
+            Err(MutationError::Capture(CaptureError::UndiscoveredRepositoryPath(path)))
+                if path == VirtualPath::EVENTS
+        ));
     }
 }

@@ -1,0 +1,47 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T12:43:03.690961969Z",
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "12ecb90c-eb0c-4c4d-8717-f217217eb5c9",
+    "3ee3a4d1-3e66-4935-ad2c-4df89663cea7",
+    "d5966ba2-93b2-4d9e-aa07-2b38b020231e"
+  ],
+  "description": "Make archive discovery resolve every embedded reference once, when its artifact is parsed, and compute reachability once per distinct document root instead of once per linking document.\n\n## Background\n\n- `ParsedArtifact` (`crates/jit/src/domain/artifact_discovery.rs:31-35`) stores the raw `references: Vec<String>`. `resolve_reference` (`artifact_discovery.rs:633`) is a pure function of the parent path and the reference, yet it runs at three sites over the same parsed references: closure expansion in `expand_artifact_closure` (`:261`), inventory discovery in `discover_archive_artifacts` through `followed_references` (`:293-305`, resolved at `:413`), and every reachability walk in `reachable_parsed_paths` (`:536-555`, resolved at `:548`).\n- `discover_embedded_owners` (`artifact_discovery.rs:501-534`) calls `reachable_parsed_paths` once per (issue, unpinned document). Two issues that link one document walk it twice, and each walk resolves every reference again.\n- `parse_artifact` (`artifact_discovery.rs:612`) knows the parent path when it extracts references, so it can store each reference beside its resolution.\n\n## Success Criteria\n\n- [hard] REQ-01: `ParsedArtifact` carries each extracted reference together with its `ReferenceResolution`, computed once in `parse_artifact`; closure expansion, discovery and reachability read the stored resolution, and no other production code in the module calls `resolve_reference`.\n- [hard] REQ-02: Embedded-owner discovery computes the reachable path set once per distinct normalized document root and derives every (issue, document) owner from that one set.\n- [hard] REQ-03: Unit tests in the module show that each stored resolution equals `resolve_reference(parent, reference)` for the parsed reference, and that two issues linking the same document root produce the same embedded owners as walking each link separately while the per-root reachability map holds one entry per distinct root.\n\n## Notes\n\n- Behaviour is unchanged: the existing discovery and archive tests pass without edits to their assertions.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+  "documents": [],
+  "done_at": "2026-11-04T13:06:15.016690641Z",
+  "first_ready_at": "2026-10-24T21:22:37.717854234Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9c1e9518-d4c0-420a-9d40-66d1ed039aea",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:03:01.077636323Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4119209d-00b5-475f-bfdd-1175fcd79d42",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:05:54.599276242Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "f56bad8d-92e6-43a1-91f5-972ff56c7734",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:archive-and-snapshot",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-08"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Archive discovery resolves each reference once",
+  "updated_at": "2026-11-04T13:06:15.016690641Z"
+}

@@ -1,12 +1,16 @@
 {
   "policy": [
     "Every tool generated from `jit --schema` appears exactly once in `include` or `exclude`, with a one-line rationale.",
+    "A command in `forbidden` generates no tool at all, so neither `JIT_MCP_ALL_TOOLS=1` nor a call by name reaches it.",
     "Include a command when an autonomous agent drives it directly: find work, claim it, inspect it, transition it, check gates, read repository structure.",
     "Exclude interactive setup, destructive operations, registry and host administration, alias spellings, and human-ergonomics reporting.",
     "A command hidden in the CLI schema is always excluded here; this manifest may narrow the set further, never widen it.",
     "Adding a CLI command fails the coverage test until it is curated. `JIT_MCP_ALL_TOOLS=1` exposes the full generated set for operators who want it.",
     "max_curated_tools is the ceiling the test suite enforces: the curated count plus 11 slots (25% headroom). One maintenance batch's worth of deliberate inclusions fits without touching the bound; the next one forces a re-curation, which is the point of the bound. Each advertised tool spends client context, so the ceiling is a budget rather than a formality."
   ],
+  "forbidden": {
+    "jit_worktree_exec": "Runs an arbitrary host command, which no MCP client reaches through the tracker."
+  },
   "max_curated_tools": 55,
   "include": {
     "jit_status": "Repository-wide counts: the cheapest orientation call an agent can make.",
@@ -83,7 +87,7 @@
     "jit_rdeps": "Top-level alias of graph rdeps.",
     "jit_item_resolve": "Alias of item show; one spelling per operation.",
     "jit_issue_search": "search covers issues and documents in one call.",
-    "jit_issue_delete": "Destructive; unwanted work is rejected or archived through issue update.",
+    "jit_issue_delete": "Destructive; unwanted work is rejected through issue reject or archived through issue update.",
     "jit_issue_assign": "Assignment without workflow semantics; claim and release carry those.",
     "jit_issue_unassign": "Assignment without workflow semantics; claim and release carry those.",
     "jit_claim_status": "Lease outcome is returned by acquire and renew; standalone inspection is a lead-side view.",

@@ -11,12 +11,12 @@ use jit::commands::CommandExecutor;
 use jit::declarations::{GateChecker, GateMode, GateStage};
 use jit::domain::{GateRunStatus, GateStatus, Priority};
 use jit::storage::{IssueStore, JsonFileStorage};
-use std::process::Command;
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains() {
-    let repo = tempfile::TempDir::new().expect("create temporary repository");
-    let jit_dir = repo.path().join(".jit");
+    let repo = JitCli::uninitialised().expect("create temporary repository");
+    let jit_dir = repo.root().join(".jit");
     let taxonomy = jit::test_taxonomy::test_taxonomy();
     std::fs::create_dir_all(&jit_dir).expect("create repository data directory");
     std::fs::write(
@@ -29,15 +29,17 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     .expect("write repository configuration");
 
     let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(repo.path(), storage.root())
+    let layout = jit::storage::discover_repository_layout(repo.root(), storage.root())
         .expect("discover repository layout before initialization");
     let executor = CommandExecutor::new(storage).with_layout(layout);
     executor
-        .initialize_fresh_repository(repo.path(), None)
+        .profiles()
+        .initialize_fresh_repository(repo.root(), None)
         .expect("initialize fresh repository");
     executor
+        .gates()
         .define_gate(
-            "durability-check".to_string(),
+            &"durability-check".parse().unwrap(),
             "Durability check".to_string(),
             "Durability check".to_string(),
             GateStage::Postcheck,
@@ -54,7 +56,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
             100,
         )
         .expect("define durability gate");
-    let (issue_id, _) = executor
+    let issue_id = executor
         .issues()
         .create_issue(
             "Durability carrier".to_string(),
@@ -66,15 +68,19 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
             None,
             false,
         )
-        .expect("create issue requiring durability gate");
+        .expect("create issue requiring durability gate")
+        .issue
+        .id;
     // Attaching the gate after creation records its explicit `pending` state, so
     // the assertions below read a recorded verdict rather than an absent key.
     executor
-        .add_gate(&issue_id, "durability-check".to_string())
+        .gates()
+        .add_gate(&issue_id, &"durability-check".parse().unwrap())
         .expect("require the durability gate on the issue");
 
     let evaluated = executor
-        .check_gate(&issue_id, "durability-check")
+        .gates()
+        .check_gate(&issue_id, &"durability-check".parse().unwrap())
         .expect("the automated gate evaluates");
     assert_eq!(evaluated.status, GateRunStatus::Passed);
 
@@ -85,7 +91,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .load_issue(&issue_id)
         .expect("load the issue the evaluation changed");
     assert_eq!(
-        recorded.gates_status["durability-check"].status,
+        recorded.gates_status[&"durability-check".parse().unwrap()].status,
         GateStatus::Passed,
         "the evaluation's verdict must be durable on the issue"
     );
@@ -94,7 +100,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .expect("list the gate runs the evaluation recorded");
     assert_eq!(
         runs.iter()
-            .filter(|run| run.gate_key == "durability-check")
+            .filter(|run| run.gate_key.as_str() == "durability-check")
             .map(|run| run.status)
             .collect::<Vec<_>>(),
         vec![GateRunStatus::Passed],
@@ -105,9 +111,8 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     // A separate process reading the same repository reports that same pair.
     // `gate status-all` is the CLI's gate-readiness report; what its exit status
     // says about readiness is its own suite's property.
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo.path())
-        .args(["gate", "status-all", &issue_id, "--json"])
+    let output = repo
+        .command(["gate", "status-all", issue_id.as_str(), "--json"])
         .output()
         .expect("spawn the jit gate readiness subprocess");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {

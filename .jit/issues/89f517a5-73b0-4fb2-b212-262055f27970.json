@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:15:01.547377413Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -11,11 +12,26 @@
   ],
   "description": "Delete the subprocess suites that re-prove command exit codes and parity now owned by the projection suite.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` and `invocation_exit_status_parity_tests.rs` re-prove bindings the exit-code projection suite owns, including the dependency-cycle exit code (`:69`). Their unique cases already have owners elsewhere. `crates/jit/tests/cli_issue/main.rs` declares both modules.\n\n## Success Criteria\n\n- [hard] REQ-01: `exit_code_tests.rs` and `invocation_exit_status_parity_tests.rs` no longer exist, and `cli_issue/main.rs` declares neither.\n- [hard] REQ-02: Every command-to-exit-code binding and human/machine parity case is proven by the projection suite.\n- [hard] REQ-03: No live document or source comment cites either file.\n",
   "documents": [],
+  "done_at": "2026-10-31T23:48:55.566519826Z",
+  "first_ready_at": "2026-10-29T07:29:58.109908415Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "17a5279b-dfbd-4b98-83a5-28a6a9297d12",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:42:18.662745789Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0a504295-ba0e-4dd5-acf3-63452abc3a2b",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:48:23.061001583Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "89f517a5-73b0-4fb2-b212-262055f27970",
   "labels": [
     "type:task",
@@ -29,7 +45,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Exit-code re-proof suites are deleted",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-31T23:48:55.566519826Z"
 }

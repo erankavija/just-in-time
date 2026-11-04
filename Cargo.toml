@@ -23,11 +23,14 @@ authors = ["erankavija"]
 # to amortize against — every agent worktree run and every local re-check is one
 # (dev/benchmarks/rust-build-budgets/README.md, "Provenance").
 debug = "line-tables-only"
+split-debuginfo = "unpacked"
 incremental = true
 
 [profile.test]
 debug = "line-tables-only"
-incremental = true
+split-debuginfo = "unpacked"
+# Test builds are frequent and short-lived; avoid accumulating incremental state on disk.
+incremental = false
 
 # Dependencies are compiled once and then run by every test process, so their
 # unoptimized code is pure repeated cost: the suite's own CPU profile is spread

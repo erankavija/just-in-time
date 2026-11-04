@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:44:13.571112036Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,12 +8,33 @@
   ],
   "description": "A profile dry run is a read-only run of the apply computation, including final validation, and returns the apply result type; the twin plan types, the twin status enums and the trait bridging them are removed.\n\n## Background\n\nPlan and apply report through parallel types in `crates/jit/src/profile/application.rs` (line numbers at the investigation baseline):\n\n- Result types: `ProfileApplyResult` (41) and `ProfilePlanEntry` (272).\n- Status enums: `ProfileApplicationStatus` (11) and `ProfilePlanStatus` (256).\n- The bridging trait `SelectionObservation` (80, implementations at 93 and 105).\n\nThe apply command's output schema is a hand-written `oneOf` over both (`crates/jit/src/schema.rs:514-530`). Both routes call the same preparation, but only apply runs final validation (`crates/jit/src/commands/profile.rs:1891-1900`), so a dry run can succeed where the apply fails.\n\nA preview runs the same mutation session as its operation, read-only (`@/charter/D-20`). One run over the profile selection takes a mode: publish, rehearse, or report. The existing refuse-or-report conflict response (`profile.rs:104`) already switches between apply and diff.\n\n## Success Criteria\n\n- [hard] REQ-01: Plan and apply return one result type with one status enum; the twin types and the bridging trait are gone.\n- [hard] REQ-02: A dry run fails exactly where the apply would, including on final validation findings, and publishes nothing.\n- [hard] REQ-03: The apply command's published output schema is derived from the result type, and the hand-written alternative schema is gone.\n- [hard] REQ-04: Human-readable plan and apply output both render from the one result type.\n- [hard] REQ-05: The MCP integration tests pass over the unified apply output.\n",
   "documents": [],
+  "done_at": "2026-11-01T18:27:10.602924953Z",
+  "first_ready_at": "2026-11-01T16:08:31.517373074Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "76d4d348-8e12-470f-9571-52bc52bab0f2",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:47:35.882544442Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "59100029-9be3-4135-923e-70bc3990b3c8",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:26:35.098245887Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "ec432cb2-455d-4338-b2b1-25d06062e33a",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:21:57.712079482Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a5fbec12-fa6a-4684-994b-5fd0652471e3",
   "labels": [
     "type:task",
@@ -24,7 +46,7 @@
     "satisfies:3d9a0ce3/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Report profile plans through the apply result type",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T18:27:10.602924953Z"
 }

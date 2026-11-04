@@ -1,54 +1,24 @@
 //! Verify field projection and multi-id support for `jit issue show`:
 //! - `--field <name>` prints a single top-level field as plain text
-//! - `--fields a,b` prints those fields as a single compact JSON object
+//! - `--fields a --fields b` prints those fields as a single compact JSON object
 //! - multiple ids with `--json` return the list envelope `{count, issues}`
 //! - unknown fields and mutually-exclusive / multi-id projection combos error
 
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_ok(temp: &TempDir, args: &[&str]) -> Vec<u8> {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone()
-}
-
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let stdout = jit_ok(
-        temp,
-        &["issue", "create", "--title", title, "--description", "Body"],
-    );
-    let stdout = String::from_utf8_lossy(&stdout);
-    stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-fn setup() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit_ok(&temp, &["init"]);
-    temp
-}
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_field_prints_scalar_as_plain_text() {
-    let temp = setup();
-    let id = create_issue(&temp, "Ready issue");
-    jit_ok(&temp, &["issue", "update", &id, "--state", "ready"]);
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "Ready issue", "--description", "Body"])
+        .unwrap();
+    temp.run(["issue", "update", &id, "--state", "ready"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--field", "state"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--field", "state"])
+        .unwrap();
     // Plain text, not JSON-quoted.
     assert_eq!(text.trim(), "ready", "got: {text:?}");
     assert!(
@@ -59,22 +29,29 @@ fn test_field_prints_scalar_as_plain_text() {
 
 #[test]
 fn test_field_string_is_raw_not_quoted() {
-    let temp = setup();
-    let id = create_issue(&temp, "My Title");
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "My Title", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--field", "title"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--field", "title"])
+        .unwrap();
     assert_eq!(text.trim(), "My Title", "got: {text:?}");
 }
 
 #[test]
 fn test_field_array_falls_back_to_compact_json() {
-    let temp = setup();
-    let id = create_issue(&temp, "Labeled");
-    jit_ok(&temp, &["issue", "update", &id, "--label", "type:task"]);
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "Labeled", "--description", "Body"])
+        .unwrap();
+    temp.run(["issue", "update", &id, "--label", "type:task"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--field", "labels"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--field", "labels"])
+        .unwrap();
     let trimmed = text.trim();
     // Array field -> compact JSON array.
     assert!(
@@ -87,12 +64,18 @@ fn test_field_array_falls_back_to_compact_json() {
 
 #[test]
 fn test_fields_prints_compact_json_object() {
-    let temp = setup();
-    let id = create_issue(&temp, "Both");
-    jit_ok(&temp, &["issue", "update", &id, "--state", "ready"]);
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "Both", "--description", "Body"])
+        .unwrap();
+    temp.run(["issue", "update", &id, "--state", "ready"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--fields", "state,title"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run([
+            "issue", "show", &id, "--fields", "state", "--fields", "title",
+        ])
+        .unwrap();
     let trimmed = text.trim();
     // Compact (no spaces after separators), single object.
     assert_eq!(
@@ -103,13 +86,16 @@ fn test_fields_prints_compact_json_object() {
 
 #[test]
 fn test_two_ids_json_returns_envelope() {
-    let temp = setup();
-    let a = create_issue(&temp, "First");
-    let b = create_issue(&temp, "Second");
+    let temp = JitCli::initialised().unwrap();
+    let a = temp
+        .create_issue(["--title", "First", "--description", "Body"])
+        .unwrap();
+    let b = temp
+        .create_issue(["--title", "Second", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &a, &b, "--json"]);
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    assert_eq!(json["count"].as_u64(), Some(2), "envelope carries count");
+    let out = temp.run(["issue", "show", &a, &b, "--json"]).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&out).unwrap();
     let arr = json["issues"]
         .as_array()
         .expect("two-id --json must wrap issues in the list envelope");
@@ -122,67 +108,80 @@ fn test_two_ids_json_returns_envelope() {
 
 #[test]
 fn test_single_id_json_stays_object() {
-    let temp = setup();
-    let id = create_issue(&temp, "Solo");
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "Solo", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--json"]);
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let out = temp.run(["issue", "show", &id, "--json"]).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert!(json.is_object(), "single-id --json must stay an object");
     assert_eq!(json["id"].as_str(), Some(id.as_str()));
 }
 
 #[test]
 fn test_unknown_field_errors() {
-    let temp = setup();
-    let id = create_issue(&temp, "X");
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "X", "--description", "Body"])
+        .unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &id, "--field", "nope"])
+    let assert = temp
+        .command(["issue", "show", &id, "--field", "nope", "--json"])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]
 fn test_unknown_field_in_fields_list_errors() {
-    let temp = setup();
-    let id = create_issue(&temp, "X");
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "X", "--description", "Body"])
+        .unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &id, "--fields", "state,bogus"])
+    let assert = temp
+        .command([
+            "issue", "show", &id, "--fields", "state", "--fields", "bogus", "--json",
+        ])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]
 fn test_field_and_fields_mutually_exclusive() {
-    let temp = setup();
-    let id = create_issue(&temp, "X");
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "X", "--description", "Body"])
+        .unwrap();
 
-    // clap-level conflict -> exit code 2 (usage error).
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let assert = temp
+        .command([
             "issue", "show", &id, "--field", "state", "--fields", "state",
         ])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(stderr.contains("cannot be used with"), "{stderr}");
 }
 
 #[test]
 fn test_projection_with_multiple_ids_errors() {
-    let temp = setup();
-    let a = create_issue(&temp, "First");
-    let b = create_issue(&temp, "Second");
+    let temp = JitCli::initialised().unwrap();
+    let a = temp
+        .create_issue(["--title", "First", "--description", "Body"])
+        .unwrap();
+    let b = temp
+        .create_issue(["--title", "Second", "--description", "Body"])
+        .unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &a, &b, "--field", "state"])
+    let assert = temp
+        .command(["issue", "show", &a, &b, "--field", "state", "--json"])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }

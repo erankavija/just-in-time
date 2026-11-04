@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fffae260f333bf38a1d6e1663138337a583c7bc3",
+  "completed_at": "2026-11-04T01:18:45.044619618Z",
+  "duration_ms": 235151,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable hard criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b33ed7eb-f699-49a1-a998-5ef6b839d394",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d319617b-03a3-4c62-a97b-0b8965f7aad5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T01:14:49.893301545Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9b7b02a88 feat(jit:b33ed7eb): recorded runs write their per-key verdict record\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-03 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T01:13:10Z); code-review pending\nTruncation recovery: reread bounded source slices for capture, finalization, record discovery/fidelity, and reuse-reader behavior after broad search output truncated\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable hard criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

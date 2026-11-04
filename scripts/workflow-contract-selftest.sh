@@ -20,7 +20,7 @@ set -uo pipefail
 #       against a scratch copy of THIS repository's `.github/` tree: pristine
 #       (must pass) and with a seeded schema defect that only actionlint detects
 #       (must fail). That proves the pinned linter is genuinely in the path
-#       rather than declared and skipped.
+#       through the entry point.
 #
 # The real repository tree is never mutated: every seed is written into a
 # mktemp scratch directory.
@@ -122,7 +122,7 @@ if cp -R "$root/.github" "$copy/.github"; then
   "$entrypoint" "$copy" >"$scratch/entry_clean.out" 2>&1
   rc_clean=$?
   if [ "$rc_clean" -eq 2 ]; then
-    echo "SKIP: entry point reported an environment error — actionlint unavailable"
+    report 1 "entry point reported an environment error: actionlint unavailable"
     sed 's/^/      | /' "$scratch/entry_clean.out"
   else
     if [ "$rc_clean" -eq 0 ]; then

@@ -22,10 +22,11 @@
     "component:core",
     "per:@/charter/D-20",
     "per:@/charter/D-18",
-    "satisfies:9876a23a/REQ-12"
+    "satisfies:9876a23a/REQ-12",
+    "resolution:superseded"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Commands read content format and strictness through the configuration accessors",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-03T23:04:33.108295807Z"
 }

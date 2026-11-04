@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0e34a581a056f12ef3ae696f8e72a1662987ca08",
+  "completed_at": "2026-11-04T16:23:46.718093876Z",
+  "duration_ms": 273020,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed readiness derivation and command integrations satisfy the issue-scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "945f9181-1066-4c5b-ac0f-5225bd59a6b0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "81957feb-9f22-4f6f-9f45-e38404991d5c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T16:19:13.697775627Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2b10d45aa (`jit:945f9181`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md), @/charter/D-20 (dev/vision/9db27a3a-charter.md), @/issue/b697a3f7/requirement/REQ-01 (issue description), @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T16:17:26Z\nTruncation recovery: recovered per-file patches and focused command/test ranges after broad-output truncation\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed readiness derivation and command integrations satisfy the issue-scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

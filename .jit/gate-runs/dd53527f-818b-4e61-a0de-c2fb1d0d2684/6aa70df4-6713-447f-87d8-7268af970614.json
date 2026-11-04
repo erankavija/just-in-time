@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "eac585eb36b07c9706d2ae31c77d6719a9284542",
+  "completed_at": "2026-11-03T21:58:05.390080805Z",
+  "duration_ms": 261208,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/claim_coordinator.rs",
+        "id": "F1",
+        "line": 411,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-19"
+        ],
+        "severity": "high",
+        "summary": "Every changing LeaseLock::apply scans claims.jsonl through next_claim_seq, so a claim mutation scales with history despite the issue's D-19 conformance claim."
+      }
+    ],
+    "summary": "LeaseLock mutations still scan the complete claims history to assign sequence numbers, violating D-19.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd53527f-818b-4e61-a0de-c2fb1d0d2684",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6aa70df4-6713-447f-87d8-7268af970614",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:53:44.181539991Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9809 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a367-63e1-7c91-8759-baae4f41c785\n--------\nuser\n--- 9796 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e3b772bbc, 685d8178d, ad57facbc, 2e2554b17, 05c6f4556\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/issue/dd53527f/requirement/REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07 and @/issue/f8a6b298/requirement/REQ-06 (issue Markdown); @/charter/D-19, @/charter/D-20, @/charter/D-22 (vision charter); @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T21:20:53Z); code-review failed (exit 1, prior structured F1/F2)\nTruncation recovery: read the e3b772b coordinator patch in three bounded ranges; reread ad57facb per affected file; inspected current mutation, reader, recovery, documentation, and test ranges\n\n1. **Blocking / issue-impact / high:** Every changing `LeaseLock::apply` still scans the entire historical claims log: `publish` calls `next_claim_seq()` at `crates/jit/src/storage/claim_coordinator.rs:411`, which reads and parses all of `claims.jsonl` at line 853. This tagged change introduced the scan despite the stored `last_seq`; claims mutations are not history-reporting commands, so it violates D-19. The current `per:@/charter/D-19` conformance claim remains unsupported. References: `@/charter/D-19`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"LeaseLock mutations still scan the complete claims history to assign sequence numbers, violating D-19.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Every changing LeaseLock::apply scans claims.jsonl through next_claim_seq, so a claim mutation scales with history despite the issue's D-19 conformance claim.\",\"file\":\"crates/jit/src/storage/claim_coordinator.rs\",\"line\":411,\"references\":[\"@/charter/D-19\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

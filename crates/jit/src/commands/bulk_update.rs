@@ -4,6 +4,7 @@
 //! Uses query filter engine to select issues and applies operations atomically per-issue.
 
 use super::*;
+use crate::domain::identity::GateKey;
 use crate::domain::{Assignee, Issue, Priority, State};
 use crate::query_engine::QueryFilter;
 use serde::Serialize;
@@ -18,15 +19,15 @@ pub struct UpdateOperations {
     /// Labels to remove
     pub remove_labels: Vec<String>,
     /// New assignee to set
-    pub assignee: Option<String>,
+    pub assignee: Option<Assignee>,
     /// Clear assignee
     pub unassign: bool,
     /// New priority to set
     pub priority: Option<Priority>,
     /// Gates to add
-    pub add_gates: Vec<String>,
+    pub add_gates: Vec<GateKey>,
     /// Gates to remove
-    pub remove_gates: Vec<String>,
+    pub remove_gates: Vec<GateKey>,
 }
 
 impl UpdateOperations {
@@ -39,8 +40,8 @@ impl UpdateOperations {
     /// repository. It never authorizes a skip by itself — a `false` result
     /// means only "not a candidate," and a `true` result means only
     /// "worth checking further": repository-dependent validity (gate registry
-    /// membership, dependency/gate transition guards, rule cleanliness, label
-    /// and assignee format) is decided exclusively inside a session — the
+    /// membership, dependency/gate transition guards, and rule cleanliness) is
+    /// decided exclusively inside a session — the
     /// shared verification session that confirms candidates
     /// (`CommandExecutor::confirm_bulk_noop_candidates`), or the normal
     /// per-issue session for anything that session does not confirm.
@@ -64,9 +65,7 @@ impl UpdateOperations {
                 .iter()
                 .all(|gate| !issue.gates_required.contains(gate));
         let assignee_holds = match &self.assignee {
-            Some(target) => {
-                issue.assignee.as_ref().map(Assignee::to_string).as_deref() == Some(target.as_str())
-            }
+            Some(target) => issue.assignee.as_ref() == Some(target),
             None => !self.unassign || issue.assignee.is_none(),
         };
 
@@ -75,27 +74,28 @@ impl UpdateOperations {
 }
 
 /// Result of bulk update operation
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct BulkUpdateResult {
     /// IDs that matched the filter
-    pub matched: Vec<String>,
+    pub matched: Vec<IssueId>,
     /// IDs successfully updated
-    pub modified: Vec<String>,
+    pub modified: Vec<IssueId>,
     /// IDs skipped with reasons (id, reason)
-    pub skipped: Vec<(String, String)>,
+    pub skipped: Vec<(IssueId, String)>,
     /// IDs that failed with errors (id, error)
-    pub errors: Vec<(String, String)>,
+    pub errors: Vec<(IssueId, String)>,
     /// Per-issue non-enforcing graph-rule warnings (id, message).
     /// Warnings never block the transition; they are informational findings
-    /// from rules with `enforce = false`.  Empty when no rules fired.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub warnings: Vec<(String, String)>,
+    /// from rules with `enforce = false`.  Empty when no rules fired. Reported
+    /// as outcome warnings, not in the payload.
+    #[serde(skip)]
+    pub warnings: Vec<(IssueId, String)>,
     /// Summary statistics
     pub summary: BulkUpdateSummary,
 }
 
 /// Summary statistics for bulk update
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct BulkUpdateSummary {
     pub total_matched: usize,
     pub total_modified: usize,
@@ -142,13 +142,13 @@ impl Default for BulkUpdateResult {
 #[derive(Debug, Serialize)]
 pub struct BulkUpdatePreview {
     /// IDs that would be matched
-    pub matched: Vec<String>,
+    pub matched: Vec<IssueId>,
     /// Planned changes per issue (id, description)
-    pub changes: Vec<(String, Vec<String>)>,
+    pub changes: Vec<(IssueId, Vec<String>)>,
     /// Warnings (id, warning)
-    pub warnings: Vec<(String, String)>,
+    pub warnings: Vec<(IssueId, String)>,
     /// Would-be errors (id, error)
-    pub would_fail: Vec<(String, String)>,
+    pub would_fail: Vec<(IssueId, String)>,
     /// Summary of what would happen
     pub summary: PreviewSummary,
 }
@@ -199,7 +199,7 @@ impl Default for BulkUpdatePreview {
     }
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> IssueOps<'_, S> {
     /// Apply bulk update to filtered issues
     ///
     /// Applies operations to all matched issues with per-issue atomicity.
@@ -240,11 +240,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let all_issues = self.storage.list_issues()?;
+        let all_issues = self.exec.storage.list_issues()?;
         let matched = filter.filter_issues(&all_issues)?;
 
         let mut result = BulkUpdateResult::new();
         result.matched = matched.iter().map(|i| i.id.clone()).collect();
+        result.warnings = self.exec.refuse_foreign_leases(&result.matched)?;
 
         let candidates: Vec<&Issue> = matched
             .iter()
@@ -261,7 +262,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .unwrap_or_default()
         };
 
-        let mut entered_terminal = false;
         for issue in matched {
             if confirmed_skips.contains(&issue.id) {
                 result
@@ -271,7 +271,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             match self.apply_operations_to_issue(issue, operations, force) {
                 Ok(outcome) => {
-                    entered_terminal |= outcome.entered_terminal;
                     for msg in outcome.warnings {
                         result.warnings.push((issue.id.clone(), msg));
                     }
@@ -287,12 +286,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     result.errors.push((issue.id.clone(), e.to_string()));
                 }
             }
-        }
-
-        // One cascade after the batch, as the single-issue update runs after
-        // its terminal change.
-        if entered_terminal {
-            self.check_auto_transitions()?;
         }
 
         result.compute_summary();
@@ -351,51 +344,41 @@ impl<S: IssueStore> CommandExecutor<S> {
         candidates: &[&Issue],
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<std::collections::HashSet<String>>
+    ) -> Result<std::collections::HashSet<IssueId>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{declarations_from_image, finalize};
+        use crate::repository_state::finalize;
         use std::collections::HashSet;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         with_mutation_session(
-            &self.storage,
+            &self.exec.storage,
             &layout,
             "bulk-update no-op verification",
             |session| {
                 let Some(crate::commands::validate::MutationBase {
                     image,
                     issues: active,
-                }) = self.capture_mutation_base(session, &[], None)?
+                }) = self.exec.capture_mutation_base(session, &[], None)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let declarations = declarations_from_image(&image)?;
-                let config = declarations.config();
-                let plan_content =
-                    crate::commands::validate::plan_content_with_issues(&image, &active, &active)?;
                 let context = super::production_mutation_context();
+                let graph = super::CapturedGraphEvidence::capture(&image, &active, &context)?;
 
                 let confirmed = candidates
                     .iter()
                     .filter_map(|candidate| {
                         let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
-                        let request = CapturedFieldUpdate::bulk(
-                            IssueIdPrefix::of_stored(&fresh.id),
-                            operations,
-                            force,
-                        )
-                        .ok()?;
+                        let request =
+                            CapturedFieldUpdate::bulk(fresh.id.clone(), operations, force).ok()?;
                         let derived = derive_field_update(
                             fresh.clone(),
                             &request,
                             CapturedTransitionEvidence {
                                 issues: &active,
-                                declarations: &declarations,
-                                config,
-                                plan_content: &plan_content,
-                                context: &context,
+                                graph: &graph,
                             },
                         )
                         .ok()?;
@@ -417,7 +400,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // apply attempt. A session short-circuits a zero-action
                 // delta before any record or event write, so a successful
                 // confirmation leaves no observable trace.
-                let plan = finalize(&layout, &image, &context, &[])?;
+                let plan = finalize(&layout, &image, &context, &[], None)?;
                 Ok(SessionStep::Apply(plan, confirmed))
             },
         )
@@ -433,13 +416,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// state transition (if any).  Returns `Err` on hard failures so the caller can
     /// record the issue in its `errors` list and continue best-effort.
     ///
-    /// Note: this does NOT call `update_issue_state()` (it skips that path's
-    /// prechecks/postchecks/gate-diversion — see the DESIGN DECISION below), but
-    /// the literal state change is routed through the captured transition
-    /// derivation, so the dependency and gate guards and
-    /// transition-time graph-rule enforcement (CC-2) hold on the bulk path with
-    /// exactly the semantics of a single-issue transition (jit bc86f54c,
-    /// jit b6eb2585). A blocked transition or a blocking enforce rule fails THIS
+    /// The state change is routed through the captured transition derivation,
+    /// so the dependency and gate guards and transition-time graph-rule
+    /// enforcement (CC-2) hold on the bulk path with exactly the semantics of a
+    /// single-issue transition (jit bc86f54c, jit b6eb2585). A blocked transition or a blocking enforce rule fails THIS
     /// issue's update like any other per-issue failure; `apply_bulk_update` records
     /// it in `errors` and continues best-effort with the remaining matched issues.
     fn apply_operations_to_issue(
@@ -451,7 +431,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        self.publish_captured_bulk_update(issue.id.clone(), operations, force)
+        self.exec
+            .publish_captured_bulk_update(&issue.id, operations, force)
     }
 
     /// Preview bulk update without applying changes (dry-run)
@@ -460,7 +441,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         filter: &QueryFilter,
         operations: &UpdateOperations,
     ) -> Result<BulkUpdatePreview> {
-        let all_issues = self.storage.list_issues()?;
+        let all_issues = self.exec.storage.list_issues()?;
         let matched = filter.filter_issues(&all_issues)?;
 
         let mut preview = BulkUpdatePreview::new();
@@ -477,7 +458,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let blocked = operations
                 .state
                 .filter(|target| *target != issue.state)
-                .map(|target| self.transition_blockers(issue, target))
+                .map(|target| self.exec.transition_blockers(issue, target))
                 .unwrap_or(Ok(()));
 
             if let Err(e) = blocked.and_then(|()| self.validate_update_preview(issue, operations)) {
@@ -501,7 +482,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // State change
         if let Some(new_state) = operations.state {
             if issue.state != new_state {
-                changes.push(format!("state: {:?} → {:?}", issue.state, new_state));
+                changes.push(format!("state: {} → {}", issue.state, new_state));
             }
         }
 
@@ -536,7 +517,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Assignee change
         let current_assignee = issue.assignee.as_ref().map(Assignee::to_string);
         if let Some(ref assignee) = operations.assignee {
-            if current_assignee.as_deref() != Some(assignee.as_str()) {
+            if issue.assignee.as_ref() != Some(assignee) {
                 changes.push(format!(
                     "assignee: {} → {}",
                     current_assignee.as_deref().unwrap_or("none"),
@@ -553,10 +534,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Priority change
         if let Some(new_priority) = operations.priority {
             if issue.priority != new_priority {
-                changes.push(format!(
-                    "priority: {:?} → {:?}",
-                    issue.priority, new_priority
-                ));
+                changes.push(format!("priority: {} → {}", issue.priority, new_priority));
             }
         }
 
@@ -585,9 +563,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             updated.labels.retain(|l| l != label);
         }
         if let Some(ref assignee) = operations.assignee {
-            // Projection only feeds label/state rules; a malformed assignee here
-            // (rejected later by `validate_update`) is simply dropped.
-            updated.assignee = assignee.parse().ok();
+            updated.assignee = Some(assignee.clone());
         } else if operations.unassign {
             updated.assignee = None;
         }
@@ -605,7 +581,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Validate gate operations - check that gates exist in registry
         if !operations.add_gates.is_empty() {
-            let registry = self.storage.load_gate_registry()?;
+            let registry = self.exec.storage.load_gate_registry()?;
             for gate_key in &operations.add_gates {
                 if !registry.gates.contains_key(gate_key) {
                     return Err(crate::storage::GateNotFoundError::single(gate_key).into());
@@ -613,19 +589,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // Validate assignee format
-        if let Some(ref assignee) = operations.assignee {
-            crate::labels::validate_assignee_format(assignee)?;
-        }
-
         // The captured mutation coordinator owns dependency and gate guards.
 
         let projected = Self::projected_after_update(issue, operations);
-        let repo_format = self.repo_content_format()?;
-        let strictness = self.cached_config()?.strictness()?;
-        let evaluation =
-            crate::validation::evaluate_local(&projected, self.effective_rules()?, repo_format)?
-                .with_strictness(strictness);
+        let repo_format = self.exec.cached_config()?.content_format();
+        let strictness = self.exec.cached_config()?.strictness();
+        let evaluation = crate::validation::evaluate_local(
+            &projected,
+            self.exec.effective_rules()?,
+            repo_format,
+        )?
+        .with_strictness(strictness);
         if let Some(message) = evaluation.rejection_message() {
             return Err(crate::errors::ValidationFailedError::new(message).into());
         }
@@ -636,6 +610,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::EventBody;
     use crate::domain::{Issue, Priority, State};
 
     /// Fails the FIRST session open at the moment `SessionOpenCounter` also
@@ -664,9 +639,9 @@ mod tests {
         }
     }
 
-    fn create_test_issue(id: &str, state: State, labels: Vec<&str>) -> Issue {
+    fn create_test_issue(id: &IssueId, state: State, labels: Vec<&str>) -> Issue {
         Issue {
-            id: id.to_string(),
+            id: id.clone(),
             title: format!("Test {}", id),
             description: String::new(),
             state,
@@ -713,9 +688,17 @@ mod tests {
     #[test]
     fn test_bulk_update_result_compute_summary() {
         let mut result = BulkUpdateResult::new();
-        result.matched = vec!["1".to_string(), "2".to_string()];
-        result.modified = vec!["1".to_string()];
-        result.skipped = vec![("2".to_string(), "no changes".to_string())];
+        result.matched = vec![
+            crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+        ];
+        result.modified = vec![crate::test_utils::issue_id(
+            0x4d6d537d80cc5cce1e28447cf692926d,
+        )];
+        result.skipped = vec![(
+            crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+            "no changes".to_string(),
+        )];
 
         result.compute_summary();
 
@@ -728,10 +711,19 @@ mod tests {
     #[test]
     fn test_preview_compute_summary() {
         let mut preview = BulkUpdatePreview::new();
-        preview.matched = vec!["1".to_string(), "2".to_string()];
+        preview.matched = vec![
+            crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+        ];
         preview.changes = vec![
-            ("1".to_string(), vec!["state change".to_string()]),
-            ("2".to_string(), vec![]), // No changes
+            (
+                crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+                vec!["state change".to_string()],
+            ),
+            (
+                crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+                vec![],
+            ), // No changes
         ];
 
         preview.compute_summary();
@@ -743,7 +735,11 @@ mod tests {
 
     #[test]
     fn test_compute_changes_state() {
-        let issue = create_test_issue("1", State::Ready, vec![]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec![],
+        );
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
@@ -752,15 +748,19 @@ mod tests {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
-        let changes = executor.compute_changes(&issue, &ops).unwrap();
+        let changes = executor.issues().compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 1);
-        assert!(changes[0].contains("Ready"));
-        assert!(changes[0].contains("Done"));
+        assert!(changes[0].contains("ready"));
+        assert!(changes[0].contains("done"));
     }
 
     #[test]
     fn test_compute_changes_labels() {
-        let issue = create_test_issue("1", State::Ready, vec!["type:task"]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec!["type:task"],
+        );
         let ops = UpdateOperations {
             add_labels: vec!["milestone:v1.0".to_string()],
             remove_labels: vec!["type:task".to_string()],
@@ -770,7 +770,7 @@ mod tests {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
-        let changes = executor.compute_changes(&issue, &ops).unwrap();
+        let changes = executor.issues().compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 2);
         assert!(changes
             .iter()
@@ -782,7 +782,11 @@ mod tests {
 
     #[test]
     fn test_compute_changes_no_changes() {
-        let issue = create_test_issue("1", State::Ready, vec![]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec![],
+        );
         let ops = UpdateOperations {
             state: Some(State::Ready), // Same state
             ..Default::default()
@@ -791,7 +795,7 @@ mod tests {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
-        let changes = executor.compute_changes(&issue, &ops).unwrap();
+        let changes = executor.issues().compute_changes(&issue, &ops).unwrap();
         assert!(changes.is_empty());
     }
 
@@ -803,22 +807,34 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("test-1", State::Ready, vec!["type:task"]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0x5a6a_549e_b9fb_2027_b699_f39d_12c9_39a1),
+                State::Ready,
+                vec!["type:task"],
+            ),
         );
         // A clone shares the in-memory state, so we can read events after the
         // executor takes ownership of `storage`.
         let reader = storage.clone();
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
-            assignee: Some("agent:worker-1".to_string()),
+            assignee: Some("agent:worker-1".parse().unwrap()),
             ..Default::default()
         };
-        executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // claimed_at stamped by the bulk assignment.
-        let updated = executor.get_issue("test-1").unwrap();
+        let updated = executor
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(
+                0x5a6a549eb9fb2027b699f39d12c939a1,
+            ))
+            .unwrap();
         assert!(updated.claimed_at.is_some());
 
         // @/inv/event-log: the assignee mutation appended an issue_claimed event.
@@ -826,18 +842,30 @@ mod tests {
             .read_events()
             .unwrap()
             .into_iter()
-            .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+            .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
             .count();
         assert_eq!(claimed, 1);
 
         // First-occurrence: a second assignee change does not move claimed_at.
         let first = updated.claimed_at;
         let ops2 = UpdateOperations {
-            assignee: Some("agent:worker-2".to_string()),
+            assignee: Some("agent:worker-2".parse().unwrap()),
             ..Default::default()
         };
-        executor.apply_bulk_update(&filter, &ops2, false).unwrap();
-        assert_eq!(executor.get_issue("test-1").unwrap().claimed_at, first);
+        executor
+            .issues()
+            .apply_bulk_update(&filter, &ops2, false)
+            .unwrap();
+        assert_eq!(
+            executor
+                .issues()
+                .show_issue(&crate::test_utils::issue_id(
+                    0x5a6a549eb9fb2027b699f39d12c939a1
+                ))
+                .unwrap()
+                .claimed_at,
+            first
+        );
     }
 
     #[test]
@@ -848,10 +876,14 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create test issue
-        let issue = create_test_issue("test-1", State::Ready, vec!["type:task"]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x5a6a_549e_b9fb_2027_b699_f39d_12c9_39a1),
+            State::Ready,
+            vec!["type:task"],
+        );
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Apply bulk update
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -860,14 +892,22 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 1);
         assert_eq!(result.summary.total_errors, 0);
 
         // Verify issue was updated
-        let updated = executor.get_issue("test-1").unwrap();
+        let updated = executor
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(
+                0x5a6a549eb9fb2027b699f39d12c939a1,
+            ))
+            .unwrap();
         assert_eq!(updated.state, State::Done);
     }
 
@@ -880,14 +920,26 @@ mod tests {
 
         // Create test issues
         for issue in [
-            create_test_issue("0001", State::Ready, vec![]),
-            create_test_issue("0002", State::Ready, vec![]),
-            create_test_issue("0003", State::InProgress, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+                State::Ready,
+                vec![],
+            ),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xc56d_5478_ab94_4a28_fb3c_d51d_1598_c99b),
+                State::Ready,
+                vec![],
+            ),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xa0cb_57d0_ac34_69f2_7978_37c6_6185_9fa8),
+                State::InProgress,
+                vec![],
+            ),
         ] {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Update all ready issues
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -896,16 +948,29 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 2);
         assert_eq!(result.summary.total_modified, 2);
 
         // Verify labels added
-        let issue1 = executor.get_issue("0001").unwrap();
+        let issue1 = executor
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(
+                0xedeb5b73a03a451ec76b0d6a0370f495,
+            ))
+            .unwrap();
         assert!(issue1.labels.contains(&"milestone:v1.0".to_string()));
 
-        let issue3 = executor.get_issue("0003").unwrap();
+        let issue3 = executor
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(
+                0xa0cb57d0ac3469f2797837c661859fa8,
+            ))
+            .unwrap();
         assert!(!issue3.labels.contains(&"milestone:v1.0".to_string()));
     }
 
@@ -917,10 +982,14 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Done, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+                State::Done,
+                vec![],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to set same state
         let filter = QueryFilter::parse("state:done").unwrap();
@@ -929,7 +998,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -944,11 +1016,15 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create issue with unpassed gates
-        let mut issue = create_test_issue("0001", State::Gated, vec![]);
-        issue.gates_required = vec!["tests".to_string()];
+        let mut issue = create_test_issue(
+            &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+            State::Gated,
+            vec![],
+        );
+        issue.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to transition to Done without passing gates
         let filter = QueryFilter::parse("state:gated").unwrap();
@@ -957,7 +1033,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -977,19 +1056,31 @@ mod tests {
         // Create mix of valid and invalid issues
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("0001", State::Ready, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+                State::Ready,
+                vec![],
+            ),
         );
 
-        let mut blocked = create_test_issue("0002", State::Ready, vec![]);
-        blocked.gates_required = vec!["tests".to_string()];
+        let mut blocked = create_test_issue(
+            &crate::test_utils::issue_id(0xc56d_5478_ab94_4a28_fb3c_d51d_1598_c99b),
+            State::Ready,
+            vec![],
+        );
+        blocked.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, blocked);
 
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("0003", State::Ready, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xa0cb_57d0_ac34_69f2_7978_37c6_6185_9fa8),
+                State::Ready,
+                vec![],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to transition all to Done
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -998,7 +1089,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should succeed for 2, fail for 1
         assert_eq!(result.summary.total_matched, 3);
@@ -1006,9 +1100,16 @@ mod tests {
         assert_eq!(result.summary.total_errors, 1);
 
         // Verify partial success
-        assert!(result.modified.contains(&"0001".to_string()));
-        assert!(result.modified.contains(&"0003".to_string()));
-        assert_eq!(result.errors[0].0, "0002");
+        assert!(result.modified.contains(&crate::test_utils::issue_id(
+            0xedeb5b73a03a451ec76b0d6a0370f495
+        )));
+        assert!(result.modified.contains(&crate::test_utils::issue_id(
+            0xa0cb57d0ac3469f2797837c661859fa8
+        )));
+        assert_eq!(
+            result.errors[0].0,
+            crate::test_utils::issue_id(0xc56d_5478_ab94_4a28_fb3c_d51d_1598_c99b)
+        );
     }
 
     #[test]
@@ -1019,10 +1120,14 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("0001", State::Ready, vec!["type:task"]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+                State::Ready,
+                vec!["type:task"],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to add label without colon (invalid format)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1031,7 +1136,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should reject with error. After the a0f0f342 consolidation the rejection
         // comes from the always-enforced `label-format` rule (canonical format,
@@ -1063,13 +1171,13 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                "0001",
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec![&format!("type:{}", taxonomy.type_at_level(4))],
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to add another type:* label (violates uniqueness)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1078,7 +1186,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should reject with error. After the a0f0f342 consolidation the rejection
         // comes from the always-enforced `namespace-unique-type` rule (origin =
@@ -1090,55 +1201,33 @@ mod tests {
     }
 
     #[test]
-    fn test_bulk_update_rejects_invalid_assignee_format() {
+    fn test_bulk_update_sets_typed_assignee() {
         use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+                State::Ready,
+                vec![],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
-
-        // Try to set assignee without colon (invalid format)
-        let filter = QueryFilter::parse("state:ready").unwrap();
-        let ops = UpdateOperations {
-            assignee: Some("invalid_no_colon".to_string()),
-            ..Default::default()
-        };
-
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
-
-        // Should reject with error
-        assert_eq!(result.summary.total_matched, 1);
-        assert_eq!(result.summary.total_modified, 0);
-        assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("format"));
-    }
-
-    #[test]
-    fn test_bulk_update_accepts_valid_assignee_format() {
-        use crate::query_engine::QueryFilter;
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        crate::commands::test_helpers::seed_issue(
-            &storage,
-            create_test_issue("0001", State::Ready, vec![]),
-        );
-
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Valid assignee format should work
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
-            assignee: Some("agent:copilot".to_string()),
+            assignee: Some("agent:copilot".parse().unwrap()),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should succeed
         assert_eq!(result.summary.total_matched, 1);
@@ -1146,7 +1235,12 @@ mod tests {
         assert_eq!(result.summary.total_errors, 0);
 
         // Verify assignee set correctly
-        let updated = executor.get_issue("0001").unwrap();
+        let updated = executor
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(
+                0xedeb5b73a03a451ec76b0d6a0370f495,
+            ))
+            .unwrap();
         assert_eq!(updated.assignee, Some("agent:copilot".parse().unwrap()));
     }
 
@@ -1163,7 +1257,7 @@ mod tests {
     /// Every event the log recorded for `issue_id`, in order, payload-normalized.
     fn event_payloads_for(
         storage: &crate::storage::InMemoryStorage,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Vec<String> {
         use crate::storage::IssueStore;
         storage
@@ -1171,7 +1265,7 @@ mod tests {
             .unwrap()
             .iter()
             .map(event_payload)
-            .filter(|value| value["issue_id"] == issue_id)
+            .filter(|value| value["issue_id"].as_str() == Some(issue_id.as_str()))
             .map(|value| value.to_string())
             .collect()
     }
@@ -1185,7 +1279,10 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
-            for id in ["aaaa1111", "bbbb2222"] {
+            for id in [0xaaaa1111, 0xbbbb2222]
+                .map(crate::test_utils::issue_id)
+                .iter()
+            {
                 crate::commands::test_helpers::seed_issue(
                     storage,
                     create_test_issue(id, State::Ready, vec!["type:task"]),
@@ -1196,20 +1293,26 @@ mod tests {
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
         let bulk_reader = bulk_storage.clone();
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
         };
-        let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = bulk
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
         assert_eq!(result.summary.total_modified, 2);
 
         let single_storage = InMemoryStorage::new();
         seed(&single_storage);
         let single_reader = single_storage.clone();
         let single = crate::commands::test_helpers::memory_executor(single_storage);
-        for id in ["aaaa1111", "bbbb2222"] {
+        for id in [0xaaaa1111, 0xbbbb2222]
+            .map(crate::test_utils::issue_id)
+            .iter()
+        {
             single
                 .issues()
                 .update_issue(
@@ -1227,7 +1330,10 @@ mod tests {
                 .unwrap();
         }
 
-        for id in ["aaaa1111", "bbbb2222"] {
+        for id in [0xaaaa1111, 0xbbbb2222]
+            .map(crate::test_utils::issue_id)
+            .iter()
+        {
             assert_eq!(
                 event_payloads_for(&bulk_reader, id),
                 event_payloads_for(&single_reader, id),
@@ -1246,22 +1352,34 @@ mod tests {
         let seed = |storage: &InMemoryStorage| {
             crate::commands::test_helpers::seed_issue(
                 storage,
-                create_test_issue("aaaa1111", State::Backlog, vec!["type:task"]),
+                create_test_issue(
+                    &crate::test_utils::issue_id(0xaaaa_1111),
+                    State::Backlog,
+                    vec!["type:task"],
+                ),
             );
-            let mut blocked = create_test_issue("bbbb2222", State::Ready, vec!["type:task"]);
-            blocked.dependencies = vec!["aaaa1111".to_string()];
+            let mut blocked = create_test_issue(
+                &crate::test_utils::issue_id(0xbbbb_2222),
+                State::Ready,
+                vec!["type:task"],
+            );
+            blocked.dependencies = vec![crate::test_utils::issue_id(0xaaaa_1111)];
             crate::commands::test_helpers::seed_issue(storage, blocked);
         };
 
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
-        let issue = bulk.get_issue("bbbb2222").unwrap();
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let issue = bulk
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(0xbbbb_2222))
+            .unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
         };
         let bulk_error = bulk
+            .issues()
             .apply_operations_to_issue(&issue, &ops, false)
             .unwrap_err()
             .downcast::<TransitionBlockedError>()
@@ -1273,7 +1391,7 @@ mod tests {
         let single_error = single
             .issues()
             .update_issue(
-                "bbbb2222",
+                &crate::test_utils::issue_id(0xbbbb_2222),
                 None,
                 None,
                 None,
@@ -1300,20 +1418,28 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
-            let mut gated = create_test_issue("aaaa1111", State::Ready, vec!["type:task"]);
-            gated.gates_required = vec!["tests".to_string()];
+            let mut gated = create_test_issue(
+                &crate::test_utils::issue_id(0xaaaa_1111),
+                State::Ready,
+                vec!["type:task"],
+            );
+            gated.gates_required = vec!["tests".parse().unwrap()];
             crate::commands::test_helpers::seed_issue(storage, gated);
         };
 
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
-        let issue = bulk.get_issue("aaaa1111").unwrap();
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let issue = bulk
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            .unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
         };
         let bulk_error = bulk
+            .issues()
             .apply_operations_to_issue(&issue, &ops, false)
             .unwrap_err()
             .downcast::<TransitionBlockedError>()
@@ -1325,7 +1451,7 @@ mod tests {
         let single_error = single
             .issues()
             .update_issue(
-                "aaaa1111",
+                &crate::test_utils::issue_id(0xaaaa_1111),
                 None,
                 None,
                 None,
@@ -1352,10 +1478,14 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("0001", State::Ready, vec!["type:task"]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+                State::Ready,
+                vec!["type:task"],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Valid labels should work
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1364,7 +1494,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should succeed
         assert_eq!(result.summary.total_matched, 1);
@@ -1372,7 +1505,12 @@ mod tests {
         assert_eq!(result.summary.total_errors, 0);
 
         // Verify labels added
-        let updated = executor.get_issue("0001").unwrap();
+        let updated = executor
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(
+                0xedeb5b73a03a451ec76b0d6a0370f495,
+            ))
+            .unwrap();
         assert!(updated.labels.contains(&"milestone:v1.0".to_string()));
         assert!(updated.labels.contains(&"epic:auth".to_string()));
     }
@@ -1381,7 +1519,11 @@ mod tests {
 
     #[test]
     fn test_is_provable_noop_state_holds_only_at_target_state() {
-        let issue = create_test_issue("1", State::Ready, vec![]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec![],
+        );
 
         assert!(UpdateOperations {
             state: Some(State::Ready),
@@ -1399,7 +1541,11 @@ mod tests {
 
     #[test]
     fn test_is_provable_noop_labels_require_adds_present_and_removes_absent() {
-        let issue = create_test_issue("1", State::Ready, vec!["type:task"]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec!["type:task"],
+        );
 
         assert!(UpdateOperations {
             add_labels: vec!["type:task".to_string()],
@@ -1425,7 +1571,11 @@ mod tests {
 
     #[test]
     fn test_is_provable_noop_priority_holds_only_at_target_priority() {
-        let issue = create_test_issue("1", State::Ready, vec![]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec![],
+        );
 
         assert!(UpdateOperations {
             priority: Some(Priority::Normal),
@@ -1441,26 +1591,30 @@ mod tests {
 
     #[test]
     fn test_is_provable_noop_gates_require_adds_present_and_removes_absent() {
-        let mut issue = create_test_issue("1", State::Ready, vec![]);
-        issue.gates_required = vec!["tests".to_string()];
+        let mut issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec![],
+        );
+        issue.gates_required = vec!["tests".parse().unwrap()];
 
         assert!(UpdateOperations {
-            add_gates: vec!["tests".to_string()],
+            add_gates: vec!["tests".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(!UpdateOperations {
-            add_gates: vec!["code-review".to_string()],
+            add_gates: vec!["code-review".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(UpdateOperations {
-            remove_gates: vec!["code-review".to_string()],
+            remove_gates: vec!["code-review".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(!UpdateOperations {
-            remove_gates: vec!["tests".to_string()],
+            remove_gates: vec!["tests".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
@@ -1468,7 +1622,11 @@ mod tests {
 
     #[test]
     fn test_is_provable_noop_assignee_holds_at_target_identity_or_absence() {
-        let mut issue = create_test_issue("1", State::Ready, vec![]);
+        let mut issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec![],
+        );
 
         // Already unassigned: `unassign` is a no-op.
         assert!(UpdateOperations {
@@ -1484,12 +1642,12 @@ mod tests {
         }
         .is_provable_noop(&issue));
         assert!(UpdateOperations {
-            assignee: Some("agent:worker-1".to_string()),
+            assignee: Some("agent:worker-1".parse().unwrap()),
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(!UpdateOperations {
-            assignee: Some("agent:worker-2".to_string()),
+            assignee: Some("agent:worker-2".parse().unwrap()),
             ..Default::default()
         }
         .is_provable_noop(&issue));
@@ -1497,7 +1655,11 @@ mod tests {
 
     #[test]
     fn test_is_provable_noop_mixed_operations_requires_every_target_to_already_hold() {
-        let issue = create_test_issue("1", State::Ready, vec!["type:task"]);
+        let issue = create_test_issue(
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            State::Ready,
+            vec!["type:task"],
+        );
 
         // Priority already holds, but the label add does not: NOT a no-op, since
         // every operation's target must already hold, not just some.
@@ -1518,6 +1680,61 @@ mod tests {
         .is_provable_noop(&issue));
     }
 
+    /// Bulk-update a `Ready` blocker to `Done`, optionally with a `Backlog`
+    /// dependent; returns the session opens the update took and the
+    /// dependent's state.
+    fn bulk_complete_blocker(with_dependent: bool) -> (usize, Option<State>) {
+        use crate::commands::test_helpers::{memory_executor, seed_issue, SessionOpenCounter};
+        use crate::storage::InMemoryStorage;
+
+        let counter = SessionOpenCounter::new();
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
+        let mut blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+        blocker.state = State::Ready;
+        let blocker_id = blocker.id.clone();
+        seed_issue(&storage, blocker);
+        let dependent_id = with_dependent.then(|| {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.dependencies.push(blocker_id.clone());
+            let id = dependent.id.clone();
+            seed_issue(&storage, dependent);
+            id
+        });
+        let executor = memory_executor(storage);
+        let opened = counter.count();
+
+        let result = executor
+            .issues()
+            .apply_bulk_update(
+                &crate::query_engine::QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    state: Some(State::Done),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(result.modified, [blocker_id]);
+        (
+            counter.count() - opened,
+            dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
+        )
+    }
+
+    #[test]
+    fn test_apply_bulk_update_completing_a_blocker_promotes_its_dependent_in_the_same_publication()
+    {
+        let (baseline, _) = bulk_complete_blocker(false);
+        let (sessions, dependent) = bulk_complete_blocker(true);
+
+        assert_eq!(dependent, Some(State::Ready));
+        assert_eq!(
+            sessions, baseline,
+            "the dependent's promotion must add no session to the blocker's update"
+        );
+    }
+
     // -- Session budget (REQ-01, REQ-04) ---------------------------------
 
     /// REQ-01, REQ-04 (amended, D-1): sessions open only for matched issues
@@ -1525,11 +1742,8 @@ mod tests {
     /// session whenever at least one skip candidate exists. `C` (the
     /// per-mutation session constant) is derived from a single-issue baseline
     /// run rather than hardcoded, session opens are counted via the
-    /// once-per-session-open failure-point probe shared with the
-    /// automatic-transitions budget test
-    /// (`crate::commands::issue::tests::test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues`),
-    /// and the assertion is the semantic relationship `C * J + 1`, not a
-    /// copied constant.
+    /// once-per-session-open failure-point probe, and the assertion is the
+    /// semantic relationship `C * J + 1`, not a copied constant.
     #[test]
     fn test_apply_bulk_update_session_budget_scales_with_issues_needing_change() {
         use crate::commands::test_helpers::SessionOpenCounter;
@@ -1550,11 +1764,15 @@ mod tests {
             InMemoryStorage::new().with_mutation_interruption_view(baseline_counter.clone());
         crate::commands::test_helpers::seed_issue(
             &baseline_storage,
-            create_test_issue("baseline", State::Ready, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xbf6f_5def_83ab_82e5_6d81_bb2c_dccd_09a6),
+                State::Ready,
+                vec![],
+            ),
         );
-        let mut baseline_executor =
-            crate::commands::test_helpers::memory_executor(baseline_storage);
+        let baseline_executor = crate::commands::test_helpers::memory_executor(baseline_storage);
         let baseline_result = baseline_executor
+            .issues()
             .apply_bulk_update(&filter, &ops, false)
             .unwrap();
         assert_eq!(baseline_result.summary.total_modified, 1);
@@ -1572,14 +1790,21 @@ mod tests {
         let counter = SessionOpenCounter::new();
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..k {
-            let mut issue = create_test_issue(&format!("issue-{index}"), State::Ready, vec![]);
+            let mut issue = create_test_issue(
+                &crate::test_utils::fixture_issue(format!("Issue {index}"), String::new()).id,
+                State::Ready,
+                vec![],
+            );
             if index >= j {
                 issue.priority = Priority::High;
             }
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, k);
         assert_eq!(result.summary.total_modified, j);
@@ -1611,11 +1836,15 @@ mod tests {
             InMemoryStorage::new().with_mutation_interruption_view(baseline_counter.clone());
         crate::commands::test_helpers::seed_issue(
             &baseline_storage,
-            create_test_issue("baseline", State::Ready, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xbf6f_5def_83ab_82e5_6d81_bb2c_dccd_09a6),
+                State::Ready,
+                vec![],
+            ),
         );
-        let mut baseline_executor =
-            crate::commands::test_helpers::memory_executor(baseline_storage);
+        let baseline_executor = crate::commands::test_helpers::memory_executor(baseline_storage);
         baseline_executor
+            .issues()
             .apply_bulk_update(&filter, &ops, false)
             .unwrap();
         let sessions_per_change = baseline_counter.count();
@@ -1629,11 +1858,18 @@ mod tests {
         for index in 0..k {
             crate::commands::test_helpers::seed_issue(
                 &storage,
-                create_test_issue(&format!("issue-{index}"), State::Ready, vec![]),
+                create_test_issue(
+                    &crate::test_utils::fixture_issue(format!("Issue {index}"), String::new()).id,
+                    State::Ready,
+                    vec![],
+                ),
             );
         }
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, k);
         assert_eq!(result.summary.total_modified, k);
@@ -1658,18 +1894,25 @@ mod tests {
         let counter = SessionOpenCounter::new();
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..3 {
-            let mut issue = create_test_issue(&format!("noop-{index}"), State::Ready, vec![]);
+            let mut issue = create_test_issue(
+                &crate::test_utils::fixture_issue(format!("Issue {index}"), String::new()).id,
+                State::Ready,
+                vec![],
+            );
             issue.priority = Priority::High;
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 3);
         assert_eq!(result.summary.total_modified, 0);
@@ -1695,18 +1938,25 @@ mod tests {
         let counter = SessionOpenCounter::new();
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
 
-        let mut issue = create_test_issue("blocked", State::Gated, vec![]);
-        issue.gates_required = vec!["tests".to_string()];
+        let mut issue = create_test_issue(
+            &crate::test_utils::issue_id(0xa715_50ab_b754_0cce_3ea8_599e_3e96_88bd),
+            State::Gated,
+            vec![],
+        );
+        issue.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:gated").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -1742,10 +1992,14 @@ mod tests {
         // already violates the always-enforced default label-format rule.
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("0001", State::Ready, vec!["bad_label_no_colon"]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
+                State::Ready,
+                vec!["bad_label_no_colon"],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         // Field-level no-op: the requested priority already holds, so this
         // issue IS nominated as a skip candidate.
@@ -1754,7 +2008,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(
@@ -1795,8 +2052,12 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
-            let mut issue = create_test_issue("aaaa1111", State::Done, vec!["type:task"]);
-            issue.gates_required = vec!["tests".to_string()];
+            let mut issue = create_test_issue(
+                &crate::test_utils::issue_id(0xaaaa_1111),
+                State::Done,
+                vec!["type:task"],
+            );
+            issue.gates_required = vec!["tests".parse().unwrap()];
             crate::commands::test_helpers::seed_issue(storage, issue);
         };
         let ops = UpdateOperations {
@@ -1809,14 +2070,22 @@ mod tests {
         // 412925b9).
         let direct_storage = InMemoryStorage::new();
         seed(&direct_storage);
-        let mut direct = crate::commands::test_helpers::memory_executor(direct_storage);
-        let issue = direct.get_issue("aaaa1111").unwrap();
+        let direct = crate::commands::test_helpers::memory_executor(direct_storage);
+        let issue = direct
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            .unwrap();
         let direct_error = direct
+            .issues()
             .apply_operations_to_issue(&issue, &ops, false)
             .unwrap_err()
             .downcast::<TransitionBlockedError>()
             .expect("direct per-issue path reports a typed transition blocker");
-        let direct_final_state = direct.get_issue("aaaa1111").unwrap().state;
+        let direct_final_state = direct
+            .issues()
+            .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            .unwrap()
+            .state;
         assert_eq!(
             direct_final_state,
             State::Gated,
@@ -1827,9 +2096,12 @@ mod tests {
         // so the shared verification session must demote it.
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let filter = QueryFilter::parse("state:done").unwrap();
-        let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = bulk
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(
@@ -1840,7 +2112,10 @@ mod tests {
         assert_eq!(result.summary.total_errors, 1);
         assert_eq!(result.errors[0].1, direct_error.to_string());
         assert_eq!(
-            bulk.get_issue("aaaa1111").unwrap().state,
+            bulk.issues()
+                .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+                .unwrap()
+                .state,
             direct_final_state,
             "the divert-to-Gated write must happen identically through the bulk path"
         );
@@ -1873,22 +2148,30 @@ mod tests {
         });
         let storage = InMemoryStorage::new().with_mutation_interruption_view(injector.clone());
 
-        let mut noop_issue = create_test_issue("noop", State::Ready, vec![]);
+        let mut noop_issue = create_test_issue(
+            &crate::test_utils::issue_id(0xda63_513d_8380_c647_8f7f_4e3c_47a3_b00c),
+            State::Ready,
+            vec![],
+        );
         noop_issue.priority = Priority::High;
         crate::commands::test_helpers::seed_issue(&storage, noop_issue);
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("changer", State::Ready, vec![]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xfd4e_5e37_a828_861d_13bc_00c5_f491_534f),
+                State::Ready,
+                vec![],
+            ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).expect(
+        let result = executor.issues().apply_bulk_update(&filter, &ops, false).expect(
             "a verification-session failure must degrade to per-issue best-effort, not abort the command",
         );
 
@@ -1906,9 +2189,24 @@ mod tests {
             injector.opens.load(Ordering::SeqCst) > 1,
             "per-issue sessions must still have opened after the failed shared verification session"
         );
-        assert_eq!(executor.get_issue("noop").unwrap().priority, Priority::High);
         assert_eq!(
-            executor.get_issue("changer").unwrap().priority,
+            executor
+                .issues()
+                .show_issue(&crate::test_utils::issue_id(
+                    0xda63513d8380c6478f7f4e3c47a3b00c
+                ))
+                .unwrap()
+                .priority,
+            Priority::High
+        );
+        assert_eq!(
+            executor
+                .issues()
+                .show_issue(&crate::test_utils::issue_id(
+                    0xfd4e5e37a828861d13bc00c5f491534f
+                ))
+                .unwrap()
+                .priority,
             Priority::High
         );
     }
@@ -1937,7 +2235,11 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        let mut noop_issue = create_test_issue("noop", State::Ready, vec![]);
+        let mut noop_issue = create_test_issue(
+            &crate::test_utils::issue_id(0xda63_513d_8380_c647_8f7f_4e3c_47a3_b00c),
+            State::Ready,
+            vec![],
+        );
         noop_issue.priority = Priority::High; // matches the requested target
         crate::commands::test_helpers::seed_issue(&storage, noop_issue.clone());
 
@@ -1946,20 +2248,28 @@ mod tests {
         // requested target before that retry's own capture reads it.
         let mut changed = noop_issue;
         changed.priority = Priority::Low;
-        let storage = with_open_race(storage, 2, SessionRaceAction::Save(Box::new(changed)));
+        let storage = with_open_race(
+            storage,
+            crate::storage::MutationPoint::SessionOpen,
+            2,
+            SessionRaceAction::Save(Box::new(changed)),
+        );
         // Force exactly one retry on the shared verification session's own
         // (empty-delta) apply, as if its natural optimistic check had itself
         // found the concurrent mutation.
         storage.inject_repository_state_apply_conflicts(1);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(
@@ -1968,28 +2278,34 @@ mod tests {
         );
         assert_eq!(result.summary.total_modified, 1);
         assert_eq!(result.summary.total_errors, 0);
-        assert_eq!(executor.get_issue("noop").unwrap().priority, Priority::High);
+        assert_eq!(
+            executor
+                .issues()
+                .show_issue(&crate::test_utils::issue_id(
+                    0xda63513d8380c6478f7f4e3c47a3b00c
+                ))
+                .unwrap()
+                .priority,
+            Priority::High
+        );
     }
 
-    /// Seeds blocker `bbbb2222` (Ready) and backlog dependent `aaaa1111`
-    /// depending on it; returns an executor plus a reader over the same storage.
-    fn blocked_dependent_fixture() -> (
-        CommandExecutor<crate::storage::InMemoryStorage>,
-        crate::storage::InMemoryStorage,
-    ) {
-        let storage = crate::storage::InMemoryStorage::new();
-        let mut dependent = create_test_issue("aaaa1111", State::Backlog, vec!["type:task"]);
-        dependent.dependencies = vec!["bbbb2222".to_string()];
-        crate::commands::test_helpers::seed_issue(&storage, dependent);
-        crate::commands::test_helpers::seed_issue(
-            &storage,
-            create_test_issue("bbbb2222", State::Ready, vec!["type:task"]),
+    fn seed_blocked_dependent(storage: &crate::storage::InMemoryStorage) {
+        let mut dependent = create_test_issue(
+            &crate::test_utils::issue_id(0xaaaa_1111),
+            State::Backlog,
+            vec!["type:task"],
         );
-        let reader = storage.clone();
-        (
-            crate::commands::test_helpers::memory_executor(storage),
-            reader,
-        )
+        dependent.dependencies = vec![crate::test_utils::issue_id(0xbbbb_2222)];
+        crate::commands::test_helpers::seed_issue(storage, dependent);
+        crate::commands::test_helpers::seed_issue(
+            storage,
+            create_test_issue(
+                &crate::test_utils::issue_id(0xbbbb_2222),
+                State::Ready,
+                vec!["type:task"],
+            ),
+        );
     }
 
     /// REQ-01, REQ-02, REQ-04: a bulk move to either terminal state promotes the
@@ -1999,20 +2315,32 @@ mod tests {
         use crate::storage::IssueStore;
 
         for target in [State::Done, State::Rejected] {
-            let (mut bulk, bulk_reader) = blocked_dependent_fixture();
+            let bulk_storage = crate::storage::InMemoryStorage::new();
+            seed_blocked_dependent(&bulk_storage);
+            let bulk_reader = bulk_storage.clone();
+            let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
             let filter = QueryFilter::parse("state:ready").unwrap();
             let ops = UpdateOperations {
                 state: Some(target),
                 ..Default::default()
             };
-            let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
-            assert_eq!(result.modified, vec!["bbbb2222".to_string()]);
+            let result = bulk
+                .issues()
+                .apply_bulk_update(&filter, &ops, false)
+                .unwrap();
+            assert_eq!(
+                result.modified,
+                vec![crate::test_utils::issue_id(0xbbbb_2222)]
+            );
 
-            let (single, single_reader) = blocked_dependent_fixture();
+            let single_storage = crate::storage::InMemoryStorage::new();
+            seed_blocked_dependent(&single_storage);
+            let single_reader = single_storage.clone();
+            let single = crate::commands::test_helpers::memory_executor(single_storage);
             single
                 .issues()
                 .update_issue(
-                    "bbbb2222",
+                    &crate::test_utils::issue_id(0xbbbb_2222),
                     None,
                     None,
                     None,
@@ -2025,11 +2353,17 @@ mod tests {
                 )
                 .unwrap();
 
-            let bulk_state = bulk_reader.load_issue("aaaa1111").unwrap().state;
+            let bulk_state = bulk_reader
+                .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+                .unwrap()
+                .state;
             assert_eq!(bulk_state, State::Ready, "dependent after bulk {target:?}");
             assert_eq!(
                 bulk_state,
-                single_reader.load_issue("aaaa1111").unwrap().state,
+                single_reader
+                    .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+                    .unwrap()
+                    .state,
                 "bulk and per-issue {target:?} diverge"
             );
         }
@@ -2041,15 +2375,27 @@ mod tests {
     fn test_apply_bulk_update_non_terminal_state_leaves_dependent_unchanged() {
         use crate::storage::IssueStore;
 
-        let (mut executor, reader) = blocked_dependent_fixture();
+        let storage = crate::storage::InMemoryStorage::new();
+        seed_blocked_dependent(&storage);
+        let reader = storage.clone();
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             state: Some(State::InProgress),
             ..Default::default()
         };
-        executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
-        assert_eq!(reader.load_issue("aaaa1111").unwrap().state, State::Backlog);
+        assert_eq!(
+            reader
+                .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+                .unwrap()
+                .state,
+            State::Backlog
+        );
     }
 
     /// REQ-03: a terminal target that changes only issues already in that state
@@ -2060,24 +2406,44 @@ mod tests {
         use crate::storage::IssueStore;
 
         let storage = crate::storage::InMemoryStorage::new();
-        let mut dependent = create_test_issue("aaaa1111", State::Backlog, vec!["type:task"]);
-        dependent.dependencies = vec!["bbbb2222".to_string()];
+        let mut dependent = create_test_issue(
+            &crate::test_utils::issue_id(0xaaaa_1111),
+            State::Backlog,
+            vec!["type:task"],
+        );
+        dependent.dependencies = vec![crate::test_utils::issue_id(0xbbbb_2222)];
         crate::commands::test_helpers::seed_issue(&storage, dependent);
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("bbbb2222", State::Done, vec!["type:task"]),
+            create_test_issue(
+                &crate::test_utils::issue_id(0xbbbb_2222),
+                State::Done,
+                vec!["type:task"],
+            ),
         );
         let reader = storage.clone();
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:done").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             add_labels: vec!["milestone:v1.0".to_string()],
             ..Default::default()
         };
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
-        assert_eq!(result.modified, vec!["bbbb2222".to_string()]);
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
+        assert_eq!(
+            result.modified,
+            vec![crate::test_utils::issue_id(0xbbbb_2222)]
+        );
 
-        assert_eq!(reader.load_issue("aaaa1111").unwrap().state, State::Backlog);
+        assert_eq!(
+            reader
+                .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+                .unwrap()
+                .state,
+            State::Backlog
+        );
     }
 }

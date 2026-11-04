@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8b4ca79561d3feb99d91611f4beef5a371ee71d1",
+  "completed_at": "2026-11-03T03:54:46.959083636Z",
+  "duration_ms": 125863,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The config facade satisfies the issue criteria and recorded Rust CI is passing.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dbd05242-6bcb-4cc8-89e5-6f5fc23de997",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "774c2fc8-a7ff-484a-b2e0-71a7fb976641",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T03:52:41.095566788Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f092ebd0f (`jit:dbd05242`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (.jit issue Markdown); @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T03:51:06Z); code-review pending (unrun)\nTruncation recovery: narrowed reads of the config patch, current implementation, design rationale, method inventory, and gate definition\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The config facade satisfies the issue criteria and recorded Rust CI is passing.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

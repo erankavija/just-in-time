@@ -1,8 +1,11 @@
 //! Command-line interface definitions using clap.
 
-use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 
 use crate::build_info;
+use crate::domain::event_catalog::EventTag;
+use crate::domain::State;
+use clap::Arg;
 
 /// Just-In-Time Issue Tracker
 ///
@@ -40,28 +43,238 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+impl Cli {
+    /// Parse `args`, or print clap's diagnostic, after the canonical-command
+    /// hint when the rejected subcommand is a known wrong guess, and return
+    /// clap's exit status.
+    pub fn parse_or_status(args: &[String]) -> Result<Self, crate::output::RunStatus> {
+        Self::try_parse_from(args).map_err(|error| {
+            if let Some(hint) = unknown_subcommand_hint(&error, args) {
+                eprintln!("Hint: use '{hint}' instead.");
+            }
+            // Clap's own exit path ignores a failed diagnostic write too.
+            let _ = error.print();
+            crate::output::RunStatus::Passthrough(error.exit_code())
+        })
+    }
+}
+
+/// Wrong-command guess -> canonical-command hint, keyed by (group, guessed verb).
+/// Consulted only when clap rejects a subcommand, so a wrong verb prints its
+/// hint and clap's diagnostic on stderr and exits 2, outside the failure
+/// envelope. See docs/reference/cli-commands.md's "Command and flag aliases"
+/// section: these are hints, not aliases.
+const COMMAND_HINTS: &[(&str, &str, &str)] = &[
+    ("dep", "remove", "jit dep rm"),
+    ("dep", "delete", "jit dep rm"),
+    ("issue", "rm", "jit issue delete"),
+    ("issue", "remove", "jit issue delete"),
+    ("issue", "complete", "jit issue update <id> --state done"),
+    ("issue", "edit", "jit issue update <id>"),
+    ("gate", "rm", "jit gate remove"),
+    ("gate", "delete", "jit gate remove"),
+    ("doc", "rm", "jit doc remove"),
+    ("doc", "delete", "jit doc remove"),
+    (
+        "label",
+        "add",
+        "jit issue update <id> --label <namespace:value>",
+    ),
+    (
+        "label",
+        "rm",
+        "jit issue update <id> --remove-label <namespace:value>",
+    ),
+    (
+        "label",
+        "remove",
+        "jit issue update <id> --remove-label <namespace:value>",
+    ),
+    ("invariant", "list", "jit item list --kind invariant"),
+];
+
+/// The canonical command for a parser-level unknown subcommand, if the
+/// rejected command is one of the known first-guess residuals.
+fn unknown_subcommand_hint(error: &clap::Error, args: &[String]) -> Option<&'static str> {
+    if error.kind() != clap::error::ErrorKind::InvalidSubcommand {
+        return None;
+    }
+    let mut positional = args
+        .iter()
+        .skip(1)
+        .filter(|argument| !matches!(argument.as_str(), "-q" | "--quiet" | "--schema"));
+    let (group, verb) = (positional.next()?, positional.next()?);
+    COMMAND_HINTS
+        .iter()
+        .find_map(|(known_group, known_verb, hint)| {
+            (known_group == group && known_verb == verb).then_some(*hint)
+        })
+}
+
+/// Field filters shared by issue listings, searches, and query subsets.
+#[derive(Args, Default)]
+pub struct IssueFilterArgs {
+    /// Filter by state
+    #[arg(short = 's', long)]
+    pub state: Option<String>,
+
+    /// Filter by assignee (format: type:identifier)
+    #[arg(short = 'a', long)]
+    pub assignee: Option<String>,
+
+    /// Filter by priority
+    #[arg(short = 'p', long)]
+    pub priority: Option<String>,
+
+    /// Filter by exact namespace:value or namespace:* pattern; repeatable and AND-combined
+    #[arg(short = 'l', long = "label")]
+    pub labels: Vec<String>,
+}
+
+impl IssueFilterArgs {
+    /// Parse at dispatch time so invalid values retain JSON failure envelopes.
+    pub fn parse(&self) -> anyhow::Result<crate::domain::queries::AllFilter<'_>> {
+        let state = self.state.as_deref().map(str::parse).transpose()?;
+        let priority = self.priority.as_deref().map(str::parse).transpose()?;
+        let assignee = self.assignee.as_deref().map(str::parse).transpose()?;
+        self.labels
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
+        Ok(crate::domain::queries::AllFilter {
+            state,
+            priority,
+            assignee,
+            labels: &self.labels,
+        })
+    }
+}
+
+/// Arguments of `jit init`.
+#[derive(Args)]
+pub struct InitArgs {
+    /// Select a worktree package directory by its path.
+    /// Repeatable; occurrence order is preserved.
+    #[arg(
+        long,
+        value_name = "SELECTOR",
+        action = ArgAction::Append
+    )]
+    pub profile: Vec<String>,
+
+    /// Optional TOML file containing the `[variables]` value map.
+    #[arg(long, value_name = "PATH")]
+    pub values_file: Option<std::path::PathBuf>,
+
+    /// Set one declared profile variable; repeatable and last-wins.
+    #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+    pub set: Vec<String>,
+}
+
+/// Arguments of `jit apply`.
+#[derive(Args)]
+pub struct ApplyArgs {
+    /// Template name to apply (must be declared in `.jit/templates.toml`)
+    pub template: String,
+
+    /// Container issue ID to apply the template to
+    pub container: String,
+
+    /// Bind a template anchor: `role=id` (repeatable). The repository's
+    /// container anchor is auto-bound to `<container>`; binding it explicitly
+    /// overrides that.
+    #[arg(long, value_name = "ROLE=ID")]
+    pub anchor: Vec<String>,
+
+    /// Bypass validation warnings and refresh an already-applied template
+    #[arg(long)]
+    pub force: bool,
+}
+
+/// Arguments of the top-level `search` command.
+#[derive(clap::Args)]
+pub struct SearchArgs {
+    /// Search query string
+    pub query: String,
+
+    /// Use regex pattern matching
+    #[arg(short, long)]
+    pub regex: bool,
+
+    /// Case sensitive search
+    #[arg(short = 'C', long)]
+    pub case_sensitive: bool,
+
+    /// Show N lines of context
+    #[arg(short = 'c', long, default_value = "0")]
+    pub context: usize,
+
+    /// Maximum results to return
+    #[arg(short = 'n', long)]
+    pub limit: Option<usize>,
+
+    /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
+    #[arg(short = 'g', long)]
+    pub glob: Option<String>,
+}
+
+/// Arguments for the `validate` command.
+#[derive(Args)]
+pub struct ValidateArgs {
+    /// Issue id to validate (runs local + graph rules for this issue only).
+    /// When omitted, validates the whole repository.
+    pub id: Option<String>,
+
+    /// Explain rule outcomes for the issue: which rules matched and whether
+    /// each passed or failed (requires an issue id)
+    #[arg(long)]
+    pub explain: bool,
+
+    /// Validate a container's bracket subtree as a deterministic gate
+    /// checker: report the findings, from rules evaluated over the whole
+    /// repository, of the issues in the container's transitive dependency
+    /// closure (bounded at the template's breakdown node), excluding
+    /// whole-repo rules.
+    /// Exits 4 with findings shown when an enforcing rule fails, 0 when
+    /// clean. Mutually exclusive with a positional id and with
+    /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
+    #[arg(long, value_name = "ID")]
+    pub scope: Option<String>,
+
+    /// Evaluate one configured graph rule with the positional issue as its
+    /// sole firing subject. Repository issues remain resolution context.
+    #[arg(long, value_name = "RULE")]
+    pub rule: Option<String>,
+
+    /// Repair safe findings; derived-state repairs publish through one redo
+    /// record
+    #[arg(long)]
+    pub fix: bool,
+
+    /// Show what would be fixed without applying changes (requires --fix)
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Validate that git's `origin/main` is an ancestor of the current
+    /// branch, so the branch still sits on top of it. This is the git
+    /// concern; membership labels the DAG does not back are reported by
+    /// `jit query divergence`. Requires git.
+    #[arg(long)]
+    pub branch_drift: bool,
+
+    /// Hidden stub: fails with a hint naming `--branch-drift`
+    #[arg(long, hide = true)]
+    pub divergence: bool,
+
+    /// Validate active leases are consistent and not stale
+    #[arg(long)]
+    pub leases: bool,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
     /// staged complete and published without replacing an occupied destination
-    Init {
-        /// Select a worktree package directory by its path.
-        /// Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-    },
+    Init(InitArgs),
 
     /// Inspect and apply repository profiles
     #[command(subcommand)]
@@ -78,23 +291,8 @@ pub enum Commands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     List {
-        /// Filter by state
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee (format: type:identifier)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -119,23 +317,7 @@ pub enum Commands {
     ///   jit apply plan epic-123                       # Apply the `plan` template
     ///   jit apply plan epic-123 --json                # Machine-readable result
     ///   jit apply plan epic-123 --anchor container=epic-123 --force
-    Apply {
-        /// Template name to apply (must be declared in `.jit/templates.toml`)
-        template: String,
-
-        /// Container issue ID to apply the template to
-        container: String,
-
-        /// Bind a template anchor: `role=id` (repeatable). The repository's
-        /// container anchor is auto-bound to `<container>`; binding it explicitly
-        /// overrides that.
-        #[arg(long, value_name = "ROLE=ID")]
-        anchor: Vec<String>,
-
-        /// Bypass validation warnings and refresh an already-applied template
-        #[arg(long)]
-        force: bool,
-    },
+    Apply(ApplyArgs),
 
     /// Dependency management commands
     #[command(subcommand, visible_alias = "dependency")]
@@ -206,34 +388,7 @@ pub enum Commands {
     /// ready` (alias of `available`) for unassigned, unblocked ready issues.
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
-    Query {
-        /// Subcommand — omit to list all issues
-        #[command(subcommand)]
-        subcommand: Option<QueryCommands>,
-
-        /// Filter by state (used when no subcommand is given)
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee — format: type:identifier (used when no subcommand is given)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority (used when no subcommand is given)
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard) — used when no subcommand is given.
-        /// Repeatable; patterns are ANDed, so an issue must match every
-        /// pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
-
-        /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
-        #[arg(long)]
-        full: bool,
-    },
+    Query(QueryArgs),
 
     /// Label namespace management commands
     ///
@@ -306,30 +461,7 @@ pub enum Commands {
     /// Search issues and documents
     ///
     /// JSON output uses the list envelope `{"count": N, "results": [...]}`.
-    Search {
-        /// Search query string
-        query: String,
-
-        /// Use regex pattern matching
-        #[arg(short, long)]
-        regex: bool,
-
-        /// Case sensitive search
-        #[arg(short = 'C', long)]
-        case_sensitive: bool,
-
-        /// Show N lines of context
-        #[arg(short = 'c', long, default_value = "0")]
-        context: usize,
-
-        /// Maximum results to return
-        #[arg(short = 'n', long)]
-        limit: Option<usize>,
-
-        /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
-        #[arg(short = 'g', long)]
-        glob: Option<String>,
-    },
+    Search(SearchArgs),
 
     /// Show CLI version and build metadata
     Version,
@@ -338,55 +470,7 @@ pub enum Commands {
     Status,
 
     /// Validate repository integrity and diagnose declared derived-state drift
-    Validate {
-        /// Issue id to validate (runs local + graph rules for this issue only).
-        /// When omitted, validates the whole repository.
-        id: Option<String>,
-
-        /// Explain rule outcomes for the issue: which rules matched and whether
-        /// each passed or failed (requires an issue id)
-        #[arg(long)]
-        explain: bool,
-
-        /// Validate a container's bracket subtree as a deterministic gate
-        /// checker: evaluate the rules whose selector matches each issue in the
-        /// container's transitive dependency closure (including the
-        /// `type:breakdown` node, bounded there), excluding whole-repo rules.
-        /// Exits 4 with findings shown when an enforcing rule fails, 0 when
-        /// clean. Mutually exclusive with a positional id and with
-        /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
-        #[arg(long, value_name = "ID")]
-        scope: Option<String>,
-
-        /// Evaluate one configured graph rule with the positional issue as its
-        /// sole firing subject. Repository issues remain resolution context.
-        #[arg(long, value_name = "RULE")]
-        rule: Option<String>,
-
-        /// Repair safe findings; derived-state repairs publish through one redo
-        /// record
-        #[arg(long)]
-        fix: bool,
-
-        /// Show what would be fixed without applying changes (requires --fix)
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Validate that git's `origin/main` is an ancestor of the current
-        /// branch, so the branch still sits on top of it. This is the git
-        /// concern; membership labels the DAG does not back are reported by
-        /// `jit query divergence`. Requires git.
-        #[arg(long)]
-        branch_drift: bool,
-
-        /// Hidden stub: fails with a hint naming `--branch-drift`
-        #[arg(long, hide = true)]
-        divergence: bool,
-
-        /// Validate active leases are consistent and not stale
-        #[arg(long)]
-        leases: bool,
-    },
+    Validate(ValidateArgs),
 
     /// Run recovery: apply a leftover redo record, then the repair routines
     ///
@@ -394,8 +478,9 @@ pub enum Commands {
     /// session opens, then in sequence:
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - In a Git repository: cleans up stale claim locks from crashed processes
-    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
-    ///   and evicts expired leases; without Git, skips these with a warning
+    ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
+    ///   heartbeat is stale, and removes interrupted lease operations' stage
+    ///   files; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never
@@ -418,32 +503,36 @@ pub enum Commands {
     ///   jit serve --stop           # Stop the running server
     ///   jit serve --fg             # Run in foreground (for debugging)
     ///   jit serve --json           # Machine-readable output
-    Serve {
-        /// Preferred port to listen on (auto-selects from 3000–3099 if
-        /// taken; pass 0 for any OS-assigned free port)
-        #[arg(long, default_value = "3000")]
-        port: u16,
+    Serve(ServeArgs),
+}
 
-        /// Stop the running server for this repository
-        #[arg(long, conflicts_with_all = ["status", "fg"])]
-        stop: bool,
+/// Arguments of `jit serve`.
+#[derive(Args)]
+pub struct ServeArgs {
+    /// Preferred port to listen on (auto-selects from 3000–3099 if
+    /// taken; pass 0 for any OS-assigned free port)
+    #[arg(long, default_value = "3000")]
+    pub port: u16,
 
-        /// Show server status and exit
-        #[arg(long, conflicts_with_all = ["stop", "fg"])]
-        status: bool,
+    /// Stop the running server for this repository
+    #[arg(long, conflicts_with_all = ["status", "fg"])]
+    pub stop: bool,
 
-        /// Run in foreground instead of daemonizing (useful for debugging)
-        #[arg(long)]
-        fg: bool,
+    /// Show server status and exit
+    #[arg(long, conflicts_with_all = ["stop", "fg"])]
+    pub status: bool,
 
-        /// Write server output to this file [default: .jit/server.log]
-        #[arg(long)]
-        log: Option<String>,
+    /// Run in foreground instead of daemonizing (useful for debugging)
+    #[arg(long)]
+    pub fg: bool,
 
-        /// Directory containing built web UI static files (auto-detected if omitted)
-        #[arg(long)]
-        web_dir: Option<String>,
-    },
+    /// Write server output to this file [default: .jit/server.log]
+    #[arg(long)]
+    pub log: Option<String>,
+
+    /// Directory containing built web UI static files (auto-detected if omitted)
+    #[arg(long)]
+    pub web_dir: Option<String>,
 }
 
 /// Addressable structured item subcommands.
@@ -633,13 +722,13 @@ pub enum IssueCommands {
 
         /// Gate keys from registry to require (e.g., 'tests', 'code-review').
         /// Gates are quality checkpoints that must pass before issue completion.
-        /// Use comma-separated (--gate tests,clippy) or multiple flags (--gate tests --gate clippy).
+        /// Repeat the flag for several gates (--gate tests --gate clippy).
         /// Gates must be defined in registry first with 'jit gate define'.
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short, long)]
         gate: Vec<String>,
 
         /// Labels (format: namespace:value, repeatable)
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short, long)]
         label: Vec<String>,
 
         /// Content format of the description body, selecting the parser used to
@@ -653,10 +742,6 @@ pub enum IssueCommands {
         /// Bypass validation warnings
         #[arg(long)]
         force: bool,
-
-        /// Explicitly allow orphaned leaf issues (tasks without parent labels)
-        #[arg(long)]
-        orphan: bool,
     },
 
     /// Batch-create issues with dependency wiring from a JSON file.
@@ -715,23 +800,12 @@ pub enum IssueCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Search {
+        #[command(flatten)]
+        filters: IssueFilterArgs,
+
         /// Search query (searches title, description, and ID). Optional when any
         /// filter flag is provided.
         query: Option<String>,
-
-        #[arg(short, long)]
-        state: Option<String>,
-
-        #[arg(short, long)]
-        assignee: Option<String>,
-
-        #[arg(short, long)]
-        priority: Option<String>,
-
-        /// Filter by label: exact `namespace:value` or `namespace:*` wildcard.
-        /// Repeatable; labels are ANDed, so an issue must match every one.
-        #[arg(short = 'l', long = "label")]
-        labels: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -755,7 +829,7 @@ pub enum IssueCommands {
     /// Field projection (single id only):
     ///   --field <name>   print one top-level field as plain text (arrays/objects
     ///                    fall back to compact JSON for that field)
-    ///   --fields a,b,c   print those fields as one compact JSON object
+    ///   --fields <name>  (repeatable) print those fields as one compact JSON object
     ///
     /// Pass two or more ids with `--json` to get the list envelope
     /// `{"count": N, "issues": [...]}` with issue objects in argument order.
@@ -763,7 +837,7 @@ pub enum IssueCommands {
     ///
     /// Examples:
     ///   jit issue show abc123 --field state          # -> ready
-    ///   jit issue show abc123 --fields state,title    # -> {"state":"ready",...}
+    ///   jit issue show abc123 --fields state --fields title    # -> {"state":"ready",...}
     ///   jit issue show abc123 def456 --json           # -> {"count":2,"issues":[...]}
     Show {
         /// Issue id(s). Two or more ids with `--json` produce the
@@ -783,9 +857,9 @@ pub enum IssueCommands {
         #[arg(long, value_name = "NAME", conflicts_with = "fields")]
         field: Option<String>,
 
-        /// Print the named comma-separated top-level fields as one compact JSON
+        /// Print the named top-level fields (repeatable) as one compact JSON
         /// object (`{"a":...,"b":...}`). Requires a single id.
-        #[arg(long, value_name = "A,B,C", value_delimiter = ',')]
+        #[arg(long, value_name = "NAME")]
         fields: Vec<String>,
     },
 
@@ -844,10 +918,10 @@ pub enum IssueCommands {
     ///
     /// Membership follows the dependency DAG (direct dependencies are the
     /// children; labels are advisory and not consulted). `by state` lists every
-    /// lifecycle state, zero-count states included. `done` and `rejected` are
+    /// lifecycle state, zero-count states included. The two terminal states are
     /// counted distinctly — a rejected child is terminal but not delivered — and,
-    /// because `archived` is terminality-preserving, a child archived from
-    /// `done`/`rejected` counts toward that origin; `open` is every child that is
+    /// because archiving is terminality-preserving, an archived child counts
+    /// toward its terminal origin; `open` is every child that is
     /// not effectively terminal; the `done/total` ratio and percent measure
     /// delivery. For a deep rollup use `jit graph deps <id> --depth`; to
     /// aggregate a label bucket use `jit query count --by state --label ns:v`.
@@ -942,7 +1016,8 @@ pub enum IssueCommands {
         #[arg(short, long)]
         priority: Option<String>,
 
-        #[arg(short, long)]
+        /// Target state (`rejected` is set by `jit issue reject`)
+        #[arg(short, long, value_parser = UpdateStateParser)]
         state: Option<String>,
 
         /// Issue type (e.g. `task`, `story`, `epic`). Must be declared in
@@ -952,19 +1027,19 @@ pub enum IssueCommands {
         issue_type: Option<String>,
 
         /// Add label(s) (format: namespace:value, repeatable)
-        #[arg(short, long, value_delimiter = ',', visible_alias = "add-label")]
+        #[arg(short, long, visible_alias = "add-label")]
         label: Vec<String>,
 
         /// Remove label(s) (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         remove_label: Vec<String>,
 
         /// Add gate(s) to issue (gate keys from registry, repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         add_gate: Vec<String>,
 
         /// Remove gate(s) from issue (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         remove_gate: Vec<String>,
 
         /// Set assignee (format: type:identifier)
@@ -1032,12 +1107,12 @@ pub enum IssueCommands {
         id: String,
     },
 
-    /// Reject an issue (convenience for --state rejected)
+    /// Reject an issue; the only command form that sets state `rejected`
     Reject {
         /// Issue ID
         id: String,
 
-        /// Reason for rejection (adds resolution:REASON label)
+        /// Reason for rejection (adds resolution:REASON label; the reason must be a valid label value)
         #[arg(long)]
         reason: Option<String>,
     },
@@ -1071,23 +1146,8 @@ pub enum IssueCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     List {
-        /// Filter by state
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee (format: type:identifier)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1385,6 +1445,9 @@ pub enum GateCommands {
     /// run's verdict over the same content, and its run record names the run
     /// that verdict came from. Every manual evaluation records a fresh
     /// attestation. Use --force to execute an automated checker unconditionally.
+    ///
+    /// A pass that clears the last unpassed gate of a gated issue moves it to
+    /// done and promotes its dependents.
     #[command(visible_alias = "eval")]
     Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1428,7 +1491,8 @@ pub enum GateCommands {
     /// Automated gates inherit declared-input verdict reuse; every manual gate
     /// records a fresh attestation. Use --force to execute every automated
     /// checker. An issue with no required gates
-    /// succeeds (exit 0) with an empty result set.
+    /// succeeds (exit 0) with an empty result set. A gated issue moves to done
+    /// once every gate in the run has passed.
     EvaluateAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
@@ -1655,7 +1719,7 @@ pub enum PresetCommands {
         no_postcheck: bool,
 
         /// Exclude specific gates (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         except: Vec<String>,
     },
 
@@ -2015,7 +2079,7 @@ pub enum EventCommands {
     /// JSON output uses the list envelope `{"count": N, "events": [...]}`.
     Query {
         #[arg(short, long)]
-        event_type: Option<String>,
+        event_type: Option<EventTag>,
 
         #[arg(short, long)]
         issue_id: Option<String>,
@@ -2025,29 +2089,29 @@ pub enum EventCommands {
     },
 }
 
+/// Arguments of `jit query`: the bare form's own filters, or a subcommand.
+#[derive(Args)]
+pub struct QueryArgs {
+    #[command(flatten)]
+    pub filters: IssueFilterArgs,
+
+    /// Subcommand — omit to list all issues
+    #[command(subcommand)]
+    pub subcommand: Option<QueryCommands>,
+
+    /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
+    #[arg(long)]
+    pub full: bool,
+}
+
 #[derive(Subcommand)]
 pub enum QueryCommands {
     /// Query all issues with optional filters
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     All {
-        /// Filter by state
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee (format: type:identifier)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2059,15 +2123,8 @@ pub enum QueryCommands {
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     #[command(visible_alias = "ready")]
     Available {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2078,15 +2135,8 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Blocked {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2097,15 +2147,8 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Strategic {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2117,32 +2160,24 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Closed {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
     },
 
-    /// Aggregate issues into counts by a dimension over a label bucket (or the
-    /// whole repo), with a done/total delivery rollup.
+    /// Aggregate filtered issues into counts by a dimension, with a done/total delivery rollup.
     ///
-    /// The bucket is every issue matching all `--label` patterns (AND-combined;
-    /// none given means the whole repository); membership is by label here, the
+    /// The bucket matches every supplied field filter (AND-combined;
+    /// none given means the whole repository), the
     /// advisory grouping counterpart to the DAG-authoritative `issue progress`
     /// over a container's children. `--by state` lists every lifecycle state,
-    /// zero-count states included. `done` and `rejected` are counted distinctly
-    /// (a rejected issue is terminal but not delivered) and, because `archived` is
-    /// terminality-preserving, an issue archived from `done`/`rejected` counts
-    /// toward that origin; `open` is every issue that is not effectively terminal;
+    /// zero-count states included. The two terminal states are counted distinctly
+    /// (a rejected issue is terminal but not delivered) and, because archiving is
+    /// terminality-preserving, an archived issue counts toward its terminal
+    /// origin; `open` is every issue that is not effectively terminal;
     /// the `done/total` ratio and percent measure delivery.
     ///
     /// `--json` emits `{count, by_state: [{state, count}], total, done, rejected,
@@ -2152,15 +2187,12 @@ pub enum QueryCommands {
     ///   jit query count --by state
     ///   jit query count --by state --label milestone:m1 --json
     Count {
+        #[command(flatten)]
+        filters: IssueFilterArgs,
+
         /// Aggregation dimension.
         #[arg(long, value_name = "DIMENSION")]
         by: CountDimension,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given. None given aggregates the whole repo.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
     },
 
     /// Report membership labels that disagree with DAG-resolved containment
@@ -2185,6 +2217,49 @@ pub enum QueryCommands {
 pub enum CountDimension {
     /// Count by lifecycle state.
     State,
+}
+
+/// Value parser for `issue update --state`: every [`State`] except `rejected`,
+/// which only `jit issue reject` sets.
+#[derive(Clone, Copy)]
+pub struct UpdateStateParser;
+
+impl UpdateStateParser {
+    fn accepted() -> impl Iterator<Item = State> {
+        State::ALL
+            .into_iter()
+            .filter(|state| *state != State::Rejected)
+    }
+}
+
+impl clap::builder::TypedValueParser for UpdateStateParser {
+    type Value = String;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<String, clap::Error> {
+        if value == State::Rejected.as_str() {
+            return Err(cmd.clone().error(
+                clap::error::ErrorKind::InvalidValue,
+                "`issue update` cannot set state rejected; use `jit issue reject <id> [--reason <reason>]`",
+            ));
+        }
+        clap::builder::PossibleValuesParser::new(
+            Self::accepted().map(|state| clap::builder::PossibleValue::new(state.as_str())),
+        )
+        .parse_ref(cmd, arg, value)
+    }
+
+    fn possible_values(
+        &self,
+    ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+        Some(Box::new(Self::accepted().map(|state| {
+            clap::builder::PossibleValue::new(state.as_str())
+        })))
+    }
 }
 
 #[derive(Subcommand)]
@@ -2281,41 +2356,44 @@ pub enum SnapshotCommands {
     ///
     ///   # Export only working tree files (no git)
     ///   jit snapshot export --working-tree
-    Export {
-        /// Output path (default: snapshot-YYYYMMDD-HHMMSS)
-        #[arg(long)]
-        out: Option<String>,
+    Export(SnapshotExportArgs),
+}
 
-        /// Output format: dir or tar
-        #[arg(long, default_value = "dir")]
-        format: String,
+#[derive(Args)]
+pub struct SnapshotExportArgs {
+    /// Output path (default: snapshot-YYYYMMDD-HHMMSS)
+    #[arg(long)]
+    pub out: Option<String>,
 
-        /// Scope: all (default), issue:ID, or label:namespace:value
-        ///
-        /// Examples:
-        ///   --scope all                    All issues
-        ///   --scope issue:abc123           Single issue
-        ///   --scope label:epic:auth        Issues with label epic:auth
-        ///   --scope label:milestone:v1.0   Issues in milestone v1.0
-        #[arg(long, default_value = "all")]
-        scope: String,
+    /// Output format: dir or tar
+    #[arg(long, default_value = "dir")]
+    pub format: String,
 
-        /// Git commit/tag to export (requires git repository)
-        #[arg(long)]
-        at: Option<String>,
+    /// Scope: all (default), issue:ID, or label:namespace:value
+    ///
+    /// Examples:
+    ///   --scope all                    All issues
+    ///   --scope issue:abc123           Single issue
+    ///   --scope label:epic:auth        Issues with label epic:auth
+    ///   --scope label:milestone:v1.0   Issues in milestone v1.0
+    #[arg(long, default_value = "all")]
+    pub scope: String,
 
-        /// Export from working tree instead of git
-        #[arg(long)]
-        working_tree: bool,
+    /// Git commit/tag to export (requires git repository)
+    #[arg(long)]
+    pub at: Option<String>,
 
-        /// Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)
-        #[arg(long)]
-        committed_only: bool,
+    /// Export from working tree instead of git
+    #[arg(long)]
+    pub working_tree: bool,
 
-        /// Skip repository validation before export
-        #[arg(long)]
-        force: bool,
-    },
+    /// Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)
+    #[arg(long)]
+    pub committed_only: bool,
+
+    /// Skip repository validation before export
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Subcommand)]
@@ -2368,36 +2446,37 @@ pub enum ClaimCommands {
         issue_id: String,
     },
 
-    /// Renew a lease
+    /// Renew your lease on an issue
     ///
-    /// Extends the expiry time of an existing lease. Allows agents to continue
-    /// working on an issue beyond the original TTL.
+    /// Extends the expiry time of your lease on the issue. Allows agents to
+    /// continue working on an issue beyond the original TTL. An indefinite
+    /// lease gets a heartbeat instead.
     ///
     /// Examples:
-    ///   jit claim renew abc12345-6789-... --extension 600   # Extend by 10 minutes
-    ///   jit claim renew abc12345-6789-... --extension 3600  # Extend by 1 hour
-    ///   jit claim renew abc12345-6789-...                   # Extend by the default TTL
+    ///   jit claim renew abc123 --extension 600   # Extend by 10 minutes
+    ///   jit claim renew abc123 --extension 3600  # Extend by 1 hour
+    ///   jit claim renew abc123                   # Extend by the default TTL
     Renew {
-        /// Lease ID to renew
-        lease_id: String,
+        /// Issue ID whose lease to renew (short ids accepted)
+        issue_id: String,
 
         /// How many seconds to extend the lease by
         #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
         extension: u64,
     },
 
-    /// Send heartbeat for an indefinite lease
+    /// Send a heartbeat for your lease on an issue
     ///
     /// Updates the last_beat timestamp without changing expiration.
     /// Used to signal the agent is still actively working on the issue.
     /// Only needed for TTL=0 (indefinite) leases to prevent staleness.
     ///
     /// Examples:
-    ///   jit claim heartbeat abc12345-6789-...       # Send heartbeat
-    ///   jit claim heartbeat abc12345-6789-... --json
+    ///   jit claim heartbeat abc123       # Send heartbeat
+    ///   jit claim heartbeat abc123 --json
     Heartbeat {
-        /// Lease ID to heartbeat
-        lease_id: String,
+        /// Issue ID whose lease to heartbeat (short ids accepted)
+        issue_id: String,
     },
 
     /// Show active lease status
@@ -2434,18 +2513,20 @@ pub enum ClaimCommands {
     /// JSON output uses the list envelope `{"count": N, "leases": [...]}`.
     List,
 
-    /// Force-evict a lease (admin operation)
+    /// Force-evict the lease on an issue (admin operation)
     ///
-    /// Removes a lease immediately, regardless of who owns it. This is an
-    /// administrative operation for handling stale leases or emergency situations.
-    /// The eviction is logged with the provided reason for audit trail.
+    /// Removes the issue's lease immediately, regardless of who owns it. This is
+    /// an administrative operation for handling stale leases or emergency
+    /// situations. The issue ID is matched against stored leases, not issues,
+    /// so a lease whose issue was deleted can still be evicted. The eviction is
+    /// logged with the provided reason for audit trail.
     ///
     /// Examples:
-    ///   jit claim force-evict abc12345-6789-... --reason "Stale after crash"
-    ///   jit claim force-evict abc12345-6789-... --reason "Admin override" --json
+    ///   jit claim force-evict abc123 --reason "Stale after crash"
+    ///   jit claim force-evict abc123 --reason "Admin override" --json
     ForceEvict {
-        /// Lease ID to evict
-        lease_id: String,
+        /// Issue ID whose lease to evict (short ids accepted)
+        issue_id: String,
 
         /// Reason for eviction (required for audit trail)
         #[arg(long)]
@@ -2492,18 +2573,34 @@ pub enum WorktreeCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "divergences": [...]}`.
     StoreDivergence,
+
+    /// Run a command holding the repository write lock
+    ///
+    /// Waits for the lock up to `JIT_LOCK_TIMEOUT` seconds, refuses a leftover
+    /// redo record, runs the command, and exits with its status. `--json` shapes
+    /// only this command's own failures.
+    ///
+    /// Examples:
+    ///   jit worktree exec -- git status
+    Exec {
+        /// The command and its arguments
+        #[arg(last = true, required = true)]
+        command: Vec<String>,
+    },
 }
 
 /// Git hooks commands
 #[derive(Debug, Subcommand)]
 pub enum HooksCommands {
-    /// Install git hooks for lease and branch-drift validation
+    /// Install the git hook for branch-drift validation
     ///
-    /// Copies hook templates to .git/hooks/ and makes them executable.
+    /// Copies the hook template to .git/hooks/ and makes it executable.
     ///
-    /// Hooks installed:
-    ///   - pre-commit: Validates leases and branch drift before commit
-    ///   - pre-push: Validates leases before push
+    /// Hook installed:
+    ///   - pre-commit: Validates branch drift before commit
+    ///
+    /// No hook checks leases: they are enforced when a mutation is written, so a
+    /// hand edit of an issue record is not caught at commit.
     ///
     /// Examples:
     ///   jit hooks install          # Install hooks
@@ -2659,7 +2756,7 @@ impl Commands {
     /// the generated-command guard required by the universal recovery boundary.
     pub fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Init { .. } | Self::Apply { .. } | Self::Recover { .. } => true,
+            Self::Init(_) | Self::Apply(_) | Self::Recover { .. } => true,
             Self::Profile(command) => command.requires_recovery_dispatch(),
             Self::Issue(command) => command.requires_recovery_dispatch(),
             Self::Dep(command) => command.requires_recovery_dispatch(),
@@ -2672,17 +2769,17 @@ impl Commands {
             Self::Invariant(command) => command.requires_recovery_dispatch(),
             Self::Project(command) => command.requires_recovery_dispatch(),
             Self::Snapshot(command) => command.requires_recovery_dispatch(),
-            Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
-            Self::Serve { status, .. } => !*status,
+            Self::Validate(args) => args.fix && !args.dry_run,
+            Self::Serve(args) => !args.status,
             Self::List { .. }
             | Self::Events(_)
             | Self::Graph(_)
             | Self::Rdeps { .. }
-            | Self::Query { .. }
+            | Self::Query(_)
             | Self::Label(_)
             | Self::Worktree(_)
             | Self::Item(_)
-            | Self::Search { .. }
+            | Self::Search(_)
             | Self::Version { .. }
             | Self::Status { .. } => false,
         }
@@ -2704,10 +2801,10 @@ impl Commands {
             Self::Doc(command) => command.coordinates_claims_first(),
             Self::Archive(command) => command.coordinates_claims_first(),
             Self::Graph(command) => command.coordinates_claims_first(),
-            Self::Query {
+            Self::Query(QueryArgs {
                 subcommand: Some(command),
                 ..
-            } => command.coordinates_claims_first(),
+            }) => command.coordinates_claims_first(),
             Self::Label(command) => command.coordinates_claims_first(),
             Self::Config(command) => command.coordinates_claims_first(),
             Self::Snapshot(command) => command.coordinates_claims_first(),
@@ -2717,17 +2814,17 @@ impl Commands {
             Self::Item(command) => command.coordinates_claims_first(),
             Self::Invariant(command) => command.coordinates_claims_first(),
             Self::Project(command) => command.coordinates_claims_first(),
-            Self::Init { .. }
+            Self::Recover => true,
+            Self::Init(_)
             | Self::List { .. }
-            | Self::Apply { .. }
+            | Self::Apply(_)
             | Self::Rdeps { .. }
-            | Self::Query {
+            | Self::Query(QueryArgs {
                 subcommand: None, ..
-            }
-            | Self::Search { .. }
-            | Self::Validate { .. }
-            | Self::Recover { .. }
-            | Self::Serve { .. }
+            })
+            | Self::Search(_)
+            | Self::Validate(_)
+            | Self::Serve(_)
             | Self::Version { .. }
             | Self::Status { .. } => false,
         }
@@ -2894,7 +2991,7 @@ impl ProjectCommands {
 impl SnapshotCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Export { .. } => true,
+            Self::Export(_) => true,
         }
     }
 }
@@ -3063,7 +3160,7 @@ impl ConfigCommands {
 impl SnapshotCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::Export { .. } => false,
+            Self::Export(_) => false,
         }
     }
 }
@@ -3084,7 +3181,10 @@ impl ClaimCommands {
 impl WorktreeCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::Info { .. } | Self::List { .. } | Self::StoreDivergence { .. } => false,
+            Self::Info { .. }
+            | Self::List { .. }
+            | Self::StoreDivergence { .. }
+            | Self::Exec { .. } => false,
         }
     }
 }
@@ -3228,6 +3328,7 @@ mod recovery_dispatch_tests {
         "status",
         "validate",
         "version",
+        "worktree exec",
         "worktree info",
         "worktree list",
         "worktree store-divergence",
@@ -3245,6 +3346,7 @@ mod recovery_dispatch_tests {
         "issue delete",
         "issue reject",
         "issue update",
+        "recover",
     ];
 
     fn collect_leaf_commands(
@@ -3272,6 +3374,26 @@ mod recovery_dispatch_tests {
     }
 
     #[test]
+    fn test_events_query_parses_event_type_vocabulary_at_cli_boundary() {
+        let event_type = EventTag::LinkedCheckoutWriteOverridden.as_str();
+        let cli =
+            Cli::try_parse_from(["jit", "events", "query", "--event-type", event_type]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Events(EventCommands::Query {
+                event_type: Some(EventTag::LinkedCheckoutWriteOverridden),
+                ..
+            }))
+        ));
+
+        let error =
+            Cli::try_parse_from(["jit", "events", "query", "--event-type", "unknown_event"])
+                .err()
+                .expect("an unknown event type is rejected during argument parsing");
+        assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
+    }
+
+    #[test]
     fn test_recovery_dispatch_inventory_covers_every_generated_cli_leaf() {
         let mut actual = BTreeSet::new();
         for command in Cli::command()
@@ -3292,13 +3414,13 @@ mod recovery_dispatch_tests {
 
     #[test]
     fn test_representative_writer_and_reader_classification() {
-        assert!(Commands::Init {
+        assert!(Commands::Init(InitArgs {
             profile: Vec::new(),
             values_file: None,
             set: Vec::new(),
-        }
+        })
         .requires_recovery_dispatch());
-        assert!(Commands::Validate {
+        assert!(Commands::Validate(ValidateArgs {
             id: None,
             explain: false,
             scope: None,
@@ -3308,7 +3430,7 @@ mod recovery_dispatch_tests {
             branch_drift: false,
             divergence: false,
             leases: false,
-        }
+        })
         .requires_recovery_dispatch());
         assert!(!Commands::Status.requires_recovery_dispatch());
         assert!(!Commands::Issue(IssueCommands::BatchCreate {
@@ -3316,14 +3438,14 @@ mod recovery_dispatch_tests {
             dry_run: true,
         })
         .requires_recovery_dispatch());
-        assert!(!Commands::Serve {
+        assert!(!Commands::Serve(ServeArgs {
             port: 3000,
             stop: false,
             status: true,
             fg: false,
             log: None,
             web_dir: None,
-        }
+        })
         .requires_recovery_dispatch());
     }
 
@@ -3350,10 +3472,23 @@ mod recovery_dispatch_tests {
             ),
             ("claim acquire", &["jit", "claim", "acquire", "deadbeef"]),
             ("claim release", &["jit", "claim", "release", "deadbeef"]),
-            ("claim renew", &["jit", "claim", "renew", "lease-id"]),
+            (
+                "claim renew",
+                &[
+                    "jit",
+                    "claim",
+                    "renew",
+                    "00000000-0000-4000-8000-000000000001",
+                ],
+            ),
             (
                 "claim heartbeat",
-                &["jit", "claim", "heartbeat", "lease-id"],
+                &[
+                    "jit",
+                    "claim",
+                    "heartbeat",
+                    "00000000-0000-4000-8000-000000000001",
+                ],
             ),
             (
                 "claim force-evict",
@@ -3361,11 +3496,12 @@ mod recovery_dispatch_tests {
                     "jit",
                     "claim",
                     "force-evict",
-                    "lease-id",
+                    "00000000-0000-4000-8000-000000000001",
                     "--reason",
                     "stale",
                 ],
             ),
+            ("recover", &["jit", "recover"]),
         ];
         let classified = claim_first
             .iter()
@@ -3449,15 +3585,17 @@ mod recovery_dispatch_tests {
 
     #[test]
     fn test_snapshot_export_requires_recovery_dispatch() {
-        assert!(Commands::Snapshot(SnapshotCommands::Export {
-            out: None,
-            format: "dir".to_string(),
-            scope: "all".to_string(),
-            at: None,
-            working_tree: false,
-            committed_only: false,
-            force: false,
-        })
-        .requires_recovery_dispatch());
+        assert!(
+            Commands::Snapshot(SnapshotCommands::Export(SnapshotExportArgs {
+                out: None,
+                format: "dir".to_string(),
+                scope: "all".to_string(),
+                at: None,
+                working_tree: false,
+                committed_only: false,
+                force: false,
+            }))
+            .requires_recovery_dispatch()
+        );
     }
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:40:51.085305528Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,33 @@
   ],
   "description": "Make the command-layer list results that carry a hand-set `count` typed list envelopes declared as their commands' output schemas.\n\n## Background\n\n`crates/jit/src/schema.rs` maps commands to output schemas and falls back to `(None, \"CommandResponse\")` (`:730`) for unregistered ones. `ListEnvelope<K, T, E>` (`crates/jit/src/output.rs`, `crates/jit/src/domain/list_envelope.rs`) derives `count` from its collection and has a manual `JsonSchema`. A command whose JSON carries `count` beside a collection under the fallback is invisible to a schema-driven list check.\n\nThese serialized results carry a hand-set `count` beside a collection and have no schema registration:\n\n- `DocumentListResult` and `AssetListResult` (`crates/jit/src/commands/mod.rs:1863`, `:1878`) for `doc list` and `doc assets list`.\n- `ItemListResult` (`commands/item.rs:20`) for `item list` and `item search`.\n- `InvariantCheckResult` (`commands/invariant.rs:24`) for `invariant check`.\n- `ProjectRenderResult` (`commands/project.rs:47`) for `project render`.\n- `ArchiveCandidates` (`domain/artifact_plan.rs:30`) for `archive candidates`, and `ArtifactPlan` (`:962`, with `count` equal to the artifact list's length) for `archive document` and `archive container`.\n\nThese counts are not list envelopes and stay as they are: `ProjectionRenderReport.count` (`commands/project.rs:27`) counts rendered items; `StateCount` (`output.rs:1909`) is a tally; `IssuesInfo` and `DocumentsInfo` (`snapshot.rs:53`, `:64`) are snapshot manifest data written to the export, not command stdout.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed result is a `ListEnvelope` instantiation, or embeds one for its collection, and is declared as its command's output schema; none sets `count` by hand.\n- [hard] REQ-02: Each command's JSON output is unchanged apart from field order, and `ArtifactPlan` still rejects a non-canonical plan on decode.\n- [hard] REQ-03: No struct under `crates/jit/src` carries a numeric `count` beside a collection outside `ListEnvelope`, except the non-envelope counts the Background names.\n- [hard] REQ-04: MCP tool generation and its unit tests pass against the regenerated schema.\n",
   "documents": [],
+  "done_at": "2026-10-27T01:01:28.433188795Z",
+  "first_ready_at": "2026-10-24T23:42:52.231194556Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4a968a3d-e760-41e0-9311-d0d5344e57fd",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:56:43.865037649Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "04495760-82dd-48cd-8750-2b58352c6691",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:58:21.746258243Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "6c8b5e6e-5bc6-496c-94aa-41fcc3bb74b5",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:56:49.206477186Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "53f78490-ca3e-4bb4-aa18-503d2e04df97",
   "labels": [
     "type:task",
@@ -27,7 +49,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Command-layer list results become typed list envelopes",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T01:01:28.433188795Z"
 }

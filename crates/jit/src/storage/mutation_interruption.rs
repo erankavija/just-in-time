@@ -13,6 +13,8 @@ use std::sync::Arc;
 pub enum MutationPoint {
     /// A session is opening, before it recovers or captures anything.
     SessionOpen,
+    /// A lock-free read session is opening, before it observes commits.
+    ReadSessionOpen,
     /// A held session's apply, before it checks its capture against the live
     /// repository.
     BeforeCommitCheck,

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "abc9b6d898d3498334886f7adcd8222ff895ad67",
+  "completed_at": "2026-11-04T09:22:20.561753785Z",
+  "duration_ms": 203196,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The registered executor-free version handler satisfies the attributable criteria with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f930acf2-0f03-4ca0-8ad8-97ddcc85f368",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20b0b779-d4e2-4df0-9552-40d9e8c44d7b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:18:57.364957572Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8f6e9ffd8, 9a43a0e9a, 06e0c91af, 5c8b6454c, da1e3086a (`jit:f930acf2`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18; @/issue/12c0f3fb/requirement/REQ-01; @/issue/12c0f3fb/decision/D-01; @/invariant/architecture-dependency-direction; @/invariant/convention-convergence; @/invariant/orthogonal-tests; @/invariant/essential-code-prose; @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T09:14:34Z); mcp-ci passed (exit not recorded, 2026-11-04T09:14:56Z); code-review is current with no prior projection\nTruncation recovery: recovered path-scoped first-parent merge diffs, current dispatch/schema/output sources, version CLI tests, and registry sources; unrelated integration-merge storage/server/tracker changes were outside this issue’s impact cone.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The registered executor-free version handler satisfies the attributable criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

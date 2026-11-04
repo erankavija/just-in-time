@@ -12,12 +12,10 @@ use crate::repository_state::{Contribution, KeyedArrayTarget, MapEntryTarget};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const REFERENCE_PREFIX: &str = "{{jit:";
 const REFERENCE_KIND: &str = "var:";
-const RESOLVED_TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-resolved-target-v1\0";
 
 /// Inputs captured by a command before it enters pure package resolution.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -84,21 +82,31 @@ impl VariableInputs {
         }
     }
 
-    /// Reject input names that are not in a participating package set.
-    pub fn validate_against_names(
+    /// Reject an input naming a variable, or an environment variable, that no
+    /// participating declaration carries.
+    pub fn validate_against<'a>(
         &self,
-        names: &BTreeSet<ProfileVariableName>,
-        environment_names: &BTreeSet<EnvironmentVariableName>,
+        declarations: impl IntoIterator<Item = &'a ProfileVariableDeclaration>,
     ) -> Result<(), VariableError> {
+        #[cfg(test)]
+        super::selection_probe::record(super::selection_probe::SelectionStage::VariableValidation);
+        let (names, environment_names) = declarations.into_iter().fold(
+            (BTreeSet::new(), BTreeSet::new()),
+            |(mut names, mut environment_names), declaration| {
+                names.insert(&declaration.name);
+                environment_names.extend(declaration.env.as_ref());
+                (names, environment_names)
+            },
+        );
         self.values_file
             .keys()
-            .try_for_each(|name| validate_input_name(names, name, "values file"))?;
+            .try_for_each(|name| validate_input_name(&names, name, "values file"))?;
         self.environment
             .keys()
-            .try_for_each(|name| validate_environment_name(environment_names, name))?;
+            .try_for_each(|name| validate_environment_name(&environment_names, name))?;
         self.command_line
             .iter()
-            .try_for_each(|assignment| validate_input_name(names, &assignment.name, "--set"))
+            .try_for_each(|assignment| validate_input_name(&names, &assignment.name, "--set"))
     }
 }
 
@@ -182,25 +190,12 @@ impl ResolvedProfileContent {
 
 /// Resolve every declared value by the fixed package-variable precedence.
 ///
-/// # Errors
-///
-/// Returns [`VariableError`] when an input names a variable no declaration
-/// carries.
+/// An input no declaration names takes no part; a caller validates its inputs
+/// once with [`VariableInputs::validate_against`] before resolving.
 pub fn resolve_variables(
     declarations: &[ProfileVariableDeclaration],
     inputs: &VariableInputs,
-) -> Result<ResolvedVariables, VariableError> {
-    validate_declarations(declarations)?;
-    let declared = declarations
-        .iter()
-        .map(|declaration| declaration.name.clone())
-        .collect::<BTreeSet<_>>();
-    let environment_names = declarations
-        .iter()
-        .filter_map(|declaration| declaration.env.clone())
-        .collect::<BTreeSet<_>>();
-    inputs.validate_against_names(&declared, &environment_names)?;
-
+) -> ResolvedVariables {
     // A repeated --set intentionally has last-occurrence-wins semantics.
     let command_line = inputs
         .command_line
@@ -238,18 +233,19 @@ pub fn resolve_variables(
             })
         })
         .collect();
-    Ok(ResolvedVariables(resolved))
+    ResolvedVariables(resolved)
 }
 
 /// Resolve and substitute one immutable package without changing its package
 /// identity or unresolved source bytes.
+///
+/// The package's variable references were validated when it was read, and
+/// `inputs` are validated by the caller, as [`resolve_variables`] states.
 pub fn resolve_package(
     package: &ProfilePackage,
     inputs: &VariableInputs,
 ) -> Result<ResolvedProfileContent, VariableError> {
-    let model = package.model();
-    validate_model_references(model)?;
-    let variables = resolve_variables(&model.variables, inputs)?;
+    let variables = resolve_variables(&package.model().variables, inputs);
     resolve_package_content(package, variables)
 }
 
@@ -304,88 +300,12 @@ fn resolve_package_content(
     })
 }
 
-impl ResolvedProfileContent {
-    /// Hash resolved semantic contributions and resolved file bytes by their
-    /// repository target without exposing the resolved values themselves.
-    pub fn target_hashes(&self) -> Result<BTreeMap<String, String>, VariableError> {
-        let variable_frame = canonical_json_bytes(&self.variables)?;
-        let mut frames = BTreeMap::<String, Vec<Vec<u8>>>::new();
-        for contribution in &self.model.contributions {
-            frames
-                .entry(contribution.registry_path().to_string())
-                .or_default()
-                .push(canonical_json_bytes(contribution)?);
-        }
-        for asset in &self.model.assets {
-            let mut frame = canonical_json_bytes(asset)?;
-            append_frame(
-                &mut frame,
-                self.source_bytes(&asset.source)
-                    .ok_or_else(|| VariableError::MissingSource(asset.source.clone()))?,
-            );
-            frames.entry(asset.target.clone()).or_default().push(frame);
-        }
-        for region in &self.model.regions {
-            let mut frame = canonical_json_bytes(region)?;
-            append_frame(
-                &mut frame,
-                self.source_bytes(&region.source)
-                    .ok_or_else(|| VariableError::MissingSource(region.source.clone()))?,
-            );
-            frames.entry(region.target.clone()).or_default().push(frame);
-        }
-        frames
-            .into_iter()
-            .map(|(target, target_frames)| {
-                let mut hasher = Sha256::new();
-                hasher.update(RESOLVED_TARGET_HASH_DOMAIN);
-                hash_frame(&mut hasher, b"variables");
-                hash_frame(&mut hasher, &variable_frame);
-                hash_frame(&mut hasher, target.as_bytes());
-                target_frames
-                    .iter()
-                    .for_each(|frame| hash_frame(&mut hasher, frame));
-                Ok((target, format!("{:x}", hasher.finalize())))
-            })
-            .collect()
-    }
-}
-
-fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, VariableError> {
-    serde_json::to_vec(&canonicalize_json(
-        serde_json::to_value(value)
-            .map_err(|error| VariableError::Serialization(error.to_string()))?,
-    ))
-    .map_err(|error| VariableError::Serialization(error.to_string()))
-}
-
-fn canonicalize_json(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_json).collect()),
-        Value::Object(values) => Value::Object(
-            values
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_json(value)))
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .collect(),
-        ),
-        scalar => scalar,
-    }
-}
-
-fn append_frame(frame: &mut Vec<u8>, bytes: &[u8]) {
-    frame.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
-    frame.extend_from_slice(bytes);
-}
-
-fn hash_frame<D: Digest>(hasher: &mut D, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_be_bytes());
-    hasher.update(bytes);
-}
-
 /// Validate reference syntax and positions without requiring input values.
 pub(crate) fn validate_model_references(model: &ProfilePackageModel) -> Result<(), VariableError> {
+    #[cfg(test)]
+    super::selection_probe::record(
+        super::selection_probe::SelectionStage::ModelReferenceValidation,
+    );
     validate_declarations(&model.variables)?;
 
     model
@@ -471,7 +391,7 @@ fn validate_declarations(declarations: &[ProfileVariableDeclaration]) -> Result<
 }
 
 fn validate_input_name(
-    declared: &BTreeSet<ProfileVariableName>,
+    declared: &BTreeSet<&ProfileVariableName>,
     name: &ProfileVariableName,
     source: &'static str,
 ) -> Result<(), VariableError> {
@@ -486,7 +406,7 @@ fn validate_input_name(
 }
 
 fn validate_environment_name(
-    declared: &BTreeSet<EnvironmentVariableName>,
+    declared: &BTreeSet<&EnvironmentVariableName>,
     name: &EnvironmentVariableName,
 ) -> Result<(), VariableError> {
     if declared.contains(name) {
@@ -893,9 +813,6 @@ pub enum VariableError {
     /// A declared package source was absent from the package image.
     #[error("declared package source '{0}' is unavailable")]
     MissingSource(String),
-    /// A resolved semantic definition could not be serialized for hashing.
-    #[error("failed to serialize resolved profile content for hashing: {0}")]
-    Serialization(String),
 }
 
 #[cfg(test)]
@@ -941,7 +858,7 @@ mod tests {
             ],
         };
 
-        let resolved = resolve_variables(&declarations, &inputs).unwrap();
+        let resolved = resolve_variables(&declarations, &inputs);
 
         assert_eq!(
             resolved.values()[&"DEFAULT_ONLY".try_into().unwrap()],
@@ -977,10 +894,8 @@ mod tests {
         let package_a = [declaration("NAME", None, Some("ENV_A"))];
         let package_b = [declaration("NAME", None, Some("ENV_B"))];
 
-        let resolved_a =
-            resolve_variables(&package_a, &inputs.for_declarations(&package_a)).unwrap();
-        let resolved_b =
-            resolve_variables(&package_b, &inputs.for_declarations(&package_b)).unwrap();
+        let resolved_a = resolve_variables(&package_a, &inputs.for_declarations(&package_a));
+        let resolved_b = resolve_variables(&package_b, &inputs.for_declarations(&package_b));
 
         assert_eq!(
             resolved_a.values()[&"NAME".try_into().unwrap()],
@@ -993,29 +908,18 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_variables_rejects_duplicate_declarations_and_undeclared_inputs() {
-        let duplicate = resolve_variables(
-            &[
-                declaration("NAME", None, None),
-                declaration("NAME", None, None),
-            ],
-            &VariableInputs::default(),
-        )
+    fn test_variable_inputs_validate_against_rejects_an_input_no_declaration_carries() {
+        let declarations = [declaration("NAME", None, None)];
+        let undeclared = VariableInputs {
+            command_line: vec![ProfileVariableAssignment::new(
+                "OTHER".try_into().unwrap(),
+                "value",
+            )],
+            ..VariableInputs::default()
+        }
+        .validate_against(&declarations)
         .unwrap_err();
-        assert!(duplicate.to_string().contains("NAME"));
-        assert!(duplicate.to_string().contains("duplicate"));
 
-        let undeclared = resolve_variables(
-            &[declaration("NAME", None, None)],
-            &VariableInputs {
-                command_line: vec![ProfileVariableAssignment::new(
-                    "OTHER".try_into().unwrap(),
-                    "value",
-                )],
-                ..VariableInputs::default()
-            },
-        )
-        .unwrap_err();
         assert!(undeclared.to_string().contains("OTHER"));
         assert!(undeclared.to_string().contains("undeclared"));
     }
@@ -1026,7 +930,7 @@ mod tests {
             declaration("NAME", Some("Ada"), None),
             declaration("NESTED", Some("{{jit:var:NAME}}"), None),
         ];
-        let resolved = resolve_variables(&declarations, &VariableInputs::default()).unwrap();
+        let resolved = resolve_variables(&declarations, &VariableInputs::default());
 
         let substituted = substitute_string(
             "contribution[0].value",
@@ -1043,8 +947,7 @@ mod tests {
         let resolved = resolve_variables(
             &[declaration("NAME", Some("value"), None)],
             &VariableInputs::default(),
-        )
-        .unwrap();
+        );
         let identity = Contribution::MapEntry {
             target: crate::repository_state::MapEntryTarget::LabelAssociations,
             identity: "{{jit:var:NAME}}".to_string(),
@@ -1070,8 +973,8 @@ mod tests {
 
         let model = ProfilePackageModel {
             id: "package".try_into().unwrap(),
-            version: "1.0.0".to_string(),
-            compatible_jit: "*".to_string(),
+            version: semver::Version::new(1, 0, 0),
+            compatible_jit: semver::VersionReq::STAR,
             dependencies: Vec::new(),
             incompatibilities: Vec::new(),
             variables: vec![declaration("NAME", Some("value"), None)],
@@ -1122,8 +1025,7 @@ mod tests {
         let resolved = resolve_variables(
             &[declaration("NAME", Some("value"), None)],
             &VariableInputs::default(),
-        )
-        .unwrap();
+        );
         for key in [
             "working_dir",
             "prompt_file",
@@ -1163,8 +1065,7 @@ mod tests {
         let resolved = resolve_variables(
             &[declaration("NAME", Some("value"), None)],
             &VariableInputs::default(),
-        )
-        .unwrap();
+        );
         let scalar = Contribution::Scalar {
             target: ScalarTarget::DocumentationDevelopmentRoot,
             value: "docs/{{jit:var:NAME}}".to_string(),

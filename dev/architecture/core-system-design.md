@@ -61,8 +61,7 @@ Gate Definition (global registry, .jit/gates.toml)
 
 System metadata (.jit/index.json)
 - schema_version: integer
-- next_id_hint: optional (if using incremental ids; nil if ULIDs)
-- all_ids: list of ids (or computed from filesystem)
+- deleted_ids: tombstones; issue membership is the files under issues/
 
 Derived fields:
 - dependents: computed (reverse edges)
@@ -421,9 +420,8 @@ mode        = "auto"
 
 .jit/index.json (sample)
 {
-  "schema_version": 1,
-  "next_id_hint": null,
-  "all_ids": []
+  "schema_version": 3,
+  "deleted_ids": []
 }
 
 ---

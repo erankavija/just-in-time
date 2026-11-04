@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "661c51e71b79177ecc4bebf159be28c3e06fb851",
+  "completed_at": "2026-11-01T15:47:14.777735801Z",
+  "duration_ms": 176451,
+  "evaluation_stability": "stable",
+  "exit_code": 75,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "29a8946cef07b5344ceb6caa4951687158e1164cf9636c80b17f92771a084c37",
+  "issue_id": "0dcabcca-d6f5-415f-90f2-12dc29f97313",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5fa00332-2f1a-413b-9a61-481e3fac4724",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:44:18.326219473Z",
+  "status": "error",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 42156 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 42156 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 103025 ms, warmed 18 executables (2080522328 bytes) in 308 ms.\n  ✓ fmt: ok (1601 ms)\n  ✓ clippy: ok (28437 ms)\n  ✓ suite-build: built in 103025 ms, warmed 18 executables (2080522328 bytes) in 308 ms (103336 ms)\n  ✓ test: 4676 passed, 0 failed, 0 skipped (39023 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (3115 ms)\n  ✓ suite-clock: 42156 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (96 ms)\n\ncargo-ci: infrastructure fault (exit 75): failing steps (budget) are environment-sensitive; baseline load1=7.13 >= threshold 4.08 (0.17 x 24 CPUs); rerun when the host is quiet\n"
+}

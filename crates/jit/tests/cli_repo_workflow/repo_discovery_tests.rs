@@ -6,36 +6,16 @@
 //! the real `jit` binary from various working directories inside isolated
 //! `TempDir` fixtures.
 
+use jit::test_cli::JitCli;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 use tempfile::TempDir;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// Build a sanitized `jit` command anchored at `dir`, with `JIT_DATA_DIR`
-/// removed so ambient environment state never leaks into a test.
-fn jit_cmd(dir: &Path) -> Command {
-    let mut cmd = Command::new(jit_binary());
-    cmd.current_dir(dir)
-        .env_remove("JIT_DATA_DIR")
-        .env_remove("JIT_ISSUE_ID")
-        .env_remove("JIT_GATE_KEY");
-    cmd
-}
-
-fn jit_init(dir: &Path) -> Output {
-    jit_cmd(dir)
-        .arg("init")
-        .output()
-        .expect("jit init failed to spawn")
-}
-
-fn jit_status(dir: &Path) -> Output {
-    jit_cmd(dir)
-        .args(["status", "--json"])
+/// `jit status --json` run from `dir` against `cli`'s environment.
+fn jit_status(cli: &JitCli, dir: &Path) -> Output {
+    cli.command(["status", "--json"])
+        .current_dir(dir)
         .output()
         .expect("jit status failed to spawn")
 }
@@ -55,14 +35,12 @@ fn status_error_message(output: &Output) -> String {
 
 #[test]
 fn test_status_discovers_repo_from_nested_subdirectory() {
-    let temp = TempDir::new().unwrap();
-    let init_out = jit_init(temp.path());
-    assert!(init_out.status.success(), "init failed: {:?}", init_out);
+    let cli = JitCli::initialised().unwrap();
 
-    let nested = temp.path().join("crates/jit/src");
+    let nested = cli.root().join("crates/jit/src");
     fs::create_dir_all(&nested).unwrap();
 
-    let out = jit_status(&nested);
+    let out = jit_status(&cli, &nested);
     assert!(
         out.status.success(),
         "status from nested subdirectory failed: stderr={}",
@@ -72,17 +50,15 @@ fn test_status_discovers_repo_from_nested_subdirectory() {
 
 #[test]
 fn test_status_discovers_repo_from_inside_dot_jit() {
-    let temp = TempDir::new().unwrap();
-    let init_out = jit_init(temp.path());
-    assert!(init_out.status.success(), "init failed: {:?}", init_out);
+    let cli = JitCli::initialised().unwrap();
 
-    let inside_dot_jit = temp.path().join(".jit/issues");
+    let inside_dot_jit = cli.root().join(".jit/issues");
     assert!(
         inside_dot_jit.exists(),
         "jit init should have created .jit/issues"
     );
 
-    let out = jit_status(&inside_dot_jit);
+    let out = jit_status(&cli, &inside_dot_jit);
     assert!(
         out.status.success(),
         "status from inside .jit/issues failed: stderr={}",
@@ -92,20 +68,16 @@ fn test_status_discovers_repo_from_inside_dot_jit() {
 
 #[test]
 fn test_nested_profile_init_keeps_data_and_assets_in_child() {
-    let parent = TempDir::new().unwrap();
-    let parent_init = jit_init(parent.path());
-    assert!(
-        parent_init.status.success(),
-        "parent init failed: {parent_init:?}"
-    );
-    let parent_index = fs::read(parent.path().join(".jit/index.json")).unwrap();
-    let parent_events = fs::read(parent.path().join(".jit/events.jsonl")).unwrap();
+    let parent = JitCli::initialised().unwrap();
+    let parent_index = fs::read(parent.root().join(".jit/index.json")).unwrap();
+    let parent_events = fs::read(parent.root().join(".jit/events.jsonl")).unwrap();
 
-    let child = parent.path().join("child");
+    let child = parent.root().join("child");
     fs::create_dir(&child).unwrap();
     let location = crate::repository_package_at(&child, "jit-dogfood");
-    let child_init = jit_cmd(&child)
-        .args(["init", "--profile", &location, "--json"])
+    let child_init = parent
+        .command(["init", "--profile", &location, "--json"])
+        .current_dir(&child)
         .output()
         .expect("nested init failed to spawn");
 
@@ -117,31 +89,32 @@ fn test_nested_profile_init_keeps_data_and_assets_in_child() {
     assert!(child.join(".jit/index.json").is_file());
     assert!(child.join(".agents/skills/jit-manage/SKILL.md").is_file());
     assert_eq!(
-        fs::read(parent.path().join(".jit/index.json")).unwrap(),
+        fs::read(parent.root().join(".jit/index.json")).unwrap(),
         parent_index
     );
     assert_eq!(
-        fs::read(parent.path().join(".jit/events.jsonl")).unwrap(),
+        fs::read(parent.root().join(".jit/events.jsonl")).unwrap(),
         parent_events
     );
-    assert!(!parent.path().join(".agents").exists());
+    assert!(!parent.root().join(".agents").exists());
 }
 
 #[test]
 fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
-    let parent = TempDir::new().unwrap();
-    assert!(jit_init(parent.path()).status.success());
-    let parent_events = fs::read(parent.path().join(".jit/events.jsonl")).unwrap();
-    let child = parent.path().join("child");
+    let parent = JitCli::initialised().unwrap();
+    let parent_events = fs::read(parent.root().join(".jit/events.jsonl")).unwrap();
+    let child = parent.root().join("child");
     fs::create_dir(&child).unwrap();
     let external = TempDir::new().unwrap();
     let data_root = external.path().join("jit-data");
     let location = crate::repository_package_at(&child, "jit-dogfood");
 
-    let output = Command::new(jit_binary())
+    let output = parent
+        .command_with_env(
+            ["init", "--profile", &location, "--json"],
+            [("JIT_DATA_DIR", &data_root)],
+        )
         .current_dir(&child)
-        .env("JIT_DATA_DIR", &data_root)
-        .args(["init", "--profile", &location, "--json"])
         .output()
         .expect("explicit-root init failed to spawn");
 
@@ -153,34 +126,35 @@ fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
     assert!(data_root.join("index.json").is_file());
     assert!(child.join(".agents/skills/jit-manage/SKILL.md").is_file());
     assert_eq!(
-        fs::read(parent.path().join(".jit/events.jsonl")).unwrap(),
+        fs::read(parent.root().join(".jit/events.jsonl")).unwrap(),
         parent_events
     );
-    assert!(!parent.path().join(".agents").exists());
+    assert!(!parent.root().join(".agents").exists());
 }
 
 #[test]
 fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit_init(repo.path()).status.success());
-    let child = repo.path().join("child");
+    let repo = JitCli::initialised().unwrap();
+    let child = repo.root().join("child");
     fs::create_dir(&child).unwrap();
     // Staged in the worktree the application targets, which the child's data
     // root override resolves to, not in the child the command runs from.
     let location = repo
-        .path()
-        .join(crate::repository_package_at(repo.path(), "jit-dogfood"));
+        .root()
+        .join(crate::repository_package_at(repo.root(), "jit-dogfood"));
 
-    let output = Command::new(jit_binary())
+    let output = repo
+        .command_with_env(
+            [
+                "profile",
+                "apply",
+                "--profile",
+                &location.to_string_lossy(),
+                "--json",
+            ],
+            [("JIT_DATA_DIR", "../.jit")],
+        )
         .current_dir(&child)
-        .env("JIT_DATA_DIR", "../.jit")
-        .args([
-            "profile",
-            "apply",
-            "--profile",
-            &location.to_string_lossy(),
-            "--json",
-        ])
         .output()
         .expect("relative-root profile apply failed to spawn");
 
@@ -190,13 +164,13 @@ fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+        fs::read_to_string(repo.root().join(".jit/events.jsonl"))
             .unwrap()
             .contains("profile_lifecycle"),
         "the application is audited under the overridden data root"
     );
     assert!(repo
-        .path()
+        .root()
         .join(".agents/skills/jit-manage/SKILL.md")
         .is_file());
     assert!(!child.join(".agents").exists());
@@ -209,20 +183,17 @@ fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
 
 #[test]
 fn test_status_does_not_cross_git_boundary_into_unrelated_ancestor_repo() {
-    let workspace = TempDir::new().unwrap();
-
     // An unrelated jit repository living above the boundary.
-    let outer_init = jit_init(workspace.path());
-    assert!(outer_init.status.success());
+    let workspace = JitCli::initialised().unwrap();
 
     // A nested, separately version-controlled project with no `.jit` of its
     // own, and a subdirectory inside it.
-    let repo_dir = workspace.path().join("repo");
+    let repo_dir = workspace.root().join("repo");
     let sub_dir = repo_dir.join("sub");
     fs::create_dir_all(&sub_dir).unwrap();
     fs::create_dir(repo_dir.join(".git")).unwrap();
 
-    let out = jit_status(&sub_dir);
+    let out = jit_status(&workspace, &sub_dir);
     assert!(
         !out.status.success(),
         "status must not succeed by escaping into the unrelated outer .jit/"
@@ -242,12 +213,12 @@ fn test_status_does_not_cross_git_boundary_into_unrelated_ancestor_repo() {
 
 #[test]
 fn test_status_reports_not_found_with_init_suggestion_when_no_repo_in_boundary() {
-    let temp = TempDir::new().unwrap();
-    fs::create_dir(temp.path().join(".git")).unwrap();
-    let sub_dir = temp.path().join("sub");
+    let cli = JitCli::uninitialised().unwrap();
+    fs::create_dir(cli.root().join(".git")).unwrap();
+    let sub_dir = cli.root().join("sub");
     fs::create_dir(&sub_dir).unwrap();
 
-    let out = jit_status(&sub_dir);
+    let out = jit_status(&cli, &sub_dir);
     assert!(!out.status.success());
     let message = status_error_message(&out);
     assert!(
@@ -264,11 +235,11 @@ fn test_status_reports_not_found_with_init_suggestion_when_no_repo_in_boundary()
 
 #[test]
 fn test_status_reports_not_found_with_init_suggestion_when_no_repo_anywhere() {
-    let temp = TempDir::new().unwrap();
-    let sub_dir = temp.path().join("a/b/c");
+    let cli = JitCli::uninitialised().unwrap();
+    let sub_dir = cli.root().join("a/b/c");
     fs::create_dir_all(&sub_dir).unwrap();
 
-    let out = jit_status(&sub_dir);
+    let out = jit_status(&cli, &sub_dir);
     assert!(!out.status.success());
     let message = status_error_message(&out);
     assert!(
@@ -292,33 +263,25 @@ fn test_status_reports_not_found_with_init_suggestion_when_no_repo_anywhere() {
 fn test_jit_data_dir_override_takes_precedence_over_ancestor_discovery() {
     // `ancestor_repo` is a real repository that ancestor discovery *would*
     // find from `ancestor_repo/sub` if the override were not honored.
-    let ancestor_repo = TempDir::new().unwrap();
-    let ancestor_init = jit_init(ancestor_repo.path());
-    assert!(ancestor_init.status.success());
-    let sub_dir = ancestor_repo.path().join("sub");
+    let ancestor_repo = JitCli::initialised().unwrap();
+    let sub_dir = ancestor_repo.root().join("sub");
     fs::create_dir(&sub_dir).unwrap();
 
     // `override_repo` is a distinct repository pointed to explicitly via
     // JIT_DATA_DIR; it holds a marker issue that only exists there.
-    let override_repo = TempDir::new().unwrap();
-    let override_init = jit_init(override_repo.path());
-    assert!(override_init.status.success());
-    let create_out = jit_cmd(override_repo.path())
-        .args(["issue", "create", "-t", "override-marker-issue"])
-        .output()
-        .expect("issue create failed to spawn");
-    assert!(
-        create_out.status.success(),
-        "issue create failed: {:?}",
-        create_out
-    );
+    let override_repo = JitCli::initialised().unwrap();
+    override_repo
+        .create_issue(["-t", "override-marker-issue"])
+        .unwrap();
 
-    let override_jit_dir = override_repo.path().join(".jit");
+    let override_jit_dir = override_repo.root().join(".jit");
 
-    let out = Command::new(jit_binary())
+    let out = ancestor_repo
+        .command_with_env(
+            ["issue", "list", "--json"],
+            [("JIT_DATA_DIR", &override_jit_dir)],
+        )
         .current_dir(&sub_dir)
-        .env("JIT_DATA_DIR", &override_jit_dir)
-        .args(["issue", "list", "--json"])
         .output()
         .expect("issue list failed to spawn");
     assert!(
@@ -336,25 +299,18 @@ fn test_jit_data_dir_override_takes_precedence_over_ancestor_discovery() {
 
 #[test]
 fn test_hooks_install_targets_repository_selected_by_data_dir_override() {
-    let git_init = |dir: &Path| {
-        let out = Command::new("git")
-            .args(["init", "-q"])
-            .current_dir(dir)
-            .output()
-            .expect("git init failed to spawn");
-        assert!(out.status.success(), "git init failed: {:?}", out);
-    };
-    let process_repo = TempDir::new().unwrap();
-    git_init(process_repo.path());
-    assert!(jit_init(process_repo.path()).status.success());
-    let selected_repo = TempDir::new().unwrap();
-    git_init(selected_repo.path());
-    assert!(jit_init(selected_repo.path()).status.success());
+    let process_repo = JitCli::uninitialised().unwrap();
+    process_repo.init_git().unwrap();
+    process_repo.run(["init"]).unwrap();
+    let selected_repo = JitCli::uninitialised().unwrap();
+    selected_repo.init_git().unwrap();
+    selected_repo.run(["init"]).unwrap();
 
-    let out = Command::new(jit_binary())
-        .current_dir(process_repo.path())
-        .env("JIT_DATA_DIR", selected_repo.path().join(".jit"))
-        .args(["hooks", "install", "--json"])
+    let out = process_repo
+        .command_with_env(
+            ["hooks", "install", "--json"],
+            [("JIT_DATA_DIR", selected_repo.root().join(".jit"))],
+        )
         .output()
         .expect("hooks install failed to spawn");
     assert!(
@@ -363,8 +319,8 @@ fn test_hooks_install_targets_repository_selected_by_data_dir_override() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    assert!(selected_repo.path().join(".git/hooks/pre-commit").exists());
-    assert!(!process_repo.path().join(".git/hooks/pre-commit").exists());
+    assert!(selected_repo.root().join(".git/hooks/pre-commit").exists());
+    assert!(!process_repo.root().join(".git/hooks/pre-commit").exists());
 }
 
 // ---------------------------------------------------------------------------
@@ -378,24 +334,25 @@ fn test_hooks_install_targets_repository_selected_by_data_dir_override() {
 
 #[test]
 fn test_bare_ancestor_jit_is_skipped_not_bound() {
-    let root = TempDir::new().unwrap();
+    let root = JitCli::uninitialised().unwrap();
     // `.git` bounds discovery to this fixture.
-    fs::create_dir(root.path().join(".git")).unwrap();
+    fs::create_dir(root.root().join(".git")).unwrap();
     // A bare `.jit` with no index.json (a lone worktree.json mimics the
     // observed stray dir). This must be skipped, not adopted.
-    let bare_jit = root.path().join(".jit");
+    let bare_jit = root.root().join(".jit");
     fs::create_dir(&bare_jit).unwrap();
     fs::write(bare_jit.join("worktree.json"), "{}").unwrap();
 
-    let sub = root.path().join("a/b");
+    let sub = root.root().join("a/b");
     fs::create_dir_all(&sub).unwrap();
 
-    let out = jit_status(&sub);
+    let out = jit_status(&root, &sub);
     assert!(!out.status.success());
+    let envelope: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(
-        out.status.code(),
-        Some(3),
-        "bare ancestor .jit must yield NotFound (3), not GenericError (1); stderr={}",
+        envelope["error"]["code"],
+        jit::output::ErrorCode::RepositoryNotFound.as_str(),
+        "bare ancestor .jit must be reported as not found; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
     let message = status_error_message(&out);

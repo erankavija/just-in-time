@@ -38,25 +38,9 @@ pub fn publish_fixture_directory_noreplace(source: &Path, destination: &Path) ->
     let destination_name = destination
         .file_name()
         .context("fixture destination has no file name")?;
-    let parent = super::repository_state_store::open_absolute_dir_nofollow(source_parent)
+    let parent = super::capability_fs::open_absolute_dir_nofollow(source_parent)
         .with_context(|| format!("open fixture cache parent {}", source_parent.display()))?;
     rename_noreplace_cap(&parent, source_name, &parent, destination_name).map_err(Into::into)
-}
-
-/// Publish a staged fixture receipt as one no-replace hard link.
-#[doc(hidden)]
-pub fn publish_fixture_file_noreplace(source: &Path, destination: &Path) -> Result<()> {
-    let metadata = std::fs::symlink_metadata(source)?;
-    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
-        bail!("fixture receipt staging path is not an ordinary file");
-    }
-    std::fs::hard_link(source, destination).with_context(|| {
-        format!(
-            "atomically publish fixture receipt {}",
-            destination.display()
-        )
-    })?;
-    Ok(())
 }
 
 impl InMemoryStorage {
@@ -162,6 +146,7 @@ impl InMemoryStorage {
             entries,
             data_root_exists,
             record: None,
+            commits: BTreeMap::new(),
         };
         Ok(())
     }
@@ -179,23 +164,24 @@ impl InMemoryStorage {
         }
     }
 
-    /// Seed one exact issue preimage and canonical active-index membership.
+    /// Seed one exact issue preimage and an index when the fixture has none.
     ///
     /// This deliberately bypasses product mutation behavior while preserving the
     /// repository codec and index invariants used by production publishers.
     #[doc(hidden)]
     pub fn seed_issue_fixture(&self, issue: &Issue) {
-        let mut index = self
+        let index = self
             .read_repo_file(".jit/index.json")
             .expect("fixture index path is valid")
             .map(|bytes| RepositoryIndex::parse(bytes.as_bytes()).expect("fixture index is valid"))
             .unwrap_or_default();
-        index.upsert_active(issue.id.clone());
 
         let issue_bytes = serialize_issue(issue).expect("fixture issue serializes");
         let index_bytes = index.to_pretty_bytes().expect("fixture index serializes");
         self.add_data_file(
-            format!("issues/{}.json", issue.id),
+            crate::repository_state::VirtualPath::issue_record(&issue.id)
+                .relative()
+                .as_path(),
             std::str::from_utf8(&issue_bytes).expect("issue JSON is UTF-8"),
         );
         self.add_data_file(

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T12:59:04.246688216Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -7,13 +8,28 @@
     "ce221384-7b46-41b6-968a-cbeee7b600d3",
     "f22147ec-0158-4afb-b10d-64119e5a395c"
   ],
-  "description": "Aggregate the work that removes repeated work from validation capture, issue creation, `validate --fix` and link checking, and measures the result.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture specs validate only added entries, and a capture round requests its document references as one batch.\n- [hard] REQ-02: Issue creation reports findings from its own mutation image, identically in human and JSON output.\n- [hard] REQ-03: `validate --fix` publishes one mutation and always reports one post-fix report.\n- [hard] REQ-04: Link checking probes each distinct URL once through one timed agent with bounded concurrency.\n- [hard] REQ-05: A recorded release-build run on this repository shows per-issue validation no slower than whole validation.\n",
+  "description": "Aggregate the work that removes repeated work from validation capture, issue creation, `validate --fix` and link checking, and measures the result.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture specs validate only added entries, and a capture applies its base requests once.\n- [hard] REQ-02: Issue creation reports findings from its own mutation image, identically in human and JSON output.\n- [hard] REQ-03: `validate --fix` publishes one mutation and always reports one post-fix report.\n- [hard] REQ-04: Link checking probes each distinct URL once through one timed agent with bounded concurrency.\n- [hard] REQ-05: A recorded release-build run on this repository shows per-issue validation no slower than whole validation.",
   "documents": [],
+  "done_at": "2026-11-04T13:06:33.232449557Z",
+  "first_ready_at": "2026-11-04T12:58:57.677634791Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "32246c66-c631-4df0-a4f0-005ce8ceb040",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:04:21.399566826Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "85569d87-c4a9-45aa-8252-c0a2b020e55b",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:06:20.534692389Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "91edfa5c-2663-4fcb-a9d0-2817bc60664b",
   "labels": [
     "type:story",
@@ -26,7 +42,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Capture, creation, fix and link checking stop repeating work",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-04T13:06:33.232449557Z"
 }

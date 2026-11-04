@@ -3,18 +3,40 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "2a23bb58-9b3d-445b-afb9-e369dfe3504e",
-    "964db1a8-3cd0-4ce8-96d1-05d7593fa047",
-    "be45195f-4d01-4bfe-85df-dc43b2e9f894",
-    "e3b1908d-e974-4e5c-b7a7-6649ee8b8375"
+    "655273d9-f712-4659-ab68-06bbb17b2d57",
+    "77f3db10-26b7-49f4-85c3-95f7adb843c3",
+    "ba4c6054-4117-4ab8-8810-d5b74dea0a35"
   ],
-  "description": "Gate-run records are stored and read by key, so reading one issue's runs, its latest run of a gate, or a reusable verdict never reads another key's records.\n\n## Background\n\nGate runs were stored flat, and every reader enumerated and parsed all of them. This story stores runs per issue, names each issue's latest run of a gate on its gate state, finds reusable verdicts through a per-key verdict record, captures only the evaluated issue's latest runs into gate mutations, and rewrites this repository's recorded runs once into that layout.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading one issue's latest runs or its run history opens only that issue's run records.\n- [hard] REQ-02: Reuse reads one verdict record and the run it names.\n- [hard] REQ-03: Gate evaluation, precheck planning and validation capture no other issue's run records.\n- [hard] REQ-04: This repository's recorded runs, latest-run references and verdict records are in the per-key layout, and every cited run id resolves.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
-  "documents": [],
+  "description": "Gate-run records are stored and read by key, so reading one issue's runs, its latest run of a gate, or a reusable verdict never reads another key's records.\n\n## Background\n\nGate runs are stored flat, and readers enumerate and parse them. This story stores runs per issue, makes each issue's gate state the route to its latest run of a gate, finds reusable verdicts through a per-key verdict record, captures only the evaluated issue's named runs into gate mutations, and moves recorded runs into that layout through the format cutover.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading one issue's latest runs or its run history opens only that issue's run records.\n- [hard] REQ-02: Reuse reads one verdict record and the run it names.\n- [hard] REQ-03: Gate evaluation, precheck planning and validation's precheck-history capture capture no other issue's run records; the record-fidelity pass of whole-repository validation is the named history reader (f8a6b298 REQ-13).\n- [hard] REQ-04: This repository's recorded runs, latest-run references and verdict records are in the per-key layout, and every cited run id resolves.\n\n## Decisions\n\n- D-1 (steward ruling, just-in-time-6a for the user, 2026-11-04; plan DEC-27): REQ-03 names the epic REQ-13 exception. Whole-repository validation's record-fidelity pass reads every gate-run and verdict record by design; holistic-review 2413b19d F1 had read the unqualified criterion as forbidding it.\n- D-2: User decision (2026-11-04, relayed by just-in-time-6a): the five-repository format 4 cutover is accepted on the steward's independent post-window verification. The installed jit and jit-server are the format 4 build from a05567fde; `jit validate` returned error_count 0 in just-in-time, gf2, mealie-fi, inflected-messages and research; jit-server restarted with identical arguments and /api/health returned 200. Evidence about repositories outside this checkout is accepted on that verification, not on the committed narrative.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Format 4 cutover record",
+      "path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/format4-cutover.md"
+    }
+  ],
+  "done_at": "2026-11-04T11:55:06.872496654Z",
+  "first_ready_at": "2026-11-02T23:39:56.383039976Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c28450b5-813a-437c-a98b-861d7bad14f6",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:20:03.125396749Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "db3eee9d-ed1b-4b81-a1dd-f046325a9bcc",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:41:34.018062265Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "735949ef-ad86-4629-bf53-69a6e17ae419",
   "labels": [
     "type:story",
@@ -26,7 +48,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate runs are addressed per issue, per gate and per inputs digest",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-04T12:19:53.001700253Z"
 }

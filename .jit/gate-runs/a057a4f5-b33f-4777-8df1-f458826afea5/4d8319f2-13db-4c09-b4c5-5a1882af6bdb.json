@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6e18820676f30f4f4f75322e7fecd5c17b87681c",
+  "completed_at": "2026-10-28T22:07:32.269462241Z",
+  "duration_ms": 54150,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact defects found in the current issue-scoped fallback review.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a057a4f5-b33f-4777-8df1-f458826afea5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4d8319f2-13db-4c09-b4c5-5a1882af6bdb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:06:38.118660085Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no reachable commit message contains `jit:a057a4f5`\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (2026-10-28T22:06:36Z; exit code none)\nTruncation recovery: narrowed reads of the three scoped tests, shared fixture, item registries, and gate configuration after an initial broad search truncated\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found in the current issue-scoped fallback review.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

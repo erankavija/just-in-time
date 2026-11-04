@@ -2,6 +2,9 @@
 
 use super::*;
 
+const EXTERNAL_URL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const EXTERNAL_URL_WORKERS: usize = 4;
+
 /// Bounds for one document reference edit, which mutates one named issue while
 /// also reading the document and its assets: the shared issue-mutation bounds
 /// at the depth those worktree paths reach.
@@ -34,8 +37,9 @@ enum DocumentScanSource {
     Pinned { revision: String, path: String },
 }
 
-/// Capture bounds for one link check: every reference, plus the assets and link
-/// targets a pinned reference names at its commit.
+/// Capture bounds for one link check: each pinned reference's content, plus the
+/// kinds of every reference and of the assets and link targets a pinned
+/// reference names at its commit.
 const LINK_CHECK_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
         max_listings: 0,
@@ -91,11 +95,23 @@ impl DocumentScanWarning {
     }
 }
 
+/// Document operations of a [`CommandExecutor`].
+pub struct DocumentOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The document family.
+    pub fn documents(&self) -> DocumentOps<'_, S> {
+        DocumentOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> DocumentOps<'_, S> {
     #[allow(clippy::too_many_arguments)] // CLI command parameters - refactoring would reduce clarity
     pub fn add_document_reference(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         commit: Option<&str>,
         label: Option<&str>,
@@ -105,10 +121,32 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
+        let full_id = issue_id.clone();
+        let lease_warnings = self.exec.refuse_foreign_lease(&full_id)?;
+        let (result, warnings) =
+            self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)?;
+        Ok((result, lease_warnings.into_iter().chain(warnings).collect()))
+    }
+
+    /// The no-follow listing of the tree rooted at `root` at `scope`; a root
+    /// that is absent, a file, or a symlink lists nothing.
+    fn list_artifact_tree(
+        &self,
+        root: &str,
+        scope: crate::domain::artifact_discovery::ArtifactListingScope,
+    ) -> Result<Vec<String>> {
+        use crate::domain::artifact_discovery::ArtifactEvidence;
+
+        Ok(
+            match crate::storage::artifact_planning::inspect_artifact_evidence(
+                &self.exec.storage,
+                root,
+                scope,
+            )? {
+                ArtifactEvidence::Directory { entries, .. } => entries,
+                _ => Vec::new(),
+            },
+        )
     }
 
     /// Each declared issue-scoped area paired with its no-follow recursive
@@ -117,29 +155,19 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The registry is read through the accessor that decides area membership
     /// everywhere else: a declared entry that normalizes to nothing names no
     /// area, so it is neither walked nor named. Each surviving area is named in
-    /// its normalized spelling. An area that is absent, a file, or a symlink
-    /// lists nothing.
+    /// its normalized spelling.
     fn list_issue_scoped_areas(
         &self,
         documentation: &crate::config::DocumentationConfig,
         scope: crate::domain::artifact_discovery::ArtifactListingScope,
     ) -> Result<Vec<(String, Vec<String>)>> {
-        use crate::domain::artifact_discovery::ArtifactEvidence;
-
         documentation
             .issue_scoped_areas()
             .into_iter()
             .filter(|area| documentation.is_issue_scoped_area(area))
             .map(|area| {
                 let area = crate::domain::artifact_plan::normalize_artifact_path(&area);
-                let entries = match crate::storage::artifact_planning::inspect_artifact_evidence(
-                    &self.storage,
-                    &area,
-                    scope,
-                )? {
-                    ArtifactEvidence::Directory { entries, .. } => entries,
-                    _ => Vec::new(),
-                };
+                let entries = self.list_artifact_tree(&area, scope)?;
                 Ok((area, entries))
             })
             .collect()
@@ -149,8 +177,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// by the documents it owns by location
     /// ([`derive_issue_documents`](crate::domain::artifact_directory::derive_issue_documents)).
     ///
-    /// The declared issue-scoped areas are listed once for the whole set, so a
-    /// repository declaring none reads no tree.
+    /// One issue lists only the directories it owns; several share one listing
+    /// of the declared areas. A repository declaring none reads no tree.
     fn with_issue_documents(
         &self,
         issues: Vec<crate::domain::Issue>,
@@ -158,16 +186,32 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let documentation = self
+            .exec
             .config_manager
             .load()?
             .documentation
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let files = self
-            .list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveFiles)?
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let files = match issues.as_slice() {
+            [issue] => crate::domain::artifact_directory::owned_artifact_directories(
+                issue,
+                &documentation,
+                &hierarchy,
+            )
+            .iter()
+            .map(|directory| {
+                self.list_artifact_tree(directory, ArtifactListingScope::RecursiveFiles)
+            })
+            .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .flat_map(|(_, files)| files)
-            .collect::<Vec<_>>();
+            .flatten()
+            .collect::<Vec<_>>(),
+            _ => self
+                .list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveFiles)?
+                .into_iter()
+                .flat_map(|(_, files)| files)
+                .collect::<Vec<_>>(),
+        };
         Ok(issues
             .into_iter()
             .map(|issue| {
@@ -184,6 +228,33 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .collect();
                 (issue, documents)
             })
+            .collect())
+    }
+
+    /// `issues` with `documents` replaced by the set every reader reports:
+    /// explicit links, then the files each owns by location. For display only;
+    /// nothing derived is stored.
+    pub fn with_reported_documents(
+        &self,
+        issues: Vec<crate::domain::Issue>,
+    ) -> Result<Vec<crate::domain::Issue>> {
+        Ok(self
+            .with_issue_documents(issues)?
+            .into_iter()
+            .map(|(issue, documents)| crate::domain::Issue { documents, ..issue })
+            .collect())
+    }
+
+    /// `issue`'s documents as every reader reports them
+    /// ([`with_reported_documents`](Self::with_reported_documents)).
+    pub fn issue_documents(
+        &self,
+        issue: &crate::domain::Issue,
+    ) -> Result<Vec<crate::domain::DocumentReference>> {
+        Ok(self
+            .with_reported_documents(vec![issue.clone()])?
+            .into_iter()
+            .flat_map(|issue| issue.documents)
             .collect())
     }
 
@@ -215,44 +286,31 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
     }
 
-    /// [`find_issue_document`](Self::find_issue_document) for the CLI, which
-    /// reports an absent document as a
-    /// [`NotFoundError`](crate::errors::NotFoundError).
+    /// [`find_issue_document`](Self::find_issue_document) with the typed
+    /// [`PathReadError`](crate::storage::PathReadError) kept as the CLI error,
+    /// so an absent document classifies by variant.
     fn require_issue_document(
         &self,
         issue: crate::domain::Issue,
         path: &str,
     ) -> Result<crate::domain::DocumentReference> {
-        self.find_issue_document(issue, path)
-            .map_err(|error| match error {
-                crate::storage::PathReadError::NotFound(message) => {
-                    crate::errors::NotFoundError::new(message).into()
-                }
-                other => other.into(),
-            })
+        Ok(self.find_issue_document(issue, path)?)
     }
 
     /// List `issue_id`'s documents: its explicit links, then the files it owns
     /// by location under its artifact directories.
     pub fn list_document_references(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<crate::commands::DocumentListResult> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
-        let documents = self
-            .with_issue_documents(vec![issue])?
-            .into_iter()
-            .flat_map(|(_, documents)| documents)
-            .collect::<Vec<_>>();
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
+        let documents = self.issue_documents(&issue)?;
 
-        Ok(crate::commands::DocumentListResult {
-            issue_id: full_id,
-            count: documents.len(),
+        Ok(crate::commands::DocumentListResult::with_extras(
             documents,
-        })
+            crate::commands::DocumentListScope { issue_id: full_id },
+        ))
     }
 
     /// Resolve the canonical artifact directory `issue_id` owns in `area`.
@@ -274,19 +332,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// loaded, or when the repository's configuration cannot be read.
     pub fn resolve_issue_artifact_directory(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         area: &str,
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
         let documentation = self
+            .exec
             .config_manager
             .load()?
             .documentation
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
 
         let directory = crate::domain::artifact_directory::resolve_artifact_directory(
             &issue,
@@ -338,12 +395,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let documentation = self
+            .exec
             .config_manager
             .load()?
             .documentation
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let issues = self.storage.list_issues()?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let issues = self.exec.storage.list_issues()?;
         let listings =
             self.list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveEntries)?;
 
@@ -375,16 +433,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn remove_document_reference(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
-    ) -> Result<DocumentRemoveResult>
+    ) -> Result<(DocumentRemoveResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        self.publish_document_remove(&full_id, path)
+        let full_id = issue_id.clone();
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
+        Ok((self.publish_document_remove(&full_id, path)?, warnings))
     }
 
     /// Add or refresh one document reference from a coherent repository image.
@@ -393,7 +450,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(clippy::too_many_arguments)]
     fn publish_document_add(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         commit: Option<&str>,
         label: Option<&str>,
@@ -408,9 +465,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeSet;
 
         validate_repo_relative_path(path)?;
-        let layout = self.require_layout()?;
-        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
-        let events_path = VirtualPath::EVENTS;
+        let layout = self.exec.require_layout()?;
+        let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
         let source = match commit {
@@ -422,8 +478,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let context = super::production_mutation_context();
 
-        with_mutation_session(&self.storage, &layout, "document add", |session| {
-            let initial_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+        with_mutation_session(&self.exec.storage, &layout, "document add", |session| {
+            let initial_paths = BTreeSet::from([issue_path.clone()]);
             let initial_spec = if skip_scan {
                 document_capture_spec(initial_paths)?
             } else {
@@ -465,48 +521,49 @@ impl<S: IssueStore> CommandExecutor<S> {
             if derived.intents.is_empty() {
                 return Ok(SessionStep::Done((derived.outcome, warnings)));
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, (derived.outcome, warnings)))
         })
     }
 
     /// Remove one path-selected document reference and its event atomically.
-    fn publish_document_remove(&self, issue_id: &str, path: &str) -> Result<DocumentRemoveResult>
+    fn publish_document_remove(
+        &self,
+        issue_id: &IssueId,
+        path: &str,
+    ) -> Result<DocumentRemoveResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, VirtualPath};
         use std::collections::BTreeSet;
 
-        let layout = self.require_layout()?;
-        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
-        let events_path = VirtualPath::EVENTS;
+        let layout = self.exec.require_layout()?;
+        let issue_path = VirtualPath::issue_record(issue_id);
         let context = super::production_mutation_context();
-        with_mutation_session(&self.storage, &layout, "document removal", |session| {
-            let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+        with_mutation_session(&self.exec.storage, &layout, "document removal", |session| {
+            let paths = BTreeSet::from([issue_path.clone()]);
             let Some(image) = capture_or_retry(session.capture(document_capture_spec(paths)?))?
             else {
                 return Ok(SessionStep::Retry);
             };
             let issue = captured_issue(&image, &issue_path, issue_id)?;
             let derived = derive_document_remove(issue, path)?;
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, derived.outcome))
         })
     }
 
     pub fn show_document_content(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<DocumentContentResult> {
         use git2::Repository;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
 
         // Determine which commit to view
@@ -521,13 +578,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Read content: try git first, fall back to filesystem if git unavailable
         let content = if at_commit.is_some() || doc.commit.is_some() {
             // Explicit version requested - require git
-            let repo = Repository::open(self.require_layout()?.worktree_root())
+            let repo = Repository::open(self.exec.require_layout()?.worktree_root())
                 .context("Git repository required when viewing specific commit version")?;
             self.read_file_from_git(&repo, &doc.path, reference)
                 .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
         } else {
             // No specific version - try git, fall back to filesystem
-            match Repository::open(self.require_layout()?.worktree_root()) {
+            match Repository::open(self.exec.require_layout()?.worktree_root()) {
                 Ok(repo) => {
                     // Git available - read from git
                     self.read_file_from_git(&repo, &doc.path, "HEAD")
@@ -535,12 +592,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
                 Err(_) => {
                     // Git not available - read from filesystem via storage layer
-                    self.storage
+                    self.exec
+                        .storage
                         .read_path_text(&doc.path, None)
                         .map(|(text, _)| text)
-                        .map_err(|e| {
-                            anyhow!("Failed to read {} from filesystem: {}", doc.path, e)
-                        })?
+                        .with_context(|| format!("Failed to read {} from filesystem", doc.path))?
                 }
             }
         };
@@ -556,18 +612,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn document_history(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
     ) -> Result<crate::commands::DocumentHistory> {
         use git2::Repository;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let repo = Repository::open(layout.worktree_root())
             .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -581,20 +635,18 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn document_diff(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         from: &str,
         to: Option<&str>,
     ) -> Result<DocumentDiffResult> {
         use git2::Repository;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let repo = Repository::open(layout.worktree_root())
             .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -639,20 +691,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// file existence structurally, and `InMemoryStorage` checks the HashMap.
     fn load_issue_typed(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
-        use crate::storage::{AmbiguousIdError, IssueNotFoundError, PathReadError};
-
-        let prefix = IssueIdPrefix::parse(issue_id)
-            .map_err(|error| PathReadError::NotFound(error.to_string()))?;
-        let full_id = self.storage.resolve_issue_id(&prefix).map_err(|error| {
-            if error.is::<IssueNotFoundError>() || error.is::<AmbiguousIdError>() {
-                PathReadError::NotFound(error.to_string())
-            } else {
-                PathReadError::Other(error)
-            }
-        })?;
-        self.storage.load_issue_or_not_found(&full_id)
+        self.exec.storage.load_issue_or_not_found(issue_id)
     }
 
     /// Read document content from git or filesystem.
@@ -666,7 +707,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn read_document_content(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(String, String), crate::storage::PathReadError> {
@@ -681,12 +722,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // working-tree reads against the repo root (see
         // `JsonFileStorage::read_path_bytes`), so we pass the stored path
         // through unchanged.
-        self.storage.read_path_text(&doc.path, effective_commit)
+        self.exec
+            .storage
+            .read_path_text(&doc.path, effective_commit)
     }
 
     /// Read raw document bytes for an issue-scoped path (byte-faithful variant).
     ///
-    /// Unlike [`read_document_content`], this method does not convert file
+    /// Unlike [`Self::read_document_content`], this method does not convert file
     /// content to `String`, so binary artifacts are round-tripped without loss.
     ///
     /// Steps:
@@ -700,7 +743,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn read_document_bytes(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
@@ -718,7 +761,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // That makes pre-resolving to an absolute path here both unnecessary
         // and actively harmful, so we simply pass the stored repo-relative path
         // through.
-        self.storage.read_path_bytes(&doc.path, effective_commit)
+        self.exec
+            .storage
+            .read_path_bytes(&doc.path, effective_commit)
     }
 
     /// Get document history from git.
@@ -731,7 +776,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn get_document_history(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
     ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
@@ -740,7 +785,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.load_issue_typed(issue_id)?;
         self.find_issue_document(issue, path)?;
 
-        let layout = self.require_layout().map_err(PathReadError::Other)?;
+        let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
 
         // Try to get history from git, return empty list if not available
@@ -764,7 +809,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn get_document_diff(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         from: &str,
         to: Option<&str>,
@@ -776,7 +821,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.load_issue_typed(issue_id)?;
         self.find_issue_document(issue, path)?;
 
-        let layout = self.require_layout().map_err(PathReadError::Other)?;
+        let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
 
         // Try to get diff from git, return error message if not available
@@ -821,7 +866,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn get_issue_document_paths(&self) -> Result<Vec<String>> {
         Ok(self
-            .with_issue_documents(self.storage.list_issues()?)?
+            .with_issue_documents(self.exec.storage.list_issues()?)?
             .into_iter()
             .flat_map(|(_, documents)| documents)
             .map(|document| document.path)
@@ -843,7 +888,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
-        self.storage.read_path_bytes(path, at_commit)
+        self.exec.storage.read_path_bytes(path, at_commit)
     }
 
     fn read_file_from_git(
@@ -916,10 +961,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn list_document_assets(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         rescan: bool,
-    ) -> Result<crate::commands::AssetListResult>
+    ) -> Result<(crate::commands::AssetListResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -928,10 +973,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut warnings = Vec::new();
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
         let document = issue
@@ -966,20 +1009,22 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|a| a.asset_type == AssetType::Missing)
             .count();
 
-        Ok(crate::commands::AssetListResult {
-            issue_id: full_id,
-            document_path: path.to_string(),
-            count: total,
+        let listed = crate::commands::AssetListResult::with_extras(
             assets,
-            summary: crate::commands::AssetSummary {
-                total,
-                per_doc: per_doc_count,
-                shared: shared_count,
-                external: external_count,
-                missing: missing_count,
+            crate::commands::AssetListScope {
+                worktree_root: self.exec.require_layout()?.worktree_root().to_path_buf(),
+                issue_id: full_id,
+                document_path: path.to_string(),
+                summary: crate::commands::AssetSummary {
+                    total,
+                    per_doc: per_doc_count,
+                    shared: shared_count,
+                    external: external_count,
+                    missing: missing_count,
+                },
             },
-            warnings,
-        })
+        );
+        Ok((listed, warnings))
     }
 
     /// Rescan one unpinned document from a coherent captured image and publish
@@ -987,7 +1032,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// inventories are a true no-op: no id, timestamp, event, or issue bytes.
     fn rescan_document_assets(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         warnings: &mut Vec<String>,
     ) -> Result<Vec<crate::document::Asset>>
@@ -996,20 +1041,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
-        let layout = self.require_layout()?;
-        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+        let layout = self.exec.require_layout()?;
+        let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)?;
-        let events_path = VirtualPath::EVENTS;
         let source = DocumentScanSource::Worktree(document_path);
 
         // Operation-scoped so a fresh-session retry cannot resample the update
         // timestamp or audit-event identity.
         let context = super::production_mutation_context();
-        with_mutation_session(&self.storage, &layout, "document rescan", |session| {
+        with_mutation_session(&self.exec.storage, &layout, "document rescan", |session| {
             let initial = document_scan_capture_spec(
-                [issue_path.clone(), events_path.clone()]
-                    .into_iter()
-                    .collect(),
+                [issue_path.clone()].into_iter().collect(),
                 &source,
                 &Default::default(),
             )?;
@@ -1045,41 +1087,22 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 MutationIntent::RecordEvent {
                     phase: 1,
-                    event: Box::new(crate::domain::Event::draft_issue_updated(
-                        issue_id.to_string(),
+                    event: Box::new(crate::domain::EventBody::draft_issue_updated(
+                        issue_id.clone(),
                         "doc-rescan".to_string(),
                         vec!["documents.assets".to_string()],
                     )),
                 },
             ];
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             Ok(SessionStep::Apply(plan, scanned))
         })
     }
 
-    /// Validate that an external URL is reachable
-    ///
-    /// Returns Ok(true) if URL is reachable, Ok(false) if not reachable,
-    /// or Err if validation failed (network error, timeout, etc.)
-    fn validate_external_url(url: &str) -> Result<bool> {
-        // Quick HEAD request
-        // In ureq 3.x, use Agent for configuration
-        let agent = ureq::Agent::new_with_defaults();
-        let response = agent.head(url).call();
-
-        match response {
-            Ok(resp) => {
-                // Check if status is success or redirection (2xx or 3xx)
-                let status = resp.status();
-                Ok(status.is_success() || status.is_redirection())
-            }
-            Err(_e) => {
-                // Any error (IO, DNS, SSL, HTTP 4xx/5xx, etc.) means unreachable
-                // Note: ureq 3.x doesn't distinguish between error types easily
-                // We consider all errors as "unreachable"
-                Ok(false)
-            }
-        }
+    fn validate_external_url(agent: &ureq::Agent, url: &str) -> bool {
+        agent.head(url).call().is_ok_and(|response| {
+            response.status().is_success() || response.status().is_redirection()
+        })
     }
 
     /// Check document links and assets for validity
@@ -1105,19 +1128,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
         use std::path::PathBuf;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let repo_root = layout.worktree_root();
 
         // Resolve the scope to the set of issues whose documents to check.
         let issues = match scope {
-            DocumentScope::All => self.storage.list_issues()?,
-            DocumentScope::Issue(issue_id) => {
-                let full_id = self
-                    .storage
-                    .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-                let issue = self.storage.load_issue(&full_id)?;
-                vec![issue]
-            }
+            DocumentScope::All => self.exec.storage.list_issues()?,
+            DocumentScope::Issue(issue_id) => vec![self.exec.storage.load_issue(issue_id)?],
         };
 
         // Every document in scope, explicit or derived, is checked and tracked.
@@ -1139,7 +1156,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(crate::commands::LinkCheckResult {
                 valid: true,
                 errors: Vec::new(),
-                warnings: Vec::new(),
+                link_warnings: Vec::new(),
                 scope: scope.to_string(),
                 summary: crate::commands::LinkCheckSummary {
                     total_documents: 0,
@@ -1159,6 +1176,37 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Read every reference at the version it names, before any classification.
         let readings =
             self.read_documents_at_named_versions(&layout, &all_documents, &link_validator)?;
+
+        let mut urls = all_documents
+            .iter()
+            .zip(&readings)
+            .filter(|(_, reading)| !matches!(reading, CheckedDocument::Unresolved(_)))
+            .flat_map(|((_, document), _)| &document.assets)
+            .filter(|asset| asset.asset_type == AssetType::External)
+            .map(|asset| asset.original_path.as_str())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .map(|url| (url, false))
+            .collect::<Vec<_>>();
+        let agent = ureq::Agent::new_with_config(
+            ureq::Agent::config_builder()
+                .timeout_global(Some(EXTERNAL_URL_TIMEOUT))
+                .build(),
+        );
+        let chunk_size = urls.len().div_ceil(EXTERNAL_URL_WORKERS).max(1);
+        std::thread::scope(|scope| {
+            urls.chunks_mut(chunk_size).for_each(|urls| {
+                let agent = &agent;
+                scope.spawn(move || {
+                    urls.iter_mut().for_each(|(url, reachable)| {
+                        *reachable = Self::validate_external_url(agent, url);
+                    });
+                });
+            });
+        });
+        let reachable = urls
+            .into_iter()
+            .collect::<std::collections::BTreeMap<_, _>>();
 
         // Validate each document
         let mut errors = Vec::new();
@@ -1246,34 +1294,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }));
                     }
                     AssetType::External => {
-                        // Validate external URLs
-                        match Self::validate_external_url(&asset.original_path) {
-                            Ok(true) => {
-                                // URL is reachable - all good
-                            }
-                            Ok(false) => {
-                                // URL exists but returned error or is unreachable
-                                errors.push(serde_json::json!({
-                                    "issue_id": issue_id,
-                                    "document": doc.path,
-                                    "type": "unreachable_url",
-                                    "asset": asset.original_path,
-                                    "message": format!("External URL is unreachable: {}", asset.original_path),
-                                }));
-                            }
-                            Err(e) => {
-                                // Validation failed (network error, timeout, etc.)
-                                warnings.push(serde_json::json!({
-                                    "issue_id": issue_id,
-                                    "document": doc.path,
-                                    "type": "url_validation_failed",
-                                    "asset": asset.original_path,
-                                    "message": format!(
-                                        "Could not validate external URL ({}): {}",
-                                        e, asset.original_path
-                                    ),
-                                }));
-                            }
+                        if reachable.get(asset.original_path.as_str()) != Some(&true) {
+                            errors.push(serde_json::json!({
+                                "issue_id": issue_id,
+                                "document": doc.path,
+                                "type": "unreachable_url",
+                                "asset": asset.original_path,
+                                "message": format!("External URL is unreachable: {}", asset.original_path),
+                            }));
                         }
                     }
                 }
@@ -1348,7 +1376,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(crate::commands::LinkCheckResult {
             valid: errors.is_empty(),
             errors,
-            warnings,
+            link_warnings: warnings,
             scope: scope.to_string(),
             summary: crate::commands::LinkCheckSummary {
                 total_documents: all_documents.len(),
@@ -1365,35 +1393,42 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// A pinned reference's link targets are only known once its pinned content
     /// has been scanned, so the capture expands once — the same discover-then-
     /// re-capture shape document scanning uses — and a re-scan that reveals a
-    /// target the expanded capture does not hold restarts the session.
+    /// target the expanded capture does not hold retries the read.
     fn read_documents_at_named_versions(
         &self,
         layout: &crate::repository_state::RepositoryLayout,
-        documents: &[(String, &crate::domain::DocumentReference)],
+        documents: &[(IssueId, &crate::domain::DocumentReference)],
         link_validator: &crate::document::LinkValidator,
     ) -> Result<Vec<CheckedDocument>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use std::collections::BTreeSet;
-
-        with_mutation_session(&self.storage, layout, "document link check", |session| {
-            let spec = link_check_capture_spec(documents, &BTreeSet::new())?;
-            let Some(image) = capture_discovering(session, spec, |image, spec| {
-                pinned_link_targets(image, documents, link_validator)
-                    .iter()
-                    .try_for_each(|(revision, path)| discover_derived_pinned(spec, revision, path))
-            })?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            Ok(SessionStep::Done(read_documents(
-                &image,
-                documents,
-                link_validator,
-            )?))
-        })
+        with_read_session(
+            &self.exec.storage,
+            layout,
+            "document link check",
+            |session| capture_link_check_readings(session, documents, link_validator),
+        )
     }
+}
+
+/// Capture and read every document reference at the version it names, in one
+/// discovering round of `session`. `None` is a retryable conflict.
+fn capture_link_check_readings(
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
+    link_validator: &crate::document::LinkValidator,
+) -> Result<Option<Vec<CheckedDocument>>> {
+    let spec = link_check_capture_spec(documents, &std::collections::BTreeSet::new())?;
+    let Some(image) = capture_discovering(session, spec, |image, spec| {
+        pinned_link_targets(image, documents, link_validator)
+            .iter()
+            .try_for_each(|(revision, path)| discover_derived_pinned(spec, revision, path))
+    })?
+    else {
+        return Ok(None);
+    };
+    read_documents(&image, documents, link_validator).map(Some)
 }
 
 impl CapturedDocumentScan {
@@ -1418,11 +1453,15 @@ fn local_asset_paths(
         .filter_map(|asset| asset.resolved_path.as_deref())
 }
 
-/// Declare the evidence a link check reads: each reference at the version it
-/// names, a pinned reference's local assets at its commit, and `link_targets`
-/// discovered by scanning pinned content.
+/// Declare the evidence a link check reads: the kind of each reference at the
+/// version it names, the content of a pinned reference, whose links are scanned
+/// from it, and the kinds of a pinned reference's local assets at its commit and
+/// of `link_targets` discovered by scanning pinned content.
+///
+/// An unpinned reference's links and assets are checked against the working
+/// tree itself, so its content is never captured.
 fn link_check_capture_spec(
-    documents: &[(String, &crate::domain::DocumentReference)],
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_targets: &std::collections::BTreeSet<(String, String)>,
 ) -> Result<crate::repository_state::CaptureSpec> {
     use crate::document::DocumentReferenceRequests;
@@ -1435,21 +1474,23 @@ fn link_check_capture_spec(
         let requests = DocumentReferenceRequests::for_reference(document)?;
         worktree.extend(requests.worktree().cloned());
         let (revision, path) = requests.pinned();
-        spec.discover_pinned(revision, path)?;
         if document.commit.is_some() {
+            spec.discover_pinned(revision, path)?;
             for asset in local_asset_paths(document) {
                 discover_derived_pinned(&mut spec, revision, &asset.to_string_lossy())?;
             }
+        } else {
+            spec.discover_pinned_kind(revision, path)?;
         }
     }
-    spec.discover_paths(worktree)?;
+    spec.discover_kinds(worktree)?;
     for (revision, path) in link_targets {
         discover_derived_pinned(&mut spec, revision, path)?;
     }
     Ok(spec)
 }
 
-/// Request pinned evidence for a path derived from a document's content.
+/// Request the pinned kind of a path derived from a document's content.
 ///
 /// A derived path the pinned-request contract rejects — a link target that
 /// climbs past the repository root, say — names no repository file, so it is
@@ -1462,7 +1503,7 @@ fn discover_derived_pinned(
 ) -> Result<()> {
     use crate::repository_state::CaptureError;
 
-    match spec.discover_pinned(revision, path) {
+    match spec.discover_pinned_kind(revision, path) {
         Ok(()) | Err(CaptureError::InvalidPinnedRequest(..)) | Err(CaptureError::Layout(_)) => {
             Ok(())
         }
@@ -1503,7 +1544,7 @@ fn pinned_target_kind(
 /// requests at that document's own commit.
 fn pinned_link_targets(
     image: &crate::repository_state::RepositoryImage,
-    documents: &[(String, &crate::domain::DocumentReference)],
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_validator: &crate::document::LinkValidator,
 ) -> std::collections::BTreeSet<(String, String)> {
     documents
@@ -1526,7 +1567,7 @@ fn pinned_link_targets(
 /// Derive each reference's reading from one closed image.
 fn read_documents(
     image: &crate::repository_state::RepositoryImage,
-    documents: &[(String, &crate::domain::DocumentReference)],
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_validator: &crate::document::LinkValidator,
 ) -> Result<Vec<CheckedDocument>> {
     documents
@@ -1580,9 +1621,11 @@ fn read_document(
 fn document_capture_spec(
     paths: std::collections::BTreeSet<crate::repository_state::VirtualPath>,
 ) -> Result<crate::repository_state::CaptureSpec> {
-    use crate::repository_state::CaptureSpec;
+    use crate::repository_state::{CaptureSpec, VirtualPath};
 
-    Ok(CaptureSpec::new(paths, document_capture_budget())?)
+    let mut spec = CaptureSpec::new(paths, document_capture_budget())?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
+    Ok(spec)
 }
 
 fn document_scan_capture_spec(
@@ -1618,21 +1661,20 @@ fn discover_scan_assets(
 fn captured_issue(
     image: &crate::repository_state::RepositoryImage,
     issue_path: &crate::repository_state::VirtualPath,
-    expected_id: &str,
+    expected_id: &IssueId,
 ) -> Result<Issue> {
     use crate::repository_state::RepositoryEntry;
 
     let issue = match image.entry(issue_path)? {
         RepositoryEntry::File { content, .. } => {
-            serde_json::from_slice::<Issue>(content.bytes())
-                .with_context(|| format!("failed to parse captured issue {expected_id}"))?
+            crate::repository_state::decode_issue_record(issue_path, content.bytes())?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(expected_id).into())
+            return Err(crate::storage::IssueNotFoundError::new(expected_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };
-    if issue.id != expected_id {
+    if &issue.id != expected_id {
         return Err(anyhow!(
             "captured issue identity mismatch: requested {expected_id}, found {}",
             issue.id
@@ -1842,7 +1884,7 @@ fn derive_document_add(
         Some(index) => issue.documents[index] = document,
         None => issue.documents.push(document),
     }
-    let event = crate::domain::Event::draft_issue_updated(
+    let event = crate::domain::EventBody::draft_issue_updated(
         issue.id.clone(),
         if updated { "doc-update" } else { "doc-add" }.to_string(),
         vec!["documents".to_string()],
@@ -1879,7 +1921,7 @@ fn derive_document_remove(
         issue_id: issue.id.clone(),
         path: path.to_string(),
     };
-    let event = crate::domain::Event::draft_issue_updated(
+    let event = crate::domain::EventBody::draft_issue_updated(
         issue.id.clone(),
         "doc-remove".to_string(),
         vec!["documents".to_string()],
@@ -1926,6 +1968,56 @@ mod tests {
     use crate::test_utils::document_reference;
     use std::collections::BTreeSet;
 
+    #[test]
+    fn test_validate_external_url_times_out_when_server_never_answers() {
+        use std::net::TcpListener;
+        use std::time::{Duration, Instant};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/stalled", listener.local_addr().unwrap());
+        let (release, waiting) = std::sync::mpsc::channel();
+        let timeout = Duration::from_millis(50);
+        let agent = ureq::Agent::new_with_config(
+            ureq::Agent::config_builder()
+                .timeout_global(Some(timeout))
+                .build(),
+        );
+        std::thread::scope(|scope| {
+            scope.spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                let _ = waiting.recv_timeout(Duration::from_secs(1));
+                drop(stream);
+            });
+            let started = Instant::now();
+            let reachable = DocumentOps::<InMemoryStorage>::validate_external_url(&agent, &url);
+            let elapsed = started.elapsed();
+            let _ = release.send(());
+            assert!(!reachable);
+            assert!(
+                elapsed < Duration::from_millis(500),
+                "probe took {elapsed:?}"
+            );
+        });
+    }
+
+    #[test]
+    fn test_report_artifact_conformance_propagates_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .documents()
+            .report_artifact_conformance()
+            .expect_err("invalid hierarchy must fail artifact conformance reporting");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
+
     fn capture_spec(paths: impl IntoIterator<Item = VirtualPath>) -> CaptureSpec {
         document_capture_spec(paths.into_iter().collect::<BTreeSet<_>>()).unwrap()
     }
@@ -1947,22 +2039,121 @@ mod tests {
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
 
         let first = executor
+            .documents()
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
-        assert_eq!(first.assets.len(), 1);
-        assert_eq!(
-            first.assets[0].asset_type,
-            crate::document::AssetType::Local
-        );
+        let first = first.0;
+        assert_eq!(first.items.len(), 1);
+        assert_eq!(first.items[0].asset_type, crate::document::AssetType::Local);
         let event_count = storage.read_events().unwrap().len();
         let updated_at = storage.load_issue(&id).unwrap().updated_at;
 
         let second = executor
+            .documents()
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
-        assert_eq!(second.assets, first.assets);
+        assert_eq!(second.0.items, first.items);
         assert_eq!(storage.read_events().unwrap().len(), event_count);
         assert_eq!(storage.load_issue(&id).unwrap().updated_at, updated_at);
+    }
+
+    #[test]
+    fn test_capture_link_check_readings_resolves_unscanned_document_larger_than_capture_budget() {
+        let storage = InMemoryStorage::new();
+        let max_bytes = 64 * 1024;
+        storage.add_worktree_file("receipts/large.log", &"x".repeat(max_bytes * 2));
+        let mut issue = crate::test_utils::fixture_issue("Receipts".into(), String::new());
+        issue
+            .documents
+            .push(document_reference("receipts/large.log"));
+        crate::commands::test_helpers::seed_issue(&storage, issue.clone());
+        let layout = storage.repository_layout();
+        let documents = issue
+            .documents
+            .iter()
+            .map(|document| (issue.id.clone(), document))
+            .collect::<Vec<_>>();
+        let link_validator = crate::document::LinkValidator::new(
+            layout.worktree_root().to_path_buf(),
+            vec!["receipts/large.log".into()],
+        );
+        let mut session = crate::commands::test_helpers::LimitedCaptureSession {
+            inner: storage.open_mutation_session(layout).unwrap(),
+            max_bytes: max_bytes as u64,
+        };
+
+        let readings = capture_link_check_readings(&mut session, &documents, &link_validator)
+            .unwrap()
+            .expect("a settled capture");
+
+        assert!(matches!(
+            readings.as_slice(),
+            [CheckedDocument::WorkingTree]
+        ));
+    }
+
+    #[test]
+    fn test_check_document_links_for_one_issue_completes_beside_a_held_mutation_session() {
+        let executor = crate::commands::test_helpers::setup();
+        executor
+            .storage()
+            .add_worktree_file("docs/guide.md", "# Guide\n");
+        let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(document_reference("docs/guide.md"));
+        let scope = crate::document::DocumentScope::Issue(issue.id.clone());
+        crate::commands::test_helpers::seed_issue(executor.storage(), issue);
+
+        let checked = crate::commands::test_helpers::read_beside_held_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            || executor.documents().check_document_links(&scope).unwrap(),
+        );
+
+        assert_eq!(checked.summary.total_documents, 1);
+        assert!(checked.valid, "{:?}", checked.errors);
+    }
+
+    #[test]
+    fn test_list_document_references_serializes_the_issue_beside_its_documents() {
+        let storage = InMemoryStorage::new();
+        let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(document_reference("docs/guide.md"));
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let listed = executor.documents().list_document_references(&id).unwrap();
+        let value = serde_json::to_value(&listed).unwrap();
+
+        assert_eq!(value["issue_id"], id.as_str());
+        assert_eq!(value["documents"][0]["path"], "docs/guide.md");
+    }
+
+    #[test]
+    fn test_list_document_assets_serializes_its_scope_and_summary_beside_the_assets() {
+        let storage = InMemoryStorage::new();
+        let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(document_reference("docs/guide.md"));
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
+        storage.add_worktree_file("docs/guide.md", "![logo](./logo.png)\n");
+        storage.add_worktree_file("docs/logo.png", "png bytes");
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let listed = executor
+            .documents()
+            .list_document_assets(&id, "docs/guide.md", true)
+            .unwrap();
+        let value = serde_json::to_value(&listed.0).unwrap();
+
+        assert_eq!(value["issue_id"], id.as_str());
+        assert_eq!(value["document_path"], "docs/guide.md");
+        assert_eq!(
+            value["summary"]["total"],
+            value["assets"].as_array().unwrap().len()
+        );
     }
 
     #[test]
@@ -1977,8 +2168,7 @@ mod tests {
         storage.add_worktree_file("docs/new.png", "new bytes");
 
         let layout = storage.repository_layout();
-        let issue_path = VirtualPath::data(format!("issues/{id}.json")).unwrap();
-        let events_path = VirtualPath::data("events.jsonl").unwrap();
+        let issue_path = VirtualPath::issue_record(&id);
         let document_path = VirtualPath::worktree("docs/guide.md").unwrap();
         let old_asset_path = VirtualPath::worktree("docs/old.png").unwrap();
         let expected_time = chrono::DateTime::parse_from_rfc3339("2026-07-20T13:14:15Z")
@@ -1990,7 +2180,6 @@ mod tests {
         let first_image = first_session
             .capture(capture_spec([
                 issue_path.clone(),
-                events_path.clone(),
                 document_path.clone(),
                 old_asset_path,
             ]))
@@ -2012,7 +2201,7 @@ mod tests {
             first_scan.format,
             first_scan.assets,
         );
-        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents, None).unwrap();
 
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".into());
@@ -2029,7 +2218,6 @@ mod tests {
         let retry_image = retry_session
             .capture(capture_spec([
                 issue_path.clone(),
-                events_path,
                 document_path.clone(),
                 new_asset_path,
             ]))
@@ -2050,7 +2238,7 @@ mod tests {
             retry_scan.format,
             retry_scan.assets,
         );
-        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents, None).unwrap();
         assert_eq!(event_bytes(&first_plan), event_bytes(&retry_plan));
         retry_session.apply(&retry_plan).unwrap();
 
@@ -2112,6 +2300,7 @@ mod tests {
             CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
 
         let error = executor
+            .documents()
             .add_document_reference(&id, "../outside.md", None, None, None, false)
             .unwrap_err();
         assert!(matches!(
@@ -2131,21 +2320,32 @@ mod tests {
         let (temp, storage) = crate::test_utils::setup_test_repo()?;
         let executor =
             CommandExecutor::new(storage.clone()).with_layout(storage.configured_layout()?);
-        let (issue_id, _) = executor.issues().create_issue(
-            "Long History Issue".to_string(),
-            String::new(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Long History Issue".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
         std::fs::create_dir_all(temp.path().join("docs"))?;
         std::fs::write(temp.path().join("docs/plan.md"), "# Plan\n")?;
         crate::test_utils::grow_event_log_beyond(&storage, 64 * 1024 * 1024)?;
 
-        executor.add_document_reference(&issue_id, "docs/plan.md", None, None, None, false)?;
+        executor.documents().add_document_reference(
+            &issue_id,
+            "docs/plan.md",
+            None,
+            None,
+            None,
+            false,
+        )?;
 
         assert_eq!(
             storage

@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:19:54.755391268Z",
+  "context": {},
+  "created_at": "2026-11-01T19:19:53.197473349Z",
+  "dependencies": [],
+  "description": "Remove the `PROFILE_NOT_FOUND` error code, which no route reaches, or make it reachable where it belongs.\n\n## Background\n\nAn absent package directory returns `PROFILE_ERROR` with exit 1 (surfaced by 1a989754 and again by 0f648627). `PROFILE_NOT_FOUND` has no reachable route, and the `NotFoundError` branch in `crates/jit/src/output/failure.rs` serves only it.\n\n## Success Criteria\n\n- [hard] REQ-01: `PROFILE_NOT_FOUND` either no longer exists, with its failure branch and generated error-code reference entry removed, or an absent package directory reports it with a test proving so. One outcome, with net-negative production lines preferred.\n- [hard] REQ-02: An absent package directory reports one error code, with an actionable message naming the path.\n",
+  "documents": [],
+  "done_at": "2026-11-01T19:49:33.189597516Z",
+  "first_ready_at": "2026-11-01T19:19:53.197473349Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d2e0fe02-378c-4d44-980e-1b6dc3daf31d",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:42:39.980061548Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "901db063-88b5-4c3e-946b-80e7c5f3dd45",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:46:24.722740542Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Settle the unreachable PROFILE_NOT_FOUND code",
+  "updated_at": "2026-11-01T19:49:33.189597516Z"
+}

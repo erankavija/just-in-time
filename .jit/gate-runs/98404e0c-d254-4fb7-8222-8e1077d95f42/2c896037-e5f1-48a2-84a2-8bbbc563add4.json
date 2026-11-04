@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-98404e0c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dfb293fad23c719ccf1652cb4b034de613057abc",
+  "completed_at": "2026-10-25T03:40:57.943547453Z",
+  "duration_ms": 130968,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/claim_coordinator.rs",
+        "id": "F1",
+        "line": 1397,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/convention-convergence",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "The local test_issue_id fixture cites unrelated issue bf87bbdb instead of a valid tracked convergence condition for the planned shared fixture."
+      }
+    ],
+    "summary": "One issue-impact policy defect remains: the local test-ID fixture cites an unrelated task instead of a tracked convergence condition.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2c896037-e5f1-48a2-84a2-8bbbc563add4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T03:38:46.974908947Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 16049 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-98404e0c\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17123-b1e0-7852-8056-1ec45753c997\n--------\nuser\n--- 16036 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 1a16902410e8c77cfc03612003c07f6aeb77d398; dfb293fad23c719ccf1652cb4b034de613057abc\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/2195c98f/requirement/REQ-01 and REQ-06 (.jit issue source); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, canonical-cutover, convention-convergence, essential-code-prose, orthogonal-tests, shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T03:37:23Z); code-review pending\nTruncation recovery: per-commit and per-path patch reads, including all 905 lines of claim_coordinator.rs diff, plus focused current-source and registry reads\n\n1. **[blocking, issue-impact]** `test_issue_id` is a temporary local shared fixture, but its claimed convergence condition points to `bf87bbdb`, which is an unrelated backlog task for graph query results. The actual planned shared-fixture work is `0af95f14`; therefore the exception has no valid tracked convergence condition. This also leaves misleading task-history prose in code. [crates/jit/src/storage/claim_coordinator.rs:1397] (@/invariant/convention-convergence, @/invariant/essential-code-prose)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact policy defect remains: the local test-ID fixture cites an unrelated task instead of a tracked convergence condition.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The local test_issue_id fixture cites unrelated issue bf87bbdb instead of a valid tracked convergence condition for the planned shared fixture.\",\"file\":\"crates/jit/src/storage/claim_coordinator.rs\",\"line\":1397,\"references\":[\"@/invariant/convention-convergence\",\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

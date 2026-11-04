@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8a71fbc3813a407b5512099c1456ef47b9d1bd13",
+  "completed_at": "2026-11-01T09:42:40.543254076Z",
+  "duration_ms": 104660,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied by the attributable current tree and recorded evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "87d5fd34-a913-4c6e-bad1-344c2fb3adc3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d5008d28-c83b-4c46-a6df-f2657d91af71",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T09:40:55.882709979Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 413df0ddf, b5f2d9730, 78b5e5cdc, 8a71fbc38 (all `jit:87d5fd34`)\nPolicy sources: AGENTS.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose, @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T09:39:26Z); code-review pending/unrun\nTruncation recovery: narrowed executable-writer, shebang, call-site, historical-flake, and merge-parent reads\n\n1. No findings. The shared helper seals executable fixtures before use, runnable script call sites use it, shutdown tests synchronize on handler entry, and the issue records the required 20 distinct shuffled shared-process seeds.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied by the attributable current tree and recorded evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

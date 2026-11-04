@@ -1,0 +1,51 @@
+runs=3 tests=4979
+unit         median-of-runs  n= 3283 median=0.013 p95=0.314 p99=0.867 max=20.007
+unit         worst-run       n= 3283 median=0.014 p95=0.343 p99=0.894 max=20.010
+integration  median-of-runs  n= 1696 median=0.217 p95=0.809 p99=2.128 max=20.005
+integration  worst-run       n= 1696 median=0.229 p95=0.871 p99=2.889 max=20.006
+all          median-of-runs  n= 4979 median=0.015 p95=0.549 p99=1.597 max=20.007
+all          worst-run       n= 4979 median=0.016 p95=0.591 p99=1.612 max=20.010
+
+per-run suite times: [746.0, 743.7, 804.8]
+
+top 40 by median-of-runs:
+ 20.007  20.010 unit        jit storage::redo_conformance::prop_re_application_after_an_interruption_at_any_point_reaches_and_holds_the_new_state
+ 20.005  20.006 integration jit::cli_repo_workflow profile_cli_tests::test_profile_pack_and_add_carry_a_package_at_the_model_limits
+ 20.004  20.005 integration jit::cli_repo_workflow profile_cli_tests::test_profile_add_publishes_a_package_whose_directories_outnumber_its_files
+  6.640   6.642 unit        jit commands::event_tail_tests::test_mutations_append_over_unparseable_history_without_capturing_the_whole_log
+  5.904   8.495 integration jit::cli_repo_workflow profile_acceptance_tests::test_shipped_profile_archive_bootstraps_a_repository_without_jit_state
+  5.015   7.209 integration jit::cli_repo_workflow steering_scenarios::test_all_steering_scenarios
+  4.311   4.312 unit        jit commands::profile::tests::test_apply_profiles_jit_dogfood_composes_what_applying_both_packages_composes
+  4.069   5.632 integration jit::cli_repo_workflow profile_acceptance_tests::test_profile_fresh_init_and_existing_apply_are_equivalent_without_git
+  3.883   3.893 unit        jit commands::gate_check::tests::test_repository_validation_checker_passes_exactly_where_validate_passes
+  3.391   4.015 integration jit::cli_repo_workflow lease_enforcement_tests::test_strict_lease_exempt_paths_write_for_their_stated_reason
+  3.353   4.230 integration jit::cli_repo_workflow profile_acceptance_tests::test_offline_public_cli_profile_reaches_implementation_ready_breakdown
+  3.033   3.517 integration jit::cli_repo_workflow lease_enforcement_tests::test_mutating_leaves_classified_as_no_record_leave_every_issue_record_alone
+  2.879   4.452 integration jit::fast_docs_templates artifact_discovery_tests::test_data_attribute_quote_and_local_path_matrix_warns
+  2.442   3.568 integration jit::cli_repo_workflow profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op
+  2.341   2.419 integration jit::cli_repo_workflow lock_contention_tests::test_concurrent_mutations_queue_behind_a_holder_under_the_default_wait
+  2.334   3.179 integration jit::cli_repo_workflow profile_cli_tests::test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op
+  2.322   2.326 integration jit::cli_issue command_exit_code_projection_tests::test_command_exit_codes_expired_lock_wait_emits_11
+  2.291   2.491 unit        jit storage::claim_coordinator::proptests::test_concurrent_claims_exclusive
+  2.258   2.337 integration jit::cli_repo_workflow lease_enforcement_tests::test_strict_lease_refusal_precedes_the_external_precheck
+  2.224   2.240 unit        jit profile::repository_package::tests::test_profile_applies_to_neutral_repo_and_ordinary_renderers_consume_config
+  2.203   2.205 unit        jit test_utils::tests::test_profiled_repository_fixture_memory_build_writes_the_tree_a_file_build_writes
+  2.173   3.301 integration jit::cli_repo_workflow profile_cli_tests::test_profile_pack_packs_every_shipped_package_from_a_repository_holding_it
+  2.170   2.193 integration jit::cli_repo_workflow lease_enforcement_tests::test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuses
+  2.146   2.337 integration jit::cli_repo_workflow lease_enforcement_tests::test_warn_mode_dependency_writes_warn_only_in_human_non_quiet_mode
+  2.143   2.184 unit        jit storage::claim_coordinator::proptests::test_concurrent_different_issues_succeed
+  2.127   2.548 integration jit::cli_repo_workflow profile_acceptance_tests::test_profile_application_contributes_workflow_invariants_to_scaffolded_registry
+  2.106   3.274 integration jit::fast_docs_templates artifact_discovery_tests::test_every_binding_family_warns_without_blocking
+  2.103   3.308 integration jit::fast_docs_templates artifact_discovery_tests::test_loader_external_and_non_path_literals_do_not_warn
+  2.032   2.043 integration jit::cli_repo_workflow lease_enforcement_tests::test_dependency_and_document_edits_record_an_event_naming_the_issue
+  2.031   2.579 integration jit::cli_repo_workflow profile_cli_tests::test_existing_partial_profiled_init_atomically_completes_neutral_scaffold
+  2.025   2.058 unit        jit commands::profile::tests::test_apply_workflow_profile_to_bare_repository_contributes_hierarchy_rules
+  2.019   3.112 integration jit::cli_repo_workflow repo_discovery_tests::test_relative_data_root_override_keeps_worktree_assets_at_discovered_root
+  2.007   3.071 integration jit::cli_repo_workflow repo_discovery_tests::test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd
+  2.005   3.039 integration jit::cli_repo_workflow repo_discovery_tests::test_nested_profile_init_keeps_data_and_assets_in_child
+  1.978   1.990 integration jit::cli_issue failure_probe_fixture::test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class
+  1.937   1.963 unit        jit commands::gate_check::tests::test_repository_validation_records_a_repository_judged_wrong_as_a_failed_run
+  1.893   1.918 unit        jit commands::init::tests::test_fresh_profile_init_applies_every_package_of_the_selected_closure
+  1.882   2.881 integration jit::cli_repo_workflow profile_cli_tests::test_profiled_init_publishes_a_valid_repo
+  1.877   1.913 integration jit::cli_repo_workflow lease_enforcement_tests::test_strict_lease_enforced_mutation_leaves_the_claims_log_unchanged
+  1.870   1.889 unit        jit commands::init::tests::test_fresh_profile_init_publishes_complete_valid_repo_without_git

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cc3344730446e0406ea68f183660b8026e8f6fbe",
+  "completed_at": "2026-10-27T01:13:23.653284549Z",
+  "duration_ms": 286469,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All scoped CLI migrations use shared process support; the prior helper finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8e69776c-443e-4842-b818-c6af28fc73c9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "132e23cb-77a4-40aa-99c9-e182e6625fb3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T01:08:37.183320758Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 13c03895, 320a12bb, ecadfa6b, cb9f94b9, cc334473\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-27T01:08:33Z; exit code none)\nTruncation recovery: reread tagged patches and current affected files in bounded commit/path/line-range calls\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All scoped CLI migrations use shared process support; the prior helper finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

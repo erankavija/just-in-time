@@ -1,0 +1,49 @@
+{
+  "assignee": "agent:checker-unify",
+  "claimed_at": "2026-11-01T14:09:19.824009802Z",
+  "context": {},
+  "created_at": "2026-11-01T13:24:02.997122490Z",
+  "dependencies": [
+    "1a6d25ac-88f1-402d-a3e0-8b89b1bb6455"
+  ],
+  "description": "An adopter's gate using the built-in `repository_validation` checker can pass where `jit validate` fails, because the two compute validation differently. They must judge through one computation.\n\n## Background\n\n`jit validate` passes record-fidelity and materialization inputs to validation; the built-in checker calls the narrower entry point and skips them. This repository's own `repo-validate` gate runs `jit validate` as an exec command, so it sees the full verdict and hides the gap. Commit c36c6a393 removed tests of stored-record properties on the basis that the gate covers them, which is false for any repository using the built-in checker.\n\n## Success Criteria\n\n- [hard] REQ-01: The built-in `repository_validation` checker and whole-repository `jit validate` reach the same verdict over the same repository, through one computation.\n- [hard] REQ-02: A repository holding a record that does not reproduce fails the built-in checker.\n- [hard] REQ-03: Each property whose test c36c6a393 removed on that basis has one owning test that does not depend on this repository's live tracker.\n\n## Notes\n\nThis must land only after gf2 passes whole-repository validation on the installed binary, because 44 open gf2 issues require a gate using the built-in checker. The pure report function planned for repository validation is expected to absorb this code.\n\n- [hard] REQ-04: Whole-repository validation reports an event id that appears on more than one line of the event log, whether or not the lines match, and each finding names the id. All known logs hold none today, so this fails nothing on adoption. `merge=union` creates such lines silently.\n- [hard] REQ-05: A `repository_validation` verdict is never reused, whether or not the gate declares inputs, because it depends on records the input digest excludes.\n\nOne rule classifies a built-in repository validation run: if the checker read the repository and found it wrong, the run is `failed`; if it could not load or read what it needed, the run is `error`. A dangling dependency, a cycle, stale readiness or an undecodable record is `failed`; unloadable configuration or rules, a missing index or an unreadable repository is `error`. This refines REQ-02 of the built-in checker fault issue (39710b3b): its \"repository-integrity fault\" no longer records `error`.\n\nAdoption: the unified checker passed on the format 3 repositories gf2, mealie-fi and inflected-messages. `research` is checked once it converts to format 3.\n",
+  "documents": [],
+  "done_at": "2026-11-01T18:23:55.877152100Z",
+  "first_ready_at": "2026-11-01T13:24:02.997122490Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f4b3cc38-4b78-4038-ab17-3297709c0468",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:17:42.416455392Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "71b1e8c8-5120-4226-9a9c-9379d9e46120",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:22:32.566929714Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "37267c3d-b583-4f21-8d20-42dc2871f044",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:18:05.878801384Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "0a6fd04e-03a5-4e61-8768-ed5aa24aaf77",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Judge the built-in repository validation checker and jit validate through one computation",
+  "updated_at": "2026-11-01T18:23:55.877152100Z"
+}

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "88e7e8dfb173923faf24e29bdbd2c4d285220a59",
+  "completed_at": "2026-10-28T23:42:14.578501314Z",
+  "duration_ms": 222357,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/gate_cli_integration_test.rs",
+        "id": "F1",
+        "line": 210,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "Edited JSON gate-failure tests no longer prove the outer GATE_FAILED error class after removing projected exit-code checks."
+      }
+    ],
+    "summary": "Three edited JSON tests omit required non-exit-code evidence for the GATE_FAILED class.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8f87e366-0470-42de-a24a-9262b637bd13",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6f18faf7-1a1a-40f3-8bff-9ceb6e261664",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:38:32.220544692Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3822 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184e1-2e4a-7712-bb24-4e6f3749f0f1\n--------\nuser\n--- 3809 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 221742543; 1bac3f8ce\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit issue source); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-28T23:38:31Z); code-review pending\nTruncation recovery: reread each affected 221742543 patch separately; inspected both merge-parent deltas and targeted current projection/policy reads\n\n1. [blocking][issue-impact] REQ-02 is unmet in `crates/jit/tests/cli_gate/gate_cli_integration_test.rs:210`, `:254`, and `crates/jit/tests/cli_gate/gate_findings_test.rs:274`. Each formerly asserted projected exit 4, but now only asserts generic failure plus nested payload content; none verifies the outer `GATE_FAILED` error class. Assert `error.code == \"GATE_FAILED\"` (or equivalent class evidence) without restoring a process-code assertion.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three edited JSON tests omit required non-exit-code evidence for the GATE_FAILED class.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Edited JSON gate-failure tests no longer prove the outer GATE_FAILED error class after removing projected exit-code checks.\",\"file\":\"crates/jit/tests/cli_gate/gate_cli_integration_test.rs\",\"line\":210,\"references\":[\"@/issue/c780514e/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

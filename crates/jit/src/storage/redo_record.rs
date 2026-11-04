@@ -8,13 +8,9 @@
 //! needs, so a make-directory operation carries only a directory no other
 //! operation's path lies beneath (OD-7).
 
-use crate::repository_state::{
-    FileMode, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
-};
-use crate::storage::atomic_write::{create_file_synced, sync_directory};
-use anyhow::Context;
+use crate::domain::relative_path::RootRelativePath;
+use crate::repository_state::{FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 
 pub use crate::repository_state::RECORD_SCRATCH_DIR;
 
@@ -36,7 +32,8 @@ pub struct PutFile {
     pub mode: FileMode,
 }
 
-/// Event-log bytes written at the offset the mutation captured as the log's length.
+/// Event-log bytes written at the log's captured committed length: the end of
+/// its last newline-terminated line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventAppend {
     pub offset: u64,
@@ -68,11 +65,13 @@ impl RedoRecord {
     /// overlap: no operation's path may be an ancestor of another's, and no
     /// two operations may name the same path. The event append's implicit
     /// target, [`VirtualPath::EVENTS`], participates alongside every
-    /// make-directory, put and delete.
+    /// make-directory, put and delete. Puts and deletes at the event log are
+    /// forbidden.
     ///
     /// # Errors
     ///
-    /// Returns [`RedoRecordError::OverlappingAncestor`] or
+    /// Returns [`RedoRecordError::EventLogRewrite`] for a put or delete at the
+    /// event log, or [`RedoRecordError::OverlappingAncestor`] or
     /// [`RedoRecordError::DuplicatePath`] when the operation set contradicts
     /// itself.
     pub fn new(
@@ -81,6 +80,14 @@ impl RedoRecord {
         deletes: Vec<VirtualPath>,
         event_append: Option<EventAppend>,
     ) -> Result<Self, RedoRecordError> {
+        if puts
+            .iter()
+            .map(|put| &put.path)
+            .chain(deletes.iter())
+            .any(|path| *path == VirtualPath::EVENTS)
+        {
+            return Err(RedoRecordError::EventLogRewrite);
+        }
         let record = Self {
             make_directories,
             puts,
@@ -106,7 +113,8 @@ impl RedoRecord {
         &self.deletes
     }
 
-    /// The event append, if the mutation appended to the log.
+    /// The event append; absent only from the worktree record an absent-root
+    /// publication commits, since storage refuses any other record without one.
     pub fn event_append(&self) -> Option<&EventAppend> {
         self.event_append.as_ref()
     }
@@ -188,41 +196,14 @@ impl RedoRecord {
         Ok(bytes)
     }
 
-    /// Write the record under `data_root`'s scratch directory, returning its
-    /// path once it is durable: the bytes are synced and every directory entry
-    /// naming them is fsynced. This is the mutation's commit point — the first
-    /// live write follows it, because a redo-only protocol has no way back once
-    /// a live file is replaced.
-    ///
-    /// The record is written in place rather than staged and renamed: an
-    /// interrupted write leaves a truncated record, which [`Self::parse`]
-    /// rejects; session open then refuses to proceed with
-    /// `UnreadableRedoRecord` rather than skipping it. An occupied record path
-    /// is refused instead of replaced: what occupies it is a mutation no
-    /// session applied, and session open decides its fate.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the record cannot be serialized, the data root is
-    /// absent, the record path is occupied, or a write or sync fails.
-    pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
-        let scratch = data_root.join(RECORD_SCRATCH_DIR);
-        if create_scratch(data_root, &scratch)? {
-            sync_directory(data_root)?;
-        }
-        let path = scratch.join(RECORD_FILE_NAME);
-        create_file_synced(&path, &self.serialize()?)?;
-        sync_directory(&scratch)?;
-        Ok(path)
-    }
-
     /// Parse a record from its serialized form.
     ///
     /// # Errors
     ///
     /// Returns [`RedoRecordError`] when the bytes carry no header, a header this
     /// build cannot read, a path outside the repository roots, fewer content
-    /// bytes than the header declares, or bytes beyond them.
+    /// bytes than the header declares, bytes beyond them, or an operation set
+    /// rejected by [`Self::new`].
     pub fn parse(bytes: &[u8]) -> Result<Self, RedoRecordError> {
         let end = bytes
             .iter()
@@ -267,16 +248,7 @@ impl RedoRecord {
             })
             .transpose()?;
         match content.len() - read {
-            0 => {
-                let record = Self {
-                    make_directories,
-                    puts,
-                    deletes,
-                    event_append,
-                };
-                record.ensure_disjoint_paths()?;
-                Ok(record)
-            }
+            0 => Self::new(make_directories, puts, deletes, event_append),
             trailing => Err(RedoRecordError::TrailingBytes(trailing)),
         }
     }
@@ -300,6 +272,8 @@ pub enum RedoRecordError {
     OverlappingAncestor(VirtualPath, VirtualPath),
     #[error("redo record names path {0:?} in more than one operation")]
     DuplicatePath(VirtualPath),
+    #[error("the event log changes only by a positioned append")]
+    EventLogRewrite,
     #[error(transparent)]
     Path(#[from] RepositoryLayoutError),
 }
@@ -339,37 +313,6 @@ struct AppendHeader {
     length: u64,
 }
 
-/// Create the scratch directory when absent, with the data root's own mode,
-/// reporting whether this call created it: a created entry is durable only once
-/// its parent is fsynced, and a mode left to the umask is not the one the rest
-/// of the data root carries. An absent data root is not created here.
-fn create_scratch(data_root: &Path, scratch: &Path) -> anyhow::Result<bool> {
-    match std::fs::create_dir(scratch) {
-        Ok(()) => adopt_mode(data_root, scratch).map(|()| true),
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
-        Err(error) => Err(error).with_context(|| format!("creating {}", scratch.display())),
-    }
-}
-
-/// Give `directory` the permission bits `source` carries. The mode is set after
-/// creation rather than passed to `mkdir`, whose mode the umask masks.
-#[cfg(unix)]
-fn adopt_mode(source: &Path, directory: &Path) -> anyhow::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let mode = std::fs::metadata(source)
-        .with_context(|| format!("reading the mode of {}", source.display()))?
-        .permissions()
-        .mode();
-    std::fs::set_permissions(directory, std::fs::Permissions::from_mode(mode & 0o7777))
-        .with_context(|| format!("setting the mode of {}", directory.display()))
-}
-
-#[cfg(not(unix))]
-fn adopt_mode(_source: &Path, _directory: &Path) -> anyhow::Result<()> {
-    Ok(())
-}
-
 /// The wire spelling of a path's root-relative portion.
 fn relative_spelling(path: &VirtualPath) -> String {
     path.relative().as_str().to_owned()
@@ -384,7 +327,7 @@ fn canonical_path(
 ) -> Result<VirtualPath, RedoRecordError> {
     Ok(VirtualPath::from_root(
         root,
-        RootRelativePath::parse(relative)?,
+        RootRelativePath::parse(relative).map_err(RepositoryLayoutError::from)?,
     )?)
 }
 
@@ -408,7 +351,7 @@ fn take_content<'a>(
 /// The overlap between two operation paths, if any: the same path named by
 /// both, or one a containing directory of the other. Different root classes
 /// never overlap. Components are compared, not string prefixes, so
-/// `issues/a.json` and `issues/ab.json` share a spelling prefix without
+/// `records/a.json` and `records/ab.json` share a spelling prefix without
 /// overlapping.
 fn overlap(a: &VirtualPath, b: &VirtualPath) -> Option<RedoRecordError> {
     if a.root_class() != b.root_class() {
@@ -446,8 +389,8 @@ mod tests {
             make_directories: vec![VirtualPath::data("templates").unwrap()],
             puts: vec![
                 PutFile {
-                    path: VirtualPath::data("issues/a.json").unwrap(),
-                    bytes: br#"{"id":"a"}"#.to_vec(),
+                    path: VirtualPath::data("records/a.json").unwrap(),
+                    bytes: br#"{"value":"a"}"#.to_vec(),
                     mode: FileMode::Regular,
                 },
                 PutFile {
@@ -525,7 +468,7 @@ mod tests {
         let record = sample_record().serialize().unwrap();
         let end = record.iter().position(|byte| *byte == b'\n').unwrap();
         let header = String::from_utf8(record[..end].to_vec()).unwrap().replacen(
-            "issues/a.json",
+            "records/a.json",
             "../outside/a.json",
             1,
         );
@@ -548,8 +491,8 @@ mod tests {
 
     #[test]
     fn test_new_rejects_a_path_that_is_an_ancestor_of_another_operations_path() {
-        let ancestor = VirtualPath::data("issues").unwrap();
-        let descendant = VirtualPath::data("issues/a.json").unwrap();
+        let ancestor = VirtualPath::data("records").unwrap();
+        let descendant = VirtualPath::data("records/a.json").unwrap();
 
         let forward = RedoRecord::new(
             Vec::new(),
@@ -593,8 +536,8 @@ mod tests {
     /// directory itself (OD-7).
     #[test]
     fn test_new_rejects_a_made_directory_an_operations_path_lies_beneath() {
-        let directory = VirtualPath::data("issues").unwrap();
-        let nested = VirtualPath::data("issues/a.json").unwrap();
+        let directory = VirtualPath::data("records").unwrap();
+        let nested = VirtualPath::data("records/a.json").unwrap();
 
         let error = RedoRecord::new(
             vec![directory.clone()],
@@ -611,41 +554,49 @@ mod tests {
     }
 
     #[test]
-    fn test_new_rejects_a_delete_naming_the_event_log_while_appending_to_it() {
-        let error = RedoRecord::new(
-            Vec::new(),
-            Vec::new(),
-            vec![VirtualPath::EVENTS],
+    fn test_new_rejects_a_put_or_delete_at_the_event_log_with_or_without_an_append() {
+        for event_append in [
+            None,
             Some(EventAppend {
                 offset: 0,
                 bytes: Vec::new(),
             }),
-        )
-        .unwrap_err();
-
-        assert_eq!(error, RedoRecordError::DuplicatePath(VirtualPath::EVENTS));
+        ] {
+            for (puts, deletes) in [
+                (vec![put(VirtualPath::EVENTS)], Vec::new()),
+                (Vec::new(), vec![VirtualPath::EVENTS]),
+            ] {
+                assert!(
+                    RedoRecord::new(Vec::new(), puts, deletes, event_append.clone()).is_err(),
+                    "the event log must reject puts and deletes regardless of an append"
+                );
+            }
+        }
     }
 
     #[test]
-    fn test_parse_rejects_the_same_overlap_new_rejects() {
-        let path = VirtualPath::data("issues/a.json").unwrap();
-        let puts = vec![put(path.clone()), put(path)];
-        // Built directly through the struct literal: `serialize` carries no
-        // validation of its own, so this is the same bytes a corrupted or
-        // adversarial process could hand `parse`.
-        let bytes = RedoRecord {
-            make_directories: Vec::new(),
-            puts: puts.clone(),
-            deletes: Vec::new(),
-            event_append: None,
-        }
-        .serialize()
-        .unwrap();
+    fn test_parse_rejects_the_same_operation_sets_new_rejects() {
+        let path = VirtualPath::data("records/a.json").unwrap();
+        for (puts, deletes) in [
+            (vec![put(path.clone()), put(path)], Vec::new()),
+            (vec![put(VirtualPath::EVENTS)], Vec::new()),
+            (Vec::new(), vec![VirtualPath::EVENTS]),
+        ] {
+            // Bypass construction to represent corrupt serialized input.
+            let bytes = RedoRecord {
+                make_directories: Vec::new(),
+                puts: puts.clone(),
+                deletes: deletes.clone(),
+                event_append: None,
+            }
+            .serialize()
+            .unwrap();
 
-        assert_eq!(
-            RedoRecord::parse(&bytes).unwrap_err(),
-            RedoRecord::new(Vec::new(), puts, Vec::new(), None).unwrap_err(),
-        );
+            assert_eq!(
+                RedoRecord::parse(&bytes).unwrap_err(),
+                RedoRecord::new(Vec::new(), puts, deletes, None).unwrap_err(),
+            );
+        }
     }
 
     #[test]
@@ -653,12 +604,12 @@ mod tests {
         let record = RedoRecord::new(
             Vec::new(),
             vec![
-                put(VirtualPath::data("issues/ab.json").unwrap()),
-                put(VirtualPath::data("issues/a.json").unwrap()),
+                put(VirtualPath::data("records/ab.json").unwrap()),
+                put(VirtualPath::data("records/a.json").unwrap()),
             ],
             vec![
-                VirtualPath::worktree("issues/a").unwrap(),
-                VirtualPath::worktree("issues/ab").unwrap(),
+                VirtualPath::worktree("records/a").unwrap(),
+                VirtualPath::worktree("records/ab").unwrap(),
             ],
             None,
         )
@@ -702,125 +653,14 @@ mod tests {
     }
 
     #[test]
-    fn test_commit_writes_a_record_a_later_session_parses() {
-        let data_root = tempfile::tempdir().unwrap();
-        let record = sample_record();
-
-        let path = record.commit(data_root.path()).unwrap();
-
-        assert_eq!(
-            path,
-            data_root
-                .path()
-                .join(RECORD_SCRATCH_DIR)
-                .join(RECORD_FILE_NAME)
-        );
-        assert_eq!(
-            RedoRecord::parse(&std::fs::read(&path).unwrap()).unwrap(),
-            record
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_commit_creates_an_absent_scratch_directory_with_the_data_root_mode() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let mode = |directory: &std::path::Path| {
-            std::fs::metadata(directory).unwrap().permissions().mode() & 0o7777
-        };
-        let parent = tempfile::tempdir().unwrap();
-        // A directory the ambient umask alone shaped, so the mode the data root
-        // is given differs from it whatever that umask is: a scratch directory
-        // left to the umask carries this control's mode, not the data root's.
-        let control = parent.path().join("control");
-        std::fs::create_dir(&control).unwrap();
-        let data_mode = if mode(&control) == 0o700 {
-            0o750
-        } else {
-            0o700
-        };
-
-        let data_root = parent.path().join("data");
-        std::fs::create_dir(&data_root).unwrap();
-        std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(data_mode)).unwrap();
-
-        let path = sample_record().commit(&data_root).unwrap();
-
-        assert_eq!(
-            mode(path.parent().unwrap()),
-            mode(&data_root),
-            "the scratch directory does not carry the data root's mode"
-        );
-    }
-
-    /// A data root entries can be created in but not opened for reading: its
-    /// fsync fails, and the record write that follows it never runs. A commit
-    /// that skips that fsync reaches the write, and the record is there to find.
-    #[cfg(unix)]
-    #[test]
-    fn test_commit_fsyncs_the_data_root_before_writing_into_a_scratch_it_created() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let parent = tempfile::tempdir().unwrap();
-        let data_root = parent.path().join("data");
-        std::fs::create_dir(&data_root).unwrap();
-        let restrict = |mode| {
-            std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(mode)).unwrap()
-        };
-        restrict(0o300);
-
-        let outcome = sample_record().commit(&data_root);
-
-        let record = data_root.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
-        let wrote_record = record.exists();
-        restrict(0o700);
-        assert!(outcome.is_err(), "the unsyncable data root went unreported");
-        assert!(
-            !wrote_record,
-            "the record was written under a scratch directory the data root never made durable"
-        );
-    }
-
-    #[test]
-    fn test_commit_writes_into_a_scratch_directory_that_already_exists() {
-        let data_root = tempfile::tempdir().unwrap();
-        let scratch = data_root.path().join(RECORD_SCRATCH_DIR);
-        std::fs::create_dir(&scratch).unwrap();
-
-        let path = sample_record().commit(data_root.path()).unwrap();
-
-        assert!(path.starts_with(&scratch));
-        assert!(RedoRecord::parse(&std::fs::read(&path).unwrap()).is_ok());
-    }
-
-    #[test]
-    fn test_commit_leaves_a_record_a_previous_mutation_left_behind() {
-        let data_root = tempfile::tempdir().unwrap();
-        let path = sample_record().commit(data_root.path()).unwrap();
-        let leftover = std::fs::read(&path).unwrap();
-
-        assert!(RedoRecord::default().commit(data_root.path()).is_err());
-
-        assert_eq!(
-            std::fs::read(&path).unwrap(),
-            leftover,
-            "the commit overwrote a record no session had applied"
-        );
-    }
-
-    #[test]
-    fn test_commit_interrupted_partway_leaves_bytes_no_later_session_parses() {
-        let data_root = tempfile::tempdir().unwrap();
-        let path = sample_record().commit(data_root.path()).unwrap();
-        let complete = std::fs::read(&path).unwrap();
+    fn test_parse_rejects_every_proper_prefix_of_a_serialized_record() {
+        let complete = sample_record().serialize().unwrap();
 
         // The record is written in place, so every interruption of the write
         // leaves a proper prefix of these bytes at the record's path.
         (0..complete.len()).for_each(|length| {
-            std::fs::write(&path, &complete[..length]).unwrap();
             assert!(
-                RedoRecord::parse(&std::fs::read(&path).unwrap()).is_err(),
+                RedoRecord::parse(&complete[..length]).is_err(),
                 "a {length}-byte residue of an interrupted write parsed as a record"
             );
         });

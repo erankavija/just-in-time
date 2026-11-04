@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T20:49:40.345386844Z",
+  "context": {},
+  "created_at": "2026-11-04T19:09:02.842879201Z",
+  "dependencies": [],
+  "description": "Development and test executables keep their debug information outside the linked executable, so each test binary stops carrying its own copy of the workspace's debug sections.\n\n## Background\n\nThe dev and test profiles use `debug = \"line-tables-only\"`. Each of the about 13 active test executables is still roughly 115 MB, and about 75% of that is debug information. For `cli_issue` this is `.debug_str` 25.7 MB, `.debug_info` 19.4 MB and `.debug_line` 18.3 MB, against 16.1 MB of code, duplicated into every executable. The build-budget step reported `active-executables=14 bytes=1716158664` against a 2 GiB budget on 2026-11-04.\n\n## Success Criteria\n\n- [hard] REQ-01: The dev and test profiles declare `split-debuginfo = \"unpacked\"`.\n- [hard] REQ-02: Active test-executable bytes, as reported by the build-budget step, fall by at least 30% from the before value measured on the same commit without the change. Both values and the measurement commands are recorded in the build-budget README.\n- [hard] REQ-03: A panicking test still prints a backtrace with source file and line numbers for workspace frames, shown by a test or a recorded reproduction.\n- [hard] REQ-04: The executable-bytes budget in `scripts/rust-build-budget.sh` is lowered to the measured after value plus at most 10% headroom, and the README derives it.\n- [hard] REQ-05: The build profile policy test asserts the setting, and the existing suites pass.\n\n## Decisions\n\n- D-01: User-approved measured reduction floor is 30%. The specified unpacked setting reduces active executable bytes by 31.44% on the current tree while preserving source-line backtraces; this replaces the former 40% estimate without adding compiler or linker mechanisms.\n",
+  "documents": [],
+  "done_at": "2026-11-04T21:44:13.062137850Z",
+  "first_ready_at": "2026-11-04T19:09:02.842879201Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "51441b08-88af-45ad-bab3-8c8b7f4996dc",
+      "status": "passed",
+      "updated_at": "2026-11-04T21:42:18.830329745Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6ea0b765-8d61-486d-ad1b-c2c31eb530ad",
+      "status": "passed",
+      "updated_at": "2026-11-04T21:43:39.134863411Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "75b46be9-ebc5-4320-92c7-454b01ecb4db",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "type:task"
+  ],
+  "priority": "critical",
+  "state": "done",
+  "title": "Test executables keep debug information out of the linked binary",
+  "updated_at": "2026-11-04T21:44:13.062137850Z"
+}

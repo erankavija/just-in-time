@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2f76a56e7b4aa570ab851858a5b0d2012fe4d17b",
+  "completed_at": "2026-11-03T20:54:13.185579092Z",
+  "duration_ms": 226959,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met by the attributable current tree; cargo-ci is recorded passing.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a3a99cf8-5c62-4c91-a890-7404d9cfe9c9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "10903b02-4b9f-4aad-bd0b-17550446eea4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T20:50:26.225754362Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `b20b2aa50`, `557a3902a`\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/df129d9e/requirement/REQ-03`, `REQ-09`, `REQ-16` (`.jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json`); relevant invariants (`.jit/invariants.toml`)\nGate evidence: `cargo-ci` passed (exit 0, 2026-11-03); `code-review` pending\nTruncation recovery: inspected per-commit, per-file patches and focused current-tree/test searches after bounded-output truncation\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met by the attributable current tree; cargo-ci is recorded passing.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

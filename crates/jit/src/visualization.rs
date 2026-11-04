@@ -4,6 +4,7 @@
 //! like DOT (Graphviz) and Mermaid. These functions are Issue-specific and access
 //! Issue fields like title and state for rendering.
 
+use crate::domain::identity::IssueId;
 use crate::domain::{Issue, Priority, State};
 use crate::graph::hierarchy::NodeHierarchy;
 use crate::graph::DependencyGraph;
@@ -15,8 +16,8 @@ use serde::Serialize;
 /// by both the summary and `--full` shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphExportEdge {
-    pub from: String,
-    pub to: String,
+    pub from: IssueId,
+    pub to: IssueId,
 }
 
 /// A node in the default (summary) `jit graph export --format json` shape.
@@ -26,7 +27,7 @@ pub struct GraphExportEdge {
 /// for `--full`, whose node is the complete stored record ([`GraphExportFullNode`]).
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphExportSummaryNode {
-    pub id: String,
+    pub id: IssueId,
     pub short_id: String,
     pub title: String,
     pub state: State,
@@ -75,7 +76,7 @@ fn build_export_edges(all_nodes: &[&Issue]) -> Vec<GraphExportEdge> {
             issue
                 .dependencies
                 .iter()
-                .filter(|dep_id| node_ids.contains(dep_id.as_str()))
+                .filter(|dep_id| node_ids.contains(dep_id))
                 .map(|dep_id| GraphExportEdge {
                     from: issue.id.clone(),
                     to: dep_id.clone(),
@@ -91,8 +92,8 @@ fn build_export_edges(all_nodes: &[&Issue]) -> Vec<GraphExportEdge> {
 /// out-of-scope issues as dangling edges. Unscoped exports are unaffected —
 /// repository validation keeps every dependency resolvable, so the filter
 /// passes every edge through.
-fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&'a str> {
-    all_nodes.iter().map(|issue| issue.id.as_str()).collect()
+fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&'a IssueId> {
+    all_nodes.iter().map(|issue| &issue.id).collect()
 }
 
 /// Export Issue dependency graph as DOT format for Graphviz
@@ -132,7 +133,7 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
     let node_ids = exported_node_ids(&all_nodes);
     for issue in &all_nodes {
         for dep in &issue.dependencies {
-            if node_ids.contains(dep.as_str()) {
+            if node_ids.contains(dep) {
                 output.push_str(&format!("  \"{}\" -> \"{}\";\n", issue.id, dep));
             }
         }
@@ -170,7 +171,7 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     let node_ids = exported_node_ids(&all_nodes);
     for issue in &all_nodes {
         for dep in &issue.dependencies {
-            if node_ids.contains(dep.as_str()) {
+            if node_ids.contains(dep) {
                 output.push_str(&format!("  {} --> {}\n", issue.id, dep));
             }
         }
@@ -179,7 +180,7 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     // One class per lifecycle state, named by its canonical token
     output.push('\n');
     output.push_str(
-        &State::all()
+        &State::ALL
             .into_iter()
             .map(|state| {
                 format!(
@@ -217,13 +218,18 @@ fn mermaid_fill(state: State) -> &'static str {
 /// orchestration loops. For complete node records use [`export_json_full`]
 /// (`--full`); the two share an identical `edges` list.
 pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
+    pretty_document(&summary_document(graph))
+}
+
+/// The summary document of [`export_json`], as a typed response.
+pub fn summary_document(graph: &DependencyGraph<Issue>) -> GraphExportSummaryResponse {
     let all_nodes = graph.nodes_by_id();
 
     let nodes: Vec<GraphExportSummaryNode> = all_nodes
         .iter()
         .map(|issue| GraphExportSummaryNode {
             id: issue.id.clone(),
-            short_id: issue.id.chars().take(8).collect(),
+            short_id: issue.id.short_id().to_string(),
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
@@ -231,11 +237,15 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
         })
         .collect();
 
-    let response = GraphExportSummaryResponse {
+    GraphExportSummaryResponse {
         nodes,
         edges: build_export_edges(&all_nodes),
-    };
-    serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
+    }
+}
+
+/// The pretty JSON text of a document; serialization of these shapes cannot fail.
+pub fn pretty_document<T: Serialize>(document: &T) -> String {
+    serde_json::to_string_pretty(document).unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Export Issue dependency graph as JSON with COMPLETE node records (`--full`).
@@ -262,8 +272,16 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// not keep.
 pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
-    resolution: &crate::graph::hierarchy::HierarchyResolution,
+    resolution: &crate::graph::hierarchy::HierarchyResolution<'_, Issue>,
 ) -> String {
+    pretty_document(&full_document(graph, resolution))
+}
+
+/// The complete-record document of [`export_json_full`], as a typed response.
+pub fn full_document(
+    graph: &DependencyGraph<Issue>,
+    resolution: &crate::graph::hierarchy::HierarchyResolution<'_, Issue>,
+) -> GraphExportFullResponse {
     let all_nodes = graph.nodes_by_id();
 
     let nodes: Vec<GraphExportFullNode> = all_nodes
@@ -274,11 +292,10 @@ pub fn export_json_full(
         })
         .collect();
 
-    let response = GraphExportFullResponse {
+    GraphExportFullResponse {
         nodes,
         edges: build_export_edges(&all_nodes),
-    };
-    serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
+    }
 }
 
 #[cfg(test)]
@@ -286,7 +303,7 @@ mod tests {
     use super::*;
 
     fn typed_issue(title: &str, level: u8) -> crate::domain::Issue {
-        let mut issue = crate::domain::fixture_issue(title.into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
         issue.labels = vec![format!(
             "type:{}",
             crate::test_taxonomy::test_taxonomy().type_at_level(level)
@@ -296,10 +313,14 @@ mod tests {
 
     #[test]
     fn test_export_dot_format() {
-        let issue1 =
-            crate::domain::fixture_issue("API Design".to_string(), "Design REST API".to_string());
-        let mut issue2 =
-            crate::domain::fixture_issue("Backend".to_string(), "Implement backend".to_string());
+        let issue1 = crate::test_utils::fixture_issue(
+            "API Design".to_string(),
+            "Design REST API".to_string(),
+        );
+        let mut issue2 = crate::test_utils::fixture_issue(
+            "Backend".to_string(),
+            "Implement backend".to_string(),
+        );
         issue2.dependencies.push(issue1.id.clone());
 
         let issues = vec![&issue1, &issue2];
@@ -309,8 +330,8 @@ mod tests {
 
         assert!(dot.contains("digraph issues"));
         assert!(dot.contains("rankdir=LR"));
-        assert!(dot.contains(&issue1.id));
-        assert!(dot.contains(&issue2.id));
+        assert!(dot.contains(issue1.id.as_str()));
+        assert!(dot.contains(issue2.id.as_str()));
         assert!(dot.contains("API Design"));
         assert!(dot.contains("Backend"));
         assert!(dot.contains(&format!("\"{}\" -> \"{}\"", issue2.id, issue1.id)));
@@ -318,9 +339,10 @@ mod tests {
 
     #[test]
     fn test_export_mermaid_format() {
-        let issue1 = crate::domain::fixture_issue("Setup".to_string(), "Initial setup".to_string());
+        let issue1 =
+            crate::test_utils::fixture_issue("Setup".to_string(), "Initial setup".to_string());
         let mut issue2 =
-            crate::domain::fixture_issue("Deploy".to_string(), "Deploy to prod".to_string());
+            crate::test_utils::fixture_issue("Deploy".to_string(), "Deploy to prod".to_string());
         issue2.dependencies.push(issue1.id.clone());
 
         let issues = vec![&issue1, &issue2];
@@ -329,8 +351,8 @@ mod tests {
         let mermaid = export_mermaid(&graph);
 
         assert!(mermaid.contains("graph LR"));
-        assert!(mermaid.contains(&issue1.id));
-        assert!(mermaid.contains(&issue2.id));
+        assert!(mermaid.contains(issue1.id.as_str()));
+        assert!(mermaid.contains(issue2.id.as_str()));
         assert!(mermaid.contains("Setup"));
         assert!(mermaid.contains("Deploy"));
         assert!(mermaid.contains(&format!("{} --> {}", issue2.id, issue1.id)));
@@ -338,12 +360,14 @@ mod tests {
 
     #[test]
     fn test_export_mermaid_declares_one_class_per_state_and_every_node_class() {
-        let issues: Vec<Issue> = State::all()
+        let issues: Vec<Issue> = State::ALL
             .into_iter()
             .enumerate()
             .map(|(i, state)| {
-                let mut issue =
-                    crate::domain::fixture_issue(format!("Issue {i}"), "State fixture".to_string());
+                let mut issue = crate::test_utils::fixture_issue(
+                    format!("Issue {i}"),
+                    "State fixture".to_string(),
+                );
                 issue.state = state;
                 issue
             })
@@ -358,7 +382,7 @@ mod tests {
             .filter_map(|line| line.trim().strip_prefix("classDef "))
             .filter_map(|rest| rest.split_whitespace().next())
             .collect();
-        let mut expected: Vec<&str> = State::all().iter().map(|s| s.as_str()).collect();
+        let mut expected: Vec<&str> = State::ALL.iter().map(|s| s.as_str()).collect();
         declared.sort_unstable();
         expected.sort_unstable();
         assert_eq!(declared, expected);
@@ -377,11 +401,13 @@ mod tests {
     #[test]
     fn test_export_dot_with_different_states() {
         let mut issue1 =
-            crate::domain::fixture_issue("Done Action".to_string(), "Completed".to_string());
+            crate::test_utils::fixture_issue("Done Action".to_string(), "Completed".to_string());
         issue1.state = State::Done;
 
-        let mut issue2 =
-            crate::domain::fixture_issue("In Progress".to_string(), "Working on it".to_string());
+        let mut issue2 = crate::test_utils::fixture_issue(
+            "In Progress".to_string(),
+            "Working on it".to_string(),
+        );
         issue2.state = State::InProgress;
 
         let issues = vec![&issue1, &issue2];
@@ -395,8 +421,10 @@ mod tests {
 
     #[test]
     fn test_export_handles_special_characters() {
-        let issue =
-            crate::domain::fixture_issue("Title with \"quotes\"".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue(
+            "Title with \"quotes\"".to_string(),
+            "Test".to_string(),
+        );
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
 
@@ -410,7 +438,8 @@ mod tests {
     /// the six documented keys and nothing else — no full-record fields leak in.
     #[test]
     fn test_export_json_summary_node_has_exactly_summary_keys() {
-        let issue = crate::domain::fixture_issue("Summary".to_string(), "Body text".to_string());
+        let issue =
+            crate::test_utils::fixture_issue("Summary".to_string(), "Body text".to_string());
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
 
@@ -438,11 +467,12 @@ mod tests {
     #[test]
     fn test_export_json_full_node_is_complete_record() {
         use crate::domain::{GateState, GateStatus, State};
-        let mut issue = crate::domain::fixture_issue("Full".to_string(), "Body text".to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Full".to_string(), "Body text".to_string());
         issue.state = State::Done;
-        issue.gates_required.push("tests".to_string());
+        issue.gates_required.push("tests".parse().unwrap());
         issue.gates_status.insert(
-            "tests".to_string(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: None,
@@ -478,8 +508,8 @@ mod tests {
     /// contents.
     #[test]
     fn test_export_json_shapes_share_edges() {
-        let dep = crate::domain::fixture_issue("Dep".to_string(), String::new());
-        let mut issue = crate::domain::fixture_issue("Root".to_string(), String::new());
+        let dep = crate::test_utils::fixture_issue("Dep".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Root".to_string(), String::new());
         issue.dependencies.push(dep.id.clone());
 
         let issues = vec![&dep, &issue];
@@ -493,8 +523,8 @@ mod tests {
         let full: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
         assert_eq!(summary["edges"], full["edges"]);
-        assert_eq!(summary["edges"][0]["from"], issue.id);
-        assert_eq!(summary["edges"][0]["to"], dep.id);
+        assert_eq!(summary["edges"][0]["from"], issue.id.as_str());
+        assert_eq!(summary["edges"][0]["to"], dep.id.as_str());
     }
 
     /// The `--full` node carries the four DAG-resolved hierarchy fields; the
@@ -514,20 +544,20 @@ mod tests {
 
         let full: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
-        let node_by_id = |id: &str| -> serde_json::Value {
+        let node_by_id = |id: &IssueId| -> serde_json::Value {
             full["nodes"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .find(|n| n["id"] == serde_json::Value::String(id.to_string()))
+                .find(|n| n["id"] == id.as_str())
                 .unwrap()
                 .clone()
         };
 
         let action_node = node_by_id(&action.id);
-        assert_eq!(action_node["parent"], initiative.id);
+        assert_eq!(action_node["parent"], initiative.id.as_str());
         // The initiative is a root container, so the whole subtree clusters to it.
-        assert_eq!(action_node["cluster"], initiative.id);
+        assert_eq!(action_node["cluster"], initiative.id.as_str());
         assert_eq!(action_node["children"], serde_json::json!([]));
         assert_eq!(action_node["rank"], 0);
 
@@ -543,11 +573,33 @@ mod tests {
         }
     }
 
-    /// The `--full` export and the `graph tree` view publish the *same* four
-    /// resolution keys, because both flatten one `NodeHierarchy` serialization.
+    /// Typed hierarchy facts retain the string wire format on both surfaces.
     #[test]
-    fn test_export_json_full_hierarchy_keys_match_tree_view() {
+    fn test_export_json_full_hierarchy_serialization_matches_tree_view() {
         use crate::output::HierarchyNodeView;
+
+        #[derive(Serialize)]
+        struct WireNode<T> {
+            #[serde(flatten)]
+            identity: T,
+            #[serde(flatten)]
+            hierarchy: NodeHierarchy<String>,
+        }
+
+        #[derive(Serialize)]
+        struct TreeIdentity<'a> {
+            id: &'a str,
+            short_id: &'a str,
+            title: &'a str,
+            #[serde(rename = "type")]
+            type_name: Option<&'a str>,
+        }
+
+        #[derive(Serialize)]
+        struct WireExport<'a> {
+            nodes: Vec<WireNode<&'a Issue>>,
+            edges: Vec<GraphExportEdge>,
+        }
 
         let mut initiative = typed_issue("Initiative", 2);
         let action = typed_issue("Action", 4);
@@ -559,79 +611,72 @@ mod tests {
             &issues,
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
-        let facts = resolution.get(&action.id).cloned().unwrap_or_default();
+        let string_facts = |issue: &Issue| {
+            let facts = resolution.get(&issue.id).unwrap();
+            NodeHierarchy {
+                parent: facts.parent.as_ref().map(ToString::to_string),
+                children: facts.children.iter().map(ToString::to_string).collect(),
+                cluster: facts.cluster.as_ref().map(ToString::to_string),
+                rank: facts.rank,
+            }
+        };
 
-        // The keys a `graph tree` node contributes beyond its identity fields.
-        let tree_node = serde_json::to_value(HierarchyNodeView {
-            id: action.id.clone(),
-            short_id: action.short_id(),
-            title: action.title.clone(),
-            type_name: Some(
-                crate::test_taxonomy::test_taxonomy()
-                    .type_at_level(4)
-                    .to_string(),
-            ),
-            hierarchy: facts,
-        })
-        .unwrap();
-        let identity: std::collections::BTreeSet<&str> =
-            ["id", "short_id", "title", "type"].into_iter().collect();
-        let tree_resolution_keys: std::collections::BTreeSet<String> = tree_node
-            .as_object()
-            .unwrap()
-            .keys()
-            .filter(|k| !identity.contains(k.as_str()))
-            .cloned()
-            .collect();
+        for issue in &issues {
+            let type_name = crate::labels::type_label_value(&issue.labels);
+            let tree_node = HierarchyNodeView {
+                id: issue.id.clone(),
+                short_id: issue.short_id(),
+                title: issue.title.clone(),
+                type_name: type_name.map(str::to_string),
+                hierarchy: resolution.get(&issue.id).unwrap().clone(),
+            };
+            let expected = WireNode {
+                identity: TreeIdentity {
+                    id: issue.id.as_str(),
+                    short_id: issue.id.short_id(),
+                    title: &issue.title,
+                    type_name,
+                },
+                hierarchy: string_facts(issue),
+            };
+            assert_eq!(
+                serde_json::to_string(&tree_node).unwrap(),
+                serde_json::to_string(&expected).unwrap(),
+            );
+        }
 
-        // The keys the `--full` export node adds beyond the on-disk issue record.
-        let full: serde_json::Value =
-            serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
-        let full_node = full["nodes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|n| n["id"] == serde_json::Value::String(action.id.clone()))
-            .unwrap();
-        let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&action)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect();
-        let export_resolution_keys: std::collections::BTreeSet<String> = full_node
-            .as_object()
-            .unwrap()
-            .keys()
-            .filter(|k| !record_keys.contains(*k))
-            .cloned()
-            .collect();
-
-        assert_eq!(export_resolution_keys, tree_resolution_keys);
-        let expected: std::collections::BTreeSet<String> =
-            ["parent", "children", "cluster", "rank"]
-                .into_iter()
-                .map(String::from)
-                .collect();
-        assert_eq!(export_resolution_keys, expected);
+        let all_nodes = graph.nodes_by_id();
+        let expected = WireExport {
+            nodes: all_nodes
+                .iter()
+                .map(|issue| WireNode {
+                    identity: *issue,
+                    hierarchy: string_facts(issue),
+                })
+                .collect(),
+            edges: build_export_edges(&all_nodes),
+        };
+        assert_eq!(
+            export_json_full(&graph, &resolution),
+            serde_json::to_string_pretty(&expected).unwrap(),
+        );
     }
 
-    fn exported_ids(json: &str) -> std::collections::BTreeSet<String> {
+    fn exported_ids(json: &str) -> std::collections::BTreeSet<IssueId> {
         serde_json::from_str::<serde_json::Value>(json).unwrap()["nodes"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|n| n["id"].as_str().unwrap().to_string())
+            .map(|n| serde_json::from_value::<IssueId>(n["id"].clone()).unwrap())
             .collect()
     }
 
     #[test]
     fn test_export_json_scope_members_depending_only_on_outside_issues_all_appear() {
-        let outside = crate::domain::fixture_issue("Outside".into(), String::new());
-        let mut task = crate::domain::fixture_issue("Task".into(), String::new());
+        let outside = crate::test_utils::fixture_issue("Outside".into(), String::new());
+        let mut task = crate::test_utils::fixture_issue("Task".into(), String::new());
         task.dependencies.push(outside.id.clone());
-        let mut epic = crate::domain::fixture_issue("Epic".into(), String::new());
+        let mut epic = crate::test_utils::fixture_issue("Epic".into(), String::new());
         epic.dependencies.push(task.id.clone());
 
         let scope = vec![&task, &epic];
@@ -650,9 +695,9 @@ mod tests {
         ) {
             let mut issues: Vec<Issue> = masks
                 .iter()
-                .map(|_| crate::domain::fixture_issue("N".into(), String::new()))
+                .map(|_| crate::test_utils::fixture_issue("N".into(), String::new()))
                 .collect();
-            let ids: Vec<String> = issues.iter().map(|i| i.id.clone()).collect();
+            let ids: Vec<IssueId> = issues.iter().map(|i| i.id.clone()).collect();
             for (index, mask) in masks.iter().enumerate() {
                 issues[index].dependencies = (0..index)
                     .filter(|earlier| mask & (1 << earlier) != 0)
@@ -665,7 +710,7 @@ mod tests {
                 .filter(|(index, _)| scope_bits & (1 << index) != 0)
                 .map(|(_, issue)| issue)
                 .collect();
-            let expected: std::collections::BTreeSet<String> =
+            let expected: std::collections::BTreeSet<IssueId> =
                 selected.iter().map(|i| i.id.clone()).collect();
 
             let graph = DependencyGraph::new(&selected);

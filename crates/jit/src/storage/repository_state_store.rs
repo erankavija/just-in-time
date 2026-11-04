@@ -5,25 +5,29 @@
 //! absent data root is the exception, published by [`init_publish`] because the
 //! record's home is inside the root that does not exist yet.
 
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, DirectoryListing, EntryIdentity,
-    EventLogTail, ExpectedPreimage, FileMode, MaterializationPlan, PinnedDocumentEvidence,
-    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath,
+    EventLogTail, ExpectedPreimage, FileMode, ImageToken, MaterializationPlan,
+    PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RepositoryRootEvidence, VirtualPath,
 };
-use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::capability_fs::{
+    capability_metadata_identity, open_capability_parent, open_descendant_dir_nofollow,
+    open_regular_file_nofollow, CapabilityFsError, CapabilityRoots,
+};
 use crate::storage::init_publish;
 use crate::storage::memory::{append_events, MemoryRepositoryState};
 use crate::storage::{
-    EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, MemoryRedoApplier,
-    MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier, RedoApplyError, RedoRecord,
-    RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
+    commit_redo_record, EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage,
+    MemoryRedoApplier, MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier,
+    RedoApplyError, RedoRecord, RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME,
+    RECORD_SCRATCH_DIR,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
-use cap_std::{ambient_authority, fs::MetadataExt as _};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -66,6 +70,10 @@ pub enum RepositoryStateStoreError {
     /// leave partly written files nothing can replay.
     #[error("mutation writes worktree targets and creates no data root at {path}, so no redo record can commit it")]
     UncommittableWorktreeMutation { path: PathBuf },
+    /// A redo record over a present data root appends no event, so the event
+    /// log's length would not count its commit.
+    #[error("redo record over a present data root appends no event")]
+    RecordWithoutEventAppend,
     #[error("repository recovery or publication failed: {0}")]
     Publication(#[source] anyhow::Error),
     #[error("leftover redo record {path} is not readable: {source}")]
@@ -82,6 +90,16 @@ pub enum RepositoryStateStoreError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+impl From<CapabilityFsError> for RepositoryStateStoreError {
+    fn from(error: CapabilityFsError) -> Self {
+        match error {
+            CapabilityFsError::UnsafeTarget(target) => Self::UnsafeTarget(target),
+            CapabilityFsError::RetryableConflict { path } => Self::RetryableConflict { path },
+            CapabilityFsError::Io(error) => Self::Io(error),
+        }
+    }
 }
 
 /// Whether session open failed on the leftover redo record: it did not parse,
@@ -209,13 +227,11 @@ impl Drop for LayoutReentry {
     }
 }
 
-/// Opaque mutation session retaining serialization through capture and apply.
-pub trait RepositoryMutationSession {
+/// The capture half of a session: what a read derives from.
+pub trait RepositoryReadSession {
     /// Canonical layout held by this session.
     fn layout(&self) -> &RepositoryLayout;
-    /// Recovery completed before this session became available for capture.
-    fn recovery_report(&self) -> &RecoveryDispatchReport;
-    /// Capture one complete bounded image after recovery has converged.
+    /// Capture one complete bounded image.
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError>;
     /// Grow `image` to `spec`, reading only the requests `image` does not
     /// already answer the same way; what it read is kept, never re-read.
@@ -224,11 +240,79 @@ pub trait RepositoryMutationSession {
         image: RepositoryImage,
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError>;
+    /// The event log's whole bytes, read without following a link, or `None`
+    /// when absent. Outside any [`CaptureSpec`], so no image holds the whole
+    /// log; whole-repository record fidelity is its one reader.
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError>;
+}
+
+/// Opaque mutation session retaining serialization through capture and apply.
+pub trait RepositoryMutationSession: RepositoryReadSession {
+    /// Recovery completed before this session became available for capture.
+    fn recovery_report(&self) -> &RecoveryDispatchReport;
     /// Publish one complete semantic plan, refused if the files it writes moved.
     fn apply(
         &mut self,
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError>;
+}
+
+/// The whole log from its entry: a link or any non-file is unsafe, not absent.
+fn history_log_bytes(
+    entry: Option<&RepositoryEntry>,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    match entry {
+        Some(RepositoryEntry::File { content, .. }) => Ok(Some(content.bytes().to_vec())),
+        None | Some(RepositoryEntry::Absent) => Ok(None),
+        _ => Err(RepositoryStateStoreError::UnsafeTarget(format!(
+            "{:?}",
+            VirtualPath::EVENTS
+        ))),
+    }
+}
+
+/// The whole JSON-backed log, through the session's capability roots.
+fn json_history_log(
+    layout: &RepositoryLayout,
+    roots: &CapabilityRoots,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    revalidate_layout_capabilities(layout, roots)?;
+    history_log_bytes(Some(&inspect_capability_entry(
+        layout,
+        roots,
+        &VirtualPath::EVENTS,
+        ReadMode::Whole,
+    )?))
+}
+
+/// The whole in-memory log.
+fn memory_history_log(
+    storage: &InMemoryStorage,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    history_log_bytes(storage.repository_state().entries.get(&VirtualPath::EVENTS))
+}
+
+/// Whether a lock-free read's capture is one whole repository version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadAdmission {
+    /// No commit crossed the capture.
+    Granted,
+    /// A redo record was present at open or at admission.
+    Busy,
+    /// The event log changed, the data root's presence changed, or a root was
+    /// replaced.
+    Moved,
+}
+
+/// A lock-free read session (`@/charter/D-22`): its capture counts only once
+/// [`admit`](Self::admit) grants it.
+pub trait OptimisticReadSession: RepositoryReadSession {
+    /// Judge the captures made so far against the repository now.
+    ///
+    /// Sound because every record over a present data root appends an event
+    /// and is committed before its first live write: a commit whose live write
+    /// fell inside the capture either left its record in place or grew the log.
+    fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError>;
 }
 
 /// Storage backend capable of one capture/apply mutation boundary.
@@ -239,6 +323,51 @@ pub trait RepositoryStateStore {
         &self,
         layout: RepositoryLayout,
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
+
+    /// Open a read session for exactly `layout`, taking no lock and applying
+    /// nothing.
+    fn open_read_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError>;
+}
+
+/// What a read session observes of commits: whether a record is present, then
+/// the event log's length and tail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommitObservation {
+    data_root: bool,
+    record: bool,
+    log: Option<EventLogTail>,
+}
+
+impl CommitObservation {
+    /// The admission of a read opened at `self` and observing `now`; a
+    /// retryable conflict while observing is a move.
+    fn admit(
+        &self,
+        now: Result<CommitObservation, RepositoryStateStoreError>,
+    ) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        match now {
+            _ if self.record => Ok(ReadAdmission::Busy),
+            Ok(now) if now.record => Ok(ReadAdmission::Busy),
+            Ok(now) if now == *self => Ok(ReadAdmission::Granted),
+            Ok(_) | Err(RepositoryStateStoreError::RetryableConflict { .. }) => {
+                Ok(ReadAdmission::Moved)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Refuse a capture over a record the open saw: its admission is `Busy`.
+    fn ensure_capturable(&self) -> Result<(), RepositoryStateStoreError> {
+        match self.record {
+            true => Err(RepositoryStateStoreError::RetryableConflict {
+                path: format!("{RECORD_SCRATCH_DIR}/{RECORD_FILE_NAME}"),
+            }),
+            false => Ok(()),
+        }
+    }
 }
 
 /// The record [`read_leftover_record`] found, applied and cleared: one, or
@@ -262,27 +391,14 @@ fn apply_leftover_record(
 }
 
 /// Runs before the record is applied, so a record this open refuses is refused
-/// over an untouched repository. A repository holding none pays one look at the
-/// record's own name: the parent walk stops at an absent scratch directory and
-/// the open at an absent record, and nothing there is enumerated or otherwise
-/// read.
+/// over an untouched repository.
 fn read_leftover_record(
     roots: &CapabilityRoots,
 ) -> Result<Option<RedoRecord>, RepositoryStateStoreError> {
-    let Some(data) = roots.root(RepositoryRootClass::Data) else {
+    let Some(mut file) = open_leftover_record(roots)? else {
         return Ok(None);
     };
     let relative = Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
-    let Some((scratch, leaf)) = open_capability_parent(data, &relative)? else {
-        return Ok(None);
-    };
-    let mut file = match open_regular_file_nofollow(&scratch, &leaf) {
-        Ok(file) => file,
-        Err(RepositoryStateStoreError::Io(error)) if error.kind() == ErrorKind::NotFound => {
-            return Ok(None)
-        }
-        Err(error) => return Err(error),
-    };
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
     RedoRecord::parse(&bytes).map(Some).map_err(|source| {
@@ -291,6 +407,26 @@ fn read_leftover_record(
             source,
         }
     })
+}
+
+/// The leftover record, opened by name. A repository holding none pays one look
+/// at that name: the parent walk stops at an absent scratch directory and the
+/// open at an absent record, and nothing there is enumerated or otherwise read.
+fn open_leftover_record(
+    roots: &CapabilityRoots,
+) -> Result<Option<cap_std::fs::File>, RepositoryStateStoreError> {
+    let Some(data) = roots.root(RepositoryRootClass::Data) else {
+        return Ok(None);
+    };
+    let relative = Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+    let Some((scratch, leaf)) = open_capability_parent(data, &relative)? else {
+        return Ok(None);
+    };
+    match open_regular_file_nofollow(&scratch, &leaf) {
+        Ok(file) => Ok(Some(file)),
+        Err(CapabilityFsError::Io(error)) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// [`apply_leftover_record`] over the record the in-memory backend holds.
@@ -322,74 +458,6 @@ pub fn discover_repository_layout(
     .map_err(Into::into)
 }
 
-/// Open no-follow handles for the selected roots, constructed only inside the
-/// session boundary that verified their identity.
-pub struct CapabilityRoots {
-    worktree: Dir,
-    data: Option<Dir>,
-}
-
-impl CapabilityRoots {
-    pub(in crate::storage) fn open(
-        layout: &RepositoryLayout,
-    ) -> Result<(Self, Dir, String), RepositoryStateStoreError> {
-        let worktree = open_absolute_dir_nofollow(layout.worktree_root())?;
-        ensure_capability_identity(
-            &worktree,
-            layout.worktree_identity(),
-            layout.worktree_root(),
-        )?;
-        let data_parent_path = layout.data_root().parent().ok_or_else(|| {
-            RepositoryStateStoreError::UnsafeTarget(layout.data_root().display().to_string())
-        })?;
-        let data_parent = open_absolute_dir_nofollow(data_parent_path)?;
-        let data_leaf = layout
-            .data_root()
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| {
-                RepositoryStateStoreError::UnsafeTarget(layout.data_root().display().to_string())
-            })?
-            .to_string();
-        let data = match data_parent.symlink_metadata(&data_leaf) {
-            Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {
-                let data = open_child_dir_nofollow(&data_parent, &data_leaf)?;
-                ensure_capability_identity(&data, layout.data_identity(), layout.data_root())?;
-                Some(data)
-            }
-            Ok(_) => {
-                return Err(RepositoryStateStoreError::UnsafeTarget(
-                    layout.data_root().display().to_string(),
-                ))
-            }
-            Err(error) if error.kind() == ErrorKind::NotFound => None,
-            Err(error) => return Err(error.into()),
-        };
-        // Bind the held parent capability to the absent-root parent recorded in
-        // the layout. The fd already resists path redirection; this additionally
-        // rejects a parent swapped out from under the layout before capture, so a
-        // staged root is never published beneath a directory the layout never saw.
-        if data.is_none() {
-            if let Some(parent_identity) = capability_dir_identity(&data_parent) {
-                let expected = format!("absent:{parent_identity}:{data_leaf}");
-                if expected != layout.data_identity() {
-                    return Err(RepositoryStateStoreError::RetryableConflict {
-                        path: layout.data_root().display().to_string(),
-                    });
-                }
-            }
-        }
-        Ok((Self { worktree, data }, data_parent, data_leaf))
-    }
-
-    pub(in crate::storage) fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
-        match class {
-            RepositoryRootClass::Worktree => Some(&self.worktree),
-            RepositoryRootClass::Data => self.data.as_ref(),
-        }
-    }
-}
-
 struct JsonMutationSession {
     layout: RepositoryLayout,
     storage: JsonFileStorage,
@@ -407,7 +475,7 @@ struct JsonMutationSession {
     events_lock: Option<(FileLocker, PathBuf)>,
     _reentry: LayoutReentry,
     _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
-    captured: Option<RepositoryImage>,
+    captured: Option<ImageToken>,
 }
 
 struct MemoryMutationSession {
@@ -417,14 +485,31 @@ struct MemoryMutationSession {
     _guard: RepoWriteGuard,
     _reentry: LayoutReentry,
     _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
-    captured: Option<RepositoryImage>,
+    captured: Option<ImageToken>,
 }
 
-impl RepositoryStateStore for JsonFileStorage {
-    fn open_mutation_session(
+/// A lock-free read over the filesystem, holding no guard.
+struct JsonReadSession {
+    layout: RepositoryLayout,
+    storage: JsonFileStorage,
+    roots: CapabilityRoots,
+    opened: CommitObservation,
+}
+
+/// A lock-free read over the in-memory backend's entry map.
+struct MemoryReadSession {
+    layout: RepositoryLayout,
+    storage: InMemoryStorage,
+    opened: CommitObservation,
+}
+
+impl JsonFileStorage {
+    /// The layout a session opens: the one this storage is bound to when it
+    /// names the same roots, refused when it names others.
+    fn session_layout(
         &self,
         layout: RepositoryLayout,
-    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+    ) -> Result<RepositoryLayout, RepositoryStateStoreError> {
         let layout = match self.configured_layout() {
             Ok(configured)
                 if configured.worktree_root() == layout.worktree_root()
@@ -448,6 +533,46 @@ impl RepositoryStateStore for JsonFileStorage {
                 RepositoryLayoutError::OutsideRepositoryRoots(self.root().to_path_buf()).into(),
             );
         }
+        Ok(layout)
+    }
+}
+
+/// The record probe, then the event log's tail: a commit removes its record
+/// only after its append.
+fn observe_json_commits(
+    layout: &RepositoryLayout,
+    roots: &CapabilityRoots,
+) -> Result<CommitObservation, RepositoryStateStoreError> {
+    let record = open_leftover_record(roots)?.is_some();
+    Ok(CommitObservation {
+        data_root: roots.root(RepositoryRootClass::Data).is_some(),
+        record,
+        log: live_event_log_tail(layout, roots)?,
+    })
+}
+
+/// [`observe_json_commits`] over the in-memory backend, read under one lock
+/// of its state.
+fn observe_memory_commits(storage: &InMemoryStorage) -> CommitObservation {
+    let state = storage.repository_state();
+    CommitObservation {
+        data_root: state.data_root_exists,
+        record: state.record.is_some(),
+        log: match state.entries.get(&VirtualPath::EVENTS) {
+            Some(RepositoryEntry::File { content, .. }) => {
+                Some(EventLogTail::of_bytes(content.bytes()))
+            }
+            _ => None,
+        },
+    }
+}
+
+impl RepositoryStateStore for JsonFileStorage {
+    fn open_mutation_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        let layout = self.session_layout(layout)?;
         // A retained session may reenter the reentrant lock chain only for the
         // same canonical layout.
         self.active_mutation_layout().enter(&layout)?;
@@ -476,7 +601,8 @@ impl RepositoryStateStore for JsonFileStorage {
         let leftover_record = read_leftover_record(&roots)?;
         interruptions.check(&MutationPoint::SessionOpen)?;
 
-        let (repository_guard, applied_records) = if roots.data.is_some() {
+        let (repository_guard, applied_records) = if roots.root(RepositoryRootClass::Data).is_some()
+        {
             let repository_guard = self.acquire_repo_write_lock_raw()?;
             let _events_guard = self.acquire_events_write_lock()?;
             // Inside both locks, because the record writes repository state.
@@ -488,7 +614,9 @@ impl RepositoryStateStore for JsonFileStorage {
         } else {
             (None, 0)
         };
-        let events_lock = roots.data.as_ref().map(|_| self.events_lock_spec());
+        let events_lock = roots
+            .root(RepositoryRootClass::Data)
+            .map(|_| self.events_lock_spec());
 
         self.configure_repository_layout(&layout);
         Ok(Box::new(JsonMutationSession {
@@ -505,6 +633,24 @@ impl RepositoryStateStore for JsonFileStorage {
             _reentry: reentry,
             _order_guard: order_guard,
             captured: None,
+        }))
+    }
+
+    fn open_read_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError> {
+        let layout = self.session_layout(layout)?;
+        revalidate_layout(&layout)?;
+        let (roots, _, _) = CapabilityRoots::open(&layout)?;
+        self.mutation_interruptions()
+            .check(&MutationPoint::ReadSessionOpen)?;
+        let opened = observe_json_commits(&layout, &roots)?;
+        Ok(Box::new(JsonReadSession {
+            layout,
+            storage: self.clone(),
+            roots,
+            opened,
         }))
     }
 }
@@ -540,15 +686,24 @@ impl RepositoryStateStore for InMemoryStorage {
             captured: None,
         }))
     }
+
+    fn open_read_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError> {
+        self.mutation_interruptions()
+            .check(&MutationPoint::ReadSessionOpen)?;
+        Ok(Box::new(MemoryReadSession {
+            layout,
+            storage: self.clone(),
+            opened: observe_memory_commits(self),
+        }))
+    }
 }
 
-impl RepositoryMutationSession for JsonMutationSession {
+impl RepositoryReadSession for JsonReadSession {
     fn layout(&self) -> &RepositoryLayout {
         &self.layout
-    }
-
-    fn recovery_report(&self) -> &RecoveryDispatchReport {
-        &self.recovery_report
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -563,13 +718,103 @@ impl RepositoryMutationSession for JsonMutationSession {
         self.capture_over(image.into_answers(&spec), spec)
     }
 
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        json_history_log(&self.layout, &self.roots)
+    }
+}
+
+impl JsonReadSession {
+    fn capture_over(
+        &mut self,
+        prior: CapturedAnswers,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        capture_capability_image(&self.layout, &self.roots, &self.storage, spec, prior)
+    }
+}
+
+impl OptimisticReadSession for JsonReadSession {
+    fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        self.opened.admit(
+            revalidate_layout_capabilities(&self.layout, &self.roots)
+                .and_then(|()| observe_json_commits(&self.layout, &self.roots)),
+        )
+    }
+}
+
+impl RepositoryReadSession for MemoryReadSession {
+    fn layout(&self) -> &RepositoryLayout {
+        &self.layout
+    }
+
+    fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        capture_memory_image(
+            &self.layout,
+            &self.storage.repository_state(),
+            spec,
+            CapturedAnswers::default(),
+        )
+    }
+
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        let prior = image.into_answers(&spec);
+        capture_memory_image(&self.layout, &self.storage.repository_state(), spec, prior)
+    }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        memory_history_log(&self.storage)
+    }
+}
+
+impl OptimisticReadSession for MemoryReadSession {
+    fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        self.opened.admit(Ok(observe_memory_commits(&self.storage)))
+    }
+}
+
+impl RepositoryReadSession for JsonMutationSession {
+    fn layout(&self) -> &RepositoryLayout {
+        &self.layout
+    }
+
+    fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.capture_over(CapturedAnswers::default(), spec)
+    }
+
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.capture_over(image.into_answers(&spec), spec)
+    }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        json_history_log(&self.layout, &self.roots)
+    }
+}
+
+impl RepositoryMutationSession for JsonMutationSession {
+    fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
+    }
+
     fn apply(
         &mut self,
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let image = plan.image();
-        let delta = plan.delta();
-        ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
+        let delta = plan.publication();
+        ensure_session_image(&self.layout, self.captured, image)?;
         ensure_delta_is_captured(image, delta)?;
         let interruptions = self.storage.mutation_interruptions();
         interruptions.check(&MutationPoint::BeforeCommitCheck)?;
@@ -591,7 +836,10 @@ impl RepositoryMutationSession for JsonMutationSession {
         let outcome = RepositoryApplyOutcome {
             actions_applied: delta.actions().len(),
         };
-        match (self.roots.data.is_some(), delta.actions().is_empty()) {
+        match (
+            self.roots.root(RepositoryRootClass::Data).is_some(),
+            delta.actions().is_empty(),
+        ) {
             (false, false) => self.publish_absent_data_root(image, delta, interruptions)?,
             (true, false) => self.publish_through_record(image, delta, interruptions)?,
             (_, true) => {}
@@ -610,7 +858,7 @@ impl JsonMutationSession {
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
         let image =
             capture_capability_image(&self.layout, &self.roots, &self.storage, spec, prior)?;
-        self.captured = Some(image.clone());
+        self.captured = Some(image.token());
         Ok(image)
     }
 
@@ -622,11 +870,12 @@ impl JsonMutationSession {
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let record = redo_record_for(image, delta.actions().iter())?;
+        let record = appending_record(image, delta)?;
         ensure_write_set_unchanged(&self.roots, image, &record)?;
-        record
-            .commit(self.layout.data_root())
-            .map_err(RepositoryStateStoreError::Publication)?;
+        let root = self.roots.data_root().ok_or_else(|| {
+            RepositoryStateStoreError::UnsafeTarget(self.layout.data_root().display().to_string())
+        })?;
+        commit_redo_record(root, &record).map_err(RepositoryStateStoreError::Publication)?;
         RedoApplier::new(SessionRedoInterruptions::new(interruptions))
             .apply(&self.roots, &record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
@@ -659,7 +908,7 @@ impl JsonMutationSession {
         let redo = |outcome: Result<(), RedoApplyError>| {
             outcome.map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
         };
-        init_publish::stage_new_data_root(
+        let stage = init_publish::stage_new_data_root(
             &self.data_parent,
             &self.data_leaf,
             of_class(RepositoryRootClass::Data),
@@ -669,9 +918,7 @@ impl JsonMutationSession {
             // Durable inside the stage, so publishing the root and committing
             // its worktree targets are one act: the rename carries the record
             // into the root, and an interruption between them leaves it there.
-            record
-                .commit(&init_publish::stage_path(self.layout.data_root()))
-                .map_err(RepositoryStateStoreError::Publication)?;
+            commit_redo_record(&stage, &record).map_err(RepositoryStateStoreError::Publication)?;
         }
         interruptions.check(&MutationPoint::BeforeRootPublication)?;
         init_publish::publish_staged_data_root(
@@ -701,13 +948,9 @@ impl JsonMutationSession {
     }
 }
 
-impl RepositoryMutationSession for MemoryMutationSession {
+impl RepositoryReadSession for MemoryMutationSession {
     fn layout(&self) -> &RepositoryLayout {
         &self.layout
-    }
-
-    fn recovery_report(&self) -> &RecoveryDispatchReport {
-        &self.recovery_report
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -722,13 +965,23 @@ impl RepositoryMutationSession for MemoryMutationSession {
         self.capture_over(image.into_answers(&spec), spec)
     }
 
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        memory_history_log(&self.storage)
+    }
+}
+
+impl RepositoryMutationSession for MemoryMutationSession {
+    fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
+    }
+
     fn apply(
         &mut self,
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let image = plan.image();
-        let delta = plan.delta();
-        ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
+        let delta = plan.publication();
+        ensure_session_image(&self.layout, self.captured, image)?;
         ensure_delta_is_captured(image, delta)?;
         #[cfg(feature = "test-support")]
         if self.storage.consume_repository_state_apply_conflict() {
@@ -761,7 +1014,7 @@ impl MemoryMutationSession {
         let state = self.storage.repository_state();
         let image = capture_memory_image(&self.layout, &state, spec, prior)?;
         drop(state);
-        self.captured = Some(image.clone());
+        self.captured = Some(image.token());
         Ok(image)
     }
 
@@ -773,7 +1026,7 @@ impl MemoryMutationSession {
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let record = redo_record_for(image, delta.actions().iter())?;
+        let record = appending_record(image, delta)?;
         ensure_memory_write_set_unchanged(&self.storage.repository_state(), image, &record)?;
         self.storage
             .commit_record(&record)
@@ -845,10 +1098,10 @@ fn publish_absent_memory_root(
 
 fn ensure_session_image(
     layout: &RepositoryLayout,
-    captured: Option<&RepositoryImage>,
+    captured: Option<ImageToken>,
     image: &RepositoryImage,
 ) -> Result<(), RepositoryStateStoreError> {
-    if image.layout() != layout || captured != Some(image) {
+    if image.layout() != layout || captured != Some(image.token()) {
         return Err(RepositoryStateStoreError::RetryableConflict {
             path: "image does not belong to this mutation session".into(),
         });
@@ -938,21 +1191,13 @@ fn ensure_write_set_unchanged_against(
         .iter()
         .chain(record.puts().iter().map(|put| &put.path))
         .chain(record.deletes().iter())
-        .filter(|path| **path != VirtualPath::EVENTS)
         .try_for_each(|path| ensure_target_unchanged(captured, path, live))?;
-    let touches_event_log = record.event_append().is_some()
-        || record
-            .puts()
-            .iter()
-            .any(|put| put.path == VirtualPath::EVENTS)
-        || record.deletes().contains(&VirtualPath::EVENTS);
-    if !touches_event_log {
+    if record.event_append().is_none() {
         return Ok(());
     }
     // An ordinary captured log is the only state carrying a tail to compare;
     // any other occupant is compared like any other write target.
     let tail = match captured.entry(&VirtualPath::EVENTS)? {
-        RepositoryEntry::File { content, .. } => EventLogTail::of_bytes(content.bytes()),
         RepositoryEntry::FileTail { tail, .. } => tail.clone(),
         _ => return ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
     };
@@ -1041,6 +1286,19 @@ fn redo_record_for<'a>(
         .collect();
     RedoRecord::new(make_directories, puts, deletes, event_append)
         .map_err(|source| RepositoryStateStoreError::Other(source.into()))
+}
+
+/// The redo record publishing `delta` over a present data root, refused
+/// when it appends no event: the event log's length counts every commit.
+fn appending_record(
+    image: &RepositoryImage,
+    delta: &RepositoryDelta,
+) -> Result<RedoRecord, RepositoryStateStoreError> {
+    let record = redo_record_for(image, delta.actions().iter())?;
+    match record.event_append() {
+        Some(_) => Ok(record),
+        None => Err(RepositoryStateStoreError::RecordWithoutEventAppend),
+    }
 }
 
 fn event_append_of(action: &RepositoryAction) -> Option<EventAppend> {
@@ -1145,8 +1403,14 @@ fn capture_capability_image(
         .iter()
         .filter(|request| !prior.pinned.contains_key(*request))
         .cloned()
+        .collect::<BTreeSet<_>>();
+    let kind_only = unanswered
+        .iter()
+        .filter(|request| spec.pinned_read_mode(request) == Some(ReadMode::Kind))
+        .cloned()
         .collect();
-    let pinned_reads = storage.inspect_pinned_targets(layout.worktree_root(), &unanswered);
+    let pinned_reads =
+        storage.inspect_pinned_targets(layout.worktree_root(), &unanswered, &kind_only);
     let mut evidence_cache = storage.pinned_evidence_cache();
     let pinned = spec
         .pinned()
@@ -1170,6 +1434,7 @@ fn capture_capability_image(
                         .filter(|evidence| {
                             evidence.commit_oid() == Some(read.version().as_str())
                                 && evidence.object_oid() == read.object_oid()
+                                && evidence.bytes().is_some() == read.bytes().is_some()
                         });
                     if let Some(evidence) = cached {
                         return Ok(((revision.clone(), path.clone()), evidence.clone()));
@@ -1236,6 +1501,9 @@ fn capture_memory_image(
                 tail: EventLogTail::of_bytes(content.bytes()),
                 mode: *mode,
             }
+        }
+        (Some(RepositoryEntry::File { mode, .. }), Some(ReadMode::Kind)) => {
+            RepositoryEntry::FileKind { mode: *mode }
         }
         (entry, _) => entry.cloned().unwrap_or(RepositoryEntry::Absent),
     };
@@ -1320,7 +1588,10 @@ fn ensure_memory_parent_exists(
     if parent.as_os_str().is_empty() {
         return Ok(());
     }
-    let parent_path = VirtualPath::from_root(path.root_class(), RootRelativePath::parse(parent)?)?;
+    let parent_path = VirtualPath::from_root(
+        path.root_class(),
+        RootRelativePath::parse(parent).map_err(RepositoryLayoutError::from)?,
+    )?;
     if matches!(
         state.entries.get(&parent_path),
         Some(RepositoryEntry::Directory { .. })
@@ -1474,6 +1745,11 @@ fn inspect_capability_leaf(
     if metadata.is_dir() {
         return directory_entry(metadata);
     }
+    if metadata.is_file() && read == ReadMode::Kind {
+        return Ok(RepositoryEntry::FileKind {
+            mode: normalized_mode(&metadata),
+        });
+    }
     if metadata.is_file() {
         let mut options = OpenOptions::new();
         options.read(true);
@@ -1544,372 +1820,6 @@ fn normalized_mode(metadata: &cap_std::fs::Metadata) -> FileMode {
     }
 }
 
-/// Open the parent directory of a repository-relative target for capture.
-///
-/// `Ok(None)` means an ancestor directory does not exist, so the target captures
-/// as absence. A symlinked or non-directory ancestor stays a hard error: it is an
-/// unsafe target, not a clean absence.
-pub(in crate::storage) fn open_capability_parent(
-    root: &Dir,
-    path: &Path,
-) -> Result<Option<(Dir, String)>, RepositoryStateStoreError> {
-    let components = path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let (leaf, parents) = components
-        .split_last()
-        .ok_or_else(|| RepositoryStateStoreError::UnsafeTarget(path.display().to_string()))?;
-    let mut current = root.try_clone()?;
-    for component in parents {
-        match current.symlink_metadata(component) {
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                return Err(RepositoryStateStoreError::UnsafeTarget(component.clone()))
-            }
-            Ok(_) => current = open_child_dir_nofollow(&current, component)?,
-            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(error.into()),
-        }
-    }
-    Ok(Some((current, leaf.clone())))
-}
-
-/// Open the parent directory of a repository-relative target, creating the
-/// ancestors it lacks.
-///
-/// Each directory it creates is synced into the parent that now names it before
-/// the walk descends, so a file published underneath is reachable after a crash
-/// rather than hanging off an entry the filesystem never wrote
-/// (`@/inv/atomic-writes`). An ancestor that already exists costs no sync.
-pub(in crate::storage) fn open_or_create_capability_parent(
-    root: &Dir,
-    path: &Path,
-) -> Result<(Dir, String), RepositoryStateStoreError> {
-    let components = path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let (leaf, parents) = components
-        .split_last()
-        .ok_or_else(|| RepositoryStateStoreError::UnsafeTarget(path.display().to_string()))?;
-    parents
-        .iter()
-        .try_fold(root.try_clone()?, |current, component| {
-            match current.symlink_metadata(component) {
-                Err(error) if error.kind() == ErrorKind::NotFound => {
-                    current.create_dir(component)?;
-                    sync_capability_directory(&current)?;
-                }
-                Err(error) => return Err(error.into()),
-                Ok(_) => {}
-            }
-            open_child_dir_nofollow(&current, component)
-        })
-        .map(|parent| (parent, leaf.clone()))
-}
-
-fn open_descendant_dir_nofollow(root: &Dir, path: &Path) -> Result<Dir, RepositoryStateStoreError> {
-    let mut current = root.try_clone()?;
-    for component in path.components() {
-        current = open_child_dir_nofollow(&current, Path::new(component.as_os_str()))?;
-    }
-    Ok(current)
-}
-
-pub(crate) fn open_child_dir_nofollow(
-    parent: &Dir,
-    name: impl AsRef<Path>,
-) -> Result<Dir, RepositoryStateStoreError> {
-    let name = name.as_ref();
-    let metadata = parent.symlink_metadata(name)?;
-    if metadata.is_symlink() || !metadata.is_dir() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            name.display().to_string(),
-        ));
-    }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    options._cap_fs_ext_maybe_dir(true);
-    let file = parent.open_with(name, &options)?;
-    if !file.metadata()?.is_dir() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            name.display().to_string(),
-        ));
-    }
-    Ok(Dir::from_std_file(file.into_std()))
-}
-
-/// Open `leaf` under `parent` as an ordinary file, refusing a symlink or any
-/// non-regular target without following it.
-pub(crate) fn open_regular_file_nofollow(
-    parent: &Dir,
-    leaf: &str,
-) -> Result<cap_std::fs::File, RepositoryStateStoreError> {
-    let metadata = parent.symlink_metadata(leaf)?;
-    if metadata.is_symlink() || !metadata.is_file() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(leaf.to_string()));
-    }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let file = parent.open_with(leaf, &options)?;
-    if !file.metadata()?.is_file() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(leaf.to_string()));
-    }
-    Ok(file)
-}
-
-pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, RepositoryStateStoreError> {
-    if !path.is_absolute() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            path.display().to_string(),
-        ));
-    }
-    let mut anchor = PathBuf::new();
-    let mut descendants = Vec::new();
-    for component in path.components() {
-        match component {
-            Component::Prefix(_) | Component::RootDir => anchor.push(component.as_os_str()),
-            Component::Normal(name) => descendants.push(name),
-            Component::CurDir => {}
-            Component::ParentDir => {
-                return Err(RepositoryStateStoreError::UnsafeTarget(
-                    path.display().to_string(),
-                ))
-            }
-        }
-    }
-    let mut current = Dir::open_ambient_dir(&anchor, ambient_authority())?;
-    for name in descendants {
-        current = open_child_dir_nofollow(&current, name)?;
-    }
-    Ok(current)
-}
-
-/// Read one validated root-relative ordinary file without following links.
-///
-/// `Ok(None)` means the leaf or one of its parents is absent. Symlinked
-/// ancestors, symlink leaves, directories, and special files are unsafe rather
-/// than absence.
-pub(crate) fn read_repository_file_nofollow(
-    root: &Path,
-    relative: &RootRelativePath,
-) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
-    if relative.is_root() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            root.display().to_string(),
-        ));
-    }
-    let root = open_absolute_dir_nofollow(root)?;
-    let Some((parent, leaf)) = open_capability_parent(&root, relative.as_path())? else {
-        return Ok(None);
-    };
-    let metadata = match parent.symlink_metadata(&leaf) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.into()),
-    };
-    if metadata.is_symlink() || !metadata.is_file() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            relative.as_path().display().to_string(),
-        ));
-    }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(&leaf, &options)?;
-    if !file.metadata()?.is_file() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            relative.as_path().display().to_string(),
-        ));
-    }
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    Ok(Some(bytes))
-}
-
-/// Read one validated root-relative ordinary file through a confined root handle.
-///
-/// Symlinks may be followed, but capability resolution keeps every traversal
-/// beneath `root`; a raced path cannot redirect the final open outside it.
-pub(crate) fn read_repository_file_confined(
-    root: &Path,
-    relative: &RootRelativePath,
-) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
-    if relative.is_root() {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            root.display().to_string(),
-        ));
-    }
-    let root_dir = open_absolute_dir_nofollow(root)?;
-    read_confined_relative(root, &root_dir, relative.as_path(), 0)
-}
-
-fn read_confined_relative(
-    root_path: &Path,
-    root: &Dir,
-    relative: &Path,
-    symlink_depth: usize,
-) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
-    if symlink_depth >= 40 {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            relative.display().to_string(),
-        ));
-    }
-    let components = relative
-        .components()
-        .map(|component| match component {
-            Component::Normal(name) => Ok(name.to_os_string()),
-            _ => Err(RepositoryStateStoreError::UnsafeTarget(
-                relative.display().to_string(),
-            )),
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut current = root.try_clone()?;
-    let mut traversed = PathBuf::new();
-    for (index, component) in components.iter().enumerate() {
-        let metadata = match current.symlink_metadata(component) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(error.into()),
-        };
-        if metadata.is_symlink() {
-            let target = current.read_link_contents(component)?;
-            let resolved =
-                resolve_confined_symlink(root_path, &traversed, &target, &components[index + 1..])?;
-            return read_confined_relative(root_path, root, &resolved, symlink_depth + 1);
-        }
-        if index + 1 == components.len() {
-            if !metadata.is_file() {
-                return Err(RepositoryStateStoreError::UnsafeTarget(
-                    relative.display().to_string(),
-                ));
-            }
-            let mut options = OpenOptions::new();
-            options.read(true);
-            options._cap_fs_ext_follow(FollowSymlinks::No);
-            let mut file = current.open_with(component, &options)?;
-            if !file.metadata()?.is_file() {
-                return Err(RepositoryStateStoreError::UnsafeTarget(
-                    relative.display().to_string(),
-                ));
-            }
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)?;
-            return Ok(Some(bytes));
-        }
-        if !metadata.is_dir() {
-            return Err(RepositoryStateStoreError::UnsafeTarget(
-                relative.display().to_string(),
-            ));
-        }
-        current = open_child_dir_nofollow(&current, component)?;
-        traversed.push(component);
-    }
-    Err(RepositoryStateStoreError::UnsafeTarget(
-        relative.display().to_string(),
-    ))
-}
-
-fn resolve_confined_symlink(
-    root: &Path,
-    parent: &Path,
-    target: &Path,
-    tail: &[std::ffi::OsString],
-) -> Result<PathBuf, RepositoryStateStoreError> {
-    let is_absolute = target.is_absolute();
-    let target = if is_absolute {
-        target
-            .strip_prefix(root)
-            .map_err(|_| RepositoryStateStoreError::UnsafeTarget(target.display().to_string()))?
-    } else {
-        target
-    };
-    let mut resolved = if is_absolute {
-        PathBuf::new()
-    } else {
-        parent.to_path_buf()
-    };
-    for component in target.components() {
-        match component {
-            Component::CurDir => {}
-            Component::Normal(name) => resolved.push(name),
-            Component::ParentDir if resolved.pop() => {}
-            _ => {
-                return Err(RepositoryStateStoreError::UnsafeTarget(
-                    target.display().to_string(),
-                ))
-            }
-        }
-    }
-    resolved.extend(tail);
-    Ok(resolved)
-}
-
-fn ensure_capability_identity(
-    directory: &Dir,
-    expected: &str,
-    path: &Path,
-) -> Result<(), RepositoryStateStoreError> {
-    let actual = capability_metadata_identity(&directory.dir_metadata()?)?;
-    if actual == expected {
-        Ok(())
-    } else {
-        Err(RepositoryStateStoreError::RetryableConflict {
-            path: path.display().to_string(),
-        })
-    }
-}
-
-/// Directory-capability identity in the same `dev:ino` form the layout records
-/// for the absent-root parent. `None` on platforms without stable inode identity,
-/// where the absent-root parent binding is skipped.
-pub(crate) fn capability_dir_identity(directory: &Dir) -> Option<String> {
-    #[cfg(any(unix, windows))]
-    {
-        let metadata = directory.dir_metadata().ok()?;
-        capability_metadata_identity(&metadata).ok()
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = directory;
-        None
-    }
-}
-
-#[cfg(unix)]
-fn capability_metadata_identity(
-    metadata: &cap_std::fs::Metadata,
-) -> Result<String, RepositoryStateStoreError> {
-    Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
-}
-
-#[cfg(windows)]
-fn capability_metadata_identity(
-    metadata: &cap_std::fs::Metadata,
-) -> Result<String, RepositoryStateStoreError> {
-    let volume =
-        cap_primitives::fs::_WindowsByHandle::volume_serial_number(metadata).ok_or_else(|| {
-            RepositoryStateStoreError::UnsafeTarget("Windows volume identity unavailable".into())
-        })?;
-    let index = cap_primitives::fs::_WindowsByHandle::file_index(metadata).ok_or_else(|| {
-        RepositoryStateStoreError::UnsafeTarget("Windows file identity unavailable".into())
-    })?;
-    Ok(format!("{volume}:{index}"))
-}
-
-#[cfg(not(any(unix, windows)))]
-fn capability_metadata_identity(
-    metadata: &cap_std::fs::Metadata,
-) -> Result<String, RepositoryStateStoreError> {
-    Ok(format!(
-        "{}:{}",
-        metadata.len(),
-        metadata.permissions().readonly()
-    ))
-}
-
 fn revalidate_layout_capabilities(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
@@ -1921,7 +1831,10 @@ fn revalidate_layout_capabilities(
     // which otherwise lets the delta publish into the now-unlinked old inode (a
     // silent lost update). A fresh path resolution sees the new inode and aborts.
     revalidate_layout(layout)?;
-    match (&roots.data, layout.data_root().exists()) {
+    match (
+        roots.root(RepositoryRootClass::Data),
+        layout.data_root().exists(),
+    ) {
         (Some(_), true) | (None, false) => Ok(()),
         _ => Err(RepositoryStateStoreError::RetryableConflict {
             path: layout.data_root().display().to_string(),
@@ -2068,6 +1981,9 @@ fn lexical_absolute(path: &Path) -> Result<PathBuf, RepositoryStateStoreError> {
 #[cfg(test)]
 #[path = "repository_state_store_contention_tests.rs"]
 mod repository_state_store_contention_tests;
+#[cfg(test)]
+#[path = "repository_state_store_fixtures.rs"]
+pub(crate) mod test_fixtures;
 #[cfg(test)]
 #[path = "repository_state_store_tests.rs"]
 mod tests;

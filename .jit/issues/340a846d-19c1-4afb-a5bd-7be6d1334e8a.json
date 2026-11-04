@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:15:02.752964736Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Make the MCP tool-generation parity test fail rather than pass when it cannot run node.\n\n## Background\n\n`crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs:930-935` returns early, printing \"node not available; skipping MCP parity assertion\", when `node --version` fails. The test runs the MCP server's tool generator (`mcp-server/lib/tool-generator.js`) over the real schema.\n\n## Success Criteria\n\n- [hard] REQ-01: The parity test fails, naming the missing tool, when node cannot run.\n- [hard] REQ-02: The test has no skip path, and it still asserts the generated `jit_validate` tool's properties.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:03:49.091980267Z",
+  "first_ready_at": "2026-10-28T22:11:47.349729116Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dd6d3147-d43d-4016-9418-270716280b7b",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:56:46.309293927Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "799006e5-b70f-4505-904f-dadd67094c33",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:59:40.664540965Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "340a846d-19c1-4afb-a5bd-7be6d1334e8a",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "MCP parity test fails when node is missing",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:03:49.091980267Z"
 }

@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T21:00:46.917701531Z",
+  "context": {},
+  "created_at": "2026-10-27T20:59:57.083162691Z",
+  "dependencies": [],
+  "description": "Repository-image captures for mutations, repairs and proposed-state validation read every document referenced by any issue, in full, so they grow with project history and `jit recover` fails on a repository with large referenced documents. Document bytes are read only where a pass consumes them.\n\n## Background\n\n`capture_proposed_base` (`crates/jit/src/commands/validate.rs:183-206`) grows its base through `grow_discovering(.., discover_document_references)` (`validate.rs:890-903`). For every document reference on every issue, this requests the working-tree file and the pinned git blob. The base serves `repair_derived_state` (`jit recover`, `claim.rs:720`, `validate.rs:554`), proposed-state validation (`validate.rs:161`), `config set` (`config.rs:265`), `init` (`init.rs:211,245,1347`) and `gate check` (`gate_check.rs:818`), all under `CAPTURE_MAX_BYTES` (512 MiB, `commands/mod.rs:269`).\n\nObserved in a downstream repository, where both `jit recover` and `jit validate` fail (copy reproduced with the installed 1.0.0 binary and with main at 01c3d8f85): `jit recover` fails with `captured 537290260 bytes but the maximum is 536870912`. The repository has 4318 document references to 4037 unique paths (bench logs and receipts up to 60 MB). The capture reads about 269 MB of working-tree files plus 267 MB of pinned blobs. The `.jit` data itself is about 6 MB of that.\n\nThis contradicts `@/charter/D-19`: reads never scale with project history.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit recover` and derived-state repair capture no document-reference content, and succeed on a repository whose referenced documents total more than the capture byte budget.\n- [hard] REQ-02: Every capture that serves a mutation (`config set`, `init`, `gate check`, issue mutations) reads document-reference content only for the documents a pass of that mutation consumes, never every issue's documents.\n- [hard] REQ-03: `jit validate` succeeds on a repository whose referenced documents total more than the capture byte budget, and its document-reference checks keep their current verdicts: a missing, changed or dangling document reference is still reported.\n- [hard] REQ-04: One owning test proves that a derived-state repair over an issue whose referenced document exceeds a small capture budget succeeds without reading it, and one owning test proves REQ-02's per-mutation scoping at the shared capture mechanism.",
+  "documents": [],
+  "done_at": "2026-10-27T21:41:42.512638737Z",
+  "first_ready_at": "2026-10-27T20:59:57.083162691Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fdddd32a-2bc8-4e79-a8eb-bd6852e729b7",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:41:23.738331598Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d7795ea3-a929-44c3-9c9d-e3f5fd0f1993",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:24:57.722831995Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "55e3d3fd-4fe9-4c16-a2f4-e463b9994f41",
+  "labels": [
+    "type:bug",
+    "component:core",
+    "component:storage",
+    "milestone:v1.0",
+    "per:@/charter/D-19"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Mutation and repair captures read only the documents their passes consume",
+  "updated_at": "2026-10-27T21:41:42.512638737Z"
+}

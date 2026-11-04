@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a29e64c1dfaa5afa1fcff72127373f695ec3bd88",
+  "completed_at": "2026-10-27T22:47:20.027365690Z",
+  "duration_ms": 242361,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The domain query owner, focused ownership tests, CLI wiring reductions, and readiness coverage satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ea5ffaba-f183-46ae-8704-c4a17b5ebc60",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "025e337e-059d-47b6-b827-072f123a8b17",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:43:17.665918902Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 58c4e17c5, a29e64c1d (first-parent merge patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-02 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T22:41:37Z); code-review pending (unrun)\nTruncation recovery: repository-scoped AGENTS discovery; per-commit, per-path, and line-range reads recovered truncated diffs and sources\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The domain query owner, focused ownership tests, CLI wiring reductions, and readiness coverage satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

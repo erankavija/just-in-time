@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:f4d9502a-lead",
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-24T19:06:20.387120948Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
@@ -8,6 +8,7 @@
   ],
   "description": "Create the storage-owned module that is the only place jit starts git, with the one-process probe that classifies a directory.\n\n## Background\n\n- Ten production files start git today, each naming the literal `git`, among them layout detection (`crates/jit/src/storage/worktree_paths.rs:58-141`), claims, worktree commands, validation, init and gate execution. Charter decision `@/charter/D-21` gives git one storage-owned module that runs the CLI.\n- `git -C <dir> rev-parse --git-common-dir --show-toplevel` answers both layout facts in one process. It succeeds in a primary checkout, a linked checkout and a repository without commits, and exits nonzero outside a repository and inside a `.git` directory. A relative common directory is resolved against the probed directory, as `:104-109` does today. A failure to start git means no executable is available.\n- No production setting names a git executable. `JsonFileStorage.git_program` (`crates/jit/src/storage/json.rs:403`) defaults to `git` (`:441`) and only a `#[cfg(test)]` constructor changes it (`crates/jit/src/storage/json.rs:481-488`).\n- `WorktreePaths` (`crates/jit/src/storage/worktree_paths.rs:13`) is the layout value the CLI detects once (`crates/jit/src/main.rs:1903`) and hands to storage, the executor, claims and worktree commands; `is_git_repository()` (`crates/jit/src/storage/worktree_paths.rs:144`) says whether it is a git checkout.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/storage/git.rs` (`storage::git`, public) holds a `Git` value naming the git executable, whose default is the bare name `git` looked up on `PATH`, and `Git::with_program` names another. Every process the module starts runs as `<program> -C <directory> …`, never in the process working directory, and a failure to start one is the module error for an unavailable executable, naming the program.\n- [hard] REQ-02: `GitCheckout` pairs a `Git` with a checkout's worktree root and carries the module's git operations. `WorktreePaths::git()` returns one for a git checkout, built with the default executable, and `None` otherwise.\n- [hard] REQ-03: `Git::probe(dir)` classifies a directory with one git process. A primary checkout, a linked checkout and a repository without commits yield the common directory and the top-level path; a directory outside a repository, a `.git` directory, and an executable that cannot start yield no checkout.\n- [hard] REQ-04: The module's behaviour suite, a new module of the `fast_docs_templates` suite, proves REQ-03 against real repositories and counts one process per probe with the shared counting stand-in.\n\n## Notes\n\n- The module gains one operation for each git fact production code needs, each just before its first production consumer; in the end state every public item has a production caller. Without an executable, core commands behave as outside git (`@/charter/D-4`).\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-01T14:05:17.748543797Z",
   "first_ready_at": "2026-10-24T19:06:20.069005037Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "9e908b95-cfc2-46e0-b4f8-fa1b3b81b28f",
-      "status": "failed",
-      "updated_at": "2026-10-24T19:24:26.266695019Z",
+      "run_id": "e0483789-452f-46ec-966d-31b960acd47d",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:00:02.613875474Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "ff37c97e-6ac4-441e-b776-bf193650ca8f",
-      "status": "failed",
-      "updated_at": "2026-10-24T19:20:01.385537227Z",
+      "run_id": "ace1572b-b268-4906-9957-d6f31c6c184d",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:04:39.040021689Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,7 +42,7 @@
     "satisfies:f4d9502a/REQ-12"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Storage-owned git module with a one-process probe",
-  "updated_at": "2026-10-24T19:24:26.266695019Z"
+  "updated_at": "2026-11-01T14:05:17.748543797Z"
 }

@@ -7,6 +7,7 @@
   ],
   "description": "Rewrite the storage-record reference prose and the `GateRunResult` rustdoc so they describe per-issue run records instead of the flat layout's rationale.\n\n## Background\n\nThe generated storage-record reference explains that \"`gate-runs/` is flat rather than nested per issue\" (`crates/jit/src/storage/reference.rs:184-188,549-556`, rendered into `docs/reference/storage-records.md:60-65,126`), and the `GateRunResult` rustdoc names `gate-runs/<run-id>/result.json` (`domain/types.rs:923-929`). Runs are stored at `gate-runs/<issue-id>/<run-id>.json`, and an issue's history is one directory listing.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference source and the `GateRunResult` rustdoc describe `gate-runs/<issue-id>/<run-id>.json` and the per-issue history listing, with no flat-layout rationale.\n- [hard] REQ-02: The committed reference is regenerated and matches the projection.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:36.942950051Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -23,10 +24,11 @@
     "component:docs",
     "per:@/charter/D-19",
     "enforces:@/invariant/single-source-prose",
-    "satisfies:f8a6b298/REQ-15"
+    "satisfies:f8a6b298/REQ-15",
+    "resolution:merged-into-1630015d"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Gate-run layout prose describes per-issue records",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:48.659335090Z"
 }

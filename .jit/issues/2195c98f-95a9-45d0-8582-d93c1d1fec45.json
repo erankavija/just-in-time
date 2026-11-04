@@ -1,24 +1,63 @@
 {
-  "assignee": "agent:planning-lead-2195c98f",
+  "archived_from": "done",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T20:35:49.020284998Z",
   "context": {},
   "created_at": "2026-10-20T20:12:36.610884572Z",
   "dependencies": [
     "0461a6f7-cd92-4432-b835-d7d3dd2d9a8f",
+    "592d663e-f516-4167-8449-d2b467ea32f4",
     "5dd29767-b7c9-4037-a99c-c6c9a1081344",
+    "64420cff-2c04-42a7-bbcf-232cb0e8003c",
     "83d04069-e6ea-4591-a97f-44c2c941aa72",
     "8c40d01b-145e-4974-8f22-41676a158aa0",
     "9537f74b-bec7-4762-8350-b255a1864e35",
     "e2651d77-d171-483a-9a21-90c70885a6ae"
   ],
   "description": "Give every identity, path and closed vocabulary one semantic type, parsed once at the boundary, so raw strings remain only at parse and serialize sites. Consumers then stop re-validating, re-normalising and re-spelling the same values.\n\n## Background\n\nAn audit of the workspace (re-verified at commit 79c177fb) found these values travelling as raw strings.\n\n**Issue identity.**\n- These are all `String` or `&str`:\n  - `Issue.id` and its dependency list (`domain/types.rs:414`);\n  - `GateRunResult.issue_id` and the issue id in every `Event` variant;\n  - the `Lease` fields `lease_id`, `issue_id`, `agent_id` and `worktree_id` (`storage/claim_coordinator.rs:33-39`);\n  - the `IssueStore` trait (`load_issue(&str)`, `resolve_issue_id(&str) -> String`, `load_gate_run_result(run_id: &str)`, `find_reusable_gate_run(gate_key: &str, ..)`, `storage/mod.rs:166-290`).\n- Raw ids cause harm in the backends. The JSON backend joins an id that contains `/` under `issues/`, and the memory backend panics on a non-canonical id (`storage/memory.rs:338-340`).\n- Prefix matching is written in five functions (`commands/mod.rs:1995`, `dependency.rs:458`, `template.rs:911`, `storage/json.rs:1259`, `memory.rs:843`) and inline at four more sites (`validate.rs:248`, `gate_check.rs:722`, `claim_coordinator.rs:306,814`).\n- The short id is derived by `chars().take(SHORT_ID_LENGTH)` at nine sites and by `take(8)` or `[..8]` literals elsewhere (`validate.rs:1055`, `claim.rs:1057`).\n- `Event::get_issue_id` returns `\"\"` for repository-scoped events (`domain/types.rs:2002-2010`).\n- The issue record path is spelled `format!(\"issues/{id}.json\")` 65 times across 19 source files, including two private `issue_path` helpers (`repository_state/mutation.rs:503`, `archive.rs:426`).\n\n**Profile identity, records and versions.**\n- `ProfilePackageId` (`repository_state/profile_apply.rs:608`) is an unvalidated twin of `ProfileId` (`profile/manifest.rs:26`). It is constructed at 37 sites, mostly by stringifying a validated `ProfileId`.\n- The applied-record path `profiles/{id}.json` is spelled at 8 production sites.\n- Seven readers parse that record, each with different validation (`profile_apply.rs:2039-2122`, `commands/profile.rs:2986`, `initialize.rs:636,1080`).\n- Versions are `String` fields (`profile/manifest.rs:136-178`). Validation parses and discards them, and graph resolution parses them again behind four `ProfileGraphError::Invalid*` variants that a validated package cannot produce.\n- Reserved application targets are matched as raw `.jit/...` prefixes before classification (`commands/profile.rs:3018`, `init.rs:400`).\n\n**Closed vocabularies.**\n- The state token is spelled four times: `State::as_str`, `errors.rs:975`, `declarations/rules.rs:338` and the `VALID_STATE_TOKENS` table at `rules.rs:354`. `errors::gate_status_name` copies `GateStatus::as_str`.\n- `strictness` and `content_format` (`config.rs:267,274`) and template `Transform::kind` (`templates.rs:386`) are strings, re-parsed on every access.\n- Built-in `GateFinding` severity and disposition are string literals at four sites in `gate_check.rs`. `GateRunResult.by` is `Option<String>` (`domain/types.rs:982`) and is re-parsed into `Assignee`.\n- The query language holds `Assignee(String)` and hand-copied `STATE_VALUES` and `PRIORITY_VALUES` lists.\n- `mode_token` and `style_token` restate serde renames (`commands/project.rs:55-64`). `KindScopeConfig` (`config.rs:785`) mirrors `item::KindScope`. `Projection` stringifies state and priority through `serde_json::Value` (`domain/projection.rs:64,164`).\n- Repository action owners are strings (`repository_state/image.rs:1096`), and behaviour branches on `matches!(action.owner(), \"default-rule-membership\" | \"default-schema\")` (`initialize.rs:560`).\n- The system actors `system:list`, `system:check`, `system:admin`, `system:recovery` (`commands/claim.rs:530-700`) and `system:lease-check` (`commands/mod.rs:729`) are string literals.\n\n**Wire tables and envelopes.**\n- `EventTag` derives serde renames and also hand-writes 22 `as_str` strings and a 22-entry `ALL` (`domain/event_catalog.rs:79-157`). `EvidenceCode`, `BlockerCode` and `WarningCode` follow the same pattern (`domain/artifact_plan.rs:373-497`).\n- `PlanError` hand-writes `Display` and `Error` (`artifact_plan.rs:1138-1187`).\n- `Event` repeats `id` and `timestamp` in all 22 variants, so `id()`, `assign_identity()` and `get_issue_id()` are each 22-arm matches.\n- `Priority` has no `Ord`, so its rank match is copied (`commands/query.rs:142`, `issue.rs:752`).\n\n**Untyped declarations.**\n- The graph assertions `LabelCoverage`, `LabelReference` and `DependencyShape` hold raw `toml::value::Table` values (`declarations/rules.rs:579-589`). Evaluation re-parses their keys and compiles regexes on every call (`validation/graph.rs:869,1608,1781`), so a malformed rule surfaces only during evaluation.\n- `HierarchyConfig` is built from `LabelNamespaces` at four production sites with three error policies: `config_manager.rs:307` returns an error, `validate.rs:1039` propagates, `default_rules.rs:520` falls back to an empty configuration, and `template_expand.rs:703` builds its own.\n- \"Strategic\" has three definitions, one of them a hardcoded `level <= 2` (`commands/query.rs:68`).\n\n## Success Criteria\n\n- [hard] REQ-01: An `IssueId` type is the issue identity in issues, dependencies, events, gate-run results, leases and every `IssueStore` method. Gate-run ids and gate keys are typed in the trait as well, and storage derives record paths from these types without validation or panics.\n- [hard] REQ-02: A user-supplied id prefix is parsed once into an `IssueIdPrefix`, and prefix resolution maps an `IssueIdPrefix` to an `IssueId`.\n- [hard] REQ-03: Only `IssueId` derives the short id. No other production site truncates an id by length.\n- [hard] REQ-04: The issue accessor of an event returns an optional `IssueId`, and no empty-string sentinel remains.\n- [hard] REQ-05: `Event` is an envelope that holds `id` and `timestamp` once around a tagged body. Serialized event-log lines keep their current shape.\n- [hard] REQ-06: Lease fields are typed: the agent is an `Assignee`, the issue is an `IssueId`, and the lease and worktree ids are dedicated types.\n- [hard] REQ-07: Issue record and schema paths come only from `VirtualPath` constructors, and well-known `.jit` files come only from `VirtualPath` constants. No production `format!` builds one of these paths.\n- [hard] REQ-08: One `VirtualPath` predicate recognises reserved application targets, and it is applied after classification.\n- [hard] REQ-09: One profile identity type, `ProfileId`, is defined in the domain layer and constructed only through validation. Profile dependency resolution and the package graph compare `ProfileId` values, never strings.\n- [hard] REQ-10: Each closed vocabulary has exactly one enum, with serde at the boundary. This covers lifecycle state, gate status, validation strictness, content format, template transform kind, item-kind scope, projection mode and style, built-in gate-finding severity and disposition, and repository action owner. No token function, token table or second enum restates one of them.\n- [hard] REQ-11: Gate-run actors, query assignee filters and system actors are `Assignee` values, and each system actor is a named constant.\n- [hard] REQ-12: The query language derives its valid-value lists from the typed enums. Validation projections hold typed state and priority.\n- [hard] REQ-13: Event tags and artifact-plan codes state each variant's wire spelling once, and `as_str`, the enumeration and serde all derive from it. `PlanError` uses the crate's derive-based error convention.\n- [hard] REQ-14: `Priority` orders by rank through `Ord`, and no priority-to-rank match remains.\n- [hard] REQ-15: Graph-assertion configurations are typed and compiled at load, regexes included. A malformed assertion fails declaration loading with an error that names the rule, and evaluation compiles no regex.\n- [hard] REQ-16: One fallible constructor with one error policy builds `HierarchyConfig` from repository declarations.\n- [hard] REQ-17: Raw strings that carry these identities and vocabularies appear only at parse and serialize boundaries: CLI arguments, server requests, file decoding and rendering.\n\n## Notes\n\n- Serves `@/inv/semantic-types`, `@/inv/convention-convergence` and `@/charter/D-18`. It also serves `@/inv/architecture-dependency-direction`, because shared identity types move into the domain layer.\n- The project is greenfield (`@/inv/canonical-cutover`), so stored records need no compatibility readers. Where a typed field changes a serialized shape, this repository's data is rewritten once.\n- Deleting `ProfilePackageId` and typing profile versions as semver belong to the profile apply-once rework.\n- Profile application is being reworked to apply packages once (`@/charter/D-8`). The profile criteria apply to whatever record and identity surface remains after that rework.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Session 2 handoff",
+      "path": "dev/archive/2195c98f-semantic-types/active/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "handoff",
+      "format": "markdown",
+      "label": "Session 3 handoff",
+      "path": "dev/archive/2195c98f-semantic-types/active/handoff-2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2195c98f-semantic-types/active/completion-report.md"
+    }
+  ],
+  "done_at": "2026-11-01T05:30:03.966921533Z",
   "first_ready_at": "2026-10-20T20:12:36.610884572Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "8e445bfa-633d-440f-b848-c03ade9c6672",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:28:45.465794931Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "ef0fd351-e5ef-4949-9c3a-fb33cb8f3540",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:26:20.931671524Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "labels": [
     "epic:semantic-types",
@@ -31,7 +70,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "archived",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-21T05:32:21.108409050Z"
+  "updated_at": "2026-11-01T05:30:35.035154985Z"
 }

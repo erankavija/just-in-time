@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::declarations::GateMode;
+use crate::domain::identity::GateKey;
 use crate::domain::{GateRunResult, GateRunStatus};
 
 /// Error returned when `jit gate evaluate` runs an automated checker that does not pass.
@@ -10,13 +11,13 @@ use crate::domain::{GateRunResult, GateRunStatus};
 /// without disagreeing with the persisted `gates_status` value.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
+    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
 )]
 pub struct GatePassFailed {
     /// Issue whose gate was checked.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Gate key that failed.
-    pub gate_key: String,
+    pub gate_key: GateKey,
     /// Raw checker status.
     pub status: GateRunStatus,
     /// Checker process exit code, when available.
@@ -37,10 +38,44 @@ pub struct GatePassFailed {
 #[error("Gate '{gate_key}' is not required for issue {issue_id}")]
 pub struct GateNotRequiredError {
     /// Issue that was targeted.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Gate key that is not in the issue's required set.
+    pub gate_key: GateKey,
+}
+
+/// Error returned by `jit gate status` when its two positionals look swapped:
+/// the first names a registered gate and the second resolves to an issue.
+///
+/// An invalid-argument condition (exit code `2`) whose message names the
+/// canonical argument order.
+#[derive(Debug)]
+pub struct GateStatusArgumentsTransposedError {
+    /// The issue, as written in the gate position.
+    pub issue: String,
+    /// The gate key, as written in the issue position.
     pub gate_key: String,
 }
+
+impl GateStatusArgumentsTransposedError {
+    /// The invocation with the arguments in canonical order.
+    pub fn canonical_command(&self) -> String {
+        format!("jit gate status {} {}", self.issue, self.gate_key)
+    }
+}
+
+impl std::fmt::Display for GateStatusArgumentsTransposedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "'{}' is a gate key and '{}' is an issue; the issue id and gate key look transposed.\n  Did you mean: {}",
+            self.gate_key,
+            self.issue,
+            self.canonical_command()
+        )
+    }
+}
+
+impl std::error::Error for GateStatusArgumentsTransposedError {}
 
 /// Error returned when `jit gate evaluate`/`pass` targets a MANUAL gate with no
 /// `--by` attestor.
@@ -58,12 +93,12 @@ pub struct GateNotRequiredError {
 )]
 pub struct ManualGateAttestationRequiredError {
     /// Issue whose gate was targeted.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Manual gate key that was targeted without `--by`.
-    pub gate_key: String,
+    pub gate_key: GateKey,
 }
 
-/// Outcome of a successful [`pass_gate`](CommandExecutor::pass_gate) call.
+/// Outcome of a successful [`pass_gate`](GateOps::pass_gate) call.
 ///
 /// Carries any warnings gathered along the way (e.g. lease warnings).
 #[derive(Debug, Clone)]
@@ -78,12 +113,12 @@ pub struct GatePassOutcome {
 #[derive(Debug, Clone)]
 pub struct GatePassAllEntry {
     /// The gate that was passed.
-    pub gate_key: String,
+    pub gate_key: GateKey,
     /// Warnings gathered while passing this gate.
     pub warnings: Vec<String>,
 }
 
-/// Outcome of a successful [`pass_all_gates`](CommandExecutor::pass_all_gates) run.
+/// Outcome of a successful [`pass_all_gates`](GateOps::pass_all_gates) run.
 ///
 /// `results` holds one [`GatePassAllEntry`] per required gate, in declaration
 /// order. When the issue has no required gates the list is empty (the command
@@ -99,12 +134,12 @@ pub struct PassAllOutcome {
 /// The outcome of evaluating one gate across several issues.
 pub struct GateEvaluateManyEntry {
     /// Issue identifier as supplied to the command.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The per-issue gate result, or the error that prevented a verdict.
     pub result: Result<GatePassOutcome>,
 }
 
-/// Per-issue results from [`CommandExecutor::pass_gate_many`].
+/// Per-issue results from [`GateOps::pass_gate_many`].
 pub struct GateEvaluateManyOutcome {
     /// Results in the same order as the requested issue identifiers.
     pub results: Vec<GateEvaluateManyEntry>,
@@ -113,15 +148,15 @@ pub struct GateEvaluateManyOutcome {
 /// Result of adding multiple gates
 #[derive(Debug, Serialize)]
 pub struct GateAddResult {
-    pub added: Vec<String>,
-    pub already_exist: Vec<String>,
+    pub added: Vec<GateKey>,
+    pub already_exist: Vec<GateKey>,
 }
 
 /// Result of removing multiple gates
 #[derive(Debug, Serialize)]
 pub struct GateRemoveResult {
-    pub removed: Vec<String>,
-    pub not_found: Vec<String>,
+    pub removed: Vec<GateKey>,
+    pub not_found: Vec<GateKey>,
 }
 
 /// A tri-state edit for an optional/clearable field.
@@ -150,7 +185,7 @@ impl<T> FieldEdit<T> {
     }
 }
 
-/// Mutable fields for [`update_gate`](CommandExecutor::update_gate).
+/// Mutable fields for [`update_gate`](GateOps::update_gate).
 ///
 /// Each `Some`/`Set` field replaces the gate's current value; each `None`/`Keep`
 /// leaves it unchanged. The clearable fields ([`FieldEdit`]) additionally
@@ -211,8 +246,8 @@ impl GateUpdate {
 #[derive(Clone)]
 enum CapturedGateRegistryMutation {
     Define(GateDefinition),
-    Update { key: String, update: GateUpdate },
-    Remove { key: String },
+    Update { key: GateKey, update: GateUpdate },
+    Remove { key: GateKey },
 }
 
 enum CapturedGateRegistryOutcome {
@@ -223,7 +258,7 @@ enum CapturedGateRegistryOutcome {
 
 struct DerivedGateRegistryMutation {
     registry: crate::declarations::GateRegistry,
-    event: Event,
+    event: EventBody,
     outcome: CapturedGateRegistryOutcome,
 }
 
@@ -282,7 +317,6 @@ fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPat
         VirtualPath::INVARIANTS,
         VirtualPath::RULES,
         VirtualPath::GATES,
-        VirtualPath::EVENTS,
         VirtualPath::CONFIG_DIR,
         VirtualPath::GATE_PRESETS,
         VirtualPath::ISSUES,
@@ -304,24 +338,22 @@ fn capture_gate_preset_image(
         captured_gate_preset_fixed_paths(),
         GATE_PRESET_CAPTURE_BUDGET,
     )?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
     spec.discover_listings([presets_dir.clone(), issues_dir.clone()])?;
     let create_path = create_target
         .map(|name| VirtualPath::data(format!("{}/{name}.json", presets_dir.relative().as_str())))
         .transpose()?;
     let Some(image) = super::capture_discovering(session, spec, |image, spec| {
-        let index_bytes = image
-            .file_bytes(&VirtualPath::INDEX)?
-            .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-        let issue_paths = crate::storage::json::parse_repository_index(index_bytes)?
-            .all_ids
+        let issue_paths = crate::repository_state::captured_issue_ids(image)?
             .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
-            .collect::<Result<Vec<_>>>()?;
+            .map(VirtualPath::issue_record)
+            .collect::<Vec<_>>();
         let closure = if include_projection_closure {
             let config = assemble_config(image)?;
-            let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
+            let rules_text =
+                super::image_virtual_bytes(image, &crate::repository_state::VirtualPath::RULES)?
+                    .map(String::from_utf8)
+                    .transpose()?;
             render_capture_closure(image.layout(), &config, &[], rules_text.as_deref())?
         } else {
             Vec::new()
@@ -337,28 +369,6 @@ fn capture_gate_preset_image(
     else {
         return Ok(None);
     };
-    let current_index = image
-        .file_bytes(&VirtualPath::INDEX)?
-        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))
-        .and_then(crate::storage::json::parse_repository_index)?;
-    let listing = image
-        .directory_listings()
-        .get(&issues_dir)
-        .ok_or_else(|| anyhow!("complete issues listing is absent"))?;
-    let listed = listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .cloned()
-        .collect::<std::collections::BTreeSet<_>>();
-    let indexed = current_index
-        .all_ids
-        .iter()
-        .map(|id| format!("{id}.json"))
-        .collect::<std::collections::BTreeSet<_>>();
-    if listed != indexed {
-        return Ok(None);
-    }
     Ok(Some(image))
 }
 
@@ -377,21 +387,20 @@ fn captured_gate_registry(
 
 fn captured_gate_preset_issue(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<Issue> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
-    let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+    let path = VirtualPath::issue_record(issue_id);
     let issue = match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
-            serde_json::from_slice::<Issue>(content.bytes())
-                .with_context(|| format!("failed to parse captured issue {issue_id}"))?
+            crate::repository_state::decode_issue_record(&path, content.bytes())?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(issue_id).into())
+            return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };
-    if issue.id != issue_id {
+    if &issue.id != issue_id {
         return Err(anyhow!(
             "captured issue identity mismatch: requested {issue_id}, found {}",
             issue.id
@@ -400,14 +409,24 @@ fn captured_gate_preset_issue(
     Ok(issue)
 }
 
+/// Which of a preset's gates an application leaves out.
+struct PresetGateExclusions<'a> {
+    skip_precheck: bool,
+    skip_postcheck: bool,
+    except_gates: &'a [GateKey],
+}
+
 fn derive_gate_preset_application(
     issue: Issue,
     mut registry: crate::declarations::GateRegistry,
     preset: &crate::gate_presets::GatePresetDefinition,
     timeout_override: Option<u64>,
-    skip_precheck: bool,
-    skip_postcheck: bool,
-    except_gates: &[String],
+    PresetGateExclusions {
+        skip_precheck,
+        skip_postcheck,
+        except_gates,
+    }: PresetGateExclusions<'_>,
+    context: &crate::repository_state::MutationContext,
 ) -> Result<DerivedGatePresetApplication> {
     use crate::declarations::{GateChecker, GateStage};
     use crate::repository_state::MutationIntent;
@@ -418,7 +437,7 @@ fn derive_gate_preset_application(
         .filter(|gate| {
             !(skip_precheck && gate.stage == GateStage::Precheck
                 || skip_postcheck && gate.stage == GateStage::Postcheck
-                || except_gates.contains(&gate.key))
+                || except_gates.iter().any(|key| key == &gate.key))
         })
         .collect::<Vec<_>>();
     if gates.is_empty() {
@@ -445,9 +464,9 @@ fn derive_gate_preset_application(
             intents.push(MutationIntent::RecordEvent {
                 phase: 0,
                 event: Box::new(if existed {
-                    Event::draft_gate_definition_updated(gate.key)
+                    EventBody::draft_gate_definition_updated(gate.key)
                 } else {
-                    Event::draft_gate_definition_created(gate.key)
+                    EventBody::draft_gate_definition_created(gate.key)
                 }),
             });
         }
@@ -472,6 +491,7 @@ fn derive_gate_preset_application(
             issue_id,
             gate_keys: keys,
         },
+        context,
     )?;
     let super::CapturedIssueMutationOutcome::GatesAdded {
         added,
@@ -631,15 +651,13 @@ fn derive_gate_registry_mutation(
     let (event, outcome) = match request {
         CapturedGateRegistryMutation::Define(definition) => {
             if registry.gates.contains_key(&definition.key) {
-                return Err(
-                    crate::storage::GateAlreadyExistsError::new(definition.key.as_str()).into(),
-                );
+                return Err(crate::storage::GateAlreadyExistsError::new(&definition.key).into());
             }
             registry
                 .gates
                 .insert(definition.key.clone(), definition.clone());
             (
-                Event::draft_gate_definition_created(definition.key.clone()),
+                EventBody::draft_gate_definition_created(definition.key.clone()),
                 CapturedGateRegistryOutcome::Defined,
             )
         }
@@ -650,18 +668,19 @@ fn derive_gate_registry_mutation(
                 .cloned()
                 .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
             let updated = updated_gate_definition(current, update.clone())?;
-            registry.gates.insert(key.clone(), updated.clone());
+            registry.gates.insert(updated.key.clone(), updated.clone());
             (
-                Event::draft_gate_definition_updated(key.clone()),
+                EventBody::draft_gate_definition_updated(updated.key.clone()),
                 CapturedGateRegistryOutcome::Updated(Box::new(updated)),
             )
         }
         CapturedGateRegistryMutation::Remove { key } => {
-            if registry.gates.remove(key).is_none() {
-                return Err(crate::storage::GateNotFoundError::by_key(key).into());
-            }
+            let removed = registry
+                .gates
+                .remove(key)
+                .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
             (
-                Event::draft_gate_definition_removed(key.clone()),
+                EventBody::draft_gate_definition_removed(removed.key),
                 CapturedGateRegistryOutcome::Removed,
             )
         }
@@ -678,15 +697,27 @@ fn derive_gate_registry_mutation(
     })
 }
 
+/// Quality-gate operations of a [`CommandExecutor`].
+pub struct GateOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The quality-gate family.
+    pub fn gates(&self) -> GateOps<'_, S> {
+        GateOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> GateOps<'_, S> {
     /// Add a single gate to an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<Vec<String>>
+    pub fn add_gate(&self, issue_id: &IssueId, gate_key: &GateKey) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        self.add_gates(issue_id, &[gate_key])
+        self.add_gates(issue_id, std::slice::from_ref(gate_key))
             .map(|(_, warnings)| warnings)
     }
 
@@ -695,8 +726,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn add_gates(
         &self,
-        issue_id: &str,
-        gate_keys: &[String],
+        issue_id: &IssueId,
+        gate_keys: &[GateKey],
     ) -> Result<(GateAddResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
@@ -706,23 +737,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
         let CapturedIssueMutationOutcome::GatesAdded {
             added,
             already_exist,
-        } = self.publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
-            issue_id: full_id,
-            gate_keys: gate_keys.to_vec(),
-        })?
+        } = self
+            .exec
+            .publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
+                issue_id: full_id,
+                gate_keys: gate_keys.to_vec(),
+            })?
+            .1
         else {
             return Err(anyhow!("unexpected result from captured gate addition"));
         };
@@ -741,8 +770,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn remove_gates(
         &self,
-        issue_id: &str,
-        gate_keys: &[String],
+        issue_id: &IssueId,
+        gate_keys: &[GateKey],
     ) -> Result<(GateRemoveResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
@@ -752,21 +781,18 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
         let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = self
+            .exec
             .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
                 issue_id: full_id,
                 gate_keys: gate_keys.to_vec(),
             })?
+            .1
         else {
             return Err(anyhow!("unexpected result from captured gate removal"));
         };
@@ -774,19 +800,36 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((GateRemoveResult { removed, not_found }, warnings))
     }
 
-    /// Mark a gate as passed.
-    ///
-    /// For an automated gate this runs the checker; for a manual gate it records
-    /// the attestation. A gate declaring inputs a prior run's verdict already
-    /// covers reuses that verdict ([`check_gate`](Self::check_gate)); `force`
-    /// refuses reuse and executes. Manual attestations are always recorded as
-    /// fresh evidence.
+    /// Mark a gate as passed, then complete the issue if that cleared the last
+    /// unpassed gate of a gated issue.
     ///
     /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings).
     pub fn pass_gate(
         &self,
-        issue_id: &str,
-        gate_key: String,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
+        by: Option<String>,
+        force: bool,
+    ) -> Result<GatePassOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let outcome = self.record_gate_pass(issue_id, gate_key, by, force)?;
+        self.exec.auto_transition_to_done(issue_id)?;
+        Ok(outcome)
+    }
+
+    /// Record a gate's pass without advancing the issue.
+    ///
+    /// For an automated gate this runs the checker; for a manual gate it records
+    /// the attestation. A gate declaring inputs a prior run's verdict already
+    /// covers reuses that verdict ([`check_gate`](GateOps::check_gate)); `force`
+    /// refuses reuse and executes. Manual attestations are always recorded as
+    /// fresh evidence.
+    fn record_gate_pass(
+        &self,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
         by: Option<String>,
         force: bool,
     ) -> Result<GatePassOutcome>
@@ -798,31 +841,26 @@ impl<S: IssueStore> CommandExecutor<S> {
         let by = by
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let mut warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
 
-        if !issue.gates_required.contains(&gate_key) {
+        if !issue.gates_required.contains(gate_key) {
             return Err(GateNotRequiredError {
                 issue_id: full_id,
-                gate_key,
+                gate_key: gate_key.clone(),
             }
             .into());
         }
 
-        let registry = self.storage.load_gate_registry()?;
+        let registry = self.exec.storage.load_gate_registry()?;
         let gate = registry
             .gates
-            .get(&gate_key)
-            .ok_or_else(|| crate::storage::GateNotFoundError::single(&gate_key))?;
+            .get(gate_key)
+            .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
 
         // Check if gate is automated - if so, run the checker instead
         if gate.mode == GateMode::Auto {
@@ -834,11 +872,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 crate::commands::VerdictSource::ReuseUnchangedInputs
             };
-            let result = self.check_gate_with(&full_id, &gate_key, source)?;
+            let result = self.check_gate_with(&full_id, gate_key, source)?;
             if result.status != GateRunStatus::Passed {
                 return Err(GatePassFailed {
                     issue_id: full_id,
-                    gate_key,
+                    gate_key: gate_key.clone(),
                     status: result.status,
                     exit_code: result.exit_code,
                     result,
@@ -860,46 +898,43 @@ impl<S: IssueStore> CommandExecutor<S> {
         let Some(by) = by else {
             return Err(ManualGateAttestationRequiredError {
                 issue_id: full_id,
-                gate_key,
+                gate_key: gate_key.clone(),
             }
             .into());
         };
 
-        self.publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
-            issue_id: full_id.clone(),
-            gate_key,
-            status: GateStatus::Passed,
-            by: Some(by),
-        })?;
-
-        // Check if Gated issue can now transition to Done
-        self.auto_transition_to_done(&full_id)?;
+        self.exec
+            .publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
+                issue_id: full_id.clone(),
+                gate_key: gate_key.clone(),
+                status: GateStatus::Passed,
+                by: Some(by),
+            })?;
 
         Ok(GatePassOutcome { warnings })
     }
 
     /// Pass every required gate for an issue in declaration order, fail-fast.
     ///
-    /// Each gate is passed via [`pass_gate`](Self::pass_gate), so automated gates
-    /// inherit its verdict reuse and manual gates record fresh evidence.
-    /// On the FIRST gate that does not pass,
-    /// the underlying error is propagated unchanged and no later gate is
+    /// Each gate is recorded via [`record_gate_pass`](Self::record_gate_pass), so
+    /// automated gates inherit its verdict reuse and manual gates record fresh
+    /// evidence. The issue advances only after the last gate, so a re-evaluated
+    /// gate that now fails cannot follow a completion. On the FIRST gate that does
+    /// not pass, the underlying error is propagated unchanged and no later gate is
     /// attempted, so the caller can map it to the right exit code (checker
     /// failure, runner error, etc.). An issue with no required gates succeeds
     /// with an empty result set.
     pub fn pass_all_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         by: Option<String>,
         force: bool,
     ) -> Result<PassAllOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let issue = self.exec.storage.load_issue(&full_id)?;
 
         // Fail-fast: pass each required gate in order, stopping at the first that
         // does not pass and propagating its error unchanged. `try_fold` short-
@@ -907,7 +942,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let results = issue.gates_required.iter().try_fold(
             Vec::with_capacity(issue.gates_required.len()),
             |mut results, gate_key| {
-                let outcome = self.pass_gate(&full_id, gate_key.clone(), by.clone(), force)?;
+                let outcome = self.record_gate_pass(&full_id, gate_key, by.clone(), force)?;
                 results.push(GatePassAllEntry {
                     gate_key: gate_key.clone(),
                     warnings: outcome.warnings,
@@ -915,6 +950,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Ok::<_, anyhow::Error>(results)
             },
         )?;
+        self.exec.auto_transition_to_done(&full_id)?;
 
         Ok(PassAllOutcome { results })
     }
@@ -927,8 +963,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// prevent later issue identifiers from being evaluated.
     pub fn pass_gate_many(
         &self,
-        issue_ids: &[String],
-        gate_key: &str,
+        issue_ids: &[IssueId],
+        gate_key: &GateKey,
         by: Option<String>,
         force: bool,
     ) -> GateEvaluateManyOutcome
@@ -939,7 +975,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .map(|issue_id| GateEvaluateManyEntry {
                 issue_id: issue_id.clone(),
-                result: self.pass_gate(issue_id, gate_key.to_string(), by.clone(), force),
+                result: self.pass_gate(issue_id, gate_key, by.clone(), force),
             })
             .collect();
 
@@ -951,8 +987,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns warnings (e.g., lease warnings) if any.
     pub fn fail_gate(
         &self,
-        issue_id: &str,
-        gate_key: String,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
         by: Option<String>,
     ) -> Result<Vec<String>>
     where
@@ -963,29 +999,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         let by = by
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
 
-        if !issue.gates_required.contains(&gate_key) {
+        if !issue.gates_required.contains(gate_key) {
             return Err(GateNotRequiredError {
                 issue_id: full_id,
-                gate_key,
+                gate_key: gate_key.clone(),
             }
             .into());
         }
 
         // Check if gate is automated - reject manual pass/fail
-        let registry = self.storage.load_gate_registry()?;
-        if let Some(gate) = registry.gates.get(&gate_key) {
+        let registry = self.exec.storage.load_gate_registry()?;
+        if let Some(gate) = registry.gates.get(gate_key) {
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
                     "Gate '{}' is automated and cannot be manually failed. Use 'jit gate evaluate {} {}' to run the checker.",
@@ -994,19 +1025,30 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        self.publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
-            issue_id: full_id,
-            gate_key,
-            status: GateStatus::Failed,
-            by,
-        })?;
+        self.exec
+            .publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
+                issue_id: full_id,
+                gate_key: gate_key.clone(),
+                status: GateStatus::Failed,
+                by,
+            })?;
 
         Ok(warnings)
     }
 
     pub fn list_gates(&self) -> Result<Vec<GateDefinition>> {
-        let registry = self.storage.load_gate_registry()?;
+        let registry = self.exec.storage.load_gate_registry()?;
         Ok(registry.gates.into_values().collect())
+    }
+
+    /// Whether `jit gate status <issue> <gate_key>` has its positionals swapped:
+    /// `issue` names a registered gate and `gate_key` resolves to an issue.
+    pub fn are_gate_status_arguments_transposed(&self, issue: &str, gate_key: &str) -> bool {
+        self.list_gates()
+            .is_ok_and(|gates| gates.iter().any(|gate| gate.key.as_str() == issue))
+            && gate_key
+                .parse::<crate::domain::identity::IssueIdPrefix>()
+                .is_ok_and(|prefix| self.exec.storage.resolve_issue_id(&prefix).is_ok())
     }
 
     fn publish_gate_registry_mutation(
@@ -1021,34 +1063,37 @@ impl<S: IssueStore> CommandExecutor<S> {
             CaptureSpec, MutationIntent, RepositoryEntry, VirtualPath,
         };
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         let budget = CaptureBudget {
             max_listings: 64,
             max_bytes: 256 * 1024 * 1024,
             max_depth: 16,
         };
-        let registries = || -> Result<[VirtualPath; 5]> {
+        let registries = || -> Result<[VirtualPath; 4]> {
             Ok([
                 VirtualPath::CONFIG,
                 VirtualPath::INVARIANTS,
                 VirtualPath::RULES,
                 VirtualPath::GATES,
-                VirtualPath::EVENTS,
             ])
         };
 
         with_mutation_session(
-            &self.storage,
+            &self.exec.storage,
             &layout,
             "gate registry mutation",
             |session| {
-                let spec = CaptureSpec::new(registries()?, budget)?;
+                let mut spec = CaptureSpec::new(registries()?, budget)?;
+                spec.discover_tail(VirtualPath::EVENTS)?;
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = assemble_config(image)?;
-                    let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                        .map(String::from_utf8)
-                        .transpose()?;
+                    let rules_text = super::image_virtual_bytes(
+                        image,
+                        &crate::repository_state::VirtualPath::RULES,
+                    )?
+                    .map(String::from_utf8)
+                    .transpose()?;
                     Ok(spec.discover_paths(render_capture_closure(
                         image.layout(),
                         &config,
@@ -1093,14 +1138,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Define a new gate with full control over stage, mode, and checker.
     ///
-    /// Returns an error if `key` is already registered, or if `mode` is
-    /// [`GateMode::Auto`](crate::declarations::GateMode) without a `checker`. A
+    /// Returns an error if `key` is already registered,
+    /// or if `mode` is [`GateMode::Auto`](crate::declarations::GateMode) without a
+    /// `checker`. A
     /// `gate_definition_created` event is appended (@/inv/event-log), mirroring
     /// [`update_gate`](Self::update_gate)'s `gate_definition_updated` event.
     #[allow(clippy::too_many_arguments)]
     pub fn define_gate(
         &self,
-        key: String,
+        key: &GateKey,
         title: String,
         description: String,
         stage: crate::declarations::GateStage,
@@ -1112,7 +1158,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations()?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
         // Validate: auto gates must have checker
         if mode == crate::declarations::GateMode::Auto && checker.is_none() {
@@ -1131,7 +1177,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Define(
             GateDefinition {
                 version: 1,
-                key,
+                key: key.clone(),
                 title,
                 description,
                 stage,
@@ -1161,7 +1207,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// automated mode must have a configured checker (and an exec checker must
     /// have a non-empty command), while a manual gate carries no checker.
     ///
-    /// Returns the updated [`GateDefinition`] so callers can render it.
+    /// Refuses when another agent leases an issue that requires the gate.
+    /// Returns the updated [`GateDefinition`] and the `warn`-mode lease warnings.
     ///
     /// # Examples
     ///
@@ -1170,14 +1217,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::declarations::{GateMode, GateStage};
     /// use jit::InMemoryStorage;
     ///
-    /// jit::test_mode::enable(); // skip the main-history guard
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// executor
-    ///     .define_gate(
-    ///         "tests".to_string(),
+    ///     .gates().define_gate(
+    ///         &"tests".parse().unwrap(),
     ///         "Old title".to_string(),
     ///         "Desc".to_string(),
     ///         GateStage::Postcheck,
@@ -1188,9 +1234,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .unwrap();
     ///
     /// // Update only the title; every other field is preserved.
-    /// let updated = executor
-    ///     .update_gate(
-    ///         "tests",
+    /// let (updated, _warnings) = executor
+    ///     .gates().update_gate(
+    ///         &"tests".parse().unwrap(),
     ///         GateUpdate {
     ///             title: Some("All Tests Pass".to_string()),
     ///             ..Default::default()
@@ -1200,36 +1246,62 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(updated.title, "All Tests Pass");
     /// assert_eq!(updated.description, "Desc");
     /// ```
-    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<GateDefinition>
+    pub fn update_gate(
+        &self,
+        key: &GateKey,
+        update: GateUpdate,
+    ) -> Result<(GateDefinition, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main (mirrors define_gate).
-        crate::commands::worktree::enforce_main_only_operations()?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
-            key: key.to_string(),
+            key: key.clone(),
             update,
         })? {
-            CapturedGateRegistryOutcome::Updated(updated) => Ok(*updated),
+            CapturedGateRegistryOutcome::Updated(updated) => Ok((*updated, warnings)),
             _ => unreachable!("update request has one outcome"),
         }
     }
 
-    pub fn remove_gate_definition(&self, key: &str) -> Result<()>
+    /// [`CommandExecutor::refuse_foreign_leases`] over the issues requiring `key`.
+    fn refuse_foreign_leases_on_gate_users(&self, key: &GateKey) -> Result<Vec<String>> {
+        let requiring = self
+            .exec
+            .storage
+            .list_issues()?
+            .into_iter()
+            .filter(|issue| issue.gates_required.contains(key))
+            .map(|issue| issue.id)
+            .collect::<Vec<_>>();
+        Ok(self
+            .exec
+            .refuse_foreign_leases(&requiring)?
+            .into_iter()
+            .map(|(_, warning)| warning)
+            .collect())
+    }
+
+    /// Remove a gate definition, refusing when another agent leases an issue that
+    /// requires it. Answers warnings in `warn` mode.
+    pub fn remove_gate_definition(&self, key: &GateKey) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations()?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
+        let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
-            key: key.to_string(),
+            key: key.clone(),
         })?;
-        Ok(())
+        Ok(warnings)
     }
 
-    pub fn show_gate_definition(&self, key: &str) -> Result<GateDefinition> {
-        let registry = self.storage.load_gate_registry()?;
+    pub fn show_gate_definition(&self, key: &GateKey) -> Result<GateDefinition> {
+        let registry = self.exec.storage.load_gate_registry()?;
         registry
             .gates
             .get(key)
@@ -1240,14 +1312,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     // Preset management methods
 
     pub fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        self.storage.list_gate_presets()
+        self.exec.storage.list_gate_presets()
     }
 
     pub fn show_gate_preset(
         &self,
         name: &str,
     ) -> Result<crate::gate_presets::GatePresetDefinition> {
-        self.storage.get_gate_preset(name)
+        self.exec.storage.get_gate_preset(name)
     }
 
     /// Apply a gate preset to an issue.
@@ -1255,26 +1327,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn apply_gate_preset(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         preset_name: &str,
         timeout_override: Option<u64>,
         skip_precheck: bool,
         skip_postcheck: bool,
-        except_gates: &[String],
+        except_gates: &[GateKey],
     ) -> Result<(GateAddResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, finalize_gate_registry_edit};
 
-        let issue_id = &IssueIdPrefix::parse(issue_id)?;
-        let layout = self.require_layout()?;
+        let issue_id = &issue_id.clone();
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("gate preset application", || {
             let (expected_target, expected_mode) = {
-                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let mut preflight = self.exec.storage.open_mutation_session(layout.clone())?;
                 let Some(preflight) =
-                    self.capture_mutation_preflight(&mut *preflight, issue_id, |_| false)?
+                    self.exec
+                        .capture_mutation_preflight(&mut *preflight, issue_id, |_| false)?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
@@ -1282,24 +1355,23 @@ impl<S: IssueStore> CommandExecutor<S> {
                 (preflight.target.id, config.enforcement_mode())
             };
             let claims_guard = (expected_mode != crate::config::EnforcementMode::Off)
-                .then(|| super::claims_mutation_guard(self.require_worktree_paths()?))
+                .then(|| super::claims_mutation_guard(self.exec.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some(image) = capture_gate_preset_image(&mut *session, true, None)? else {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
-            let target = super::resolve_issue_from_capture(&issues, issue_id)?;
+            let target = super::require_issue_in_capture(&issues, issue_id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let mode = config.enforcement_mode();
             if target != expected_target || mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }
-            let warnings = super::captured_lease_warnings(
+            let warnings = super::refuse_foreign_leases_held(
                 mode,
                 std::slice::from_ref(&target),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let preset = parse_captured_gate_presets(&image)?
@@ -1311,9 +1383,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_gate_registry(&image)?,
                 &preset,
                 timeout_override,
-                skip_precheck,
-                skip_postcheck,
-                except_gates,
+                PresetGateExclusions {
+                    skip_precheck,
+                    skip_postcheck,
+                    except_gates,
+                },
+                &context,
             )?;
             if derived.intents.is_empty() {
                 return Ok(AttemptOutcome::Done((derived.result, warnings)));
@@ -1329,7 +1404,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     declarations.borrowed(),
                 )?
             } else {
-                finalize(&layout, &image, &context, &derived.intents)?
+                finalize(&layout, &image, &context, &derived.intents, None)?
             };
             classify_apply(session.apply(&plan), (derived.result, warnings))
         })
@@ -1340,31 +1415,33 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Results are sorted newest-first by `started_at`.
     pub fn list_gate_runs(
         &self,
-        issue_id: &str,
-        gate_key_filter: Option<&str>,
+        issue_id: &IssueId,
+        gate_key_filter: Option<&GateKey>,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
+        let full_id = issue_id.clone();
+        let mut runs = self.exec.storage.list_gate_runs_for_issue(&full_id)?;
 
         if let Some(key) = gate_key_filter {
-            runs.retain(|r| r.gate_key == key);
+            runs.retain(|r| &r.gate_key == key);
         }
 
         runs.sort_by_key(|run| std::cmp::Reverse(run.started_at));
         Ok(runs)
     }
 
-    /// Load a single gate run result by run ID.
-    pub fn get_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
-        self.storage.load_gate_run_result(run_id)
+    /// Load a single gate run result belonging to the issue.
+    pub fn get_gate_run_result(
+        &self,
+        issue_id: &IssueId,
+        run_id: &crate::domain::identity::GateRunId,
+    ) -> Result<crate::domain::GateRunResult> {
+        self.exec.storage.load_gate_run_result(issue_id, run_id)
     }
 
     pub fn create_gate_preset(
         &self,
         preset_name: &str,
-        from_issue_id: &str,
+        from_issue_id: &IssueId,
     ) -> Result<std::path::PathBuf>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1373,88 +1450,82 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         crate::gate_presets::validate_preset_name(preset_name)
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
-        let from_issue_id = &IssueIdPrefix::parse(from_issue_id)?;
+        let from_issue_id = &from_issue_id.clone();
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
-        with_mutation_session(&self.storage, &layout, "gate preset creation", |session| {
-            let Some(image) = capture_gate_preset_image(session, false, Some(preset_name))? else {
-                return Ok(SessionStep::Retry);
-            };
-            let issues = super::captured_active_issues(&image)?;
-            let full_id = super::resolve_issue_from_capture(&issues, from_issue_id)?;
-            let presets_dir = crate::repository_state::VirtualPath::GATE_PRESETS;
-            let target = crate::repository_state::VirtualPath::data(format!(
-                "{}/{preset_name}.json",
-                presets_dir.relative().as_str()
-            ))?;
-            if !matches!(
-                image.entry(&target)?,
-                crate::repository_state::RepositoryEntry::Absent
-            ) {
-                return Err(crate::errors::AlreadyExistsError::new(format!(
-                    "Custom gate preset '{preset_name}' already exists"
-                ))
-                .into());
-            }
-            let issue = captured_gate_preset_issue(&image, &full_id)?;
-            if issue.gates_required.is_empty() {
-                return Err(anyhow!("Issue has no gates to create preset from"));
-            }
-            let registry = captured_gate_registry(&image)?;
-            let gates = issue
-                .gates_required
-                .iter()
-                .map(|gate_key| {
-                    let gate = registry
-                        .gates
-                        .get(gate_key)
-                        .ok_or_else(|| crate::storage::GateNotFoundError::in_registry(gate_key))?;
-                    Ok(GateTemplate {
-                        key: gate.key.clone(),
-                        title: gate.title.clone(),
-                        description: gate.description.clone(),
-                        stage: gate.stage,
-                        mode: gate.mode,
-                        checker: gate.checker.clone(),
+        with_mutation_session(
+            &self.exec.storage,
+            &layout,
+            "gate preset creation",
+            |session| {
+                let Some(image) = capture_gate_preset_image(session, false, Some(preset_name))?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let issues = super::captured_active_issues(&image)?;
+                let full_id = super::require_issue_in_capture(&issues, from_issue_id)?;
+                let presets_dir = crate::repository_state::VirtualPath::GATE_PRESETS;
+                let target = crate::repository_state::VirtualPath::data(format!(
+                    "{}/{preset_name}.json",
+                    presets_dir.relative().as_str()
+                ))?;
+                if !matches!(
+                    image.entry(&target)?,
+                    crate::repository_state::RepositoryEntry::Absent
+                ) {
+                    return Err(crate::errors::AlreadyExistsError::new(format!(
+                        "Custom gate preset '{preset_name}' already exists"
+                    ))
+                    .into());
+                }
+                let issue = captured_gate_preset_issue(&image, &full_id)?;
+                if issue.gates_required.is_empty() {
+                    return Err(anyhow!("Issue has no gates to create preset from"));
+                }
+                let registry = captured_gate_registry(&image)?;
+                let gates = issue
+                    .gates_required
+                    .iter()
+                    .map(|gate_key| {
+                        let gate = registry.gates.get(gate_key).ok_or_else(|| {
+                            crate::storage::GateNotFoundError::in_registry(gate_key)
+                        })?;
+                        Ok(GateTemplate {
+                            key: gate.key.clone(),
+                            title: gate.title.clone(),
+                            description: gate.description.clone(),
+                            stage: gate.stage,
+                            mode: gate.mode,
+                            checker: gate.checker.clone(),
+                        })
                     })
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let preset = GatePresetDefinition {
-                name: preset_name.to_string(),
-                description: format!("Custom preset created from issue {}", issue.short_id()),
-                gates,
-            };
-            let intents = [crate::repository_state::MutationIntent::CreateGatePreset {
-                preset: Box::new(preset),
-            }];
-            let plan = crate::repository_state::finalize(&layout, &image, &context, &intents)?;
-            Ok(SessionStep::Apply(plan, layout.resolve(&target)?))
-        })
+                    .collect::<Result<Vec<_>>>()?;
+                let preset = GatePresetDefinition {
+                    name: preset_name.to_string(),
+                    description: format!("Custom preset created from issue {}", issue.short_id()),
+                    gates,
+                };
+                let intents = [crate::repository_state::MutationIntent::CreateGatePreset {
+                    preset: Box::new(preset),
+                }];
+                let plan =
+                    crate::repository_state::finalize(&layout, &image, &context, &intents, None)?;
+                Ok(SessionStep::Apply(plan, layout.resolve(&target)?))
+            },
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
-
-    fn setup() -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-
-        // Create config with enforcement off for test backward compatibility
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        seed_repo_file(&storage, ".jit/config.toml", config_toml);
-
-        crate::commands::test_helpers::memory_executor(storage)
-    }
 
     #[test]
     fn test_pass_of_automated_gate_runs_checker() {
@@ -1463,10 +1534,10 @@ enforce_leases = "off"
         // Define an automated gate that will pass
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "auto-gate".to_string(),
+            "auto-gate".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "auto-gate".to_string(),
+                key: "auto-gate".parse().unwrap(),
                 title: "Automated Gate".to_string(),
                 description: "Auto gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -1492,13 +1563,14 @@ enforce_leases = "off"
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "auto-gate".to_string())
+            .gates()
+            .add_gate(&issue_id, &"auto-gate".parse().unwrap())
             .unwrap();
 
         // Smart pass should auto-run the checker
-        let result = executor.pass_gate(
+        let result = executor.gates().pass_gate(
             &issue_id,
-            "auto-gate".to_string(),
+            &"auto-gate".parse().unwrap(),
             Some("human:test".to_string()),
             false,
         );
@@ -1511,19 +1583,38 @@ enforce_leases = "off"
         // Verify gate is marked as passed
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
-            issue.gates_status.get("auto-gate").unwrap().status,
+            issue
+                .gates_status
+                .get(&"auto-gate".parse().unwrap())
+                .unwrap()
+                .status,
             crate::domain::GateStatus::Passed
         );
     }
 
+    #[test]
+    fn test_are_gate_status_arguments_transposed_requires_a_gate_then_an_issue() {
+        let executor = setup();
+        define_manual_gate(&executor, &"tests".parse().unwrap());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
+        let id = issue.id.to_string();
+        seed_issue(executor.storage(), issue);
+        let gates = executor.gates();
+
+        assert!(gates.are_gate_status_arguments_transposed("tests", &id));
+        assert!(!gates.are_gate_status_arguments_transposed(&id, "tests"));
+        assert!(!gates.are_gate_status_arguments_transposed("tests", "other"));
+        assert!(!gates.are_gate_status_arguments_transposed("unknown", &id));
+    }
+
     /// Register a simple manual gate so it can be added to issues in tests.
-    fn define_manual_gate(executor: &CommandExecutor<InMemoryStorage>, key: &str) {
+    fn define_manual_gate(executor: &CommandExecutor<InMemoryStorage>, key: &GateKey) {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            key.to_string(),
+            key.clone(),
             GateDefinition {
                 version: 1,
-                key: key.to_string(),
+                key: key.clone(),
                 title: key.to_string(),
                 description: String::new(),
                 stage: GateStage::Postcheck,
@@ -1540,21 +1631,27 @@ enforce_leases = "off"
     #[test]
     fn test_add_existing_gate_is_noop() {
         let executor = setup();
-        define_manual_gate(&executor, "g1");
+        define_manual_gate(&executor, &"g1".parse().unwrap());
 
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
 
         // Add the gate for real, then snapshot updated_at.
-        let (res1, _) = executor.add_gates(&issue_id, &["g1".to_string()]).unwrap();
-        assert_eq!(res1.added, vec!["g1".to_string()]);
+        let (res1, _) = executor
+            .gates()
+            .add_gates(&issue_id, &["g1".parse().unwrap()])
+            .unwrap();
+        assert_eq!(res1.added, vec!["g1".parse::<GateKey>().unwrap()]);
         let updated_after_add = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Re-adding the same gate is a no-op: it must not bump updated_at.
-        let (res2, _) = executor.add_gates(&issue_id, &["g1".to_string()]).unwrap();
+        let (res2, _) = executor
+            .gates()
+            .add_gates(&issue_id, &["g1".parse().unwrap()])
+            .unwrap();
         assert!(res2.added.is_empty());
-        assert_eq!(res2.already_exist, vec!["g1".to_string()]);
+        assert_eq!(res2.already_exist, vec!["g1".parse::<GateKey>().unwrap()]);
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
             updated_after_add,
@@ -1565,7 +1662,7 @@ enforce_leases = "off"
     #[test]
     fn test_remove_absent_gate_is_noop() {
         let executor = setup();
-        define_manual_gate(&executor, "g1");
+        define_manual_gate(&executor, &"g1".parse().unwrap());
 
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
@@ -1574,10 +1671,11 @@ enforce_leases = "off"
 
         // Removing a gate the issue does not have is a no-op.
         let (res, _) = executor
-            .remove_gates(&issue_id, &["g1".to_string()])
+            .gates()
+            .remove_gates(&issue_id, &["g1".parse().unwrap()])
             .unwrap();
         assert!(res.removed.is_empty());
-        assert_eq!(res.not_found, vec!["g1".to_string()]);
+        assert_eq!(res.not_found, vec!["g1".parse::<GateKey>().unwrap()]);
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
             updated_before,
@@ -1592,10 +1690,10 @@ enforce_leases = "off"
         // Define an automated gate that will fail
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "auto-gate".to_string(),
+            "auto-gate".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "auto-gate".to_string(),
+                key: "auto-gate".parse().unwrap(),
                 title: "Automated Gate".to_string(),
                 description: "Auto gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -1621,13 +1719,14 @@ enforce_leases = "off"
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "auto-gate".to_string())
+            .gates()
+            .add_gate(&issue_id, &"auto-gate".parse().unwrap())
             .unwrap();
 
         // Smart pass runs the checker, which fails
-        let result = executor.pass_gate(
+        let result = executor.gates().pass_gate(
             &issue_id,
-            "auto-gate".to_string(),
+            &"auto-gate".parse().unwrap(),
             Some("human:test".to_string()),
             false,
         );
@@ -1640,8 +1739,79 @@ enforce_leases = "off"
         // Verify gate is marked as failed (checker failed)
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
-            issue.gates_status.get("auto-gate").unwrap().status,
+            issue
+                .gates_status
+                .get(&"auto-gate".parse().unwrap())
+                .unwrap()
+                .status,
             crate::domain::GateStatus::Failed
+        );
+    }
+
+    /// Pass the only manual gate of a `Gated` issue, optionally blocking a
+    /// `Backlog` dependent; returns the session opens the pass took, the
+    /// issue's state, and the dependent's state.
+    fn pass_last_gate_of_gated_issue(with_dependent: bool) -> (usize, State, Option<State>) {
+        use crate::commands::test_helpers::{memory_executor, SessionOpenCounter};
+
+        let counter = SessionOpenCounter::new();
+        let executor = memory_executor(
+            InMemoryStorage::new().with_mutation_interruption_view(counter.clone()),
+        );
+        let key: GateKey = "review".parse().unwrap();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            key.clone(),
+            GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: "Review".to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                inputs: None,
+                priority: 100,
+                reserved: HashMap::new(),
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        let mut gated = crate::test_utils::fixture_issue("Gated".into(), String::new());
+        gated.state = State::Gated;
+        gated.gates_required = vec![key.clone()];
+        let gated_id = gated.id.clone();
+        seed_issue(executor.storage(), gated);
+        let dependent_id = with_dependent.then(|| {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.dependencies = vec![gated_id.clone()];
+            let id = dependent.id.clone();
+            seed_issue(executor.storage(), dependent);
+            id
+        });
+        let opened = counter.count();
+
+        executor
+            .gates()
+            .pass_gate(&gated_id, &key, Some("human:reviewer".to_string()), false)
+            .unwrap();
+
+        (
+            counter.count() - opened,
+            executor.storage.load_issue(&gated_id).unwrap().state,
+            dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
+        )
+    }
+
+    #[test]
+    fn test_pass_gate_completing_an_issue_promotes_its_dependent_in_the_same_publication() {
+        let (baseline, _, _) = pass_last_gate_of_gated_issue(false);
+        let (sessions, state, dependent) = pass_last_gate_of_gated_issue(true);
+
+        assert_eq!(state, State::Done);
+        assert_eq!(dependent, Some(State::Ready));
+        assert_eq!(
+            sessions, baseline,
+            "the dependent's promotion must add no session to the automatic completion"
         );
     }
 
@@ -1652,10 +1822,10 @@ enforce_leases = "off"
         // Define a manual gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "manual-gate".to_string(),
+            "manual-gate".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "manual-gate".to_string(),
+                key: "manual-gate".parse().unwrap(),
                 title: "Manual Gate".to_string(),
                 description: "Manual gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -1673,13 +1843,14 @@ enforce_leases = "off"
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "manual-gate".to_string())
+            .gates()
+            .add_gate(&issue_id, &"manual-gate".parse().unwrap())
             .unwrap();
 
         // Manual pass of manual gate should succeed
-        let result = executor.pass_gate(
+        let result = executor.gates().pass_gate(
             &issue_id,
-            "manual-gate".to_string(),
+            &"manual-gate".parse().unwrap(),
             Some("human:reviewer".to_string()),
             false,
         );
@@ -1688,7 +1859,11 @@ enforce_leases = "off"
         // Verify gate is marked as passed
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
-            issue.gates_status.get("manual-gate").unwrap().status,
+            issue
+                .gates_status
+                .get(&"manual-gate".parse().unwrap())
+                .unwrap()
+                .status,
             crate::domain::GateStatus::Passed
         );
     }
@@ -1700,16 +1875,20 @@ enforce_leases = "off"
     #[test]
     fn test_manual_pass_of_manual_gate_without_by_fails() {
         let executor = setup();
-        define_manual_gate(&executor, "manual-gate");
+        define_manual_gate(&executor, &"manual-gate".parse().unwrap());
 
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "manual-gate".to_string())
+            .gates()
+            .add_gate(&issue_id, &"manual-gate".parse().unwrap())
             .unwrap();
 
-        let result = executor.pass_gate(&issue_id, "manual-gate".to_string(), None, false);
+        let result =
+            executor
+                .gates()
+                .pass_gate(&issue_id, &"manual-gate".parse().unwrap(), None, false);
         let err = result.expect_err("bare pass_gate on a manual gate must fail");
         assert!(
             err.downcast_ref::<ManualGateAttestationRequiredError>()
@@ -1725,7 +1904,7 @@ enforce_leases = "off"
         // left the gate Pending.
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
-            issue.gates_status["manual-gate"].status,
+            issue.gates_status[&"manual-gate".parse().unwrap()].status,
             GateStatus::Pending,
             "a rejected bare pass must leave the gate Pending"
         );
@@ -1762,8 +1941,9 @@ enforce_leases = "off"
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
         assert!(executor
+            .gates()
             .define_gate(
-                "atomic-review".to_string(),
+                &"atomic-review".parse().unwrap(),
                 "Atomic review".to_string(),
                 "Must publish with its event".to_string(),
                 GateStage::Postcheck,
@@ -1805,6 +1985,7 @@ enforce_leases = "off"
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
         assert!(executor
+            .gates()
             .apply_gate_preset(&issue_id, "plan-review", None, false, false, &[])
             .is_err());
         drop(
@@ -1830,12 +2011,13 @@ enforce_leases = "off"
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        define_manual_gate(&executor, "manual-gate");
+        define_manual_gate(&executor, &"manual-gate".parse().unwrap());
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "manual-gate".to_string())
+            .gates()
+            .add_gate(&issue_id, &"manual-gate".parse().unwrap())
             .unwrap();
 
         // The attestation's own publication is the first this view sees: the
@@ -1849,9 +2031,10 @@ enforce_leases = "off"
         let attesting = crate::commands::test_helpers::memory_executor(injected);
 
         let error = attesting
+            .gates()
             .pass_gate(
                 &issue_id,
-                "manual-gate".to_string(),
+                &"manual-gate".parse().unwrap(),
                 Some("human:reviewer".to_string()),
                 false,
             )
@@ -1867,7 +2050,8 @@ enforce_leases = "off"
                 .expect("recovery converges"),
         );
         assert_eq!(
-            recovered.load_issue(&issue_id).unwrap().gates_status["manual-gate"].status,
+            recovered.load_issue(&issue_id).unwrap().gates_status[&"manual-gate".parse().unwrap()]
+                .status,
             GateStatus::Pending,
             "a failed attestation must leave no recorded pass"
         );
@@ -1877,8 +2061,8 @@ enforce_leases = "off"
                 .unwrap()
                 .iter()
                 .any(|event| matches!(
-                    event,
-                    Event::GatePassed { gate_key, .. } if gate_key == "manual-gate"
+                    event.body(),
+                    EventBody::GatePassed { gate_key, .. } if gate_key == &"manual-gate".parse::<GateKey>().unwrap()
                 )),
             "a failed attestation must log no gate-passed event"
         );
@@ -1891,9 +2075,9 @@ enforce_leases = "off"
         use crate::storage::{RepositoryStateStore, RepositoryStateStoreError};
 
         let executor = setup();
-        define_manual_gate(&executor, "review");
+        define_manual_gate(&executor, &"review".parse().unwrap());
         let mut issue = crate::test_utils::fixture_issue("Preset source".into(), String::new());
-        issue.gates_required.push("review".into());
+        issue.gates_required.push("review".parse().unwrap());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         let layout = executor.storage.repository_layout();
@@ -1910,7 +2094,7 @@ enforce_leases = "off"
             name: "race-preset".into(),
             description: "Captured race".into(),
             gates: vec![GateTemplate {
-                key: "review".into(),
+                key: "review".parse().unwrap(),
                 title: "review".into(),
                 description: String::new(),
                 stage: GateStage::Postcheck,
@@ -1930,10 +2114,12 @@ enforce_leases = "off"
             &[MutationIntent::CreateGatePreset {
                 preset: Box::new(preset),
             }],
+            None,
         )
         .unwrap();
 
         executor
+            .gates()
             .create_gate_preset("race-preset", &issue_id)
             .unwrap();
         assert!(matches!(
@@ -1950,13 +2136,14 @@ enforce_leases = "off"
     #[test]
     fn test_memory_gate_preset_create_is_visible_to_list_and_show() {
         let executor = setup();
-        define_manual_gate(&executor, "review");
+        define_manual_gate(&executor, &"review".parse().unwrap());
         let mut issue = crate::test_utils::fixture_issue("Preset source".into(), String::new());
-        issue.gates_required.push("review".into());
+        issue.gates_required.push("review".parse().unwrap());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
 
         let path = executor
+            .gates()
             .create_gate_preset("team-review", &issue_id)
             .unwrap();
         assert_eq!(
@@ -1969,15 +2156,16 @@ enforce_leases = "off"
         );
 
         let listed = executor
+            .gates()
             .list_gate_presets()
             .unwrap()
             .into_iter()
             .find(|preset| preset.name == "team-review")
             .expect("created custom preset is listed");
         assert_eq!(listed.gate_count, 1);
-        let shown = executor.show_gate_preset("team-review").unwrap();
+        let shown = executor.gates().show_gate_preset("team-review").unwrap();
         assert_eq!(shown.gates.len(), 1);
-        assert_eq!(shown.gates[0].key, "review");
+        assert_eq!(shown.gates[0].key, "review".parse().unwrap());
     }
 
     #[test]
@@ -1998,6 +2186,7 @@ enforce_leases = "off"
         );
 
         let error = executor
+            .gates()
             .list_gate_presets()
             .expect_err("a .json directory must be rejected");
         assert!(error.to_string().contains("must be an ordinary file"));
@@ -2006,9 +2195,9 @@ enforce_leases = "off"
     #[test]
     fn test_gate_preset_create_reports_occupied_malformed_target_as_already_exists() {
         let executor = setup();
-        define_manual_gate(&executor, "review");
+        define_manual_gate(&executor, &"review".parse().unwrap());
         let mut issue = crate::test_utils::fixture_issue("Preset source".into(), String::new());
-        issue.gates_required.push("review".into());
+        issue.gates_required.push("review".parse().unwrap());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         seed_repo_file(
@@ -2018,6 +2207,7 @@ enforce_leases = "off"
         );
 
         let error = executor
+            .gates()
             .create_gate_preset("occupied", &issue_id)
             .expect_err("an occupied exact target must not be parsed or overwritten");
         assert!(error
@@ -2028,42 +2218,20 @@ enforce_leases = "off"
     #[test]
     fn test_gate_definition_updates_configured_projection_in_same_mutation() {
         let storage = InMemoryStorage::new();
-        seed_repo_file(
-            &storage,
-            ".jit/config.toml",
-            r#"
-[item_kinds.gate]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = []
-scope = "project"
-source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
-source-of-truth = "registry-first"
-
-[item_kinds.rule]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = []
-scope = "project"
-source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
-source-of-truth = "registry-first"
-
-[projection.gates]
-kind = ["rule", "gate"]
-mode = "separate-file"
-target = "gates.md"
-style = "full"
-"#,
+        let config = format!(
+            "{}\n[projection.gates]\nkind = [\"rule\", \"gate\"]\nmode = \"separate-file\"\n\
+             target = \"gates.md\"\nstyle = \"full\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["gate", "rule"])
         );
+        seed_repo_file(&storage, ".jit/config.toml", &config);
         seed_repo_file(&storage, ".jit/rules.toml", "");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout);
 
         executor
+            .gates()
             .define_gate(
-                "projected-review".to_string(),
+                &"projected-review".parse().unwrap(),
                 "Projected review".to_string(),
                 "Rendered from the registry".to_string(),
                 GateStage::Postcheck,
@@ -2080,10 +2248,10 @@ style = "full"
             .expect("configured projection is materialized");
         assert!(projection.contains("projected-review"));
         let event = executor.storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
@@ -2101,13 +2269,12 @@ style = "full"
         seed_repo_file(&storage, ".jit/config.toml", "");
         let layout = storage.repository_layout();
         let spec = || {
-            CaptureSpec::new(
+            let mut spec = CaptureSpec::new(
                 [
                     VirtualPath::data("config.toml").unwrap(),
                     VirtualPath::data("invariants.toml").unwrap(),
                     VirtualPath::data("rules.toml").unwrap(),
                     VirtualPath::data("gates.toml").unwrap(),
-                    VirtualPath::data("events.jsonl").unwrap(),
                 ],
                 CaptureBudget {
                     max_listings: 0,
@@ -2115,11 +2282,13 @@ style = "full"
                     max_depth: 4,
                 },
             )
-            .unwrap()
+            .unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
+            spec
         };
         let request = CapturedGateRegistryMutation::Define(GateDefinition {
             version: 1,
-            key: "ours".to_string(),
+            key: "ours".parse().unwrap(),
             title: "Ours".to_string(),
             description: String::new(),
             stage: GateStage::Postcheck,
@@ -2171,10 +2340,10 @@ style = "full"
 
         let mut concurrent = crate::declarations::GateRegistry::default();
         concurrent.gates.insert(
-            "theirs".to_string(),
+            "theirs".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "theirs".to_string(),
+                key: "theirs".parse().unwrap(),
                 title: "Theirs".to_string(),
                 description: String::new(),
                 stage: GateStage::Postcheck,
@@ -2199,13 +2368,13 @@ style = "full"
         retry_session.apply(&retry_plan).unwrap();
 
         let registry = storage.load_gate_registry().unwrap();
-        assert!(registry.gates.contains_key("ours"));
-        assert!(registry.gates.contains_key("theirs"));
+        assert!(registry.gates.contains_key(&"ours".parse().unwrap()));
+        assert!(registry.gates.contains_key(&"theirs".parse().unwrap()));
         let event = storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
@@ -2215,14 +2384,14 @@ style = "full"
     fn test_gate_registry_missing_update_and_remove_keep_typed_errors() {
         for request in [
             CapturedGateRegistryMutation::Update {
-                key: "missing-update".to_string(),
+                key: "missing-update".parse().unwrap(),
                 update: GateUpdate {
                     title: Some("No gate".to_string()),
                     ..Default::default()
                 },
             },
             CapturedGateRegistryMutation::Remove {
-                key: "missing-remove".to_string(),
+                key: "missing-remove".parse().unwrap(),
             },
         ] {
             let error = match derive_gate_registry_mutation(Default::default(), &request) {

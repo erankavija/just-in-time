@@ -50,7 +50,7 @@ jit gate add $ISSUE tests
 
 # Run the checker
 jit gate evaluate $ISSUE tests
-# ✓ Gate 'tests' passed
+# Passed gate 'tests' for issue <issue-id>
 
 # Inspect the most recent recorded gate runs
 jit gate status-all $ISSUE
@@ -205,7 +205,7 @@ executing the checker. This is what lets a batch of issues sitting on one
 unchanged tree pay for a whole-tree checker once instead of once per issue.
 
 A reused verdict stays distinguishable from an independently derived one. Its
-run record names the run it was taken from, and `jit gate status <issue> <gate>
+run record names the issue and run it was taken from, and `jit gate status <issue> <gate>
 --json` reports the distinction:
 
 ```json
@@ -214,7 +214,7 @@ run record names the run it was taken from, and `jit gate status <issue> <gate>
   "key": "tests",
   "status": "passed",
   "inputs_digest": "9a3f…",
-  "origin": { "derivation": "reused", "source_run": "7b2b…" }
+  "origin": { "derivation": "reused", "source_issue": "9d1f…", "source_run": "7b2b…" }
 }
 ```
 
@@ -257,17 +257,16 @@ Every gate checker receives these environment variables:
 | `JIT_ISSUE_ID` | Full issue ID being checked |
 | `JIT_GATE_KEY` | Gate key (e.g., `tests`) |
 | `JIT_STAGE` | `precheck` or `postcheck` |
-| `JIT_ISSUE_DOCS` | JSON array of the issue's linked documents (see below) |
+| `JIT_ISSUE_DOCS` | JSON array of the issue's documents (see below) |
 | `JIT_CONTEXT_FILE` | Path to context JSON (only when `--pass-context` is set) |
 
 ### `JIT_ISSUE_DOCS`
 
 Every gate checker receives `JIT_ISSUE_DOCS`, a JSON array describing the
-issue's explicitly linked documents, so a checker script can inline a plan,
+issue's documents, explicit and [derived](../reference/configuration.md#issue-artifact-directories)
+(the set `jit doc list <issue>` shows), so a checker script can inline a plan,
 design doc, or amendment into its review prompt instead of relying on the
-description alone. It omits the [derived
-documents](../reference/configuration.md#issue-artifact-directories) that `jit
-doc list <issue>` also shows.
+description alone. A derived document carries `null` for both `doc_type` and `label`.
 
 Each element has three fields, all string or `null`:
 
@@ -344,10 +343,10 @@ verdict is fabricated.
 
 # Run tests
 if cargo test --quiet; then
-  echo "✓ All tests passed"
+  echo "ok: All tests passed"
   exit 0
 else
-  echo "✗ Tests failed"
+  echo "error: Tests failed"
   exit 1   # a finding; use 75 when the checker itself could not run
 fi
 ```
@@ -482,7 +481,7 @@ cargo test --lib
 **2. Provide clear output**
 ```bash
 # Good: Specific error message
-echo "✗ Clippy found 3 warnings in src/main.rs"
+echo "error: Clippy found 3 warnings in src/main.rs"
 
 # Avoid: Generic failure
 echo "Failed"
@@ -530,7 +529,7 @@ cargo clippy --all-targets -- -D warnings
 echo "3/3 Running tests..."
 cargo test --lib
 
-echo "✓ All quality checks passed"
+echo "ok: All quality checks passed"
 exit 0
 ```
 
@@ -736,12 +735,8 @@ jit gate define tests \
 # Attempt to finish; unpassed gates move the issue to gated
 jit issue update $ISSUE --state done
 
-# Run the required automated postcheck and inspect the result
+# Run the required automated postcheck; its pass moves the issue to done
 jit gate evaluate $ISSUE tests
-jit gate status-all $ISSUE
-
-# Once all required statuses pass, request completion again
-jit issue update $ISSUE --state done
 ```
 
 ### Choosing Stage
@@ -1088,15 +1083,11 @@ jit gate add $ISSUE code-review
 # Attempt completion; the unpassed gates move the issue to gated
 jit issue update $ISSUE --state done
 
-# Run automated gates and record manual review
+# Run automated gates and record manual review; the last pass moves the issue
+# to done
 jit gate evaluate $ISSUE tests
 jit gate evaluate $ISSUE clippy
 jit gate evaluate $ISSUE code-review --by "human:alice"
-
-# Manual approval may complete a gated issue; otherwise retry explicitly after
-# status-all reports every required gate as passed.
-jit gate status-all $ISSUE
-jit issue update $ISSUE --state done
 ```
 
 ## Troubleshooting Gate Failures
@@ -1140,7 +1131,7 @@ a problem when that project configures a default or a rule requiring it.
 Warning: Issue is an orphaned task (no epic:* or milestone:* label)
 ```
 
-**Solution:** Add parent label: `jit issue update $ISSUE --label "epic:auth"` or use `--orphan` flag to explicitly allow orphaned issues.
+**Solution:** Add parent label: `jit issue update $ISSUE --label "epic:auth"`.
 
 ### Validation and Recovery
 

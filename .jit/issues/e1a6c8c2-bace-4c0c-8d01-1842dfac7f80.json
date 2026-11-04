@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:24:55.328494623Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Replace literal well-known `.jit` file names in storage, configuration and declaration loaders with `VirtualPath` constants.\n\n## Background\n\n`VirtualPath` declares well-known data-root files through `declare_well_known_paths!` (`crates/jit/src/repository_state/path.rs:259-310`), and host paths derive through `RepositoryLayout::resolve` (`path.rs:530`). Literals remain in `storage/user_config_store.rs`, `storage/discovery.rs`, `storage/json.rs`, `storage/ruleset_store.rs`, `storage/gate_store.rs`, `config.rs`, `declarations/invariants.rs`, `templates.rs`, `profile/template_region.rs`, `validation/repository.rs` and `main.rs`. `gate_presets/manager.rs:25,95` joins `config/gate-presets` from literals, and `storage/memory.rs:361` matches the `gate-runs` segment as a literal.\n\n## Success Criteria\n\n- [hard] REQ-01: No string literal in the listed files, `gate_presets/manager.rs` and `storage/memory.rs` included, builds or matches the path of a well-known `.jit` file or directory.\n- [hard] REQ-02: Each such site uses a `VirtualPath` constant, and host paths derive through `RepositoryLayout::resolve`.\n",
   "documents": [],
+  "done_at": "2026-10-25T08:41:54.933858168Z",
+  "first_ready_at": "2026-10-25T04:07:50.389035056Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1817cbfe-9d94-4579-9440-6f76e8d506a2",
+      "status": "passed",
+      "updated_at": "2026-10-25T08:41:49.056139980Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b6ff6730-4137-4634-b10b-9f5a5af561b3",
+      "status": "passed",
+      "updated_at": "2026-10-25T08:39:42.011871179Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e1a6c8c2-bace-4c0c-8d01-1842dfac7f80",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Storage and configuration code name well-known files through VirtualPath constants",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T08:41:54.933858168Z"
 }

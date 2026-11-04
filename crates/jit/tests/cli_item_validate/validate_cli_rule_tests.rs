@@ -4,140 +4,123 @@
 //! parity for the new positional + flag.
 
 use assert_cmd::prelude::*;
+use jit::commands::test_helpers::ExecutorTestAccess;
+use jit::test_cli::JitCli;
+use jit::test_utils::profiled_repository_fixture;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
-use tempfile::TempDir;
 
-fn bin() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+fn append_rules(cli: &JitCli, rules_toml: &str) {
+    let rules_path = cli.root().join(".jit/rules.toml");
+    let mut rules = fs::read_to_string(&rules_path).unwrap();
+    rules.push_str(rules_toml);
+    fs::write(rules_path, rules).unwrap();
 }
 
-/// Absolute path to the built `jit` binary, for use inside gate checker commands
-/// (the gate runs `sh -c <command>` and may not have `jit` on PATH).
-fn jit_path() -> String {
-    assert_cmd::cargo::cargo_bin!("jit")
-        .to_string_lossy()
-        .to_string()
-}
+/// An epic carrying its identifying `epic:*` label, so the built-in
+/// strategic-consistency warning adds no finding beside the user rule.
+const EPIC: [&str; 6] = [
+    "--title",
+    "An epic",
+    "--label",
+    "type:epic",
+    "--label",
+    "epic:auth",
+];
 
-/// Initialize a repo and write a `.jit/rules.toml`. Also declares a `req`
-/// label namespace so `req:*` labels pass the namespace registry check.
-fn setup_repo_with_rules(rules_toml: &str) -> TempDir {
-    let temp = crate::setup_repo_with_default_vocabulary();
-    // Register the `req` namespace used by the test rules.
-    let config_path = temp.path().join(".jit").join("config.toml");
-    let mut config = fs::read_to_string(&config_path).unwrap();
-    config.push_str("\n[namespaces.req]\ndescription = \"Requirement id.\"\nunique = false\n");
-    fs::write(config_path, config).unwrap();
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", "--fix"])
-        .assert()
-        .success();
+/// [`EPIC`] with the `component:*` label the epic rules require.
+const COMPLIANT_EPIC: [&str; 8] = [
+    "--title",
+    "An epic",
+    "--label",
+    "type:epic",
+    "--label",
+    "epic:auth",
+    "--label",
+    "component:api",
+];
 
-    if !rules_toml.is_empty() {
-        let rules_path = temp.path().join(".jit").join("rules.toml");
-        let mut rules = fs::read_to_string(&rules_path).unwrap();
-        rules.push_str(rules_toml);
-        fs::write(rules_path, rules).unwrap();
-    }
-    temp
-}
+/// An epic whose body declares a single `[hard]` success criterion.
+const EPIC_WITH_CRITERION: [&str; 6] = [
+    "--title",
+    "An epic",
+    "--label",
+    "type:epic",
+    "--description",
+    "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
+];
 
-/// Create an epic issue, returning its short id.
-fn create_epic(temp: &TempDir, with_req: bool) -> String {
-    let mut args = vec![
-        "issue".to_string(),
-        "create".to_string(),
-        "--title".to_string(),
-        "An epic".to_string(),
-        "--label".to_string(),
-        "type:epic".to_string(),
-        // Strategic-consistency is a built-in default warning: give the epic its
-        // identifying `epic:*` label so the only finding under test is the user
-        // rule, not the hierarchy warning.
-        "--label".to_string(),
-        "epic:auth".to_string(),
-    ];
-    if with_req {
-        args.push("--label".to_string());
-        args.push("req:REQ-01".to_string());
-    }
-    let output = bin()
-        .current_dir(temp.path())
-        .args(&args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&output);
-    s.lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-fn create_labeled_issue(temp: &TempDir, title: &str, labels: &[&str]) -> String {
-    let mut args = vec![
-        "issue".to_string(),
-        "create".to_string(),
-        "--title".to_string(),
-        title.to_string(),
-    ];
-    labels.iter().for_each(|label| {
-        args.push("--label".to_string());
-        args.push((*label).to_string());
-    });
-    let output = bin()
-        .current_dir(temp.path())
-        .args(&args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    String::from_utf8_lossy(&output)
-        .lines()
-        .find(|line| line.contains("Created issue:"))
-        .expect("created issue line")
-        .split_whitespace()
-        .last()
-        .expect("created issue id")
-        .to_string()
-}
-
-const EPIC_NEEDS_REQ: &str = r#"
+const EPIC_NEEDS_COMPONENT: &str = r#"
 [[rules]]
-name = "epic-needs-req"
+name = "epic-needs-component"
 when = { type = "epic" }
 severity = "error"
 enforce = false
-assert = { require-label = { label = "req:*", min = 1 } }
+assert = { require-label = { label = "component:*", min = 1 } }
 "#;
 
-const EPIC_WARNS_WITHOUT_REQ: &str = r#"
+const EPIC_WARNS_WITHOUT_COMPONENT: &str = r#"
 [[rules]]
-name = "epic-warns-without-req"
+name = "epic-warns-without-component"
 when = { type = "epic" }
 severity = "warn"
 enforce = false
-assert = { require-label = { label = "req:*", min = 1 } }
+assert = { require-label = { label = "component:*", min = 1 } }
 "#;
 
 #[test]
-fn test_validate_id_passes_for_compliant_issue() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
+fn test_validate_custom_only_rules_reject_malformed_labels() {
+    let cli = JitCli::initialised().unwrap();
+    let rules_path = cli.root().join(".jit/rules.toml");
+    fs::write(&rules_path, EPIC_NEEDS_COMPONENT).unwrap();
+    cli.command(["issue", "create", "--title", "Malformed", "--label", "BAD"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("label-format"));
 
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id])
+    cli.create_issue(["--title", "Forced malformed", "--label", "BAD", "--force"])
+        .unwrap();
+    fs::write(rules_path, EPIC_NEEDS_COMPONENT).unwrap();
+    cli.command(["validate"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("label-format"));
+}
+
+#[test]
+fn test_config_writes_and_validate_fix_restore_defaults_in_custom_only_file() {
+    for args in [
+        &["config", "set", "validation.strictness", "loose"][..],
+        &["validate", "--fix"][..],
+        &["init"][..],
+    ] {
+        let cli = JitCli::initialised().unwrap();
+        let rules_path = cli.root().join(".jit/rules.toml");
+        fs::write(&rules_path, EPIC_NEEDS_COMPONENT).unwrap();
+        cli.command(args).assert().success();
+        let restored = fs::read_to_string(&rules_path).unwrap();
+        assert!(restored.starts_with(EPIC_NEEDS_COMPONENT));
+        let executor = jit::test_utils::file_executor(cli.root()).unwrap();
+        assert!(executor
+            .rules()
+            .unwrap()
+            .rules
+            .iter()
+            .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default")));
+    }
+}
+
+#[test]
+fn test_validate_id_passes_for_compliant_issue() {
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
+
+    cli.command(["validate", &id])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed"));
@@ -145,14 +128,13 @@ fn test_validate_id_passes_for_compliant_issue() {
 
 #[test]
 fn test_validate_id_json_success_keeps_the_rule_report() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--json"])
-        .assert()
-        .success();
+    let assert = cli.command(["validate", &id, "--json"]).assert().success();
     let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
     assert!(
         json["findings"].is_array(),
@@ -163,57 +145,65 @@ fn test_validate_id_json_success_keeps_the_rule_report() {
 
 #[test]
 fn test_validate_id_fails_and_exits_nonzero() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, false);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(EPIC).unwrap();
 
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("epic-needs-req"));
+    let output = cli.command(["validate", &id]).output().unwrap();
+    assert_eq!(output.status.code(), Some(4));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("epic-needs-component"));
 }
 
 #[test]
 fn test_validate_id_json_reports_findings_and_exits_nonzero() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, false);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(EPIC).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--json"])
-        .assert()
-        .failure();
+    let assert = cli.command(["validate", &id, "--json"]).assert().failure();
     let out = assert.get_output().stdout.clone();
+    assert_eq!(assert.get_output().status.code(), Some(4));
     let json: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert!(assert.get_output().stderr.is_empty());
     let findings = json["error"]["details"]["findings"].as_array().unwrap();
-    assert!(findings.iter().any(|f| f["rule"] == "epic-needs-req"));
+    assert!(findings.iter().any(|f| f["rule"] == "epic-needs-component"));
     assert!(findings.iter().any(|f| f["severity"] == "error"));
 }
 
 #[test]
 fn test_validate_explain_lists_outcomes() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, false);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(EPIC).unwrap();
 
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain"])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("epic-needs-req"))
-        .stdout(predicate::str::contains("FAIL"))
-        .stdout(predicate::str::contains("type=epic"));
+    let output = cli
+        .command(["validate", &id, "--explain"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(4));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("epic-needs-component"));
+    assert!(stdout.contains("FAIL"));
+    assert!(stdout.contains("type=epic"));
 }
 
 #[test]
 fn test_validate_explain_json_structure() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain", "--json"])
+    let assert = cli
+        .command(["validate", &id, "--explain", "--json"])
         .assert()
         .success();
     let out = assert.get_output().stdout.clone();
@@ -223,8 +213,8 @@ fn test_validate_explain_json_structure() {
     // rule is no longer guaranteed at index 0; find it by name.
     let outcome = outcomes
         .iter()
-        .find(|o| o["rule"] == "epic-needs-req")
-        .expect("epic-needs-req outcome present");
+        .find(|o| o["rule"] == "epic-needs-component")
+        .expect("epic-needs-component outcome present");
     assert_eq!(outcome["scope"], "local");
     assert_eq!(outcome["passed"], true);
 }
@@ -245,15 +235,16 @@ assert = { require-section = { heading = "Summary" } }
 #[test]
 fn test_validate_explain_renders_skipped_rule_with_state_reason() {
     // The success criterion: `jit validate <id> --explain` shows whether the
-    // state predicate matched. A fresh issue is in `backlog`, so the `done`-scoped
-    // rule is rendered as a [SKIP] line naming the issue state and the wanted
+    // state predicate matched. A fresh issue is not in the rule's wanted state,
+    // so the rule is rendered as a [SKIP] line naming the issue state and the wanted
     // token.
-    let temp = setup_repo_with_rules(DONE_NEEDS_SUMMARY);
-    let id = create_epic(&temp, true);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, DONE_NEEDS_SUMMARY);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
 
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain"])
+    cli.command(["validate", &id, "--explain"])
         .assert()
         .success()
         .stdout(predicate::str::contains("[SKIP] done-needs-summary"))
@@ -263,12 +254,14 @@ fn test_validate_explain_renders_skipped_rule_with_state_reason() {
 
 #[test]
 fn test_validate_explain_json_includes_matched_and_skip_reason() {
-    let temp = setup_repo_with_rules(DONE_NEEDS_SUMMARY);
-    let id = create_epic(&temp, true);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, DONE_NEEDS_SUMMARY);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain", "--json"])
+    let assert = cli
+        .command(["validate", &id, "--explain", "--json"])
         .assert()
         .success();
     let out = assert.get_output().stdout.clone();
@@ -290,12 +283,14 @@ fn test_validate_explain_json_includes_matched_and_skip_reason() {
 #[test]
 fn test_validate_explain_json_matched_rule_has_no_skip_reason() {
     // A matched rule keeps `matched = true` and omits `skip_reason` from JSON.
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain", "--json"])
+    let assert = cli
+        .command(["validate", &id, "--explain", "--json"])
         .assert()
         .success();
     let out = assert.get_output().stdout.clone();
@@ -304,8 +299,8 @@ fn test_validate_explain_json_matched_rule_has_no_skip_reason() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|o| o["rule"] == "epic-needs-req")
-        .expect("epic-needs-req outcome present");
+        .find(|o| o["rule"] == "epic-needs-component")
+        .expect("epic-needs-component outcome present");
     assert_eq!(outcome["matched"], true);
     assert!(
         outcome.get("skip_reason").is_none(),
@@ -315,10 +310,11 @@ fn test_validate_explain_json_matched_rule_has_no_skip_reason() {
 
 #[test]
 fn test_validate_explain_requires_id() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", "--explain"])
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    cli.command(["validate", "--explain"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("requires an issue id"));
@@ -329,62 +325,48 @@ fn test_gate_checker_via_jit_issue_id_env_var() {
     // A gate whose checker runs `jit validate "$JIT_ISSUE_ID" --json` must pass
     // when the issue is compliant. This proves the JIT_ISSUE_ID wiring end to end
     // (no `{issue}` placeholder is used).
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let checker = format!("{} validate \"$JIT_ISSUE_ID\" --json", jit_path());
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let checker = format!(
+        "{} validate \"$JIT_ISSUE_ID\" --json",
+        jit::test_cli::jit_binary().display()
+    );
 
-    bin()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "rules-gate",
-            "--title",
-            "Rules Gate",
-            "--description",
-            "Runs jit validate for the issue",
-            "--mode",
-            "auto",
-            "--checker-command",
-            &checker,
-            "--timeout",
-            "30",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "gate",
+        "define",
+        "rules-gate",
+        "--title",
+        "Rules Gate",
+        "--description",
+        "Runs jit validate for the issue",
+        "--mode",
+        "auto",
+        "--checker-command",
+        &checker,
+        "--timeout",
+        "30",
+    ])
+    .assert()
+    .success();
 
     // Compliant epic with the gate -> gate passes.
-    let output = bin()
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
+    let good_id = cli
+        .create_issue([
             "--title",
             "Good epic",
             "--label",
             "type:epic",
             "--label",
-            "req:REQ-01",
+            "component:api",
             "--gate",
             "rules-gate",
         ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&output);
-    let good_id = s
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
+        .unwrap();
 
-    bin()
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &good_id, "rules-gate"])
+    cli.command(["gate", "evaluate", &good_id, "rules-gate"])
         .assert()
         .success();
 }
@@ -393,35 +375,36 @@ fn test_gate_checker_via_jit_issue_id_env_var() {
 fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
     // The same gate must FAIL when the issue violates an error-severity rule,
     // because `jit validate "$JIT_ISSUE_ID"` exits non-zero.
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let checker = format!("{} validate \"$JIT_ISSUE_ID\" --json", jit_path());
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let checker = format!(
+        "{} validate \"$JIT_ISSUE_ID\" --json",
+        jit::test_cli::jit_binary().display()
+    );
 
-    bin()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "rules-gate",
-            "--title",
-            "Rules Gate",
-            "--description",
-            "Runs jit validate for the issue",
-            "--mode",
-            "auto",
-            "--checker-command",
-            &checker,
-            "--timeout",
-            "30",
-        ])
-        .assert()
-        .success();
+    cli.command([
+        "gate",
+        "define",
+        "rules-gate",
+        "--title",
+        "Rules Gate",
+        "--description",
+        "Runs jit validate for the issue",
+        "--mode",
+        "auto",
+        "--checker-command",
+        &checker,
+        "--timeout",
+        "30",
+    ])
+    .assert()
+    .success();
 
-    // Non-compliant epic (no req:* label) with the gate -> gate fails.
-    let output = bin()
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
+    // Non-compliant epic (no component:* label) with the gate -> gate fails.
+    let bad_id = cli
+        .create_issue([
             "--title",
             "Bad epic",
             "--label",
@@ -429,24 +412,9 @@ fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
             "--gate",
             "rules-gate",
         ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&output);
-    let bad_id = s
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
+        .unwrap();
 
-    bin()
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &bad_id, "rules-gate"])
+    cli.command(["gate", "evaluate", &bad_id, "rules-gate"])
         .assert()
         .failure();
 }
@@ -454,7 +422,7 @@ fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
 // ---------------------------------------------------------------------------
 // Rework (jit:b8ba1b10): whole-repo --json must surface graph-rule findings;
 // id + legacy flags must be rejected; per-issue + --explain must report
-// malformed graph rules instead of silently passing.
+// unresolved container pointers instead of silently passing.
 // ---------------------------------------------------------------------------
 
 /// A `label-coverage` GRAPH rule at error severity. An epic declaring a `[hard]`
@@ -465,17 +433,6 @@ name = "epic-criteria-covered"
 when = { type = "epic" }
 severity = "error"
 assert = { label-coverage = { child-link = "any", marker = "[hard]" } }
-"#;
-
-/// A MALFORMED `label-coverage` GRAPH rule: its `child-link` names no link
-/// direction, so the rule cannot be applied and must surface as a config-error
-/// finding.
-const MALFORMED_GRAPH_RULE: &str = r#"
-[[rules]]
-name = "broken-graph-rule"
-when = { type = "epic" }
-severity = "error"
-assert = { label-coverage = { child-link = "bogus" } }
 "#;
 
 const DISABLED_GRAPH_RULE: &str = r#"
@@ -502,49 +459,19 @@ severity = "error"
 assert = { label-coverage = { child-link = "dependencies", marker = "[hard]", container-from-label = "brackets" } }
 "#;
 
-/// Create an epic whose body declares a single `[hard]` success criterion.
-fn create_epic_with_criterion(temp: &TempDir) -> String {
-    let output = bin()
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "An epic",
-            "--label",
-            "type:epic",
-            "--description",
-            "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&output);
-    s.lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
 #[test]
 fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero() {
     // Regression for finding #1: a whole-repo `jit validate --json` with an
     // error-severity GRAPH rule violation must EMIT the structured rule report
     // including the graph finding, and exit non-zero — not bail via the generic
     // error path that drops the structured report.
-    let temp = setup_repo_with_rules(COVERAGE_GRAPH_RULE);
-    let _id = create_epic_with_criterion(&temp);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, COVERAGE_GRAPH_RULE);
+    let _id = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", "--json"])
-        .assert()
-        .failure();
+    let assert = cli.command(["validate", "--json"]).assert().failure();
     let out = assert.get_output().stdout.clone();
     let json: Value = serde_json::from_slice(&out).unwrap();
     let details = &json["error"]["details"];
@@ -562,27 +489,27 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
 }
 
 #[test]
-fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, false);
-    let issue_path = temp.path().join(".jit/issues").join(format!("{id}.json"));
+fn test_validate_retains_rule_findings_with_integrity_failure() {
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(EPIC).unwrap();
+    let issue_path = cli.root().join(".jit/issues").join(format!("{id}.json"));
     let mut issue: Value = serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
-    issue["dependencies"] = serde_json::json!(["nonexistent"]);
+    issue["dependencies"] = serde_json::json!(["00000000-0000-4000-8000-00000000dead"]);
     fs::write(&issue_path, serde_json::to_vec_pretty(&issue).unwrap()).unwrap();
 
-    bin()
-        .current_dir(temp.path())
-        .arg("validate")
+    cli.command(["validate"])
         .assert()
-        .code(4)
-        .stdout(predicate::str::contains("[epic-needs-req]"))
+        .failure()
+        .stdout(predicate::str::contains("[epic-needs-component]"))
         .stdout(predicate::str::contains("does not exist"));
 
-    let output = bin()
-        .current_dir(temp.path())
-        .args(["validate", "--json"])
+    let output = cli
+        .command(["validate", "--json"])
         .assert()
-        .code(4)
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -597,17 +524,18 @@ fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|finding| finding["rule"] == "epic-needs-req"));
+        .any(|finding| finding["rule"] == "epic-needs-component"));
 }
 
 #[test]
 fn test_validate_id_with_fix_is_rejected() {
     // Finding #2: `--fix` is repo-wide and must not be silently scoped to an id.
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--fix"])
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
+    cli.command(["validate", &id, "--fix"])
         .assert()
         .failure()
         .stderr(predicate::str::contains(
@@ -615,9 +543,9 @@ fn test_validate_id_with_fix_is_rejected() {
         ));
 }
 
-fn configure_review_placeholder(temp: &TempDir) {
+fn configure_review_placeholder(cli: &JitCli) {
     fs::write(
-        temp.path().join(".jit/gates.toml"),
+        cli.root().join(".jit/gates.toml"),
         r#"[[gates]]
 version = 1
 key = "review-test"
@@ -636,20 +564,19 @@ type = "review_placeholder"
 
 #[test]
 fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
-    let temp = setup_repo_with_rules("");
-    configure_review_placeholder(&temp);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    configure_review_placeholder(&cli);
 
-    bin()
-        .current_dir(temp.path())
-        .arg("validate")
+    cli.command(["validate"])
         .assert()
         .success()
         .stdout(predicate::str::contains("[review-placeholder]"))
         .stdout(predicate::str::contains("review-test"));
 
-    let output = bin()
-        .current_dir(temp.path())
-        .args(["validate", "--json"])
+    let output = cli
+        .command(["validate", "--json"])
         .assert()
         .success()
         .get_output()
@@ -658,24 +585,26 @@ fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
     let json: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(json["valid"], true);
     assert_eq!(json["warning_count"], 1);
-    assert_eq!(json["warnings"][0]["rule"], "review-placeholder");
+    assert_eq!(json["validation_warnings"][0]["rule"], "review-placeholder");
     assert_eq!(json["rule_findings"][0]["rule"], "review-placeholder");
 }
 
 #[test]
 fn test_validate_scope_with_only_warnings_prints_findings_without_pass_line_and_succeeds() {
-    let temp = setup_repo_with_rules(EPIC_WARNS_WITHOUT_REQ);
-    let container = create_epic(&temp, false);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_WARNS_WITHOUT_COMPONENT);
+    let container = cli.create_issue(EPIC).unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", "--scope", &container])
+    let assert = cli
+        .command(["validate", "--scope", &container])
         .assert()
         .success();
     let output = assert.get_output();
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("warning [epic-warns-without-req]"),
+        stdout.contains("warning [epic-warns-without-component]"),
         "warnings-only scope run must list its findings, got: {stdout}"
     );
     assert!(
@@ -688,11 +617,12 @@ fn test_validate_scope_with_only_warnings_prints_findings_without_pass_line_and_
 #[test]
 fn test_validate_id_with_branch_drift_is_rejected() {
     // Finding #2: `--branch-drift` is repo-wide and incompatible with a positional id.
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--branch-drift"])
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
+    cli.command(["validate", &id, "--branch-drift"])
         .assert()
         .failure()
         .stderr(predicate::str::contains(
@@ -703,11 +633,12 @@ fn test_validate_id_with_branch_drift_is_rejected() {
 #[test]
 fn test_validate_id_with_leases_is_rejected() {
     // Finding #2: `--leases` is repo-wide and incompatible with a positional id.
-    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
-    let id = create_epic(&temp, true);
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--leases"])
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(&cli, EPIC_NEEDS_COMPONENT);
+    let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
+    cli.command(["validate", &id, "--leases"])
         .assert()
         .failure()
         .stderr(predicate::str::contains(
@@ -716,83 +647,30 @@ fn test_validate_id_with_leases_is_rejected() {
 }
 
 #[test]
-fn test_validate_id_reports_malformed_graph_rule_not_passed() {
-    // Finding #3: a malformed graph rule whose selector applies to the issue must
-    // be REPORTED for a per-issue `jit validate <id>` (a config-error finding),
-    // never silently dropped.
-    let temp = setup_repo_with_rules(MALFORMED_GRAPH_RULE);
-    let id = create_epic(&temp, false);
-
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--json"])
-        .assert()
-        .failure();
-    let out = assert.get_output().stdout.clone();
-    let json: Value = serde_json::from_slice(&out).unwrap();
-    let findings = json["error"]["details"]["findings"].as_array().unwrap();
-    assert!(
-        findings.iter().any(|f| f["rule"] == "broken-graph-rule"
-            && f["message"].as_str().unwrap_or("").contains("config error")),
-        "malformed graph rule must be reported per-issue: {findings:?}"
-    );
-}
-
-#[test]
-fn test_validate_explain_marks_malformed_graph_rule_as_failed() {
-    // Finding #3 (--explain): a graph rule with a config error for the issue must
-    // be shown as FAILED, never PASS.
-    let temp = setup_repo_with_rules(MALFORMED_GRAPH_RULE);
-    let id = create_epic(&temp, false);
-
-    // Human form: the rule appears and is marked FAIL.
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain"])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("broken-graph-rule"))
-        .stdout(predicate::str::contains("FAIL"));
-
-    // JSON form: the outcome for the malformed rule has passed = false.
-    let assert = bin()
-        .current_dir(temp.path())
-        .args(["validate", &id, "--explain", "--json"])
-        .assert()
-        .failure();
-    let out = assert.get_output().stdout.clone();
-    let json: Value = serde_json::from_slice(&out).unwrap();
-    let outcomes = json["error"]["details"]["outcomes"].as_array().unwrap();
-    let outcome = outcomes
-        .iter()
-        .find(|o| o["rule"] == "broken-graph-rule")
-        .expect("malformed graph rule must appear as an outcome");
-    assert_eq!(
-        outcome["passed"], false,
-        "a config-errored graph rule must be reported as failed, not passed: {outcome}"
-    );
-}
-
-#[test]
 fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application() {
-    let temp = setup_repo_with_rules(SELECTED_COVERAGE_GRAPH_RULE);
-    let selected = create_epic_with_criterion(&temp);
-    let _child = create_labeled_issue(
-        &temp,
-        "Selected implementation",
-        &["type:task", &format!("satisfies:{}/REQ-01", &selected[..8])],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    bin()
-        .current_dir(temp.path())
-        .args(["dep", "add", &selected, &_child])
+    append_rules(&cli, SELECTED_COVERAGE_GRAPH_RULE);
+    let selected = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
+    let child = cli
+        .create_issue([
+            "--title",
+            "Selected implementation",
+            "--label",
+            "type:task",
+            "--label",
+            &format!("satisfies:{}/REQ-01", &selected[..8]),
+        ])
+        .unwrap();
+    cli.command(["dep", "add", &selected, &child])
         .assert()
         .success();
-    let _unrelated = create_epic_with_criterion(&temp);
+    let _unrelated = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
     let selected_prefix = &selected[..8];
 
-    let clean = bin()
-        .current_dir(temp.path())
-        .args([
+    let clean = cli
+        .command([
             "validate",
             selected_prefix,
             "--rule",
@@ -804,10 +682,9 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
     let clean_json: Value = serde_json::from_slice(&clean.get_output().stdout).unwrap();
     assert!(clean_json["findings"].as_array().unwrap().is_empty());
 
-    let failing = create_epic_with_criterion(&temp);
-    let failed = bin()
-        .current_dir(temp.path())
-        .args([
+    let failing = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
+    let failed = cli
+        .command([
             "validate",
             &failing,
             "--rule",
@@ -815,9 +692,11 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
             "--json",
         ])
         .assert()
-        .failure()
-        .code(1);
+        .failure();
     let failed_json: Value = serde_json::from_slice(&failed.get_output().stdout).unwrap();
+    assert_eq!(failed.get_output().status.code(), Some(4));
+    assert_eq!(failed_json["error"]["code"], "VALIDATION_FAILED");
+    assert!(failed.get_output().stderr.is_empty());
     let findings = failed_json["error"]["details"]["findings"]
         .as_array()
         .unwrap();
@@ -833,9 +712,17 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
 
 #[test]
 fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
-    let temp = setup_repo_with_rules(&format!("{COVERAGE_GRAPH_RULE}\n{DISABLED_GRAPH_RULE}"));
-    let epic = create_epic_with_criterion(&temp);
-    let task = create_labeled_issue(&temp, "A task", &["type:task"]);
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    append_rules(
+        &cli,
+        &format!("{COVERAGE_GRAPH_RULE}\n{DISABLED_GRAPH_RULE}"),
+    );
+    let epic = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
+    let task = cli
+        .create_issue(["--title", "A task", "--label", "type:task"])
+        .unwrap();
 
     for (id, rule, message) in [
         (&epic, "missing-graph-rule", "was not found"),
@@ -846,12 +733,11 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
             "does not match selected issue",
         ),
     ] {
-        let assert = bin()
-            .current_dir(temp.path())
-            .args(["validate", id, "--rule", rule, "--json"])
+        let assert = cli
+            .command(["validate", id, "--rule", rule, "--json"])
             .assert()
-            .failure()
-            .code(1);
+            .failure();
+        assert_eq!(assert.get_output().status.code(), Some(4));
         let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
         let findings = json["error"]["details"]["findings"].as_array().unwrap();
         assert!(
@@ -863,27 +749,31 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
         );
     }
 
-    bin()
-        .current_dir(temp.path())
-        .args(["validate", "--rule", "epic-criteria-covered"])
+    cli.command(["validate", "--rule", "epic-criteria-covered"])
         .assert()
         .failure()
-        .code(2)
         .stderr(predicate::str::contains("requires a positional issue id"));
 }
 
 #[test]
 fn test_validate_rule_cli_reports_missing_selected_container() {
-    let temp = setup_repo_with_rules(SELECTED_BREAKDOWN_COVERAGE_RULE);
-    let breakdown = create_labeled_issue(
-        &temp,
-        "Breakdown with missing target",
-        &["type:breakdown", "brackets:missing-target"],
+    let cli = JitCli::with_repository(
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
+    append_rules(&cli, SELECTED_BREAKDOWN_COVERAGE_RULE);
+    let breakdown = cli
+        .create_issue([
+            "--title",
+            "Breakdown with missing target",
+            "--label",
+            "type:breakdown",
+            "--label",
+            "brackets:missing-target",
+        ])
+        .unwrap();
 
-    let assert = bin()
-        .current_dir(temp.path())
-        .args([
+    let assert = cli
+        .command([
             "validate",
             &breakdown,
             "--rule",
@@ -891,8 +781,7 @@ fn test_validate_rule_cli_reports_missing_selected_container() {
             "--json",
         ])
         .assert()
-        .failure()
-        .code(1);
+        .failure();
     let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
     let findings = json["error"]["details"]["findings"].as_array().unwrap();
     assert!(findings.iter().any(|finding| {
@@ -908,7 +797,11 @@ fn test_validate_rule_cli_reports_missing_selected_container() {
 fn test_schema_exposes_validate_positional_and_explain_flag() {
     // MCP parity: the new positional `id` arg and `--explain` flag MUST appear in
     // `jit --schema` so the MCP server auto-generates a working tool (DR §9.3).
-    let output = bin().arg("--schema").output().unwrap();
+    let output = JitCli::uninitialised()
+        .unwrap()
+        .command(["--schema"])
+        .output()
+        .unwrap();
     assert!(output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     let validate = &json["commands"]["validate"];
@@ -944,20 +837,15 @@ fn test_mcp_generates_validate_tool_with_id_and_explain() {
     // over the real schema and assert the `jit_validate` tool carries the new
     // `id` and `explain` properties (proves a WORKING tool is generated for the
     // new surface, not just that the schema contains the fields).
-    let schema_out = bin().arg("--schema").output().unwrap();
+    let schema_out = JitCli::uninitialised()
+        .unwrap()
+        .command(["--schema"])
+        .output()
+        .unwrap();
     assert!(schema_out.status.success());
     let schema_json = String::from_utf8(schema_out.stdout).unwrap();
 
     let mcp_dir = mcp_server_dir();
-    // Skip gracefully if node is unavailable in the environment.
-    let node = match Command::new("node").arg("--version").output() {
-        Ok(o) if o.status.success() => "node",
-        _ => {
-            eprintln!("node not available; skipping MCP parity assertion");
-            return;
-        }
-    };
-
     let script = r#"
 import { generateTools } from './lib/tool-generator.js';
 let data = '';
@@ -978,14 +866,16 @@ process.stdin.on('end', () => {
 });
 "#;
 
-    let mut child = Command::new(node)
+    let mut child = Command::new("node")
         .current_dir(&mcp_dir)
         .args(["--input-type=module", "-e", script])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .expect("spawn node");
+        .expect(
+            "node is required for the MCP tool-generation parity test and could not be spawned",
+        );
     {
         use std::io::Write;
         child

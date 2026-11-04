@@ -24,7 +24,7 @@ the result with `jit validate`.
    | Situation | Action |
    |---|---|
    | No `.jit/` | Prefer the profile bootstrap for JIT's portable workflow: pack the package from a jit checkout, add the archive to the worktree, then `jit init --profile <added-dir>` (`--profile` takes the package directory path). Use plain `jit init` or `--hierarchy-template` only for custom methodology. See [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md). |
-   | `.jit/` exists, index empty | Proceed. |
+   | `.jit/` exists, no issues | Proceed. |
    | `.jit/` exists and already has issues | Warn: "Migration will **add** issues; existing issues are untouched." Ask the user to confirm before continuing. |
 
 3. Confirm `jit validate` passes on the current state before adding anything.

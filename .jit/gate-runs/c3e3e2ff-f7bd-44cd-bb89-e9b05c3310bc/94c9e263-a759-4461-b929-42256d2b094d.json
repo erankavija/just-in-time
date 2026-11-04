@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5a36ad2ea9d09f6fc9d7d94be23eac6b75719a66",
+  "completed_at": "2026-11-03T04:26:17.084285824Z",
+  "duration_ms": 287108,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable requirements are implemented and covered by the recorded passing CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c3e3e2ff-f7bd-44cd-bb89-e9b05c3310bc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "94c9e263-a759-4461-b929-42256d2b094d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T04:21:29.975633608Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 855663d9 feat(jit:c3e3e2ff): lock-free lease reads through the coordinator\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19, @/charter/D-22 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-05 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-03T04:21:29Z; its commit contains the attributable commit and no affected path changed afterward\nTruncation recovery: Re-read all five attributable patches separately and narrowed policy, call-site, and current-line reads; abandoned only unrelated repository-wide search output\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable requirements are implemented and covered by the recorded passing CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

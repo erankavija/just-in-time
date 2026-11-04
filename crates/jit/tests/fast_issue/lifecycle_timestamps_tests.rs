@@ -5,7 +5,9 @@
 //! unit-tested at the domain layer (`Issue::mark_*`); here we verify the command
 //! paths wire those helpers in.
 
-use jit::domain::{Event, State};
+use jit::domain::event_catalog::EventTag;
+use jit::domain::identity::{IssueId, IssueIdPrefix};
+use jit::domain::{EventBody, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -24,49 +26,9 @@ fn test_create_dependency_free_issue_stamps_first_ready() {
     assert!(issue.done_at.is_none());
 }
 
-/// Completing a dependency auto-transitions the dependent to Ready THROUGH the
-/// chokepoint, leaving it Ready with `first_ready_at` set.
-///
-/// (A harness-created issue is dependency-free and therefore born Ready — hence
-/// already stamped — before `add_dependency` reverts it to Backlog; the
-/// first-occurrence chokepoint stamp is exercised precisely by
-/// `test_backlog_to_ready_transition_stamps_first_ready` below.)
-#[test]
-fn test_auto_ready_on_dependency_completion_leaves_ready_stamp() {
-    let h = TestHarness::new();
-    let dep = h.create_issue("Dependency");
-    let blocked = h.create_issue("Blocked");
-    h.executor.add_dependency(&blocked, &dep).unwrap();
-
-    // Adding the dependency reverted the dependent to Backlog.
-    assert_eq!(h.get_issue(&blocked).state, State::Backlog);
-
-    // Complete the dependency through `update_issue` (which cascades ready
-    // auto-transitions to dependents); the dependent returns to Ready.
-    h.executor
-        .issues()
-        .update_issue(
-            &dep,
-            None,
-            None,
-            None,
-            Some(State::Done),
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    let after = h.get_issue(&blocked);
-    assert_eq!(after.state, State::Ready);
-    assert!(after.first_ready_at.is_some());
-}
-
 /// A precise chokepoint check: an issue that has NEVER been Ready (forced into
 /// Backlog with the stamp cleared) gets `first_ready_at` set the first time
-/// `update_issue_state` lands it in Ready.
+/// a state update lands it in Ready.
 #[test]
 fn test_backlog_to_ready_transition_stamps_first_ready() {
     let h = TestHarness::new();
@@ -79,10 +41,7 @@ fn test_backlog_to_ready_transition_stamps_first_ready() {
     issue.first_ready_at = None;
     jit::test_harness::seed_memory_issue(&h.storage, &issue);
 
-    h.executor
-        .issues()
-        .update_issue_state(&id, State::Ready)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &id, State::Ready).unwrap();
 
     let after = h.get_issue(&id);
     assert_eq!(after.state, State::Ready);
@@ -98,7 +57,7 @@ fn test_claim_stamps_claimed_at() {
 
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
 
     let issue = h.get_issue(&id);
@@ -115,7 +74,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
 
     h.executor
         .issues()
-        .assign_issue(&id, "human:alice".to_string())
+        .assign_issue(&IssueIdPrefix::from(&id), "human:alice".parse().unwrap())
         .unwrap();
 
     assert!(h.get_issue(&id).claimed_at.is_some());
@@ -125,9 +84,66 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
         .count();
     assert_eq!(claimed, 1);
+}
+
+/// The events a claim of `id` by `assignee` appends, by tag.
+fn tags_appended_by_claim(h: &TestHarness, id: &IssueId, assignee: &str) -> Vec<EventTag> {
+    let before = h.storage.read_events().unwrap().len();
+    h.executor
+        .issues()
+        .claim_issue(&IssueIdPrefix::from(id), assignee.parse().unwrap())
+        .unwrap();
+    h.storage.read_events().unwrap()[before..]
+        .iter()
+        .map(|event| event.body().tag())
+        .collect()
+}
+
+#[test]
+fn test_claim_issue_of_unassigned_issue_appends_a_claim_event() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Unassigned");
+
+    let tags = tags_appended_by_claim(&h, &id, "agent:worker-1");
+
+    assert_eq!(
+        tags.iter()
+            .filter(|tag| **tag == EventTag::IssueClaimed)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn test_claim_issue_promoting_same_assignee_appends_only_the_state_change() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Assigned");
+    h.executor
+        .issues()
+        .assign_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
+        .unwrap();
+
+    let tags = tags_appended_by_claim(&h, &id, "agent:worker-1");
+
+    assert_eq!(tags, [EventTag::IssueStateChanged]);
+    assert_eq!(h.get_issue(&id).state, State::InProgress);
+}
+
+/// A claim that neither reassigns nor promotes changes nothing.
+#[test]
+fn test_claim_issue_same_assignee_without_promotion_appends_nothing() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Finished");
+    h.executor
+        .issues()
+        .assign_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
+        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &id, State::Done).unwrap();
+
+    assert!(tags_appended_by_claim(&h, &id, "agent:worker-1").is_empty());
 }
 
 /// Transitioning an issue to Done stamps `done_at`.
@@ -137,10 +153,7 @@ fn test_done_transition_stamps_done_at() {
     let id = h.create_ready_issue("Finishable");
     assert!(h.get_issue(&id).done_at.is_none());
 
-    h.executor
-        .issues()
-        .update_issue_state(&id, State::Done)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &id, State::Done).unwrap();
 
     let issue = h.get_issue(&id);
     assert_eq!(issue.state, State::Done);
@@ -155,7 +168,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     let id = h.create_ready_issue("Claimable");
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
     let first = h.get_issue(&id).claimed_at;
     assert!(first.is_some());
@@ -163,7 +176,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     // Re-claiming as the same assignee promotes/no-ops but must not re-stamp.
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
     assert_eq!(h.get_issue(&id).claimed_at, first);
 }

@@ -1,0 +1,39 @@
+{
+  "assignee": "agent:external-root-lead",
+  "claimed_at": "2026-11-01T23:13:38.965599448Z",
+  "context": {},
+  "created_at": "2026-11-01T23:09:56.813550547Z",
+  "dependencies": [],
+  "description": "Claims and lease recovery fail or are skipped when the data root lies outside every checkout, so a store selected through `JIT_DATA_DIR` cannot coordinate agents across linked worktrees.\n\n## Background\n\nLayout detection probes the selected data root (`WorktreePaths::detect_from_with_non_git_root`, `crates/jit/src/storage/worktree_paths.rs:60-104`). When that probe finds no git repository, the layout records `git_repository: false` and takes `common_dir` and `shared_jit` from `<worktree root>/.git`. It keeps only the worktree root of the checkout it finds through `relocated_worktree_checkout` and discards that checkout's common directory.\n\nObserved with jit 1.0.0, a data root outside any repository, and `JIT_DATA_DIR` set to it:\n\n- In the primary checkout, acquiring a lease succeeds and writes to `<primary>/.git/jit`.\n- In a linked worktree, `.git` is a file. Listing and acquiring leases both fail with `Failed to create locks directory`, so that worktree cannot see or respect the primary's lease.\n- In a linked worktree, worktree information reports `Type: main worktree` and `Common dir: <linked>/.git`.\n- Recovery warns `Skipped claims and lease recovery because it requires a git repository` from inside a git checkout.\n\n## Success Criteria\n\n- [hard] REQ-01: With the data root outside every checkout, a primary checkout and a linked worktree of one repository use the same claims directory, under that repository's git common directory.\n- [hard] REQ-02: In that layout, a lease acquired in one checkout is listed from the other, and a conflicting acquire from the other is refused as a lease conflict.\n- [hard] REQ-03: In that layout, recovery run from a git checkout performs claims and lease recovery and reports no skip.\n- [hard] REQ-04: In that layout, worktree information from a linked worktree reports a linked worktree and the repository's actual common directory.\n- [hard] REQ-05: Run outside every git checkout, recovery still reports the skip and lease commands still fail with an error stating the cause.\n- [hard] REQ-06: Layouts with the data root inside a checkout keep their current claims location.\n- [hard] REQ-07: An integration test exercises REQ-01 through REQ-04 with a real linked worktree and an external data root.\n\n## Notes\n\n- Found while assessing a move of gf2's tracker data out of its repository. gf2 runs its agents in linked worktrees.\n- This covers a data root in no repository. A data root inside its own tracker repository with a configured worktree root is specified by @/issue/5046408a.\n",
+  "documents": [],
+  "done_at": "2026-11-02T06:30:57.158850545Z",
+  "first_ready_at": "2026-11-01T23:09:56.813550547Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6179b396-bccf-4857-bbcd-813a2d828fcf",
+      "status": "passed",
+      "updated_at": "2026-11-02T06:26:23.783640870Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "727408ea-d24d-4c2c-898f-139d85f7713f",
+      "status": "passed",
+      "updated_at": "2026-11-02T06:30:35.039140387Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "c4e07f6d-8e88-4953-b9e3-f9c5d61878d5",
+  "labels": [
+    "component:storage",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Claims and lease recovery work from linked worktrees with an external data root",
+  "updated_at": "2026-11-02T06:30:57.158850545Z"
+}

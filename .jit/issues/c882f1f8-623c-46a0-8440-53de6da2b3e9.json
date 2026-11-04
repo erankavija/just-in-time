@@ -1,0 +1,49 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T01:29:55.599357260Z",
+  "context": {},
+  "created_at": "2026-11-01T01:29:54.921264771Z",
+  "dependencies": [],
+  "description": "Stop the cargo-ci self-test's wrong-nextest-version fixture hanging on a host whose `cargo` is a shim that resolves the real cargo through `PATH`.\n\n## Background\n\n`scripts/cargo-ci-selftest.sh` `test_wrong_nextest_version_fails_fast` puts a fake `cargo` first on `PATH`; its `--version` branch execs the `cargo` resolved earlier by `command -v`. On a host where that is a PATH-scanning shim, the shim finds the fake again, so the two exec each other forever. The self-test then holds the shared CI locks until its gate timeout.\n\n## Success Criteria\n\n- [hard] REQ-01: The fixture answers `cargo --version` without re-entering `PATH` resolution, so `./scripts/cargo-ci-selftest.sh` finishes on a host whose `cargo` is a PATH-scanning shim.\n- [hard] REQ-02: The wrong-nextest-version case asserts what it asserted before.\n",
+  "documents": [],
+  "done_at": "2026-11-01T04:42:53.939661214Z",
+  "first_ready_at": "2026-11-01T01:29:54.921264771Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "cargo-ci-selftest"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "48cac294-cb16-4f2e-8a95-1d2256b1e676",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:34:20.836420119Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci-selftest": {
+      "run_id": "662d204b-73d2-42b3-b4cf-0904168fff02",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:42:35.746867979Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "554aee8e-c96e-44e0-b7af-ade91c9b8d99",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:36:56.733565649Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "c882f1f8-623c-46a0-8440-53de6da2b3e9",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "cargo-ci self-test fixture does not loop through a cargo shim",
+  "updated_at": "2026-11-01T04:42:53.939661214Z"
+}

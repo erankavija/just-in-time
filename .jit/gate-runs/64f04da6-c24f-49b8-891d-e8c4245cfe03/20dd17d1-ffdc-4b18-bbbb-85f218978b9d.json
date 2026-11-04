@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aad88f27214d7f7fba8b1a659bba6c4bf58dfc68",
+  "completed_at": "2026-10-27T22:45:52.532865536Z",
+  "duration_ms": 256081,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable test-fixture migrations use shared Git initialization and retain their assertions; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "64f04da6-c24f-49b8-891d-e8c4245cfe03",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20dd17d1-ffdc-4b18-bbbb-85f218978b9d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:41:36.451050186Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ccfea5f3c641 (implementation) and aad88f27214d (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose, @/invariant/convention-convergence (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci — passed, exit code none, 2026-10-27T22:41:35Z\nTruncation recovery: reread the truncated repository-state patch by bounded ranges; inspected merge delta and current shared-helper call sites separately\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable test-fixture migrations use shared Git initialization and retain their assertions; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

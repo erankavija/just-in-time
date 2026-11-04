@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3558721b078d7b4e778c128e047fe48b813bbf96",
+  "completed_at": "2026-10-28T23:08:57.609687745Z",
+  "duration_ms": 314183,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the current tree; the recorded cargo-ci gate passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f0bee761-b2a9-4d61-ac5a-bb40730aec03",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "378ccd83-1c20-487d-8ec6-a890f316b0ac",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:03:43.425976768Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 276ef9cb, c1f2e248, 3558721b (tag `jit:f0bee761`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 and REQ-06 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json)\nGate evidence: cargo-ci: passed, 2026-10-28T23:03:41Z (exit code unavailable)\nTruncation recovery: Re-read each tagged commit’s stats/name-status and patch portions by path; recovered current fixture/test line ranges and focused fast_docs_templates scans.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the current tree; the recorded cargo-ci gate passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

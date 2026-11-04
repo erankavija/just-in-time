@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T04:09:57.026132389Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "cac57c93-1e32-4e1a-b4b1-c56bfb669cf8"
+    "84e1e27a-8272-4885-84af-8e667cbad57e"
   ],
-  "description": "Make every validation capture request the event log through the end-of-log probe, so `jit validate` and broad built-in prechecks never read the whole log.\n\n## Background\n\nRepository validation no longer parses the event log. The non-mutation validation base still captures the log whole (`crates/jit/src/commands/validate.rs:415-416`, `mutation=false`), and `discover_issue_closure` requests it whole for broad built-in prechecks (`commands/validate.rs:884`). Mutation bases already capture only the tail (`validate.rs:415`), asserted at `:3712-3722`.\n\n## Success Criteria\n\n- [hard] REQ-01: Every validation capture, mutation or not, requests the event log through `discover_tail`, and `discover_issue_closure` requests no whole log; a unit test pins the read mode for both.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make every validation capture request the event log through the end-of-log probe, delete the records pass's parse of the log, and give whole-repository record fidelity its own named whole-log read, so `jit validate` and the `repository_validation` checker are the only validation readers of the log's records.\n\n## Background\n\nRepository validation parses the whole event log only to count its records (`event_count`, `RepositoryValidationReport`, `load_records` in `crates/jit/src/validation/repository.rs`); nothing outside the module reads the count.\n\n`capture_proposed_base_inner` (`commands/validate.rs`) captures the log whole for every purpose but a mutation: its `mutation` flag chooses `discover_tail` or `discover_paths`. `discover_issue_closure` requests it whole for broad built-in prechecks. A test pins the whole read for validation. `BaseCapturePurpose::Archive` is different: `captured_archive_events` parses the log from that image through `file_bytes`, which errors with `TailOnlyCapture` on a tail, so the archive base stays whole until archive execute reads evidence records.\n\nWhole-repository validation needs the whole log: `record_drift` (`validation/record_fidelity.rs`) reads `image.file_bytes(&VirtualPath::EVENTS)`, which errors with `TailOnlyCapture` on a tail, and reports lines that do not reproduce and event ids on more than one line, a risk `merge=union` keeps producing. `capture_record_fidelity_validation` (`commands/validate.rs`) is already a separate capture, reached from whole-repository `jit validate` and the `repository_validation` checker (`commands/gate_check.rs`). `docs/reference/worktree-validate.md` documents that read.\n\n`event_log_drift` returns empty when the log does not parse, and its module comment assigns that finding to the records pass, so once the records pass stops parsing, an unparseable log would be reported by nothing.\n\n`RepositoryMutationSession` (`storage/repository_state_store.rs`) declares `capture`, `extend` and `apply`, implemented for the file backend (`JsonMutationSession`) and the memory backend (`MemoryMutationSession`).\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryValidationReport.event_count` and the event-log parse in the records pass no longer exist, and a test shows that the records pass succeeds over an image whose event log is unparseable.\n- [hard] REQ-02: Every capture purpose except `BaseCapturePurpose::Archive` requests the event log through `discover_tail`, `discover_issue_closure` requests no whole log, a unit test pins the read mode, and archive execute still succeeds over its whole-log base.\n- [hard] REQ-03: `RepositoryMutationSession::read_history_log` returns the log's bytes through a no-follow read on both backends. It is outside `CaptureSpec` and adds nothing to any image. `capture_record_fidelity_validation` is its only production caller, and `record_drift` takes those bytes instead of reading the image's log entry.\n- [hard] REQ-04: Whole-repository `jit validate` reports an unparseable log as one finding naming the line, keeps reporting lines that do not reproduce and duplicate event ids, and the module comment of `record_fidelity.rs` states this. A test shows the unparseable-log finding.\n",
   "documents": [],
+  "done_at": "2026-11-03T20:38:40.631550927Z",
+  "first_ready_at": "2026-11-02T23:39:54.093666613Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d82f71b7-14c1-40fa-8e04-162664951fc0",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:35:47.979450949Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9967d23a-c312-4794-b00a-ed22e4d52500",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:38:40.155319839Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e",
   "labels": [
     "type:task",
@@ -20,10 +36,11 @@
     "story:history-boundary",
     "component:validation",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-13"
+    "satisfies:f8a6b298/REQ-13",
+    "per:@/charter/D-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Validation captures read only the event log's end",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-03T20:38:40.631550927Z"
 }

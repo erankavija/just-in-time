@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:57:15.850953366Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Declare the evidence, blocker and warning codes of artifact plans through the vocabulary macro.\n\n## Background\n\n`EvidenceCode`, `BlockerCode` and `WarningCode` (`crates/jit/src/domain/artifact_plan.rs:369,408,497`) each pair a kebab-case serde rename with a hand-written `ALL` and `const fn as_str`. Codes are sorted by `as_str` (`artifact_plan.rs:1224,1228`, `domain/artifact_inventory.rs:261-262`, `repository_state/archive.rs:337-338`). The external wire contract is pinned by `crates/jit/tests/fast_docs_templates/artifact_plan_model_tests.rs:343,355,373`.\n\n## Success Criteria\n\n- [hard] REQ-01: The three code enums are declared through the macro, and their hand-written `ALL` and `as_str` are gone.\n- [hard] REQ-02: Code ordering still follows the wire spelling, so plan output order is unchanged.\n- [hard] REQ-03: The artifact-plan wire-contract suite passes unchanged.\n",
   "documents": [],
+  "done_at": "2026-10-25T00:31:30.419464067Z",
+  "first_ready_at": "2026-10-24T23:55:25.701399904Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "58a93523-fa33-49c5-897f-de6312cb3970",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:26:55.604008071Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "07b7b7f5-273d-471a-a127-bc69f210f8ec",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:27:59.820166515Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Artifact-plan codes declare their wire spelling once",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T00:31:30.419464067Z"
 }

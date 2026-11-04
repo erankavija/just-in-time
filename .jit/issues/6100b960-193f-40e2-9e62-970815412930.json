@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T21:48:22.821077282Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Give tests one way to build a closed `RepositoryImage` from declared entries, listings and pinned evidence, without a storage backend or a mutation session.\n\n## Background\n\n- Pure image construction exists only as private test helpers that each build a synthetic `RepositoryLayout`, a `CaptureSpec` and `RepositoryImage::close` (`crates/jit/src/repository_state/image.rs:708`), for example `layout` and `image_with` in `repository_state/mod.rs:1237,1434`, `image_with` in `repository_state/mutation.rs:1435`, `repository_state/archive.rs:631-645` and `image` in `document/reference.rs:320-350`.\n- The helpers it must serve close images over every `RepositoryEntry` kind: files, absences, directories (`repository_state/export.rs`, `archive.rs`, `initialize.rs`, `profile_apply.rs` tests) and symlinks (`export.rs` tests), over listings, over pinned `PinnedDocumentEvidence` keyed by revision and path (`document/reference.rs`, `archive.rs` tests), and some over a capture spec produced by the code under test (`RepositoryExportIntent::capture_spec` in the `export.rs` tests).\n- Shared test helpers live in `jit::test_harness` (`crates/jit/src/test_harness.rs`), compiled under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:35-36`), so library unit tests and integration suites both reach it.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit::test_harness` offers an image builder that takes any `RepositoryEntry` value at a repository-relative or virtual path (files, absences, directories and symlinks), tail-read entries, directory listings and pinned document evidence keyed by revision and path, with either a capture spec derived from what was declared or one the caller supplies, and returns a closed `RepositoryImage` over a fixed synthetic layout or one the caller supplies.\n- [hard] REQ-02: Fixture tests show that a file reads back with its bytes, an absence reads as absent, a directory and a symlink read back as declared, a listing reads back with its names, pinned evidence reads back by revision and path, a caller-supplied spec is the image's spec, and a path outside the declared set is refused as uncaptured.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-03T22:11:30.685696635Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f52c86bc-ceee-48df-82e9-3772d6e0515f",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:08:29.941772286Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "eff1d8e4-b73c-4833-8d16-3b18b32805d5",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:10:44.512011698Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6100b960-193f-40e2-9e62-970815412930",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "satisfies:9876a23a/REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Shared test fixture for repository images",
-  "updated_at": "2026-10-21T20:31:34.922657835Z"
+  "updated_at": "2026-11-03T22:11:30.685696635Z"
 }

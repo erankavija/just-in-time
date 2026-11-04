@@ -9,11 +9,125 @@
   "description": "Add contributor install and run guidance for the pinned cargo-nextest to the testing guide.\n\n## Background\n\nThe pinned executable, committed `.config/nextest.toml` policy, and CI provisioning land in `nextest-foundation`; this task documents them for contributors. The later `inherent-cost-attribution` task adds the cost table to the same file in a declared ordered overlap.\n\n## Success Criteria\n\n- [hard] REQ-01: Documents installing the pinned cargo-nextest 0.9.133 with `cargo install cargo-nextest --locked --version 0.9.133` and running the workspace suite and doctest substep in `dev/TESTING.md`.\n- [hard] REQ-02: Describes the committed `.config/nextest.toml` policy by citation rather than restating its values.\n\n## Notes\n\nOrdered overlap: `dev/TESTING.md` is touched here first; `inherent-cost-attribution` adds the cost table afterwards.",
   "documents": [
     {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "ef3deccdf69cccb837f48c560b681a5a9a9bd516b0eb9a2ac72394499df90fc4",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1169e93257e12fe42984479c0274eced435e6a2e45c699d06d5d6201c44969ef",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../crates/jit/tests/fast_issue/test_no_coordinator.rs",
+          "resolved_path": "crates/jit/tests/fast_issue/test_no_coordinator.rs"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "a30511da6f5344fed5507ad383ff57ebdd86b5f771a46fd44243ee502b32e75c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmarks/rust-build-budgets/README.md",
+          "resolved_path": "dev/benchmarks/rust-build-budgets/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "64f4b299ec879433754f51911f52d6a670b75c085d01c8102d365c331e321fe6",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmarks/suite-enforcement-4b7c06d0/README.md",
+          "resolved_path": "dev/benchmarks/suite-enforcement-4b7c06d0/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "12a2257ef46ee903d23bf95aeed3974f7e4a8f6b3dd719ad20c1f87a83d02da2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmarks/publication-cost-722878d4/README.md",
+          "resolved_path": "dev/benchmarks/publication-cost-722878d4/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b31238e91ee7bed867b363705ea8906e6c1d50ceef1a99ed0db9da77d8207ea0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmarks/cold-warm-verdict-0708d692/README.md",
+          "resolved_path": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://docs.rs/proptest",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "directory",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "benchmarks/dependency-profile-6d10e5d4/",
+          "resolved_path": "dev/benchmarks/dependency-profile-6d10e5d4"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "df6101fe38dff782ddca91684a354f797e0c42cd165eebf0d17ca8dd03c63a30",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../.config/nextest.toml",
+          "resolved_path": ".config/nextest.toml"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8c66aa6e8e4d6d8b43b38245462065549edf56b635c24610b7a7d7587774f827",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../.github/copilot-instructions.md",
+          "resolved_path": ".github/copilot-instructions.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d678bd752cd9184e0e0f9c76e013509325de6d81b69ee9603ca29b4e18b53798",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../docs/reference/jit-content-standards.md",
+          "resolved_path": "docs/reference/jit-content-standards.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8a21e97bd71985b85c2daeafc0d04b47e9c60f9323797c967d1fca1bbccf395d",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../AGENTS.md",
+          "resolved_path": "AGENTS.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8f2a5700b4647729430ae55f73f27f63483fdc09b4159dcbf4ee51b7fc301ccb",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../crates/jit/src/test_harness.rs",
+          "resolved_path": "crates/jit/src/test_harness.rs"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2c04f2b39aeb35eb79a7456bcc4fb91d4b39f7e0de27a68f4225113a51e9c4c5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmarks/rust-build-efficiency/report.md",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/report.md"
+        }
+      ],
       "commit": null,
       "doc_type": "guide",
       "format": "markdown",
       "label": "Pinned nextest contributor guidance",
-      "path": "dev/archive/4b7c06d0-test-suite-performance/TESTING.md"
+      "path": "dev/TESTING.md"
     }
   ],
   "done_at": "2026-08-12T00:04:21.301562043Z",
@@ -54,5 +168,5 @@
   "priority": "high",
   "state": "done",
   "title": "Document pinned nextest installation and use",
-  "updated_at": "2026-10-01T19:33:21.249822398Z"
+  "updated_at": "2026-11-04T14:10:25.916010597Z"
 }

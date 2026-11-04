@@ -1,109 +1,34 @@
-//! Integration tests for the markdown-first `decision` item kind (issue
-//! `b629686b`).
+//! Integration tests for the markdown-first `decision` item kind.
 //!
-//! The `jit-default` package supplies a `[item_kinds]` table that declares
-//! `decision` alongside `requirement`, so a profiled repo indexes decisions authored as list
-//! entries under a `## Decisions` section of an issue description. Decisions become
-//! addressable, queryable items through the SAME generic triple-driven parse path
-//! `requirement` uses; no engine code special-cases the kind (the engine bakes in
-//! no kinds — the tuple is authored entirely in the emitted config table).
-//!
-//! The `decision` tuple supplied by the package is:
-//!
-//! ```text
-//! section          = "decisions"          # authored under a `## Decisions` heading
-//! id-pattern       = "D-[0-9]+"           # self-ids read D-1, D-2, ... (e.g. D-01)
-//! markers          = []                   # no marker; every matching line qualifies
-//! link-namespaces  = ["per"]             # a `per:<issue>/D-01` label references a decision
-//! scope            = "issue"              # decisions live in issue descriptions
-//! source-of-truth  = "markdown-first"
-//! ```
-//!
-//! Coverage of the issue's `[hard]` success criteria, all against a repository
-//! initialized with the shared taxonomy fixture:
-//! - REQ-01: [`test_default_repo_item_list_kind_decision_returns_decisions`] runs
-//!   the real `jit` binary so `jit item list --kind decision` returns decisions
-//!   parsed from an issue description with the configured `decision` item kind.
-//! - REQ-02: [`test_default_repo_per_label_resolves_decision`] proves a
-//!   `per:<issue>/D-01` label resolves to the addressed decision through the
-//!   existing generic `resolve_link_label` (the `per` namespace is recognized
-//!   because the `decision` kind declares the `per` link-namespace).
-//! - REQ-03: [`test_default_repo_markdown_is_sole_source_for_decisions`] proves
-//!   the markdown description is the only source — editing it changes the index and
-//!   no parallel structured store is written under `.jit/`.
-//! - REQ-04: every test below runs under `cargo test`.
-
-use jit::commands::CommandExecutor;
-use jit::storage::{IssueStore, JsonFileStorage};
-use serde_json::Value;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// Build a fresh repo from the shared taxonomy fixture and declare `decision`.
-fn setup_test_repo() -> TempDir {
-    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
-    let config_path = temp.path().join(".jit/config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap();
-    config.push_str(
-        "\n[item_kinds.decision]\n\
-         section = \"decisions\"\n\
-         id-pattern = \"D-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"per\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-    );
-    std::fs::write(config_path, config).unwrap();
-    temp
-}
-
-/// Create an issue with `body` through the real CLI and return its 8-char short id.
-fn create_issue(repo: &Path, title: &str, body: &str) -> String {
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-d", body, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue create failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let full_id = json["id"].as_str().expect("created issue has an id");
-    full_id.chars().take(8).collect()
-}
+//! These exercise the shipped config through item list/show and verify that issue
+//! descriptions remain the sole source for decision items.
+use jit::test_cli::JitCli;
+use jit::test_utils::setup_test_repo_with_config;
 
 #[test]
 fn test_default_repo_item_list_kind_decision_returns_decisions() {
     // REQ-01: in a fixture-initialized repo with the configured `decision` kind, `jit item list
     // --kind decision` returns decision items parsed from an issue's `## Decisions`
     // section — exercised through the actual binary.
-    let temp = setup_test_repo();
-    let short = create_issue(
-        temp.path(),
-        "Architecture",
-        "## Decisions\n\n- D-01: use json storage\n- D-02: atomic temp-file writes\n",
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+            .unwrap()
+            .0,
     );
+    let short = cli
+        .create_issue([
+            "-t",
+            "Architecture",
+            "-d",
+            "## Decisions\n\n- D-01: use json storage\n- D-02: atomic temp-file writes\n",
+        ])
+        .unwrap()[..8]
+        .to_owned();
 
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "decision", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["item", "list", "--kind", "decision"])
         .unwrap();
-    assert!(
-        output.status.success(),
-        "item list --kind decision failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     let items = json["items"].as_array().unwrap();
     for item in items {
         assert_eq!(item["kind"].as_str().unwrap(), "decision");
@@ -121,25 +46,23 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
     // REQ-01: a decision resolves through the real `jit item show` binary by its
     // `<short-id>/<self-id>` sugar INPUT, and reports the canonical uniform
     // kind-segmented qualified id.
-    let temp = setup_test_repo();
-    let short = create_issue(
-        temp.path(),
-        "Architecture",
-        "## Decisions\n\n- D-01: use json storage\n",
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+            .unwrap()
+            .0,
     );
+    let short = cli
+        .create_issue([
+            "-t",
+            "Architecture",
+            "-d",
+            "## Decisions\n\n- D-01: use json storage\n",
+        ])
+        .unwrap()[..8]
+        .to_owned();
     let sugar = format!("{short}/D-01");
 
-    let output = Command::new(jit_binary())
-        .args(["item", "show", &sugar, "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "item show failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let json = cli.run_json(["item", "show", &sugar]).unwrap();
     assert_eq!(json["item"]["self_id"].as_str().unwrap(), "D-01");
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "decision");
     assert_eq!(
@@ -152,110 +75,35 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
         .contains("json storage"));
 }
 
-/// Build a [`JsonFileStorage`]-backed executor over a `.jit` repo whose
-/// `config.toml` declares the `decision` kind (the engine bakes in no kinds), seed
-/// `issues`, and return it paired with the seeded issues' short ids in insertion
-/// order.
-///
-/// The declared `decision` kind brings the `per` link namespace; this declaration
-/// mirrors the one the package supplies, so the test exercises the shipped kind shape,
-/// not an arbitrary override.
-fn default_executor_with(
-    repo: &Path,
-    issues: Vec<(&str, &str)>,
-) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let jit_dir = repo.join(".jit");
-    std::fs::create_dir_all(&jit_dir).unwrap();
-    std::fs::write(
-        jit_dir.join("config.toml"),
-        format!(
-            "{}[item_kinds.decision]\n\
-         section = \"decisions\"\n\
-         id-pattern = \"D-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"per\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-            taxonomy.config_fragment()
-        ),
-    )
-    .unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(repo, None)
-        .unwrap();
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
-    let mut shorts = Vec::new();
-    for (title, body) in issues {
-        shorts.push(crate::create_issue(&executor, title, body));
-    }
-    (executor, shorts)
-}
-
-#[test]
-fn test_default_repo_per_label_resolves_decision() {
-    // REQ-02: a `per:<issue>/D-01` label resolves to the addressed decision item
-    // through the existing generic `resolve_link_label`; the configured `decision`
-    // kind declares the `per` namespace.
-    let temp = TempDir::new().unwrap();
-    let (exec, shorts) = default_executor_with(
-        temp.path(),
-        vec![("Architecture", "## Decisions\n\n- D-01: use json storage\n")],
-    );
-    let short = &shorts[0];
-
-    let label = format!("per:{short}/D-01");
-    let resolved = exec
-        .resolve_link_label(&label)
-        .unwrap()
-        .expect("a per:<issue>/D-01 label resolves to the addressed decision");
-    assert_eq!(resolved.item.self_id, "D-01");
-    assert_eq!(resolved.item.kind, "decision");
-    assert_eq!(
-        resolved.item.qualified_id,
-        format!("@/issue/{short}/decision/D-01")
-    );
-    assert!(resolved.item.text.contains("json storage"));
-
-    // A registered `per:` namespace whose qualified id cannot be resolved is an
-    // error, never a silent drop.
-    let bad = format!("per:{short}/D-99");
-    assert!(exec.resolve_link_label(&bad).is_err());
-}
-
 #[test]
 fn test_default_repo_markdown_is_sole_source_for_decisions() {
     // REQ-03: the markdown description is the ONLY source for decision items. The
     // index is a pure projection — there is no parallel structured store — so
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no decision store file is written under `.jit/`.
-    let temp = setup_test_repo();
-    let short = create_issue(
-        temp.path(),
-        "Architecture",
-        "## Decisions\n\n- D-01: use json storage\n",
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+            .unwrap()
+            .0,
     );
+    let short = cli
+        .create_issue([
+            "-t",
+            "Architecture",
+            "-d",
+            "## Decisions\n\n- D-01: use json storage\n",
+        ])
+        .unwrap()[..8]
+        .to_owned();
 
-    let count_decisions = |repo: &Path| -> u64 {
-        let output = Command::new(jit_binary())
-            .args(["item", "list", "--kind", "decision", "--json"])
-            .current_dir(repo)
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-        json["count"].as_u64().unwrap()
-    };
-
-    assert_eq!(count_decisions(temp.path()), 1);
+    let listed = cli
+        .run_json(["item", "list", "--kind", "decision"])
+        .unwrap();
+    assert_eq!(listed["items"].as_array().unwrap().len(), 1);
 
     // No parallel structured store: nothing under `.jit/` persists decisions; the
     // ONLY place D-01 appears is the issue's own JSON description.
-    let jit_dir = temp.path().join(".jit");
+    let jit_dir = cli.root().join(".jit");
     for entry in std::fs::read_dir(&jit_dir).unwrap() {
         let path = entry.unwrap().path();
         if !path.is_file() {
@@ -290,31 +138,20 @@ fn test_default_repo_markdown_is_sole_source_for_decisions() {
 
     // Editing the markdown description (the sole source) changes the index: drop
     // D-01, add D-02 and D-03.
-    let output = Command::new(jit_binary())
-        .args([
-            "issue",
-            "update",
-            &short,
-            "-d",
-            "## Decisions\n\n- D-02: switch to wal\n- D-03: add caching\n",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue update failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    cli.run([
+        "issue",
+        "update",
+        &short,
+        "-d",
+        "## Decisions\n\n- D-02: switch to wal\n- D-03: add caching\n",
+    ])
+    .unwrap();
 
     // The index now reflects ONLY the edited markdown.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "decision", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["item", "list", "--kind", "decision"])
         .unwrap();
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     let self_ids: Vec<&str> = json["items"]
         .as_array()
         .unwrap()

@@ -77,9 +77,8 @@ products of one issue, so archiving that issue takes them with it: selected
 documents in `managed_paths` move to the archive mirror. A permanent area holds
 living documentation, a configured item-kind source, or a documented invocation
 path, so its source stays where readers and configuration already point:
-selected documents in `permanent_paths` are copied to the mirror while their
-source remains in place; “permanent” prevents source deletion, not mirror
-publication. The table above assigns each shipped area to one of the two
+selected documents in `permanent_paths` are retained in place with no mirror
+copy, so no frozen second copy of a living document exists. The table above assigns each shipped area to one of the two
 classes.
 
 `development_root` is the outer boundary of both. A document it does not
@@ -169,9 +168,9 @@ written there, and an area the repository does not declare is rejected rather
 than resolved.
 
 Every file under that directory is one of the issue's documents by location,
-with no `jit doc add`: `jit doc list`, `jit doc show`, `history`, `diff`,
-`jit doc check-links`, and the server's document routes and search treat it as
-tracked. A derived document carries no commit pin, type, or label. An explicit
+with no `jit doc add`: `jit doc list`, `jit issue show`, the `JIT_ISSUE_DOCS` value gates receive,
+`jit doc show`, `history`, `diff`, `jit doc check-links`, and the server's
+document routes, search, and single-issue read treat it as tracked. A derived document carries no commit pin, type, or label. An explicit
 link attaches a path outside the directory, or metadata such as a label to any
 path; a path both linked and derived is listed once, as its link. A repository
 declaring no issue-scoped area derives nothing.
@@ -271,16 +270,24 @@ proceeds and the bypass is logged, at every level.
 > `[type_hierarchy]` tables; custom rules are authored there as well. The
 > `orphan-leaf` and `strategic-consistency` workflow warnings arrive with the
 > workflow package when it is installed.
-> The built-in rules marked `origin = "default"` derive their assertion — and
-> the family's membership — from the `[namespaces]` /
-> `[type_hierarchy]` registry in `config.toml`, in memory at load; the
-> `schemas/default-*.json` files are regenerated projections, not the validation
-> authority. So you change what a default rule checks by editing that registry
-> (a hand-declared namespace takes effect on the next command, no regeneration;
-> the next jit-driven config write — `jit config set` or re-init — also writes
-> the matching rows through to `rules.toml` so each `@/rule/<name>` address
-> resolves), and author new conventions as custom rules
-> in `rules.toml`. `strictness` tunes how all of these gate operations globally.
+> The built-in rules marked `origin = "default"` derive their assertions and
+> membership from the `[namespaces]` / `[type_hierarchy]` registry in
+> `config.toml` at load. Missing default rows still apply, including when
+> `rules.toml` is empty or holds only custom rules. Registry edits take effect
+> on the next command; `schemas/default-*.json` files are projections.
+> The next successful config write (`jit config set` or re-init), or
+> `jit validate --fix`, restores missing default rows in `rules.toml`, removes
+> defaults the registry no longer derives, and refreshes their assertions and
+> schema projections. Custom rules and existing default rows' policy edits
+> (`severity`, `enforce`, `when`, and `description`) are preserved.
+>
+> To disable a default rule, keep its `origin = "default"` row and set
+> `severity = "off"`. Deleting the row does not disable it. A custom rule cannot
+> take a derived default's name: rule names are addresses (`@/rule/<name>`), so
+> such a collision is a configuration error. Under `loose`
+> strictness, `enforce = false` only stops the rule blocking writes: it still
+> reports findings, and an error-severity finding still fails `jit validate`.
+> `strict` strictness can block even unenforced findings, as described above.
 
 ### `[namespaces.*]`
 
@@ -471,7 +478,7 @@ after adding or changing labels that are subject to uniqueness rules.
 
 ### `[worktree]` Section
 
-This section carries lease enforcement for structural issue operations and the
+This section carries lease enforcement for issue-record writes and the
 write-policy stance governing state-mutating commands run inside a linked
 non-primary checkout. Commands apply both.
 
@@ -485,14 +492,32 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 
 | Value | Description |
 |-------|-------------|
-| `"strict"` | Require an active lease for structural issue operations; fail without one |
-| `"warn"` | Warn if no lease but allow operation |
+| `"strict"` | Refuse a write to an issue anyone but the writer holds an active lease on; a writer with no identity holds none. A write to an unleased issue succeeds |
+| `"warn"` | Warn where `strict` would refuse, and allow the write |
 | `"off"` | No lease enforcement |
+
+Leases remain the way to claim exclusive work: acquire one with `jit claim acquire` and other agents' writes to that issue refuse.
 
 The mode is read from the repository's own `.jit/config.toml` only: `off`
 with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
 section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
 commands all resolve it by this rule; environment variables do not change it.
+
+`jit issue update --filter` checks every matched issue and refuses the whole
+operation before writing, naming the leased ones.
+`jit gate remove` and `jit gate update` refuse when another agent leases an
+issue that requires the gate.
+
+Some writes reach a leased issue without the check: `jit issue release`
+(timeout recovery with a required reason; its event names who released),
+`jit issue claim` on an unleased issue, promotions of dependents, the rewrite of
+dependents when a dependency is deleted, the derived repair and transitive
+reduction of `jit validate --fix` (its type fix does refuse), `jit archive
+--execute` on a terminal target, and `jit recover`, which replays what already
+committed.
+
+Enforcement happens when a mutation is written; no git hook checks leases, so a
+hand edit of an issue record is not caught at commit.
 
 #### `write_policy`
 
@@ -512,7 +537,8 @@ repository write, lock, lease, or event append: that checkout's store and event
 log are left exactly as they were, and the refusal names the checkout, the
 stance that refused it, and both ways to permit the operation. Read-only
 commands, commands in the primary checkout, and commands outside version
-control are unaffected by either stance.
+control are unaffected by either stance. A store outside every checkout belongs
+to no linked checkout, so the policy does not govern writes to it.
 
 The classifier is deliberately broader than the divergent-store hazard that
 motivates it: a command that writes only the shared control plane or
@@ -712,7 +738,7 @@ See [example-config.toml](example-config.toml) for a complete annotated template
 | Use Case | Key Settings |
 |----------|--------------|
 | Single agent | Defaults work, no config needed |
-| Multi-agent team | `enforce_leases = "strict"`; acquire a lease before structural changes |
+| Multi-agent team | `enforce_leases = "strict"`; acquire a lease to claim exclusive work |
 | CI/CD | Set `JIT_AGENT_ID` when a command needs an agent identity |
 | Solo dev | `enforce_leases = "warn"` for flexibility |
 

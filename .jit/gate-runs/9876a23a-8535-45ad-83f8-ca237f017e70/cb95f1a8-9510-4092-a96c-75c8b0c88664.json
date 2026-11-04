@@ -1,0 +1,23 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "afe1c49281c56748aea937ceb4116cf5d8dce3ca",
+  "completed_at": "2026-11-04T13:06:45.213423106Z",
+  "duration_ms": 3504,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "repo-validate",
+  "issue_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cb95f1a8-9510-4092-a96c-75c8b0c88664",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:06:41.708698742Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Repository validation passed\nwarning: 80 membership label(s) not backed by the DAG (run `jit query divergence` for details)\n"
+}

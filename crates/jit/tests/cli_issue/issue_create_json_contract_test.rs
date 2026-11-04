@@ -6,43 +6,9 @@
 //!   `exit_code`), not the legacy `gates_required`/`gates_status` map
 //! - `dependencies` is an array of enriched objects, not raw ID strings
 //! - `labels` is a JSON array
+//! - `findings` carries the findings creation returned
 
-use std::process::Command;
-
-fn jit_bin() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-}
-
-/// Run a jit command in `dir` and return its stdout.
-fn jit(dir: &std::path::Path, args: &[&str]) -> serde_json::Value {
-    let out = jit_bin()
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .expect("jit command failed to spawn");
-    assert!(
-        out.status.success(),
-        "jit {:?} exited non-zero; stderr: {}",
-        args,
-        String::from_utf8_lossy(&out.stderr)
-    );
-    serde_json::from_slice(&out.stdout).unwrap_or_else(|_| {
-        panic!(
-            "stdout was not valid JSON: {}",
-            String::from_utf8_lossy(&out.stdout)
-        )
-    })
-}
-
-fn setup_repo() -> tempfile::TempDir {
-    let tmp = tempfile::TempDir::new().unwrap();
-    jit_bin()
-        .current_dir(tmp.path())
-        .arg("init")
-        .status()
-        .unwrap();
-    tmp
-}
+use jit::test_cli::JitCli;
 
 // ---------------------------------------------------------------------------
 // REQ-14: short_id present, gates array, no legacy fields
@@ -50,32 +16,28 @@ fn setup_repo() -> tempfile::TempDir {
 
 #[test]
 fn test_issue_create_json_has_short_id_and_gates_array() {
-    let repo = setup_repo();
+    let repo = JitCli::initialised().unwrap();
 
     // Define a gate so the created issue carries it.
-    jit_bin()
-        .current_dir(repo.path())
-        .args([
-            "gate",
-            "define",
-            "cargo-ci",
-            "--title",
-            "CI",
-            "--description",
-            "Runs CI",
-            "--mode",
-            "manual",
-        ])
-        .status()
-        .unwrap();
+    repo.run([
+        "gate",
+        "define",
+        "cargo-ci",
+        "--title",
+        "CI",
+        "--description",
+        "Runs CI",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
 
     // Create the issue with that gate.
-    let json = jit(
-        repo.path(),
-        &[
-            "issue", "create", "--title", "My task", "--gate", "cargo-ci", "--json",
-        ],
-    );
+    let json = repo
+        .run_json([
+            "issue", "create", "--title", "My task", "--gate", "cargo-ci",
+        ])
+        .unwrap();
 
     // short_id is present and is the first 8 chars of id.
     let id = json["id"].as_str().expect("id must be a string");
@@ -114,28 +76,22 @@ fn test_issue_create_json_has_short_id_and_gates_array() {
 
 #[test]
 fn test_issue_create_json_dependencies_are_enriched_objects() {
-    let repo = setup_repo();
+    let repo = JitCli::initialised().unwrap();
 
     // Create a prerequisite first.
-    let dep = jit(
-        repo.path(),
-        &["issue", "create", "--title", "Prerequisite", "--json"],
-    );
+    let dep = repo
+        .run_json(["issue", "create", "--title", "Prerequisite"])
+        .unwrap();
     let dep_id = dep["id"].as_str().unwrap();
 
     // Create the dependent issue (no gate, to keep the test focused).
-    let json = jit(
-        repo.path(),
-        &["issue", "create", "--title", "Dependent", "--json"],
-    );
+    let json = repo
+        .run_json(["issue", "create", "--title", "Dependent"])
+        .unwrap();
     let id = json["id"].as_str().unwrap();
 
     // Wire the dependency.
-    jit_bin()
-        .current_dir(repo.path())
-        .args(["dep", "add", id, dep_id])
-        .status()
-        .unwrap();
+    repo.run(["dep", "add", id, dep_id]).unwrap();
 
     // Re-fetch via create is impossible after the fact; use show to confirm
     // the enriched shape is now produced identically by create for new issues
@@ -152,7 +108,7 @@ fn test_issue_create_json_dependencies_are_enriched_objects() {
 
     // Verify show --json produces the same top-level keys so the contract is
     // symmetric.
-    let show = jit(repo.path(), &["issue", "show", id, "--json"]);
+    let show = repo.run_json(["issue", "show", id]).unwrap();
     assert!(json.get("short_id").is_some(), "create has short_id");
     assert!(show.get("short_id").is_some(), "show has short_id");
     assert!(json.get("gates").is_some(), "create has gates");
@@ -169,20 +125,18 @@ fn test_issue_create_json_dependencies_are_enriched_objects() {
 
 #[test]
 fn test_issue_create_json_labels_is_array() {
-    let repo = setup_repo();
+    let repo = JitCli::initialised().unwrap();
 
-    let json = jit(
-        repo.path(),
-        &[
+    let json = repo
+        .run_json([
             "issue",
             "create",
             "--title",
             "Labelled",
             "--label",
             "type:task",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
 
     let labels = json["labels"]
         .as_array()
@@ -190,5 +144,83 @@ fn test_issue_create_json_labels_is_array() {
     assert!(
         labels.iter().any(|l| l == "type:task"),
         "label added at create time must appear in create --json output"
+    );
+}
+
+#[test]
+fn test_issue_create_forced_reports_same_findings_in_json_and_human_output() {
+    let jit::test_taxonomy::TaxonomyRepo { temp, taxonomy } =
+        jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    std::fs::write(
+        temp.path().join(".jit/rules.toml"),
+        "[[rules]]\nname = \"orphan-leaf\"\nseverity = \"warn\"\n\
+         assert = { type-hierarchy = { kind = \"orphan-leaf\" } }\n",
+    )
+    .unwrap();
+    let repo = JitCli::with_repository(temp);
+    let leaf = jit::test_taxonomy::type_label(&taxonomy, 4);
+    let args = ["issue", "create", "-t", "Leaf", "--label", &leaf, "--force"];
+
+    let json_output = repo
+        .command(args.iter().copied().chain(["--json"]))
+        .output()
+        .unwrap();
+    assert!(json_output.status.success());
+    assert!(
+        json_output.stderr.is_empty(),
+        "JSON create must not print human findings to stderr: {}",
+        String::from_utf8_lossy(&json_output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).unwrap();
+    let human = repo.command(args).output().unwrap();
+
+    let findings = json["findings"]
+        .as_array()
+        .filter(|findings| !findings.is_empty())
+        .unwrap_or_else(|| panic!("create --json must report findings; got: {json}"));
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding["rule"] == "orphan-leaf"),
+        "create --json must report the orphan-leaf finding; got: {findings:?}"
+    );
+    let human_stdout = String::from_utf8_lossy(&human.stdout);
+    let human_id = human_stdout
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .strip_prefix("Created issue: ")
+        .unwrap_or_else(|| panic!("human create prints the id; got: {human_stdout}"));
+    let human_stderr = String::from_utf8_lossy(&human.stderr);
+    assert!(
+        human_stderr.is_empty(),
+        "create findings use the shared renderer on stdout: {human_stderr}"
+    );
+    let human_findings = human_stdout.lines().skip(1).collect::<Vec<_>>();
+    assert_eq!(human_findings.len(), findings.len());
+    for (index, finding) in findings.iter().enumerate() {
+        let expected = finding["message"]
+            .as_str()
+            .unwrap()
+            .replace(json["id"].as_str().unwrap(), human_id)
+            .replace(json["short_id"].as_str().unwrap(), &human_id[..8]);
+        assert_eq!(
+            human_findings[index],
+            format!("warning [{}] {expected}", finding["rule"].as_str().unwrap()),
+            "human create must print the same finding in the same order"
+        );
+    }
+
+    let quiet = repo
+        .command(args.iter().copied().chain(["--quiet"]))
+        .output()
+        .unwrap();
+    assert!(quiet.status.success());
+    assert!(quiet.stderr.is_empty());
+    let quiet_stdout = String::from_utf8_lossy(&quiet.stdout);
+    assert_eq!(quiet_stdout.lines().count(), 1);
+    assert!(
+        jit::domain::identity::IssueId::try_from(quiet_stdout.trim()).is_ok(),
+        "quiet create prints only the full issue id: {quiet_stdout}"
     );
 }

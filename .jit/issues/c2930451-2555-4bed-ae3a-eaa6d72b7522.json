@@ -3,8 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "b06cee74-7635-49c0-bc13-448bcfa28324",
-    "e98ae5a4-595a-4d49-9c88-2d2422198e9e"
+    "84e1e27a-8272-4885-84af-8e667cbad57e"
   ],
   "description": "Position every event append at the end of the log's last newline-terminated line, so an unterminated final line is an uncommitted append that the next append overwrites instead of a fragment it buries.\n\n## Background\n\nThe finalizer appends at the captured log length and, when the log ends in an unterminated final line, prefixes a separator newline (`compose_events`, `crates/jit/src/repository_state/mutation.rs:615-630`; offset at `:1241`; `captured_log_end` at `:639`). That turns the fragment into a permanent malformed middle line. To avoid corrupting the log, the finalizer refuses every append over an unterminated, unparseable final line unless the mutation writes a profile marker (`:1195-1206`, `MutationError::UncertifiedTornTail`). `finalize_audit_append` (`:1258`) shares the same path. Both backends already apply an event append at its offset and truncate to the offset plus its bytes (`storage/redo_apply.rs:302-320`, `storage/memory.rs:692-712`; the overlay at `repository_state/overlay.rs:120-126`), and the end-of-log probe already holds the final line (owner decision @/issue/c88822a5/decision/D-1). Tests pinning today's behaviour: `mutation.rs:1772-1810,2449-2560` and `commands/profile.rs:5219-5240,6365-6395`. The rustdoc and test prose of the functions this changes go with them (`@/inv/essential-code-prose`).\n\n## Success Criteria\n\n- [hard] REQ-01: The length a mutation reads from the event log is its committed length: the end of its last newline-terminated line, which the end-of-log probe determines. Every event append, `finalize_audit_append` included, is positioned at that length and writes no separator newline. The rustdoc of `compose_events` and `captured_log_end` (`mutation.rs:617,632`), the offset test's doc (`:1769`) and its assertion message (`:2485`) say committed length.\n- [hard] REQ-02: No mutation refuses to append over an unterminated final line, and a finalizer unit test shows that an append over one starts at that line's offset and leaves a log every line of which is newline-terminated.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
@@ -24,10 +23,11 @@
     "per:@/charter/D-17",
     "enforces:@/invariant/atomic-writes",
     "satisfies:f8a6b298/REQ-10",
-    "satisfies:f8a6b298/REQ-12"
+    "satisfies:f8a6b298/REQ-12",
+    "resolution:merged-into-84e1e27a"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Event appends land at the log's committed length",
-  "updated_at": "2026-10-21T10:40:08.101007823Z"
+  "updated_at": "2026-11-02T23:41:51.456279203Z"
 }

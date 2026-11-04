@@ -8,6 +8,7 @@
   ],
   "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one operation backed by one git process.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:46-64` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3350` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\n`git rev-parse HEAD --abbrev-ref HEAD` prints the commit and the abbreviated ref in one process (`HEAD` when detached) and exits nonzero on an unborn branch. The domain's canonical commit type is `CanonicalCommitOid` (`crates/jit/src/domain/artifact_plan.rs:112`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts one git process. It returns `Ok(None)` on an unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. A nonzero exit is an unborn branch, since a `GitCheckout` exists only for a checkout git already recognized.\n- [hard] REQ-04: The behaviour suite covers a branch, a detached HEAD, an unborn branch and a missing executable, and counts one process per lookup.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T14:05:18.430019023Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:f4d9502a/REQ-05"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "One head lookup in the git module",
-  "updated_at": "2026-10-24T19:27:04.364326261Z"
+  "updated_at": "2026-11-01T14:05:18.430019023Z"
 }

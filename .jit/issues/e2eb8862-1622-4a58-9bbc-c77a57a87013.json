@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T21:40:27.414776691Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Delete the storage section that re-proves mutation finalization through both backends.\n\n## Background\n\nThe typed-mutation-determinism section of `crates/jit/src/storage/repository_state_store_tests.rs` (`:1754-2585`) re-proves finalization, which the repository-state layer owns as a pure function of the image.\n\n## Success Criteria\n\n- [hard] REQ-01: The typed-mutation-determinism section of `repository_state_store_tests.rs` no longer exists.\n- [hard] REQ-02: Remaining storage tests assert only what a backend adds to finalization, such as publication, durability or read-back.\n",
   "documents": [],
+  "done_at": "2026-10-28T21:55:12.670479009Z",
+  "first_ready_at": "2026-10-27T22:46:58.578460906Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ca4ad699-78dc-4d21-aeef-8103176ddb43",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:55:02.827100936Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c6e440a3-1e8f-4140-aae1-5ec982ca4cbd",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:52:29.981642366Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e2eb8862-1622-4a58-9bbc-c77a57a87013",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Storage tests stop re-proving mutation finalization",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T21:55:12.670479009Z"
 }

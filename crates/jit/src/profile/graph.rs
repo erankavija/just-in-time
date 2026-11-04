@@ -1,12 +1,13 @@
 //! Deterministic resolution of a participating profile-package graph.
 //!
 //! Package loading is a command concern. This module receives the complete
-//! candidate set — selected packages, already-applied packages, and any
-//! dependencies loaded for them — and settles the graph without consulting
-//! the filesystem or choosing a winner from selector order.
+//! candidate set — selected packages and the dependencies loaded for them —
+//! and settles the graph without consulting the filesystem or choosing a winner
+//! from selector order.
 
-use super::{ProfileId, ProfilePackage};
-use semver::{Version, VersionReq};
+use super::ProfilePackage;
+use crate::domain::identity::ProfileId;
+use semver::Version;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// The semantic version of the running JIT engine.
@@ -43,9 +44,8 @@ pub struct ResolvedProfileGraph {
 impl ResolvedProfileGraph {
     /// Resolve every supplied package and return a dependency-first order.
     ///
-    /// The supplied map must contain the selected packages, every applied
-    /// package that remains in the repository, and the dependency closure of
-    /// both. The resolver still verifies that closure, compatibility, and
+    /// The supplied map must contain the selected packages and their dependency
+    /// closure. The resolver still verifies that closure, compatibility, and
     /// incompatibility claims are all satisfied before returning.
     pub fn resolve(
         packages: BTreeMap<ProfileId, ProfilePackage>,
@@ -62,24 +62,10 @@ impl ResolvedProfileGraph {
 
         for package in packages.values() {
             let model = package.model();
-            Version::parse(&model.version).map_err(|source| {
-                ProfileGraphError::InvalidPackageVersion {
-                    package: model.id.to_string(),
-                    value: model.version.clone(),
-                    source,
-                }
-            })?;
-            let requirement = VersionReq::parse(&model.compatible_jit).map_err(|source| {
-                ProfileGraphError::InvalidEngineRequirement {
-                    package: model.id.to_string(),
-                    value: model.compatible_jit.clone(),
-                    source,
-                }
-            })?;
-            if !requirement.matches(&engine.0) {
+            if !model.compatible_jit.matches(&engine.0) {
                 return Err(ProfileGraphError::IncompatibleEngine {
                     package: model.id.to_string(),
-                    required: model.compatible_jit.clone(),
+                    required: model.compatible_jit.to_string(),
                     actual: engine.to_string(),
                 });
             }
@@ -95,27 +81,12 @@ impl ResolvedProfileGraph {
                         dependency: dependency.id.to_string(),
                     });
                 };
-                let version = Version::parse(&resolved.model().version).map_err(|source| {
-                    ProfileGraphError::InvalidPackageVersion {
-                        package: resolved.model().id.to_string(),
-                        value: resolved.model().version.clone(),
-                        source,
-                    }
-                })?;
-                let requirement = VersionReq::parse(&dependency.version).map_err(|source| {
-                    ProfileGraphError::InvalidDependencyRequirement {
-                        package: id.to_string(),
-                        dependency: dependency.id.to_string(),
-                        value: dependency.version.clone(),
-                        source,
-                    }
-                })?;
-                if !requirement.matches(&version) {
+                if !dependency.version.matches(&resolved.model().version) {
                     return Err(ProfileGraphError::DependencyVersionMismatch {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
-                        required: dependency.version.clone(),
-                        found: resolved.model().version.clone(),
+                        required: dependency.version.to_string(),
+                        found: resolved.model().version.to_string(),
                     });
                 }
                 declared.insert(dependency.id.clone());
@@ -125,37 +96,22 @@ impl ResolvedProfileGraph {
 
         for (id, package) in &packages {
             let mut incompatibilities = package.model().incompatibilities.clone();
-            incompatibilities.sort_by(|left, right| {
-                left.id
-                    .cmp(&right.id)
-                    .then_with(|| left.version.cmp(&right.version))
+            incompatibilities.sort_by_cached_key(|incompatibility| {
+                (
+                    incompatibility.id.clone(),
+                    incompatibility.version.to_string(),
+                )
             });
             for incompatibility in incompatibilities {
                 let Some(other) = packages.get(&incompatibility.id) else {
                     continue;
                 };
-                let version = Version::parse(&other.model().version).map_err(|source| {
-                    ProfileGraphError::InvalidPackageVersion {
-                        package: other.model().id.to_string(),
-                        value: other.model().version.clone(),
-                        source,
-                    }
-                })?;
-                let requirement =
-                    VersionReq::parse(&incompatibility.version).map_err(|source| {
-                        ProfileGraphError::InvalidIncompatibilityRequirement {
-                            package: id.to_string(),
-                            other: incompatibility.id.to_string(),
-                            value: incompatibility.version.clone(),
-                            source,
-                        }
-                    })?;
-                if requirement.matches(&version) {
+                if incompatibility.version.matches(&other.model().version) {
                     return Err(ProfileGraphError::IncompatiblePackages {
                         package: id.to_string(),
                         other: incompatibility.id.to_string(),
-                        requirement: incompatibility.version,
-                        other_version: other.model().version.clone(),
+                        requirement: incompatibility.version.to_string(),
+                        other_version: other.model().version.to_string(),
                     });
                 }
             }
@@ -179,17 +135,28 @@ impl ResolvedProfileGraph {
         })
     }
 
-    /// Return all participating packages in canonical dependency-first order.
-    pub fn packages(&self) -> Vec<ProfilePackage> {
-        self.order
-            .iter()
-            .filter_map(|id| self.packages.get(id).cloned())
-            .collect()
+    /// Each participating package's transitive dependencies.
+    pub fn transitive_dependencies(&self) -> BTreeMap<ProfileId, BTreeSet<ProfileId>> {
+        self.order.iter().fold(BTreeMap::new(), |mut closure, id| {
+            let required = self.dependencies.get(id).into_iter().flatten();
+            let reached = required
+                .flat_map(|dependency| {
+                    closure
+                        .get(dependency)
+                        .into_iter()
+                        .flatten()
+                        .chain(std::iter::once(dependency))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            closure.insert(id.clone(), reached);
+            closure
+        })
     }
 
     /// Return the selected roots and their dependency closure in canonical
-    /// dependency-first order. Unselected applied packages are constraints,
-    /// not packages to publish again.
+    /// dependency-first order.
     pub fn selected_packages(&self) -> Vec<ProfilePackage> {
         let mut reachable = self.selected.clone();
         let mut pending = VecDeque::from_iter(self.selected.iter().cloned());
@@ -216,20 +183,6 @@ pub enum ProfileGraphError {
     /// A selected id was not present in the candidate map.
     #[error("selected profile '{id}' is missing from the package graph")]
     SelectedPackageMissing { id: String },
-    /// A package version was not semantic.
-    #[error("profile '{package}' has invalid version '{value}': {source}")]
-    InvalidPackageVersion {
-        package: String,
-        value: String,
-        source: semver::Error,
-    },
-    /// A package compatibility range was not semantic.
-    #[error("profile '{package}' has invalid compatible-jit range '{value}': {source}")]
-    InvalidEngineRequirement {
-        package: String,
-        value: String,
-        source: semver::Error,
-    },
     /// A package's engine range excludes the running engine.
     #[error(
         "profile '{package}' requires compatible-jit '{required}', but the running engine is '{actual}'"
@@ -242,16 +195,6 @@ pub enum ProfileGraphError {
     /// A declared dependency is not in the participating map.
     #[error("profile '{package}' declares missing dependency '{dependency}'")]
     MissingDependency { package: String, dependency: String },
-    /// A declared dependency requirement was not semantic.
-    #[error(
-        "profile '{package}' has invalid dependency requirement for '{dependency}' '{value}': {source}"
-    )]
-    InvalidDependencyRequirement {
-        package: String,
-        dependency: String,
-        value: String,
-        source: semver::Error,
-    },
     /// A dependency exists but has the wrong version.
     #[error(
         "profile '{package}' requires dependency '{dependency}' at '{required}', but the participating package provides '{found}'"
@@ -261,16 +204,6 @@ pub enum ProfileGraphError {
         dependency: String,
         required: String,
         found: String,
-    },
-    /// A declared incompatibility requirement was not semantic.
-    #[error(
-        "profile '{package}' has invalid incompatibility requirement for '{other}' '{value}': {source}"
-    )]
-    InvalidIncompatibilityRequirement {
-        package: String,
-        other: String,
-        value: String,
-        source: semver::Error,
     },
     /// A participating package pair violates an incompatibility declaration.
     #[error(
@@ -282,9 +215,19 @@ pub enum ProfileGraphError {
         requirement: String,
         other_version: String,
     },
-    /// The participating dependency graph contains a cycle.
+    /// The participating dependency graph contains a cycle, named as a closed
+    /// path whose first id repeats as the last.
     #[error("profile dependency cycle: {}", cycle.join(" -> "))]
     DependencyCycle { cycle: Vec<String> },
+    /// Two different package images claim one profile identity.
+    #[error(
+        "profile id '{id}' resolves to different package images '{first_hash}' and '{second_hash}'"
+    )]
+    ConflictingPackageIdentity {
+        id: String,
+        first_hash: String,
+        second_hash: String,
+    },
 }
 
 #[cfg(test)]
@@ -344,6 +287,46 @@ mod tests {
                 .map(|package| package.model().id.to_string())
                 .collect::<Vec<_>>(),
             vec!["alpha", "zulu"]
+        );
+    }
+
+    #[test]
+    fn test_transitive_dependencies_closes_over_a_chain() {
+        let temp = TempDir::new().unwrap();
+        let packages = [("top", Some("middle")), ("middle", Some("base")), ("base", None)]
+            .map(|(id, dependency)| {
+                let _ = package_tree(&temp, id);
+                let declared = dependency
+                    .map(|dependency| format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n"))
+                    .unwrap_or_default();
+                std::fs::write(
+                    temp.path().join(id).join("manifest.toml"),
+                    format!(
+                        "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n{declared}\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"docs/{id}.txt\"\n"
+                    ),
+                )
+                .unwrap();
+                let package = ProfilePackage::from_directory(&temp.path().join(id)).unwrap();
+                (package.model().id.clone(), package)
+            })
+            .into_iter()
+            .collect();
+
+        let closure = ResolvedProfileGraph::resolve(
+            packages,
+            selected(&["top"]),
+            &EngineVersion::running().unwrap(),
+        )
+        .unwrap()
+        .transitive_dependencies();
+
+        assert_eq!(
+            closure[&ProfileId::try_from("top").unwrap()],
+            selected(&["middle", "base"])
+        );
+        assert_eq!(
+            closure[&ProfileId::try_from("base").unwrap()],
+            selected(&[])
         );
     }
 

@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T13:48:04.290002036Z",
+  "context": {},
+  "created_at": "2026-11-01T07:36:43.277712236Z",
+  "dependencies": [],
+  "description": "Landing a branch on a shared checkout forces the lead to commit other sessions' pending tracker lines, so tracker history misattributes work and commits carry state their author never reviewed.\n\n## Background\n\nSeveral sessions write `.jit/events.jsonl` in one primary checkout, and each leaves appended lines uncommitted until its own next tracker commit. A branch that changed the same log cannot merge there, because git refuses to overwrite a dirty file, even though the log uses the union merge driver. The only available route is to commit the log first, which publishes every other session's pending lines under the landing issue's attribution. Commit `99100d61e` did this deliberately to land 12a0a694. Commit `bbcf19b7d` did it by accident when filing that issue, since a tracker commit naming the log takes the whole file. Other sessions' issue records can be dirty in the same checkout, and an unrelated completion can sweep their readiness changes into the landing branch as well.\n\n## Success Criteria\n\n- [hard] REQ-01: A landing never attributes another session's tracker lines to its own issue: pending tracker state lands in its own neutral commit before the merge.\n- [hard] REQ-02: Every tracker commit a landing makes publishes a coherent `.jit` state, taken under the repository write lock, and a leftover redo record refuses the landing.\n- [hard] REQ-03: One product primitive holds the repository write lock around a child command with a bounded wait and refuses a leftover redo record; one script in the skill performs the landing through it; it refuses clearly without git and on conflict aborts and names the paths.\n- [hard] REQ-04: The landing prose and steps the command replaces are removed from the skills, and `git add .jit` is swept where the command supersedes it. Net lines are reported.\n\n## Notes\n\nMechanism ruled by the invoker after a tested round. Per-writer logs and a gitignored log were rejected: the first rewords two invariants and adds about 250 lines, and the second contradicts `@/charter/D-1`. Publishing only one's own event lines was rejected because a commit holding one writer's lines cannot be coherent with `index.json` and issue records (`@/inv/derived-state-coherence`).\n\nEach session working in its own linked checkout (option 4) was tested on a scratch clone and failed: concurrent creates conflict on `index.json`, same-issue edits and the same promoted dependent conflict on the issue record, in 4 of 4 runs per scenario. Leases stayed exclusive across checkouts. A stale view in that layout let a second session take a closed issue's lease; this applies only to that rejected layout and needs no action.\n\nA conflict on `index.json` is a loud refusal until the separate index-membership task lands; `aeafc378` does not wait on it.\n\nThe split between a product primitive and a skill script (`jit worktree exec`, `land.sh`) replaced an earlier `jit worktree land` of about +344 production lines; `@/charter/D-21` governs jit's own git access, and this script is workflow tooling. The primitive is excluded from the MCP bridge outright, because a tracker's tool surface must not gain arbitrary command execution, and `jit serve` exposes no route to it.\n\n\n\nA strict repository with the hook installed fails loudly on `land.sh` until 17fbcf25 lands, because the hook refuses a sync commit holding records the lander has no lease on. This repository has no hook installed and is unaffected. The real-hook test for the sync commit moved to 17fbcf25.\n\n\n\n## Net lines\n\nFrom the attributable commits `b5b621755`, `59f359cfa` and `a492e2d1d`: production +61 (Rust primitive, excluding test modules), MCP bridge exclusion +4, `land.sh` +41, tests +358, docs and skills +42. Figures are the worker's report, summed per commit.\n",
+  "documents": [],
+  "done_at": "2026-11-01T15:43:04.183280060Z",
+  "first_ready_at": "2026-11-01T07:36:43.277712236Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "99491da0-edb5-4250-8002-68ab08ce5a53",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:09:30.483524410Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c30d1773-627c-420a-8c84-bf5999cc8b27",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:42:29.580699499Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "aeafc378-3073-4b32-be1b-53a05b656168",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Land branches without committing other sessions' pending tracker lines",
+  "updated_at": "2026-11-01T15:43:04.183280060Z"
+}

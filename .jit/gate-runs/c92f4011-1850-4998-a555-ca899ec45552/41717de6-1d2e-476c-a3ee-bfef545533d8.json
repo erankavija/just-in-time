@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b14656acf6c915d9afa0d455f583390e9e00b624",
+  "completed_at": "2026-11-03T23:32:50.200101344Z",
+  "duration_ms": 214168,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/default_rules.rs",
+        "id": "F1",
+        "line": 205,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c92f4011/requirement/REQ-02",
+          "@/issue/c92f4011/decision/D-01"
+        ],
+        "severity": "high",
+        "summary": "A custom rule sharing a derived default's name suppresses that default at runtime and during restoration."
+      }
+    ],
+    "summary": "A custom rule name collision still suppresses a derived default rule, creating an undocumented disabling mechanism.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c92f4011-1850-4998-a555-ca899ec45552",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "41717de6-1d2e-476c-a3ee-bfef545533d8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:29:16.031109113Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12499 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a3be-d9e6-7232-881c-5bef9bb23bce\n--------\nuser\n--- 12486 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0e84e0fc4, 03d19c4c1, f37bd8e8e\nPolicy sources: AGENTS.md\nResolved items: @/issue/c92f4011/requirement/REQ-01–REQ-05 and @/issue/c92f4011/decision/D-01 (.jit issue record, markdown-first); @/invariant/domain-agnostic, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T23:29:12Z); docs-mechanical failed (exit 2, 2026-11-03T23:29:15Z; package-content checker unsafe-target error)\nTruncation recovery: split per-commit patches, current source/test/doc ranges, and targeted gate-result reads; unrelated repository-wide search output was outside the impact cone\n\n1. **F1 — blocking, issue-impact (high):** A custom rule can still disable a derived default merely by reusing its name. `reconcile_default_rules_with_config` lets any non-default rule occupy a generated default name and suppresses the default append at [default_rules.rs:205](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/default_rules.rs:205); the config-write/`--fix` membership diff does the same at line 278. Thus a custom `name = \"label-format\"` row prevents the real default from applying and from being restored. The new test at line 972 explicitly asserts that the custom rule wins. This violates REQ-02 and D-01’s requirement that `severity = \"off\"` on the default row is the sole disabling mechanism. Reject such collisions or preserve the derived default through another explicit policy path.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A custom rule name collision still suppresses a derived default rule, creating an undocumented disabling mechanism.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A custom rule sharing a derived default's name suppresses that default at runtime and during restoration.\",\"file\":\"crates/jit/src/repository_state/default_rules.rs\",\"line\":205,\"references\":[\"@/issue/c92f4011/requirement/REQ-02\",\"@/issue/c92f4011/decision/D-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

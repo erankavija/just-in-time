@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T22:38:09.888273823Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the domain artifact and projection unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `artifact_conformance.rs`, `artifact_classifier.rs`, `store_divergence.rs`, `artifact_directory.rs`, `projection.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:19:32.190666053Z",
   "first_ready_at": "2026-10-22T15:28:23.659429778Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "29f96463-982e-4106-afc4-cdee8757de59",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:10:23.016033959Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dc88951b-6aa8-4aac-9582-ed0f31c7ceb5",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:13:36.814581728Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "58dbb1a0-3eb1-4d34-8ebc-44eb080348b3",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Domain artifact and projection unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:23.659429778Z"
+  "updated_at": "2026-10-27T00:19:32.190666053Z"
 }

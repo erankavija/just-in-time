@@ -3,7 +3,6 @@
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
     "2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a"
   ],
   "description": "Request every document-reference path of a validation capture round in one batch, and apply the base capture requests once per capture rather than once per round.\n\n## Background\n\n- `discover_document_references` (`crates/jit/src/commands/validate.rs:932-945`) calls `discover_paths` once per document reference and `discover_pinned` once per pin; it runs inside `grow_discovering` (`:235-237`), which runs the closure once more after the last extension, so discovery runs twice per validation.\n- `DocumentReferenceRequests::for_reference` (`crates/jit/src/document/reference.rs:70-81`) is pure, so a round's requests can be computed before any is added.\n- The `discover` closure in `capture_proposed_base_inner` re-applies `base(spec)` on every round (`:430-434`) and returns early when that changed the spec; `base` is already applied before the first capture when no start image is given (`:504-510`).\n- Round-count tests over `counted_session` live at `commands/validate.rs:3530-3600`.\n\n## Success Criteria\n\n- [hard] REQ-01: `discover_document_references` adds a round's worktree paths through one `discover_paths` call and adds each pin once.\n- [hard] REQ-02: The base requests are applied once per capture, before the first round or to the start image's spec, and the `discover` closure no longer re-applies them.\n- [hard] REQ-03: The existing capture and round-count suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
@@ -22,10 +21,11 @@
     "component:validation",
     "component:core",
     "per:@/charter/D-20",
-    "satisfies:9876a23a/REQ-09"
+    "satisfies:9876a23a/REQ-09",
+    "resolution:superseded"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Validation capture requests a round's document references as one batch",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-03T23:04:33.299470754Z"
 }
