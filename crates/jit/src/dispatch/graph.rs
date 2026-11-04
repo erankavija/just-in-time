@@ -200,9 +200,9 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_output_schema_top_level_rdeps_matches_graph_rdeps() {
-        let top_level = CommandSchema::resolve_output_schema("rdeps").unwrap();
-        let graph = CommandSchema::resolve_output_schema("graph_rdeps").unwrap();
+    fn test_get_output_schema_for_command_top_level_rdeps_matches_graph_rdeps() {
+        let top_level = CommandSchema::get_output_schema_for_command("rdeps").unwrap();
+        let graph = CommandSchema::get_output_schema_for_command("graph_rdeps").unwrap();
 
         assert_eq!(top_level.success, graph.success);
         assert_eq!(top_level.success_schema, graph.success_schema);
