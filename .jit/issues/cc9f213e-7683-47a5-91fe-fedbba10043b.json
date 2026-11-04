@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6675ac07-1d42-44f5-a245-52334a7778c3",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:52:52.512959946Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ca9e3b4f-a1b6-4679-a246-53ba61137320",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:56:33.934921374Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Path history query in the git module",
-  "updated_at": "2026-11-04T23:15:50.139602854Z"
+  "updated_at": "2026-11-04T23:56:33.934921374Z"
 }
