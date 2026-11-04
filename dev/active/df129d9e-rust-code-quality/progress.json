@@ -888,6 +888,11 @@
       "source": "abe555e9 worker",
       "summary": "jit --schema output order is nondeterministic run to run: CommandSchema.commands, types and subcommands are HashMaps (pre-existing). Schema identity checks must compare with sorted keys; byte-stable output would need BTreeMap.",
       "disposition": "reconcile against da30b92a / 46fe7593 schema criteria before container gates"
+    },
+    {
+      "id": "inherited-landing-lock",
+      "summary": "A lead landing script holding its serial flock on an inherited fd lost it to the sccache server a child cargo run daemonized, deadlocking b23faa59 and 1eb949a5 for two hours past the 03:30 hold. Take serial locks with `flock -o` so children never inherit them.",
+      "status": "fixed in the lead's scratchpad script"
     }
   ],
   "external_blockers": {},
@@ -931,6 +936,6 @@
     "head_rev": "b5bd434e8"
   },
   "wave_notes": {
-    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet."
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host."
   }
 }
