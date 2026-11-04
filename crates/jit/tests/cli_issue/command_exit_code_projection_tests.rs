@@ -730,7 +730,135 @@ fn invoke_claim_without_git(json: bool) -> Vec<Output> {
     vec![output_in_form(&cli, &["claim", "status"], json)]
 }
 
+fn invoke_profile_apply_missing_values_file(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            "packages/profile",
+            "--values-file",
+            "absent.toml",
+        ],
+        json,
+    )]
+}
+
+fn invoke_profile_conflict(command: &str, json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/left"));
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/right"));
+    let manifest = cli.root().join("packages/right/manifest.toml");
+    let declared = fs::read_to_string(&manifest).unwrap();
+    fs::write(
+        &manifest,
+        declared.replace("id = \"planner-asset-only\"", "id = \"rival\""),
+    )
+    .unwrap();
+    fs::write(
+        cli.root().join("packages/right/assets/profile.txt"),
+        "different bytes\n",
+    )
+    .unwrap();
+    let output = output_in_form(
+        &cli,
+        &[
+            "profile",
+            command,
+            "--profile",
+            "packages/left",
+            "--profile",
+            "packages/right",
+        ],
+        json,
+    );
+    if json {
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(envelope["error"]["code"], "VALIDATION_FAILED");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        if command == "diff" {
+            assert!(envelope["error"]["details"]["profiles"].is_array());
+        }
+    }
+    vec![output]
+}
+
+fn invoke_profile_apply_conflict(json: bool) -> Vec<Output> {
+    invoke_profile_conflict("apply", json)
+}
+
+fn invoke_profile_diff_conflict(json: bool) -> Vec<Output> {
+    invoke_profile_conflict("diff", json)
+}
+
+fn invoke_profile_add_missing_archive(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "add",
+            "--archive",
+            "absent.tar",
+            "--destination",
+            "packages/arrived",
+        ],
+        json,
+    )]
+}
+
+fn invoke_profile_occupied_output(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
+    cli.run([
+        "profile",
+        "pack",
+        "--source",
+        "packages/profile",
+        "--output",
+        "package.tar",
+    ])
+    .unwrap();
+    vec![
+        output_in_form(
+            &cli,
+            &[
+                "profile",
+                "pack",
+                "--source",
+                "packages/profile",
+                "--output",
+                "package.tar",
+            ],
+            json,
+        ),
+        output_in_form(
+            &cli,
+            &[
+                "profile",
+                "add",
+                "--archive",
+                "package.tar",
+                "--destination",
+                "packages/profile",
+            ],
+            json,
+        ),
+    ]
+}
+
 row_bindings! {
+    test_command_exit_codes_profile_apply_missing_values_file_emits_2: ("profile apply", Some(2), false) => invoke_profile_apply_missing_values_file;
+    test_command_exit_codes_profile_apply_repository_state_conflict_emits_4: ("profile apply", Some(4), false) => invoke_profile_apply_conflict;
+    test_command_exit_codes_profile_diff_conflicting_findings_emit_4: ("profile diff", Some(4), true) => invoke_profile_diff_conflict;
+    test_command_exit_codes_profile_add_missing_archive_emits_3: ("profile add", Some(3), false) => invoke_profile_add_missing_archive;
+    test_command_exit_codes_profile_occupied_output_emits_6: ("profile pack, profile add", Some(6), false) => invoke_profile_occupied_output;
     test_command_exit_codes_success_emits_0: ("*", Some(0), false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", Some(1), false) => invoke_malformed_stored_record;
     test_command_exit_codes_invalid_argument_emits_2: ("*", Some(2), false) => invoke_invalid_argument;
