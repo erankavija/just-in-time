@@ -14,6 +14,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "2dcbbeab-8f82-4d3a-90e6-aa17317e64d8",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:37:40.417297161Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "7c0a4f51-dd4b-4595-af2b-d633493ae12f",
       "status": "failed",
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reject incompatible repository layout bindings",
-  "updated_at": "2026-11-04T23:21:33.209619378Z"
+  "updated_at": "2026-11-04T23:37:40.417297161Z"
 }
