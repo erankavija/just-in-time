@@ -379,7 +379,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     // conflict is classified as a profile conflict (4) above and listed here only for
     // exhaustiveness;
     // a layout rejection is an argument error (2); capture/parse producer failures and
-    // the structural delta/overlay/initialization failures keep the
+    // the structural delta/overlay/initialization/mutation failures keep the
     // generic code (1). The `project render` command additionally unwraps this error
     // to its bare inner `ProjectionError`/`ManagedDocumentError`, which the checks
     // above classify identically.
@@ -397,7 +397,8 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
             RepositoryStateError::Producer(_)
             | RepositoryStateError::Initialization(_)
             | RepositoryStateError::Delta(_)
-            | RepositoryStateError::Overlay(_) => ErrorCode::GenericError,
+            | RepositoryStateError::Overlay(_)
+            | RepositoryStateError::Mutation(_) => ErrorCode::GenericError,
         };
     }
     // A failed batch-create pre-validation is an argument error (exit 2): no

@@ -113,7 +113,8 @@ impl RedoRecord {
         &self.deletes
     }
 
-    /// The event append, if the mutation appended to the log.
+    /// The event append; absent only from the worktree record an absent-root
+    /// publication commits, since storage refuses any other record without one.
     pub fn event_append(&self) -> Option<&EventAppend> {
         self.event_append.as_ref()
     }

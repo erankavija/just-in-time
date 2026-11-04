@@ -1417,6 +1417,14 @@ pub enum EventBody {
         /// permitted the invocation.
         invocation_override: LinkedCheckoutWriteStance,
     },
+    /// A write that records no domain event reached its commit point.
+    ///
+    /// Repository-scoped: it stands in for the domain event such a write lacks,
+    /// so every redo record grows the log by at least one record.
+    FilesPublished {
+        /// Sorted repository-relative paths the write wrote, made or deleted.
+        paths: Vec<String>,
+    },
 }
 
 /// One event-log record: an id and a timestamp around a tagged [`EventBody`].
@@ -1694,6 +1702,12 @@ impl EventBody {
         }
     }
 
+    /// Draft the record of an event-less write naming the sorted
+    /// repository-relative `paths` it wrote, made or deleted.
+    pub fn draft_files_published(paths: Vec<String>) -> Self {
+        EventBody::FilesPublished { paths }
+    }
+
     /// The issue this event names; `None` for repository- and registry-scoped events.
     pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
         match self {
@@ -1718,6 +1732,7 @@ impl EventBody {
             EventBody::GateDefinitionRemoved { .. } => None,
             EventBody::ProfileLifecycle { .. } => None,
             EventBody::LinkedCheckoutWriteOverridden { .. } => None,
+            EventBody::FilesPublished { .. } => None,
         }
     }
 
