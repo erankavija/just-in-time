@@ -1,10 +1,9 @@
 # Installation Guide
 
 How to install JIT from the archive a release publishes, and how to build it
-from a source checkout. Two adjacent workflows have their own homes:
+from a source checkout. An adjacent workflow has its own home:
 [Deployment](docs/how-to/deployment.md) serves the API and web UI from a
-container, and [MCP Integration](docs/how-to/mcp-integration.md) installs the
-MCP server for an agent client.
+container.
 
 ## Table of Contents
 
@@ -135,8 +134,7 @@ directory on `PATH` when a source checkout needs to serve a repository.
 - **Git**: Core issue tracking is Git-optional; advisory leases (`jit claim`)
   and worktree coordination need a Git repository with a resolvable `HEAD`
   (`apt install git`)
-- **Node.js 20 or newer**: Required to build the web bundle and to run the MCP
-  server (`apt install nodejs npm`); the floor is the `node-version: '20'` the
+- **Node.js 20 or newer**: Required to build the web bundle (`apt install nodejs npm`); the floor is the `node-version: '20'` the
   CI jobs install (`.github/workflows/ci.yml`)
 - **ripgrep**: For full-text search (`apt install ripgrep` or
   `yum install ripgrep`)
@@ -183,9 +181,7 @@ rg --version
 ```
 
 Container startup failures are covered by [deployment
-troubleshooting](docs/how-to/deployment.md#troubleshooting), and MCP client
-startup failures by [MCP
-troubleshooting](docs/how-to/mcp-integration.md#troubleshooting).
+troubleshooting](docs/how-to/deployment.md#troubleshooting).
 
 ---
 
@@ -207,9 +203,7 @@ A user-directory install is removed the same way from `~/.local/bin`.
 rm -rf .jit/
 ```
 
-Removing a [container deployment](docs/how-to/deployment.md#container-deployment)
-and an [installed MCP server](docs/how-to/mcp-integration.md) is covered by
-their own guides.
+Removing a [container deployment](docs/how-to/deployment.md#container-deployment) is covered by its guide.
 
 ---
 

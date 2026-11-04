@@ -387,46 +387,6 @@ jit issue update <id> --type bug
 
 ---
 
-## MCP Tools
-
-The [MCP server](../../mcp-server/README.md) generates its tools from the CLI
-schema, so each tool mirrors the command of the same name:
-
-| Tool | Purpose |
-|------|---------|
-| `jit_label_namespaces` | List declared namespaces, so an agent writes a label the `namespace-registry` rule accepts |
-| `jit_label_values` | List values in use in a namespace, so an agent reuses the project vocabulary |
-| `jit_issue_update` | Add (`label`) and remove (`remove-label`) labels on an issue |
-| `jit_query_all` | Find issues by label pattern, including `namespace:*` wildcards |
-
-### Agent Prompt Additions
-
-In the MCP server description or system prompt:
-
-```markdown
-## Label Usage Rules
-
-1. **Format**: Always use `namespace:value` format
-   - ✅ Correct: "milestone:v1.0", "epic:billing"
-   - ❌ Wrong: "billing", "milestone-v1.0"
-
-2. **Namespaces**: Call `jit_label_namespaces` before writing a label —
-   the registry is per-repository, and an undeclared namespace fails validation.
-
-3. **Type**: `type:*` is unique. Change it with `jit_issue_update`'s `type`
-   argument, not by adding a second `type:*` label.
-
-4. **Strategic Issues**: `jit_query_strategic` returns the issues whose type is
-   declared strategic (epics and milestones, by default).
-
-5. **Query Examples**:
-   - All milestone members: `jit_query_all` with label `milestone:*`
-   - Specific epic: `jit_query_all` with label `epic:auth`
-   - Backend work: `jit_query_all` with label `component:backend`
-```
-
----
-
 ## Disambiguation Rules
 
 ### 1. Namespace Conflicts
@@ -798,10 +758,5 @@ bare repository has none until it applies a package or authors its own registry.
 - Idempotent add
 - Paired `--remove-label` / `--label` to swap a unique namespace's value
 - Batch operations (all-or-nothing)
-
-### 5. MCP Integration
-- Tools generated from the CLI schema
-- Prompt guidance on usage
-- Error feedback loop
 
 **Result**: Agents can reliably use labels without human intervention, with clear feedback when mistakes happen.

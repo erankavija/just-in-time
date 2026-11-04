@@ -1,7 +1,7 @@
 # CLI Consistency & MCP Server Strategy
 
 **Date**: 2025-12-02  
-**Status**: Planning  
+**Status**: Historical; superseded by @/charter/D-23
 **Goal**: Make JIT optimally usable by both humans and AI agents with maximum consistency
 
 ## Current State Analysis

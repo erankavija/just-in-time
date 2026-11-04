@@ -36,9 +36,7 @@ jit gate status-all <short-hash>
 jit issue update <short-hash> --state done
 ```
 
-**Use MCP Tools** - Don't fall back to CLI for efficiency. MCP provides structured responses.
-
-See [MCP Tools Reference](../reference/cli-commands.md#mcp-tools-reference) for complete tool catalog.
+Use `--json` for structured responses; `jit --schema` describes the command interface.
 
 **Continue with human tutorial below for detailed examples...**
 

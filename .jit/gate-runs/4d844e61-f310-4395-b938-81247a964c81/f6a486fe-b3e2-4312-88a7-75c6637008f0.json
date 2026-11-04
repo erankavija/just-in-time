@@ -1,0 +1,23 @@
+{
+  "branch": "retire-mcp-4d844e61",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "a6eebaab37c66b09135c2aaa668a11c7029d4065",
+  "completed_at": "2026-11-04T22:15:09.228119780Z",
+  "duration_ms": 4005,
+  "evaluation_stability": "stable",
+  "exit_code": 4,
+  "gate_key": "repo-validate",
+  "issue_id": "4d844e61-f310-4395-b938-81247a964c81",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f6a486fe-b3e2-4312-88a7-75c6637008f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:15:05.222346388Z",
+  "status": "failed",
+  "stderr": "Repository integrity validation failed: Invalid repository: repository-integrity validation pass: Invalid document reference in issue '79252d23-23ab-4c04-9327-8d2986f361d8': file 'mcp-server/README.md' not found in the working tree or at HEAD\n",
+  "stdout": "error: Repository integrity error: Invalid repository: repository-integrity validation pass: Invalid document reference in issue '79252d23-23ab-4c04-9327-8d2986f361d8': file 'mcp-server/README.md' not found in the working tree or at HEAD\nwarning: 80 membership label(s) not backed by the DAG (run `jit query divergence` for details)\n"
+}

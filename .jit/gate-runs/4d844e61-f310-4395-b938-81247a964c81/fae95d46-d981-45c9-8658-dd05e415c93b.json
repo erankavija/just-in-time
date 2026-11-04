@@ -1,0 +1,24 @@
+{
+  "branch": "retire-mcp-4d844e61",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "a6eebaab37c66b09135c2aaa668a11c7029d4065",
+  "completed_at": "2026-11-04T22:15:03.504775184Z",
+  "duration_ms": 118532,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "c653afc14efb4c845afc5db08cca467b284c4f5256b07eb51974f930c1035299",
+  "issue_id": "4d844e61-f310-4395-b938-81247a964c81",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fae95d46-d981-45c9-8658-dd05e415c93b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:13:04.971990331Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nwarning: jit-server@1.0.0: web/dist/ not found — the jit-server binary will not include embedded web assets. Run 'cd web && npm run build' first, then rebuild.\nerror[E0560]: struct `jit::schema::Command` has no field named `hidden`\nerror: could not compile `jit` (test \"cli\") due to 1 previous error\nwarning: build failed, waiting for other jobs to finish...\n--- suite-build output ---\n   Compiling toml_edit v0.22.27\n   Compiling axum-core v0.4.5\n   Compiling tinystr v0.8.2\n   Compiling potential_utf v0.1.4\n   Compiling icu_locale_core v2.1.1\n   Compiling icu_collections v2.1.1\n   Compiling referencing v0.46.5\n   Compiling schemars v0.8.22\n   Compiling icu_provider v2.1.1\n   Compiling tokio-util v0.7.18\n   Compiling tower v0.5.2\n   Compiling tower v0.4.13\n   Compiling fs-err v3.3.1\n   Compiling icu_properties v2.1.1\n   Compiling icu_normalizer v2.1.1\n   Compiling h2 v0.4.15\n   Compiling tower-http v0.5.2\n   Compiling tokio-stream v0.1.18\n   Compiling toml v0.8.23\n   Compiling idna_adapter v1.2.1\n   Compiling idna v1.1.0\n   Compiling jsonschema v0.46.2\n   Compiling url v2.5.7\n   Compiling hyper v1.8.1\n   Compiling hyper-util v0.1.19\n   Compiling axum v0.7.9\n   Compiling axum-server v0.8.0\n   Compiling axum-test v14.10.0\nerror[E0560]: struct `jit::schema::Command` has no field named `hidden`\n   --> crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs:386:13\n    |\n386 |             hidden: false,\n    |             ^^^^^^ `jit::schema::Command` does not have this field\n    |\n    = note: all struct fields are already assigned\n\nFor more information about this error, try `rustc --explain E0560`.\nerror: could not compile `jit` (test \"cli\") due to 1 previous error\nwarning: build failed, waiting for other jobs to finish...\nerror: command `/home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101\n--- test failures ---\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\n   Compiling jit v1.0.0 (/tmp/jit-retire-mcp/crates/jit)\nerror[E0560]: struct `jit::schema::Command` has no field named `hidden`\n   --> crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs:386:13\n    |\n386 |             hidden: false,\n    |             ^^^^^^ `jit::schema::Command` does not have this field\n    |\n    = note: all struct fields are already assigned\n\nFor more information about this error, try `rustc --explain E0560`.\nerror: could not compile `jit` (test \"cli\") due to 1 previous error\nerror: command `/home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101\n--- excluded-tests output ---\ncargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement\n--- budget diagnostics ---\ncat: /tmp/tmp.xpDf8REyDH/suite-artifacts.json: No such file or directory\n--- suite-clock scope ---\nsuite-clock 5441 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: error: command `/home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101.\n  ✓ fmt: ok (1628 ms)\n  ✗ clippy: FAILED (exit 101) (50599 ms)\n  ✗ suite-build: FAILED (exit 1) (60576 ms)\n  ✗ test: FAILED (exit 101) (2666 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2759 ms)\n  ✓ suite-clock: 5441 ms\n  ✗ excluded-tests: FAILED (exit 1) (5 ms)\n  ✗ budget: FAILED (exit 1) (58 ms)\n\ncargo-ci: verdict (exit 1): step 'clippy' failed on repository content\n"
+}

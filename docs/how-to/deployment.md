@@ -263,6 +263,5 @@ jit validate --fix
 ## See Also
 
 - [Installation Guide](../../INSTALL.md) - Installing the CLI and the server
-- [MCP Integration](mcp-integration.md) - Serving agent clients over MCP
 - [Multi-Agent Coordination](multi-agent-coordination.md) - Team workflows
 - [Configuration](../reference/configuration.md) - Runtime options
