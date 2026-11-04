@@ -8,6 +8,7 @@
   ],
   "description": "Update the command reference, the custom-gates guide and the execution-lead skill for reused-verdict provenance that names its source issue, for per-issue gate-run records, and for searches that exclude history files by default.\n\n## Background\n\nThe execution-lead skill reads review findings through the glob `.jit/gate-runs/*/result.json` (`.agents/skills/jit-execution-lead/references/lead-review-protocol.md`, `references/rework-prompt-template.md`); under per-issue run records (`gate-runs/<issue-id>/<run-id>.json`) the glob matches nothing, silently. `jit gate status <id> <gate> --all --json` reports an issue's runs of a gate and works on both layouts, so live sessions lose nothing while this repository's tracker stays at format 3.\n\n`docs/how-to/custom-gates.md` and `docs/reference/cli-commands.md` show a reused verdict as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`; it also carries `source_issue`. The `jit search` section of `docs/reference/cli-commands.md` says that search covers the event log.\n\n## Success Criteria\n\n- [hard] REQ-01: Both skill references read findings through `jit gate status <id> <gate> --all --json` and name no gate-run path.\n- [hard] REQ-02: Both pages show the reused-verdict shape with `source_issue` and `source_run`.\n- [hard] REQ-03: The `jit search` reference no longer says that search covers the event log, states that a search without an explicit file selection excludes history files, and states that an explicit glob can still select them.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T03:28:13.134883760Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -24,7 +25,7 @@
     "satisfies:f8a6b298/REQ-11"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Gate provenance, gate-run lookup and search docs match per-key reads",
-  "updated_at": "2026-11-02T23:40:54.395439986Z"
+  "updated_at": "2026-11-04T03:28:13.134883760Z"
 }
