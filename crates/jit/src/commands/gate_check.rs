@@ -4067,6 +4067,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let concurrent = issue_id.clone();
         let evaluating = with_open_race(
             base.storage.clone(),
+            crate::storage::MutationPoint::SessionOpen,
             2,
             SessionRaceAction::Run(Box::new(move |storage| {
                 std::fs::write(&marker, "").unwrap();
@@ -4088,6 +4089,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let concurrent = issue_id.clone();
         let attesting = with_open_race(
             base.storage.clone(),
+            crate::storage::MutationPoint::SessionOpen,
             2,
             SessionRaceAction::Run(Box::new(move |storage| {
                 memory_executor(storage.clone())

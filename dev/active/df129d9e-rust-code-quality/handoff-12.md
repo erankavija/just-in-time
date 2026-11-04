@@ -88,6 +88,12 @@ Outgoing lead: just-in-time-7c (`agent:df129d9e-lead`), which took over from jus
 ## What to do next
 
 - [ ] Finish anything left open in the final status section at the end; it is authoritative over the bullets above.
+- [ ] **First, by user ruling:** the four critical build-footprint tasks under story fb2dc5c3. Each is ready and has measured targets in its criteria.
+  - [ ] 5f12265a: reclaim harvests no incremental state and only the newest artifact generation. Gates: worktree-cache-test, code-review.
+  - [ ] f855d631: the test profile does not force incremental compilation. Gates: cargo-ci, code-review.
+  - [ ] 75b46be9: `split-debuginfo = "unpacked"`, at least 40% fewer test-executable bytes, and a lowered bytes budget. Gates: cargo-ci, code-review.
+  - [ ] b22aabce: the `jit` integration tests become at most two suites, with a lowered target budget. Gates: cargo-ci, code-review.
+  - Order: 5f12265a and f855d631 in parallel. 75b46be9 and b22aabce both edit the build-budget script and README, so run them one after the other, and measure 75b46be9's before value on the commit it starts from.
 - [ ] df129d9e, in order. fb38bf1f and 487f45a9 may run in parallel; both touch output and error codes, so the second to land merges main and adapts.
   - [ ] fb38bf1f: commands import nothing from output, plus a structural scan test.
   - [ ] 487f45a9: one requires-Git error.
@@ -130,6 +136,17 @@ Outgoing lead: just-in-time-7c (`agent:df129d9e-lead`), which took over from jus
   - Their sandbox cannot spawn the jit binary, so MCP tests fail there and `mcp-ci` covers them.
 - **Review verdicts are final.** Bring a disputed finding to 6a; never rerun a review unchanged.
 - **Scope changes go to 6a.** Record each ruling in the issue as a `## Decisions` item, amending the criterion text when a criterion changes (6a's 635f23c7 ruling).
+
+## Build-footprint tasks (user ruling 2026-11-04: filed as critical, first next session)
+
+Filed as 5f12265a, f855d631, 75b46be9 and b22aabce under story fb2dc5c3. The items below are what they implement.
+
+Context: on 2026-11-04 /mnt/nvme had 189 GB free. 21 done worktrees held hundreds of GB of `target/*/incremental`: 311 GB in agent-0fe46027 and 384 GB in agent-2e2c8ee3. The incremental state spread through the cache pool: the reclaim script harvested it, and dispatch seeded it into every new worktree (231 identical entries per worktree today). After deleting the incremental directories and reclaiming, 292 GB were free and the pool was 42 GB.
+
+1. **`reclaim-worker-worktree.sh` harvests no `*/incremental` and only the newest artifact per crate and target name.** Today the pool keeps every hashed generation, and seeding copies all of them; the user saw 13 generations of each test binary in one worktree. Target: pool size and seeded worktree size before and after.
+2. **The test profile stops forcing incremental.** Remove `[profile.test] incremental = true` from `Cargo.toml`, so no worker depends on remembering `CARGO_INCREMENTAL=0`. Target: no `incremental` directory after a worker run without the variable.
+3. **`split-debuginfo = "unpacked"` for the dev and test profiles.** About 75% of each roughly 115 MB test binary is debug info. For cli_issue that is `.debug_str` 25.7 MB, `.debug_info` 19.4 MB and `.debug_line` 18.3 MB, against 16.1 MB of code, duplicated into all 13 executables. Target: active test-executable bytes before and after, as reported by the budget step.
+4. **Consolidate the nine `jit` integration test targets into one or two suites** (`@/inv/bounded-rust-build-footprint`), removing about seven linked copies per build. Target: integration-target count and executable bytes from the budget step.
 
 ## Open questions needing invoker input
 

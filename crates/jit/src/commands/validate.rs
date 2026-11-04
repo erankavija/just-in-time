@@ -1978,6 +1978,46 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_repository_report_reads_a_write_raced_at_its_read_session_open() {
+        use crate::commands::test_helpers::{
+            with_open_race, SessionOpenCounter, SessionRaceAction,
+        };
+        use crate::storage::MutationPoint;
+
+        let executor = crate::commands::test_helpers::setup();
+        let mut raced = crate::test_utils::fixture_issue("Raced".into(), String::new());
+        // A dangling dependency fails the integrity pass naming `raced`.
+        raced.dependencies =
+            vec![crate::test_utils::fixture_issue("Absent".into(), String::new()).id];
+        let opens = SessionOpenCounter::new();
+        let storage = with_open_race(
+            executor
+                .storage()
+                .with_mutation_interruption_view(opens.clone()),
+            MutationPoint::ReadSessionOpen,
+            1,
+            SessionRaceAction::Save(Box::new(raced.clone())),
+        );
+        let executor =
+            CommandExecutor::new(storage).with_layout(executor.require_layout().unwrap());
+
+        let (failure, _) = executor
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .into_parts();
+
+        let failure = failure.map(|error| format!("{error:#}"));
+        assert!(
+            failure
+                .as_deref()
+                .is_some_and(|failure| failure.contains(raced.id.as_str())),
+            "the read derives from the raced write: {failure:?}"
+        );
+        assert_eq!(opens.count(), 0, "the read opened a mutation session");
+    }
+
+    #[test]
     fn test_validate_with_fix_dry_run_completes_beside_a_held_mutation_session() {
         let executor = executor_with_redundant_dependency();
         let (alone, _, _, _) = executor.validation().validate_with_fix(true).unwrap();

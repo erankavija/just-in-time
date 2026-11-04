@@ -16,7 +16,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "47987aeb-e037-4898-80eb-948668796a5d",
+      "status": "passed",
+      "updated_at": "2026-11-04T18:49:44.181149566Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "424a7843-d459-473e-a35d-d0da14e391b8",
+      "status": "failed",
+      "updated_at": "2026-11-04T18:54:42.980441052Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "e2700be4-1603-4cb1-a987-d76c157bb740",
+      "status": "passed",
+      "updated_at": "2026-11-04T18:50:03.141828032Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6acd7a05-b199-43f8-b619-554b536dc420",
   "labels": [
     "epic:rust-code-quality",
@@ -28,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Validate success response declares no payload warnings",
-  "updated_at": "2026-11-04T17:40:43.682974894Z"
+  "updated_at": "2026-11-04T18:54:42.980441052Z"
 }
