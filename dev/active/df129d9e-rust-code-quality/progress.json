@@ -1362,9 +1362,10 @@
       "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
     },
     "f87f9b00": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Sonnet",
-      "reason": "gate status handler move; first of the four remaining moves"
+      "reason": "gate status handler move; first of the four remaining moves",
+      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114"
     },
     "24a982b7": {
       "status": "landing",
@@ -1438,5 +1439,8 @@
       "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)"
     }
   ],
-  "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)"
+  "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
+  "notes_for_tasks": {
+    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)"
+  }
 }
