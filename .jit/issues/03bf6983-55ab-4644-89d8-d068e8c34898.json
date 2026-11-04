@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T10:06:03.090430259Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -8,12 +8,26 @@
   ],
   "description": "Remove the last references from the validation layer to `commands`: the test fixtures that drive an executor and the rustdoc that names executor items.\n\n## Background\n\n- The tests in `crates/jit/src/validation/repository.rs` (from about `:870`) build images through `crate::commands::CommandExecutor` (`:902-916`), `crate::commands::overrides_from_repo_changes`, `crate::commands::validation_overlay` and `capture_validation_image_with` (`:925-970`). They judge overlay validation, a command-layer composition of capture and report.\n- `crates/jit/src/validation/mod.rs:7` links `effective_rules` on `crate::commands::CommandExecutor`; `crates/jit/src/validation/graph.rs:76-96` names `CommandExecutor::resolve_link_label`, `query_by_label`, `show_item` and `commands::claim::assert_valid_actor`.\n- `jit::test_harness` builds closed images without an executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No code, test or rustdoc under `crates/jit/src/validation/` names a `crate::commands` item.\n- [hard] REQ-02: Report tests that need only an image build it through the shared test image builder; tests that judge overlay capture live in the commands test module; each asserts the property it asserted before.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T10:27:19.675505910Z",
   "first_ready_at": "2026-11-04T10:05:35.568074480Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c4eb99bd-a552-423c-a867-68bfdd2bbc65",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:24:22.451796309Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "50a3c4fc-cc7b-4ff7-9b29-28918f35df4e",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:26:47.770201963Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "03bf6983-55ab-4644-89d8-d068e8c34898",
   "labels": [
     "type:task",
@@ -27,7 +41,7 @@
     "satisfies:9876a23a/REQ-06"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Validation-layer tests and prose stop naming commands",
-  "updated_at": "2026-11-04T10:06:03.090430259Z"
+  "updated_at": "2026-11-04T10:27:19.675505910Z"
 }
