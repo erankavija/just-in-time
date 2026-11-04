@@ -103,7 +103,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_with_approved_fixture_extension"
+          "worker_status": "fixture_default_behavior_correction"
         },
         {
           "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
@@ -120,7 +120,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "delimiter_path_correction"
+          "worker_status": "pinned_configured_gates_running"
         },
         {
           "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
@@ -129,7 +129,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_checks"
+          "worker_status": "pinned_configured_gates_running"
         },
         {
           "id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
@@ -138,23 +138,25 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "rework_design_experiment_pending"
+          "worker_status": "authorized_two_process_experiment"
         },
         {
           "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
           "short_id": "bb5040a8",
           "title": "Origin URL query in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementation"
         },
         {
           "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
           "short_id": "cc9f213e",
           "title": "Path history query in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared_waiting_worker_slot"
         }
       ]
     },
@@ -473,7 +475,8 @@
   "rework_counts": {
     "7aafec83": 1,
     "81664a6a": 1,
-    "4ba18af4": 1
+    "4ba18af4": 1,
+    "24d3b460": 1
   },
   "surfaced_pitfalls": [
     {
@@ -588,6 +591,22 @@
       "agent": "/root/head_contract",
       "classification": "research",
       "reason": "Reliable single-process unborn versus genuine Git failure contract requires experimental edge-case analysis before criterion reconciliation."
+    },
+    {
+      "issue": "bb5040a8",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Bounded origin URL primitive and process-count tests",
+      "agent": "/root/origin_url",
+      "prepared": true
+    },
+    {
+      "issue": "cc9f213e",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Bounded Git log parsing and merge-history behavior matrix",
+      "agent": "/root/file_history",
+      "prepared": true
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -606,7 +625,13 @@
     "7297f922 configured cargo-ci 75648818-5b22-4b6b-b7a0-e82533f5f632 and code-review 8b7dabdb-92eb-4b0f-a06c-e40d616940b1 passed against pinned source 2d998c5b7670cda2c3e551b0f2a150c2fa6e0cf1. Actual evidence committed 9770b610a in worker tree; main integration and merged Cargo pending.",
     "Head source 8854c45a2 passed Cargo but review 008c2ae3-d632-448a-85d4-982b9490c59e failed: unchecked construction permits genuine Git failures to look unborn. Constructor restriction alone is insufficient. Steward requires bounded experimental design: confirmed unborn None, genuine failure typed error, one process, no worktree walk or locale-dependent stderr parsing; propose criterion reconciliation only after evidence.",
     "Steward approved 24d3b460 narrow shared GitStandIn explicit child config/env override for deterministic unset user.name testing. Defaults unchanged; no host/process-wide changes. Existing equivalent inspected and absent.",
-    "Steward approved df exact-name-only corrections in live f6eaba42/d5cae9e3/23b48cf0 descriptions; df owns those edits. Root repository validation cleanup completed separately with zero errors/warnings/divergences."
+    "Steward approved df exact-name-only corrections in live f6eaba42/d5cae9e3/23b48cf0 descriptions; df owns those edits. Root repository validation cleanup completed separately with zero errors/warnings/divergences.",
+    "7297f922 Done in593d78dde after merged stable Cargo gate; worktree reclaimed canonically. Source slot released to df487, now done; next root ancestry fix owns slot.",
+    "46a89061 source9af52c2af and437907da sourcea0f836080 committed, refreshed from main and frozen for configured gates. Lost worker check session25527 is inaccessible to both worker and lead; no remaining process exists in46tree. Configured cargo-ci will establish remaining evidence; no duplicate focused run needed.",
+    "24d3b460 lead found extra PATH-resolved env executable introduced into default GitStandIn behavior. Worker replacing it with validated quoted shell environment assignments and direct absolute Git exec; no new private runner.",
+    "Steward chooses D-19 over branch-listing history scan: head phase2 may experimentally use at most two direct Git processes with no unrelated ref/history/worktree walk or lazy network fetch. No Git minimum or criterion budget change yet approved; reconcile after evidence. Experiment report currently scratch /tmp/f4d9502a-lead/head-experiment-results.md.",
+    "Steward temp policy: new focused tests use short unique owned /dev/shm TMPDIR and cleanup on exit; build caches remain disk. Pause new heavy launches/report if /tmp free inodes below20% or free bytes below4GiB. Do not alter running directories or generic /tmp contents.",
+    "df487 exact error-name corrections now landed05b00219f. Planning refresh remains required beforec506 and should include pending head contract reconciliation. Frontend lead owns fallible layout binding9c3; c506 will consume landed API, no concurrent server changes here."
   ],
   "planning_reviews_pending": [
     {

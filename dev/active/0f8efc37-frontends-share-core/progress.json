@@ -32,14 +32,14 @@
           "short_id": "abf68973",
           "title": "Compile server modules through the library",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
           "short_id": "1cdf5965",
           "title": "Index graph layout and refresh passes",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "reviewing"
         }
       ]
     },
@@ -145,5 +145,13 @@
   "escalations": [],
   "rework_counts": {},
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Three first-wave workers dispatched; independent server-modules is undispatched; external dependencies and exact graph remain in instantiation.json."
+  "note": "Three first-wave workers dispatched; independent server-modules is undispatched; external dependencies and exact graph remain in instantiation.json.",
+  "surfaced_pitfalls": [
+    {
+      "issue": "abf68973",
+      "source": "preliminary code-review F1",
+      "summary": "Reviewer flags satisfies:c8e79465/REQ-01 on server-modules as not directly establishing route behavior; reconcile against server-story REQ-01 before container completion.",
+      "status": "open"
+    }
+  ]
 }
