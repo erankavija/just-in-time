@@ -25,7 +25,8 @@ use crate::declarations::GateRegistry;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::identity::{GateKey, GateRunId, IssueId};
 use crate::domain::{
-    Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
+    Assignee, Event, EventBody, GateRunResult, GateStatus, GateVerdictRecord, Issue,
+    LinkedCheckoutWriteStance, State,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -526,6 +527,53 @@ pub(crate) fn captured_gate_run_ids(image: &RepositoryImage) -> Option<Vec<GateR
     )
 }
 
+/// The gate key of each directory a captured `gate-runs/verdicts` listing names.
+/// Names that are not gate keys, and occupants not captured as directories, are
+/// ignored.
+pub(crate) fn captured_gate_verdict_keys(image: &RepositoryImage) -> Vec<GateKey> {
+    image
+        .directory_listings()
+        .get(&VirtualPath::GATE_VERDICTS)
+        .map(|listing| {
+            listing
+                .names()
+                .iter()
+                .filter_map(|name| GateKey::try_from(name.as_str()).ok())
+                .filter(|key| {
+                    matches!(
+                        image
+                            .entries()
+                            .get(&VirtualPath::gate_verdict_directory(key)),
+                        Some(RepositoryEntry::Directory { .. })
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The path of each verdict record the captured listings of
+/// [`captured_gate_verdict_keys`]' directories name. Names not of the form
+/// `<inputs-digest>.json` are ignored.
+pub(crate) fn captured_gate_verdict_records(image: &RepositoryImage) -> Vec<VirtualPath> {
+    captured_gate_verdict_keys(image)
+        .into_iter()
+        .flat_map(|key| {
+            image
+                .directory_listings()
+                .get(&VirtualPath::gate_verdict_directory(&key))
+                .into_iter()
+                .flat_map(|listing| listing.names().iter())
+                .filter_map(|name| {
+                    let digest = name.strip_suffix(".json")?;
+                    crate::domain::repository_inputs::InputsDigest::try_from(digest).ok()
+                })
+                .map(|digest| VirtualPath::gate_verdict_record(&key, &digest))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
 /// Serialize an issue to its exact on-disk bytes (pretty, no trailing newline).
 pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
     Ok(canonical_json(issue, true)?)
@@ -534,6 +582,11 @@ pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
 /// Serialize a gate-run result to its exact on-disk bytes.
 pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationError> {
     Ok(canonical_json(result, true)?)
+}
+
+/// Serialize a gate verdict record to its exact on-disk bytes.
+pub fn serialize_gate_verdict(record: &GateVerdictRecord) -> Result<Vec<u8>, MutationError> {
+    Ok(canonical_json(record, true)?)
 }
 
 /// Serialize a fresh (empty) index to its exact on-disk bytes.
@@ -568,20 +621,6 @@ pub(crate) fn canonical_json<T: Serialize + ?Sized>(
     }
 }
 
-/// Whether a captured `events.jsonl` prefix ends in a malformed, unterminated
-/// (torn) tail: a non-empty prefix not ending in a newline whose final line is
-/// not valid JSON. The finalizer — not command code — owns this inspection.
-pub fn prefix_has_torn_tail(prefix: &[u8]) -> bool {
-    if prefix.is_empty() || prefix.ends_with(b"\n") {
-        return false;
-    }
-    let final_line = prefix
-        .rsplit(|byte| *byte == b'\n')
-        .next()
-        .unwrap_or(prefix);
-    serde_json::from_slice::<serde_json::Value>(final_line).is_err()
-}
-
 /// Compose the bytes appended at the log's committed length: each event line with
 /// exactly one trailing newline.
 fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
@@ -592,14 +631,13 @@ fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
 }
 
 /// The captured event log's committed length, the end of its last
-/// newline-terminated line, and the uncommitted bytes after it, from a whole read
-/// or a tail that holds that whole line.
+/// newline-terminated line, from a whole read or a tail that holds that line.
 ///
 /// # Errors
 ///
 /// [`CaptureError::TailOnlyCapture`] for a tail that holds only part of the
 /// final line, which cannot say where that line starts.
-fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
+fn captured_log_end(image: &RepositoryImage) -> Result<u64, MutationError> {
     let (length, final_line) =
         if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
             let final_line = tail
@@ -611,7 +649,7 @@ fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationErr
             let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
             (log.len() as u64, final_line)
         };
-    Ok((length - final_line.len() as u64, final_line))
+    Ok(length - final_line.len() as u64)
 }
 
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
@@ -1020,6 +1058,34 @@ pub(super) fn finalize_delta(
             bytes: serialize_gate_run(&result)?,
             mode: FileMode::Regular,
         });
+        // A run holding a reusable verdict becomes its key's reuse source. The
+        // record sorts after the run directory it names, so it never names an
+        // unpublished run.
+        if let Some(digest) = result.reusable_digest() {
+            let path = VirtualPath::gate_verdict_record(&result.gate_key, digest);
+            for parent in path.ancestor_directories()? {
+                if matches!(image.entry(&parent)?, RepositoryEntry::Absent)
+                    && !actions.iter().any(|action| action.path() == &parent)
+                {
+                    actions.push(RepositoryAction::CreateDirectory {
+                        path: parent,
+                        owner: RepositoryActionOwner::RepositoryStateMutation,
+                        expected: ExpectedPreimage::Absent,
+                    });
+                }
+            }
+            let record = GateVerdictRecord {
+                issue_id: result.issue_id.clone(),
+                run_id: result.run_id.clone(),
+            };
+            actions.push(RepositoryAction::WriteFile {
+                expected: expected_of(image, &path)?,
+                path,
+                owner: RepositoryActionOwner::RepositoryStateMutation,
+                bytes: serialize_gate_verdict(&record)?,
+                mode: FileMode::Regular,
+            });
+        }
     }
 
     // Explicit provenance/audit events join the pending set.
@@ -1112,35 +1178,16 @@ fn compose_event_action(
     if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
         pending_events.push(record);
     }
-    let (committed_length, final_line) = captured_log_end(image)?;
-    // No reader consults the marker's torn-tail flag or its first-line position;
-    // 97f5f2b7 removes both with the field.
-    let torn_tail = prefix_has_torn_tail(final_line);
+    let committed_length = captured_log_end(image)?;
 
     let now = context.timestamp();
-    // Assign identifiers in canonical event order, stamping the single mutation
-    // timestamp and the torn-tail evidence.
+    // Assign identifiers in canonical event order and stamp the single mutation
+    // timestamp.
     pending_events.sort_by(PendingEvent::compare);
-    let mut events = pending_events
+    let events = pending_events
         .into_iter()
-        .map(|pending| {
-            Event::new(
-                context.allocate(),
-                now,
-                pending.body.with_isolated_torn_tail(torn_tail),
-            )
-        })
+        .map(|pending| Event::new(context.allocate(), now, pending.body))
         .collect::<Vec<_>>();
-    let marker = torn_tail
-        .then(|| {
-            events
-                .iter()
-                .position(|event| matches!(event.body(), EventBody::ProfileLifecycle { .. }))
-        })
-        .flatten();
-    if let Some(marker) = marker {
-        events[..=marker].rotate_right(1);
-    }
     let lines = events
         .iter()
         .map(serialize_event)
@@ -1269,7 +1316,7 @@ fn event_identities(body: &EventBody) -> (Option<IssueId>, EventSecondaryIdentit
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{GateState, GateStatus};
+    use crate::domain::{GateRunStatus, GateState, GateStatus};
     use crate::repository_state::{
         CapturedBytes, RepositoryEntry, RepositoryImage, RepositoryIndex,
         SUPPORTED_INDEX_SCHEMA_VERSION,
@@ -1678,7 +1725,7 @@ mod tests {
         let tail = crate::repository_state::EventLogTail::of_bytes(&log);
         let image = tail_image(tail.clone());
 
-        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())])
+        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_event())])
             .unwrap()
             .expect("a non-empty audit append composes an action");
 
@@ -1698,17 +1745,17 @@ mod tests {
         );
     }
 
-    /// A tail whose window starts inside the final line cannot say where that
-    /// line starts, so the composer refuses it rather than guess the offset.
+    /// A tail whose window starts inside the final line cannot determine the
+    /// committed append offset.
     #[test]
-    fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
+    fn test_event_append_requires_a_tail_that_holds_the_final_line() {
         let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW;
         let partial =
             crate::repository_state::EventLogTail::new(2 * window, vec![b'x'; window as usize]);
         let image = tail_image(partial.unwrap());
 
         assert!(matches!(
-            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())]),
+            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_event())]),
             Err(MutationError::Capture(CaptureError::TailOnlyCapture(_)))
         ));
     }
@@ -1723,7 +1770,7 @@ mod tests {
         let action = finalize_audit_append(
             &image,
             &annotated_ctx(),
-            vec![(2, profile_lifecycle_marker())],
+            vec![(2, profile_lifecycle_event())],
         )
         .unwrap()
         .expect("a non-empty audit append composes an action");
@@ -2219,6 +2266,195 @@ mod tests {
         );
     }
 
+    fn verdict_digest() -> crate::domain::repository_inputs::InputsDigest {
+        crate::domain::repository_inputs::InputsDigest::try_from("c".repeat(64)).unwrap()
+    }
+
+    /// A run of `cargo-ci` its derived id names, executed over [`verdict_digest`].
+    fn executed_run(context: &MutationContext, status: GateRunStatus) -> GateRunResult {
+        let mut run = GateRunResult::attestation(
+            &context.gate_run_id_at(0),
+            &crate::test_utils::issue_id(7),
+            &"cargo-ci".parse().unwrap(),
+            crate::declarations::GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.origin = crate::domain::GateVerdictOrigin::Executed;
+        run.status = status;
+        run.inputs_digest = Some(verdict_digest());
+        run
+    }
+
+    /// An image holding `gate-runs` and, when `prior` is set, a verdict record
+    /// for `cargo-ci` over [`verdict_digest`] naming `prior`.
+    fn verdict_image(
+        context: &MutationContext,
+        prior: Option<&GateVerdictRecord>,
+    ) -> RepositoryImage {
+        let gate_key = "cargo-ci".parse().unwrap();
+        let run_id = context.gate_run_id_at(0);
+        let directory = || RepositoryEntry::Directory {
+            identity: crate::repository_state::EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let builder = ImageBuilder::new()
+            .entry(VirtualPath::GATE_RUNS, directory())
+            .entry(
+                VirtualPath::gate_run_directory(&run_id),
+                RepositoryEntry::Absent,
+            )
+            .entry(
+                VirtualPath::gate_run_record(&run_id),
+                RepositoryEntry::Absent,
+            );
+        let record = VirtualPath::gate_verdict_record(&gate_key, &verdict_digest());
+        match prior {
+            None => builder
+                .entry(VirtualPath::GATE_VERDICTS, RepositoryEntry::Absent)
+                .entry(
+                    VirtualPath::gate_verdict_directory(&gate_key),
+                    RepositoryEntry::Absent,
+                )
+                .entry(record, RepositoryEntry::Absent),
+            Some(prior) => builder
+                .entry(VirtualPath::GATE_VERDICTS, directory())
+                .entry(VirtualPath::gate_verdict_directory(&gate_key), directory())
+                .entry(record, file_entry(&serialize_gate_verdict(prior).unwrap())),
+        }
+        .build()
+    }
+
+    /// The delta actions under `gate-runs/verdicts`.
+    fn verdict_actions(delta: &RepositoryDelta) -> Vec<&RepositoryAction> {
+        delta
+            .actions()
+            .iter()
+            .filter(|action| {
+                action
+                    .path()
+                    .relative()
+                    .as_path()
+                    .starts_with(VirtualPath::GATE_VERDICTS.relative().as_path())
+            })
+            .collect()
+    }
+
+    fn record_run(
+        image: &RepositoryImage,
+        context: &MutationContext,
+        run: GateRunResult,
+    ) -> RepositoryDelta {
+        finalize(
+            &synthetic_layout(),
+            image,
+            context,
+            &[MutationIntent::RecordGateRun {
+                draft: Box::new(run),
+            }],
+        )
+        .unwrap()
+        .delta()
+        .clone()
+    }
+
+    #[test]
+    fn test_finalize_gate_run_with_a_reusable_verdict_writes_its_verdict_record() {
+        let context = ctx();
+        let image = verdict_image(&context, None);
+        for status in [GateRunStatus::Passed, GateRunStatus::Failed] {
+            let run = executed_run(&context, status);
+            let delta = record_run(&image, &context, run.clone());
+
+            let record = VirtualPath::gate_verdict_record(&run.gate_key, &verdict_digest());
+            let expected = GateVerdictRecord {
+                issue_id: run.issue_id.clone(),
+                run_id: run.run_id.clone(),
+            };
+            assert!(
+                matches!(
+                    verdict_actions(&delta).as_slice(),
+                    [
+                        RepositoryAction::CreateDirectory { path: verdicts, expected: ExpectedPreimage::Absent, .. },
+                        RepositoryAction::CreateDirectory { path: gate, expected: ExpectedPreimage::Absent, .. },
+                        RepositoryAction::WriteFile { path, bytes, expected: ExpectedPreimage::Absent, .. },
+                    ] if *verdicts == VirtualPath::GATE_VERDICTS
+                        && *gate == VirtualPath::gate_verdict_directory(&run.gate_key)
+                        && *path == record
+                        && serde_json::from_slice::<GateVerdictRecord>(bytes).unwrap() == expected
+                ),
+                "{status:?}: {:?}",
+                delta.actions()
+            );
+        }
+    }
+
+    #[test]
+    fn test_finalize_gate_run_with_a_reusable_verdict_replaces_the_keys_prior_record() {
+        let context = ctx();
+        let prior = GateVerdictRecord {
+            issue_id: crate::test_utils::issue_id(3),
+            run_id: crate::test_utils::gate_run_id(9),
+        };
+        let image = verdict_image(&context, Some(&prior));
+        let run = executed_run(&context, GateRunStatus::Passed);
+        let record = VirtualPath::gate_verdict_record(&run.gate_key, &verdict_digest());
+
+        let delta = record_run(&image, &context, run.clone());
+
+        assert!(
+            matches!(
+                verdict_actions(&delta).as_slice(),
+                [RepositoryAction::WriteFile { path, bytes, expected, .. }]
+                    if *path == record
+                        && *expected == ExpectedPreimage::of(image.entry(&record).unwrap())
+                        && serde_json::from_slice::<GateVerdictRecord>(bytes).unwrap().run_id == run.run_id
+            ),
+            "{:?}",
+            delta.actions()
+        );
+    }
+
+    #[test]
+    fn test_finalize_gate_run_without_a_reusable_verdict_writes_no_verdict_record() {
+        let context = ctx();
+        let image = verdict_image(&context, None);
+        let executed = executed_run(&context, GateRunStatus::Passed);
+        let runs = [
+            GateRunResult {
+                inputs_digest: None,
+                ..executed.clone()
+            },
+            GateRunResult {
+                status: GateRunStatus::Error,
+                ..executed.clone()
+            },
+            GateRunResult {
+                origin: crate::domain::GateVerdictOrigin::Reused {
+                    source_issue: crate::test_utils::issue_id(3),
+                    source_run: crate::test_utils::gate_run_id(9),
+                },
+                ..executed.clone()
+            },
+            GateRunResult {
+                origin: crate::domain::GateVerdictOrigin::Attested,
+                ..executed
+            },
+        ];
+        for run in runs {
+            let delta = record_run(&image, &context, run.clone());
+            assert!(
+                verdict_actions(&delta).is_empty(),
+                "{run:?}: {:?}",
+                delta.actions()
+            );
+            assert!(delta
+                .actions()
+                .iter()
+                .any(|action| action.path() == &VirtualPath::gate_run_record(&run.run_id)));
+        }
+    }
+
     #[test]
     fn test_finalize_creation_orders_events_and_assigns_frozen_identity_sequence() {
         let ids = IdAuthority::from_seed([7u8; 32]);
@@ -2530,14 +2766,6 @@ mod tests {
         assert_eq!(persisted.done_at, Some(fixed_instant()));
     }
 
-    #[test]
-    fn test_torn_tail_detection() {
-        assert!(!prefix_has_torn_tail(b""));
-        assert!(!prefix_has_torn_tail(b"{\"type\":\"x\"}\n"));
-        assert!(prefix_has_torn_tail(b"{\"type\":\"x\"}\n{\"partial"));
-        assert!(!prefix_has_torn_tail(b"{\"a\":1}"));
-    }
-
     /// The finalizer's event-log action over `image`: its offset and bytes.
     fn event_append(image: &RepositoryImage, intents: &[MutationIntent]) -> (u64, Vec<u8>) {
         let plan = finalize(&synthetic_layout(), image, &ctx(), intents).unwrap();
@@ -2562,7 +2790,7 @@ mod tests {
         ))
         .unwrap();
         let terminated = [prior.as_slice(), b"\n"].concat();
-        let torn = [terminated.as_slice(), b"{\"parti"].concat();
+        let unterminated = [terminated.as_slice(), b"{\"parti"].concat();
         // Final lines longer than the tail window, read back to their start.
         let long = serialize_event(&crate::test_utils::stamped_event(
             EventBody::draft_gate_definition_created(
@@ -2575,7 +2803,7 @@ mod tests {
         ))
         .unwrap();
         let long_valid = [terminated.as_slice(), &long].concat();
-        let long_torn = [
+        let long_unterminated = [
             terminated.as_slice(),
             &vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize],
         ]
@@ -2596,10 +2824,10 @@ mod tests {
                 "cargo-ci".parse().unwrap(),
             )),
         };
-        let cases = [Vec::new(), terminated.clone(), prior.clone(), torn]
+        let cases = [Vec::new(), terminated.clone(), prior.clone(), unterminated]
             .map(whole)
             .into_iter()
-            .chain([long_valid, long_torn].map(tail));
+            .chain([long_valid, long_unterminated].map(tail));
         for (log, image) in cases {
             let (offset, appended) = event_append(&image, std::slice::from_ref(&record));
 
@@ -2625,13 +2853,13 @@ mod tests {
         }
     }
 
-    fn profile_lifecycle_marker() -> EventBody {
+    fn profile_lifecycle_event() -> EventBody {
         EventBody::draft_profile_lifecycle(
             crate::domain::ProfileLifecycleOperation::Apply,
             vec![crate::domain::ProfileLifecycleProfile {
                 id: "example"
                     .try_into()
-                    .expect("the profile marker has a canonical identifier"),
+                    .expect("the profile event has a canonical identifier"),
                 version: semver::Version::new(1, 0, 0),
                 status: crate::domain::ProfileLifecycleStatus::Installed,
                 variables: Default::default(),
@@ -2639,7 +2867,7 @@ mod tests {
         )
     }
 
-    fn torn_log() -> Vec<u8> {
+    fn log_with_unterminated_fragment() -> Vec<u8> {
         let event = crate::test_utils::stamped_event(
             EventBody::draft_issue_completed(crate::test_utils::issue_id(1)),
             "e0",
@@ -2649,9 +2877,12 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_orders_the_stamped_marker_first_over_a_torn_tail() {
+    fn test_finalize_keeps_canonical_event_order_when_tail_is_unterminated() {
         let image = ImageBuilder::new()
-            .entry(VirtualPath::EVENTS, file_entry(&torn_log()))
+            .entry(
+                VirtualPath::EVENTS,
+                file_entry(&log_with_unterminated_fragment()),
+            )
             .build();
         let record = |event| MutationIntent::RecordEvent {
             phase: 0,
@@ -2663,17 +2894,18 @@ mod tests {
                 record(EventBody::draft_gate_definition_created(
                     "cargo-ci".parse().unwrap(),
                 )),
-                record(profile_lifecycle_marker()),
+                record(profile_lifecycle_event()),
             ],
         );
 
         let events = crate::domain::event_log::parse_known_events(&appended).unwrap();
         assert!(matches!(
             events[0].body(),
-            EventBody::ProfileLifecycle {
-                isolated_torn_tail: true,
-                ..
-            }
+            EventBody::GateDefinitionCreated { .. }
+        ));
+        assert!(matches!(
+            events[1].body(),
+            EventBody::ProfileLifecycle { .. }
         ));
     }
 

@@ -341,9 +341,17 @@ impl IssueIdPrefix {
         &self.requested
     }
 
+    pub(crate) fn normalised(&self) -> &str {
+        &self.normalised
+    }
+
     /// Whether this prefix names `id`.
     pub fn matches(&self, id: &IssueId) -> bool {
-        normalise(id.as_str()).starts_with(&self.normalised)
+        id.as_str()
+            .bytes()
+            .filter(|byte| *byte != b'-')
+            .take(self.normalised.len())
+            .eq(self.normalised.bytes())
     }
 }
 
@@ -888,6 +896,35 @@ mod tests {
                 })
                 .collect();
             prop_assert!(IssueIdPrefix::try_from(requested.as_str()).unwrap().matches(&IssueId::try_from(id).unwrap()));
+        }
+
+        #[test]
+        fn test_matches_agrees_with_normalised_candidate(
+            id in canonical_id(),
+            other in canonical_id(),
+            len in IssueIdPrefix::MIN_ID_PREFIX_LENGTH..=33usize,
+            spelling in proptest::collection::vec((any::<bool>(), 0usize..3), 33),
+            trailing_hyphens in 0usize..3,
+        ) {
+            let candidate = IssueId::try_from(id.as_str()).unwrap();
+            for source in [&id, &other] {
+                let mut requested: String = normalise(source)
+                    .chars()
+                    .chain(std::iter::once('0'))
+                    .take(len)
+                    .zip(&spelling)
+                    .map(|(c, (upper, hyphens))| {
+                        let c = if *upper { c.to_ascii_uppercase() } else { c };
+                        format!("{}{c}", "-".repeat(*hyphens))
+                    })
+                    .collect();
+                requested.push_str(&"-".repeat(trailing_hyphens));
+                let prefix = IssueIdPrefix::try_from(requested.as_str()).unwrap();
+                prop_assert_eq!(
+                    prefix.matches(&candidate),
+                    normalise(&id).starts_with(&normalise(&requested)),
+                );
+            }
         }
     }
 

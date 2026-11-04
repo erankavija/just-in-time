@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e5bfcbe79e36f080db822f4def585e84c10b123",
+  "completed_at": "2026-11-04T00:23:55.385168539Z",
+  "duration_ms": 257494,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "web/src/types/models.ts",
+        "id": "F1",
+        "line": 50,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/93b7f1dd/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "Required web tests, lint, and production build remain unverified because npm-ci is pending."
+      }
+    ],
+    "summary": "The web validation required by hard REQ-04 has not been recorded.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "93b7f1dd-109a-4b89-a0e5-0427b3b645e1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8eab254c-7dce-48fc-9c9f-ed83879486b6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:19:37.891003702Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13652 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a3ec-f603-7321-ba06-422e815c8304\n--------\nuser\n--- 13639 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 95ff0c53f feat(jit:93b7f1dd): reused verdicts name their source issue and source run\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 and D-20 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-01 and REQ-02; @/issue/93b7f1dd/requirement/REQ-01, REQ-02, REQ-03, and REQ-04 (issue descriptions); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T00:14:33Z); doc-review pending; docs-mechanical pending; npm-ci pending\nTruncation recovery: Re-read bounded config/gate sections and resolved each relevant item directly after broad item-search output truncated.\n\n1. [blocking][issue-impact] `web/src/types/models.ts:50` correctly adds `source_issue`, but REQ-04 also requires web tests, lint, and production build to pass. The required `npm-ci` projection is still pending, so that hard criterion remains materially unverified for the changed web contract. References: `@/issue/93b7f1dd/requirement/REQ-04`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The web validation required by hard REQ-04 has not been recorded.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Required web tests, lint, and production build remain unverified because npm-ci is pending.\",\"file\":\"web/src/types/models.ts\",\"line\":50,\"references\":[\"@/issue/93b7f1dd/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

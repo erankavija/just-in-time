@@ -53,45 +53,6 @@ fn ttl_strategy() -> impl Strategy<Value = u64> {
     ]
 }
 
-// Property 1: Index rebuild produces consistent results
-// The same log rebuilt twice produces the same set of active issues
-proptest! {
-    #![proptest_config(io_config())]
-    #[test]
-    fn test_index_rebuild_idempotent(
-        issue_ids in prop::collection::vec(issue_id_strategy(), 1..10),
-        ttls in prop::collection::vec(ttl_strategy(), 1..10)
-    ) {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Acquire multiple leases
-        let issue_count = issue_ids.len().min(ttls.len());
-        for i in 0..issue_count {
-            coordinator.acquire_claim_synchronized(
-                &issue_ids[i], ttls[i], Some("test lease"),
-                ClaimAcquireLimits::new(100, 100), |_| Ok(()),
-            ).unwrap();
-        }
-
-        // Rebuild index twice
-        let index1 = coordinator.rebuild_index_from_log().unwrap();
-        let index2 = coordinator.rebuild_index_from_log().unwrap();
-
-        // Indexes should have same structure
-        prop_assert_eq!(index1.leases.len(), index2.leases.len());
-        prop_assert_eq!(index1.last_seq, index2.last_seq);
-
-        // Same set of issue IDs (order may differ)
-        let mut issues1: Vec<_> = index1.leases.iter().map(|l| &l.issue_id).collect();
-        let mut issues2: Vec<_> = index2.leases.iter().map(|l| &l.issue_id).collect();
-        issues1.sort();
-        issues2.sort();
-        prop_assert_eq!(issues1, issues2,
-            "Rebuilt indexes should contain same set of issues");
-    }
-}
-
 // Property 2: Lease count invariant
 // Number of active leases = acquires - (releases + evictions)
 proptest! {
@@ -123,13 +84,12 @@ proptest! {
             coordinator.force_evict_lease(&lease.lease_id, "test release").unwrap();
         }
 
-        // Rebuild index and verify count
-        let index = coordinator.rebuild_index_from_log().unwrap();
+        let stored = read_leases(&coordinator.paths).unwrap().len();
         let expected_active = acquired_count - released_count;
 
-        prop_assert_eq!(index.leases.len(), expected_active,
+        prop_assert_eq!(stored, expected_active,
             "Active leases ({}) should equal acquired ({}) minus released ({})",
-            index.leases.len(), acquired_count, released_count);
+            stored, acquired_count, released_count);
     }
 }
 
@@ -231,48 +191,6 @@ proptest! {
     }
 }
 
-// Property 5: No data loss in index rebuild
-// Every acquired lease appears in rebuilt index (unless expired/released)
-proptest! {
-    #![proptest_config(io_config())]
-    #[test]
-    fn test_no_data_loss_in_rebuild(
-        issue_ids in prop::collection::hash_set(issue_id_strategy(), 1..10)
-    ) {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        let mut lease_ids = Vec::new();
-
-        // Acquire leases with long TTL (won't expire during test)
-        for issue_id in &issue_ids {
-            let (lease, ()) = coordinator.acquire_claim_synchronized(
-                issue_id, 3600, Some("test lease"),
-                ClaimAcquireLimits::new(100, 100), |_| Ok(()),
-            ).unwrap();
-            lease_ids.push(lease.lease_id);
-        }
-
-        // Rebuild index
-        let index = coordinator.rebuild_index_from_log().unwrap();
-
-        // All acquired leases should be in index
-        for lease_id in &lease_ids {
-            prop_assert!(
-                index.leases.iter().any(|l| l.lease_id == *lease_id),
-                "Lease {} should be in rebuilt index", lease_id
-            );
-        }
-
-        prop_assert_eq!(index.leases.len(), lease_ids.len(),
-            "Index should contain exactly the acquired leases");
-    }
-}
-
-// Note: Expired lease filtering is tested in example-based tests
-// (test_rebuild_index_filters_expired_leases) to avoid slow property tests
-// that would need to sleep for expiration.
-
 // Property 7: Concurrent claims on different issues succeed
 proptest! {
     #![proptest_config(io_config())]
@@ -331,7 +249,6 @@ proptest! {
             acquired_at: now - chrono::Duration::seconds(secs_since_beat as i64),
             expires_at: None,
             last_beat: now - chrono::Duration::seconds(secs_since_beat as i64),
-            stale: false, // Not yet computed
         };
 
         let is_stale = lease.is_stale(now);
@@ -340,6 +257,34 @@ proptest! {
         prop_assert_eq!(is_stale, expected,
             "Staleness({}) should equal (secs_since_beat {} > built-in threshold)",
             is_stale, secs_since_beat);
+    }
+}
+
+// Property 8b: Recovery reclaims exactly the indefinite leases listings report stale
+proptest! {
+    #![proptest_config(io_config())]
+    #[test]
+    fn test_evict_lapsed_reclaims_an_indefinite_lease_iff_it_is_stale(
+        secs_since_beat in 0u64..2 * crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS
+    ) {
+        use crate::storage::clock::FixedClock;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = chrono::Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let lease = coordinator.acquire_claim_synchronized(
+            &crate::test_utils::issue_id(54), 0, Some("test lease"),
+            ClaimAcquireLimits::new(1, 1), |_| Ok(()),
+        ).unwrap().0;
+        let now = base + chrono::Duration::seconds(secs_since_beat as i64);
+        clock.set(now);
+
+        let lapsed = coordinator.evict_lapsed().unwrap();
+
+        let stale = lease.is_stale(now);
+        prop_assert_eq!(lapsed.reclaimed == 1, stale);
+        prop_assert_eq!(read_leases(&coordinator.paths).unwrap().is_empty(), stale);
     }
 }
 
@@ -361,7 +306,6 @@ proptest! {
             acquired_at: now - chrono::Duration::seconds(secs_since_beat as i64),
             expires_at: Some(now + chrono::Duration::seconds(3600)),
             last_beat: now - chrono::Duration::seconds(secs_since_beat as i64),
-            stale: false,
         };
 
         let is_stale = lease.is_stale(now);
@@ -370,42 +314,5 @@ proptest! {
         prop_assert!(!is_stale,
             "Finite lease (ttl={}) should never be stale, regardless of last_beat ({}s ago)",
             ttl, secs_since_beat);
-    }
-}
-
-// Property 10: Staleness field is correctly set during index rebuild
-proptest! {
-    #![proptest_config(io_config())]
-    #[test]
-    fn test_staleness_computed_during_rebuild(
-        issue_ids in prop::collection::vec(issue_id_strategy(), 1..5)
-    ) {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Acquire indefinite leases
-        for issue_id in &issue_ids {
-            coordinator.acquire_claim_synchronized(
-                issue_id, 0, Some("test lease"),
-                ClaimAcquireLimits::new(100, 100), |_| Ok(()),
-            ).unwrap();
-        }
-
-        // Rebuild index - staleness should be computed
-        let index = coordinator.rebuild_index_from_log().unwrap();
-
-        for lease in &index.leases {
-            if lease.ttl_secs == 0 {
-                // For indefinite leases, verify stale matches is_stale()
-                let expected_stale = lease.is_stale(index.generated_at);
-                prop_assert_eq!(lease.stale, expected_stale,
-                    "Lease {} stale field ({}) should match is_stale() ({})",
-                    lease.lease_id, lease.stale, expected_stale);
-            } else {
-                // Finite leases should have stale = false
-                prop_assert!(!lease.stale,
-                    "Finite lease {} should have stale=false", lease.lease_id);
-            }
-        }
     }
 }

@@ -177,13 +177,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     ) -> Result<Vec<jit::domain::GateRunResult>> {
         self.inner.list_gate_runs_for_issue(issue_id)
     }
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &jit::domain::identity::GateKey,
-        digest: &jit::domain::repository_inputs::InputsDigest,
-    ) -> Result<Option<jit::domain::GateRunResult>> {
-        self.inner.find_reusable_gate_run(gate_key, digest)
-    }
     fn root(&self) -> &std::path::Path {
         self.inner.root()
     }

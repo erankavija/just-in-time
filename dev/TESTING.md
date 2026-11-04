@@ -125,7 +125,7 @@ impl TestHarness {
 impl Default for TestHarness { /* delegates to new() */ }
 ```
 
-`new()` initializes the storage and enables test mode. The helpers cover the common
+`new()` initializes the storage. The helpers cover the common
 shapes; anything else goes through `h.executor` (any command) or `h.storage` (direct
 `IssueStore` calls).
 
@@ -208,7 +208,7 @@ New and migrated CLI tests spawn `jit` through `jit::test_cli::JitCli`, the one 
 subprocess fixture. It owns a temporary repository (`uninitialised()`, `initialised()` by
 `jit init`, or `with_repository(TempDir)` for one built by shared test support) and removes it
 on drop. `command(args)` yields a `std::process::Command` for the target's `jit` with the
-repository as working directory, test mode on and every inherited `JIT_*` variable removed;
+repository as working directory and every inherited `JIT_*` variable removed;
 `command_with_env` sets a variable for that process alone, so tests keep `assert_cmd`'s
 assertion traits. `run` and `run_json` return stdout or parsed `--json` output,
 `create_issue` returns the created id from `--json`, and `init_git` (backed by
@@ -512,9 +512,7 @@ repair correctness across every owned class of a real profile package.
 
 `test_concurrent_fresh_profile_init_publishes_one_coherent_repository` races real threads
 through real initialization; `test_concurrent_writer_observes_failed_apply_preimage_then_publishes`
-does the same across a real write barrier. `test_rebuild_index_filters_expired_leases`
-acquires a lease with a real 1s TTL and sleeps 1.1s past it, because expiry is a real clock
-property, not a mocked one. `test_start_watching_ignores_events_jsonl` starts a real
+does the same across a real write barrier. `test_start_watching_ignores_events_jsonl` starts a real
 filesystem watcher and sleeps past its own real debounce window; it is compiled once into
 the `jit-server` crate's library test target and once into its binary target, so it runs —
 and is measured — twice.
@@ -543,16 +541,10 @@ and each scenario runs multiple real `jit` subprocess invocations.
 `test_resolve_ambiguous` creates real issues through the full command pipeline until
 two land on the same 4-character id prefix — the property under test, ambiguous-prefix
 rejection, cannot be observed without a real collision.
-`test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` writes 257 real
-gate-run directories to disk, plus a real named pipe via `mkfifo` alongside a stray file and
-symlink, to prove the precheck's history capture holds at a real page-scale size rather than
-a handful of examples, and ignores clutter mixed into the same directory that is not itself
-a run.
 
 | Test | Warm (ms) |
 | --- | ---: |
 | `short_hash_tests::test_resolve_ambiguous` | 1,969 |
-| `commands::gate_check::tests::test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` | 517 |
 
 ### Repeated real gate execution
 
@@ -578,10 +570,8 @@ ran rather than what the sources appear to declare.
 
 ## Test Environment
 
-Three environment behaviors matter when writing tests:
+Two environment behaviors matter when writing tests:
 
-- **`JIT_TEST_MODE`** disables the claims-index validation inside `jit validate` in a live
-  repository. Tests that spawn the binary pass the variable with `Command::env`; `JitCli` does.
 - **Process-wide state** (environment variables, working directory) is never changed, so tests
   read it and run in parallel without a lock. A test that varies a value passes it explicitly
   (`Command::env`, `Command::current_dir`, a function parameter, an absolute path).

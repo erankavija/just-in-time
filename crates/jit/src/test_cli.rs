@@ -1,12 +1,12 @@
 //! Shared fixture for tests that spawn the `jit` binary.
 //!
 //! A [`JitCli`] owns a temporary repository and builds every `Command` through
-//! one convention: working directory at the repository, test mode on, and no
-//! inherited `JIT_*` variable.
+//! one convention: working directory at the repository and no inherited
+//! `JIT_*` variable.
 
 use crate::repository_state::{
     repository_relative_path, RepositoryRootClass, RootRelativePath, VirtualPath,
-    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
     REPO_WRITE_LOCK_FILE,
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
@@ -183,7 +183,6 @@ impl JitCli {
         product_vars(std::env::vars_os().map(|(name, _)| name)).for_each(|name| {
             command.env_remove(name);
         });
-        command.env("JIT_TEST_MODE", "1");
         command
     }
 
@@ -324,7 +323,6 @@ fn machine_local_ignores() -> Result<Vec<String>> {
     let data_locks = [
         REPO_WRITE_LOCK_FILE,
         INDEX_LOCK_FILE,
-        GATES_LOCK_FILE,
         EVENTS_LOCK_FILE,
         RECORD_SCRATCH_DIR,
     ]
@@ -402,7 +400,6 @@ mod tests {
             Some("agent:given")
         );
         assert_eq!(value(&plain, "JIT_AGENT_ID"), None);
-        assert_eq!(value(&plain, "JIT_TEST_MODE").as_deref(), Some("1"));
     }
 
     /// A global hook rejects every commit, so a successful commit proves the

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07baa8b46c48ab4b0b83c5b3f42106b7710e0a2e",
+  "completed_at": "2026-11-04T01:09:18.058877056Z",
+  "duration_ms": 164098,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged change satisfies the issue-scoped address-index, captured-kind reuse, and focused unit-test criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "001a9c46-75ce-45a5-8ca3-7dffa4352736",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "11c6e98b-e62f-48e0-b580-e90c6bb69c0b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T01:06:33.959887382Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 56ea0c9b7 (`jit:001a9c46`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-07 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T01:04:36Z)\nTruncation recovery: focused reads of materialize.rs, validate.rs, repository.rs, item.rs, and declaration flow after one broad search truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged change satisfies the issue-scoped address-index, captured-kind reuse, and focused unit-test criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

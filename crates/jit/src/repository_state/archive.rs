@@ -7,32 +7,32 @@ use super::{
     RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{
-    archive_executions, ArchiveExecution, ArchiveExecutionResult, ArchivePublication,
+    ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult, ArchivePublication,
 };
 use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ContentIdentity, PlanError, PlanTarget, PlanWarning,
     ReferenceChange, WarningCode,
 };
-use crate::domain::event_log::EventLogError;
 use crate::domain::identity::IssueId;
-use crate::domain::{Event, EventBody, Issue, State};
+use crate::domain::{EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Close a captured archive plan into one materialization plan, which
-/// publishes as one redo record.
+/// publishes as one redo record. `evidence` is the target record decoded by
+/// the planner from the same image.
 pub fn finalize_archive_execution(
     image: &RepositoryImage,
     context: &MutationContext,
     plan: &ArtifactPlan,
+    mut evidence: ArchiveEvidenceRecord,
 ) -> Result<(MaterializationPlan, ArchiveExecutionResult), RepositoryStateError> {
     let artifacts = plan
         .executable_artifacts()
         .map_err(ArchiveExecutionError::Plan)?;
     crate::domain::artifact_classifier::validate_proposed_layout(plan)
         .map_err(ArchiveExecutionError::Producer)?;
-    let prior = archive_executions(&captured_archive_events(image)?);
     let (covered_publications, covered_changes) =
-        archive_coverage(&prior, plan.target(), plan.destination_root());
+        archive_coverage(&evidence.executions, plan.target(), plan.destination_root());
     let mut actions = Vec::new();
     let mut publications = Vec::new();
     let mut created_directories = BTreeSet::new();
@@ -302,18 +302,30 @@ pub fn finalize_archive_execution(
         })
         .collect::<Result<Vec<_>, ArchiveExecutionError>>()?;
     if event_needed {
+        let execution = ArchiveExecution {
+            target: plan.target().clone(),
+            destination_root: plan.destination_root().into(),
+            publications: publications.clone(),
+            reference_changes: event_changes.clone(),
+            planned_deletions: planned_deletions.clone(),
+            reconciling,
+        };
+        let path = VirtualPath::archive_evidence_record(plan.target());
+        let entry = captured_entry(image, &path)?;
+        evidence.executions.push(execution.clone());
+        create_ancestors(image, &path, &mut created_directories, &mut actions)?;
+        actions.push(RepositoryAction::WriteFile {
+            path,
+            owner: RepositoryActionOwner::ArchiveExecution,
+            expected: ExpectedPreimage::of(entry),
+            bytes: super::canonical_json(&evidence, true)
+                .map_err(MutationError::from)
+                .map_err(ArchiveExecutionError::Mutation)?,
+            mode: FileMode::Regular,
+        });
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(EventBody::draft_artifact_archive_executed(
-                ArchiveExecution {
-                    target: plan.target().clone(),
-                    destination_root: plan.destination_root().into(),
-                    publications: publications.clone(),
-                    reference_changes: event_changes.clone(),
-                    planned_deletions: planned_deletions.clone(),
-                    reconciling,
-                },
-            )),
+            event: Box::new(EventBody::draft_artifact_archive_executed(execution)),
         });
     }
     if let Some(event) = state_event {
@@ -451,17 +463,6 @@ fn captured_issue<'a>(
         .ok_or_else(|| ArchiveExecutionError::CapturedIssueCacheLost(id.clone()))
 }
 
-pub(crate) fn captured_archive_events(
-    image: &RepositoryImage,
-) -> Result<Vec<Event>, ArchiveExecutionError> {
-    let path = VirtualPath::EVENTS;
-    let bytes = image
-        .file_bytes(&path)
-        .map_err(ProducerError::from)?
-        .unwrap_or_default();
-    crate::domain::event_log::parse_known_events(bytes).map_err(ArchiveExecutionError::EventLog)
-}
-
 /// A typed failure raised while finalizing one archive execution.
 ///
 /// Composed into [`RepositoryStateError::ArchiveExecution`]. Fields hold paths
@@ -542,9 +543,6 @@ pub enum ArchiveExecutionError {
     /// The archive plan's artifacts were not eligible for execution.
     #[error(transparent)]
     Plan(#[from] PlanError),
-    /// The captured event log could not be parsed.
-    #[error(transparent)]
-    EventLog(#[from] EventLogError),
     /// A materialization producer failed reading captured evidence or
     /// canonicalizing a path, including the proposed-layout edge check.
     #[error(transparent)]
@@ -606,6 +604,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::domain::artifact_execution::archive_executions;
     use crate::domain::artifact_plan::{
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
@@ -683,10 +682,118 @@ mod tests {
         image: &RepositoryImage,
         plan: &ArtifactPlan,
     ) -> ArchiveExecutionError {
-        match finalize_archive_execution(image, &context(), plan).unwrap_err() {
+        match finalize_archive_execution(
+            image,
+            &context(),
+            plan,
+            ArchiveEvidenceRecord {
+                target: plan.target().clone(),
+                executions: Vec::new(),
+            },
+        )
+        .unwrap_err()
+        {
             RepositoryStateError::ArchiveExecution(error) => error,
             other => panic!("expected a typed archive-execution error, got {other:?}"),
         }
+    }
+
+    fn evidence_write(
+        prior: Option<serde_json::Value>,
+    ) -> (serde_json::Value, Vec<ArchiveExecution>) {
+        let path = VirtualPath::archive_evidence_record(&PlanTarget::Document {
+            path: "doc.md".into(),
+        });
+        let directory = if prior.is_some() {
+            directory_entry()
+        } else {
+            RepositoryEntry::Absent
+        };
+        let plan = move_artifact(
+            "doc.md",
+            "archived.md",
+            ContentIdentity::from_bytes(b"content"),
+        );
+        let evidence = prior.clone().map_or_else(
+            || ArchiveEvidenceRecord {
+                target: plan.target().clone(),
+                executions: Vec::new(),
+            },
+            |value| serde_json::from_value(value).unwrap(),
+        );
+        let entry = prior.map_or(RepositoryEntry::Absent, |value| {
+            file_entry(&serde_json::to_vec(&value).unwrap())
+        });
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::ARCHIVE_EVIDENCE, directory.clone())
+            .entry(
+                path.ancestor_directories().unwrap().pop().unwrap(),
+                directory,
+            )
+            .entry(path.clone(), entry.clone())
+            .file("doc.md", b"content")
+            .entry("archived.md", RepositoryEntry::Absent)
+            .build();
+        let (materialization, _) =
+            finalize_archive_execution(&image, &context(), &plan, evidence).unwrap();
+        let actions = materialization.delta().actions();
+        let written = actions
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile {
+                    path: found,
+                    bytes,
+                    expected,
+                    ..
+                } if found == &path => {
+                    assert_eq!(expected, &ExpectedPreimage::of(&entry));
+                    Some(serde_json::from_slice(bytes).unwrap())
+                }
+                _ => None,
+            })
+            .expect("the event's delta must also write the target evidence");
+        let events = actions
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::AppendEvents { bytes, .. } => {
+                    Some(crate::domain::event_log::parse_known_events(bytes).unwrap())
+                }
+                _ => None,
+            })
+            .unwrap();
+        (written, archive_executions(&events))
+    }
+
+    #[test]
+    fn test_finalize_archive_execution_creates_evidence_with_its_event() {
+        let (written, executions) = evidence_write(None);
+        assert_eq!(
+            written,
+            serde_json::json!({
+                "target": executions[0].target,
+                "executions": executions,
+            })
+        );
+    }
+
+    #[test]
+    fn test_finalize_archive_execution_appends_to_captured_evidence_in_order() {
+        let prior = crate::test_utils::archive_execution(
+            PlanTarget::Document {
+                path: "doc.md".into(),
+            },
+            "earlier",
+            &[],
+        );
+        let (written, executions) = evidence_write(Some(serde_json::json!({
+            "target": prior.target,
+            "executions": [prior.clone()],
+        })));
+        assert_eq!(
+            written["executions"],
+            serde_json::json!([prior, executions[0]])
+        );
     }
 
     #[test]

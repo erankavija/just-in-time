@@ -539,12 +539,12 @@ impl CommandSchema {
                 });
                 (Some(union), "IssueShowResponse")
             }
-            // `issue create --json` returns the same enriched projection as
-            // `issue show`, so its gate list is the `gates` array, not the raw
+            // `issue create --json` returns the `issue show` projection with its
+            // findings, so its gate list is the `gates` array, not the raw
             // stored record.
             "issue_create" => (
-                Some(schema_to_value::<IssueShowResponse>()),
-                "IssueShowResponse",
+                Some(schema_to_value::<crate::output::IssueCreateResponse>()),
+                "IssueCreateResponse",
             ),
             // Lifecycle mutation confirmations echo the raw stored record, so the
             // gate list stays under gates_required / gates_status.

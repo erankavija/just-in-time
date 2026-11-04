@@ -205,7 +205,7 @@ executing the checker. This is what lets a batch of issues sitting on one
 unchanged tree pay for a whole-tree checker once instead of once per issue.
 
 A reused verdict stays distinguishable from an independently derived one. Its
-run record names the run it was taken from, and `jit gate status <issue> <gate>
+run record names the issue and run it was taken from, and `jit gate status <issue> <gate>
 --json` reports the distinction:
 
 ```json
@@ -214,7 +214,7 @@ run record names the run it was taken from, and `jit gate status <issue> <gate>
   "key": "tests",
   "status": "passed",
   "inputs_digest": "9a3f…",
-  "origin": { "derivation": "reused", "source_run": "7b2b…" }
+  "origin": { "derivation": "reused", "source_issue": "9d1f…", "source_run": "7b2b…" }
 }
 ```
 
@@ -1131,7 +1131,7 @@ a problem when that project configures a default or a rule requiring it.
 Warning: Issue is an orphaned task (no epic:* or milestone:* label)
 ```
 
-**Solution:** Add parent label: `jit issue update $ISSUE --label "epic:auth"` or use `--orphan` flag to explicitly allow orphaned issues.
+**Solution:** Add parent label: `jit issue update $ISSUE --label "epic:auth"`.
 
 ### Validation and Recovery
 

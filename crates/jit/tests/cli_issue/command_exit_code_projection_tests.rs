@@ -458,7 +458,7 @@ fn invoke_validate_branch_drift(json: bool) -> Vec<Output> {
     vec![output_in_form(&cli, &["validate", "--branch-drift"], json)]
 }
 
-/// `jit validate --leases` over a corrupt claims index, so lease validation
+/// `jit validate --leases` over a malformed lease record, so lease validation
 /// cannot produce a clean result.
 fn invoke_validate_leases(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();

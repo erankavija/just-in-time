@@ -81,7 +81,7 @@ fn test_graph_roots_human_output_ends_with_total() {
 #[test]
 fn test_graph_export_json_is_sugar_for_format_json() {
     let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-    cli.create_issue(["-t", "A", "--orphan"]).unwrap();
+    cli.create_issue(["-t", "A"]).unwrap();
 
     let via_json_flag = cli.run(["graph", "export", "--json"]).unwrap();
     let via_format_flag = cli.run(["graph", "export", "--format", "json"]).unwrap();
@@ -97,7 +97,7 @@ fn test_graph_export_json_is_sugar_for_format_json() {
 #[test]
 fn test_graph_export_json_composes_with_full() {
     let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-    cli.create_issue(["-t", "A", "--orphan"]).unwrap();
+    cli.create_issue(["-t", "A"]).unwrap();
 
     let json = cli.run_json(["graph", "export", "--full"]).unwrap();
     // The full shape carries resolved-hierarchy fields absent from the summary shape.

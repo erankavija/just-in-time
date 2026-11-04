@@ -404,8 +404,8 @@ pub enum Commands {
     /// session opens, then in sequence:
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - In a Git repository: cleans up stale claim locks from crashed processes
-    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
-    ///   and evicts expired leases; without Git, skips these with a warning
+    ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
+    ///   heartbeat is stale; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never
@@ -663,10 +663,6 @@ pub enum IssueCommands {
         /// Bypass validation warnings
         #[arg(long)]
         force: bool,
-
-        /// Explicitly allow orphaned leaf issues (tasks without parent labels)
-        #[arg(long)]
-        orphan: bool,
     },
 
     /// Batch-create issues with dependency wiring from a JSON file.
@@ -2718,6 +2714,7 @@ impl Commands {
             Self::Item(command) => command.coordinates_claims_first(),
             Self::Invariant(command) => command.coordinates_claims_first(),
             Self::Project(command) => command.coordinates_claims_first(),
+            Self::Recover => true,
             Self::Init { .. }
             | Self::List { .. }
             | Self::Apply { .. }
@@ -2727,7 +2724,6 @@ impl Commands {
             }
             | Self::Search { .. }
             | Self::Validate { .. }
-            | Self::Recover { .. }
             | Self::Serve { .. }
             | Self::Version { .. }
             | Self::Status { .. } => false,
@@ -3282,6 +3278,7 @@ mod recovery_dispatch_tests {
         "issue delete",
         "issue reject",
         "issue update",
+        "recover",
     ];
 
     fn collect_leaf_commands(
@@ -3436,6 +3433,7 @@ mod recovery_dispatch_tests {
                     "stale",
                 ],
             ),
+            ("recover", &["jit", "recover"]),
         ];
         let classified = claim_first
             .iter()

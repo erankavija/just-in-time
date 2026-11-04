@@ -44,7 +44,10 @@ fn create_typed(worktree: &std::path::Path, type_label: &str) -> Vec<String> {
             false,
         )
         .unwrap()
-        .warnings
+        .findings
+        .into_iter()
+        .map(|finding| finding.rule)
+        .collect()
 }
 
 #[test]
@@ -58,10 +61,10 @@ fn test_new_type_passes_without_schema_regeneration() {
     assert!(!stale.contains("planning"));
     assert!(!create_typed(temp.path(), "type:planning")
         .iter()
-        .any(|warning| warning.contains("type-hierarchy-known")));
+        .any(|rule| rule == "type-hierarchy-known"));
     assert!(!create_typed(temp.path(), "type:epic")
         .iter()
-        .any(|warning| warning.contains("type-hierarchy-known")));
+        .any(|rule| rule == "type-hierarchy-known"));
 }
 
 #[test]
@@ -69,5 +72,5 @@ fn test_unknown_type_still_warns() {
     let (temp, _) = setup_test_repo_with_config(HIERARCHY_CONFIG).unwrap();
     assert!(create_typed(temp.path(), "type:nonsense")
         .iter()
-        .any(|warning| warning.contains("type-hierarchy-known")));
+        .any(|rule| rule == "type-hierarchy-known"));
 }

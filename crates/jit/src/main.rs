@@ -737,8 +737,14 @@ fn print_gate_run_details(result: &GateRunResult) {
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
     }
-    if let Some(source_run) = result.origin.source_run() {
-        println!("  Verdict: taken from run {source_run} over the same declared inputs");
+    if let jit::domain::GateVerdictOrigin::Reused {
+        source_issue,
+        source_run,
+    } = &result.origin
+    {
+        println!(
+            "  Verdict: taken from issue {source_issue}, run {source_run} over the same declared inputs"
+        );
     }
     if result.origin == jit::domain::GateVerdictOrigin::Attested {
         println!(
@@ -1730,7 +1736,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     label,
                     content_format,
                     force,
-                    orphan,
                 } => {
                     let gate = parse_gate_keys(gate, json)?;
 
@@ -1755,66 +1760,34 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let jit::commands::IssueCreation { issue, warnings } =
-                        executor.issues().create_issue(
-                            title,
-                            description,
-                            prio,
-                            gate,
-                            label,
-                            content_format,
-                            issue_type,
-                            force,
-                        )?;
-
-                    // Print warnings to stderr
-                    for warning in &warnings {
-                        eprintln!("Warning: {}", warning);
-                    }
-
-                    let output_ctx = OutputContext::new(quiet, json);
-
+                    let creation = executor.issues().create_issue(
+                        title,
+                        description,
+                        prio,
+                        gate,
+                        label,
+                        content_format,
+                        issue_type,
+                        force,
+                    )?;
                     if json {
+                        let issue = creation.issue;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
-                        let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-                        let gate_runs = executor
-                            .gates()
-                            .list_gate_runs(&issue.id, None)
-                            .with_context(|| {
-                                format!("Failed to load gate runs for issue {}", issue.id)
-                            })?;
-                        let response = jit::output::IssueShowResponse::from_issue(
-                            issue,
-                            enriched_deps,
-                            &gate_runs,
-                        );
+                        // A new issue has no dependencies and no gate runs.
+                        let response = jit::output::IssueCreateResponse {
+                            issue: jit::output::IssueShowResponse::from_issue(issue, vec![], &[]),
+                            findings: creation.findings,
+                        };
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // In quiet mode, output just the ID for scripting
                         if quiet {
-                            println!("{}", issue.id);
+                            println!("{}", creation.issue.id);
                         } else {
-                            println!("Created issue: {}", issue.id);
-                        }
-
-                        // Surface workflow type-hierarchy warnings
-                        // (`TypeHierarchyKind` checks) for the new issue
-                        // unless --force or --quiet. These are GRAPH rule
-                        // findings produced by the rule engine, not a hard-coded
-                        // check. `--orphan` suppresses the orphan-leaf hint
-                        // (acknowledged intentional orphan).
-                        if !force && !quiet {
-                            let issues = storage.list_issues()?;
-                            let graph_findings =
-                                executor.validation().evaluate_graph_rules(&issues)?;
-                            for gf in graph_findings.iter().filter(|gf| {
-                                gf.issue_id.as_ref() == Some(&issue.id)
-                                    && !(orphan && gf.finding.rule == "orphan-leaf")
-                            }) {
-                                let _ =
-                                    output_ctx.print_warning(format!("\n{}", gf.finding.message));
-                            }
+                            println!("Created issue: {}", creation.issue.id);
+                            jit::output::render_validation_findings(&creation.findings, None)
+                                .print();
                         }
                     }
                 }
@@ -6239,15 +6212,17 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 Ok(report) => {
                     if json {
                         let msg = format!(
-                            "Recovery: {} locks cleaned, {} leases evicted",
-                            report.stale_locks_cleaned, report.expired_leases_evicted
+                            "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
+                            report.stale_locks_cleaned,
+                            report.expired_leases_evicted,
+                            report.stale_leases_reclaimed
                         );
                         let output = JsonOutput::success(json!({
                             "success": true,
                             "redo_records_applied": redo_records_applied,
                             "stale_locks_cleaned": report.stale_locks_cleaned,
-                            "index_rebuilt": report.index_rebuilt,
                             "expired_leases_evicted": report.expired_leases_evicted,
+                            "stale_leases_reclaimed": report.stale_leases_reclaimed,
                             "temp_files_removed": report.temp_files_removed,
                             "derived_state_repaired": report.derived_state_repaired,
                             "claims_lease_recovery": report.claims_lease_recovery,
@@ -6259,10 +6234,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         println!("Recovery complete:");
                         println!("  • Redo records applied: {redo_records_applied}");
                         println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
-                        println!("  • Index rebuilt: {}", report.index_rebuilt);
                         println!(
                             "  • Expired leases evicted: {}",
                             report.expired_leases_evicted
+                        );
+                        println!(
+                            "  • Stale leases reclaimed: {}",
+                            report.stale_leases_reclaimed
                         );
                         println!("  • Temp files removed: {}", report.temp_files_removed);
                         println!(
@@ -7030,7 +7008,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 }
 
 /// Render one lease for plain-text `claim status` and `claim list`.
-fn print_lease(lease: &jit::storage::Lease) {
+fn print_lease(listed: &jit::commands::claim::ListedLease) {
+    let lease = &listed.lease;
     let now = chrono::Utc::now();
     println!("Lease: {}", lease.lease_id);
     println!("  Issue:    {}", lease.issue_id);
@@ -7058,7 +7037,7 @@ fn print_lease(lease: &jit::storage::Lease) {
             lease.last_beat,
             since_beat.num_seconds()
         );
-        if lease.stale {
+        if listed.stale {
             println!(
                 "  STALE: Lease marked stale (no heartbeat for {} minutes)",
                 since_beat.num_minutes()

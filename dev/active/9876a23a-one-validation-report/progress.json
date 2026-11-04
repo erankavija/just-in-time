@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 3,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -78,7 +78,7 @@
           "short_id": "c92f4011",
           "title": "Keep default rules in force when rules.toml holds only custom rules",
           "classification": "implementation",
-          "status": "rework 1: merged-tree suite failed (batch_export roundtrip, scope JSON success) under the new default-rule semantics",
+          "status": "done (merges bdc0fd571, 108f53d99; rework 2: CI fixtures, then custom/default name collision)",
           "worker": "codex gpt-6-astra xhigh"
         }
       ]
@@ -89,27 +89,79 @@
       "issues": [
         {
           "short_id": "977d01d8",
-          "status": "dispatched",
+          "status": "done 5e0ca8825",
           "worker": "codex gpt-6-astra xhigh",
           "worker_reason": "small residue + tests"
         },
         {
           "short_id": "ea843d26",
-          "status": "dispatched",
+          "status": "done b1017884c, 976e3b932 (rework 1: trailing-hyphen property)",
           "worker": "codex gpt-6-astra xhigh",
           "worker_reason": "local allocation-free match"
         },
         {
           "short_id": "b3a768b3",
-          "status": "dispatched",
+          "status": "done 9b6397f43",
           "worker": "claude opus",
           "worker_reason": "produces parsed-records contract"
         },
         {
           "short_id": "f968dfe1",
-          "status": "dispatched",
+          "status": "done 107ee1810 (rework 1: best-effort image_plan_content; merge conflict resolved)",
           "worker": "claude opus",
           "worker_reason": "produces plan-document-resolver contract"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "base": "2edf9e3de",
+      "issues": [
+        {
+          "short_id": "5d5a1794",
+          "status": "done 308aa9485, 7487595a9, 9f219fcdf (rework 2; REQ-02 amended; .gates.lock removed with f8a6b298 agreement; --orphan removed per steward D-01)",
+          "worker": "claude opus",
+          "worker_reason": "produces creation-findings; shared helper over five copies"
+        },
+        {
+          "short_id": "8b56c215",
+          "status": "done 3e5bfcbe7",
+          "worker": "codex gpt-6-luna xhigh",
+          "worker_reason": "mechanical vocabulary"
+        },
+        {
+          "short_id": "ccd6e1fb",
+          "status": "done 9da1c873a",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "multi-file evaluation change"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "001a9c46",
+          "status": "done 07baa8b46",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "address index over existing set"
+        },
+        {
+          "short_id": "03c59566",
+          "status": "done 70f80ae6f (criteria amended by steward)",
+          "worker": "codex gpt-6-luna xhigh"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "base": "995afbd3a",
+      "issues": [
+        {
+          "short_id": "6ba4f623",
+          "status": "rework 1 done 673c5daaa (-32 prod); lead review PASS; awaiting host release for CI, land, gates",
+          "worker": "claude opus",
+          "worker_reason": "central contract validation-report"
         }
       ]
     }
@@ -134,12 +186,39 @@
       },
       {
         "wave": 2,
-        "partial": true,
         "default": 15,
-        "test_support_as_test": 0,
+        "test_support_as_test": -1,
         "by_issue": {
-          "70ac98fc": "+9 (builder file())",
-          "cf49da17": "+6 (builder files())"
+          "70ac98fc": 0,
+          "cf49da17": 0,
+          "c92f4011": -1
+        }
+      },
+      {
+        "wave": 3,
+        "test_support_as_test": -42,
+        "by_issue": {
+          "977d01d8": -7,
+          "b3a768b3": 7,
+          "f968dfe1": -46,
+          "ea843d26": 4
+        }
+      },
+      {
+        "wave": 4,
+        "test_support_as_test": 35,
+        "by_issue": {
+          "ccd6e1fb": 12,
+          "5d5a1794": 5,
+          "8b56c215": 18
+        }
+      },
+      {
+        "wave": 5,
+        "test_support_as_test": 55,
+        "by_issue": {
+          "03c59566": -24,
+          "001a9c46": 79
         }
       }
     ]
@@ -148,6 +227,14 @@
     {
       "short_id": "2a10917d",
       "note": "standalone, user-approved: code-review context states commit ancestry; under milestone 9db27a3a; not part of this epic"
+    },
+    {
+      "short_id": "14f49a28",
+      "note": "standalone, user ruling: M8 package-content check assembles outside the repo (docs-mechanical was broken by the target/ symlink); landed 7f255bf7a, docs-mechanical passed"
+    },
+    {
+      "short_id": "f368ce3d",
+      "note": "cross-epic: REQ-03 (--orphan) and its Background bullet removed per steward ruling"
     }
   ],
   "escalations": [
@@ -174,15 +261,27 @@
       "at": "2026-11-04",
       "subject": "70ac98fc code-review F1 ancestry misread",
       "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "docs-mechanical M8 fails: jit profile pack refuses symlinked target/",
+      "status": "resolved: 14f49a28 (a2) landed 7f255bf7a"
     }
   ],
   "rework_counts": {
-    "c92f4011": 1
+    "c92f4011": 2,
+    "ea843d26": 1,
+    "f968dfe1": 1,
+    "5d5a1794": 2,
+    "6ba4f623": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
-    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch"
+    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
+    "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
+    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
@@ -193,10 +292,12 @@
     "Workers verify only --lib and named suites; a behaviour change needs the whole-workspace nextest run with --no-fail-fast (c92f4011 r1).",
     "Never wrap land.sh in `jit worktree exec`: it takes the repository lock itself, so nesting waits on its own parent.",
     "Plan and manifest edits in main's checkout block other leads' land.sh; edit in scratch, then copy and commit in one command.",
-    "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review."
+    "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review.",
+    "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief)."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
     "breakdown-review de9a7557": "passed on rerun after restoring ea843d26 -> de9a7557 (2 advisory findings, no change)"
-  }
+  },
+  "worker_policy": "User 2026-11-04: Codex gpt-6-luna, gpt-6.1-sol and gpt-6-astra plus Claude, liberally. Host quiet window: no new dispatch from 03:30 EET, no builds from 03:55 until just-in-time-6a releases; workers wait on 88's cargo-hold file."
 }

@@ -925,7 +925,6 @@ jit issue create --title <TITLE> [OPTIONS]
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
 | `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
-| `--orphan` | Suppress the workflow profile's `orphan-leaf` hint for an issue deliberately created without a container. |
 | `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
 
 ```bash
@@ -1972,8 +1971,8 @@ jit gate evaluate abc123 --gate tests --force
   checker's verdict is available to every issue evaluated over that content.
 - `jit gate status <id> <gate> --json` reports the run's `inputs_digest` and an
   `origin` of `{"derivation": "executed"}` or
-  `{"derivation": "reused", "source_run": "<run-id>"}`, so a reused verdict is
-  never counted as an independent verification.
+  `{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}`,
+  so a reused verdict is never counted as an independent verification.
 - A gate declaring no inputs executes its checker on every evaluation.
 - `--force` executes the checker unconditionally.
 
@@ -3271,7 +3270,7 @@ jit validate --branch-drift [--leases] [--json]
 
 | Mode | What it does |
 |------|--------------|
-| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence, claims index) plus every local and graph rule. |
+| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence) plus every local and graph rule. |
 | `<ID>` | The local and graph rules for that issue only. |
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
@@ -3348,8 +3347,8 @@ Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), rebuild the claims index from its
-append-only log, and evict expired leases; and remove orphaned `*.tmp` files
+left by dead processes (checked by PID), evict expired leases, and reclaim indefinite leases whose
+heartbeat is [stale](claim.md#staleness); and remove orphaned `*.tmp` files
 under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
@@ -3358,6 +3357,8 @@ jit recover [--json]
 
 The report counts the leftover redo records the session open applied
 (`redo_records_applied` in JSON, "Redo records applied" in text), at most one.
+It counts expired leases evicted (`expired_leases_evicted`) apart from stale
+indefinite leases reclaimed (`stale_leases_reclaimed`).
 It removes only provably stale data and never the pending redo record, so it is
 safe to run at any time.
 
@@ -3847,7 +3848,7 @@ Use `--quiet` to suppress non-essential output:
 
 ```bash
 # Create issue and capture ID
-ISSUE_ID=$(jit issue create --title "Fix login bug" --orphan --quiet)
+ISSUE_ID=$(jit issue create --title "Fix login bug" --quiet)
 echo "Created issue: $ISSUE_ID"
 
 # Update without confirmation messages
@@ -3867,7 +3868,7 @@ Combine `--quiet` with `--json` for machine-readable output:
 
 ```bash
 # Parse with jq
-ISSUE_ID=$(jit issue create --title "Add feature" --orphan --quiet --json | jq -r '.id')
+ISSUE_ID=$(jit issue create --title "Add feature" --quiet --json | jq -r '.id')
 
 # Extract specific fields
 jit issue show $ISSUE_ID --json --quiet | jq -r '.title'
@@ -3965,7 +3966,6 @@ while IFS=',' read -r title priority component; do
     --title "$title" \
     --priority "$priority" \
     --label "component:$component" \
-    --orphan \
     --quiet)
   echo "Created: $ID - $title"
 done < issues.csv

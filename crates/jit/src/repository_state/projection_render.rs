@@ -34,16 +34,16 @@ use crate::declarations::rules::RuleSet;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::item::{
-    derive_scope_items, index_markdown_items, load_toml_scope_items, resolve_item_kinds,
-    AddressableItem, ItemKind, Scope,
+    derive_scope_items, index_markdown_items, load_toml_scope_items, AddressableItem, ItemKind,
+    Scope,
 };
-use crate::domain::ContentFormat;
 use std::collections::BTreeSet;
 
 /// The loaded registries a projection body render reads besides its source files:
 /// the config (item kinds + invariant registry), the effective rules, and the gate
 /// registry. The rules/gates are only consulted by the `full` style.
 pub(crate) struct ProjectionInputs<'a> {
+    pub kinds: &'a [ItemKind],
     /// The loaded repository config (item-kind registry + invariant registry).
     pub config: &'a JitConfig,
     /// The effective rule set (for the `full` rule+gate view).
@@ -64,14 +64,14 @@ pub(crate) fn render_projection_body(
     inputs: &ProjectionInputs,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<(String, usize), ProducerError> {
-    let all_kinds = resolve_item_kinds(inputs.config.item_kinds.as_ref())?;
     // Resolve every declared kind name (accepting aliases) to its ItemKind up
     // front, so an unknown kind fails before any source is read (REQ-07).
     let resolved: Vec<&ItemKind> = proj
         .kinds()
         .iter()
         .map(|name| {
-            all_kinds
+            inputs
+                .kinds
                 .iter()
                 .find(|kind| kind.matches_name(name))
                 .ok_or_else(|| ProjectionError::UnknownKind { kind: name.clone() })
@@ -99,7 +99,7 @@ fn resolve_rows(
     config: &JitConfig,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<Vec<AddressableItem>, ProducerError> {
-    let parser = content_parser_for(None, repo_content_format(config))?;
+    let parser = content_parser_for(None, config.content_format())?;
     let mut rows = Vec::new();
     for kind in kinds {
         if !kind.kind_scope().is_project() {
@@ -236,11 +236,4 @@ fn render_full_body(
         }
         .into())
     }
-}
-
-/// The repo-level content format (`[validation].content_format`, defaulting to
-/// [`ContentFormat::DEFAULT`]), matching the selection issue descriptions and project sources use so
-/// a projection scans its source identically.
-fn repo_content_format(config: &JitConfig) -> ContentFormat {
-    config.content_format()
 }

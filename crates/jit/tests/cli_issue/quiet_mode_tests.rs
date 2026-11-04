@@ -21,9 +21,7 @@ fn test_quiet_short_flag_exists() {
 #[test]
 fn test_quiet_mode_suppresses_success_messages() {
     let cli = JitCli::initialised().unwrap();
-    let issue_id = cli
-        .create_issue(["--title", "Test Issue", "--orphan"])
-        .unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     let normal_output = cli
         .command(["issue", "update", &issue_id, "--state", "done"])
@@ -48,10 +46,8 @@ fn test_quiet_mode_suppresses_success_messages() {
 #[test]
 fn test_quiet_mode_preserves_essential_output() {
     let cli = JitCli::initialised().unwrap();
-    cli.create_issue(["--title", "Test Issue 1", "--orphan"])
-        .unwrap();
-    cli.create_issue(["--title", "Test Issue 2", "--orphan"])
-        .unwrap();
+    cli.create_issue(["--title", "Test Issue 1"]).unwrap();
+    cli.create_issue(["--title", "Test Issue 2"]).unwrap();
 
     cli.command(["query", "all", "--quiet"])
         .assert()
@@ -63,9 +59,7 @@ fn test_quiet_mode_preserves_essential_output() {
 #[test]
 fn test_quiet_with_json_outputs_only_json() {
     let cli = JitCli::initialised().unwrap();
-    let issue_id = cli
-        .create_issue(["--title", "Test Issue", "--orphan"])
-        .unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     let output = cli
         .command(["issue", "show", &issue_id, "--quiet", "--json"])
@@ -98,12 +92,8 @@ fn test_quiet_suppresses_informational_output() {
 #[test]
 fn test_quiet_with_dep_add() {
     let cli = JitCli::initialised().unwrap();
-    let issue1 = cli
-        .create_issue(["--title", "Issue 1", "--orphan"])
-        .unwrap();
-    let issue2 = cli
-        .create_issue(["--title", "Issue 2", "--orphan"])
-        .unwrap();
+    let issue1 = cli.create_issue(["--title", "Issue 1"]).unwrap();
+    let issue2 = cli.create_issue(["--title", "Issue 2"]).unwrap();
 
     let normal_output = cli
         .command(["dep", "add", &issue1, &issue2])
@@ -146,14 +136,7 @@ fn test_issue_create_quiet_outputs_id() {
     let cli = JitCli::initialised().unwrap();
 
     let output = cli
-        .command([
-            "issue",
-            "create",
-            "--title",
-            "New Issue",
-            "--quiet",
-            "--orphan",
-        ])
+        .command(["issue", "create", "--title", "New Issue", "--quiet"])
         .output()
         .unwrap();
 
@@ -192,9 +175,7 @@ fn test_quiet_with_gate_commands() {
     .assert()
     .success();
 
-    let issue_id = cli
-        .create_issue(["--title", "Test Issue", "--orphan"])
-        .unwrap();
+    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
 
     cli.command(["gate", "add", &issue_id, "test-gate", "--quiet"])
         .assert()

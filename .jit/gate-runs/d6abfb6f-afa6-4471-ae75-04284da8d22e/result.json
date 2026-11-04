@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9dee8685a4e9b3136b07107313b500297d243737",
+  "completed_at": "2026-11-04T00:02:16.647579493Z",
+  "duration_ms": 237349,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior cross-gate projection finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d6abfb6f-afa6-4471-ae75-04284da8d22e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:58:19.298459628Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7a7a7fc97, 696a76ce2\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-01 and REQ-02 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json); relevant invariants (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T23:56:46Z)\nTruncation recovery: Narrowed reads recovered relevant call sites, storage/finalizer behavior, history dispatch, tests, and policy sources after broad searches truncated.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior cross-gate projection finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

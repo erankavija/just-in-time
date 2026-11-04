@@ -338,7 +338,7 @@ behavior depends on the arguments.
   uniqueness, type-hierarchy, and any project graph rules) and the built-in
   integrity checks — broken dependency references, gate references absent from
   the registry, DAG cycles, issues isolated from the dependency graph, redundant
-  (transitively-reducible) edges, claims-index consistency, and record fidelity:
+  (transitively-reducible) edges, and record fidelity:
   the index, issue records, gate-run results, and event log each
   decode and reproduce what the writer would publish, and no event id appears on
   more than one line. An event log that does not parse is one finding naming its
@@ -362,7 +362,7 @@ repairs publish through one redo record
 ([Publication and Recovery](storage-format.md#publication-and-recovery)) and
 preserve authored or unmanaged bytes. An ambiguous target is reported without
 writes. Coordination state — stale
-locks, the claims index, expired leases — is repaired by
+locks and expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
 
 ### Options
@@ -488,8 +488,8 @@ its session opens
 then runs, in sequence:
 1. Repair declaration-derived state through the `jit validate --fix` path
 2. In a Git repository, the coordination routines under `.git/jit/`: clear
-   claim locks left by dead processes (checked by PID), rebuild the claims index
-   from its append-only log, and evict expired leases. Without Git they are
+   claim locks left by dead processes (checked by PID), evict expired leases,
+   and reclaim indefinite leases whose heartbeat is [stale](claim.md#staleness). Without Git they are
    skipped with a warning.
 3. Remove orphaned `*.tmp` files under `.jit/` older than the
    [cleanup threshold](runtime-defaults.md)
@@ -519,8 +519,8 @@ jit recover --json
 Recovery complete:
   • Redo records applied: 0
   • Stale locks cleaned: 1
-  • Index rebuilt: true
   • Expired leases evicted: 2
+  • Stale leases reclaimed: 1
   • Temp files removed: 0
   • Derived-state targets repaired: 0
 ```

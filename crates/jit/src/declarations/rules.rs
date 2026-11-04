@@ -168,6 +168,16 @@ pub enum RuleConfigError {
         /// The name that appeared more than once.
         name: String,
     },
+
+    /// A custom rule occupies a registry-derived default rule's address.
+    #[error(
+        "custom rule '{name}' conflicts with a derived default rule; \
+         set severity = \"off\" on the default row (origin = \"default\") instead"
+    )]
+    DefaultRuleNameCollision {
+        /// The reserved default rule name.
+        name: String,
+    },
 }
 
 wire_vocabulary! {
@@ -175,7 +185,9 @@ wire_vocabulary! {
     ///
     /// Each variant's doc states its effect; only [`Severity::Error`] (with
     /// `enforce` set) can block a write.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize, schemars::JsonSchema,
+    )]
     pub enum Severity {
         /// Rule is disabled.
         Off = "off",

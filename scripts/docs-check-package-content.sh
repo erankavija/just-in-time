@@ -57,9 +57,9 @@ for tool in ("git", "jit"):
         fail(f"'{tool}' not found on PATH")
 
 
-def run(*command):
+def run(*command, cwd=None):
     """Return a command's stdout, or fail with its stderr."""
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, cwd=cwd)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip() or "(no output)"
         fail(f"`{' '.join(command)}` failed: {detail}")
@@ -127,17 +127,16 @@ if not packages:
     fail(f"{PACKAGE_SOURCES} publishes no profile package")
 
 findings = []
-# `profile add` refuses a destination outside the worktree, hence the ignored build dir.
-build = os.path.join(root, "target")
+# `profile add` publishes only inside a worktree, so packages are assembled in a
+# throwaway repository under the system temp directory, never in this tree.
+scratch = tempfile.mkdtemp(prefix=f"{ME}.")
 try:
-    os.makedirs(build, exist_ok=True)
-except OSError as error:
-    fail(f"cannot create a scratch destination under {build}: {error}")
-scratch = tempfile.mkdtemp(prefix=f"{ME}.", dir=build)
-try:
+    assembly = os.path.join(scratch, "repo")
+    os.mkdir(assembly)
+    run("jit", "init", "--quiet", cwd=assembly)
     for package in packages:
-        assembled = os.path.join(scratch, package)
-        archive = f"{assembled}.tar"
+        assembled = os.path.join(assembly, package)
+        archive = os.path.join(scratch, f"{package}.tar")
         run(
             "jit",
             "profile",
@@ -156,10 +155,14 @@ try:
             "--archive",
             archive,
             "--destination",
-            assembled,
+            package,
+            cwd=assembly,
         )
         shown = json.loads(
-            run("jit", "profile", "show", "--quiet", "--profile", str(assembled), "--json")
+            run(
+                "jit", "profile", "show", "--quiet", "--profile", assembled, "--json",
+                cwd=assembly,
+            )
         )
         manifest = shown["profiles"][0]["manifest"]
 

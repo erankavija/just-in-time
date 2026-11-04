@@ -7,7 +7,7 @@
 //! - an `enforce` rule blocks a non-forced write;
 //! - `--force` bypasses it AND logs the new `LocalRuleBypassed` event;
 //! - a `warn` rule never blocks;
-//! - a graph-scope rule is NOT evaluated on the write path;
+//! - a graph-scope rule never blocks a write; creation returns its findings;
 //! - the batch path (`apply_bulk_update`) is also enforced.
 
 use jit::commands::bulk_update::UpdateOperations;
@@ -164,7 +164,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         },
     );
 
-    let jit::commands::IssueCreation { warnings, .. } = executor
+    let jit::commands::IssueCreation { findings, .. } = executor
         .issues()
         .create_issue(
             "An epic".to_string(),
@@ -178,8 +178,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
         )
         .expect("a warn rule must not block");
     assert!(
-        warnings.iter().any(|w| w.contains("epic-warns-req")),
-        "the warning should be surfaced: {warnings:?}"
+        findings.iter().any(|f| f.rule == "epic-warns-req"),
+        "the finding should be surfaced: {findings:?}"
     );
     assert!(bypass_events(&executor).is_empty());
 }
@@ -264,6 +264,69 @@ assert = { label-coverage = { child-state = "done" } }
         false,
     );
     assert!(result.is_ok(), "graph rules must not block writes");
+}
+
+/// Rule findings `create_issue` returns for a new issue carrying `labels`,
+/// over the shared test taxonomy with an `orphan-leaf` graph rule declared.
+fn creation_findings(labels: Vec<String>) -> Vec<jit::validation::ReportedFinding> {
+    let config = format!(
+        "{}\n[worktree]\nenforce_leases = \"off\"\n",
+        jit::test_taxonomy::test_taxonomy().config_fragment()
+    );
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&config),
+            rules: Some(
+                r#"
+[[rules]]
+name = "orphan-leaf"
+severity = "warn"
+assert = { type-hierarchy = { kind = "orphan-leaf" } }
+"#,
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
+    executor
+        .issues()
+        .create_issue(
+            "A leaf".to_string(),
+            String::new(),
+            Priority::Normal,
+            vec![],
+            labels,
+            None,
+            None,
+            false,
+        )
+        .expect("a warn rule must not block")
+        .findings
+}
+
+#[test]
+fn test_create_issue_returns_orphan_leaf_graph_finding() {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
+
+    let findings = creation_findings(vec![jit::test_taxonomy::type_label(&taxonomy, 4)]);
+
+    assert!(
+        findings.iter().any(|finding| finding.rule == "orphan-leaf"),
+        "{findings:?}"
+    );
+}
+
+#[test]
+fn test_create_issue_returns_no_findings_for_compliant_issue() {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
+
+    let findings = creation_findings(vec![
+        jit::test_taxonomy::type_label(&taxonomy, 4),
+        jit::test_taxonomy::membership_label(&taxonomy, 2, "auth"),
+    ]);
+
+    assert!(findings.is_empty(), "{findings:?}");
 }
 
 #[test]
@@ -1002,14 +1065,6 @@ impl IssueStore for FailingMutationStorage {
         issue_id: &jit::domain::identity::IssueId,
     ) -> anyhow::Result<Vec<jit::domain::GateRunResult>> {
         self.inner.list_gate_runs_for_issue(issue_id)
-    }
-
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &jit::domain::identity::GateKey,
-        digest: &jit::domain::repository_inputs::InputsDigest,
-    ) -> anyhow::Result<Option<jit::domain::GateRunResult>> {
-        self.inner.find_reusable_gate_run(gate_key, digest)
     }
 
     fn root(&self) -> &std::path::Path {

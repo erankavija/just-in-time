@@ -43,9 +43,9 @@ fn mutator_lines(source: &str) -> Vec<(usize, &str)> {
 }
 
 #[test]
-fn test_mutator_lines_flags_unguarded_test_mode_mutation_and_skips_comments() {
+fn test_mutator_lines_flags_an_environment_mutation_and_skips_comments() {
     let source = format!(
-        "// std::env::{set}(\"A\", \"1\");\nfn f() {{\n    std::env::{remove}(\"JIT_TEST_MODE\");\n}}\n",
+        "// std::env::{set}(\"A\", \"1\");\nfn f() {{\n    std::env::{remove}(\"JIT_AGENT_ID\");\n}}\n",
         set = concat!("set_", "var"),
         remove = concat!("remove_", "var"),
     );

@@ -333,19 +333,6 @@ pub struct GateState {
     pub run_id: Option<GateRunId>,
 }
 
-impl GateState {
-    /// The run of `gate_key` among `runs` this status was projected from.
-    pub fn projected_run<'a>(
-        &self,
-        gate_key: &GateKey,
-        runs: &'a [GateRunResult],
-    ) -> Option<&'a GateRunResult> {
-        let run_id = self.run_id.as_ref()?;
-        runs.iter()
-            .find(|run| &run.run_id == run_id && &run.gate_key == gate_key)
-    }
-}
-
 /// An issue representing a unit of work
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "IssueWire")]
@@ -929,6 +916,17 @@ pub struct GateRunResult {
     pub evaluation_stability: GateEvaluationStability,
 }
 
+/// The reuse source for one gate over one inputs digest, as persisted to
+/// `.jit/gate-runs/verdicts/<gate-key>/<inputs-digest>.json`: the latest
+/// recorded run that [`GateRunResult::is_reusable_for`] that key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GateVerdictRecord {
+    /// Issue the named run was recorded against
+    pub issue_id: IssueId,
+    /// The run whose verdict an evaluation over this key may carry
+    pub run_id: GateRunId,
+}
+
 impl GateRunResult {
     /// Whether an evaluation of `gate_key` over inputs digesting to `digest`
     /// may carry this run's verdict.
@@ -949,6 +947,14 @@ impl GateRunResult {
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
             && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
+    }
+
+    /// The inputs digest under which this run is a reuse source
+    /// ([`is_reusable_for`](Self::is_reusable_for) its own gate), or `None`.
+    pub fn reusable_digest(&self) -> Option<&crate::domain::repository_inputs::InputsDigest> {
+        self.inputs_digest
+            .as_ref()
+            .filter(|digest| self.is_reusable_for(&self.gate_key, digest))
     }
 
     /// The draft record of a manual gate's attestation of `status` by `by`.
@@ -995,18 +1001,6 @@ impl GateRunResult {
     }
 }
 
-/// The most recently started run among `runs`, or `None` when empty.
-///
-/// Ties on the start instant fall back to the run id so one repository state
-/// always selects one run.
-pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
-    runs.into_iter().max_by(|left, right| {
-        left.started_at
-            .cmp(&right.started_at)
-            .then_with(|| left.run_id.cmp(&right.run_id))
-    })
-}
-
 /// Where a recorded gate verdict came from.
 ///
 /// A reused verdict is evidence of one checker execution read a second time,
@@ -1015,19 +1009,17 @@ pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
 /// that many independent verifications, and the named run is where the report
 /// text and findings that produced the verdict live.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(
-    tag = "derivation",
-    content = "source_run",
-    rename_all = "snake_case",
-    deny_unknown_fields
-)]
+#[serde(tag = "derivation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GateVerdictOrigin {
     /// This run executed the checker and the verdict is its own.
     #[default]
     Executed,
-    /// The verdict was taken from the run with this id, whose declared inputs
+    /// The verdict was taken from the addressed run, whose declared inputs
     /// digested to the same value. That run executed the checker.
-    Reused(GateRunId),
+    Reused {
+        source_issue: IssueId,
+        source_run: GateRunId,
+    },
     /// The verdict is a manual gate's attestation: `by` names the attestor and
     /// `started_at` the time. No checker ran.
     Attested,
@@ -1056,7 +1048,7 @@ impl GateVerdictOrigin {
     pub fn source_run(&self) -> Option<&GateRunId> {
         match self {
             Self::Executed | Self::Attested => None,
-            Self::Reused(run_id) => Some(run_id),
+            Self::Reused { source_run, .. } => Some(source_run),
         }
     }
 
@@ -1403,9 +1395,6 @@ pub enum EventBody {
         operation: ProfileLifecycleOperation,
         /// Per-profile outcomes in stable aggregate order.
         profiles: Vec<ProfileLifecycleProfile>,
-        /// Whether this append isolated a pre-existing non-newline,
-        /// malformed event tail immediately before this record.
-        isolated_torn_tail: bool,
     },
     /// An explicit per-invocation override permitted a state-mutating command
     /// inside a linked non-primary checkout.
@@ -1487,23 +1476,6 @@ impl Event {
 }
 
 impl EventBody {
-    /// Record whether this profile lifecycle marker certifies the torn tail it
-    /// follows; any other body is returned unchanged.
-    pub fn with_isolated_torn_tail(self, torn_tail: bool) -> Self {
-        match self {
-            EventBody::ProfileLifecycle {
-                operation,
-                profiles,
-                ..
-            } => EventBody::ProfileLifecycle {
-                operation,
-                profiles,
-                isolated_torn_tail: torn_tail,
-            },
-            other => other,
-        }
-    }
-
     /// Create an issue created event
     pub fn draft_issue_created(issue: &Issue) -> Self {
         EventBody::IssueCreated {
@@ -1702,7 +1674,6 @@ impl EventBody {
         EventBody::ProfileLifecycle {
             operation,
             profiles,
-            isolated_torn_tail: false,
         }
     }
 
@@ -1769,6 +1740,64 @@ mod tests {
     use crate::test_utils::{
         document_reference, document_reference_at, document_reference_typed, fixture_issue,
     };
+
+    #[test]
+    fn test_gate_verdict_origin_reused_round_trips_the_source_address() {
+        let source_issue = crate::test_utils::issue_id(160);
+        let source_run = crate::test_utils::gate_run_id(1);
+        let encoded = serde_json::json!({
+            "derivation": "reused",
+            "source_issue": source_issue,
+            "source_run": source_run,
+        });
+
+        let decoded: GateVerdictOrigin = serde_json::from_value(encoded.clone()).unwrap();
+
+        assert_eq!(serde_json::to_value(decoded).unwrap(), encoded);
+    }
+
+    #[test]
+    fn test_gate_verdict_origin_reused_requires_source_issue() {
+        let encoded = serde_json::json!({
+            "derivation": "reused",
+            "source_run": crate::test_utils::gate_run_id(1),
+        });
+
+        assert!(serde_json::from_value::<GateVerdictOrigin>(encoded).is_err());
+    }
+
+    #[test]
+    fn test_gate_verdict_origin_non_reused_variants_are_tag_only() {
+        for (origin, derivation) in [
+            (GateVerdictOrigin::Executed, "executed"),
+            (GateVerdictOrigin::Attested, "attested"),
+        ] {
+            let encoded = serde_json::json!({ "derivation": derivation });
+            assert_eq!(serde_json::to_value(&origin).unwrap(), encoded);
+            assert_eq!(
+                serde_json::from_value::<GateVerdictOrigin>(encoded).unwrap(),
+                origin
+            );
+        }
+    }
+
+    #[test]
+    fn test_gate_run_result_missing_origin_decodes_as_executed() {
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &crate::test_utils::issue_id(160),
+            &"review".parse().unwrap(),
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        let mut encoded = serde_json::to_value(run).unwrap();
+        encoded.as_object_mut().unwrap().remove("origin");
+
+        let decoded: GateRunResult = serde_json::from_value(encoded).unwrap();
+
+        assert_eq!(decoded.origin, GateVerdictOrigin::Executed);
+    }
 
     #[test]
     fn test_priority_ord_follows_rank() {
