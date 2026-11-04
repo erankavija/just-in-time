@@ -1359,6 +1359,11 @@
       "reason": "b697a3f7 track B; large config assembler",
       "epic": "b697a3f7",
       "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
+    },
+    "f87f9b00": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "gate status handler move; first of the four remaining moves"
     }
   },
   "handoff": {
