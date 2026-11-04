@@ -871,7 +871,8 @@
     "5962427b": 1,
     "1539da29": 2,
     "abe555e9": 1,
-    "b23faa59": 2
+    "b23faa59": 2,
+    "e5d618ee": 1
   },
   "surfaced_pitfalls": [
     {
@@ -991,9 +992,10 @@
       "reason": "cross-cutting or socket-bound migration"
     },
     "e5d618ee": {
-      "status": "in_progress",
+      "status": "rework",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "lead review FAIL REQ-04: ambiguous-id 400 and gate-run lookup status changes lack tests"
     },
     "20fc3b92": {
       "status": "in_progress",
@@ -1069,6 +1071,11 @@
       "status": "in_progress",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets"
+    },
+    "12c0f3fb": {
+      "status": "ready",
+      "vendor": null,
+      "reason": "form task (D-38); dispatch after the 05:30 settling window"
     }
   }
 }
