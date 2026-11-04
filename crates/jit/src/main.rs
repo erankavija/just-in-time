@@ -736,8 +736,14 @@ fn print_gate_run_details(result: &GateRunResult) {
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
     }
-    if let Some(source_run) = result.origin.source_run() {
-        println!("  Verdict: taken from run {source_run} over the same declared inputs");
+    if let jit::domain::GateVerdictOrigin::Reused {
+        source_issue,
+        source_run,
+    } = &result.origin
+    {
+        println!(
+            "  Verdict: taken from issue {source_issue}, run {source_run} over the same declared inputs"
+        );
     }
     if result.origin == jit::domain::GateVerdictOrigin::Attested {
         println!(
