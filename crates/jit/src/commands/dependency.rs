@@ -10,11 +10,6 @@ use std::collections::HashSet;
 /// A dependency mutation over resolved issue identities.
 #[derive(Clone)]
 enum CapturedDependencyMutation {
-    Single {
-        issue_id: IssueId,
-        dependency_id: IssueId,
-        policy: RedundancyPolicy,
-    },
     Batch {
         issue_id: IssueId,
         dependency_ids: Vec<IssueId>,
@@ -31,14 +26,8 @@ enum CapturedDependencyMutation {
 }
 
 enum CapturedDependencyOutcome {
-    Single {
-        result: DependencyAddResult,
-        warning: Option<String>,
-    },
     Batch(DependenciesAddResult),
-    RemovedSingle {
-        warning: Option<String>,
-    },
+    RemovedSingle { warning: Option<String> },
     RemovedBatch(DependenciesRemoveResult),
 }
 
@@ -74,63 +63,6 @@ pub struct DependenciesRemoveResult {
 }
 
 impl<S: IssueStore> GraphOps<'_, S> {
-    /// Add a dependency to an issue, dropping any now-redundant edge(s).
-    ///
-    /// Convenience wrapper over
-    /// [`add_dependency_with_policy`](Self::add_dependency_with_policy) with
-    /// [`RedundancyPolicy::Reduce`]: the resulting graph is left acyclic and
-    /// transitively reduced, which internal callers (templates, breakdown,
-    /// batch-create) rely on. Returns `(result, warnings)` where `warnings`
-    /// carries any lease warning.
-    pub fn add_dependency(
-        &self,
-        issue_id: &IssueId,
-        dep_id: &IssueId,
-    ) -> Result<(DependencyAddResult, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.add_dependency_with_policy(issue_id, dep_id, RedundancyPolicy::Reduce)
-    }
-
-    /// Add a dependency under an explicit transitive-reduction [`RedundancyPolicy`].
-    ///
-    /// Cycle detection runs first (the existing write-time guard,
-    /// @/inv/dag-acyclic). The candidate graph (the current issues plus the new
-    /// edge) is then checked for transitive-reduction violations with the same
-    /// [`DependencyGraph::find_redundant_edges`] property `jit validate` enforces:
-    ///
-    /// * [`RedundancyPolicy::Reject`] — if the edge shadows an existing direct
-    ///   edge or is itself already reachable, the add fails with a
-    ///   [`RedundantDependencyError`](crate::errors::RedundantDependencyError)
-    ///   naming the offending edge pair; nothing is written.
-    /// * [`RedundancyPolicy::Reduce`] — the edge is added and every now-redundant
-    ///   edge is dropped in the same operation, leaving the graph reduced.
-    ///
-    /// A non-redundant edge is added normally under either policy.
-    pub fn add_dependency_with_policy(
-        &self,
-        issue_id: &IssueId,
-        dep_id: &IssueId,
-        policy: RedundancyPolicy,
-    ) -> Result<(DependencyAddResult, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        match self.exec.publish_captured_dependency_mutation(
-            CapturedDependencyMutation::Single {
-                issue_id: issue_id.clone(),
-                dependency_id: dep_id.clone(),
-                policy,
-            },
-        )? {
-            CapturedDependencyOutcome::Single { result, warning } => {
-                Ok((result, warning.into_iter().collect()))
-            }
-            _ => unreachable!("single dependency request returns a single outcome"),
-        }
-    }
-
     /// Remove a dependency from an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
@@ -149,23 +81,6 @@ impl<S: IssueStore> GraphOps<'_, S> {
             }
             _ => unreachable!("single removal returns a single-removal outcome"),
         }
-    }
-
-    /// Add multiple dependencies to an issue, dropping now-redundant edge(s).
-    ///
-    /// Convenience wrapper over
-    /// [`add_dependencies_with_policy`](Self::add_dependencies_with_policy) with
-    /// [`RedundancyPolicy::Reduce`], preserving the eager-reduction behavior
-    /// internal callers rely on.
-    pub fn add_dependencies(
-        &self,
-        issue_id: &IssueId,
-        dep_ids: &[IssueId],
-    ) -> Result<DependenciesAddResult>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.add_dependencies_with_policy(issue_id, dep_ids, RedundancyPolicy::Reduce)
     }
 
     /// Add multiple dependencies under an explicit [`RedundancyPolicy`], atomically.
@@ -238,64 +153,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
 
-        let enforce_lease = matches!(request, CapturedDependencyMutation::Single { .. });
         with_mutation_attempts("dependency mutation", || {
-            // The claims guard depends only on the request, so it is taken before
-            // the one session whose image decides source and lease policy.
-            let claims_guard = enforce_lease
-                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
-                .transpose()?
-                .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) =
                 self.capture_mutation_base(session.as_mut(), &[], None)?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let expected_source = match &request {
-                CapturedDependencyMutation::Single { issue_id, .. }
-                | CapturedDependencyMutation::Batch { issue_id, .. } => {
-                    Some(super::require_issue_in_capture(&issues, issue_id)?)
-                }
-                _ => unreachable!("removals use the captured removal coordinator"),
+            let CapturedDependencyMutation::Batch {
+                issue_id,
+                dependency_ids,
+                policy,
+            } = &request
+            else {
+                unreachable!("removals use the captured removal coordinator");
             };
-            let lease_warnings = if enforce_lease {
-                let config = crate::repository_state::assemble_config(&image)?;
-                refuse_foreign_leases_held(
-                    config.enforcement_mode(),
-                    std::slice::from_ref(
-                        expected_source
-                            .as_ref()
-                            .ok_or_else(|| anyhow!("missing source"))?,
-                    ),
-                    claims_guard.as_ref(),
-                )?
-            } else {
-                Vec::new()
-            };
-            let pinned_request: CapturedDependencyMutation = match &request {
-                CapturedDependencyMutation::Single {
-                    dependency_id,
-                    policy,
-                    ..
-                } => CapturedDependencyMutation::Single {
-                    issue_id: expected_source.clone().expect("single add has a source"),
-                    dependency_id: dependency_id.clone(),
-                    policy: *policy,
-                },
-                CapturedDependencyMutation::Batch {
-                    dependency_ids,
-                    policy,
-                    ..
-                } => CapturedDependencyMutation::Batch {
-                    issue_id: expected_source.clone().expect("batch add has a source"),
-                    dependency_ids: dependency_ids.clone(),
-                    policy: *policy,
-                },
-                _ => unreachable!("removals use the captured removal coordinator"),
-            };
-            let warning = lease_warnings.into_iter().next();
-            let derived = derive_dependency_mutation(&issues, &pinned_request, warning)?;
+            let source_id = super::require_issue_in_capture(&issues, issue_id)?;
+            let derived =
+                derive_batch_dependency_add(&issues, &source_id, dependency_ids, *policy)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
@@ -442,29 +317,6 @@ fn captured_issue<'a>(issues: &'a [Issue], id: &IssueId) -> Result<&'a Issue> {
         .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
 }
 
-fn derive_dependency_mutation(
-    issues: &[Issue],
-    request: &CapturedDependencyMutation,
-    warning: Option<String>,
-) -> Result<DerivedDependencyMutation> {
-    match request {
-        CapturedDependencyMutation::Single {
-            issue_id,
-            dependency_id,
-            policy,
-        } => derive_single_dependency_add(issues, issue_id, dependency_id, *policy, warning),
-        CapturedDependencyMutation::Batch {
-            issue_id,
-            dependency_ids,
-            policy,
-        } => derive_batch_dependency_add(issues, issue_id, dependency_ids, *policy),
-        CapturedDependencyMutation::RemoveSingle { .. }
-        | CapturedDependencyMutation::RemoveBatch { .. } => {
-            unreachable!("removals use their captured derivation")
-        }
-    }
-}
-
 fn derive_dependency_removal(
     issues: &[Issue],
     request: &CapturedDependencyMutation,
@@ -579,68 +431,6 @@ fn derive_dependency_removal(
     );
     Ok(DerivedDependencyMutation {
         outcome,
-        intents,
-        error_after_apply: None,
-    })
-}
-
-fn derive_single_dependency_add(
-    issues: &[Issue],
-    full_issue_id: &IssueId,
-    dependency_id: &IssueId,
-    policy: RedundancyPolicy,
-    warning: Option<String>,
-) -> Result<DerivedDependencyMutation> {
-    let full_issue_id = full_issue_id.clone();
-    let full_dependency_id = super::require_issue_in_capture(issues, dependency_id)?;
-    let graph = dependency_graph(issues);
-    graph.validate_add_dependency(&full_issue_id, &full_dependency_id)?;
-    let from = captured_issue(issues, &full_issue_id)?;
-    if from.dependencies.contains(&full_dependency_id) {
-        return Ok(DerivedDependencyMutation {
-            outcome: CapturedDependencyOutcome::Single {
-                result: DependencyAddResult::AlreadyExists,
-                warning,
-            },
-            intents: Vec::new(),
-            error_after_apply: None,
-        });
-    }
-
-    let candidate = candidate_issues(issues, &full_issue_id, [&full_dependency_id])?;
-    let candidate_graph = dependency_graph(&candidate);
-    let redundant = candidate_graph
-        .find_redundant_edges()
-        .into_iter()
-        .map(|(from, to)| (from.id.clone(), to.id.clone()))
-        .collect::<Vec<_>>();
-    if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
-        return Err(RedundantDependencyError::new(
-            (full_issue_id.clone(), full_dependency_id.clone()),
-            redundant,
-        )
-        .into());
-    }
-    let reduced = candidate_graph
-        .compute_transitive_reduction(&full_issue_id)
-        .into_iter()
-        .map(|node| node.id.clone())
-        .collect::<HashSet<_>>();
-    let original = dependency_set(from);
-    let result = if reduced == original {
-        DependencyAddResult::Skipped {
-            reason: "transitive (already reachable via other dependencies)".to_string(),
-        }
-    } else {
-        DependencyAddResult::Added
-    };
-    let intents = if reduced == original {
-        Vec::new()
-    } else {
-        derive_reduced_graph_intents(issues, &candidate, Some((&full_issue_id, &reduced)))?
-    };
-    Ok(DerivedDependencyMutation {
-        outcome: CapturedDependencyOutcome::Single { result, warning },
         intents,
         error_after_apply: None,
     })
@@ -920,6 +710,7 @@ mod captured_tests {
     use super::*;
     use crate::domain::event_catalog::EventTag;
     use crate::storage::{InMemoryStorage, IssueStore, MutationPoint, RepositoryStateStore};
+    use crate::test_utils::add_reducing_edge;
 
     #[derive(Default)]
     struct OneFailure(std::sync::Mutex<Option<MutationPoint>>);
@@ -953,10 +744,7 @@ mod captured_tests {
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        executor
-            .graph()
-            .add_dependency(&source_id, &dependency_id)
-            .unwrap();
+        add_reducing_edge(&executor, &source_id, &dependency_id).unwrap();
 
         let updated = executor.storage.load_issue(&source_id).unwrap();
         assert_eq!(updated.title, "concurrent title");

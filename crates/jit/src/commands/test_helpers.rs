@@ -2,6 +2,7 @@
 //!
 //! Provides reusable setup functions to eliminate duplication across test modules.
 
+pub use super::dependency::DependenciesAddResult;
 use crate::commands::CommandExecutor;
 use crate::declarations::GateRegistry;
 use crate::domain::Issue;

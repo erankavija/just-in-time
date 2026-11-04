@@ -2,7 +2,7 @@
 //! validate, snapshot, instantiate (jit:14137e1a), plus edge wiring + the
 //! `move-upstream-to-role` transform (jit:73e5e853).
 //!
-//! These exercise the real `create_issue` + gate-preset + `add_dependency` +
+//! These exercise the real `create_issue` + gate-preset + `add_dependencies_with_policy` +
 //! storage path through the in-process `TestHarness` (InMemoryStorage), which is
 //! fully isolated from the production `.jit/`. The template is authored in-test
 //! via `TemplateRegistry::from_toml_str` and passed explicitly to
@@ -21,6 +21,7 @@ use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
 use jit::test_utils::issue_id;
 use jit::CommandExecutor;
 use std::collections::BTreeMap;
@@ -391,7 +392,7 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
     let upstream = h.create_issue("Upstream");
     let epic = create_epic(&h, "Snapshot epic");
     // Give the container a pre-existing upstream dependency.
-    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
     let upstream_full = h.get_issue(&upstream).id;
 
     let (result, _w) = h
@@ -533,7 +534,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
         .unwrap()
         .issue
         .id;
-    h.executor.graph().add_dependency(&epic, &planning).unwrap();
+    add_reducing_edge(&h.executor, &epic, &planning).unwrap();
 
     let before = h.all_issues().len();
     let err = h
@@ -631,11 +632,8 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     // Simulate the breakdown splice: a child depends on B, and C depends on the
     // child. Transitive reduction then DROPS the direct C → B edge.
     let child = h.create_issue("impl child");
-    h.executor
-        .graph()
-        .add_dependency(&child, &breakdown_id)
-        .unwrap();
-    h.executor.graph().add_dependency(&epic, &child).unwrap();
+    add_reducing_edge(&h.executor, &child, &breakdown_id).unwrap();
+    add_reducing_edge(&h.executor, &epic, &child).unwrap();
     assert!(
         !h.get_issue(&epic).dependencies.contains(&breakdown_id),
         "reduction must drop the now-redundant direct C → B edge"
@@ -1244,8 +1242,8 @@ fn test_apply_wires_spine_and_moves_upstream_onto_planning() {
     let up1 = h.create_issue("Upstream 1");
     let up2 = h.create_issue("Upstream 2");
     let epic = create_epic(&h, "Spine epic");
-    h.executor.graph().add_dependency(&epic, &up1).unwrap();
-    h.executor.graph().add_dependency(&epic, &up2).unwrap();
+    add_reducing_edge(&h.executor, &epic, &up1).unwrap();
+    add_reducing_edge(&h.executor, &epic, &up2).unwrap();
     let up1_full = h.get_issue(&up1).id;
     let up2_full = h.get_issue(&up2).id;
 
@@ -1376,7 +1374,7 @@ applies_to  = ["epic"]
     let upstream = h.create_issue("Upstream U");
     let epic = create_epic(&h, "Cyclic epic");
     // C → U pre-existing.
-    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
 
     let bindings = BTreeMap::from([
         ("container".to_string(), epic.clone()),
@@ -1515,7 +1513,7 @@ fn test_apply_template_returns_created_issues_by_role() {
     let mut template = plan_template();
     let epic = create_epic(&h, "Returned issues");
     let upstream = h.create_issue("Upstream");
-    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
 
     for force in [false, true, true] {
         let (result, _) = h
@@ -1548,7 +1546,7 @@ fn test_apply_result_serializes_to_expected_json_shape() {
     let template = plan_template();
     let upstream = h.create_issue("Upstream");
     let epic = create_epic(&h, "JSON epic");
-    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
     let upstream_full = h.get_issue(&upstream).id;
     let epic_full = h.get_issue(&epic).id;
 
@@ -1634,7 +1632,7 @@ fn harness_with_upstreams(
     let upstreams: Vec<IssueId> = (0..upstream_count)
         .map(|i| {
             let up = h.create_issue(&format!("Upstream {i}"));
-            h.executor.graph().add_dependency(&epic, &up).unwrap();
+            add_reducing_edge(&h.executor, &epic, &up).unwrap();
             h.get_issue(&up).id
         })
         .collect();
@@ -1653,7 +1651,7 @@ fn store_is_acyclic(h: &TestHarness) -> bool {
 
 /// True iff the store's dependency graph carries no transitively-redundant DIRECT
 /// edge: for every edge `from -> to`, `to` must NOT be reachable from `from`
-/// through any OTHER direct dependency. `add_dependency`'s eager transitive
+/// through any OTHER direct dependency. Dependency addition's eager transitive
 /// reduction must leave the result in this reduced form.
 fn store_is_transitively_reduced(h: &TestHarness) -> bool {
     let issues = h.all_issues();

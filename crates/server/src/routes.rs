@@ -1166,6 +1166,7 @@ mod tests {
     use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::domain::Priority;
     use jit::storage::{InMemoryStorage, JsonFileStorage, PathReadError};
+    use jit::test_utils::add_reducing_edge;
     use jit::test_utils::setup_test_repo_with_config;
 
     use crate::watcher::ChangeTracker;
@@ -1669,10 +1670,7 @@ mod tests {
         };
         let dependency = create("Dependency");
         let dependent = create("Dependent");
-        executor
-            .graph()
-            .add_dependency(&dependent, &dependency)
-            .unwrap();
+        add_reducing_edge(&executor, &dependent, &dependency).unwrap();
         let state = AppState {
             executor,
             tracker: Arc::new(ChangeTracker::new(16)),
@@ -1778,7 +1776,7 @@ mod tests {
             .issue
             .id;
 
-        executor.graph().add_dependency(&id2, &id1).unwrap();
+        add_reducing_edge(&executor, &id2, &id1).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1847,7 +1845,7 @@ mod tests {
         let (id1, id2) = (new("Issue 1"), new("Issue 2"));
         new("Issue 3");
         // One edge over three nodes, so a `count` of edges could not pass.
-        executor.graph().add_dependency(&id2, &id1).unwrap();
+        add_reducing_edge(&executor, &id2, &id1).unwrap();
 
         let state = AppState {
             executor,
@@ -1901,7 +1899,7 @@ mod tests {
         let leaf_type = taxonomy.type_at_level(4);
         let container = new("Container", vec![format!("type:{container_type}")]);
         let leaf = new("Leaf", vec![format!("type:{leaf_type}")]);
-        executor.graph().add_dependency(&container, &leaf).unwrap();
+        add_reducing_edge(&executor, &container, &leaf).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {

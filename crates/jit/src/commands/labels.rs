@@ -3,14 +3,6 @@
 use super::*;
 
 impl<S: IssueStore> IssueOps<'_, S> {
-    /// Get issue by ID.
-    ///
-    /// Note: Helper method for label operations, part of public API.
-    #[allow(dead_code)]
-    pub fn get_issue(&self, id: &IssueId) -> Result<Issue> {
-        self.exec.storage.load_issue(id)
-    }
-
     pub fn list_label_values(&self, namespace: &str) -> Result<Vec<String>> {
         let issues = self.exec.storage.list_issues()?;
         let mut values = std::collections::HashSet::new();

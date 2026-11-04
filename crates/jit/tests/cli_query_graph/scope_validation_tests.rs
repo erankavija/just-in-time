@@ -12,6 +12,7 @@ use jit::commands::CommandExecutor;
 use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
+use jit::test_utils::add_reducing_edge;
 use jit::test_utils::{document_reference, issue_id};
 use jit::validation::report::{BuiltInPass, Selection};
 use jit::validation::RuleReport;
@@ -60,7 +61,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
             .issue
             .id;
         for dependency in dependencies {
-            executor.graph().add_dependency(&id, &dependency).unwrap();
+            add_reducing_edge(executor, &id, &dependency).unwrap();
         }
         if executor.storage().load_issue(&id).unwrap().state != target_state {
             executor
@@ -1033,7 +1034,7 @@ mod file_backed_external_plan {
             vec!["type:task"]
         };
         let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
-        executor.graph().add_dependency(&c, &impl_id).unwrap();
+        super::add_reducing_edge(executor, &c, &impl_id).unwrap();
 
         // Write the plan under the REPO ROOT, NOT under `.jit/`.
         let plan_dir = repo_root.path().join("dev/active");

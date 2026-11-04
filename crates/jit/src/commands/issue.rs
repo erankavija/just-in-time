@@ -420,7 +420,14 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// let epic = new("Epic");
     /// let child = new("Child");
-    /// executor.graph().add_dependency(&epic, &child).unwrap();
+    /// executor
+    ///     .graph()
+    ///     .add_dependencies_with_policy(
+    ///         &epic,
+    ///         std::slice::from_ref(&child),
+    ///         jit::commands::RedundancyPolicy::Reduce,
+    ///     )
+    ///     .unwrap();
     ///
     /// let response = executor.issues().issue_children(&epic).unwrap();
     /// assert_eq!(response.extras.container.title, "Epic");
@@ -476,8 +483,22 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let epic = new("Epic");
     /// let done = new("Done child");
     /// let todo = new("Todo child");
-    /// executor.graph().add_dependency(&epic, &done).unwrap();
-    /// executor.graph().add_dependency(&epic, &todo).unwrap();
+    /// executor
+    ///     .graph()
+    ///     .add_dependencies_with_policy(
+    ///         &epic,
+    ///         std::slice::from_ref(&done),
+    ///         jit::commands::RedundancyPolicy::Reduce,
+    ///     )
+    ///     .unwrap();
+    /// executor
+    ///     .graph()
+    ///     .add_dependencies_with_policy(
+    ///         &epic,
+    ///         std::slice::from_ref(&todo),
+    ///         jit::commands::RedundancyPolicy::Reduce,
+    ///     )
+    ///     .unwrap();
     /// executor
     ///     .issues().update_issue(&done, None, None, None, Some(State::Done),
     ///         vec![], vec![], None, None, false)
@@ -635,7 +656,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// dependency resolved the target id first, and a deleted target no longer
     /// resolves. The cascade is an automatic invariant-maintaining side effect
     /// of deletion, not a user-initiated edit to the dependent — like
-    /// `add_dependency`'s Ready-to-Backlog demotion, it intentionally bypasses
+    /// dependency addition's Ready-to-Backlog demotion, it intentionally bypasses
     /// the active-lease check on the dependents; only the issue actually being
     /// deleted is lease-checked (above). The dependent rewrites, deletion, tombstone,
     /// and audit events publish through one redo record,
@@ -878,6 +899,7 @@ mod tests {
     use crate::domain::EventBody;
     use crate::domain::State;
     use crate::storage::{InMemoryStorage, MutationPoint};
+    use crate::test_utils::add_reducing_edge;
     use std::collections::HashMap;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -2678,7 +2700,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b_id = create("B");
 
         let events_before = executor.storage.read_events().unwrap().len();
-        executor.graph().add_dependency(&a_id, &b_id).unwrap();
+        add_reducing_edge(&executor, &a_id, &b_id).unwrap();
 
         // Adding a dependency edits `A`; the change must be event-logged.
         let logged = executor
@@ -2732,7 +2754,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         };
         let a_id = create("A");
         let b_id = create("B");
-        executor.graph().add_dependency(&a_id, &b_id).unwrap();
+        add_reducing_edge(&executor, &a_id, &b_id).unwrap();
 
         // Snapshot AFTER the add so we isolate the removal's event.
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2779,7 +2801,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
-        executor.graph().add_dependency(&a_id, &b_id).unwrap();
+        add_reducing_edge(&executor, &a_id, &b_id).unwrap();
 
         let events_before = executor.storage.read_events().unwrap().len();
         executor
@@ -2873,7 +2895,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
-        executor.graph().add_dependency(&a_id, &b_id).unwrap();
+        add_reducing_edge(&executor, &a_id, &b_id).unwrap();
         assert!(executor.storage.load_issue(&a_id).unwrap().dependencies == vec![b_id.clone()]);
 
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2966,7 +2988,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap()
             .issue
             .id;
-        executor.graph().add_dependency(&a_id, &b_id).unwrap();
+        add_reducing_edge(&executor, &a_id, &b_id).unwrap();
         assert!(
             executor.validation().validate_silent().is_ok(),
             "validation should pass before deletion"

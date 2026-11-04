@@ -1481,6 +1481,7 @@ mod tests {
     use crate::output::IssueShowResponse;
     use crate::repository_state::VirtualPath;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
+    use crate::test_utils::add_reducing_edge;
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
@@ -5167,10 +5168,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap()
             .issue
             .id;
-        executor
-            .graph()
-            .add_dependency(&issue_id, &dependency_id)
-            .unwrap();
+        add_reducing_edge(&executor, &issue_id, &dependency_id).unwrap();
         let dependency_path = VirtualPath::issue_record(&dependency_id).repository_relative();
         add_exec_gate(
             &executor,

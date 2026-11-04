@@ -17,6 +17,7 @@ use jit::domain::identity::IssueId;
 use jit::domain::{Event, EventBody, State};
 use jit::errors::TransitionBlockedError;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::test_utils::add_reducing_edge;
 
 /// Create canonical membership, then seed the test-specific labels and state.
 fn seed_issue(
@@ -317,7 +318,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     // A design issue the transitioning epic depends on.
     let design = seed_issue(&executor, "Design", &["type:design"], State::Done);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-    executor.graph().add_dependency(&epic, &design).unwrap();
+    add_reducing_edge(&executor, &epic, &design).unwrap();
 
     // An unrelated epic with no design dependency (violates the rule). It is not
     // connected to `epic` in the dependency graph.
