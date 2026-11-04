@@ -22,6 +22,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T00:38:25.410822237Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b3e8e687-031c-4b0b-a772-48d8b33823ba",
+      "status": "failed",
+      "updated_at": "2026-11-04T00:42:55.249114473Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "2f563673-82ee-4579-913a-e9d55c9881f1",
@@ -39,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Each lease is one record under the lease lock",
-  "updated_at": "2026-11-04T00:38:25.410822237Z"
+  "updated_at": "2026-11-04T00:42:55.249114473Z"
 }
