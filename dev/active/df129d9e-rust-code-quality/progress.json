@@ -961,7 +961,8 @@
     "9be5b0de": 2,
     "3b696589": 1,
     "24a982b7": 1,
-    "f87f9b00": 1
+    "f87f9b00": 1,
+    "d58f80c9": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1383,10 +1384,11 @@
       "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored). Landing CI: all tests passed, suite-clock budget failed (38.9 s vs 30 s) from a cold doctest build (25.2 s; cold 20.3 s / warm 3.2 s on rerun). Asked 6a for a fresh landing. Steward approved one fresh landing (D-56); land-one now retries a budget-only overrun with a cold doctest step once."
     },
     "3f816619": {
-      "status": "reviewed",
+      "status": "merging",
       "vendor": "Claude Opus",
       "reason": "largest remaining move (~580 main.rs lines, 10 leaves)",
-      "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing."
+      "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing.",
+      "note": "landing conflicted with main (24a982b7 overlap); worker merging"
     },
     "5d09e74b": {
       "status": "done",
@@ -1394,11 +1396,11 @@
       "epic": "b697a3f7"
     },
     "d58f80c9": {
-      "status": "landing",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
       "epic": "b697a3f7",
-      "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger)"
+      "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger) Branch CI: archive preview/execute fail beside an unreadable subtree (regression). Rework 1 to same worker."
     }
   },
   "handoff": {
