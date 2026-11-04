@@ -17,6 +17,10 @@ This run is inspection-only. Do not edit files or request wider permissions. Do 
 
 Completion reports, progress logs, and handoff documents written during the epic are self-attested narrative — treat them as claims to test, never as evidence. Where a claim cannot be verified from the repository, report it as unsubstantiated rather than assuming good faith.
 
+## User decisions
+
+The issue description may record user decisions as `decision` items (`D-NN`) under a `## Decisions` heading. Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses. If evidence contradicts a decision's factual premise, surface that as an advisory finding citing the decision's address, `@/issue/<short-id>/decision/D-NN`.
+
 ## Verdict
 
 Weigh findings by consequence: a criterion that is unmet or only narratively met is blocking; framing and polish issues are advisory. End your review with exactly one line:

@@ -1497,16 +1497,22 @@ mod tests {
     ///
     /// Nothing here can be flipped by load: the child sleeps well past the
     /// bound, so it never serves and never exits, and a slower host delays the
-    /// bounded failure instead of changing it. The one interval the case relies
-    /// on is the child announcing its own PID — one `echo` — inside the bound
-    /// below, which a host would have to stall for two seconds to prevent.
+    /// bounded failure instead of changing it. The first observation waits for
+    /// the child's PID announcement, so the bound can be short without racing
+    /// the child's one `echo`.
     #[test]
     #[cfg(unix)]
     fn test_start_server_bounds_a_child_that_neither_serves_nor_exits() {
-        let bound = Duration::from_secs(2);
+        let bound = Duration::from_millis(50);
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
         let announced_pid = data_dir.join("child.pid");
+        let never_serving_once_announced = |port: u16| {
+            while !std::fs::read_to_string(&announced_pid).is_ok_and(|pid| pid.ends_with('\n')) {
+                std::thread::sleep(STARTUP_POLL_INTERVAL);
+            }
+            never_serving(port)
+        };
 
         // `exec` keeps the announced PID: the shell is replaced by the sleep, so
         // the process the start must terminate is the one named in the file.
@@ -1520,7 +1526,7 @@ mod tests {
 
         let result = start_server(
             opts_for(data_dir, fake_server),
-            watch_with(&never_serving, bound),
+            watch_with(&never_serving_once_announced, bound),
         );
 
         let msg = result.unwrap_err().to_string();

@@ -442,6 +442,10 @@
     },
     {
       "item": "5ee85aed holistic-review 0dbcc3b2 and f7396783 F1: external-repo cutover evidence is self-attested by construction; options (a) raw bundle, (b) ruling, (c) reviewer with checkouts",
+      "status": "superseded: user decision recorded; rerun 2528dd8f failed again"
+    },
+    {
+      "item": "5ee85aed holistic-review 2528dd8f: F1 story REQ-01 omits epic REQ-05 indefinite-limit exception (recommend amend, DEC-28, full sweep); F2 external evidence despite user decision",
       "status": "pending with just-in-time-6a"
     }
   ],
@@ -477,6 +481,10 @@
     {
       "source": "lead",
       "text": "655273d9 was closed on repo-validate before its REQ-03 run-id resolution check was run; run afterwards (3699 cited, 0 unresolved) and recorded in format4-cutover.md."
+    },
+    {
+      "source": "lead",
+      "text": "Story criteria sweep after DEC-27 checked only the REQ-13 exception; 5ee85aed REQ-01 also omits the epic REQ-05 indefinite-limit exception. Sweep stories against every epic exception."
     }
   ],
   "dispatch_log": [

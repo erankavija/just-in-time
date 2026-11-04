@@ -53,6 +53,10 @@ prior blocking findings, or new blocking findings under the policy below; a
 minor issue of a kind that existed unchanged in a previously reviewed revision
 is advisory.
 
+## User decisions
+
+The issue description may record user decisions as `decision` items (`D-NN`) under a `## Decisions` heading. Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses. If evidence contradicts a decision's factual premise, surface that as an advisory finding citing the decision's address, `@/issue/<short-id>/decision/D-NN`.
+
 ## Finding and verdict policy
 
 Every finding must include `disposition` (`blocking` or `advisory`) and

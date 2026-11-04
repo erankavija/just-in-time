@@ -275,3 +275,42 @@ forbid = [
   "plan is approved",
   "breakdown after plan approved",
 ]
+
+# --- review prompts bind recorded user decisions -----------------------------
+# Every AI review prompt carries the same binding sentence, so no review
+# re-raises a finding a recorded user decision forecloses.
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "user decisions bind the review"
+exactly_once = [
+  "Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses.",
+]
+
+[[document]]
+path = "scripts/doc-review-prompt.md"
+topic = "user decisions bind the review"
+exactly_once = [
+  "Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses.",
+]
+
+[[document]]
+path = "scripts/holistic-review-prompt.md"
+topic = "user decisions bind the review"
+exactly_once = [
+  "Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses.",
+]
+
+[[document]]
+path = "contrib/gates/plan-review-prompt.md"
+topic = "user decisions bind the review"
+exactly_once = [
+  "Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses.",
+]
+
+[[document]]
+path = "contrib/gates/breakdown-review-prompt.md"
+topic = "user decisions bind the review"
+exactly_once = [
+  "Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses.",
+]
