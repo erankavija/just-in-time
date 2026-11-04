@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2894302d320815926d9f17a26b15e529c0cf96e1",
+  "completed_at": "2026-11-04T09:20:05.295990920Z",
+  "duration_ms": 225326,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 3446,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9876a23a/requirement/REQ-03",
+          "@/charter/D-20"
+        ],
+        "severity": "high",
+        "summary": "Parity test compares reports from fresh captures rather than the image supplied to each checker, so it cannot prove same-image equivalence."
+      }
+    ],
+    "summary": "The required same-image parity harness is not implemented.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a106d1be-918f-418d-9ee9-454ef0ed157c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d14d8997-6602-40c9-833b-16c78570cd33",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:16:19.969186063Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9848 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5d8-5591-7d21-a642-22afbdcc39ff\n--------\nuser\n--- 9835 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b119cd87 (`refactor(jit:a106d1be)`)\nPolicy sources: AGENTS.md; dev/active/9876a23a-one-validation-report/plan.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/a106d1be/decision/D-01 and @/issue/9876a23a/requirement/REQ-03,REQ-05 (.jit issue sources); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:16:19Z, exit code not recorded); code-review pending\nTruncation recovery: reread the affected commit patch, checker paths, report-selection implementation, capture paths, and checker-selection contract in bounded ranges\n\n1. [blocking][issue-impact] `crates/jit/src/commands/gate_check.rs:3446` — The new parity test captures `image`, but computes its expected issue/rule/scope report through a new `selection_report()` capture and its Whole report through another `validate_repository_report()` capture. The repository checker likewise performs its own fresh capture. It therefore does not demonstrate checker/CLI equivalence over one image as REQ-02 requires, and cannot detect capture-input divergence. References: @/issue/9876a23a/requirement/REQ-03, @/charter/D-20.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required same-image parity harness is not implemented.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Parity test compares reports from fresh captures rather than the image supplied to each checker, so it cannot prove same-image equivalence.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":3446,\"references\":[\"@/issue/9876a23a/requirement/REQ-03\",\"@/charter/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

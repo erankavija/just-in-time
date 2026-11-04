@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f6f8c786f8daee848806047351a069c04151541",
+  "completed_at": "2026-11-04T09:24:29.567088655Z",
+  "duration_ms": 365854,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/item.rs",
+        "id": "F1",
+        "line": 44,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "Item handler registers command-owned response types instead of output-owned response wrappers or constructors."
+      }
+    ],
+    "summary": "Item command success response types remain command-owned rather than output-owned.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8fa79c90-93dc-4a38-8e6a-26f956749c75",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:18:23.713044487Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7754 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5da-3685-76f2-aa58-8ad2e229d033\n--------\nuser\n--- 7741 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: baaac42c, f8fe1b52, 16c49d52, 1bea4f8e (`jit:1a4f2ebd`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/df129d9e/requirement/REQ-01; @/issue/df129d9e/requirement/REQ-02; @/issue/df129d9e/requirement/REQ-12; @/issue/df129d9e/requirement/REQ-13; @/issue/df129d9e/requirement/REQ-17; @/issue/df129d9e/requirement/REQ-18; @/invariant/architecture-dependency-direction; @/invariant/orthogonal-tests; @/invariant/semantic-test-assertions; @/invariant/essential-code-prose; @/gate/cargo-ci; @/gate/mcp-ci; @/gate/jit-validate\nGate evidence: cargo-ci passed (2026-11-04T09:14:57Z); mcp-ci passed (2026-11-04T09:14:57Z)\nTruncation recovery: recovered the truncated merge diff with per-path reads for item handler, output, schema, tests, registry, and exit-code projection; unrelated wave-7 merge content was outside the item-command impact cone.\n\n1. **[blocking][issue-impact]** The migrated leaves still use command-owned machine-readable response types: `ItemListResult` and `ItemShowResult` are defined in `crates/jit/src/commands/item.rs`, imported directly by the handler, and registered as its response types at `crates/jit/src/dispatch/item.rs:44`. `output/item.rs` only implements rendering for those command types. This misses the issue’s stated response-ownership contract and does not support its `satisfies:df129d9e/REQ-01` claim, which requires each machine-readable success payload to be an output-owned type or output constructor wrapping the command result. Use output-module response wrappers/constructors, preserving the wire payloads.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Item command success response types remain command-owned rather than output-owned.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Item handler registers command-owned response types instead of output-owned response wrappers or constructors.\",\"file\":\"crates/jit/src/dispatch/item.rs\",\"line\":44,\"references\":[\"@/issue/df129d9e/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

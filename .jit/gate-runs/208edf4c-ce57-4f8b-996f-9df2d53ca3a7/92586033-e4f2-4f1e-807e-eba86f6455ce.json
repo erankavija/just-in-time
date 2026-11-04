@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2894302d320815926d9f17a26b15e529c0cf96e1",
+  "completed_at": "2026-11-04T09:19:40.757327193Z",
+  "duration_ms": 281303,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The scoped validation view now selects from the single whole-repository report and satisfies the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "208edf4c-ce57-4f8b-996f-9df2d53ca3a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "92586033-e4f2-4f1e-807e-eba86f6455ce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:14:59.454136329Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b0aedad3f, 3aefb7c84, 47e2f46fb (`jit:208edf4c`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/208edf4c/decision/D-01, D-02 and @/issue/9876a23a/requirement/REQ-02 (issue Markdown); @/invariant/orthogonal-tests, @/invariant/essential-code-prose and @/gate/cargo-ci (.jit registries)\nGate evidence: cargo-ci passed, 2026-11-04T09:14:59Z, exit code unavailable\nTruncation recovery: re-read tagged patches and current implementation by path/range; record-only event and gate artifacts were inspected but not judged against current behavior\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped validation view now selects from the single whole-repository report and satisfies the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

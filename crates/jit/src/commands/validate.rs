@@ -579,10 +579,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 }
             };
         let mut issues = None::<ParsedIssues>;
+        let mut add_base = start.is_some();
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
-            base(spec)?;
-            if spec != image.capture_spec() {
-                return Ok(());
+            if add_base {
+                add_base = false;
+                base(spec)?;
+                if spec != image.capture_spec() {
+                    return Ok(());
+                }
             }
             // Closure planning is best-effort: a malformed registry cannot fail
             // the capture, because validation itself is the authority that

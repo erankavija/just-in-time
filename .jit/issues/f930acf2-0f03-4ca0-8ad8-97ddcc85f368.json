@@ -8,13 +8,33 @@
   ],
   "description": "`jit version` is rendered inline in `run()` and typed in the schema only by the legacy table. This registers it as a library handler that runs before repository bootstrap.\n\n## Background\n\n`run()` in `crates/jit/src/main.rs` handles `Commands::Version` before repository discovery, building `JsonOutput::success(&info)` over `build_info::VersionInfo` in the arm. Its schema entry comes from the hand-kept `\"version\"` row of `get_output_schema_for_command` in `crates/jit/src/schema.rs`. Once that table is deleted, a leaf without a registered handler would have no typed response. Like `init`, the command must work outside a repository.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit version` is dispatched to a registered handler in `crates/jit/src/dispatch/` that runs without opening a repository, and `main.rs` keeps no arm body for it.\n- [hard] REQ-02: The handler returns `VersionInfo` (or an output-owned wrapper) as its registered response, and the schema takes the leaf's success schema from the registry.\n- [hard] REQ-03: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-04: Human and machine output of `jit version` are unchanged inside and outside a repository, and the existing suites pass without weakened assertions.\n\n## Notes\n\nThe handler contract's dispatch and response registry are the mechanism; this task adds no new mechanism and reuses the executor-free single-leaf form 12c0f3fb adds. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:38:18.623943533Z",
   "first_ready_at": "2026-11-03T23:08:02.402662355Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b57b0e38-f506-4d69-bbed-f823d59298f0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:56.379537479Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "20b0b779-d4e2-4df0-9552-40d9e8c44d7b",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:22:20.563933098Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "7e6d466c-0613-4aa0-b8a0-767549c8048c",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:56.519523282Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f930acf2-0f03-4ca0-8ad8-97ddcc85f368",
   "labels": [
     "type:task",
@@ -30,7 +50,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Version command moves to a library handler",
-  "updated_at": "2026-11-04T03:00:11.664838796Z"
+  "updated_at": "2026-11-04T09:38:18.623943533Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6d21e6cae3db0e57442abc4c0830db4709b47bbf",
+  "completed_at": "2026-11-04T09:23:32.524361083Z",
+  "duration_ms": 116300,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's two attributed documentation commits accurately describe the current per-key storage layout and history-reader boundary.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ac8f07c2-92cc-464d-b032-3f596a4be776",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "79605a4c-9ee3-4d91-995d-ffe40b37bcee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:21:36.223437492Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf at configured hierarchy level 4 and has no resolved children. Reviewed only the individually tagged commits `d59a65db7` and `8d2da3991`; uncommitted changes were excluded. Current storage, validation, and server code confirm the documented paths and readers.\n\nThe updated reference and concepts accurately document per-key records, history readers, lease publication, archive-path historicity, and whole-repository validation. Decisions D-1 and D-2 are satisfied.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's two attributed documentation commits accurately describe the current per-key storage layout and history-reader boundary.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

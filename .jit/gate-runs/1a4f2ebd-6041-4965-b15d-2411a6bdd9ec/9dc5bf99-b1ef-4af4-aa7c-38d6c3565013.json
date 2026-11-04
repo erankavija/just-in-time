@@ -1,0 +1,56 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6d21e6cae3db0e57442abc4c0830db4709b47bbf",
+  "completed_at": "2026-11-04T09:28:02.372781869Z",
+  "duration_ms": 341584,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/item.rs",
+        "id": "F1",
+        "line": 11,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-01",
+          "@/issue/df129d9e/requirement/REQ-17"
+        ],
+        "severity": "high",
+        "summary": "Item handlers return command-layer response types instead of output-owned response types or output constructors."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output.rs",
+        "id": "F2",
+        "line": 1042,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-13",
+          "@/inv/canonical-cutover",
+          "@/inv/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "ITEM_COMMAND_FAILED is no longer produced but remains declared and documented, while the CLI reference still claims item failures emit it."
+      }
+    ],
+    "summary": "Two blocking issue-impact gaps remain: output-owned item responses and retirement of ITEM_COMMAND_FAILED.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9dc5bf99-b1ef-4af4-aa7c-38d6c3565013",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:22:20.788213119Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6644 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5dd-d488-7d82-b8a9-9613d7904cf7\n--------\nuser\n--- 6631 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: baaac42cd, f8fe1b525, 16c49d52c, 1bea4f8ee (`jit:1a4f2ebd`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue markdown); @/inv/architecture-dependency-direction, canonical-cutover, essential-code-prose, orthogonal-tests, semantic-types, single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed 2026-11-04T09:14:57Z (exit code unavailable); mcp-ci passed 2026-11-04T09:14:57Z (exit code unavailable)\nTruncation recovery: narrowed reads of the item patches, merge second-parent delta, linked plan/investigation sections, item failure probes, and error-code documentation generator\n\n1. **Blocking, issue-impact:** `dispatch/item.rs` returns command-layer `ItemListResult` and `ItemShowResult` directly; `output/item.rs` only implements rendering traits. These are neither types defined by output nor output constructors wrapping command-layer results, contrary to the required handler response-ownership contract. [crates/jit/src/dispatch/item.rs:11](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/item.rs:11) References: `@/issue/df129d9e/requirement/REQ-01`, `@/issue/df129d9e/requirement/REQ-17`.\n\n2. **Blocking, issue-impact:** The migration removes every producer of `ITEM_COMMAND_FAILED`, but leaves the dead fallback enum variant and its generated error-code entry; the manual CLI reference still claims all failing item commands emit it. Retire the variant and regenerate its projection, then correct [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3480). [crates/jit/src/output.rs:1042](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:1042) References: `@/issue/df129d9e/requirement/REQ-13`, `@/inv/canonical-cutover`, `@/inv/single-source-prose`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two blocking issue-impact gaps remain: output-owned item responses and retirement of ITEM_COMMAND_FAILED.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Item handlers return command-layer response types instead of output-owned response types or output constructors.\",\"file\":\"crates/jit/src/dispatch/item.rs\",\"line\":11,\"references\":[\"@/issue/df129d9e/requirement/REQ-01\",\"@/issue/df129d9e/requirement/REQ-17\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"ITEM_COMMAND_FAILED is no longer produced but remains declared and documented, while the CLI reference still claims item failures emit it.\",\"file\":\"crates/jit/src/output.rs\",\"line\":1042,\"references\":[\"@/issue/df129d9e/requirement/REQ-13\",\"@/inv/canonical-cutover\",\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

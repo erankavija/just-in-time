@@ -7,10 +7,8 @@ repository root. Machine-local runtime state lives there too, gitignored, and
 multi-agent lease coordination lives under `.git/jit/` (see
 [The `.git/jit/` Control Plane](#the-gitjit-control-plane)).
 
-Three record shapes are defined by the code that writes them and are generated
-from it: the issue identifier, the event-log line, and the gate-run record. They
-live in [Storage Record Layout](storage-records.md), which this page links to
-where each comes up.
+Record fields and serialization are generated from the code that writes them
+in [Storage Record Layout](storage-records.md).
 
 ## Directory Structure
 
@@ -26,9 +24,13 @@ where each comes up.
 ├── events.jsonl      # Append-only event log
 ├── issues/           # One JSON file per issue
 │   └── <uuid>.json   # Issue data
-├── gate-runs/        # Recorded gate runs, one directory per issue
-│   └── <issue-id>/
-│       └── <run-id>.json  # Run record (see Storage Record Layout)
+├── gate-runs/        # Runs by issue; reusable verdicts by gate and inputs
+│   ├── <issue-id>/
+│   │   └── <run-id>.json
+│   └── verdicts/<gate-key>/<inputs-digest>.json
+├── archive-evidence/
+│   ├── container/<issue-id>.json
+│   └── document/<sha256-of-normalized-path>.json
 ├── schemas/          # JSON Schema files referenced by rules.toml
 └── tmp/              # Machine-local scratch directory
     └── redo.record   # The pending redo record, while a mutation leaves one
@@ -57,10 +59,7 @@ independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
 complete the fixed set, and each checkout over a data root outside every
 checkout adds one `worktree.lock` (see [Worktree Identity](#worktree-identity)).
-Their paths come from the
-[storage layout](../../crates/jit/src/repository_state/path.rs) and the
-[`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
-implementation. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
+The `.jit/` storage locks and `.jit-bootstrap.lock` retain
 their inodes for advisory-lock race safety; they are opened with
 create-if-absent semantics and are not unlinked. No lock and no
 `worktree.json` write creates `.jit/`; `jit init` alone creates the data root.
@@ -85,8 +84,8 @@ Lease records live under `.git/jit/`, not `.jit/`. See
 
 ## Publication and Recovery
 
-A mutation publishes through one **redo record**: the directories it creates,
-the new contents of every file it writes, and the paths it removes, except
+A repository mutation publishes through one **redo record**: the directories it
+creates, the new contents of every file it writes, and the paths it removes, except
 that the event log is the one file the record extends rather than replaces,
 with new lines positioned at its committed length (`@/charter/D-17`). The
 mutation fails, before anything durable is written, if
@@ -277,14 +276,60 @@ generated [Event Log Tags](events.md) catalog.
 The log's committed length is the end of its last newline-terminated line. A
 final line without a terminating newline is an uncommitted append: readers ignore
 it and the next event append, positioned at the committed length, overwrites it.
-Any other line that is not a well-formed record of the current vocabulary fails
-the read with an error naming the line.
+Blank lines are skipped. An unknown event tag or any other malformed
+newline-terminated line, including a malformed middle line, fails the read
+with an error naming the line.
 
 ## Gate Run Records
 
-A gate execution records its result under `gate-runs/`. The run's path, the
-record's fields, and how an unset field is written are specified in
+A recorded gate run lives at `gate-runs/<issue-id>/<run-id>.json`. The issue's
+gate state names its latest run in `run_id`; latest-run views read that record
+without scanning prior runs. A gate state without `run_id` has no latest run.
+The record's fields and serialization are specified in
 [Storage Record Layout](storage-records.md#gate-run-records).
+
+### Verdict records
+
+`gate-runs/verdicts/<gate-key>/<inputs-digest>.json` names the source issue and
+run for a reusable verdict over the gate's declared inputs. The latest recorded
+run that executed the checker and passed or failed replaces that key's record.
+Reuse reads that record and the run it names. See
+[Gate Verdict Records](storage-records.md#gate-verdict-records) for the fields.
+
+## Archive Evidence Records
+
+`archive-evidence/<target-key>.json` holds a target's ordered archive executions.
+The target key is `container/<issue-id>` or
+`document/<sha256-of-normalized-path>`, with the document digest taken over its
+normalized repository-relative path. Archive preview and execution read this
+record for prior evidence. Each execution records the source and destination
+paths it had at the time, so those paths are historical and may not exist in
+the current tree. See
+[Archive Evidence Records](storage-records.md#archive-evidence-records) for the
+fields.
+
+Gate runs, verdict records, and archive evidence are written in the same redo
+record as the repository change that produces them. Lease records use their
+own commit point under [the control plane](#the-gitjit-control-plane).
+
+## History Files
+
+These paths hold history; the table names their readers.
+
+| Path | Readers |
+|------|---------|
+| `.jit/events.jsonl` | `jit events tail`, `jit events query`; `jit worktree store-divergence` reads the compared stores' logs; whole-repository `jit validate` and the `repository_validation` checker read the whole log for record fidelity |
+| `.jit/gate-runs/` | `jit gate status <id> --all` or `--limit <N>` and the server's gate-run list (`GET /api/issues/:id/gate-runs`) read an issue's run history; whole-repository `jit validate` and `repository_validation` read every gate-run and verdict record for fidelity |
+| `.jit/tmp/` | Can hold appended event bytes in `redo.record`; mutating commands and `jit recover` read a pending record to complete publication |
+| `.git/jit/claims.jsonl` | None; no command reads claim history |
+
+No other command reads history, and no file is derived from a history file.
+Ordinary commands address current records by key, including named gate runs
+and verdict records under `gate-runs/`, rather than scanning history. Issue
+operations read only the event log's length and final line, without parsing a
+record, to locate the committed append position and detect concurrent changes.
+Default `jit search` excludes the data-root history paths above; explicit file
+selection can include them (see [Repository Search](cli-commands.md#repository-search)).
 
 ## Gate Registry
 
@@ -376,7 +421,7 @@ common directory), because a lease must be visible to every worktree racing to
 claim the same issue. The repository is the one holding the data root; for a
 data root outside every checkout, it is the one holding the invoking directory.
 `jit claim` requires a git repository for this reason: with neither, it fails
-with a typed `ClaimRequiresGitError` (exit code 10) rather than falling back to a
+with exit code 10 rather than falling back to a
 per-worktree lease store.
 
 ```
