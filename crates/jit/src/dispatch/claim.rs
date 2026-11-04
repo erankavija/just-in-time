@@ -4,8 +4,8 @@ use super::{
     resolve_issue, resolve_issue_filter, CommandContext, HandlerResult, HandlerStore, Outcome,
 };
 use crate::cli::ClaimCommands;
-use crate::commands::RecoveryFailedError;
 use crate::domain::identity::IssueIdPrefix;
+use crate::errors::RecoveryFailedError;
 use crate::output::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
     ClaimRenewResponse, LeaseListResponse, RecoverResponse,

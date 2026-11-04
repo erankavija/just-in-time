@@ -346,7 +346,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// Sharing one held session lets a caller capture and apply under the same guard.
     pub(crate) fn capture_proposed_base(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         overrides: &std::collections::BTreeMap<
             crate::repository_state::VirtualPath,
             Option<Vec<u8>>,
@@ -455,7 +455,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// a listing budget for every directory below the archive roots.
     pub(crate) fn capture_archive_base(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         self.capture_proposed_base_inner(
             session,
@@ -479,7 +479,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// Repair and archive omit these rule-evaluation inputs.
     fn capture_proposed_base_inner(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         start: Option<crate::repository_state::RepositoryImage>,
         overrides: &std::collections::BTreeMap<
             crate::repository_state::VirtualPath,
@@ -795,7 +795,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     /// event log, and the paths they plan.
     fn capture_repair_base(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         Ok(self
             .exec
@@ -816,7 +816,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     /// declaration or materialization failure.
     fn capture_repair_plan(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         context: &crate::repository_state::MutationContext,
     ) -> Result<Option<Result<CapturedRepairPlan>>> {
         use crate::repository_state::{derive_materialization, MaterializationRequest};
@@ -2316,13 +2316,9 @@ depends_on = ["planning"]
         use crate::repository_state::{CaptureSpec, MaterializationPlan, RepositoryImage};
         use crate::storage::{RepositoryApplyOutcome, RepositoryStateStoreError as Error};
 
-        impl crate::storage::RepositoryMutationSession for RoundCounter {
+        impl crate::storage::RepositoryReadSession for RoundCounter {
             fn layout(&self) -> &crate::repository_state::RepositoryLayout {
                 self.0.layout()
-            }
-
-            fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
-                self.0.recovery_report()
             }
 
             fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, Error> {
@@ -2336,6 +2332,12 @@ depends_on = ["planning"]
                 spec: CaptureSpec,
             ) -> Result<RepositoryImage, Error> {
                 self.0.extend(image, spec)
+            }
+        }
+
+        impl crate::storage::RepositoryMutationSession for RoundCounter {
+            fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
+                self.0.recovery_report()
             }
 
             fn apply(
