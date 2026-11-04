@@ -16,7 +16,7 @@
 # Why the container anchor carries `repo-validate` (REQ-13 of issue 552ff75c):
 # it is the whole-repo integrity gate on the breakable container.
 # `repo-validate` is a CONFIG-DECLARED gate in .jit/gates.toml whose checker
-# runs `jit validate` with NO issue id (whole-repo run_rules(None)), distinct
+# runs `jit validate` with NO issue id (the whole-repository report), distinct
 # from the per-issue `jit-validate` gate (`jit validate "$JIT_ISSUE_ID"`). By
 # @/invariant/gate-semantics the bound container cannot reach Done until
 # whole-repo validation passes.

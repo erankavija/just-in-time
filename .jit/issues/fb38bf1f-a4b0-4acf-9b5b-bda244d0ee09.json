@@ -1,0 +1,38 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T09:40:58.219593245Z",
+  "dependencies": [
+    "06ee9b67-07c3-48ad-a938-179a83d12564",
+    "182f4c03-2c8b-431c-9c1e-a208c234a525",
+    "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
+    "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
+    "3f816619-6163-46d4-8549-f988a3de65db",
+    "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
+    "8e91126b-c17b-4274-bccb-13385e40c318",
+    "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
+    "cc4ea8a9-6f24-4dc2-ad6a-fccbe7d79be4",
+    "cd8e04cc-1f52-40a5-935a-b2b77a67240e"
+  ],
+  "description": "Every success response type a command handler registers is defined in the output layer, so response shapes have one owner and the command layer only returns domain results.\n\n## Background\n\nThe project's layering gives rendering and response shapes to the CLI and output layer; commands orchestrate domain and storage. Handlers in `crates/jit/src/dispatch/` register a success response type per leaf. Most are defined under `crates/jit/src/output/`, but some leaves register a type that the command layer, the domain layer or build metadata defines. At this task's filing these were `AssetListResult`, `DocumentHistory`, `DocumentListResult`, `DocumentRemoveResult`, `LinkCheckResult`, `InvariantCheckResult`, `ItemListResult`, `ItemShowResult` and `ProjectRenderResult` (command layer), `ArchiveCandidates` (domain), `VersionInfo` (build metadata), and the worktree handler's `WorktreeInfo`. Handler migrations still in flight may add more.\n\n## Success Criteria\n\n- [hard] REQ-01: Every success type registered by a `command_group!` leaf outside test-only groups is defined under `crates/jit/src/output/` (as a response type or an output constructor over a domain value), and no command-layer, domain-layer or build-metadata type is registered as a success response.\n- [hard] REQ-02: Command-layer copies of response shapes that the move makes redundant are deleted; commands return domain results and nothing in `commands/` derives a JSON schema for a response.\n- [hard] REQ-03: A test fails when a leaf registers a success type defined outside the output layer, so the convention holds for future handlers.\n- [hard] REQ-04: JSON payloads, schema names, human output and exit codes of every affected leaf are unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nSteward ruling (2026-11-04): output-owned success responses are the project convention. Handler issues whose criteria require only \"the registered response type\" meet those criteria as written, and this task performs the move for all of them at once.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T09:40:58.219593245Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Every registered success response is output-owned",
+  "updated_at": "2026-11-04T09:41:06.608106627Z"
+}

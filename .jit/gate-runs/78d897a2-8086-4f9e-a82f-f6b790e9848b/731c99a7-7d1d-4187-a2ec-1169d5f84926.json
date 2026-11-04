@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "34625178afe2862cd40a7be9c3b8b747c218f71f",
+  "completed_at": "2026-11-04T09:50:18.519042207Z",
+  "duration_ms": 157345,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's four tagged commits document the current validation-report selection behavior accurately; the prior blocking finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "78d897a2-8086-4f9e-a82f-f6b790e9848b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "731c99a7-7d1d-4187-a2ec-1169d5f84926",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:47:41.173586448Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf with no resolved children. I reviewed its four reachable `jit:78d897a2` commits individually and verified the current tree. The prior per-issue wording finding is resolved at [worktree-validate.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/worktree-validate.md:404).\n\nThe documentation accurately describes validation views, checker selections, scoped evaluation, and invariant gate-registry failure behavior.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's four tagged commits document the current validation-report selection behavior accurately; the prior blocking finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
