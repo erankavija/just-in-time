@@ -414,7 +414,7 @@ stable no-op rerun appends no event.
 For execution, `--execute --json` prints a distinct schema-version-1 execution
 result. Its top-level fields are `schema_version`, `target`,
 `destination_root`, `publications`, `reference_changes`, `planned_deletions`,
-`deleted_sources`, `warnings`, `event_appended`, and `reconciling`.
+`deleted_sources`, `plan_warnings`, `event_appended`, and `reconciling`.
 `publications` reports each newly published or newly adopted destination with
 its source, SHA-256/byte-size identity, and `adopted` flag. The two deletion
 arrays distinguish removals recorded before
