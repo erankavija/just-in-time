@@ -43,6 +43,7 @@ one that adds it (D-18).
 - D-21: Reach git only through the git CLI, from one storage-owned module
 - D-22: Reads never wait on writers; a lock-free capture is admitted only when no commit crossed it
 - D-23: Retire the bundled MCP server and its support surfaces; the CLI remains the machine interface
+- D-24: Git-hook installation requires a Git checkout; core tracker operations remain Git-optional
 
 ## Decision Details
 
@@ -448,4 +449,19 @@ one that adds it (D-18).
   from MCP-only clients. The owner explicitly chose complete retirement.
   Removing that maintenance burden follows D-18. A future demonstrated need can
   justify a new thin adapter over the CLI contract; git preserves the old code.
+- **Date:** 2026-11-05
+
+### D-24: State the Git-hook installation prerequisite explicitly
+
+- **Chosen:** Core tracker operations remain usable without Git. In addition to
+  the claim and lease requirements in D-4, Git-hook installation requires a Git
+  checkout and reports the same typed Git-requirement error outside one. This
+  supersedes D-4's claim that only claim and lease commands require Git; it does
+  not add a Git prerequisite to other commands or change their behavior.
+- **Rejected:** Keeping an exclusive exception list that contradicts hook
+  installation, or making hook installation pretend to succeed without a Git
+  checkout.
+- **Reasoning:** Installing a Git hook is inherently a Git operation. Documenting
+  its existing prerequisite aligns the charter, user guarantees and common error
+  contract without weakening the Git-optional core.
 - **Date:** 2026-11-05
