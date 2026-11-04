@@ -362,7 +362,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     drafts,
                     dependencies,
                 }];
-                let plan = finalize(&layout, &image, &context, &intents)?;
+                let plan = finalize(&layout, &image, &context, &intents, None)?;
                 Ok(SessionStep::Apply(
                     plan,
                     BatchCreateOutcome {

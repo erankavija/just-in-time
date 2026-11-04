@@ -1383,7 +1383,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     declarations.borrowed(),
                 )?
             } else {
-                finalize(&layout, &image, &context, &derived.intents)?
+                finalize(&layout, &image, &context, &derived.intents, None)?
             };
             classify_apply(session.apply(&plan), (derived.result, warnings))
         })
@@ -1488,7 +1488,8 @@ impl<S: IssueStore> GateOps<'_, S> {
                 let intents = [crate::repository_state::MutationIntent::CreateGatePreset {
                     preset: Box::new(preset),
                 }];
-                let plan = crate::repository_state::finalize(&layout, &image, &context, &intents)?;
+                let plan =
+                    crate::repository_state::finalize(&layout, &image, &context, &intents, None)?;
                 Ok(SessionStep::Apply(plan, layout.resolve(&target)?))
             },
         )
@@ -2010,6 +2011,7 @@ mod tests {
             &[MutationIntent::CreateGatePreset {
                 preset: Box::new(preset),
             }],
+            None,
         )
         .unwrap();
 

@@ -939,12 +939,6 @@ enum CapturedLifecycleMutation {
     AutoReady {
         issue_id: IssueId,
     },
-    /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`,
-    /// restoring agreement between stored readiness and the dependency graph
-    /// (`@/invariant/derived-state-coherence`). The inverse of [`Self::AutoReady`].
-    AutoBacklog {
-        issue_id: IssueId,
-    },
     AutoDone {
         issue_id: IssueId,
     },
@@ -956,7 +950,6 @@ impl CapturedLifecycleMutation {
             Self::Claim { issue_id, .. }
             | Self::Release { issue_id, .. }
             | Self::AutoReady { issue_id }
-            | Self::AutoBacklog { issue_id }
             | Self::AutoDone { issue_id } => issue_id,
         }
     }
@@ -989,7 +982,7 @@ struct CapturedFieldUpdate {
     state: Option<State>,
     add_labels: Vec<String>,
     remove_labels: Vec<String>,
-    label_edit: Option<CapturedLabelEdit>,
+    append_label: Option<String>,
     content_format: Option<Option<crate::domain::ContentFormat>>,
     issue_type: Option<String>,
     add_gates: Vec<GateKey>,
@@ -1001,12 +994,6 @@ struct CapturedFieldUpdate {
     enforce_lease: bool,
     /// Rejection: skips rule enforcement and promotes the dependents it unblocks.
     rejection: bool,
-}
-
-#[derive(Clone)]
-enum CapturedLabelEdit {
-    AppendUnchecked(String),
-    ReplaceExact { old: String, new: String },
 }
 
 impl CapturedFieldUpdate {
@@ -1026,7 +1013,7 @@ impl CapturedFieldUpdate {
             state: operations.state,
             add_labels: operations.add_labels.clone(),
             remove_labels: operations.remove_labels.clone(),
-            label_edit: None,
+            append_label: None,
             content_format: None,
             issue_type: None,
             add_gates: operations.add_gates.clone(),
@@ -1085,7 +1072,7 @@ impl CapturedFieldUpdate {
             state: None,
             add_labels: Vec::new(),
             remove_labels: Vec::new(),
-            label_edit: None,
+            append_label: None,
             content_format: None,
             issue_type: None,
             add_gates: Vec::new(),
@@ -1099,20 +1086,13 @@ impl CapturedFieldUpdate {
         }
     }
 
-    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
-        Self {
-            label_edit: Some(label_edit),
-            ..Self::new(issue_id)
-        }
-    }
-
     /// Reject the issue, appending `resolution` when given.
     fn rejection(issue_id: IssueId, resolution: Option<String>) -> Self {
         Self {
             state: Some(State::Rejected),
             enforce_lease: true,
             rejection: true,
-            label_edit: resolution.map(CapturedLabelEdit::AppendUnchecked),
+            append_label: resolution,
             ..Self::new(issue_id)
         }
     }
@@ -1408,16 +1388,8 @@ fn derive_field_update(
         }
         issue.labels.retain(|candidate| candidate != label);
     }
-    match &request.label_edit {
-        Some(CapturedLabelEdit::AppendUnchecked(label)) => issue.labels.push(label.clone()),
-        Some(CapturedLabelEdit::ReplaceExact { old, new })
-            if issue.labels.iter().any(|label| label == old) =>
-        {
-            issue.labels.retain(|label| label != old);
-            issue.labels.push(new.clone());
-        }
-        Some(CapturedLabelEdit::ReplaceExact { .. }) => {}
-        None => {}
+    if let Some(label) = &request.append_label {
+        issue.labels.push(label.clone());
     }
     let missing_gates = request
         .add_gates
@@ -1503,8 +1475,8 @@ fn derive_field_update(
     if let Some(target) = target {
         projected.state = target;
     }
-    let validation = match (&request.label_edit, request.rejection) {
-        (Some(CapturedLabelEdit::AppendUnchecked(_)), _) | (None, true) => {
+    let validation = match (&request.append_label, request.rejection) {
+        (Some(_), _) | (None, true) => {
             let repo_format = evidence.graph.declarations.config().content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
@@ -1522,10 +1494,6 @@ fn derive_field_update(
                 bypassed_rules: Vec::new(),
             }
         }
-        (Some(CapturedLabelEdit::ReplaceExact { .. }), _) => WriteValidation {
-            warnings: Vec::new(),
-            bypassed_rules: Vec::new(),
-        },
         (None, false) => {
             derive_write_validation(&projected, &evidence.graph.declarations, request.force)?
         }
@@ -1600,7 +1568,7 @@ fn derive_field_update(
             ));
         }
     }
-    if !changed_fields.is_empty() && request.label_edit.is_none() {
+    if !changed_fields.is_empty() && request.append_label.is_none() {
         events.push((
             5,
             EventBody::draft_issue_updated(
@@ -2575,7 +2543,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if derived.intents.is_empty() {
                     return Ok(SessionStep::Done((issue_result, derived.outcome)));
                 }
-                let plan = finalize(&layout, &image, &context, &derived.intents)?;
+                let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
                 Ok(SessionStep::Apply(plan, (issue_result, derived.outcome)))
             },
         )
@@ -2673,7 +2641,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     crate::validation::ReportedFinding::new(Some(issue_id.clone()), finding)
                 })
                 .collect();
-            let plan = finalize(&layout, &image, context, &intents)?;
+            let plan = finalize(&layout, &image, context, &intents, None)?;
             Ok(SessionStep::Apply(plan, (created, findings)))
         })
     }
@@ -2851,7 +2819,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     })),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -2915,9 +2883,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let request = match target {
             State::Ready => CapturedLifecycleMutation::AutoReady {
-                issue_id: issue_id.clone(),
-            },
-            State::Backlog => CapturedLifecycleMutation::AutoBacklog {
                 issue_id: issue_id.clone(),
             },
             State::Done => CapturedLifecycleMutation::AutoDone {
@@ -3135,7 +3100,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                 }))
                 .collect::<Vec<_>>();
-                let plan = finalize(&layout, &image, &context, &intents)?;
+                let plan = finalize(&layout, &image, &context, &intents, None)?;
                 if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                     return Ok(AttemptOutcome::Retry);
                 }
@@ -3200,18 +3165,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }));
                     }
                     State::Ready
-                }
-                CapturedLifecycleMutation::AutoBacklog { .. } => {
-                    let resolved = crate::domain::queries::build_issue_map(&issues);
-                    if issue.derive_readiness_correction(&resolved)
-                        != Some(ReadinessCorrection::Demote)
-                    {
-                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            issue,
-                            changed: false,
-                        }));
-                    }
-                    State::Backlog
                 }
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
@@ -3323,7 +3276,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     changed,
                 }));
             }
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -3969,7 +3922,7 @@ mod tests {
             &context,
         )
         .unwrap();
-        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents, None).unwrap();
 
         // Model an unrelated writer between capture and apply. The stale plan
         // conflicts instead of replacing that writer's label.
@@ -3991,7 +3944,7 @@ mod tests {
             &context,
         )
         .unwrap();
-        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents, None).unwrap();
         retry_session.apply(&retry_plan).unwrap();
 
         let updated = storage.load_issue(&id).unwrap();
@@ -4081,7 +4034,7 @@ mod tests {
             )
             .unwrap();
             let first_plan =
-                finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
+                finalize(&layout, &first_image, &first_context, &first.intents, None).unwrap();
             first_session.apply(&first_plan).unwrap();
             drop(first_session);
             assert_eq!(
@@ -4105,8 +4058,14 @@ mod tests {
                 &second_context,
             )
             .unwrap();
-            let second_plan =
-                finalize(&layout, &second_image, &second_context, &second.intents).unwrap();
+            let second_plan = finalize(
+                &layout,
+                &second_image,
+                &second_context,
+                &second.intents,
+                None,
+            )
+            .unwrap();
             assert_ne!(event_bytes(&first_plan), event_bytes(&second_plan));
             second_session.apply(&second_plan).unwrap();
 
@@ -4219,7 +4178,7 @@ mod tests {
             &context,
         )
         .unwrap();
-        drop(finalize(&layout, &first_image, &context, &first.intents).unwrap());
+        drop(finalize(&layout, &first_image, &context, &first.intents, None).unwrap());
         drop(first_session);
 
         crate::commands::test_helpers::seed_gate_registry(

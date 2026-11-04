@@ -407,7 +407,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 // apply attempt. A session short-circuits a zero-action
                 // delta before any record or event write, so a successful
                 // confirmation leaves no observable trace.
-                let plan = finalize(&layout, &image, &context, &[])?;
+                let plan = finalize(&layout, &image, &context, &[], None)?;
                 Ok(SessionStep::Apply(plan, confirmed))
             },
         )

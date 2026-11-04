@@ -2,9 +2,7 @@
 
 use super::*;
 use crate::domain::identity::GateKey;
-use crate::domain::type_taxonomy::{
-    detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
-};
+use crate::domain::type_taxonomy::{detect_validation_issues, generate_fixes, ValidationFix};
 use crate::validation::report::{group_messages, render_selector, BuiltInPass, RuleSelectionFault};
 use anyhow::Context;
 
@@ -19,7 +17,7 @@ enum BaseCapturePurpose<'a> {
 }
 
 /// A capture's parsed issues and, for validation, the JSON value each decoded from.
-type ParsedIssues = (Vec<Issue>, Vec<serde_json::Value>);
+type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
 struct CapturedRepairPlan {
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
@@ -39,81 +37,215 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> {
-    /// Validate with optional fix mode.
-    ///
-    /// # Arguments
-    ///
-    /// * `fix` - If true, attempt to fix validation issues
-    /// * `dry_run` - If true, show what would be fixed without applying changes
-    ///
-    /// # Returns
-    ///
-    /// Returns Ok with (count of fixes applied, messages), or Err if validation fails.
-    /// In fix mode a repository that still fails validation with nothing
-    /// repaired is an Err naming the findings `--fix` cannot repair.
-    pub fn validate_with_fix(&self, fix: bool, dry_run: bool) -> Result<(usize, Vec<String>)> {
-        // First run standard validation
-        let validation_result = self.validate_silent();
-
-        if validation_result.is_ok() && !fix {
-            return Ok((0, vec![]));
-        }
-
-        // If fix mode is enabled, detect and fix issues
-        if fix {
-            let mut total_fixes = 0;
-            let mut all_messages = Vec::new();
-
-            // Fix type hierarchy issues
-            let (hierarchy_fixes, mut messages) = self.detect_and_fix_hierarchy_issues(dry_run)?;
-            total_fixes += hierarchy_fixes;
-            all_messages.append(&mut messages);
-
-            // Fix transitive reduction violations (both dry-run and actual fix)
-            let (reduction_fixes, mut messages) = self.fix_all_transitive_reductions(dry_run)?;
-            total_fixes += reduction_fixes;
-            all_messages.append(&mut messages);
-
-            // Fix pending state transitions
-            let (transition_fixes, mut messages) = self.check_pending_transitions(dry_run)?;
-            total_fixes += transition_fixes;
-            all_messages.append(&mut messages);
-
-            // Repair derived state (default rules/schemas + configured projections)
-            // through one repair delta in one redo record.
-            let (repair_fixes, mut messages) = self.repair_derived_state(dry_run)?;
-            total_fixes += repair_fixes;
-            all_messages.append(&mut messages);
-
-            if total_fixes == 0 {
-                validation_result.map_err(|error| {
-                    crate::errors::ValidationFailedError::new(format!(
-                        "--fix has no automatic repair for these findings: {error}"
-                    ))
-                })?;
-            }
-
-            // Add summary message
-            if dry_run {
-                all_messages.push(format!(
-                    "\nDry run complete. {} fixes would be applied.",
-                    total_fixes
-                ));
-            } else if total_fixes > 0 {
-                all_messages.push(format!("\nApplied {} fixes", total_fixes));
-                // Re-run validation to verify fixes worked
-                self.validate_silent()?;
-                all_messages.push("Repository is now valid".to_string());
-            } else {
-                all_messages.push("\nNo fixes needed".to_string());
-            }
-
-            return Ok((total_fixes, all_messages));
-        }
-
-        // Not in fix mode, just propagate the validation error
-        validation_result?;
-        Ok((0, vec![]))
+    /// Derive all repairs from one capture, publish once, then report the resulting repository.
+    pub fn validate_with_fix(
+        &self,
+        dry_run: bool,
+    ) -> Result<(
+        usize,
+        Vec<String>,
+        crate::validation::ValidationReport,
+        crate::output::DivergenceResponse,
+    )> {
+        use crate::domain::{EventBody, ReadinessCorrection};
+        use crate::repository_state::{
+            derive_materialization, finalize, MaterializationPlan, MaterializationRequest,
+            MutationIntent, RepositoryAction, RepositoryDelta,
+        };
+        let layout = self.exec.require_layout()?;
+        let context = production_mutation_context();
+        let (count, mut messages) = with_mutation_session(
+            self.exec.storage(),
+            &layout,
+            "validation repair",
+            |session| {
+                let Some(captured) = self.capture_validation(session)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                let (Ok(original), Ok(_)) = (&captured.issues, &captured.index) else {
+                    return Ok(SessionStep::Done((0, Vec::new())));
+                };
+                let Ok(declarations) =
+                    crate::repository_state::validation_declarations_from_image(&captured.image)
+                else {
+                    return Ok(SessionStep::Done((0, Vec::new())));
+                };
+                let Ok(hierarchy) =
+                    crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
+                        &crate::config_manager::namespaces_from_config(declarations.config()),
+                    )
+                else {
+                    return Ok(SessionStep::Done((0, Vec::new())));
+                };
+                if !declarations.rules_loaded() {
+                    return Ok(SessionStep::Done((0, Vec::new())));
+                }
+                let Ok(repair) = derive_materialization(
+                    &captured.image,
+                    MaterializationRequest::RepairDerivedState {
+                        declarations: declarations.borrowed(),
+                    },
+                ) else {
+                    return Ok(SessionStep::Done((0, Vec::new())));
+                };
+                let problems = original
+                    .iter()
+                    .flat_map(|issue| {
+                        detect_validation_issues(&hierarchy, &issue.id, &issue.labels)
+                    })
+                    .collect::<Vec<_>>();
+                let mut projected = original.to_vec();
+                let mut messages = Vec::new();
+                let mut count = 0;
+                let mut intents = Vec::new();
+                for fix in generate_fixes(&problems) {
+                    let ValidationFix::ReplaceType {
+                        issue_id,
+                        old_type,
+                        new_type,
+                    } = fix;
+                    if let Some(issue) = projected.iter_mut().find(|issue| issue.id == issue_id) {
+                        issue
+                            .labels
+                            .retain(|label| label != &label_utils::type_label(&old_type));
+                        issue.labels.push(label_utils::type_label(&new_type));
+                        if !dry_run {
+                            messages.extend(self.exec.refuse_foreign_lease(&issue_id)?);
+                        }
+                        messages.push(format!(
+                            "{} type '{}' with '{}' for issue {}",
+                            if dry_run { "Would replace" } else { "Replaced" },
+                            old_type,
+                            new_type,
+                            issue_id
+                        ));
+                        count += 1;
+                        intents.push(MutationIntent::RecordEvent {
+                            phase: 0,
+                            event: Box::new(EventBody::draft_issue_updated(
+                                issue_id,
+                                "issue-update".into(),
+                                vec!["labels".into()],
+                            )),
+                        });
+                    }
+                }
+                for intent in
+                    super::dependency::derive_reduced_graph_intents(&projected, &projected, None)?
+                {
+                    match intent {
+                        MutationIntent::UpdateIssue { issue } => {
+                            if let Some(target) =
+                                projected.iter_mut().find(|target| target.id == issue.id)
+                            {
+                                let removed = target.dependencies.len() - issue.dependencies.len();
+                                count += removed;
+                                messages.push(format!(
+                                    "Fixed {removed} redundant dependencies in issue {}",
+                                    issue.short_id()
+                                ));
+                                *target = *issue;
+                            }
+                        }
+                        event => intents.push(event),
+                    }
+                }
+                loop {
+                    let resolved = crate::domain::queries::build_issue_map(&projected);
+                    let corrections = projected
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, issue)| {
+                            issue
+                                .derive_readiness_correction(&resolved)
+                                .map(|correction| (index, correction))
+                        })
+                        .collect::<Vec<_>>();
+                    if corrections.is_empty() {
+                        break;
+                    }
+                    count += corrections.len();
+                    for (index, correction) in corrections {
+                        let issue = &mut projected[index];
+                        let from = issue.state;
+                        issue.state = match correction {
+                            ReadinessCorrection::Promote => State::Ready,
+                            ReadinessCorrection::Demote => State::Backlog,
+                        };
+                        messages.push(format!(
+                            "  → Transitioning {} to {}",
+                            issue.short_id(),
+                            issue.state.as_str()
+                        ));
+                        intents.push(MutationIntent::RecordEvent {
+                            phase: 4,
+                            event: Box::new(EventBody::draft_issue_state_changed(
+                                issue.id.clone(),
+                                from,
+                                issue.state,
+                            )),
+                        });
+                    }
+                }
+                intents.extend(
+                    projected
+                        .into_iter()
+                        .zip(original.iter())
+                        .filter(|(issue, before)| issue != *before)
+                        .map(|(issue, _)| MutationIntent::UpdateIssue {
+                            issue: Box::new(issue),
+                        }),
+                );
+                let issues =
+                    finalize(&layout, &captured.image, &context, &intents, Some(original))?;
+                let changed = repair
+                    .delta()
+                    .actions()
+                    .iter()
+                    .filter(|action| !matches!(action, RepositoryAction::CreateDirectory { .. }))
+                    .map(|action| action.path())
+                    .collect::<std::collections::BTreeSet<_>>();
+                count += changed.len();
+                messages.extend(
+                    changed
+                        .into_iter()
+                        .map(|path| format!("Repaired derived-state target {path:?}")),
+                );
+                let mut actions = issues.delta().actions().to_vec();
+                for action in repair.delta().actions() {
+                    if let RepositoryAction::AppendEvents { bytes, .. } = action {
+                        if let Some(RepositoryAction::AppendEvents {
+                            bytes: existing, ..
+                        }) = actions
+                            .iter_mut()
+                            .find(|action| matches!(action, RepositoryAction::AppendEvents { .. }))
+                        {
+                            existing.extend_from_slice(bytes);
+                            continue;
+                        }
+                    }
+                    actions.push(action.clone());
+                }
+                let plan = MaterializationPlan::new(
+                    &captured.image,
+                    RepositoryDelta::new(&layout, actions)?,
+                );
+                if dry_run || plan.delta().actions().is_empty() {
+                    Ok(SessionStep::Done((count, messages)))
+                } else {
+                    Ok(SessionStep::Apply(plan, (count, messages)))
+                }
+            },
+        )?;
+        messages.push(if dry_run {
+            format!("Dry run complete. {count} fixes would be applied.")
+        } else if count > 0 {
+            format!("Applied {count} fixes")
+        } else {
+            "No fixes applied".into()
+        });
+        let (report, divergences) = self.capture_validation_report()?;
+        Ok((count, messages, report, divergences))
     }
 
     /// Validate the exact repository through the closed-image pipeline.
@@ -237,7 +369,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Mutation { precheck_target },
         )
-        .map(|captured| captured.map(|(image, (issues, _))| MutationBase { image, issues }))
+        .and_then(|captured| {
+            captured
+                .map(|(image, (issues, _))| {
+                    Ok(MutationBase {
+                        image,
+                        issues: issues?,
+                    })
+                })
+                .transpose()
+        })
     }
 
     /// Capture the resolved target and lease policy before taking the claims guard.
@@ -289,11 +430,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 precheck_target: Some(issue_id),
             },
         )?;
-        Ok(grown.map(|(image, (issues, _))| MutationPreflight {
-            image,
-            target,
-            issues: Some(issues),
-        }))
+        grown
+            .map(|(image, (issues, _))| {
+                Ok(MutationPreflight {
+                    image,
+                    target,
+                    issues: Some(issues?),
+                })
+            })
+            .transpose()
     }
 
     /// The base an archive plan reads: the event log's length and tail, with
@@ -427,21 +572,27 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // record fidelity. Repair derives from the declarations alone and
                 // decodes no record.
                 let (parsed, values) = if mutation {
-                    (super::captured_active_issues(image)?, Vec::new())
+                    (Ok(super::captured_active_issues(image)?), Vec::new())
                 } else if matches!(purpose, BaseCapturePurpose::Repair) {
-                    (Vec::new(), Vec::new())
+                    (Ok(Vec::new()), Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
-                    crate::repository_state::parse_issue_records(
-                        &issue_ids,
-                        |path| match overrides.get(path) {
+                    match crate::repository_state::parse_issue_records(&issue_ids, |path| {
+                        match overrides.get(path) {
                             Some(value) => Ok(value.as_deref()),
                             None => image.file_bytes(path),
-                        },
-                    )?
-                    .into_iter()
-                    .unzip()
+                        }
+                    }) {
+                        Ok(records) => {
+                            let (issues, values) = records.into_iter().unzip();
+                            (Ok(issues), values)
+                        }
+                        Err(error) if matches!(purpose, BaseCapturePurpose::Validation) => {
+                            (Err(error.into()), Vec::new())
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
                 };
                 if matches!(
                     purpose,
@@ -450,7 +601,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     discover_issue_closure(
                         image,
                         spec,
-                        &parsed,
+                        parsed.as_deref().unwrap_or_default(),
                         &config,
                         &effective_virtual_path,
                         precheck_target,
@@ -535,17 +686,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         )
     }
 
-    /// Repair derived state (default rules/schemas plus every configured
-    /// projection) through one mutation session (`jit validate --fix`).
-    ///
-    /// The complete owned-materialization set is derived from declared authority
-    /// over one captured image (`MaterializationRequest::RepairDerivedState`) and
-    /// applied through the same session; a coherent repository yields an empty
-    /// delta (no action). Repair is ownership-safe by construction — `rules.toml`
-    /// splices only the generated default spans and region projections splice only
-    /// their managed region, so authored content is preserved. In `dry_run` the
-    /// delta is derived but not applied. Returns the number of repaired targets and
-    /// a per-target message. JSON and memory stores execute this same path.
+    /// Repair declaration-derived targets for `jit recover`, without decoding issue records.
     pub(crate) fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::repository_state::RepositoryAction;
 
@@ -1093,107 +1234,6 @@ pub(super) fn rule_validation_outcome(
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {
-    fn detect_and_fix_hierarchy_issues(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::config_manager::get_hierarchy_config;
-
-        let config = get_hierarchy_config(&self.exec.storage)?;
-        let issues = self.exec.storage.list_issues()?;
-
-        // Collect all validation issues
-        let mut all_validation_issues = Vec::new();
-
-        for issue in &issues {
-            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
-            all_validation_issues.extend(validation_issues);
-        }
-
-        if all_validation_issues.is_empty() {
-            return Ok((0, vec![]));
-        }
-
-        // Generate fixes
-        let fixes = generate_fixes(&all_validation_issues);
-
-        if fixes.is_empty() {
-            // We found issues but can't auto-fix them
-            let mut messages = vec![format!(
-                "Found {} validation issues but no automatic fixes available:",
-                all_validation_issues.len()
-            )];
-            for issue in &all_validation_issues {
-                match issue {
-                    ValidationIssue::UnknownType {
-                        issue_id,
-                        unknown_type,
-                        ..
-                    } => {
-                        messages.push(format!(
-                            "  • Issue {} has unknown type '{}'",
-                            issue_id, unknown_type
-                        ));
-                    }
-                }
-            }
-            return Ok((0, messages));
-        }
-
-        // Apply or preview fixes
-        let mut fixes_applied = 0;
-        let mut messages = Vec::new();
-
-        for fix in &fixes {
-            match fix {
-                ValidationFix::ReplaceType {
-                    issue_id,
-                    old_type,
-                    new_type,
-                } => {
-                    if dry_run {
-                        messages.push(format!(
-                            "Would replace type '{}' with '{}' for issue {}",
-                            old_type, new_type, issue_id
-                        ));
-                    } else {
-                        messages.extend(self.exec.refuse_foreign_lease(issue_id)?);
-                        self.apply_type_fix(issue_id, old_type, new_type)?;
-                        messages.push(format!(
-                            "Replaced type '{}' with '{}' for issue {}",
-                            old_type, new_type, issue_id
-                        ));
-                    }
-                    fixes_applied += 1;
-                }
-            }
-        }
-
-        Ok((fixes_applied, messages))
-    }
-
-    fn apply_type_fix(&self, issue_id: &IssueId, old_type: &str, new_type: &str) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        // Replace the type label
-        let old_label = label_utils::type_label(old_type);
-        let new_label = label_utils::type_label(new_type);
-
-        self.exec
-            .publish_captured_field_update(CapturedFieldUpdate::label_edit(
-                issue_id.clone(),
-                CapturedLabelEdit::ReplaceExact {
-                    old: old_label,
-                    new: new_label,
-                },
-            ))
-            .map(|_| ())
-    }
-
-    // Note: apply_dependency_reversal is removed - we don't reverse dependencies
-    // Type hierarchy is orthogonal to DAG structure
-
     /// Built-in validate pass: report every node→item link label whose qualified
     /// id cannot be resolved as a finding, rather than silently dropping it
     /// (REQ-08 clause i, REQ-03).
@@ -1945,98 +1985,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         })
     }
 
-    /// Fix transitive reduction violations for all issues.
-    ///
-    /// Returns count of redundant edges fixed (or that would be fixed if dry_run).
-    fn fix_all_transitive_reductions(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.exec.reduce_all_dependencies(dry_run)
-    }
-
-    /// Reconcile stored readiness with the readiness the dependency graph derives.
-    ///
-    /// Stored state can drift from the graph in both directions: after a worktree
-    /// merge a backlog issue may have every dependency in a terminal state without
-    /// ever auto-transitioning to ready, and an issue can hold `Ready` while a
-    /// dependency that blocks it is unmet. Both are violations of
-    /// `@/invariant/derived-state-coherence` and both are repaired here, through
-    /// the one derivation [`Issue::derive_readiness_correction`] owns.
-    ///
-    /// Uses multiple passes to handle cascading transitions (e.g., when tasks reach a
-    /// terminal state, stories become ready, then epics that depend on those stories
-    /// also become ready).
-    ///
-    /// # Arguments
-    ///
-    /// * `dry_run` - If true, report what would be fixed without applying changes
-    ///
-    /// # Returns
-    ///
-    /// Count of issues transitioned and informational messages
-    fn check_pending_transitions(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::domain::ReadinessCorrection;
-
-        let mut total_fixed = 0;
-        let mut messages = Vec::new();
-        let max_passes = 10; // Safety limit to prevent infinite loops
-
-        // Keep checking until no more transitions found (cascading transitions)
-        // In dry-run mode, only do one pass since we don't actually change state
-        let num_passes = if dry_run { 1 } else { max_passes };
-
-        for _pass in 0..num_passes {
-            let issues = self.exec.storage.list_issues()?;
-            let resolved = crate::domain::queries::build_issue_map(&issues);
-
-            // Every issue whose stored readiness disagrees with the graph, with the
-            // correction that restores agreement.
-            let corrections = issues
-                .iter()
-                .filter_map(|issue| {
-                    issue
-                        .derive_readiness_correction(&resolved)
-                        .map(|correction| (issue.id.clone(), issue.short_id(), correction))
-                })
-                .collect::<Vec<_>>();
-
-            for (issue_id, short_id, correction) in &corrections {
-                messages.push(match correction {
-                    ReadinessCorrection::Promote => {
-                        format!("  → Transitioning {short_id} to ready (dependencies terminal)")
-                    }
-                    ReadinessCorrection::Demote => {
-                        format!("  → Transitioning {short_id} to backlog (dependencies unmet)")
-                    }
-                });
-
-                if !dry_run {
-                    match correction {
-                        ReadinessCorrection::Promote => {
-                            self.exec.auto_transition_to_ready(issue_id)?
-                        }
-                        ReadinessCorrection::Demote => {
-                            self.exec.auto_transition_to_backlog(issue_id)?
-                        }
-                    };
-                }
-            }
-
-            total_fixed += corrections.len();
-
-            // If no fixes this pass, we're done
-            if corrections.is_empty() {
-                break;
-            }
-        }
-
-        Ok((total_fixed, messages))
-    }
-
     /// Validate that the branch still sits on top of `origin/main`.
     ///
     /// Compares the merge-base of HEAD and `origin/main` against the
@@ -2439,10 +2387,7 @@ mod tests {
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
 
-        let (fixes, _messages) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (fixes, _messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert!(fixes >= 1, "the stale projection region must be repaired");
         let agents = std::fs::read_to_string(repo.path().join("AGENTS.md")).unwrap();
         assert!(
@@ -2454,10 +2399,7 @@ mod tests {
             "the invariant must render into the repaired region: {agents}"
         );
         // A second --fix run is a no-op: the derived state is already coherent.
-        let (again, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (again, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(again, 0, "repair must be idempotent");
     }
 
@@ -2490,10 +2432,8 @@ mod tests {
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
-        let error = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap_err();
+        let (_, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
+        let error = report.structural_failure.unwrap();
         assert!(format!("{error:#}").contains("invariants"), "{error:#}");
         assert_eq!(std::fs::read(&rules_path).unwrap(), before_rules);
         assert_eq!(std::fs::read(&agents_path).unwrap(), before_agents);
@@ -2527,10 +2467,8 @@ mod tests {
         );
         seed_repo_file(&storage, "AGENTS.md", &agents);
 
-        let error = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap_err();
+        let (_, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
+        let error = report.structural_failure.unwrap();
         assert!(format!("{error:#}").contains("invariants"), "{error:#}");
         assert_eq!(
             storage.read_repo_file(".jit/rules.toml").unwrap().unwrap(),
@@ -2587,16 +2525,98 @@ mod tests {
         let asset = repo.path().join(".agents/skills/jit-manage/SKILL.md");
         std::fs::write(&asset, "EDITED PROFILE ASSET\n").unwrap();
 
-        let (repaired, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (repaired, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
 
         assert_eq!(repaired, 0, "no profile-owned target is a repair action");
         assert_eq!(
             std::fs::read_to_string(&asset).unwrap(),
             "EDITED PROFILE ASSET\n"
         );
+    }
+
+    #[test]
+    fn test_validate_fix_reports_malformed_records_without_publishing_repairs() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = memory_executor(storage.clone());
+        let path = format!(".jit/issues/{}.json", crate::test_utils::issue_id(1));
+        seed_repo_file(&storage, &path, "{");
+        let (count, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
+        assert_eq!(count, 0);
+        assert!(report.structural_failure.is_some());
+        assert_eq!(storage.read_repo_file(&path).unwrap().as_deref(), Some("{"));
+    }
+
+    #[test]
+    fn test_validate_fix_publishes_every_fix_class_once_and_dry_run_publishes_nothing() {
+        use crate::commands::test_helpers::{
+            memory_executor_declaring, seed_issue, seed_repo_file,
+        };
+        use crate::storage::{IssueStore, MutationPoint};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        #[derive(Default)]
+        struct Publications(AtomicUsize);
+        impl crate::storage::MutationInterruptionInjector for Publications {
+            fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+                if *point == MutationPoint::BeforeCommitCheck {
+                    self.0.fetch_add(1, Ordering::SeqCst);
+                }
+                Ok(())
+            }
+        }
+        let (_source, storage) =
+            crate::test_utils::profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut leaf = crate::test_utils::fixture_issue("leaf".into(), String::new());
+        leaf.state = State::Done;
+        let mut middle = crate::test_utils::fixture_issue("middle".into(), String::new());
+        middle.state = State::Done;
+        middle.dependencies = vec![leaf.id.clone()];
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
+        source.labels = vec!["type:taks".into()];
+        source.state = State::Backlog;
+        source.dependencies = vec![middle.id.clone(), leaf.id.clone()];
+        for issue in [&source, &middle, &leaf] {
+            seed_issue(&storage, issue.clone());
+        }
+        let agents = storage.read_repo_file("AGENTS.md").unwrap().unwrap();
+        seed_repo_file(
+            &storage,
+            "AGENTS.md",
+            &agents.replacen(
+                "<!-- jit:invariants:begin -->",
+                "<!-- jit:invariants:begin -->\nSTALE",
+                1,
+            ),
+        );
+        let publications = Arc::new(Publications::default());
+        let storage = storage.with_mutation_interruption_view(publications.clone());
+        let executor =
+            CommandExecutor::new(storage.clone()).with_layout(executor.require_layout().unwrap());
+        let (preview, _, _, _) = executor.validation().validate_with_fix(true).unwrap();
+        assert_eq!(publications.0.load(Ordering::SeqCst), 0);
+        assert_eq!(storage.load_issue(&source.id).unwrap(), source);
+        let (fixed, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
+        assert_eq!(fixed, preview);
+        assert_eq!(publications.0.load(Ordering::SeqCst), 1);
+        let fixed = storage.load_issue(&source.id).unwrap();
+        assert!(fixed.labels.contains(&"type:task".into()));
+        assert_eq!(fixed.dependencies, vec![middle.id]);
+        assert_eq!(fixed.state, State::Ready);
+        assert!(!storage
+            .read_repo_file("AGENTS.md")
+            .unwrap()
+            .unwrap()
+            .contains("STALE"));
     }
 
     #[test]
@@ -2630,29 +2650,26 @@ mod tests {
             .issue
             .id;
 
-        let (first, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (first, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert!(first > 0);
         let repaired = storage.load_issue(&id).unwrap();
         assert!(repaired.labels.iter().any(|label| label == "type:task"));
         assert!(!repaired.labels.iter().any(|label| label == "type:taks"));
 
-        let (second, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (second, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(second, 0, "a captured type repair must not repeat");
     }
 
     #[test]
-    fn test_apply_type_fix_preserves_concurrent_type_correction() {
+    fn test_validate_fix_rederives_and_preserves_concurrent_type_correction() {
         use crate::commands::test_helpers::{memory_executor, with_apply_race, SessionRaceAction};
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        let executor = memory_executor(storage.clone());
+        let executor = crate::commands::test_helpers::memory_executor_declaring(storage.clone(), MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n[type_hierarchy.types]\ntask = 4\nstory = 3\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"),
+            ..MemoryDeclarations::default()
+        });
         let id = executor
             .issues()
             .create_issue(
@@ -2674,10 +2691,7 @@ mod tests {
         let raced = with_apply_race(storage, SessionRaceAction::Save(Box::new(issue)));
         let executor = memory_executor(raced.clone());
 
-        executor
-            .validation()
-            .apply_type_fix(&id, "taks", "task")
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
 
         assert_eq!(raced.load_issue(&id).unwrap().labels, ["type:story"]);
     }
