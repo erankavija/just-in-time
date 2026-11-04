@@ -8,6 +8,7 @@
   ],
   "description": "Make `jit invariant check` compute enforcement drift from captured declarations through the same function the validation report uses, fail on an unloadable gate registry as the report does, and drop the drift computation's unloadable-gate case.\n\n## Background\n\n- `check_invariants` (`crates/jit/src/commands/invariant.rs:50-58`) calls the executor's `compute_drift_findings` (`crates/jit/src/commands/validate.rs:1470-1504`), which loads rules and gates from disk and treats an unparseable `gates.toml` as an unloadable source.\n- The report's drift pass (`collect_enforcement_drift_findings`, `crates/jit/src/validation/repository.rs:576-605`) runs over captured declarations and always passes the gate registry as loaded; an unparseable `gates.toml` fails declaration loading there, so `jit validate` fails with an error naming the file.\n- `enforcement_drift` (`crates/jit/src/validation/drift.rs:165`) takes each source as a `SourceState` (`:104-120`). Once no caller passes an unloadable gate registry, the gate arm of `resolve_binding` that handles it (`:219`), its rustdoc and its unit tests (`drift.rs:443,463`) are dead; the unloadable rule-set case stays.\n- `test_check_reports_unloadable_gate_registry` (`crates/jit/tests/cli_item_validate/invariant_check_cli_tests.rs:198`) pins the tolerant behaviour; the unit tests at `invariant.rs:96-197` cover drift cases.\n\n## Success Criteria\n\n- [hard] REQ-01: `check_invariants` obtains the repository's declarations once and computes `DriftFinding`s through the validation-layer drift function the report's drift pass calls; it no longer calls `compute_drift_findings`.\n- [hard] REQ-02: An unparseable `gates.toml` makes `jit invariant check` fail with an error naming `.jit/gates.toml`; the rewritten CLI test asserts it and fails on today's code, which reports an unloadable-gate drift finding.\n- [hard] REQ-03: The drift function takes the gate registry as loaded keys, the unloadable-gate arm and its tests no longer exist, and drift findings, the unloadable-rules case included, are otherwise unchanged; the other invariant tests pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: `jit invariant check` reads its declarations once through the existing lock-free storage loads, so a read-only command never waits on writers (`@/charter/D-22`); no lock-free image capture exists yet. The interim loads move onto the read driver's lock-free capture with the read-driver work, whose criteria retire them. Rejected: capturing through a mutation session, which waits behind writers.\n\n## Notes\n\n- Behaviour change: an unloadable gate registry is an error for `jit invariant check`, as it is for `jit validate`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T05:16:36.476597820Z",
   "first_ready_at": "2026-11-03T23:04:05.323969385Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "4a1a138f-1ab7-428e-8dff-cf158b3889b3",
+      "run_id": "0af26dde-0a4c-4a99-8f2e-7242fd58a15a",
       "status": "passed",
-      "updated_at": "2026-11-04T02:50:43.602301763Z",
+      "updated_at": "2026-11-04T04:45:37.221273806Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "8ef91c3c-f05c-44bd-be66-892ba905e169",
-      "status": "failed",
-      "updated_at": "2026-11-04T02:56:00.427083062Z",
+      "run_id": "5a27f7d6-b7c4-42ce-b661-a279142d3980",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:15:24.521567469Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "satisfies:9876a23a/REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Invariant check computes drift from captured declarations",
-  "updated_at": "2026-11-04T02:56:00.427083062Z"
+  "updated_at": "2026-11-04T05:16:36.476597820Z"
 }

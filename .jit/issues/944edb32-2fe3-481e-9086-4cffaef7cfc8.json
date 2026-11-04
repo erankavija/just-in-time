@@ -10,12 +10,54 @@
     "97f5f2b7-5c95-441f-ae03-d8feeedc8420"
   ],
   "description": "Build and prove the one rewrite that moves a repository from format 3 to format 4, with the driver the lead runs, so the window has tested tooling. This task writes nothing outside its own worktree.\n\n## Background\n\nMain's binary is at format 4 and refuses format 3 (`SUPPORTED_INDEX_SCHEMA_VERSION`, `crates/jit/src/repository_state/index.rs`; `docs/reference/storage-format.md`). There is no migration reader; moving a repository is an explicit rewrite made alongside installing the matching binary. `dev/archive/3d9a0ce3-lead-friction/active/format3-window.sh` and `format3-rewrite.py` are the precedent.\n\nFormat 4 differs from format 3 on disk as follows:\n\n- gate runs live at `gate-runs/<issue-id>/<run-id>.json`, each gate state with runs names its latest in `run_id`, a reused verdict carries `source_issue`, and `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` names the latest qualifying run;\n- leases are `<common-dir>/jit/leases/<issue-id>.json` with no `stale` field, with `claims.seq` beside them, and no `claims.index.json`;\n- `archive-evidence/<target-key>.json` holds each archived target's executions in log order;\n- profile-lifecycle lines carry no `isolated_torn_tail`.\n\nThe tooling must handle what differs per repository, derived at run time because the counts move. As read on 2026-11-03: this repository has 6,306 runs and 83 archive events; gf2 has 5,971 runs, 36 archive events, 13 marker lines and 2 active leases; mealie-fi, inflected-messages and research have 414, 644 and 449 runs and none of the rest. In gf2, mealie-fi, inflected-messages and research thousands of gate states have runs and no `run_id`. Runs with no `origin` count as executed. A run's stored bytes must still pass `gate_run_drift` (`validation/record_fidelity.rs`): `origin` round-trips, and a record with the current key set stays canonical. gf2 and research gitignore `.jit/gate-runs`; the other three track it.\n\n`WorktreePaths::shared_jit` is `<common-dir>/jit` in primary and linked checkouts, so linked checkouts share one lease directory, which is machine-local and never committed.\n\n## Success Criteria\n\n- [hard] REQ-01: `format4-rewrite.py <checkout>` rewrites one checkout's data root and its `<common-dir>/jit`, and commits nothing: `schema_version` to 4 in the canonical bytes; each run record moved to the per-issue path with `source_issue` added to reused verdicts and other bytes unchanged; `run_id` set on each gate state with runs and none, from the run with the greatest `(started_at, run_id)` of that gate; one verdict record per `(gate, digest)` naming the latest qualifying run; one evidence record per archived target; `isolated_torn_tail` removed from each profile-lifecycle line with other lines byte-identical; each unexpired lease written as a lease record, including a stale one; `claims.seq` seeded from the greater of the log's highest sequence and the index's `last_seq`; and `claims.index.json` and an empty `heartbeat/` removed, with `claims.jsonl` byte-identical.\n- [hard] REQ-02: The script is idempotent, a second run changes no byte, and a run over a tree merged from an older branch converts only what the branch added.\n- [hard] REQ-03: The script refuses and changes nothing on a condition it cannot convert: a reused verdict with no resolvable source, a stored `run_id` that disagrees with the greatest run, a run record whose path and fields disagree, or a marker line carrying `true`. Before finishing it verifies that the run count is unchanged, that each run is reachable from its issue's directory, and that each record count matches what it derived.\n- [hard] REQ-04: `format4-window.sh` follows the precedent for one repository per invocation: it stops at the first failure and names what committed, refuses when the repository has uncommitted `.jit` paths or moved past its quiet check, and rewrites, validates and commits, staging only tracked `.jit` paths. A separate mode copies the old binaries for rollback and installs `jit` and `jit-server` from a commit whose `cargo-ci` passed. This task does not run either against a real repository.\n- [hard] REQ-05: The worker copies the five repositories' `.jit` and `<common-dir>/jit` into scratch git repositories under this worktree's `target/`, runs the script on each, runs it again for idempotence, then runs `jit validate`, `jit gate status` on an issue with runs, `jit claim list` and an archive preview of a seeded target with the binary built from main. Each passes, and the counts are recorded in the completion note.\n- [hard] REQ-06: No file outside this worktree changes.\n\n## Notes\n\n- Copying a repository's tracker for the dry run only reads that repository.\n- No command gains rewrite behaviour; the script is a one-off outside the product, and history stays append-only for every command.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8b72b123333524124b94429a28ddbcf0557507e04c22f632804a05c61de6d2c4",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "format4-window.sh",
+          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-window.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2e4c2aeb475c57e9f33fb87a041d37c85d96f06c8092b2f1f9da30f75a8e2c92",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "format4-rewrite.py",
+          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-rewrite.py"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aa717f1c70f29112f9441a9787ce47ffc7d175b971dacb70b8fb2ed7acb6daed",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "format4-dry-run.sh",
+          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-dry-run.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f8a6b298-history-independent-reads/format4-dry-run.md"
+    }
+  ],
+  "done_at": "2026-11-04T05:10:56.548801964Z",
   "first_ready_at": "2026-11-02T23:39:44.698348087Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "91f54b1a-8430-436e-a948-a2e1281d3361",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:10:56.069692472Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "944edb32-2fe3-481e-9086-4cffaef7cfc8",
   "labels": [
     "epic:history-independent-reads",
@@ -30,7 +72,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "A rewrite script and window driver move a repository to format 4",
-  "updated_at": "2026-11-04T03:29:01.499545940Z"
+  "updated_at": "2026-11-04T05:10:56.548801964Z"
 }
