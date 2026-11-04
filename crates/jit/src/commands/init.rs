@@ -168,13 +168,14 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                         history: None,
                     },
                 );
-                if let Some(error) = validation.structural_failure {
+                let (failure, rule_report) = validation.into_parts();
+                if let Some(error) = failure {
                     return Err(init_validation_error(error));
                 }
-                if validation.rule_report.has_errors() {
+                if rule_report.has_errors() {
                     anyhow::bail!(
                         "repository initialization produced {} validation error finding(s)",
-                        validation.rule_report.error_count()
+                        rule_report.error_count()
                     );
                 }
                 let gitattributes = scaffold.gitattributes_status(&base)?;

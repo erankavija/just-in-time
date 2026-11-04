@@ -1086,14 +1086,14 @@ fn final_validation_refusal(plan: &MaterializationPlan) -> Result<Option<Profile
             history: None,
         },
     );
-    Ok(match validation.structural_failure {
-        Some(error) => Some(ProfileApplyError::FinalValidation(error)),
-        None if validation.rule_report.has_errors() => {
+    Ok(match validation.into_parts() {
+        (Some(error), _) => Some(ProfileApplyError::FinalValidation(error)),
+        (None, rule_report) if rule_report.has_errors() => {
             Some(ProfileApplyError::FinalValidationFindings {
-                error_count: validation.rule_report.error_count(),
+                error_count: rule_report.error_count(),
             })
         }
-        None => None,
+        (None, _) => None,
     })
 }
 

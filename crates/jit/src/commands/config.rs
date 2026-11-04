@@ -297,13 +297,14 @@ impl<S: IssueStore> ConfigOps<'_, S> {
                     history: None,
                 },
             );
-            if let Some(error) = validation.structural_failure {
+            let (failure, rule_report) = validation.into_parts();
+            if let Some(error) = failure {
                 return Err(error);
             }
-            if validation.rule_report.has_errors() {
+            if rule_report.has_errors() {
                 anyhow::bail!(
                     "config set would leave {} validation error finding(s)",
-                    validation.rule_report.error_count()
+                    rule_report.error_count()
                 );
             }
             Ok(SessionStep::Apply(plan, ()))

@@ -27,6 +27,7 @@ use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 
 /// One named stage in whole-repository validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -53,8 +54,8 @@ pub enum RepositoryValidationPass {
 #[derive(Debug)]
 pub struct CapturedValidation<'a> {
     image: &'a RepositoryImage,
-    /// `None` when the loader refused the image.
-    records: Option<Vec<Issue>>,
+    /// The loader's outcome, shared with each report that fails on it.
+    records: std::result::Result<Vec<Issue>, Arc<anyhow::Error>>,
 }
 
 impl<'a> CapturedValidation<'a> {
@@ -62,7 +63,9 @@ impl<'a> CapturedValidation<'a> {
     pub fn from_image(image: &'a RepositoryImage) -> Self {
         Self {
             image,
-            records: load_records(image).ok(),
+            records: load_records(image)
+                .context("records validation pass")
+                .map_err(Arc::new),
         }
     }
 }
@@ -93,7 +96,8 @@ pub struct ValidationReport {
     /// Stages reached in deterministic pipeline order.
     pub passes: Vec<RepositoryValidationPass>,
     /// The first structural failure; every finding collected before it is kept.
-    pub structural_failure: Option<anyhow::Error>,
+    /// A records failure is shared with the [`CapturedValidation`].
+    pub structural_failure: Option<Arc<anyhow::Error>>,
     /// Whether the report judged the history verdicts.
     pub has_history: bool,
     /// Declarative and built-in findings, in wire form.
@@ -107,6 +111,17 @@ impl ValidationReport {
         self.structural_failure
             .as_ref()
             .is_some_and(|error| error.downcast_ref::<RepositoryJudgedInvalid>().is_some())
+    }
+
+    /// The structural failure as an owned error, and the findings. The error
+    /// keeps its typed causes when the report holds its only reference, as it
+    /// does once its [`CapturedValidation`] is dropped; a shared error keeps
+    /// only its message.
+    pub fn into_parts(self) -> (Option<anyhow::Error>, RuleReport) {
+        let failure = self
+            .structural_failure
+            .map(|error| Arc::try_unwrap(error).unwrap_or_else(|shared| anyhow!("{shared:#}")));
+        (failure, self.rule_report)
     }
 }
 
@@ -145,7 +160,9 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     let declarations = match crate::repository_state::validation_declarations_from_image(image) {
         Ok(declarations) => declarations,
         Err(error) => {
-            report.structural_failure = Some(anyhow!(error).context("declaration validation pass"));
+            report.structural_failure = Some(Arc::new(
+                anyhow!(error).context("declaration validation pass"),
+            ));
             return report;
         }
     };
@@ -163,8 +180,13 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     {
         Ok(expected) => expected,
         Err(error) => {
-            report.structural_failure =
-                Some(anyhow!(error).context("derived-materialization validation pass"));
+            // Whole-repository validation names the pass; a proposed overlay's
+            // caller reports the producer's error as it is.
+            let error = anyhow!(error);
+            report.structural_failure = Some(Arc::new(match inputs.history {
+                Some(_) => error.context("derived-materialization validation pass"),
+                None => error,
+            }));
             return report;
         }
     };
@@ -173,8 +195,9 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     let passes = &mut report.passes;
     let config = declarations.config();
     if let Err(error) = config.validate_item_kinds() {
-        report.structural_failure =
-            Some(anyhow!(error).context("effective-config validation pass"));
+        report.structural_failure = Some(Arc::new(
+            anyhow!(error).context("effective-config validation pass"),
+        ));
         return report;
     }
     passes.push(RepositoryValidationPass::EffectiveConfig);
@@ -203,27 +226,22 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     passes.push(RepositoryValidationPass::Gates);
 
     let issues = match &captured.records {
-        Some(issues) => {
+        Ok(issues) => {
             passes.push(RepositoryValidationPass::Records);
             Some(issues.as_slice())
         }
-        None => {
-            // The loader's error is not `Clone`; rerunning it on the image the
-            // records came from yields an owned, typed copy.
-            let error = load_records(image)
-                .err()
-                .unwrap_or_else(|| anyhow!("issue records did not load"));
-            structural_error = Some(error.context("records validation pass"));
+        Err(error) => {
+            structural_error = Some(Arc::clone(error));
             None
         }
     };
 
     let history = inputs.history.as_ref();
     if let Some(Err(message)) = history.map(|history| &history.record_fidelity) {
-        structural_error.get_or_insert(
+        structural_error.get_or_insert(Arc::new(
             anyhow::Error::from(RepositoryJudgedInvalid(message.clone()))
                 .context("record-fidelity validation pass"),
-        );
+        ));
     }
 
     if let Some(issues) = issues {
@@ -235,7 +253,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
             .context("repository-integrity validation pass")
         {
             Err(error) => {
-                structural_error.get_or_insert(error);
+                structural_error.get_or_insert(Arc::new(error));
             }
             Ok(()) if structural_error.is_none() => {
                 passes.push(RepositoryValidationPass::RepositoryIntegrity);
@@ -253,7 +271,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
                 Ok(rule_findings) => findings.extend(rule_findings),
                 Err(error) => {
                     namespace_and_hierarchy_complete = false;
-                    structural_error.get_or_insert(error);
+                    structural_error.get_or_insert(Arc::new(error));
                 }
             }
         } else {
@@ -289,7 +307,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
                 passes.push(RepositoryValidationPass::ItemLinks);
             }
             Err(error) => {
-                structural_error.get_or_insert(error);
+                structural_error.get_or_insert(Arc::new(error));
             }
         }
     }
@@ -300,7 +318,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
         {
             Ok(()) => passes.push(RepositoryValidationPass::Projections),
             Err(error) => {
-                structural_error.get_or_insert(error);
+                structural_error.get_or_insert(Arc::new(error));
             }
         }
     }
@@ -1121,6 +1139,45 @@ mod tests {
             format!("effective-config validation pass: {expected}")
         );
         assert!(report.passes.is_empty());
+    }
+
+    #[test]
+    fn test_report_names_the_materialization_pass_only_with_history() {
+        let config = format!(
+            "{}\n[projection.invariants]\nkind = \"invariant\"\ntarget = \"INVARIANTS.md\"\n\
+             mode = \"separate-file\"\nstyle = \"full\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        );
+        // The projection target lies outside the capture, so derivation fails.
+        let image = crate::test_harness::image::ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(&config)),
+                (".jit/invariants.toml", None),
+                (".jit/gates.toml", None),
+                (".jit/rules.toml", None),
+            ])
+            .build();
+        let captured = CapturedValidation::from_image(&image);
+        let failure_with = |history| {
+            failure(&report(
+                &captured,
+                &ReportInputs {
+                    now: Utc::now(),
+                    history,
+                },
+            ))
+        };
+
+        let overlay = failure_with(None);
+        let whole = failure_with(Some(HistoryVerdicts {
+            record_fidelity: Ok(()),
+            document_references: Ok(()),
+        }));
+
+        assert_eq!(
+            whole,
+            format!("derived-materialization validation pass: {overlay}")
+        );
     }
 
     #[test]

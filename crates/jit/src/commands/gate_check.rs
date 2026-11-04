@@ -599,11 +599,15 @@ fn gate_findings_from_report(
     report: crate::validation::ValidationReport,
 ) -> Result<(Vec<GateFinding>, bool)> {
     let judged_invalid = report.is_judged_invalid();
-    if let Some(error) = report.structural_failure {
+    let rules_loaded = report
+        .passes
+        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas);
+    let (failure, rule_report) = report.into_parts();
+    if let Some(error) = failure {
         if !judged_invalid {
             return Err(error);
         }
-        let mut findings = gate_findings_from_rule_report(&report.rule_report);
+        let mut findings = gate_findings_from_rule_report(&rule_report);
         findings.push(GateFinding::builtin(
             "repository-invalid",
             FindingSeverity::High,
@@ -613,12 +617,8 @@ fn gate_findings_from_report(
         ));
         return Ok((findings, true));
     }
-    if !report
-        .passes
-        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas)
-    {
-        let causes = report
-            .rule_report
+    if !rules_loaded {
+        let causes = rule_report
             .findings
             .iter()
             .filter(|finding| finding.is_error())
@@ -627,8 +627,10 @@ fn gate_findings_from_report(
             .join("; ");
         anyhow::bail!("rules declaration did not load: {causes}");
     }
-    let failed = report.rule_report.has_errors();
-    Ok((gate_findings_from_rule_report(&report.rule_report), failed))
+    Ok((
+        gate_findings_from_rule_report(&rule_report),
+        rule_report.has_errors(),
+    ))
 }
 
 /// Validate the scope named by the issue's single `<namespace>:<target-id>` label.

@@ -119,15 +119,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     /// resolve in separate bounded images under the same session. Every pass
     /// reads captured evidence.
     pub fn validate_silent(&self) -> Result<()> {
-        let report = self.validate_repository_report()?;
-        if let Some(error) = report.structural_failure {
+        let (failure, rule_report) = self.validate_repository_report()?.into_parts();
+        if let Some(error) = failure {
             // Callers render only the outermost message; it carries every cause.
             let message = format!("{error:#}");
             return Err(error.context(message));
         }
-        if report.rule_report.has_errors() {
-            let messages = report
-                .rule_report
+        if rule_report.has_errors() {
+            let messages = rule_report
                 .findings
                 .iter()
                 .filter(|finding| finding.is_error())
@@ -136,7 +135,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 .join("\n");
             return Err(anyhow!(
                 "Validation failed with {} rule error(s):\n{}",
-                report.rule_report.error_count(),
+                rule_report.error_count(),
                 messages
             ));
         }
