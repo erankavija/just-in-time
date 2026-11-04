@@ -64,6 +64,21 @@ fn test_dev_and_test_profiles_bound_debug_info_to_line_tables_only() {
 }
 
 #[test]
+fn test_dev_and_test_profiles_keep_debug_info_outside_the_executable() {
+    let manifest = workspace_manifest();
+
+    for profile in ["dev", "test"] {
+        assert_eq!(
+            profile_table(&manifest, profile)
+                .get("split-debuginfo")
+                .and_then(toml::Value::as_str),
+            Some("unpacked"),
+            "[profile.{profile}].split-debuginfo must keep debug sections outside the executable"
+        );
+    }
+}
+
+#[test]
 fn test_dev_profile_enables_incremental_but_test_profile_disables_it() {
     let manifest = workspace_manifest();
 

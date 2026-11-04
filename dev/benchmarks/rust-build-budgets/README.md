@@ -1,4 +1,4 @@
-# Rust build budgets: what the enforced constants rest on (jit:0708d692)
+# Rust build budgets: what the enforced constants rest on (jit:75b46be9, jit:0708d692)
 
 `scripts/rust-build-budget.sh` fails the `cargo-ci` gate on three quantities: the
 number of integration-test targets, the bytes of active test executables, and
@@ -13,7 +13,7 @@ whose baseline measured a build topology this tree no longer has: 140
 integration-test targets and a 92 GiB target directory, against the 10 targets
 and 3.1 GiB recorded at `a3c2f597a`. "Provenance" states what that record still holds.
 
-Raw gate output is under `raw/`.
+Historical gate output is under `raw/`.
 
 ## Environment
 
@@ -36,9 +36,83 @@ reconstruction of it. One `./scripts/cargo-ci.sh` run reports all three on its
 The second command inherits the workspace test-profile policy, as every gate
 step does; see "Test-profile incremental state" below.
 
-## What the tree measures
+## Unpacked debug information (jit:75b46be9)
 
-| quantity | measured | constant in force | used |
+Measured on 2026-11-04, starting at `efc34b1c5338bbcb48b5f5c3cd225cf56e1d8d9f`,
+with Rust 1.97.0 (`2d8144b78`, LLVM 22.1.6), `x86_64-unknown-linux-gnu`, on the
+same host and worktree. The before build had no tracked changes. The after
+build adds `split-debuginfo = "unpacked"` to both workspace profiles and the
+policy regression test; both builds retain the existing debug level and
+`[profile.test].incremental = false`.
+
+These are the commands used, with the profile edit between the two builds.
+Cargo's artifact streams identify the active executables; stale binaries in
+`target/` do not enter either measurement.
+
+```sh
+export CARGO_INCREMENTAL=0 CARGO_CI_NO_SCCACHE=1
+export TMPDIR=/mnt/nvme/jit/tmp/df129d9e-workers/home/vkaskivuo/Projects/just-in-time/agent-75b46be9
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh --cargo test --workspace --no-run --message-format=json > /tmp/jit-75b46be9-before-artifacts.jsonl
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/rust-build-budget.sh --artifacts-json /tmp/jit-75b46be9-before-artifacts.jsonl
+# Add the profile setting and its policy test, then build and measure again.
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh --cargo test --workspace --no-run --message-format=json > /tmp/jit-75b46be9-after-artifacts.jsonl
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/rust-build-budget.sh --artifacts-json /tmp/jit-75b46be9-after-artifacts.jsonl
+```
+
+| build | active executables | executable bytes |
+| --- | --- | --- |
+| before | 14 | 1,716,674,768 |
+| unpacked | 14 | 1,177,006,296 |
+
+The reduction is `1 - 1,177,006,296 / 1,716,674,768 = 31.436850%`.
+This meets the user-approved 30% reduction floor (@/issue/75b46be9/decision/D-01).
+Unpacked debug information still leaves line and range tables in each linked
+executable on this compiler. The representative `cli_issue` executable shrank
+from 121,231,336 to 82,249,880 bytes. Section evidence comes from:
+
+```sh
+readelf -SW target/debug/deps/cli_issue-3bc741823e65d0c7
+readelf -SW target/debug/deps/cli_issue-f703e0db7d2b86eb
+```
+
+| section | before bytes | unpacked bytes |
+| --- | --- | --- |
+| `.debug_info` | 20,384,553 | 1,911,118 |
+| `.debug_str` | 26,943,049 | 2,999,607 |
+| `.debug_line` | 19,238,662 | 19,181,302 |
+| `.debug_ranges` | 9,784,896 | 9,788,704 |
+| `.debug_addr` | absent | 3,642,696 |
+
+The executable-byte budget now uses **at most 10% headroom, rounded down to a
+whole MiB**: `floor(1,177,006,296 × 1.10 / 1,048,576) = 1,234 MiB`, or
+1,293,942,784 bytes (9.935078% headroom). This replaces the historical byte
+budget and its rounding rule below; the target-count and suite-clock budgets
+retain their existing derivations.
+
+### Panic backtrace reproduction
+
+With the same environment, the existing expected-panic test ran successfully:
+
+```sh
+RUST_BACKTRACE=1 flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh --cargo test --workspace --lib test_await_refusals_reports_an_unreachable_target_rather_than_waiting_out_the_bound -- --nocapture
+```
+
+Its backtrace retained workspace function names and source lines (paths below
+are relative to `crates/jit`):
+
+```text
+   2: <jit::storage::contention_probe::Contenders>::await_refusals
+             at ./src/storage/contention_probe.rs:209:13
+   3: test_await_refusals_reports_an_unreachable_target_rather_than_waiting_out_the_bound
+             at ./src/storage/contention_probe.rs:333:20
+```
+
+The test passed with its expected panic. Keep the generated `.dwo` files in the
+build tree when using these executables for source-line backtraces.
+
+## Historical gate measurements (2026-10-01)
+
+| quantity | measured | constant then | used |
 | --- | --- | --- | --- |
 | integration-test targets | 10 | 12 | 83% |
 | active test-executable bytes | 1,739,334,912 (1.62 GiB) across 14 executables | 2,147,483,648 (2 GiB) | 81% |
@@ -61,9 +135,9 @@ acceptance criterion checked by `scripts/benchmark-rust-build.sh` once per
 build-topology change, and this figure comes from a gate-warm tree rather than
 that harness's clean-room protocol.
 
-## The headroom rule
+## Historical headroom rule
 
-**Each constant is the worst warm measurement of the current tree plus 20%,
+**Each constant was the worst warm measurement of that tree plus 20%,
 rounded up to the next whole unit of its own quantity — a whole target, a whole
 GiB, five seconds.** Two conditions apply to the result: it must still pass the
 worst measurement observed in any condition, including a first run in a fresh
@@ -76,8 +150,8 @@ loosen it. A derivation that points looser is an escalation, not an edit.
 | `MAX_EXECUTABLE_BYTES` | 1,739,334,912 B | 2,087,201,894 B (1.94 GiB) | whole GiB | **2 GiB** | 2 GiB |
 | `MAX_TEST_SUITE_SECONDS` | 24,171 ms | 29,005 ms | five seconds | **30 s** | 30 s |
 
-All three derive to the value already in force, so the post-cutover re-derivation
-holds every constant. The first-run checks hold for the one that could bind:
+All three derived to the value then in force, so the post-cutover re-derivation
+held every constant. The first-run checks hold for the one that could bind:
 29,726 ms and 26,832 ms are inside 30,000 ms.
 
 ### Why 20%

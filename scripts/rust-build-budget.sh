@@ -41,7 +41,7 @@ set -euo pipefail
 # dev/benchmarks/rust-build-budgets/README.md, not in this file. Changing a
 # value here without re-deriving it there leaves a limit nothing measured.
 readonly MAX_INTEGRATION_TARGETS=12
-readonly MAX_EXECUTABLE_BYTES=$((2 * 1024 * 1024 * 1024)) # 2 GiB
+readonly MAX_EXECUTABLE_BYTES=$((1234 * 1024 * 1024)) # MiB; derivation in README
 readonly MAX_TEST_SUITE_SECONDS=30
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -152,7 +152,7 @@ EOF
     '[$a,$b][] | {reason:"compiler-artifact",profile:{test:true},executable:.}' \
     >"$fixture/artifacts.jsonl"
   run_checker 1
-  assert_report stderr "$((MAX_EXECUTABLE_BYTES + 1))" "2 GiB" shrink
+  assert_report stderr "$((MAX_EXECUTABLE_BYTES + 1))" "$MAX_EXECUTABLE_BYTES" shrink
 
   seed_fixture profile-drift
   sed -i '0,/line-tables-only/s//full/' "$fixture/Cargo.toml"
@@ -368,7 +368,7 @@ for exe in "${executables[@]}"; do
   executable_bytes=$((executable_bytes + size))
 done
 if [ "$executable_bytes" -gt "$MAX_EXECUTABLE_BYTES" ]; then
-  errors+=("active test executables: observed ${executable_bytes} bytes across ${#executables[@]} unique executables, limit ${MAX_EXECUTABLE_BYTES} bytes (2 GiB). Corrective area: shrink per-executable debug payload or consolidate suites (dev/benchmarks/rust-build-budgets/README.md).")
+  errors+=("active test executables: observed ${executable_bytes} bytes across ${#executables[@]} unique executables, limit ${MAX_EXECUTABLE_BYTES} bytes. Corrective area: shrink per-executable debug payload or consolidate suites (dev/benchmarks/rust-build-budgets/README.md).")
 fi
 
 # REQ-03: build/gate policy assertions against the injected policy sources.
