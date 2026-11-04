@@ -9,8 +9,7 @@
   "documents": [],
   "gates_required": [
     "cargo-ci",
-    "code-review",
-    "mcp-ci"
+    "code-review"
   ],
   "gates_status": {},
   "id": "9623fe6a-d9f9-4a28-80e2-cc490553b7f9",
@@ -28,5 +27,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Link checks and snapshot export select issues through one IssueScope",
-  "updated_at": "2026-10-24T21:22:37.717854234Z"
+  "updated_at": "2026-11-04T22:02:09.595020384Z"
 }
