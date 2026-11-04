@@ -1355,7 +1355,7 @@
       "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
     },
     "1ade3e6f": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track B; large config assembler",
       "epic": "b697a3f7",
