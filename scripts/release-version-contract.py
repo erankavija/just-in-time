@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify that the release metadata of every shipped component agrees.
 
-One product release version has to reach the CLI, the server, the MCP package,
+One product release version has to reach the CLI, the server,
 the web bundle, their lock metadata, the release tag, and the compatibility
 record, and it has to fall inside the compatible range this repository's
 workflow profile package declares. The same run checks the release's legal and narrative
@@ -35,7 +35,6 @@ REQUIRED_CAPABILITIES = (
     "native `jit` CLI",
     "`jit-server` Rust server and API",
     "built web UI",
-    "`@erankavija/jit-mcp-server` MCP server",
 )
 # The compatibility record is also the upgrade record: this heading is what
 # makes the upgrade expectations observable to the check.
@@ -70,13 +69,11 @@ COMPARATOR_PATTERN = re.compile(r"(?P<operator>>=|<=|>|<|=)\s*" + RELEASE_SOURCE
 # the copyright holder is derived from. The crate manifests inherit that
 # declaration and the npm manifests restate it; all of them must agree.
 WORKSPACE_MANIFEST = Path("Cargo.toml")
-PUBLISHED_PACKAGE_MANIFEST = Path("mcp-server/package.json")
 INHERITING_CRATE_MANIFESTS = (
     Path("crates/jit/Cargo.toml"),
     Path("crates/server/Cargo.toml"),
 )
 AUTHOR_RESTATING_MANIFESTS = (
-    PUBLISHED_PACKAGE_MANIFEST,
     Path("web/package.json"),
 )
 CARGO_INHERITED = {"workspace": True}
@@ -280,19 +277,6 @@ def verify_license_texts(
             f"license expression at {WORKSPACE_MANIFEST}: {error}"
         )
         return ()
-
-    try:
-        published = nested_string(
-            read_json(root / PUBLISHED_PACKAGE_MANIFEST), "license"
-        )
-    except (OSError, ValueError, json.JSONDecodeError) as error:
-        findings.append(f"license expression at {PUBLISHED_PACKAGE_MANIFEST}: {error}")
-    else:
-        if published != expression:
-            findings.append(
-                f"license expression {published!r} at {PUBLISHED_PACKAGE_MANIFEST} "
-                f"differs from {expression!r} at {WORKSPACE_MANIFEST}"
-            )
 
     carried: list[Path] = []
     for identifier in license_identifiers(expression):
@@ -500,11 +484,6 @@ def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
             Path("crates/server/Cargo.toml"),
             read_cargo_manifest,
         ),
-        (
-            "MCP server manifest",
-            Path("mcp-server/package.json"),
-            read_node_manifest,
-        ),
         ("web manifest", Path("web/package.json"), read_node_manifest),
     )
     manifest_versions = {
@@ -535,7 +514,6 @@ def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
                 findings.append(f"{label} declares {locked}, expected {expected}")
 
         for label, relative in (
-            ("MCP server lock metadata", Path("mcp-server/package-lock.json")),
             ("web lock metadata", Path("web/package-lock.json")),
         ):
             try:

@@ -13,14 +13,13 @@ Just-In-Time (JIT) is a CLI-first, repository-local issue tracker designed for A
 Run checks for the workspace you changed:
 
 - **Rust:** `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets` (zero warnings), and `cargo test`.
-- **MCP server:** `cd mcp-server && npm test`.
 - **Web UI:** `cd web && npm test && npm run lint && npm run build`.
 
 See `dev/TESTING.md` for focused Rust test commands. Configured gates in `.jit/gates.toml` are authoritative for completion. Install the dogfood binary with `./scripts/install-jit.sh`.
 
 ## Workspace Structure
 
-The Rust workspace contains the core CLI/library in `crates/jit/` and the HTTP server in `crates/server/`. `mcp-server/` is the Node.js MCP bridge generated from the CLI schema, and `web/` is the React UI. User documentation lives in `docs/`; contributor material lives in `dev/`.
+The Rust workspace contains the core CLI/library in `crates/jit/` and the HTTP server in `crates/server/`. `web/` is the React UI. User documentation lives in `docs/`; contributor material lives in `dev/`.
 
 ## Core Architecture (crates/jit)
 

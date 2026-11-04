@@ -1273,6 +1273,20 @@ fn derive_state_transition(
         });
     }
 
+    let restores_done =
+        old_state == State::Archived && target == State::Done && issue.is_effectively_terminal();
+    if target != State::Rejected && target != State::Archived && !restores_done {
+        let missing = issue
+            .gates_required
+            .iter()
+            .filter(|key| !evidence.graph.declarations.gates.gates.contains_key(*key))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(crate::storage::GateNotFoundError::new(missing).into());
+        }
+    }
+
     let mut warnings = Vec::new();
     if old_state == State::Archived {
         if let Some(origin) = issue.archived_from.filter(|origin| target != *origin) {
@@ -2851,7 +2865,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Get reference to the storage backend
-    pub(crate) fn storage(&self) -> &S {
+    fn storage(&self) -> &S {
         &self.storage
     }
 

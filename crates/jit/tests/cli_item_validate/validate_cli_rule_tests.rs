@@ -1,6 +1,6 @@
 //! CLI integration tests for the extended `jit validate` surface (issue
 //! b8ba1b10): the positional `[<id>]`, `--explain`, `--json`, error-severity
-//! exit codes, the `$JIT_ISSUE_ID` gate-checker wiring, and `--schema` / MCP
+//! exit codes, the `$JIT_ISSUE_ID` gate-checker wiring, and `--schema`
 //! parity for the new positional + flag.
 
 use assert_cmd::prelude::*;
@@ -10,7 +10,6 @@ use jit::test_utils::profiled_repository_fixture;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
-use std::process::Command;
 
 fn append_rules(cli: &JitCli, rules_toml: &str) {
     let rules_path = cli.root().join(".jit/rules.toml");
@@ -795,8 +794,6 @@ fn test_validate_rule_cli_reports_missing_selected_container() {
 
 #[test]
 fn test_schema_exposes_validate_positional_and_explain_flag() {
-    // MCP parity: the new positional `id` arg and `--explain` flag MUST appear in
-    // `jit --schema` so the MCP server auto-generates a working tool (DR §9.3).
     let output = JitCli::uninitialised()
         .unwrap()
         .command(["--schema"])
@@ -829,77 +826,4 @@ fn test_schema_exposes_validate_positional_and_explain_flag() {
             .contains("derived-state repairs publish through one redo record"),
         "schema must document the repair contract: {fix}"
     );
-}
-
-#[test]
-fn test_mcp_generates_validate_tool_with_id_and_explain() {
-    // The MCP server generates tools from `jit --schema`. Run its tool-generator
-    // over the real schema and assert the `jit_validate` tool carries the new
-    // `id` and `explain` properties (proves a WORKING tool is generated for the
-    // new surface, not just that the schema contains the fields).
-    let schema_out = JitCli::uninitialised()
-        .unwrap()
-        .command(["--schema"])
-        .output()
-        .unwrap();
-    assert!(schema_out.status.success());
-    let schema_json = String::from_utf8(schema_out.stdout).unwrap();
-
-    let mcp_dir = mcp_server_dir();
-    let script = r#"
-import { generateTools } from './lib/tool-generator.js';
-let data = '';
-process.stdin.on('data', c => data += c);
-process.stdin.on('end', () => {
-  const schema = JSON.parse(data);
-  const tools = generateTools(schema, false);
-  const tool = tools.find(t => t.name === 'jit_validate');
-  if (!tool) { console.error('no jit_validate tool'); process.exit(2); }
-  const props = tool.inputSchema.properties || {};
-  if (!props.id) { console.error('missing id property'); process.exit(3); }
-  if (!props.explain) { console.error('missing explain property'); process.exit(4); }
-  if (!props.rule) { console.error('missing rule property'); process.exit(5); }
-  if (!props.fix?.description?.includes('derived-state repairs publish through one redo record')) {
-    console.error('missing fix repair contract'); process.exit(6);
-  }
-  console.log('ok');
-});
-"#;
-
-    let mut child = Command::new("node")
-        .current_dir(&mcp_dir)
-        .args(["--input-type=module", "-e", script])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .expect(
-            "node is required for the MCP tool-generation parity test and could not be spawned",
-        );
-    {
-        use std::io::Write;
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(schema_json.as_bytes())
-            .unwrap();
-    }
-    let out = child.wait_with_output().unwrap();
-    assert!(
-        out.status.success(),
-        "MCP tool generation parity failed: stdout={} stderr={}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(String::from_utf8_lossy(&out.stdout).contains("ok"));
-}
-
-/// Locate the `mcp-server` directory relative to the crate manifest.
-fn mcp_server_dir() -> std::path::PathBuf {
-    // CARGO_MANIFEST_DIR is crates/jit; mcp-server is two levels up.
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("mcp-server")
 }

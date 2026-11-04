@@ -55,6 +55,12 @@
     "internal_edges": 19,
     "source_edges": 5,
     "sink_edges": 3,
-    "external_edges": 6
+    "external_edges": 6,
+    "infrastructure_edges": 1
+  },
+  "infrastructure_dependencies": {
+    "32607213-7402-4c17-9889-7a6286e1959e": [
+      "db094cac-3bdd-442e-8ed1-e80374f6ab8f"
+    ]
   }
 }

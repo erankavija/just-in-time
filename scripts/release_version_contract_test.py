@@ -17,7 +17,6 @@ CAPABILITIES = (
     "native `jit` CLI",
     "`jit-server` Rust server and API",
     "built web UI",
-    "`@erankavija/jit-mcp-server` MCP server",
 )
 UPGRADE_SECTION = "## Upgrade expectations"
 LICENSE_EXPRESSION = "MIT OR Apache-2.0"
@@ -108,7 +107,6 @@ class ReleaseVersionContractTests(unittest.TestCase):
         )
 
         for directory, name in (
-            ("mcp-server", "@erankavija/jit-mcp-server"),
             ("web", "web"),
         ):
             manifest: dict[str, object] = {
@@ -116,8 +114,6 @@ class ReleaseVersionContractTests(unittest.TestCase):
                 "version": self.version,
                 "author": AUTHOR,
             }
-            if directory == "mcp-server":
-                manifest["license"] = LICENSE_EXPRESSION
             self._write_json(f"{directory}/package.json", manifest)
             self._write_json(
                 f"{directory}/package-lock.json",
@@ -251,12 +247,12 @@ class ReleaseVersionContractTests(unittest.TestCase):
         self._assert_fails_with("jit-server lock metadata")
 
     def test_contract_rejects_mismatched_node_lock(self) -> None:
-        lock = self.root / "mcp-server/package-lock.json"
+        lock = self.root / "web/package-lock.json"
         value = json.loads(lock.read_text(encoding="utf-8"))
         value["packages"][""]["version"] = "7.8.8"
         lock.write_text(json.dumps(value), encoding="utf-8")
 
-        self._assert_fails_with("MCP server lock metadata")
+        self._assert_fails_with("web lock metadata")
 
     def test_contract_rejects_mismatched_tag(self) -> None:
         self._assert_fails_with("release tag", "v7.8.8")
@@ -353,16 +349,10 @@ class ReleaseVersionContractTests(unittest.TestCase):
     ) -> None:
         for relative, old, new in (
             ("Cargo.toml", LICENSE_EXPRESSION, "MIT OR Zlib"),
-            ("mcp-server/package.json", LICENSE_EXPRESSION, "MIT OR Zlib"),
         ):
             self._edit(relative, old, new)
 
         self._assert_fails_with("Zlib")
-
-    def test_contract_rejects_mismatched_license_expression(self) -> None:
-        self._edit("mcp-server/package.json", LICENSE_EXPRESSION, "MIT")
-
-        self._assert_fails_with("license expression")
 
     def test_contract_rejects_missing_changelog_release_entry(self) -> None:
         self._edit("CHANGELOG.md", f"## [{self.version}] - 2026-07-30", "## Notes")

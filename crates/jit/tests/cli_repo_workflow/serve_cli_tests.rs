@@ -1,7 +1,7 @@
 //! Integration tests for `jit serve` CLI command.
 //!
 //! Most cases cover output contracts for `--status`, `--stop`, `--json`, stale
-//! PID cleanup, and MCP schema exclusion without starting a server. The two
+//! and PID cleanup without starting a server. The two
 //! end-to-end cases at the end — the daemonizing start and the foreground one —
 //! do start a live `jit-server`, and run only when one was built beside the
 //! `jit` binary under test.
@@ -353,26 +353,6 @@ fn test_serve_status_json_has_required_fields_when_not_running() {
     let cli = JitCli::initialised().unwrap();
     let v = cli.run_json(["serve", "--status"]).unwrap();
     assert!(v.get("status").is_some(), "must have 'status' field");
-}
-
-// ── MCP schema exclusion ──────────────────────────────────────────────────────
-
-#[test]
-fn test_serve_not_in_mcp_schema() {
-    let cli = JitCli::initialised().unwrap();
-    let schema: Value =
-        serde_json::from_str(&cli.run(["--schema"]).unwrap()).expect("schema must be valid JSON");
-    let commands = schema["commands"]
-        .as_object()
-        .expect("commands must be an object");
-    // 'serve' may appear in the schema but must be marked hidden (so MCP won't expose it).
-    if let Some(serve_cmd) = commands.get("serve") {
-        assert_eq!(
-            serve_cmd["hidden"], true,
-            "'serve' must be marked hidden in MCP schema"
-        );
-    }
-    // Either absent or hidden is acceptable — just not visible (hidden: false or missing).
 }
 
 // ── --stop: stale PID with pid=0 guard ───────────────────────────────────────

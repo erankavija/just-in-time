@@ -41,14 +41,14 @@ jobs:
     name: Normal Validation Suites
     uses: ./.github/workflows/ci.yml
 
-  # The three dependency-advisory boundaries, on the tagged commit
+  # The dependency-advisory boundaries, on the tagged commit
   # (@/charter/D-11). It runs beside the suites: both are verified boundaries,
   # and everything below waits for both.
   security:
     name: Blocking Security Audits
     uses: ./.github/workflows/security-audit.yml
 
-  # The web bundle, the native archive, the MCP tarball, and the smoke test over
+  # The web bundle, the native archive, and the smoke test over
   # the extracted archive. Nothing is built until validation and the audits have
   # succeeded.
   artifacts:
@@ -92,7 +92,7 @@ jobs:
             exit 1
           fi
 
-      # The two built artifacts, named one by one: the run also carries the web
+      # The built archive: the run also carries the web
       # bundle the server embeds, which ships inside jit-server rather than as
       # an asset of its own.
       - name: Download the native archive
@@ -101,22 +101,16 @@ jobs:
           name: native-archive
           path: dist
 
-      - name: Download the MCP tarball
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: mcp-tarball
-          path: dist
-
       # One directory holding exactly what the release carries, checksummed
       # where it is assembled so the sums cover the bytes that are uploaded.
       - name: Assemble the release assets
         run: |
           cp LICENSE-MIT LICENSE-APACHE dist/
           cd dist
-          sha256sum jit-linux-x64.tar.gz *.tgz > checksums.txt
+          sha256sum jit-linux-x64.tar.gz > checksums.txt
           cat checksums.txt
 
-      # One release for the tag, carrying the two artifacts, their checksums,
+      # One release for the tag, carrying the archive, its checksum,
       # both license texts, and the committed release note as its body. No
       # package registry, no container registry, no other output.
       - name: Publish the release
@@ -129,7 +123,6 @@ jobs:
             --title "JIT ${GITHUB_REF_NAME}" \
             --notes-file "docs/release-notes/v${VERSION}.md" \
             dist/jit-linux-x64.tar.gz \
-            dist/*.tgz \
             dist/checksums.txt \
             dist/LICENSE-MIT \
             dist/LICENSE-APACHE

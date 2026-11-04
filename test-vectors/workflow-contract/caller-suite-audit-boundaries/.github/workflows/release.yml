@@ -12,11 +12,11 @@ jobs:
     needs: [audit]
     steps:
       - run: ./build-binaries.sh
-  package-mcp-server:
+  package-extra:
     runs-on: ubuntu-latest
     needs: [audit]
     steps:
-      - run: ./package-mcp-server.sh
+      - run: ./package-extra.sh
   build-web-ui:
     runs-on: ubuntu-latest
     needs: [audit]
@@ -24,7 +24,7 @@ jobs:
       - run: ./build-web-ui.sh
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-binaries, package-mcp-server, build-web-ui]
+    needs: [build-binaries, package-extra, build-web-ui]
     permissions:
       contents: write
     steps:

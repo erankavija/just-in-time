@@ -56,26 +56,6 @@ jobs:
       - name: Audit Cargo.lock
         run: cargo audit -D warnings
 
-  npm-audit-mcp-server:
-    name: MCP server advisories
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '20'
-
-      # Resolved from the committed package-lock.json. `--omit=dev` scopes the
-      # report to what ships; `--audit-level=info` makes the lowest severity the
-      # database reports enough to fail the job.
-      - name: Audit package-lock.json
-        working-directory: mcp-server
-        run: npm audit --omit=dev --audit-level=info
-
   npm-audit-web:
     name: Web UI advisories
     runs-on: ubuntu-latest

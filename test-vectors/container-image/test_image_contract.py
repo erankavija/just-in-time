@@ -108,7 +108,6 @@ class StaticImageContractTests(unittest.TestCase):
         self.assertIn('exec /usr/local/bin/jit-server --data-dir /repo/.jit', runtime)
         self.assertNotIn("nginx", runtime.lower())
         self.assertNotIn("node", runtime.lower())
-        self.assertNotIn("mcp-server", runtime.lower())
         self.assertNotRegex(runtime, r"COPY .*target/release/jit(?:\s|$)")
         self.assertNotIn("tail -f", runtime)
 

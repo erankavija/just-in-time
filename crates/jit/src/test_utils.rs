@@ -4,7 +4,7 @@
 
 #![cfg(any(test, feature = "test-support"))]
 
-use crate::commands::CommandExecutor;
+use crate::commands::{test_helpers::ExecutorTestAccess, CommandExecutor};
 use crate::config::ItemKindConfig;
 use crate::domain::{identity::IssueId, DocumentReference};
 use crate::profile::{capture_package_tree, ProfilePackage, ProfilePackageModel};

@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "73b031dbe7e5c31a5f4455e2d429b63a2bf63479",
+  "completed_at": "2026-11-04T22:34:16.647872305Z",
+  "duration_ms": 2304,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "docs-mechanical",
+  "inputs_digest": "4604ad5387b2b50b034c173295bed8511d1b94b231feea78711c8aa2a5a561d7",
+  "issue_id": "b4ca051c-e241-45a5-b0ae-6f9016ada867",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3d5356e9-9c0e-4d3f-a17c-385c8effef1a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:34:14.343668207Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n== M8 package content ==\nOK: packaged citations resolve and no package carries prohibited content\n\n== M9 policy phrases ==\nOK: declared policy phrases hold\n\n"
+}

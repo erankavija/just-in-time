@@ -45,7 +45,6 @@ source checkout, and installing the CLI from that checkout.
 
 **Optional components:**
 - `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; [Deployment](docs/how-to/deployment.md) covers serving a repository natively or from the container image, and [Building the web UI](docs/how-to/deployment.md#building-the-web-ui) covers the bundle.
-- **MCP Server**: Model Context Protocol server for AI agents — [MCP Integration](docs/how-to/mcp-integration.md) installs the released tarball and starts it from an MCP client.
 
 ### Basic Usage
 
