@@ -47,6 +47,8 @@ pub enum Outcome<R> {
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     invariant::output_schema,
+    issue::output_schema,
+    issue::alias_output_schema,
     #[cfg(test)]
     test_group::output_schema,
 ];
@@ -72,6 +74,9 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// }
 /// ```
 ///
+/// A group serving only some of its enum's variants ends its invocation with
+/// `, unmigrated: <pattern> => <Result<ExitCode> expression>` for the rest.
+///
 /// It generates `dispatch(command, ctx, out, err) -> anyhow::Result<ExitCode>`,
 /// which runs the leaf's handler and renders its outcome through
 /// [`crate::output::emit_outcome`], and `output_schema(cmd_path)`, which
@@ -84,6 +89,7 @@ macro_rules! command_group {
         leaves: {
             $( $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? ) -> $response:ty ),+ $(,)?
         }
+        $(, unmigrated: $rest:pat => $fallback:expr)?
     ) => {
         pub fn dispatch<S: $($bound)+>(
             command: $command,
@@ -96,6 +102,7 @@ macro_rules! command_group {
                     let outcome: $crate::dispatch::Outcome<$response> = $handler(ctx, $($arg),*)?;
                     $crate::output::emit_outcome(&outcome, ctx.mode, out, err)
                 } )+
+                $( $rest => $fallback, )?
             }
         }
 
@@ -109,5 +116,6 @@ macro_rules! command_group {
 }
 
 pub mod invariant;
+pub mod issue;
 #[cfg(test)]
 mod test_group;

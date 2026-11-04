@@ -34,7 +34,7 @@ pub type ItemListResult = ListEnvelope<ItemsKey, AddressableItem>;
 /// `issue_full_id` / `issue_title` are populated only for an issue-scoped item;
 /// for a project-scoped item (`@/<kind>/<self-id>`) both are `None`, since no single
 /// issue owns it (REQ-01).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ItemShowResult {
     /// The resolved addressable item.
     pub item: AddressableItem,

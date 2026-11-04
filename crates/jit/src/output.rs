@@ -16,8 +16,13 @@ use thiserror::Error;
 mod emit;
 pub mod failure;
 mod invariant;
+mod issue;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub use issue::{
+    ChildrenKey, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
+    IssueStatusOutput,
+};
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
@@ -240,6 +245,35 @@ pub fn plain_issue_rows(issues: &[Issue]) -> impl Iterator<Item = IssueListRow<'
     issues.iter().map(|issue| (issue, Vec::new()))
 }
 
+/// The fields a human issue-list row prints, shared by stored and minimal records.
+pub trait IssueRow {
+    fn id(&self) -> &IssueId;
+    fn title(&self) -> &str;
+    fn state(&self) -> State;
+    fn priority(&self) -> Priority;
+}
+
+macro_rules! impl_issue_row {
+    ($($record:ty),+) => {$(
+        impl IssueRow for $record {
+            fn id(&self) -> &IssueId {
+                &self.id
+            }
+            fn title(&self) -> &str {
+                &self.title
+            }
+            fn state(&self) -> State {
+                self.state
+            }
+            fn priority(&self) -> Priority {
+                self.priority
+            }
+        }
+    )+};
+}
+
+impl_issue_row!(Issue, MinimalIssue);
+
 /// Render a human issue list: `header`, two-space-indented rows (`id | title`
 /// plus `columns`, then one `    - reason` line per reason), and a blank-line
 /// separated `Total: N` footer. `quiet` drops the header and footer.
@@ -249,17 +283,27 @@ pub fn render_issue_list<'a>(
     columns: &[IssueColumn],
     quiet: bool,
 ) -> String {
+    render_issue_rows(header, rows, columns, quiet)
+}
+
+/// [`render_issue_list`] over any [`IssueRow`] record.
+pub fn render_issue_rows<'a, I: IssueRow + 'a>(
+    header: &str,
+    rows: impl IntoIterator<Item = (&'a I, Vec<String>)>,
+    columns: &[IssueColumn],
+    quiet: bool,
+) -> String {
     use std::fmt::Write;
 
     let mut lines = String::new();
     let mut total = 0usize;
     for (issue, reasons) in rows {
         total += 1;
-        let _ = write!(lines, "  {} | {}", issue.id, issue.title);
+        let _ = write!(lines, "  {} | {}", issue.id(), issue.title());
         for column in columns {
             let _ = match column {
-                IssueColumn::State => write!(lines, " | {}", issue.state),
-                IssueColumn::Priority => write!(lines, " | {}", issue.priority),
+                IssueColumn::State => write!(lines, " | {}", issue.state()),
+                IssueColumn::Priority => write!(lines, " | {}", issue.priority()),
             };
         }
         lines.push('\n');
@@ -2176,7 +2220,7 @@ impl From<&Issue> for ContainerHeader {
 ///
 /// `issues` holds one compact status projection per resolvable direct child,
 /// ascending short id.
-pub type IssueChildrenResponse = ListEnvelope<IssuesKey, IssueStatusResponse, ChildrenScope>;
+pub type IssueChildrenResponse = ListEnvelope<ChildrenKey, IssueStatusResponse, ChildrenScope>;
 
 /// Fields of [`IssueChildrenResponse`] beside its `issues`.
 #[derive(Debug, Serialize, JsonSchema)]

@@ -10,6 +10,12 @@ use std::io::{self, Write};
 /// newline included, written verbatim to stdout.
 pub trait HumanRender {
     fn render_human(&self) -> String;
+
+    /// The rendering under `--quiet`; the full text unless the response drops
+    /// decoration.
+    fn render_quiet(&self) -> String {
+        self.render_human()
+    }
 }
 
 /// A handler's success response: its JSON shape, published schema and human
@@ -33,8 +39,8 @@ impl<T: Serialize + HumanRender> Report for T {
 /// Render `outcome` under `mode` and return the process exit status.
 ///
 /// Success writes the success envelope with the outcome's `message`
-/// (`--json`) or the response's human rendering to `out` and returns
-/// [`ExitCode::Success`]. Findings write the failure envelope with the report
+/// (`--json`) or the response's human (`--quiet`: quiet) rendering to `out` and
+/// returns [`ExitCode::Success`]. Findings write the failure envelope with the report
 /// as `error.details` (`--json`), or the report's rendering to `out` and the
 /// outcome's `message` as one unprefixed line to `err`, and return the code's [`ErrorCode::exit_code`]. A closed pipe yields
 /// [`ExitCode::BrokenPipe`]; the caller owns process exit.
@@ -55,10 +61,14 @@ pub fn emit_outcome<R: Response>(
                 ExitCode::Success,
             )
         }
-        Outcome::Success { response, .. } => (
-            out.write_all(response.render_human().as_bytes()),
-            ExitCode::Success,
-        ),
+        Outcome::Success { response, .. } => {
+            let text = if mode.quiet {
+                response.render_quiet()
+            } else {
+                response.render_human()
+            };
+            (out.write_all(text.as_bytes()), ExitCode::Success)
+        }
         Outcome::Findings {
             code,
             message,
