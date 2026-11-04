@@ -15,7 +15,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5b6aacd6-48e6-4973-9abc-74d2b518a64e",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:44:54.766981809Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "0517eb34-be56-405f-a841-a566481cd073",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:45:13.052435948Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c9103fcf-aa0c-4642-8531-5360f5fdd58d",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Document commands move to library handlers",
-  "updated_at": "2026-11-04T06:36:48.833950420Z"
+  "updated_at": "2026-11-04T06:45:13.052435948Z"
 }
