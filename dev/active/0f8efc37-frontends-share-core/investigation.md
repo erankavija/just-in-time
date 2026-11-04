@@ -1167,3 +1167,18 @@ Matched files: 31. Every caller must propagate or explicitly assert the construc
 - `dev/archive/ad601a15-parallel-work/sessions/session-20260201-refactor-items-5-7.md:20`
 - `dev/archive/c780514e-test-topology/active/c780514e-test-topology/investigation.md:346`
 - `dev/studies/architecture-pitfalls.md:182`
+
+## Post-instantiation validation provenance
+
+The installed CLI reported zero validation errors and 80 advisory membership
+divergences after instantiation. A read-only comparison using the same binary's
+`jit query divergence --json` against an isolated `.jit/` snapshot from commit
+`814f15b02` (before batch creation and external wiring) produced exactly the same
+80 `(issue ID, label)` pairs: none added or removed. The warnings concern 28 old
+terminal issues (26 rejected, two done), with no overlap with the 16 manifest
+issues or their external prerequisite owners. They therefore predate this
+breakdown. This comparison establishes provenance, not acceptance: cleanup is
+outside this epic. Standalone issue `3f844900` subsequently removed the 80
+unsupported membership labels in commits `6020e79b4` and `7365be674`; the steward
+independently verified zero errors, warnings, and divergences after that cleanup. See `warning-provenance.json`
+for the reproducible comparison result.

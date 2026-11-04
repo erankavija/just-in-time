@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T22:47:26.900432705Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "008c2ae3-d632-448a-85d4-982b9490c59e",
+      "status": "failed",
+      "updated_at": "2026-11-04T22:52:15.540307289Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
@@ -34,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One head lookup in the git module",
-  "updated_at": "2026-11-04T22:47:26.900432705Z"
+  "updated_at": "2026-11-04T22:52:15.540307289Z"
 }
