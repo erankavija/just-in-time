@@ -3,9 +3,8 @@
 //! All issue/label validation flows through ONE declarative engine; there is no
 //! longer any hard-coded `IssueValidator`. `.jit/rules.toml` declares the
 //! operative ruleset (DR §8.2/§8.4): `jit init` materializes the FIXED
-//! [`default_ruleset`](crate::repository_state::default_ruleset) into the file, and
-//! [`effective_rules`](crate::commands::CommandExecutor) builds the same defaults
-//! IN MEMORY when the file is absent (no write on the read path). A scaffolded
+//! [`default_ruleset`](crate::repository_state::default_ruleset) into the file.
+//! The same defaults apply when the file is absent. A scaffolded
 //! file's `origin = "default"` rules are reconciled against the `config.toml`
 //! registry at load, so their assertion and the family's membership never
 //! lag a hand edit of the registry.
