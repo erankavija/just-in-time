@@ -159,7 +159,7 @@
       "issues": [
         {
           "short_id": "6ba4f623",
-          "status": "dispatched 03:12",
+          "status": "first pass 311736962 (-47 prod); rework 1 at 03:28: keep init/config set/profile apply output (REQ-04); parse once on refused image (epic REQ-10)",
           "worker": "claude opus",
           "worker_reason": "central contract validation-report"
         }
@@ -273,7 +273,8 @@
     "c92f4011": 2,
     "ea843d26": 1,
     "f968dfe1": 1,
-    "5d5a1794": 2
+    "5d5a1794": 2,
+    "6ba4f623": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
