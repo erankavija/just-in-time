@@ -159,12 +159,7 @@ fn check_links<S: IssueStore + RepositoryStateStore>(
     Ok(if result.valid {
         Outcome::success_with(result, message)
     } else {
-        Outcome::Findings {
-            code: ErrorCode::ValidationFailed,
-            message,
-            report: Box::new(result),
-            warnings: Vec::new(),
-        }
+        Outcome::findings(ErrorCode::ValidationFailed, message, result)
     })
 }
 
