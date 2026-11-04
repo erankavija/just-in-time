@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e5bfcbe79e36f080db822f4def585e84c10b123",
+  "completed_at": "2026-11-04T00:23:10.431690270Z",
+  "duration_ms": 190525,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All built-in validation pass names are centralized in the validation-layer BuiltInPass vocabulary; no attributable defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8b56c215-4a4f-4b43-b940-b6687356b3aa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cde7eecc-0908-44f6-a9be-eb0ff77d14f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:19:59.906525598Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0c933e43764720f1f737184a18618d1326e05479 (`jit:8b56c215`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/9876a23a/requirement/REQ-06 and REQ-12 (issue descriptions); @/gate/cargo-ci and @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T00:17:51Z; code-review pending\nTruncation recovery: inspected each attributable patch separately; reread bounded current source, macro, and wire-output test ranges\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All built-in validation pass names are centralized in the validation-layer BuiltInPass vocabulary; no attributable defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

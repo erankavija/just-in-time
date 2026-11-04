@@ -1972,8 +1972,8 @@ jit gate evaluate abc123 --gate tests --force
   checker's verdict is available to every issue evaluated over that content.
 - `jit gate status <id> <gate> --json` reports the run's `inputs_digest` and an
   `origin` of `{"derivation": "executed"}` or
-  `{"derivation": "reused", "source_run": "<run-id>"}`, so a reused verdict is
-  never counted as an independent verification.
+  `{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}`,
+  so a reused verdict is never counted as an independent verification.
 - A gate declaring no inputs executes its checker on every evaluation.
 - `--force` executes the checker unconditionally.
 

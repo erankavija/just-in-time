@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cd6d4a6e-d1a2-4a3e-b065-4504698e2004",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:16:11.974845920Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "41cb9b76-44b9-4aa6-b2fc-975860a01fe1",
+      "status": "failed",
+      "updated_at": "2026-11-04T00:19:57.419072017Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d5a1794-c98e-41d9-8329-344d1ae8b316",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue creation derives its findings inside its mutation",
-  "updated_at": "2026-11-04T00:12:42.143976642Z"
+  "updated_at": "2026-11-04T00:19:57.419072017Z"
 }

@@ -2463,7 +2463,7 @@ pub struct GateRunSummary {
     pub inputs_digest: Option<crate::domain::repository_inputs::InputsDigest>,
     /// Whether this run executed the checker (`{"derivation": "executed"}`),
     /// carried an earlier run's verdict
-    /// (`{"derivation": "reused", "source_run": "<run-id>"}`), or records a
+    /// (`{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}`), or records a
     /// manual gate's attestation (`{"derivation": "attested"}`). A reader
     /// tallying how many times a gate was actually verified counts the executed
     /// and attested ones and follows the named run for the report text behind a
