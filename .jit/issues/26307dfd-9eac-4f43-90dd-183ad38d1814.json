@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T02:11:28.470668322Z",
+  "dependencies": [],
+  "description": "The `mcp-ci` gate tests whatever `jit` binary is first on PATH, so a passing verdict can vouch for a binary built from a different commit. This makes the gate test the `jit` built from the commit under evaluation.\n\n## Background\n\nThe `mcp-ci` checker in `.jit/gates.toml` runs `cd mcp-server && npm test`. `mcp-server/test-unit.js` reads the schema from `execFileSync('jit', ['--schema'])`, and `mcp-server/test-integration.js` runs `jit` and starts the bridge, which also resolves `jit` from PATH. The gate's `[gates.inputs]` roots already include `crates`, `Cargo.toml` and `Cargo.lock`, so the digest covers the binary's source but not the binary that actually runs. On this host the first `jit` on PATH is the installed dogfood binary, which can trail main by any number of commits or be on a different storage format. Leads work around this by building `jit` and prepending `target/debug` to PATH before evaluating the gate (for example the df129d9e lead's landing queue).\n\n## Success Criteria\n\n- [hard] REQ-01: An `mcp-ci` evaluation builds `jit` from the tree under evaluation and runs the mcp-server suites against that binary, whatever `jit` is first on the caller's PATH.\n- [hard] REQ-02: Every input the gate's binary is built from is part of the gate's input digest, so a reused verdict cannot vouch for a binary built from different sources.\n- [hard] REQ-03: The gate's description and the comment above its `[gates.inputs]` state which binary the suites run, and the generated rules-and-gates projection is re-rendered.\n\n## Notes\n\nRequested by the steward session. Once this lands, leads delete their PATH workarounds.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T02:11:28.470668322Z",
+  "gates_required": [
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "26307dfd-9eac-4f43-90dd-183ad38d1814",
+  "labels": [
+    "type:task",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "mcp-ci tests the jit built from the commit under evaluation",
+  "updated_at": "2026-11-04T02:11:28.470668322Z"
+}
