@@ -621,20 +621,6 @@ pub(crate) fn canonical_json<T: Serialize + ?Sized>(
     }
 }
 
-/// Whether a captured `events.jsonl` prefix ends in a malformed, unterminated
-/// (torn) tail: a non-empty prefix not ending in a newline whose final line is
-/// not valid JSON. The finalizer — not command code — owns this inspection.
-pub fn prefix_has_torn_tail(prefix: &[u8]) -> bool {
-    if prefix.is_empty() || prefix.ends_with(b"\n") {
-        return false;
-    }
-    let final_line = prefix
-        .rsplit(|byte| *byte == b'\n')
-        .next()
-        .unwrap_or(prefix);
-    serde_json::from_slice::<serde_json::Value>(final_line).is_err()
-}
-
 /// Compose the bytes appended at the log's committed length: each event line with
 /// exactly one trailing newline.
 fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
@@ -645,14 +631,13 @@ fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
 }
 
 /// The captured event log's committed length, the end of its last
-/// newline-terminated line, and the uncommitted bytes after it, from a whole read
-/// or a tail that holds that whole line.
+/// newline-terminated line, from a whole read or a tail that holds that line.
 ///
 /// # Errors
 ///
 /// [`CaptureError::TailOnlyCapture`] for a tail that holds only part of the
 /// final line, which cannot say where that line starts.
-fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
+fn captured_log_end(image: &RepositoryImage) -> Result<u64, MutationError> {
     let (length, final_line) =
         if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
             let final_line = tail
@@ -664,7 +649,7 @@ fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationErr
             let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
             (log.len() as u64, final_line)
         };
-    Ok((length - final_line.len() as u64, final_line))
+    Ok(length - final_line.len() as u64)
 }
 
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
@@ -1193,35 +1178,16 @@ fn compose_event_action(
     if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
         pending_events.push(record);
     }
-    let (committed_length, final_line) = captured_log_end(image)?;
-    // No reader consults the marker's torn-tail flag or its first-line position;
-    // 97f5f2b7 removes both with the field.
-    let torn_tail = prefix_has_torn_tail(final_line);
+    let committed_length = captured_log_end(image)?;
 
     let now = context.timestamp();
-    // Assign identifiers in canonical event order, stamping the single mutation
-    // timestamp and the torn-tail evidence.
+    // Assign identifiers in canonical event order and stamp the single mutation
+    // timestamp.
     pending_events.sort_by(PendingEvent::compare);
-    let mut events = pending_events
+    let events = pending_events
         .into_iter()
-        .map(|pending| {
-            Event::new(
-                context.allocate(),
-                now,
-                pending.body.with_isolated_torn_tail(torn_tail),
-            )
-        })
+        .map(|pending| Event::new(context.allocate(), now, pending.body))
         .collect::<Vec<_>>();
-    let marker = torn_tail
-        .then(|| {
-            events
-                .iter()
-                .position(|event| matches!(event.body(), EventBody::ProfileLifecycle { .. }))
-        })
-        .flatten();
-    if let Some(marker) = marker {
-        events[..=marker].rotate_right(1);
-    }
     let lines = events
         .iter()
         .map(serialize_event)
@@ -1759,7 +1725,7 @@ mod tests {
         let tail = crate::repository_state::EventLogTail::of_bytes(&log);
         let image = tail_image(tail.clone());
 
-        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())])
+        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_event())])
             .unwrap()
             .expect("a non-empty audit append composes an action");
 
@@ -1779,17 +1745,17 @@ mod tests {
         );
     }
 
-    /// A tail whose window starts inside the final line cannot say where that
-    /// line starts, so the composer refuses it rather than guess the offset.
+    /// A tail whose window starts inside the final line cannot determine the
+    /// committed append offset.
     #[test]
-    fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
+    fn test_event_append_requires_a_tail_that_holds_the_final_line() {
         let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW;
         let partial =
             crate::repository_state::EventLogTail::new(2 * window, vec![b'x'; window as usize]);
         let image = tail_image(partial.unwrap());
 
         assert!(matches!(
-            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())]),
+            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_event())]),
             Err(MutationError::Capture(CaptureError::TailOnlyCapture(_)))
         ));
     }
@@ -1804,7 +1770,7 @@ mod tests {
         let action = finalize_audit_append(
             &image,
             &annotated_ctx(),
-            vec![(2, profile_lifecycle_marker())],
+            vec![(2, profile_lifecycle_event())],
         )
         .unwrap()
         .expect("a non-empty audit append composes an action");
@@ -2800,14 +2766,6 @@ mod tests {
         assert_eq!(persisted.done_at, Some(fixed_instant()));
     }
 
-    #[test]
-    fn test_torn_tail_detection() {
-        assert!(!prefix_has_torn_tail(b""));
-        assert!(!prefix_has_torn_tail(b"{\"type\":\"x\"}\n"));
-        assert!(prefix_has_torn_tail(b"{\"type\":\"x\"}\n{\"partial"));
-        assert!(!prefix_has_torn_tail(b"{\"a\":1}"));
-    }
-
     /// The finalizer's event-log action over `image`: its offset and bytes.
     fn event_append(image: &RepositoryImage, intents: &[MutationIntent]) -> (u64, Vec<u8>) {
         let plan = finalize(&synthetic_layout(), image, &ctx(), intents).unwrap();
@@ -2832,7 +2790,7 @@ mod tests {
         ))
         .unwrap();
         let terminated = [prior.as_slice(), b"\n"].concat();
-        let torn = [terminated.as_slice(), b"{\"parti"].concat();
+        let unterminated = [terminated.as_slice(), b"{\"parti"].concat();
         // Final lines longer than the tail window, read back to their start.
         let long = serialize_event(&crate::test_utils::stamped_event(
             EventBody::draft_gate_definition_created(
@@ -2845,7 +2803,7 @@ mod tests {
         ))
         .unwrap();
         let long_valid = [terminated.as_slice(), &long].concat();
-        let long_torn = [
+        let long_unterminated = [
             terminated.as_slice(),
             &vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize],
         ]
@@ -2866,10 +2824,10 @@ mod tests {
                 "cargo-ci".parse().unwrap(),
             )),
         };
-        let cases = [Vec::new(), terminated.clone(), prior.clone(), torn]
+        let cases = [Vec::new(), terminated.clone(), prior.clone(), unterminated]
             .map(whole)
             .into_iter()
-            .chain([long_valid, long_torn].map(tail));
+            .chain([long_valid, long_unterminated].map(tail));
         for (log, image) in cases {
             let (offset, appended) = event_append(&image, std::slice::from_ref(&record));
 
@@ -2895,13 +2853,13 @@ mod tests {
         }
     }
 
-    fn profile_lifecycle_marker() -> EventBody {
+    fn profile_lifecycle_event() -> EventBody {
         EventBody::draft_profile_lifecycle(
             crate::domain::ProfileLifecycleOperation::Apply,
             vec![crate::domain::ProfileLifecycleProfile {
                 id: "example"
                     .try_into()
-                    .expect("the profile marker has a canonical identifier"),
+                    .expect("the profile event has a canonical identifier"),
                 version: semver::Version::new(1, 0, 0),
                 status: crate::domain::ProfileLifecycleStatus::Installed,
                 variables: Default::default(),
@@ -2909,7 +2867,7 @@ mod tests {
         )
     }
 
-    fn torn_log() -> Vec<u8> {
+    fn log_with_unterminated_fragment() -> Vec<u8> {
         let event = crate::test_utils::stamped_event(
             EventBody::draft_issue_completed(crate::test_utils::issue_id(1)),
             "e0",
@@ -2919,9 +2877,12 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_orders_the_stamped_marker_first_over_a_torn_tail() {
+    fn test_finalize_keeps_canonical_event_order_when_tail_is_unterminated() {
         let image = ImageBuilder::new()
-            .entry(VirtualPath::EVENTS, file_entry(&torn_log()))
+            .entry(
+                VirtualPath::EVENTS,
+                file_entry(&log_with_unterminated_fragment()),
+            )
             .build();
         let record = |event| MutationIntent::RecordEvent {
             phase: 0,
@@ -2933,17 +2894,18 @@ mod tests {
                 record(EventBody::draft_gate_definition_created(
                     "cargo-ci".parse().unwrap(),
                 )),
-                record(profile_lifecycle_marker()),
+                record(profile_lifecycle_event()),
             ],
         );
 
         let events = crate::domain::event_log::parse_known_events(&appended).unwrap();
         assert!(matches!(
             events[0].body(),
-            EventBody::ProfileLifecycle {
-                isolated_torn_tail: true,
-                ..
-            }
+            EventBody::GateDefinitionCreated { .. }
+        ));
+        assert!(matches!(
+            events[1].body(),
+            EventBody::ProfileLifecycle { .. }
         ));
     }
 
