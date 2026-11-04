@@ -12,6 +12,12 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "run_id": "89856a23-bd7f-4854-b73a-4b06e9d19d8b",
+      "status": "failed",
+      "updated_at": "2026-11-04T20:42:27.820712407Z",
+      "updated_by": "auto:executor"
+    },
     "worktree-cache-test": {
       "run_id": "02417e70-b842-4662-af2b-c2b644e1f172",
       "status": "passed",
@@ -30,5 +36,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "Worktree reclaim harvests only reusable, current build artifacts",
-  "updated_at": "2026-11-04T20:37:22.705532805Z"
+  "updated_at": "2026-11-04T20:42:27.820712407Z"
 }
