@@ -21,6 +21,12 @@
       "updated_at": "2026-11-04T09:14:56.379537479Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "20b0b779-d4e2-4df0-9552-40d9e8c44d7b",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:22:20.563933098Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "run_id": "7e6d466c-0613-4aa0-b8a0-767549c8048c",
       "status": "passed",
@@ -45,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Version command moves to a library handler",
-  "updated_at": "2026-11-04T09:14:56.519523282Z"
+  "updated_at": "2026-11-04T09:22:20.563933098Z"
 }
