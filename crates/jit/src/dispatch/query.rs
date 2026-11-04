@@ -144,7 +144,7 @@ pub mod status {
             "{} backlog, {} ready, {} in_progress, {} done",
             status.backlog, status.ready, status.in_progress, status.done
         );
-        Ok(Outcome::success_with(status, message))
+        Ok(Outcome::success_with(status.into(), message))
     }
 
     command_group! {
