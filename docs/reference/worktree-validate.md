@@ -401,9 +401,9 @@ for expiry and references to missing worktrees or issues.
 
 | Option | Description |
 |--------|-------------|
-| `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
+| `[ID]` | Positional. Report this issue's [view](#views) of the whole-repository report; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
-| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and a rule or selection failure exits `1`. Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
+| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`; findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)). Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
 | `--scope <ID>` | Report the findings of a container's bracket scope as a deterministic gate checker. Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
@@ -420,7 +420,7 @@ with a positional `[ID]`.
 # Whole-repository validation
 jit validate
 
-# Validate a single issue's rules
+# The findings concerning one issue (its view of the whole-repository report)
 jit validate a1b2c3d4
 
 # Explain which rules apply to an issue
@@ -487,8 +487,8 @@ rather than reporting a clean selection; whole-repository validation reports it
 as a structural failure beside the findings collected before it.
 
 For `--rule`, a missing, disabled, non-graph, or non-matching configured rule is
-a validation finding and exits `1`, just like an uncovered selected application.
-Only invalid flag combinations or a missing required positional issue id are
+a `VALIDATION_FAILED` finding and exits `4`, just like an uncovered selected
+application ([exit-code reference](exit-codes.md#command-specific-mappings)). Only invalid flag combinations or a missing required positional issue id are
 usage errors and exit `2`.
 
 The code each outcome exits with — including the codes that signal findings

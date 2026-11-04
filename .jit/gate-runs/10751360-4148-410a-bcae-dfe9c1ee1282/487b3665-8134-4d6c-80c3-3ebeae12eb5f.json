@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f0fc5542bb010e1d56a0dccfad8071f7bef5daac",
+  "completed_at": "2026-11-04T10:16:38.636163178Z",
+  "duration_ms": 437518,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "10751360-4148-410a-bcae-dfe9c1ee1282",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "487b3665-8134-4d6c-80c3-3ebeae12eb5f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:09:21.118120668Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:10751360` — e0b4d2842, 0ed5ca58d, 4752b263d, 8b41319b5, 05f99c318, 845d1fe51, c8e1e7ed4, a9e5985da\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 (dev/vision/9db27a3a-charter.md); @/inv/architecture-dependency-direction, @/inv/orthogonal-tests, @/inv/essential-code-prose, and related invariants (.jit/invariants.toml); @/issue/10751360/{requirement/REQ-01..REQ-06,decision/D-01} and @/issue/df129d9e/requirement/{REQ-01,REQ-02,REQ-12,REQ-13,REQ-17,REQ-18} (.jit issue markdown)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T10:07:24Z); mcp-ci passed (exit 0, 2026-11-04T10:09:03Z)\nTruncation recovery: narrowed reads by tagged commit and affected path; inspected merge impact-cone diffs, current handlers, renderers, schema, tests, and exit-code projection\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

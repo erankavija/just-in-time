@@ -1,9 +1,8 @@
 //! Graph / aggregate rule evaluation (DR §4.2).
 //!
 //! These rule kinds need cross-issue context and therefore run in
-//! `jit validate`, gate checkers, and at state transitions (where enforcing
-//! failures block the transition; see `enforce_transition_graph_rules` in
-//! `commands`). They never run on plain field writes:
+//! `jit validate`, gate checkers, and at state transitions, where enforcing
+//! failures block the transition. They never run on plain field writes:
 //!
 //! - **`label-coverage`** — every canonical criterion id declared in a source
 //!   issue's `## Success Criteria` section is satisfied by at least one related
@@ -63,47 +62,6 @@ use crate::domain::id_pattern::IdPattern;
 use crate::domain::identity::IssueId;
 use crate::validation::engine::Finding;
 
-/// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
-/// a label value in `crates/jit/src` (excluding tests) falls into one of three
-/// buckets once the value grammar admits `@`-prefixed addresses:
-///
-/// 1. **Colon-split (namespace) sites** — stop at the first colon and never
-///    look at the rest of the value, so the widened value grammar cannot
-///    change their behavior: `labels::parse_label`, `labels::type_value_of`,
-///    [`crate::commands::ItemOps::resolve_link_label`],
-///    [`crate::commands::ValidationOps::dangling_link_findings`],
-///    `validation::desugar::desugar_require_label`,
-///    [`crate::commands::QueryOps::query_by_label`],
-///    `snapshot::SnapshotScope::parse`, plus unrelated-namespace assignee
-///    parsing (`commands::claim::assert_valid_actor` and
-///    `domain::Assignee::from_str` — label values never reach these parsers,
-///    which handle different input domains per @/inv/assignee-format).
-/// 2. **Slash-decode qualified-id sites** — route through the structural
-///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
-///    [`crate::domain::item::expand_sugar_address`]):
-///    [`crate::commands::ItemOps::show_item`] (via
-///    `resolve_item_address`), `resolve_link_label`'s qualified check (now
-///    [`crate::domain::item::is_qualified_reference`]), `dangling_link_findings`,
-///    and [`label_credits_id`] below — which routes an `@`-prefixed value
-///    through [`crate::domain::item::parse_kind_segmented_address`] and keeps
-///    its own two-segment split ONLY for the non-`@` `<short-id>/<self-id>`
-///    sugar shape (its doc comment explains why `expand_sugar_address` is not
-///    used there).
-/// 3. **Slash-splitters unrelated to qualified ids — confirmed OUT OF SCOPE,
-///    no change needed.** These never see a label value:
-///    [`crate::storage::memory::InMemoryStorage`]'s repo-relative path-segment
-///    check, [`crate::storage::path_errors::validate_repo_relative_path`]'s
-///    `..`-traversal check, four JSON-pointer-style instance-path splits in
-///    `validation::engine` (`empty_items_section_slug`,
-///    `render_contains_message`, `contains_subschema_via_schema_path`,
-///    `readable_instance_path`), [`slug_to_heading`] below (splits a section
-///    slug on `_`, not `/` or `:`), and `crates/server/src/routes.rs`'s
-///    `compute_base_href` (an unrelated raw-file route path).
-///
-/// A future reader auditing a new re-split site should re-run
-/// `rg -n "splitn|split_once|\.split\(" crates/jit/src crates/server/src --type rust`
-/// and classify against these three buckets rather than re-deriving them.
-///
 /// Whether a link `label` credits criterion `id` owned by `scope_id`.
 ///
 /// The single matcher behind `label-coverage` and `criteria-to-check`. Only a
@@ -333,50 +291,18 @@ pub fn evaluate_graph(
     now: DateTime<Utc>,
     plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
-    // Whole-repo evaluation: the evaluation slice IS the resolution index, so a
-    // `container-from-label` pointer resolves against the same set it evaluates.
-    evaluate_graph_indexed(
-        rules,
-        issues,
-        issues,
+    let context = GraphEvaluationContext {
+        graph_context: issues,
         hierarchy,
         repo_default_format,
         now,
         plan_content,
-    )
-}
-
-/// Evaluate graph rules over a **partial** issue slice while resolving container
-/// pointers against the **complete** repository issue set (the scope gate checker, ef0065ad).
-///
-/// The `evaluation` slice decides which issues fire each rule and which issues
-/// the coverage walk considers as candidates (a bracket subtree). The
-/// `resolution_index` is the whole-repository issue set used ONLY to resolve a
-/// `container-from-label` pointer to a container: a valid pointer to a container
-/// outside the slice therefore resolves cleanly (rather than reading as a
-/// dangling pointer against the partial map), and that container's coverage —
-/// belonging to a different bracket scope — is skipped, so only the requested
-/// bracket's coverage is evaluated. A pointer that resolves to no issue in the
-/// full index is still a genuine config error. When `evaluation` and
-/// `resolution_index` are the same slice this is exactly [`evaluate_graph`].
-pub fn evaluate_graph_scoped(
-    rules: &[&Rule],
-    evaluation: &[Issue],
-    resolution_index: &[Issue],
-    hierarchy: &HierarchyConfig,
-    repo_default_format: ContentFormat,
-    now: DateTime<Utc>,
-    plan_content: &HashMap<IssueId, String>,
-) -> Vec<GraphFinding> {
-    evaluate_graph_indexed(
-        rules,
-        evaluation,
-        resolution_index,
-        hierarchy,
-        repo_default_format,
-        now,
-        plan_content,
-    )
+    };
+    rules
+        .iter()
+        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
+        .flat_map(|rule| evaluate_one(rule, issues, &context))
+        .collect()
 }
 
 /// Explain why a selected rule cannot be applied to one issue.
@@ -422,49 +348,11 @@ pub fn select_graph_rule<'a>(
     }
 }
 
-/// Return the selected issue and its uniquely resolved coverage container id.
-///
-/// Resolution is deliberately performed against the same pure issue index that
-/// the evaluator receives. Missing or ambiguous pointers intentionally produce
-/// no additional plan source here; the pure evaluator reports those pointer
-/// errors for the selected firing issue.
-pub fn graph_rule_plan_source_ids(
-    rule: &Rule,
-    issue: &Issue,
-    resolution_index: &[Issue],
-) -> Vec<IssueId> {
-    let mut source_ids = vec![issue.id.clone()];
-    if let Assertion::LabelCoverage { config } = &rule.assert {
-        if let Some(namespace) = &config.container_from_label {
-            let prefix = format!("{namespace}:");
-            if let Some(value) = issue
-                .labels
-                .iter()
-                .find_map(|label| label.strip_prefix(&prefix))
-            {
-                if let ContainerMatch::Unique(target) = resolve_container(value, resolution_index) {
-                    if !source_ids.iter().any(|source_id| source_id == &target.id) {
-                        source_ids.push(target.id.clone());
-                    }
-                }
-            }
-        }
-    }
-    source_ids
-}
-
-/// Repository context supplied to one pure graph-rule application.
-///
-/// `graph_context` supplies relationship and declaration context, while
-/// `resolution_index` is used only for identifier resolution such as
-/// `container-from-label`. Keeping both separate from the firing slice prevents
-/// a repository-wide read set from silently widening a selected verdict.
+/// Repository context supplied to pure graph evaluation.
 #[derive(Debug, Clone, Copy)]
 pub struct GraphEvaluationContext<'a> {
     /// Issues available to relationship and declaration-aware assertions.
     pub graph_context: &'a [Issue],
-    /// Issues available when resolving identifier or label pointers.
-    pub resolution_index: &'a [Issue],
     /// Repository hierarchy used by type-hierarchy assertions.
     pub hierarchy: &'a HierarchyConfig,
     /// Default content format used for criteria parsing.
@@ -473,57 +361,6 @@ pub struct GraphEvaluationContext<'a> {
     pub now: DateTime<Utc>,
     /// Captured external plan content keyed by issue id.
     pub plan_content: &'a HashMap<IssueId, String>,
-}
-
-/// Evaluate one graph rule with an explicit firing set and separate context.
-///
-/// `firing_issues` is the only set whose matching issues can become rule
-/// subjects. `graph_context` supplies relationship and declaration context for
-/// the rule, while `resolution_index` is used only for identifier resolution
-/// such as `container-from-label`. Keeping these sets separate prevents a
-/// repository-wide read set from silently widening a selected rule's verdict.
-///
-/// This is the pure boundary used by issue-and-rule-scoped checkers. Callers
-/// must validate that the selected rule exists, is enabled, and matches the
-/// selected issue before invoking it; an empty result here means the selected
-/// rule application passed, not that an absent application passed.
-pub fn evaluate_graph_rule(
-    rule: &Rule,
-    firing_issues: &[Issue],
-    context: &GraphEvaluationContext<'_>,
-) -> Vec<GraphFinding> {
-    if rule.scope != RuleScope::Graph || rule.severity == Severity::Off {
-        return Vec::new();
-    }
-
-    evaluate_one(rule, firing_issues, context)
-}
-
-/// Shared driver for [`evaluate_graph`] and [`evaluate_graph_scoped`]: evaluate
-/// each graph rule over the `evaluation` slice, resolving container pointers
-/// against `resolution_index`.
-fn evaluate_graph_indexed(
-    rules: &[&Rule],
-    evaluation: &[Issue],
-    resolution_index: &[Issue],
-    hierarchy: &HierarchyConfig,
-    repo_default_format: ContentFormat,
-    now: DateTime<Utc>,
-    plan_content: &HashMap<IssueId, String>,
-) -> Vec<GraphFinding> {
-    let context = GraphEvaluationContext {
-        graph_context: evaluation,
-        resolution_index,
-        hierarchy,
-        repo_default_format,
-        now,
-        plan_content,
-    };
-    rules
-        .iter()
-        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, evaluation, &context))
-        .collect()
 }
 
 /// Evaluate a single graph rule, dispatching on its assertion kind.
@@ -538,7 +375,6 @@ fn evaluate_one(
             config,
             firing_issues,
             context.graph_context,
-            context.resolution_index,
             context.repo_default_format,
             context.plan_content,
         ),
@@ -732,20 +568,11 @@ fn config_error(rule: &Rule, subject: &IssueId, message: impl Into<String>) -> G
 /// One finding is produced per uncovered criterion id per container. An unresolved
 /// `container-from-label` pointer yields a single `config-error` finding.
 /// Malformed assertion configuration is rejected at rule load.
-///
-/// `resolution_index` is the issue set a `container-from-label` pointer resolves
-/// against; it is the complete repository issue set even when `issues` is a partial
-/// scope slice (ef0065ad). A pointer that resolves to a container OUTSIDE the
-/// evaluation slice names a different bracket scope, so that firing issue's
-/// coverage is skipped (no finding) rather than evaluated against the partial map.
-/// For whole-repo evaluation the two sets are identical, so every resolved
-/// container is in-slice and nothing is skipped.
 fn evaluate_label_coverage(
     rule: &Rule,
     config: &LabelCoverageConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
-    resolution_index: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
@@ -783,18 +610,8 @@ fn evaluate_label_coverage(
             let container: &Issue = match container_ns {
                 None => source,
                 Some(ns) => match values_in_namespace(source, ns).next() {
-                    Some(value) => match resolve_container(value, resolution_index) {
-                        ContainerMatch::Unique(c) => {
-                            // A valid pointer to a container outside the evaluation
-                            // slice names a different bracket scope; skip this
-                            // firing issue's coverage (ef0065ad). Whole-repo
-                            // evaluation resolves against the same slice, so the
-                            // container is always in-slice and nothing is skipped.
-                            if !graph_context.iter().any(|i| i.id == c.id) {
-                                return Vec::new();
-                            }
-                            c
-                        }
+                    Some(value) => match resolve_container(value, graph_context) {
+                        ContainerMatch::Unique(c) => c,
                         ContainerMatch::Ambiguous => {
                             return vec![config_error(
                                 rule,
@@ -2393,82 +2210,6 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         assert_eq!(findings[0].subject, Some(breakdown_id));
     }
 
-    // --- label-coverage: scoped resolution index (ef0065ad) ----------------
-
-    #[test]
-    fn test_scoped_container_pointer_resolves_outside_slice_and_skips() {
-        // REQ-01/REQ-02 at the engine layer: a breakdown fires in the evaluation
-        // slice, but the container it brackets lives only in the full resolution
-        // index (outside the slice). The pointer resolves cleanly against the full
-        // index, so the out-of-scope container's coverage is skipped rather than
-        // reported as a dangling pointer.
-        let rule = rule_from(
-            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
-             severity = \"error\"\nassert = { label-coverage = { \
-             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
-        );
-        // The container carries an UNCOVERED criterion: were it evaluated it would
-        // fire a finding, so a clean result proves the coverage was skipped.
-        let container = initiative_with_criteria(&["REQ-01"]);
-        let mut breakdown = issue("B", &["type:breakdown"]);
-        breakdown
-            .labels
-            .push(format!("brackets:{}", container.short_id()));
-
-        // The slice holds only the firing breakdown; the container is full-index-only.
-        let slice = vec![breakdown.clone()];
-        let full = vec![container, breakdown];
-
-        let rules = vec![&rule];
-        let findings = evaluate_graph_scoped(
-            &rules,
-            &slice,
-            &full,
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert!(
-            findings.is_empty(),
-            "an out-of-slice container must be skipped, not reported: {findings:?}"
-        );
-    }
-
-    #[test]
-    fn test_scoped_container_pointer_unresolvable_in_full_index_is_config_error() {
-        // REQ-03 at the engine layer: a pointer that resolves to no issue even in
-        // the full resolution index is a genuine config error, not silently skipped.
-        let rule = rule_from(
-            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
-             severity = \"error\"\nassert = { label-coverage = { \
-             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
-        );
-        let mut breakdown = issue("B", &["type:breakdown"]);
-        breakdown.labels.push("brackets:deadbeef".to_string());
-
-        let slice = vec![breakdown.clone()];
-        let full = vec![breakdown];
-
-        let rules = vec![&rule];
-        let findings = evaluate_graph_scoped(
-            &rules,
-            &slice,
-            &full,
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(
-            findings.len(),
-            1,
-            "dangling pointer must fail: {findings:?}"
-        );
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("brackets:deadbeef"));
-    }
-
     #[test]
     fn test_container_indirection_resolves_short_id_label() {
         // Project convention writes `brackets:<SHORT-ID>` (e.g. brackets:2fbd2a82),
@@ -4034,72 +3775,5 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
             findings[0].is_config_error(),
             "is_config_error reads the field, not the message"
         );
-    }
-
-    #[test]
-    fn test_rule_scoped_evaluation_isolates_firing_issue_from_repository_context() {
-        let rule = rule_from(
-            r#"
-[[rules]]
-name = "coverage-preview"
-when = { type = "breakdown" }
-severity = "error"
-assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", container-from-label = "brackets", child-link = "dependencies" } }
-"#,
-        );
-
-        let mut selected = issue("selected breakdown", &["type:breakdown"]);
-        let mut selected_container = initiative_with_criteria(&["REQ-01"]);
-        let selected_child = issue(
-            "selected child",
-            &[&satisfies(&selected_container, "REQ-01")],
-        );
-        selected
-            .labels
-            .push(format!("brackets:{}", selected_container.short_id()));
-        selected_container.dependencies = vec![selected_child.id.clone()];
-
-        // This historical breakdown is deliberately in the repository context,
-        // but not in the firing set. Its rejected target has an uncovered
-        // criterion; a subtree-wide evaluator would incorrectly fail selected.
-        let mut historical = issue("historical breakdown", &["type:breakdown"]);
-        let mut rejected_target = initiative_with_criteria(&["REQ-99"]);
-        rejected_target.state = State::Rejected;
-        historical
-            .labels
-            .push(format!("brackets:{}", rejected_target.short_id()));
-
-        let context = vec![
-            selected.clone(),
-            selected_container.clone(),
-            selected_child,
-            historical.clone(),
-            rejected_target.clone(),
-        ];
-        let hierarchy = crate::test_taxonomy::test_taxonomy().hierarchy_config();
-        let plan_content = HashMap::new();
-        let evaluation_context = GraphEvaluationContext {
-            graph_context: &context,
-            resolution_index: &context,
-            hierarchy: &hierarchy,
-            repo_default_format: ContentFormat::Markdown,
-            now: fixed_now(),
-            plan_content: &plan_content,
-        };
-        let findings =
-            evaluate_graph_rule(&rule, std::slice::from_ref(&selected), &evaluation_context);
-        assert!(
-            findings.is_empty(),
-            "unrelated firing issues must not affect the selected verdict: {findings:?}"
-        );
-
-        let direct_findings = evaluate_graph_rule(
-            &rule,
-            std::slice::from_ref(&historical),
-            &evaluation_context,
-        );
-        assert_eq!(direct_findings.len(), 1);
-        assert_eq!(direct_findings[0].issue_id, Some(rejected_target.id));
-        assert!(direct_findings[0].finding.message.contains("REQ-99"));
     }
 }

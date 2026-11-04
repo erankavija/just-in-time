@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f1aa105bebd547fdc90dff12d3af38a0873b1d28",
+  "completed_at": "2026-11-04T10:04:07.292405804Z",
+  "duration_ms": 236450,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Snapshot export is correctly migrated to a typed library handler with preserved manifest shape and passing required gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "182f4c03-2c8b-431c-9c1e-a208c234a525",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4abaa561-c983-424d-857e-678a47b85548",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:00:10.842391499Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e1bff4aae, 8449ca2ac (merge resolution; unrelated merged files excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue markdown); @/invariant/architecture-dependency-direction, orthogonal-tests, essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T09:58:15Z); mcp-ci passed (exit 0, 2026-11-04T09:59:53Z)\nTruncation recovery: reread the tagged patches by affected path and merge-resolution patch; omitted broad merge output was outside the snapshot-export impact cone\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Snapshot export is correctly migrated to a typed library handler with preserved manifest shape and passing required gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

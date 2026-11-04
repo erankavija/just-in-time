@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T10:28:38.118584547Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -11,11 +12,26 @@
   ],
   "description": "Aggregate the work that turns every validation view and built-in validation gate checker into a selection of the one report.\n\n## Success Criteria\n\n- [hard] REQ-01: Whole, per-issue, scope, rule and explain validation select from one report computed from one capture; only whole validation and the repository-validation checker read event-log history and gate runs.\n- [hard] REQ-02: Each built-in validation checker reports what `jit validate` reports for its selection.\n- [hard] REQ-03: One property test owns the selection contract.\n- [hard] REQ-04: No executor-side validation pass copy or checker pipeline remains, and nothing under the validation layer names `commands`.",
   "documents": [],
+  "done_at": "2026-11-04T10:33:00.313502274Z",
+  "first_ready_at": "2026-11-04T10:27:19.786074608Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5ab52d1b-020f-453c-857a-387f7a69cb99",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:28:38.217351865Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "87342d5c-eaaf-4231-aa0b-29d5519e60ca",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:32:48.413501568Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b3ef68b5-ae91-4747-a2b2-49ac92cce1ba",
   "labels": [
     "type:story",
@@ -28,7 +44,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Every validation view is a selection of the report",
-  "updated_at": "2026-11-03T23:04:01.735195324Z"
+  "updated_at": "2026-11-04T10:33:00.313502274Z"
 }

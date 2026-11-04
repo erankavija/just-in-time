@@ -9,7 +9,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt::Write;
 
-/// Response for `claim acquire`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimAcquireResponse {
     pub lease_id: LeaseId,
@@ -27,7 +26,6 @@ impl HumanRender for ClaimAcquireResponse {
     }
 }
 
-/// Response for `claim release`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimReleaseResponse {
     #[serde(flatten)]
@@ -44,7 +42,6 @@ impl HumanRender for ClaimReleaseResponse {
     }
 }
 
-/// Response for `claim renew`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimRenewResponse {
     pub lease: Lease,
@@ -67,7 +64,6 @@ impl HumanRender for ClaimRenewResponse {
     }
 }
 
-/// Response for `claim heartbeat`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimHeartbeatResponse {
     pub lease_id: LeaseId,
@@ -83,7 +79,6 @@ impl HumanRender for ClaimHeartbeatResponse {
     }
 }
 
-/// Response for `claim force-evict`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimForceEvictResponse {
     pub lease_id: LeaseId,
@@ -100,7 +95,6 @@ impl HumanRender for ClaimForceEvictResponse {
     }
 }
 
-/// Collection key of [`LeaseListResponse`].
 pub enum LeasesKey {}
 
 impl CollectionKey for LeasesKey {
@@ -116,7 +110,6 @@ pub struct LeaseListingKind {
     pub all: bool,
 }
 
-/// Response for `claim status` and `claim list`.
 pub type LeaseListResponse = ListEnvelope<LeasesKey, ListedLease, LeaseListingKind>;
 
 impl LeaseListResponse {
@@ -143,7 +136,6 @@ impl HumanRender for LeaseListResponse {
     }
 }
 
-/// Append one lease to `text` for the plain-text listings.
 fn render_lease(text: &mut String, listed: &ListedLease) {
     let lease = &listed.lease;
     let now = chrono::Utc::now();
@@ -189,7 +181,6 @@ fn render_lease(text: &mut String, listed: &ListedLease) {
     text.push('\n');
 }
 
-/// Response for `recover`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct RecoverResponse {
     pub success: bool,

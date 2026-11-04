@@ -46,7 +46,7 @@ the rewrite moved every lease in the pre-window lease index under
   records still resolves to `.jit/gate-runs/<issue-id>/<run-id>.json`.
   [format4-run-id-check.py](format4-run-id-check.py) reproduces the check with
   `format4-run-id-check.py aec53b2f3`. The cited count grows as new records cite
-  runs: it was 3699 at 11:45, all resolved.
+  runs: it was 3699 when this record was written, all resolved.
 - **Server:** jit-server stopped as PID 3361204 and restarted from this
   repository as PID 3274476. Both processes had the arguments
   `--data-dir <repo>/.jit --bind 0.0.0.0:3000 --web-dir <repo>/web/dist`, and

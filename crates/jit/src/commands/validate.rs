@@ -1,13 +1,11 @@
 //! Validation and status operations
 
 use super::*;
-use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{detect_validation_issues, generate_fixes, ValidationFix};
 use crate::domain::{EventBody, ReadinessCorrection};
 use crate::repository_state::{
     MutationIntent, RepositoryAction, RepositoryDeclarations, RepositoryImage,
 };
-use crate::validation::report::BuiltInPass;
 use anyhow::Context;
 
 #[derive(Clone, Copy)]
@@ -334,47 +332,6 @@ fn plan_derived_state_fixes(
 }
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
-    /// Capture the declaration and rule-validation image through a mutation
-    /// session, in the one round
-    /// [`capture_proposed_base_inner`](Self::capture_proposed_base_inner) reads.
-    fn capture_validation_image(&self) -> Result<crate::repository_state::RepositoryImage> {
-        self.capture_validation_image_with(&std::collections::BTreeMap::new())
-    }
-
-    /// Capture the declaration and rule-validation image, optionally over a
-    /// proposed overlay. Document-reference auditing is a separate capture pass.
-    ///
-    /// With an empty `overrides` this captures and validates the live repository.
-    /// With a non-empty overlay (the projection of a proposed
-    /// [`RepositoryDelta`](crate::repository_state::RepositoryDelta) to final
-    /// bytes/absence) the closure is computed from the OVERLAID declarations — so
-    /// it covers what the proposed state's passes read — the base is captured over
-    /// that closure, and the overlay is applied
-    /// ([`apply_overlay`](crate::repository_state::apply_overlay)) so
-    /// the validation report judges one coherent proposed repository under the same
-    /// closed-read discipline.
-    pub(crate) fn capture_validation_image_with(
-        &self,
-        overrides: &std::collections::BTreeMap<
-            crate::repository_state::VirtualPath,
-            Option<Vec<u8>>,
-        >,
-    ) -> Result<crate::repository_state::RepositoryImage> {
-        use crate::repository_state::apply_overlay;
-
-        let layout = self.require_layout()?;
-        with_mutation_session(
-            self.storage(),
-            &layout,
-            "validation capture",
-            |session| match self.capture_proposed_base(session, overrides, &[], None)? {
-                None => Ok(SessionStep::Retry),
-                Some(base) if overrides.is_empty() => Ok(SessionStep::Done(base)),
-                Some(base) => Ok(SessionStep::Done(apply_overlay(&base, overrides.clone())?)),
-            },
-        )
-    }
-
     /// One bounded capture round of the whole-repository validation base under an
     /// already-held session.
     ///
@@ -818,7 +775,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
 
     /// Capture the whole-repository validation base with the issue records its
     /// closure planning parsed.
-    fn capture_validation(
+    pub(super) fn capture_validation(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     ) -> Result<Option<crate::validation::CapturedValidation<'static>>> {
@@ -1212,14 +1169,12 @@ fn plan_document_paths(
         .collect()
 }
 
-/// Plan-document content for `emit_for` from a captured image, whose closure
-/// holds every path [`plan_document_paths`] derives; `all_issues` is the image's
-/// complete issue set. A missing or malformed configuration yields no plan
-/// documents, and the validation report reports it.
+/// Plan content for the image's complete issue set. Its closure holds every
+/// path [`plan_document_paths`] derives. Invalid configuration yields no plans;
+/// the validation report reports the failure.
 pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
-    all_issues: &[Issue],
-    emit_for: &[Issue],
+    issues: &[Issue],
 ) -> Result<std::collections::HashMap<IssueId, String>> {
     let effective_virtual_path =
         |img: &crate::repository_state::RepositoryImage,
@@ -1231,320 +1186,13 @@ pub(crate) fn plan_content_with_issues(
     let templates = effective_templates(image, &config, effective_virtual_path)?;
     crate::validation::repository::plan_content(
         &|path| super::image_repo_bytes(image, path),
-        all_issues,
-        emit_for,
+        issues,
+        issues,
         &templates,
     )
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {
-    /// Built-in validate pass: report every node→item link label whose qualified
-    /// id cannot be resolved as a finding, rather than silently dropping it
-    /// (REQ-08 clause i, REQ-03).
-    ///
-    /// For each issue, every label is inspected. A label is a candidate link
-    /// reference when its namespace is a `link-namespace` of SOME configured item
-    /// kind (the set is derived generically from
-    /// [`ItemKind::link_namespaces`](crate::domain::item::ItemKind::link_namespaces),
-    /// never a hardcoded list of names) AND its value is a qualified id
-    /// `<scope>/<self-id>`. Each candidate is resolved through the SINGLE generic
-    /// resolver [`resolve_link_label`](crate::commands::ItemOps::resolve_link_label),
-    /// so resolution logic is not forked. A candidate that fails to resolve yields
-    /// one [`GraphFinding`] attributed to the owning issue, naming the dangling
-    /// qualified id. A link-namespace or coverage-credit-namespace label with a
-    /// bare self-id yields the
-    /// [`unqualified_link_message`](crate::domain::item::unqualified_link_message)
-    /// finding; a resolvable candidate and any other namespace yield nothing.
-    ///
-    /// The finding severity is [`Severity::Error`](crate::declarations::rules::Severity::Error)
-    /// so a dangling link fails `jit validate`. The rule name is the constant
-    /// [`BuiltInPass::DanglingItemLink`]. This pass touches no `.jit/` ruleset: it runs
-    /// unconditionally as part of the validate path.
-    pub fn dangling_link_findings(
-        &self,
-        issues: &[Issue],
-    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
-        use crate::declarations::rules::Severity;
-        use crate::validation::engine::Finding;
-        use crate::validation::graph::GraphFinding;
-        use std::collections::BTreeSet;
-
-        // Derive the link-namespace set generically from the configured kinds — no
-        // kind-name literal, just the namespaces each kind declares.
-        let kinds = self.exec.items().item_kinds()?;
-        // An unloadable rule set is reported by the rules pass; it credits nothing.
-        let credit_namespaces = self
-            .exec
-            .effective_rules()
-            .map(|set| crate::validation::graph::coverage_credit_namespaces(&set.rules))
-            .unwrap_or_default();
-        let link_namespaces: BTreeSet<String> = kinds
-            .iter()
-            .flat_map(|kind| kind.link_namespaces().iter().cloned())
-            .collect();
-
-        let mut findings = Vec::new();
-        for issue in issues {
-            for label in &issue.labels {
-                let Some((namespace, value)) = label.split_once(':') else {
-                    continue;
-                };
-                if let Some(message) = crate::domain::item::unqualified_link_message(
-                    &issue.id,
-                    namespace,
-                    value,
-                    &kinds,
-                    &credit_namespaces,
-                ) {
-                    findings.push(GraphFinding::for_issue(
-                        issue.id.clone(),
-                        Finding {
-                            rule: BuiltInPass::DanglingItemLink.as_str().to_owned(),
-                            severity: Severity::Error,
-                            message,
-                        },
-                    ));
-                    continue;
-                }
-                if !link_namespaces.contains(namespace) {
-                    continue;
-                }
-                if !crate::domain::item::is_qualified_reference(value) {
-                    continue;
-                }
-                // Resolve through the single generic resolver; an `Err` means the
-                // qualified id is dangling and is reported as a finding.
-                if self.exec.items().resolve_link_label(label).is_err() {
-                    findings.push(GraphFinding::for_issue(
-                        issue.id.clone(),
-                        Finding {
-                            rule: BuiltInPass::DanglingItemLink.as_str().to_owned(),
-                            severity: Severity::Error,
-                            message: format!(
-                                "issue {} has a dangling item link '{label}': \
-                                 the qualified id '{value}' resolves to no addressable item",
-                                issue.short_id()
-                            ),
-                        },
-                    ));
-                }
-            }
-        }
-        Ok(findings)
-    }
-
-    /// Report unresolved invariant enforcement bindings as unattributed errors.
-    /// An unloadable rule set remains reportable; gate load errors propagate.
-    pub fn enforcement_drift_findings(
-        &self,
-    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
-        use crate::declarations::rules::Severity;
-        use crate::validation::engine::Finding;
-        use crate::validation::graph::GraphFinding;
-
-        let findings = self
-            .compute_drift_findings()?
-            .into_iter()
-            .map(|f| {
-                GraphFinding::unattributed(Finding {
-                    rule: BuiltInPass::EnforcementDrift.as_str().to_owned(),
-                    // A broken binding (declared-but-unenforced) is a real defect
-                    // -> fails validate. It is the only drift direction (REQ-05).
-                    severity: Severity::Error,
-                    message: f.message(),
-                })
-            })
-            .collect();
-        Ok(findings)
-    }
-
-    /// Compute drift with tolerant rule loading and strict gate loading.
-    /// Returns no findings when no invariants are declared.
-    pub fn compute_drift_findings(&self) -> Result<Vec<crate::validation::drift::DriftFinding>> {
-        use crate::validation::drift::{enforcement_drift, SourceState};
-        use std::collections::BTreeSet;
-
-        let config = self.exec.cached_config()?;
-        let invariants = &config.invariants.invariants;
-        // Gated on declared invariants: a repo with none sees no drift findings.
-        if invariants.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let rule_names_owned = self.loadable_rule_names();
-        let gate_set: BTreeSet<GateKey> = self
-            .exec
-            .storage
-            .load_gate_registry()?
-            .gates
-            .into_keys()
-            .collect();
-
-        let rule_set: Option<BTreeSet<&str>> = rule_names_owned
-            .as_ref()
-            .map(|v| v.iter().map(String::as_str).collect());
-
-        let rules_state = match &rule_set {
-            Some(set) => SourceState::Loaded(set),
-            None => SourceState::Unloadable,
-        };
-        Ok(enforcement_drift(invariants, rules_state, &gate_set))
-    }
-
-    /// Defensively resolve the names of every LOADABLE rule, returning `None` when
-    /// the rule SOURCE is unloadable.
-    ///
-    /// Mirrors [`effective_rules`](crate::commands::CommandExecutor::effective_rules)
-    /// resolution but tolerantly: a present-and-parseable `.jit/rules.toml` yields
-    /// its rule names; an ABSENT file yields the in-memory default rule set's names
-    /// (still loadable); a present-but-MALFORMED file (or an unresolvable namespace
-    /// registry) yields `None` (unloadable). Used only by the enforcement-drift
-    /// pass, which must not crash when the ruleset fails to parse.
-    pub fn loadable_rule_names(&self) -> Option<Vec<String>> {
-        let layout = self.exec.require_layout().ok()?;
-        let rules_path = layout
-            .resolve(&crate::repository_state::VirtualPath::RULES)
-            .ok()?;
-        if rules_path.exists() {
-            // Present: parse it directly (do NOT go through the cached
-            // `effective_rules`, which `?`-errors). A parse failure -> unloadable.
-            self.exec
-                .config_manager
-                .load()
-                .ok()
-                .and_then(|config| {
-                    crate::storage::ruleset_store::load_ruleset(&layout, &config).ok()
-                })
-                .map(|set| set.rules.into_iter().map(|r| r.name).collect())
-        } else {
-            // Absent: the in-memory defaults are loadable. A namespace-registry
-            // failure (rare) reads as unloadable rather than crashing.
-            self.exec.cached_namespaces().ok().map(|namespaces| {
-                crate::repository_state::default_ruleset(namespaces)
-                    .rules
-                    .into_iter()
-                    .map(|r| r.name)
-                    .collect()
-            })
-        }
-    }
-
-    /// Evaluate every `RuleScope::Graph` rule from `.jit/rules.toml` over the supplied
-    /// issue set, returning one
-    /// [`GraphFinding`](crate::validation::graph::GraphFinding) per violation
-    /// (including `config-error` findings for malformed rules). Each finding
-    /// carries the issue it pertains to (or `None` for a config-error), so
-    /// per-issue reporting can attribute findings exactly rather than by matching
-    /// substrings in the message.
-    ///
-    /// The ruleset is loaded via [`CommandExecutor::rules`](crate::commands::CommandExecutor::rules);
-    /// a genuine `rules.toml` parse/load failure is surfaced as an `Err` rather
-    /// than silently disabling enforcement. A missing `rules.toml` yields no
-    /// findings. This method performs no filesystem writes; it reads the cached
-    /// ruleset and the issues passed in.
-    pub fn evaluate_graph_rules(
-        &self,
-        issues: &[Issue],
-    ) -> Result<Vec<crate::validation::graph::GraphFinding>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::rules::RuleScope;
-
-        // Surface a misconfigured rules.toml instead of swallowing it.
-        let ruleset = self.exec.effective_rules()?;
-
-        let graph_rules: Vec<&crate::declarations::rules::Rule> = ruleset
-            .rules
-            .iter()
-            .filter(|rule| rule.scope == RuleScope::Graph)
-            .collect();
-
-        // The repo HierarchyConfig is injected into `type-hierarchy` rules at
-        // evaluation time (D1); it is no longer stored in the parsed rule. Build
-        // it from the same namespace registry as the rule declarations.
-        let namespaces = self.exec.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy =
-            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
-        let repo_format = self.exec.cached_config()?.content_format();
-
-        // Resolve any external plan documents from the captured validation image
-        // so a container whose criteria live in an external file is validated
-        // against the FILE content; the engine itself reads only the injected map
-        // (stays pure) and the plan bytes come from the closed image, not the
-        // live filesystem.
-        let plan_content = self.image_plan_content(issues)?;
-
-        // Inject the wall-clock instant at the boundary so `gate-recency` rules
-        // are deterministic and the graph engine stays pure (CC-5b).
-        Ok(crate::validation::graph::evaluate_graph(
-            &graph_rules,
-            issues,
-            &hierarchy,
-            repo_format,
-            chrono::Utc::now(),
-            &plan_content,
-        ))
-    }
-
-    /// Plan-document content for `emit_for` from the whole-repository validation
-    /// image, resolving planning nodes over every captured issue so a scoped slice
-    /// still finds its bracket's planning node.
-    pub(crate) fn image_plan_content(
-        &self,
-        emit_for: &[Issue],
-    ) -> Result<std::collections::HashMap<IssueId, String>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let image = self.exec.capture_validation_image()?;
-        // Undecodable issue records yield no plan content; the validation report
-        // reports them.
-        let all_issues = super::captured_active_issues(&image).unwrap_or_default();
-        plan_content_with_issues(&image, &all_issues, emit_for)
-    }
-
-    /// Report configured passing review placeholders as project-scoped warnings.
-    ///
-    /// The registry keys are sorted before rendering so the finding is stable
-    /// across hash-map iteration order. This pass is advisory: placeholders make
-    /// repository validation noisy and truthful without making an otherwise
-    /// valid repository unusable before its external reviewer is configured.
-    pub fn review_placeholder_findings(
-        &self,
-    ) -> Result<Vec<crate::validation::report::ReportedFinding>> {
-        use crate::declarations::rules::Severity;
-        use crate::declarations::GateChecker;
-        use crate::validation::engine::Finding;
-        use crate::validation::report::ReportedFinding;
-
-        let registry = self.exec.storage.load_gate_registry()?;
-        let mut keys: Vec<&GateKey> = registry
-            .gates
-            .iter()
-            .filter_map(|(key, gate)| {
-                matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key)
-            })
-            .collect();
-        keys.sort_unstable();
-
-        Ok(if keys.is_empty() {
-            Vec::new()
-        } else {
-            vec![ReportedFinding::new(
-                None,
-                &Finding {
-                    rule: BuiltInPass::ReviewPlaceholder.as_str().to_owned(),
-                    severity: Severity::Warn,
-                    message: format!(
-                        "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
-                        keys.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-                    ),
-                },
-            )]
-        })
-    }
-
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.exec.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
@@ -1792,8 +1440,11 @@ fn recorded_worktree_ids(
 mod tests {
     use super::*;
     use crate::commands::test_helpers::{seed_issue, MemoryDeclarations};
+    use crate::repository_state::VirtualPath;
     use crate::storage::JsonFileStorage;
-    use chrono::Duration;
+    use crate::validation::ValidationReport;
+    use chrono::{Duration, Utc};
+    use std::path::PathBuf;
 
     const DEFAULT_LABEL_ASSERTION: &str =
         "assert = { json-schema = \"schemas/default-label-format.json\" }";
@@ -1868,24 +1519,6 @@ mod tests {
         assert!(
             format!("{error:#}").contains(&corrupt.repository_relative()),
             "{error:#}"
-        );
-    }
-
-    #[test]
-    fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
-        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
-
-        let error = executor
-            .validation()
-            .evaluate_graph_rules(&[])
-            .expect_err("invalid hierarchy must fail graph-rule evaluation");
-
-        assert_eq!(
-            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
-            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
         );
     }
 
@@ -2404,317 +2037,6 @@ kind = \"enforced\"
         issue
     }
 
-    const ONE_RULE: &str = "\
-[[rules]]
-name = \"require-success-criteria\"
-assert = { require-section = { heading = \"Success Criteria\" } }
-";
-
-    const ONE_GATE: &str = "\
-[[gates]]
-version = 1
-key = \"cargo-ci\"
-title = \"Cargo CI\"
-description = \"Full Rust CI pipeline must pass.\"
-stage = \"postcheck\"
-mode = \"manual\"
-priority = 100
-";
-
-    #[test]
-    fn test_dangling_link_findings_resolves_enforces_rule_and_gate_links() {
-        // REQ-01 (jit:d30695e4): `rule` and `gate` declaring
-        // `link-namespaces = ["enforces"]` means the SAME generic dangling-link
-        // pass that already resolves `enforces:@/<invariant-id>` above now also
-        // resolves an `enforces:@/rule/<name>` and `enforces:@/gate/<key>` label —
-        // no new resolution code, just the kind-config declaration.
-        let node = issue_with_labels(
-            "node",
-            "",
-            &[
-                "enforces:@/rule/require-success-criteria",
-                "enforces:@/gate/cargo-ci",
-            ],
-        );
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                rules: Some(ONE_RULE),
-                invariants: Some(REGISTRY_TOML),
-                gates: Some(ONE_GATE),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), node);
-        let issues = exec.storage().list_issues().unwrap();
-        assert!(
-            exec.validation()
-                .dangling_link_findings(&issues)
-                .unwrap()
-                .is_empty(),
-            "enforces: rule/gate links must resolve, not dangle"
-        );
-    }
-
-    #[test]
-    fn test_dangling_link_findings_reports_unresolvable_enforces_rule_and_gate_links() {
-        // The negative case: an `enforces:` link to a rule/gate self-id that does
-        // not exist in the registry is qualified but unresolvable, so it is
-        // reported as dangling rather than silently ignored.
-        let node = issue_with_labels(
-            "node",
-            "",
-            &[
-                "enforces:@/rule/no-such-rule",
-                "enforces:@/gate/no-such-gate",
-            ],
-        );
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                rules: Some(ONE_RULE),
-                invariants: Some(REGISTRY_TOML),
-                gates: Some(ONE_GATE),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), node);
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert_eq!(findings.len(), 2);
-        assert!(findings
-            .iter()
-            .any(|f| f.finding.message.contains("no-such-rule")));
-        assert!(findings
-            .iter()
-            .any(|f| f.finding.message.contains("no-such-gate")));
-    }
-
-    #[test]
-    fn test_dangling_link_findings_reports_unresolvable_qualified_id() {
-        // REQ-03: a node carrying `satisfies:<scope>/BOGUS` (a registered link
-        // namespace, qualified, but unresolvable) yields one error-severity
-        // finding naming the node and the dangling qualified id.
-        let target = issue_with_labels(
-            "target",
-            "## Success Criteria\n\n- [hard] REQ-01: real one\n",
-            &[],
-        );
-        let short = target.short_id();
-        let node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
-        let node_id = node.id.clone();
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), target);
-        seed_issue(exec.storage(), node);
-
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].issue_id.as_ref(), Some(&node_id));
-        assert_eq!(
-            findings[0].finding.rule,
-            BuiltInPass::DanglingItemLink.as_str()
-        );
-        assert_eq!(
-            findings[0].finding.severity,
-            crate::declarations::rules::Severity::Error
-        );
-        assert!(findings[0].finding.message.contains("BOGUS"));
-        assert!(findings[0].finding.message.contains("dangling item link"));
-    }
-
-    #[test]
-    fn test_dangling_link_findings_resolvable_link_no_finding() {
-        // A resolvable qualified link produces no finding, across all four kinds:
-        // requirement/decision/risk (issue-scope) and invariant (project-scope).
-        let target = issue_with_labels(
-            "target",
-            "## Success Criteria\n\n- [hard] REQ-01: a\n\n\
-             ## Decisions\n\n- D-01: a\n\n\
-             ## Risks\n\n- RISK-01: a\n",
-            &[],
-        );
-        let short = target.short_id();
-        let node = issue_with_labels(
-            "node",
-            "",
-            &[
-                &format!("satisfies:{short}/REQ-01"),
-                &format!("per:{short}/D-01"),
-                &format!("mitigates:{short}/RISK-01"),
-                "enforces:@/invariant/sample-invariant",
-            ],
-        );
-        let config = crate::test_utils::shipped_item_kind_tables(&[
-            "invariant",
-            "requirement",
-            "decision",
-            "risk",
-        ]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), target);
-        seed_issue(exec.storage(), node);
-
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert!(
-            findings.is_empty(),
-            "resolvable links must produce no finding, got: {findings:?}"
-        );
-    }
-
-    #[test]
-    fn test_dangling_link_findings_classifies_explicit_kind_forms() {
-        // REQ-03: the explicit `@/<kind>/<self-id>` and
-        // `@/issue/<short>/<kind>/<self-id>` forms are classified as qualified
-        // references — a resolvable one yields no finding.
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let short = target.short_id();
-        let node = issue_with_labels(
-            "node",
-            "",
-            &[
-                "enforces:@/invariant/sample-invariant",
-                &format!("satisfies:@/issue/{short}/requirement/REQ-01"),
-            ],
-        );
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), target);
-        seed_issue(exec.storage(), node);
-        let issues = exec.storage().list_issues().unwrap();
-        assert!(
-            exec.validation()
-                .dangling_link_findings(&issues)
-                .unwrap()
-                .is_empty(),
-            "resolvable explicit-kind links must produce no finding"
-        );
-
-        // An unresolvable explicit form is still classified as qualified and
-        // reported as dangling, never silently ignored as unqualified.
-        let bad = issue_with_labels("bad", "", &["enforces:@/invariant/missing-invariant"]);
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), bad);
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("missing-invariant"));
-    }
-
-    #[test]
-    fn test_dangling_link_findings_named_project_form_is_dangling_not_panic() {
-        // Audit (jit:7a2bbe4f) REQ-02: a named-project `@<name>/<kind>/<self-id>`
-        // link value is a qualified reference (`is_qualified_reference` sees the
-        // `/`), and since named-project RESOLUTION is not yet wired
-        // (task a1b6b3da), it resolves through the SAME path as any other
-        // unresolvable qualified id: a dangling-link finding, never a panic or
-        // a silently-ignored label.
-        let node = issue_with_labels("node", "", &["enforces:@acme/invariant/sample-invariant"]);
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), node);
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("dangling item link"));
-        // The dangling classification comes from `resolve_link_label` erroring on
-        // the SAME value. Assert that error's chain carries the three PARSED
-        // components in distinct phrasing, proving the named-project value was
-        // structurally routed to (project, kind, self-id) rather than mis-split.
-        let err = exec
-            .items()
-            .resolve_link_label("enforces:@acme/invariant/sample-invariant")
-            .unwrap_err();
-        let chain = format!("{err:#}");
-        assert!(chain.contains("project 'acme'"), "got: {chain}");
-        assert!(chain.contains("kind 'invariant'"), "got: {chain}");
-        assert!(chain.contains("self-id 'sample-invariant'"), "got: {chain}");
-    }
-
-    #[test]
-    fn test_dangling_link_findings_reports_unqualified_link_and_ignores_non_link_ns() {
-        // An unqualified link label is reported once; non-link namespaces are not.
-        let node = issue_with_labels("node", "", &["satisfies:REQ-01", "type:task", "epic:foo"]);
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), node);
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert_eq!(findings.len(), 1, "{findings:?}");
-        assert!(findings[0].finding.message.contains("'satisfies:REQ-01'"));
-    }
-
-    #[test]
-    fn test_dangling_invariant_link_reports_finding() {
-        // REQ-03 for the project-scope invariant kind: `enforces:@/invariant/missing-invariant`
-        // is a registered link namespace with a qualified-but-unresolvable id.
-        let node = issue_with_labels("node", "", &["enforces:@/invariant/missing-invariant"]);
-        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), node);
-        let issues = exec.storage().list_issues().unwrap();
-        let findings = exec.validation().dangling_link_findings(&issues).unwrap();
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("missing-invariant"));
-    }
-
     #[test]
     fn test_validate_silent_fails_on_dangling_link() {
         // REQ-03 via the validate PATH: a dangling link makes `validate_silent`
@@ -2752,7 +2074,8 @@ priority = 100
         let err = exec.validation().validate_silent().unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains(BuiltInPass::DanglingItemLink.as_str()) && msg.contains("BOGUS"),
+            msg.contains(crate::validation::report::BuiltInPass::DanglingItemLink.as_str())
+                && msg.contains("BOGUS"),
             "expected dangling-link rule failure, got: {msg}"
         );
     }
@@ -3142,5 +2465,625 @@ depends_on = ["planning"]
 
         assert_eq!(preflight.issues.map(|issues| issues.len()), Some(2));
         assert_eq!(counter.1, 1);
+    }
+
+    fn seed_fixture_issue(
+        executor: &mut crate::commands::CommandExecutor<JsonFileStorage>,
+        title: &str,
+        description: &str,
+        labels: Vec<String>,
+    ) {
+        executor
+            .issues()
+            .create_issue(
+                title.to_string(),
+                description.to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                labels,
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+    }
+
+    fn data_path(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        path: &VirtualPath,
+    ) -> PathBuf {
+        executor.require_layout().unwrap().resolve(path).unwrap()
+    }
+
+    fn issue_path(id: &IssueId) -> VirtualPath {
+        VirtualPath::issue_record(id)
+    }
+
+    /// Read a repo-relative fixture file's bytes, or `None` when absent.
+    fn read_fixture(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        repo_rel: &str,
+    ) -> Option<Vec<u8>> {
+        let layout = executor.require_layout().unwrap();
+        let path = layout
+            .resolve(&layout.classify_repository_relative(repo_rel).unwrap())
+            .unwrap();
+        std::fs::read(path).ok()
+    }
+
+    /// Capture and validate the live fixture repository.
+    fn validate_live(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+    ) -> std::result::Result<ValidationReport, ValidationReport> {
+        split(executor.validation().validate_repository_report().unwrap())
+    }
+
+    fn capture_overlaid_image(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        overrides: &std::collections::BTreeMap<VirtualPath, Option<Vec<u8>>>,
+        finish: impl Fn(&RepositoryImage) -> anyhow::Result<RepositoryImage>,
+    ) -> RepositoryImage {
+        with_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            "overlay fixture capture",
+            |session| {
+                let Some(base) = executor.capture_proposed_base(session, overrides, &[], None)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let proposed = crate::repository_state::apply_overlay(&base, overrides.clone())?;
+                Ok(SessionStep::Done(finish(&proposed)?))
+            },
+        )
+        .unwrap()
+    }
+
+    /// Capture and validate the fixture overlaid with proposed final bytes/absence.
+    fn validate_overlaid<P: Into<PathBuf>>(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
+    ) -> std::result::Result<ValidationReport, ValidationReport> {
+        let overrides = crate::commands::overrides_from_repo_changes(
+            &executor.require_layout().unwrap(),
+            changes
+                .into_iter()
+                .map(|(path, value)| (path.into(), value)),
+        )
+        .unwrap();
+        if overrides.is_empty() {
+            return split(executor.validation().selection_report().unwrap());
+        }
+        let image = capture_overlaid_image(executor, &overrides, |proposed| Ok(proposed.clone()));
+        split(crate::validation::report(
+            &crate::validation::CapturedValidation::from_image(&image),
+            &crate::validation::ReportInputs {
+                now: Utc::now(),
+                history: None,
+            },
+        ))
+    }
+
+    /// Validate a semantic proposal together with the exact coupled derived-state
+    /// writes the canonical materializer would publish for that proposal.
+    fn validate_materialized_overlaid<P: Into<PathBuf>>(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
+    ) -> std::result::Result<ValidationReport, ValidationReport> {
+        let layout = executor.require_layout().unwrap();
+        let overrides = crate::commands::overrides_from_repo_changes(
+            &layout,
+            changes
+                .into_iter()
+                .map(|(path, value)| (path.into(), value)),
+        )
+        .unwrap();
+        let image = capture_overlaid_image(executor, &overrides, |proposed| {
+            let declarations = crate::repository_state::declarations_from_image(proposed)?;
+            let plan = crate::repository_state::derive_materialization(
+                proposed,
+                crate::repository_state::MaterializationRequest::RepairDerivedState {
+                    declarations: declarations.borrowed(),
+                },
+            )?;
+            Ok(crate::repository_state::apply_overlay(
+                proposed,
+                crate::repository_state::action_overrides(plan.delta().actions()),
+            )?)
+        });
+        split(crate::validation::report(
+            &crate::validation::CapturedValidation::from_image(&image),
+            &crate::validation::ReportInputs {
+                now: Utc::now(),
+                history: None,
+            },
+        ))
+    }
+
+    /// `Err` when `report` carries a structural failure.
+    fn split(report: ValidationReport) -> std::result::Result<ValidationReport, ValidationReport> {
+        match report.structural_failure {
+            Some(_) => Err(report),
+            None => Ok(report),
+        }
+    }
+
+    /// A report's structural failure with its causes.
+    fn failure(report: &ValidationReport) -> String {
+        format!("{:#}", report.structural_failure.as_ref().unwrap())
+    }
+
+    /// A string-valued overlay change (create/replace with UTF-8 text).
+    fn put(path: impl Into<String>, text: &str) -> (String, Option<Vec<u8>>) {
+        (path.into(), Some(text.as_bytes().to_vec()))
+    }
+
+    /// Seed one issue holding an attested gate, and name its run.
+    fn seed_attested_gate_run(
+        executor: &mut crate::commands::CommandExecutor<JsonFileStorage>,
+    ) -> (
+        crate::domain::identity::IssueId,
+        crate::domain::identity::GateRunId,
+    ) {
+        seed_fixture_issue(
+            executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let key: GateKey = "attested".parse().unwrap();
+        executor
+            .gates()
+            .define_gate(
+                &key,
+                "Attested".to_string(),
+                String::new(),
+                crate::declarations::GateStage::Postcheck,
+                crate::declarations::GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap();
+        let issue = executor.storage().list_issues().unwrap().remove(0);
+        executor.gates().add_gate(&issue.id, &key).unwrap();
+        executor
+            .gates()
+            .pass_gate(&issue.id, &key, Some("human:test".to_string()), false)
+            .unwrap();
+        let run_id = executor
+            .storage()
+            .load_issue(&issue.id)
+            .unwrap()
+            .gates_status[&key]
+            .run_id
+            .clone()
+            .unwrap();
+        (issue.id, run_id)
+    }
+
+    #[test]
+    fn test_live_and_identity_overlay_preserve_validation_results() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let plain = validate_live(&executor).unwrap();
+        let planned = validate_overlaid::<&str>(&executor, []).unwrap();
+        assert_eq!(plain.passes, planned.passes);
+        assert_eq!(plain.rule_report(), planned.rule_report());
+        assert_eq!(plain.passes.len(), 8);
+    }
+
+    #[test]
+    fn test_validate_live_reports_a_gate_run_that_does_not_reproduce() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
+        let path = VirtualPath::gate_run_record(&issue_id, &run_id);
+        let stored = read_fixture(&executor, &path.repository_relative()).unwrap();
+        let mut raw: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+        raw["retired_key"] = serde_json::Value::Bool(true);
+        raw["origin"] = serde_json::json!({ "kind": "not-a-recorded-origin" });
+        std::fs::write(
+            data_path(&executor, &path),
+            serde_json::to_vec(&raw).unwrap(),
+        )
+        .unwrap();
+
+        let error = failure(&validate_live(&executor).unwrap_err());
+
+        assert!(
+            error.contains("record-fidelity") && error.contains(run_id.as_str()),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_validate_live_reports_a_verdict_record_that_does_not_reproduce() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
+        let path = VirtualPath::gate_verdict_record(
+            &"tests".parse().unwrap(),
+            &crate::domain::repository_inputs::InputsDigest::try_from("d".repeat(64)).unwrap(),
+        );
+        let file = data_path(&executor, &path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        let record = crate::domain::GateVerdictRecord { issue_id, run_id };
+        std::fs::write(&file, serde_json::to_vec(&record).unwrap()).unwrap();
+
+        let error = failure(&validate_live(&executor).unwrap_err());
+
+        assert!(
+            error.contains("record-fidelity") && error.contains(&path.repository_relative()),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_overlay_validation_does_not_read_gate_run_records() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
+        std::fs::write(
+            data_path(&executor, &VirtualPath::gate_run_record(&issue_id, &run_id)),
+            "not json",
+        )
+        .unwrap();
+
+        validate_overlaid::<&str>(&executor, []).unwrap();
+    }
+
+    #[test]
+    fn test_overlay_config_ignores_disagreeing_live_bytes() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        std::fs::write(data_path(&executor, &VirtualPath::CONFIG), "not toml = [").unwrap();
+        assert!(validate_overlaid(
+            &executor,
+            [put(VirtualPath::CONFIG.repository_relative(), "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n")],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_overlay_templates_ignore_disagreeing_live_bytes() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        std::fs::write(
+            data_path(&executor, &VirtualPath::TEMPLATES),
+            "not toml = [",
+        )
+        .unwrap();
+        assert!(validate_overlaid(
+            &executor,
+            [put(
+                VirtualPath::TEMPLATES.repository_relative(),
+                "templates = []\n"
+            )]
+        )
+        .is_ok());
+        assert!(validate_live(&executor).is_err());
+    }
+
+    #[test]
+    fn test_overlay_rules_ignore_disagreeing_live_bytes() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let rules = read_fixture(&executor, &VirtualPath::RULES.repository_relative()).unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::RULES), "not toml = [").unwrap();
+        assert!(validate_overlaid(
+            &executor,
+            [(VirtualPath::RULES.repository_relative(), Some(rules))]
+        )
+        .is_ok());
+        assert!(validate_live(&executor)
+            .unwrap()
+            .rule_report()
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "rules-file"));
+    }
+
+    #[test]
+    fn test_overlay_rules_and_referenced_schema_ignore_disagreeing_live_schema() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let schema_path = VirtualPath::schema("planned.json").unwrap();
+        let rules = format!(
+            "[[rules]]\nname = \"planned-schema\"\nseverity = \"error\"\nassert = {{ json-schema = {:?} }}\n",
+            schema_path.relative().as_str(),
+        );
+        std::fs::create_dir_all(data_path(&executor, &VirtualPath::SCHEMAS)).unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::RULES), &rules).unwrap();
+        std::fs::write(data_path(&executor, &schema_path), "not json").unwrap();
+        assert!(validate_materialized_overlaid(
+            &executor,
+            [
+                put(VirtualPath::RULES.repository_relative(), &rules),
+                put(schema_path.repository_relative(), "{}"),
+            ],
+        )
+        .is_ok());
+        assert!(validate_live(&executor)
+            .unwrap()
+            .rule_report()
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "rules-file"
+                && finding.message.contains("not valid JSON")));
+    }
+
+    #[test]
+    fn test_overlay_gate_registry_ignores_disagreeing_live_registry() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        std::fs::write(data_path(&executor, &VirtualPath::GATES), "not toml = [").unwrap();
+        assert!(validate_overlaid(
+            &executor,
+            [put(VirtualPath::GATES.repository_relative(), "")]
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_overlay_index_ignores_disagreeing_live_bytes() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let index = read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::INDEX), "not json").unwrap();
+        assert!(validate_overlaid(
+            &executor,
+            [(VirtualPath::INDEX.repository_relative(), Some(index))],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_validate_live_reports_an_unparseable_event_log() {
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl\n").unwrap();
+
+        let error = failure(&validate_live(&executor).unwrap_err());
+
+        assert!(
+            error.contains("record-fidelity")
+                && error.contains(&VirtualPath::EVENTS.repository_relative())
+                && error.contains("line 1"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_overlay_records_dag_and_gate_integrity_judge_planned_bytes() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let id = executor.storage().list_issues().unwrap().remove(0).id;
+        let mut issue: Issue = serde_json::from_slice(
+            &read_fixture(&executor, &issue_path(&id).repository_relative()).unwrap(),
+        )
+        .unwrap();
+        issue.dependencies = vec![crate::test_utils::issue_id(
+            0x424157f2ba6b7bb89e05938a9dbccee5,
+        )];
+        issue.gates_required = vec!["planned".parse().unwrap()];
+        let bad = serde_json::to_vec_pretty(&issue).unwrap();
+        let error = failure(
+            &validate_overlaid(
+                &executor,
+                [
+                    (issue_path(&id).repository_relative(), Some(bad)),
+                    (
+                        VirtualPath::GATES.repository_relative().to_string(),
+                        Some(b"[[gates]]\nkey = \"planned\"\ntitle = \"p\"\ndescription = \"\"\nstage = \"postcheck\"\nmode = \"manual\"\n".to_vec()),
+                    ),
+                ],
+            )
+            .unwrap_err()
+        );
+        assert!(
+            error.contains("repository-integrity")
+                && error.contains(issue.dependencies[0].as_str()),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_overlay_namespace_and_hierarchy_judge_planned_config() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let report = validate_materialized_overlaid(
+            &executor,
+            [put(
+                VirtualPath::CONFIG.repository_relative(),
+                "[type_hierarchy.types]\nepic = 2\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+            )],
+        )
+        .unwrap();
+        assert!(report.rule_report().has_errors());
+        assert!(report
+            .rule_report()
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "type-hierarchy-known"));
+    }
+
+    #[test]
+    fn test_overlay_item_links_judge_planned_registry_deletion() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let config = format!(
+            "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n{}",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        );
+        let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
+        std::fs::write(
+            data_path(&executor, &VirtualPath::CONFIG),
+            config.as_bytes(),
+        )
+        .unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::INVARIANTS), invariants).unwrap();
+        let id = &executor.storage().list_issues().unwrap().remove(0).id;
+        let mut issue: Issue = serde_json::from_slice(
+            &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
+        )
+        .unwrap();
+        issue
+            .labels
+            .push("enforces:@/invariant/planned".to_string());
+        std::fs::write(
+            data_path(&executor, &issue_path(id)),
+            serde_json::to_vec_pretty(&issue).unwrap(),
+        )
+        .unwrap();
+
+        executor.validation().validate_with_fix(false).unwrap();
+        let live = validate_live(&executor).unwrap();
+        assert!(!live.rule_report().has_errors(), "{:?}", live.rule_report());
+        let planned = validate_materialized_overlaid(
+            &executor,
+            [(VirtualPath::INVARIANTS.repository_relative(), None)],
+        )
+        .unwrap();
+        assert!(planned.rule_report().findings.iter().any(|finding| {
+            finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
+        }));
+    }
+
+    #[test]
+    fn test_overlay_projection_rejects_stale_planned_target_despite_live_state() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let config = format!(
+            "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n{}\n\
+             [projection.invariants]\nkind = \"invariant\"\ntarget = \"INVARIANTS.md\"\nmode = \"separate-file\"\nstyle = \"full\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        );
+        let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
+        let error = failure(
+            &validate_overlaid(
+                &executor,
+                [
+                    put(VirtualPath::CONFIG.repository_relative(), &config),
+                    put(VirtualPath::INVARIANTS.repository_relative(), invariants),
+                    put("INVARIANTS.md", "stale planned projection\n"),
+                ],
+            )
+            .unwrap_err(),
+        );
+        assert!(
+            error.contains("derived-materialization validation pass"),
+            "{error}"
+        );
     }
 }
