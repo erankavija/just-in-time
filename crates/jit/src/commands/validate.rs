@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::domain::type_taxonomy::{detect_validation_issues, generate_fixes, ValidationFix};
-use crate::domain::{EventBody, ReadinessCorrection};
+use crate::domain::EventBody;
 use crate::repository_state::{
     MutationIntent, RepositoryAction, RepositoryDeclarations, RepositoryImage,
 };
@@ -92,27 +92,32 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 let mut projected = original.to_vec();
                 let declarations =
                     crate::repository_state::validation_declarations_from_image(image);
-                let fixes = match &declarations {
+                let mut fixes = match declarations {
                     Ok(declarations) => {
-                        self.plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
+                        let fixes = self
+                            .plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
+                            .merge(plan_reduction_fixes(&mut projected)?);
+                        let graph = CapturedGraphEvidence {
+                            declarations,
+                            plan_content: plan_content_with_issues(image, &projected)?,
+                            context: &context,
+                        };
+                        let readiness = plan_readiness_fixes(original, &mut projected, &graph)?;
+                        let repairs = match graph.declarations.rules_load_error() {
+                            Some(error) => PlannedFixes::skipped(
+                                "derived-state repair",
+                                format_args!("rules.toml could not be loaded: {error:#}"),
+                            ),
+                            None => plan_derived_state_fixes(image, graph.declarations.borrowed()),
+                        };
+                        fixes.merge(readiness).merge(repairs)
                     }
-                    Err(error) => {
-                        PlannedFixes::skipped("hierarchy fixes and derived-state repair", error)
-                    }
+                    Err(error) => PlannedFixes::skipped(
+                        "hierarchy fixes, readiness repairs and derived-state repair",
+                        error,
+                    )
+                    .merge(plan_reduction_fixes(&mut projected)?),
                 };
-                let mut fixes = fixes
-                    .merge(plan_reduction_fixes(&mut projected)?)
-                    .merge(plan_readiness_fixes(&mut projected));
-                if let Ok(declarations) = declarations {
-                    let repairs = match declarations.rules_load_error() {
-                        Some(error) => PlannedFixes::skipped(
-                            "derived-state repair",
-                            format_args!("rules.toml could not be loaded: {error:#}"),
-                        ),
-                        None => plan_derived_state_fixes(image, declarations.borrowed()),
-                    };
-                    fixes = fixes.merge(repairs);
-                }
                 fixes.intents.extend(
                     projected
                         .into_iter()
@@ -259,37 +264,40 @@ fn plan_reduction_fixes(projected: &mut [Issue]) -> Result<PlannedFixes> {
     Ok(fixes)
 }
 
-fn plan_readiness_fixes(projected: &mut [Issue]) -> PlannedFixes {
-    use crate::domain::queries::{derive_readiness_corrections, ReadinessScope};
-    let corrections = derive_readiness_corrections(projected, projected, ReadinessScope::All);
-    let mut fixes = PlannedFixes {
-        count: corrections.len(),
-        ..PlannedFixes::default()
-    };
-    for (id, correction) in corrections {
-        let Some(issue) = projected.iter_mut().find(|issue| issue.id == id) else {
+fn plan_readiness_fixes(
+    base: &[Issue],
+    projected: &mut [Issue],
+    graph: &CapturedGraphEvidence<'_>,
+) -> Result<PlannedFixes> {
+    let readiness = super::derive_readiness_intents(base, projected, graph, ReadinessScope::All)?;
+    let mut fixes = PlannedFixes::default();
+    for issue in readiness.intents.iter().filter_map(|intent| match intent {
+        MutationIntent::UpdateIssue { issue } => Some(issue),
+        _ => None,
+    }) {
+        let Some(target) = projected.iter_mut().find(|target| target.id == issue.id) else {
             continue;
-        };
-        let from = issue.state;
-        issue.state = match correction {
-            ReadinessCorrection::Promote => State::Ready,
-            ReadinessCorrection::Demote => State::Backlog,
         };
         fixes.messages.push(format!(
             "  → Transitioning {} to {}",
             issue.short_id(),
             issue.state.as_str()
         ));
-        fixes.intents.push(MutationIntent::RecordEvent {
-            phase: 4,
-            event: Box::new(EventBody::draft_issue_state_changed(
-                issue.id.clone(),
-                from,
-                issue.state,
-            )),
-        });
+        fixes.count += 1;
+        *target = (**issue).clone();
     }
-    fixes
+    fixes.intents = readiness
+        .intents
+        .into_iter()
+        .filter(|intent| !matches!(intent, MutationIntent::UpdateIssue { .. }))
+        .collect();
+    if let Some(error) = readiness.error_after_apply {
+        fixes.messages.push(format!(
+            "Refused readiness repair for {}: {error}",
+            error.issue_id().short_id()
+        ));
+    }
+    Ok(fixes)
 }
 
 fn plan_derived_state_fixes(
@@ -1745,11 +1753,12 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(skipped.len(), 1);
         assert!(skipped[0].contains("hierarchy") && skipped[0].contains("derived-state"));
+        assert!(skipped[0].contains("readiness"));
         assert!(skipped[0].contains("gates.toml"));
         let fixed = storage.load_issue(&source.id).unwrap();
         assert_eq!(fixed.labels, source.labels);
         assert_eq!(fixed.dependencies, vec![middle.id]);
-        assert_eq!(fixed.state, State::Ready);
+        assert_eq!(fixed.state, State::Backlog);
         assert!(report.structural_failure.is_some());
     }
 
@@ -1780,6 +1789,45 @@ mod tests {
         assert!(messages.iter().any(|message| {
             message.contains("Skipped derived-state repair") && message.contains("rules")
         }));
+    }
+
+    #[test]
+    fn test_validate_fix_reports_a_graph_rule_refusing_a_readiness_promotion() {
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_issue};
+        use crate::domain::EventBody;
+        use crate::storage::IssueStore;
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                rules: Some(
+                    "[[rules]]\nname = \"ready-needs-design\"\nwhen = { type = \"epic\", state = \"ready\" }\nseverity = \"error\"\nenforce = true\nassert = { dependency-shape = { target = { type = \"design\" }, mode = \"must\" } }\n",
+                ),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut issue = crate::test_utils::fixture_issue("unblocked".into(), String::new());
+        issue.labels = vec!["type:epic".into()];
+        issue.state = State::Backlog;
+        seed_issue(&storage, issue.clone());
+
+        let (_, messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        assert_eq!(storage.load_issue(&issue.id).unwrap().state, State::Backlog);
+        assert!(storage.read_events().unwrap().iter().any(|event| matches!(
+            event.body(),
+            EventBody::TransitionBlocked { issue_id, target, rule, .. }
+                if issue_id == &issue.id && *target == State::Ready && rule == "ready-needs-design"
+        )));
+        assert!(
+            messages.iter().any(|message| {
+                message.to_ascii_lowercase().contains("refused")
+                    && message.contains(&issue.short_id())
+                    && message.contains("ready-needs-design")
+            }),
+            "the fix report must name the refused repair: {messages:?}"
+        );
     }
 
     #[test]

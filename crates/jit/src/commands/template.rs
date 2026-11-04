@@ -1036,6 +1036,7 @@ fn derive_fresh_template(
         issues,
         &candidate.values().cloned().collect::<Vec<_>>(),
         graph,
+        ReadinessScope::Affected,
     )?;
     for intent in readiness.intents {
         match intent {
