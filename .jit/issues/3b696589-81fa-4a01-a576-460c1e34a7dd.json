@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c37ed58d-17a9-4664-a2d1-ab9fe7289941",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:21:20.443289534Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3b696589-81fa-4a01-a576-460c1e34a7dd",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +30,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Graceful-shutdown tests observe the server through explicit signals",
-  "updated_at": "2026-11-04T12:50:27.187306624Z"
+  "updated_at": "2026-11-04T13:21:20.443289534Z"
 }

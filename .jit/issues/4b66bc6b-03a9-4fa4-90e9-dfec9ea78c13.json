@@ -1,16 +1,24 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T13:12:50.021192329Z",
   "context": {},
   "created_at": "2026-11-04T13:12:49.448409599Z",
   "dependencies": [],
   "description": "Record the REQ-08 measurement on the final delivered tree of this epic.\n\n## Background\n\n- The epic holistic review (9876a23a, F1) found that `dev/active/9876a23a-one-validation-report/benchmark/README.md` measured commit 4ef3977ab, an ancestor of later validation and capture changes (a106d1be, 6ac41880, f22147ec, 7516ed50, 2f12d920).\n- 5d774061 extended `scripts/benchmark-mutation-cost.sh` with a `validation` suite (interleaved `jit validate` / `jit validate <id>` pairs, medians of the other views); plan DEC-12 governs the run.\n\n## Success Criteria\n\n- [hard] REQ-01: The README and its raw timings record one validation-suite run of the existing harness on a release build of current main, naming that commit, with the load threshold, the loads, every median and the pair differences, and state whether the median pair difference is at most zero (the REQ-08 bound).\n\n## Notes\n\n- Measurement only; no code change. A run whose median pair difference exceeds zero is reported as a blocking finding, not fixed here.\n",
   "documents": [],
+  "done_at": "2026-11-04T13:24:31.597094993Z",
   "first_ready_at": "2026-11-04T13:12:49.448409599Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "0dfbaa8d-6a56-4122-bec4-e19004dfebe6",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:24:19.932729336Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4b66bc6b-03a9-4fa4-90e9-dfec9ea78c13",
   "labels": [
     "epic:one-validation-report",
@@ -21,7 +29,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Re-measure validation views on the final tree",
-  "updated_at": "2026-11-04T13:12:50.021192329Z"
+  "updated_at": "2026-11-04T13:24:31.597094993Z"
 }

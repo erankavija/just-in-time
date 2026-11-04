@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "73490b18a94f65b515e1fd32c2445b5fb7e26d59",
+  "completed_at": "2026-11-04T13:24:19.931115006Z",
+  "duration_ms": 201362,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable measurement artifacts satisfy REQ-01 and document a passing REQ-08 bound.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4b66bc6b-03a9-4fa4-90e9-dfec9ea78c13",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0dfbaa8d-6a56-4122-bec4-e19004dfebe6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:20:58.568340502Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 459515832 (`jit:4b66bc6b`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 — dev/vision/9db27a3a-charter.md; @/issue/9876a23a/requirement/REQ-08 — .jit/issues/9876a23a-8535-45ad-83f8-ca237f017e70.json\nGate evidence: code-review pending (no prior execution or exit code)\nTruncation recovery: Narrowed reads of DEC-12, the benchmark artifacts, and validation harness after a broad plan search truncated.\n\n1. No findings. The current report and raw capture name the measured release build, record load conditions, all required medians and pair differences, and correctly establish the −3363 ms median difference as meeting REQ-08.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable measurement artifacts satisfy REQ-01 and document a passing REQ-08 bound.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
