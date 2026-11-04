@@ -1255,25 +1255,7 @@ mod tests {
     }
 
     fn seed_scenario_gates(storage: &InMemoryStorage) {
-        let mut registry = storage.load_gate_registry().unwrap();
-        for key in ["tests", "code-review"].map(|key| key.parse::<GateKey>().unwrap()) {
-            registry.gates.insert(
-                key.clone(),
-                GateDefinition {
-                    version: 1,
-                    key: key.clone(),
-                    title: key.to_string(),
-                    description: String::new(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Manual,
-                    checker: None,
-                    priority: 100,
-                    reserved: HashMap::new(),
-                    inputs: None,
-                },
-            );
-        }
-        crate::commands::test_helpers::seed_gate_registry(storage, &registry);
+        crate::commands::test_helpers::seed_manual_gates(storage, &["tests", "code-review"]);
     }
 
     #[test]

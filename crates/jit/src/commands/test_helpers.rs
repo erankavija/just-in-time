@@ -190,6 +190,33 @@ pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegis
     );
 }
 
+/// Seed manual gate definitions used by command fixtures.
+pub(crate) fn seed_manual_gates(storage: &InMemoryStorage, keys: &[&str]) {
+    use crate::declarations::{GateDefinition, GateMode, GateStage};
+    let mut registry = storage.load_gate_registry().unwrap();
+    for key in keys
+        .iter()
+        .map(|key| key.parse::<crate::domain::identity::GateKey>().unwrap())
+    {
+        registry.gates.insert(
+            key.clone(),
+            GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: key.to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 100,
+                reserved: Default::default(),
+                inputs: None,
+            },
+        );
+    }
+    seed_gate_registry(storage, &registry);
+}
+
 /// Count session opens via [`MutationPoint::SessionOpen`], the moment every
 /// session open crosses exactly once, injecting no failure. Shared by tests
 /// that assert a session-open budget.
