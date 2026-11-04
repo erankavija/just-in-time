@@ -23504,3 +23504,4 @@
 {"from":"backlog","id":"9f7ab642-25eb-479a-b3dc-7c92095ec640","issue_id":"4a01ccba-b6b9-46db-ae4a-cf92a98c9279","timestamp":"2026-11-04T02:25:44.879292832Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"33a90ee5-e5ae-4973-abd2-c10899af8816","issue_id":"26307dfd-9eac-4f43-90dd-183ad38d1814","timestamp":"2026-11-04T02:25:55.608566099Z","type":"issue_claimed"}
 {"from":"ready","id":"a09992f2-7839-4914-a971-02e174fee71e","issue_id":"26307dfd-9eac-4f43-90dd-183ad38d1814","timestamp":"2026-11-04T02:25:55.704396074Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"code-review","id":"095857e5-b1cc-42e3-a1d5-b0fe7681b614","issue_id":"0851fae4-245b-4e07-bd81-3f61da54dbf2","timestamp":"2026-11-04T02:29:25.629749734Z","type":"gate_failed","updated_by":"auto:executor"}
