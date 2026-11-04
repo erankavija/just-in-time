@@ -10,12 +10,26 @@
   ],
   "description": "The event log, the claims log and gate-run history are append-only records that only history-reporting commands read, with one event-log parser, per-target archive evidence and a search that skips history by default.\n\n## Background\n\nOrdinary commands read the event log whole in captures, validation, archive planning and search, and a second event-log parser lives in the file backend's archive reader. This story gives the log one parser and one torn-line rule, moves archive evidence to per-target records, limits mutations to the log's bounded end and enforces that limit in the capture layer, names whole-repository validation as a history reader with its own read path, excludes history from default search, documents the history files and their readers, moves every repository to format 4, and proves the boundary end to end.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one event-log parser exists, with one torn-line rule, and an unknown tag is an error naming its line.\n- [hard] REQ-02: Archive preview and execute read a target's evidence record once and never read the event log.\n- [hard] REQ-03: The capture layer and the redo record admit only the end-of-log probe and the positioned append.\n- [hard] REQ-04: An end-to-end test proves ordinary commands succeed over unparseable history files, and the storage references name the history files and their readers.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:32:49.856287626Z",
   "first_ready_at": "2026-11-04T09:23:36.060670830Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c790105b-e0dc-4459-a5c8-6f01d753287d",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:28:07.692001483Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "0bbc80d7-ff14-4d61-8b66-04959a200f24",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:32:49.655312699Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dc5fa7f8-0d0b-4b4f-9e9d-99cd07bc8857",
   "labels": [
     "type:story",
@@ -28,7 +42,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Only history-reporting commands read history files",
-  "updated_at": "2026-11-04T09:23:36.060670830Z"
+  "updated_at": "2026-11-04T09:32:49.856287626Z"
 }

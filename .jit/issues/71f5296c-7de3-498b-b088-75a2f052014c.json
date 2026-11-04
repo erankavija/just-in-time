@@ -21,6 +21,12 @@
       "updated_at": "2026-11-04T09:14:59.342895250Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "f05dc6ba-2abc-4d51-a030-097c94bdd64a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:31:53.588050252Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "run_id": "aae12fa6-2c49-4271-92fb-10edecdd3226",
       "status": "passed",
@@ -45,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Hooks command moves to a library handler",
-  "updated_at": "2026-11-04T09:14:59.479089332Z"
+  "updated_at": "2026-11-04T09:31:53.588050252Z"
 }

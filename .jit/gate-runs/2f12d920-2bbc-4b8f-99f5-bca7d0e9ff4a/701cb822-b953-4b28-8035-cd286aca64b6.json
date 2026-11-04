@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:32:27.932349159Z",
+  "duration_ms": 280455,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change meets the issue criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "701cb822-b953-4b28-8035-cd286aca64b6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:27:47.476478949Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 748a63a639994fbdec08c880a359a0b23294fbd0 (`jit:2f12d920`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-09 (issue success criteria); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T09:26:12Z); code-review pending\nTruncation recovery: re-read bounded commit patches and current source/test ranges for image.rs and validate.rs\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change meets the issue criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

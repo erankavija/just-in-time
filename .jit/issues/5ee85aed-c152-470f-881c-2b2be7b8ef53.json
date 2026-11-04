@@ -14,7 +14,14 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "500b2b3a-993a-4d63-a42b-a46c54d20cd0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:30:05.724772185Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5ee85aed-c152-470f-881c-2b2be7b8ef53",
   "labels": [
     "type:story",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Leases are per-issue records under one lease sequence",
-  "updated_at": "2026-11-04T08:42:45.397338234Z"
+  "updated_at": "2026-11-04T09:30:05.724772185Z"
 }

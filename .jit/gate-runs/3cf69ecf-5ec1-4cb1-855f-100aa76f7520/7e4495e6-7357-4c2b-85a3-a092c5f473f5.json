@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ba6d540af18735ea5ecfccfc6322297c83e6761d",
+  "completed_at": "2026-11-04T09:32:37.742998261Z",
+  "duration_ms": 488148,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Archive handlers, typed schema registration, list-envelope behavior, and existing output contracts satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3cf69ecf-5ec1-4cb1-855f-100aa76f7520",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7e4495e6-7357-4c2b-85a3-a092c5f473f5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:24:29.594297426Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 81a032501; 9feb532e6; uncommitted tracker changes excluded.\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18; @/invariant/architecture-dependency-direction, orthogonal-tests, semantic-test-assertions, essential-code-prose, no-ignored-tests, canonical-cutover; @/gate/cargo-ci, mcp-ci, jit-validate\nGate evidence: cargo-ci passed (exit none); mcp-ci passed (exit none); code-review pending\nTruncation recovery: reread the merge’s first-parent patch by path and narrowed current source, tests, and linked-document reads.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Archive handlers, typed schema registration, list-envelope behavior, and existing output contracts satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
