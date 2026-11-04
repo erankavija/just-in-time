@@ -13,7 +13,7 @@ use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, PlanTarget,
 };
 use crate::domain::identity::IssueId;
-use crate::repository_state::RootRelativePath;
+use crate::domain::relative_path::RootRelativePath;
 use crate::storage::repository_state_store::{
     is_advisory_permission_denied, open_absolute_dir_nofollow, open_child_dir_nofollow,
     open_regular_file_nofollow, RepositoryStateStoreError,

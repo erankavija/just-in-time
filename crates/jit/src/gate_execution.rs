@@ -8,11 +8,11 @@
 
 use crate::declarations::{GateChecker, GateStage};
 use crate::domain::identity::{GateKey, GateRunId, IssueId};
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
     Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
-use crate::repository_state::RootRelativePath;
 use anyhow::{Context, Result};
 use std::io::Write;
 use std::path::Path;

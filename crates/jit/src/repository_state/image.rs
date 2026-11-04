@@ -1,6 +1,7 @@
 //! Closed repository images, bounded capture declarations, and exact deltas.
 
 use super::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::vocabulary::wire_vocabulary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1086,7 +1087,7 @@ fn validate_pinned_request(revision: &str, path: &str) -> Result<(), CaptureErro
             path.into(),
         ));
     }
-    let path = super::RootRelativePath::parse(path)?;
+    let path = RootRelativePath::parse(path).map_err(RepositoryLayoutError::from)?;
     if path.is_root() {
         return Err(CaptureError::InvalidPinnedRequest(
             revision.into(),

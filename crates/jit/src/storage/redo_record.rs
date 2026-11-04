@@ -8,9 +8,8 @@
 //! needs, so a make-directory operation carries only a directory no other
 //! operation's path lies beneath (OD-7).
 
-use crate::repository_state::{
-    FileMode, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
-};
+use crate::domain::relative_path::RootRelativePath;
+use crate::repository_state::{FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
 use crate::storage::atomic_write::{create_file_synced, sync_directory};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -389,7 +388,7 @@ fn canonical_path(
 ) -> Result<VirtualPath, RedoRecordError> {
     Ok(VirtualPath::from_root(
         root,
-        RootRelativePath::parse(relative)?,
+        RootRelativePath::parse(relative).map_err(RepositoryLayoutError::from)?,
     )?)
 }
 

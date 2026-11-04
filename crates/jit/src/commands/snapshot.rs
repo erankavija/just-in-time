@@ -12,8 +12,8 @@ use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
-type SnapshotDirectories = BTreeSet<crate::repository_state::RootRelativePath>;
-type SnapshotFiles = BTreeMap<crate::repository_state::RootRelativePath, Vec<u8>>;
+type SnapshotDirectories = BTreeSet<crate::domain::relative_path::RootRelativePath>;
+type SnapshotFiles = BTreeMap<crate::domain::relative_path::RootRelativePath, Vec<u8>>;
 const MAX_REPOSITORY_SNAPSHOT_BYTES: u64 = 128 * 1024 * 1024;
 
 fn origin_remote_url(repo: &git2::Repository) -> Option<String> {
@@ -173,7 +173,7 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
 
     /// Read file content from working tree filesystem
     fn read_from_filesystem(&self, path: &str) -> Result<(Vec<u8>, SourceInfo)> {
-        let relative = crate::repository_state::RootRelativePath::parse(path)?;
+        let relative = crate::domain::relative_path::RootRelativePath::parse(path)?;
         let content = crate::storage::repository_state_store::read_repository_file_nofollow(
             &self.worktree_root,
             &relative,
@@ -210,7 +210,7 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         base: &Path,
         captured: &mut HashMap<String, CapturedFile>,
     ) -> Result<(Vec<u8>, CapturedFile)> {
-        let relative = crate::repository_state::RootRelativePath::parse(path)?;
+        let relative = crate::domain::relative_path::RootRelativePath::parse(path)?;
         let destination = base.join(relative.as_path());
         if let Some(existing) = captured.get(path) {
             return Ok((std::fs::read(destination)?, existing.clone()));
@@ -455,7 +455,7 @@ This is a read-only export. Future versions may support:
         // Copy issue files
         for issue in issues {
             let issue_json = serde_json::to_string_pretty(issue)?;
-            let relative = crate::repository_state::RootRelativePath::parse(
+            let relative = crate::domain::relative_path::RootRelativePath::parse(
                 crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative(),
             )?;
             let issue_path = base.join(relative.as_path());
@@ -596,14 +596,14 @@ impl SnapshotTree {
         let directories = self
             .directories
             .iter()
-            .map(crate::repository_state::RootRelativePath::parse)
+            .map(crate::domain::relative_path::RootRelativePath::parse)
             .collect::<std::result::Result<BTreeSet<_>, _>>()?;
         let files = self
             .files
             .iter()
             .map(|relative| {
                 Ok((
-                    crate::repository_state::RootRelativePath::parse(relative)?,
+                    crate::domain::relative_path::RootRelativePath::parse(relative)?,
                     std::fs::read(root.join(relative))?,
                 ))
             })

@@ -1279,7 +1279,7 @@ impl IssueStore for JsonFileStorage {
             let short_hash = format!("{:.7}", commit.id());
             Ok((blob.content().to_vec(), short_hash))
         } else {
-            let relative = crate::repository_state::RootRelativePath::parse(path)
+            let relative = crate::domain::relative_path::RootRelativePath::parse(path)
                 .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
             crate::storage::repository_state_store::read_repository_file_confined(
                 repo_root, &relative,

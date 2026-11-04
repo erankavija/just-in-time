@@ -4,10 +4,10 @@
 //! one convention: working directory at the repository and no inherited
 //! `JIT_*` variable.
 
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{
-    repository_relative_path, RepositoryRootClass, RootRelativePath, VirtualPath,
-    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
-    REPO_WRITE_LOCK_FILE,
+    repository_relative_path, RepositoryRootClass, VirtualPath, BOOTSTRAP_LOCK_FILE,
+    EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use std::ffi::{OsStr, OsString};
