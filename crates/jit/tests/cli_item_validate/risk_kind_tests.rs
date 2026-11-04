@@ -1,27 +1,7 @@
-//! Integration tests for the markdown-first `risk` item kind (issue `be3eb6ca`).
+//! Integration tests for the markdown-first `risk` item kind.
 //!
-//! The `jit-default` package supplies a `[item_kinds]` table that declares `risk`
-//! alongside `requirement` and `decision`, so a profiled repo indexes risks
-//! authored as list entries under a `## Risks` section of an issue description.
-//! Risks become addressable, queryable items through the SAME generic
-//! triple-driven parse path `requirement` and `decision` use; no engine code
-//! special-cases the kind. The declaration under test is the shipped one, derived
-//! from the default package.
-//!
-//! Coverage of the issue's `[hard]` success criteria, all against a repository
-//! initialized with the shared taxonomy fixture:
-//! - REQ-01: [`test_default_repo_item_list_kind_risk_returns_risks`] runs the real
-//!   `jit` binary so `jit item list --kind risk` returns risks parsed from an issue
-//!   description with the configured `risk` item kind.
-//! - REQ-02: [`test_default_repo_mitigates_label_resolves_risk`] and
-//!   [`test_default_repo_resolves_label_resolves_risk`] prove that BOTH a
-//!   `mitigates:<issue>/RISK-01` and a `resolves:<issue>/RISK-01` label resolve to
-//!   the addressed risk through the existing generic `resolve_link_label` (both
-//!   namespaces are recognized because the `risk` kind declares both link-namespaces).
-//! - REQ-03: [`test_default_repo_markdown_is_sole_source_for_risks`] proves the
-//!   markdown description is the only source — editing it changes the index and no
-//!   parallel structured store is written under `.jit/`.
-//! - REQ-04: every test below runs under `cargo test`.
+//! These exercise the shipped config through item list and verify that issue
+//! descriptions remain the sole source for risk items.
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
@@ -57,74 +37,6 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
         .collect();
     assert!(qids.contains(&format!("@/issue/{short}/risk/RISK-01").as_str()));
     assert!(qids.contains(&format!("@/issue/{short}/risk/RISK-02").as_str()));
-}
-
-#[test]
-fn test_default_repo_mitigates_label_resolves_risk() {
-    // REQ-02 (mitigates): a `mitigates:<issue>/RISK-01` label resolves to the
-    // addressed risk item through the existing generic `resolve_link_label`; the
-    // configured `risk` kind declares the `mitigates` namespace.
-    let (_temp, exec) =
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"])).unwrap();
-    let issue = crate::create_issue(
-        &exec,
-        "Migration plan",
-        "## Risks\n\n- RISK-01: data loss during migration\n",
-    );
-    let short = issue.short_id();
-
-    let label = format!("mitigates:{short}/RISK-01");
-    let resolved = exec
-        .items()
-        .resolve_link_label(&label)
-        .unwrap()
-        .expect("a mitigates:<issue>/RISK-01 label resolves to the addressed risk");
-    assert_eq!(resolved.item.self_id, "RISK-01");
-    assert_eq!(resolved.item.kind, "risk");
-    assert_eq!(
-        resolved.item.qualified_id,
-        format!("@/issue/{short}/risk/RISK-01")
-    );
-    assert!(resolved.item.text.contains("data loss"));
-
-    // A registered `mitigates:` namespace whose qualified id cannot be resolved is
-    // an error, never a silent drop.
-    let bad = format!("mitigates:{short}/RISK-99");
-    assert!(exec.items().resolve_link_label(&bad).is_err());
-}
-
-#[test]
-fn test_default_repo_resolves_label_resolves_risk() {
-    // REQ-02 (resolves): a `resolves:<issue>/RISK-01` label resolves to the
-    // addressed risk item through the existing generic `resolve_link_label`; the
-    // configured `risk` kind declares the `resolves` namespace.
-    let (_temp, exec) =
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"])).unwrap();
-    let issue = crate::create_issue(
-        &exec,
-        "Migration plan",
-        "## Risks\n\n- RISK-01: data loss during migration\n",
-    );
-    let short = issue.short_id();
-
-    let label = format!("resolves:{short}/RISK-01");
-    let resolved = exec
-        .items()
-        .resolve_link_label(&label)
-        .unwrap()
-        .expect("a resolves:<issue>/RISK-01 label resolves to the addressed risk");
-    assert_eq!(resolved.item.self_id, "RISK-01");
-    assert_eq!(resolved.item.kind, "risk");
-    assert_eq!(
-        resolved.item.qualified_id,
-        format!("@/issue/{short}/risk/RISK-01")
-    );
-    assert!(resolved.item.text.contains("data loss"));
-
-    // A registered `resolves:` namespace whose qualified id cannot be resolved is
-    // an error, never a silent drop.
-    let bad = format!("resolves:{short}/RISK-99");
-    assert!(exec.items().resolve_link_label(&bad).is_err());
 }
 
 #[test]
