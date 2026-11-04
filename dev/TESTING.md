@@ -543,16 +543,10 @@ and each scenario runs multiple real `jit` subprocess invocations.
 `test_resolve_ambiguous` creates real issues through the full command pipeline until
 two land on the same 4-character id prefix — the property under test, ambiguous-prefix
 rejection, cannot be observed without a real collision.
-`test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` writes 257 real
-gate-run directories to disk, plus a real named pipe via `mkfifo` alongside a stray file and
-symlink, to prove the precheck's history capture holds at a real page-scale size rather than
-a handful of examples, and ignores clutter mixed into the same directory that is not itself
-a run.
 
 | Test | Warm (ms) |
 | --- | ---: |
 | `short_hash_tests::test_resolve_ambiguous` | 1,969 |
-| `commands::gate_check::tests::test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` | 517 |
 
 ### Repeated real gate execution
 
