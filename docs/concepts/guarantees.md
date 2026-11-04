@@ -243,6 +243,7 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 **What requires git:**
 
 ❌ `jit claim acquire` / `release` / `renew` / `heartbeat` / `status` / `list` / `force-evict` - Advisory work leases (`RequiresGitError`, exit code 10)\
+❌ `jit hooks install` - Installs hooks in a Git checkout (`REQUIRES_GIT`, exit code 10; `@/charter/D-24`)\
 ❌ `jit doc show --at <commit>` - View document at specific git revision  
 ❌ `jit snapshot export --at <tag>` - Export from specific git revision  
 ❌ Document asset validation from git history  
