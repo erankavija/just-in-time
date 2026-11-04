@@ -5,6 +5,7 @@ use super::{
     HandlerResult, HandlerStore, Outcome,
 };
 use crate::cli::{GateCommands, PresetCommands};
+use crate::commands::GateStatusEntry;
 use crate::commands::{FieldEdit, GateStatusArgumentsTransposedError, GateUpdate};
 use crate::declarations::{GateChecker, GateMode, GateStage};
 use crate::domain::identity::{GateKey, IssueId};
@@ -21,7 +22,6 @@ use crate::output::{
     BatchTarget, ErrorCode, GateCheckAllResponse, GateCheckSummary, GateDefinition,
     GateEvaluateManyResponse, GateEvaluateManyResult, GateFindingsResponse, GateFlatReportResponse,
     GateListResponse, GatePresetListResponse, GateRunHistoryResponse, GateRunSummary,
-    GateStatusEntry,
 };
 use crate::storage::IssueStore;
 use std::collections::HashMap;

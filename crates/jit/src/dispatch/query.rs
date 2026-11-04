@@ -3,12 +3,10 @@
 use super::issue::{list as list_all, ISSUE_LISTING};
 use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::{CountDimension, IssueFilterArgs, QueryArgs, QueryCommands};
+use crate::commands::{DivergenceResponse, StateRollup};
 use crate::domain::Issue;
 use crate::errors::InvalidArgumentError;
-use crate::output::{
-    BlockedListing, DivergenceResponse, IssueListing, QuerySubset, RunStatus, StateRollup,
-    SubsetListing,
-};
+use crate::output::{BlockedListing, IssueListing, QuerySubset, RunStatus, SubsetListing};
 use crate::storage::IssueStore;
 
 fn subset(subset: QuerySubset, issues: Vec<Issue>, full: bool) -> HandlerResult<SubsetListing> {

@@ -28,6 +28,21 @@ pub trait CollectionKey {
     const SCHEMA_NAME: Option<&'static str> = None;
 }
 
+/// Declares the [`CollectionKey`] marker for each list-envelope collection key.
+macro_rules! collection_keys {
+    ($($(#[$meta:meta])* $marker:ident = $key:literal $(as $schema:literal)?;)+) => {$(
+        $(#[$meta])*
+        pub enum $marker {}
+
+        impl $crate::domain::list_envelope::CollectionKey for $marker {
+            const KEY: &'static str = $key;
+            $(const SCHEMA_NAME: Option<&'static str> = Some($schema);)?
+        }
+    )+};
+}
+
+pub(crate) use collection_keys;
+
 /// A collection under `K::KEY`, its derived `count`, and the flattened fields
 /// of `E`, which is a struct or `()`.
 ///

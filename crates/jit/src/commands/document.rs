@@ -1,6 +1,109 @@
 //! Document reference operations
 
 use super::*;
+use crate::domain::list_envelope::{collection_keys, ListEnvelope};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+collection_keys! {
+    /// Collection key of [`ArtifactConformanceResponse`].
+    ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
+}
+
+/// Response for `doc dir` command.
+///
+/// One resolved value rather than a collection, so the shape is a flat named
+/// object: the issue whose directory this is, the area the caller named, and
+/// the repository-relative directory
+/// ([`resolve_artifact_directory`](crate::domain::artifact_directory::resolve_artifact_directory)
+/// derives the name inside the area). `area` echoes the caller's spelling
+/// rather than a normalized one, so a response is readable against the request
+/// that produced it, while `directory` is normalized.
+///
+/// The directory is a name: it is reported whether or not anything has been
+/// written there, and producing this response creates nothing.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ArtifactDirectoryResponse {
+    /// Full identifier of the issue the directory belongs to.
+    pub issue_id: IssueId,
+    /// Short identifier the directory name is built from.
+    pub short_id: String,
+    /// Issue-scoped area the caller named.
+    pub area: String,
+    /// Repository-relative directory the issue owns in that area.
+    pub directory: String,
+}
+
+/// Response for `doc conformance`, the advisory artifact-location report.
+///
+/// `count` is the length of `artifacts`, which are ordered by area and then by
+/// path. `areas` states the registry that was walked, which is exactly
+/// [`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas),
+/// so a machine caller reads the scanned set instead of assuming one.
+///
+/// The report is advice (`@/issue/8e071e18/decision/D-7`): an entry states
+/// where an artifact sits and where its owner's directory is, and blocks
+/// nothing.
+pub type ArtifactConformanceResponse =
+    ListEnvelope<ArtifactsKey, ArtifactConformanceEntry, ConformanceScope>;
+
+/// Fields of [`ArtifactConformanceResponse`] beside its `artifacts`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ConformanceScope {
+    /// Declared issue-scoped areas the report walked.
+    pub areas: Vec<String>,
+}
+
+/// One artifact `doc conformance` names.
+///
+/// `status` is `nonconforming` when the owning issue is known and the artifact
+/// sits outside the directory that issue owns, and `unattributed` when the
+/// report's inputs settle no single owner. `issue_id` and
+/// `canonical_directory` are carried by a `nonconforming` entry and absent from
+/// an `unattributed` one, which claims no owner and no destination.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ArtifactConformanceEntry {
+    /// Repository-relative path of the artifact, which is a directory when a
+    /// whole directory sits outside its owner's.
+    pub path: String,
+    /// Declared issue-scoped area the artifact was found under.
+    pub area: String,
+    /// Short identifier the artifact's own name opens with, empty when the name
+    /// carries none and a document reference resolved the owner instead.
+    pub short_id: String,
+    /// `nonconforming` or `unattributed`.
+    pub status: String,
+    /// Full identifier of the owning issue, for a `nonconforming` entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issue_id: Option<IssueId>,
+    /// Repository-relative directory the owner owns in that area, for a
+    /// `nonconforming` entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub canonical_directory: Option<String>,
+}
+
+impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactConformanceEntry {
+    fn from(artifact: crate::domain::artifact_conformance::ReportedArtifact) -> Self {
+        use crate::domain::artifact_conformance::ArtifactDisposition;
+
+        let status = artifact.disposition.as_str().to_string();
+        let (issue_id, canonical_directory) = match artifact.disposition {
+            ArtifactDisposition::Nonconforming {
+                issue_id,
+                canonical_directory,
+            } => (Some(issue_id), Some(canonical_directory)),
+            ArtifactDisposition::Unattributed => (None, None),
+        };
+        Self {
+            path: artifact.path,
+            area: artifact.area,
+            short_id: artifact.short_id,
+            status,
+            issue_id,
+            canonical_directory,
+        }
+    }
+}
 
 const EXTERNAL_URL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const EXTERNAL_URL_WORKERS: usize = 4;
@@ -334,7 +437,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue_id: &IssueId,
         area: &str,
-    ) -> Result<crate::output::ArtifactDirectoryResponse> {
+    ) -> Result<crate::commands::ArtifactDirectoryResponse> {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         let documentation = self
@@ -353,7 +456,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         )
         .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
 
-        Ok(crate::output::ArtifactDirectoryResponse {
+        Ok(crate::commands::ArtifactDirectoryResponse {
             short_id: issue.short_id(),
             issue_id: issue.id,
             area: area.to_string(),
@@ -391,7 +494,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     /// a finding, and the usual configuration and storage read failures.
     pub fn report_artifact_conformance(
         &self,
-    ) -> Result<crate::output::ArtifactConformanceResponse> {
+    ) -> Result<crate::commands::ArtifactConformanceResponse> {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let documentation = self
@@ -420,12 +523,12 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .flatten()
-            .map(crate::output::ArtifactConformanceEntry::from)
+            .map(crate::commands::ArtifactConformanceEntry::from)
             .collect::<Vec<_>>();
 
-        Ok(crate::output::ArtifactConformanceResponse::with_extras(
+        Ok(crate::commands::ArtifactConformanceResponse::with_extras(
             artifacts,
-            crate::output::ConformanceScope {
+            crate::commands::ConformanceScope {
                 areas: listings.into_iter().map(|(area, _)| area).collect(),
             },
         ))

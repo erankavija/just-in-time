@@ -81,7 +81,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         usize,
         Vec<String>,
         crate::validation::ValidationReport,
-        crate::output::DivergenceResponse,
+        crate::commands::DivergenceResponse,
     )> {
         let layout = self.exec.require_layout()?;
         let context = production_mutation_context();
@@ -683,7 +683,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         &self,
     ) -> Result<(
         crate::validation::ValidationReport,
-        crate::output::DivergenceResponse,
+        crate::commands::DivergenceResponse,
     )> {
         self.capture_validation_report()
     }
@@ -692,7 +692,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         &self,
     ) -> Result<(
         crate::validation::ValidationReport,
-        crate::output::DivergenceResponse,
+        crate::commands::DivergenceResponse,
     )> {
         let layout = self.exec.require_layout()?;
         with_read_session(
@@ -710,7 +710,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                         .and_then(|declarations| {
                             captured_divergences(issues, declarations.config())
                         })
-                        .unwrap_or_else(|_| crate::output::DivergenceResponse::new(Vec::new()));
+                        .unwrap_or_else(|_| crate::commands::DivergenceResponse::new(Vec::new()));
                 let Some(document_references) =
                     capture_document_reference_validation(session, issues)?
                 else {
@@ -896,34 +896,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
 fn captured_divergences(
     issues: &[Issue],
     config: &JitConfig,
-) -> Result<crate::output::DivergenceResponse> {
+) -> Result<crate::commands::DivergenceResponse> {
+    use crate::commands::DivergenceResponse;
     use crate::domain::type_taxonomy::HierarchyConfig;
-    use crate::output::{DivergenceResponse, DivergenceView};
 
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let hierarchy = HierarchyConfig::from_declarations(&namespaces)?;
-    let issue_refs = issues.iter().collect::<Vec<_>>();
-    let divergences =
-        crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &hierarchy);
-    let by_id = issues
-        .iter()
-        .map(|issue| (&issue.id, issue))
-        .collect::<std::collections::HashMap<_, _>>();
-    let divergences = divergences
-        .into_iter()
-        .map(|divergence| {
-            let issue = by_id.get(&divergence.issue_id);
-            DivergenceView {
-                short_id: divergence.issue_id.short_id().to_string(),
-                title: issue.map(|issue| issue.title.clone()).unwrap_or_default(),
-                id: divergence.issue_id,
-                label: divergence.label,
-                namespace: divergence.namespace,
-                value: divergence.value,
-            }
-        })
-        .collect::<Vec<_>>();
-    Ok(DivergenceResponse::new(divergences))
+    Ok(DivergenceResponse::from_issues(issues, &hierarchy))
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.

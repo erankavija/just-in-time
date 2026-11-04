@@ -747,3 +747,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) mod gate_reuse;

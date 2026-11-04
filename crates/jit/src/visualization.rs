@@ -576,7 +576,7 @@ mod tests {
     /// Typed hierarchy facts retain the string wire format on both surfaces.
     #[test]
     fn test_export_json_full_hierarchy_serialization_matches_tree_view() {
-        use crate::output::HierarchyNodeView;
+        use crate::commands::HierarchyNodeView;
 
         #[derive(Serialize)]
         struct WireNode<T> {

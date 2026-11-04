@@ -59,7 +59,11 @@ fn exec(
         program,
         args,
     )?;
-    Ok(Outcome::Exited(status))
+    Ok(Outcome::Exited(
+        status
+            .code()
+            .unwrap_or(crate::output::ExitCode::GenericError.code()),
+    ))
 }
 
 command_group! {
