@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T09:35:10.080562898Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -28,7 +29,7 @@
     "satisfies:9876a23a/REQ-03"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Validation and gate references describe views as report selections",
-  "updated_at": "2026-11-04T09:34:30.568628952Z"
+  "updated_at": "2026-11-04T09:35:10.080562898Z"
 }
