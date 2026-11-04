@@ -234,8 +234,8 @@ jit validate --fix
 # - Drops redundant (transitively-implied) dependency edges
 # - Advances a pending state transition that is now unblocked
 #
-# Stale temp files, lock files, and a rebuildable index are NOT --fix's job;
-# run `jit recover` for those.
+# Use `jit recover` to remove stale temp files and locks, evict expired leases,
+# and reclaim stale indefinite leases.
 ```
 
 ### Common Cycle Patterns and Solutions

@@ -3278,7 +3278,7 @@ jit validate --branch-drift [--leases] [--json]
 | `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Rules evaluate over the whole repository, so coverage children and dependency targets outside the closure count. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
-| `--leases` | Check that active leases are consistent and not stale. |
+| `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
 `--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`. `--rule` requires a

@@ -13,7 +13,20 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "802cc1ad-dbe2-43d8-9db1-95ac85a2c749",
+      "status": "failed",
+      "updated_at": "2026-11-04T08:26:33.884478642Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "3d6723dc-ac98-4e08-93c7-eede57bd48be",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:26:36.673042096Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f0a5b90a-d717-46cc-8cb4-61e24efb187d",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lease command and recovery docs match per-issue lease records",
-  "updated_at": "2026-11-04T07:54:08.985451669Z"
+  "updated_at": "2026-11-04T08:26:36.673042096Z"
 }

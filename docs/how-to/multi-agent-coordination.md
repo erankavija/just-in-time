@@ -127,7 +127,7 @@ For work that takes longer than the default TTL:
 jit claim acquire <issue-id> --ttl 3600  # 1 hour
 
 # Or renew during work
-jit claim renew <lease-id> --extension 600  # Add 10 minutes
+jit claim renew <issue-id> --extension 600  # Expire 10 minutes from now
 ```
 
 ### Pattern 5: Indefinite Leases for Manual Oversight
@@ -139,7 +139,7 @@ For tasks requiring human oversight or unpredictable duration:
 jit claim acquire <issue-id> --ttl 0 --reason "Manual review needed"
 
 # Send periodic heartbeats to prevent staleness
-jit claim heartbeat <lease-id>
+jit claim heartbeat <issue-id>
 
 # Check status (shows time since last heartbeat)
 jit claim status
@@ -170,7 +170,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 2. **Coordinate** — Contact the other agent to release
 3. **Force evict** — Admin operation for crashed agents:
    ```bash
-   jit claim force-evict <lease-id> --reason "agent crashed"
+   jit claim force-evict <issue-id> --reason "agent crashed"
    ```
 
 ### Conflict: Merge Conflicts in .jit/
@@ -253,7 +253,7 @@ here, or an invocation supplying `JIT_WORKTREE_WRITE_POLICY=allow`. See
 Configuration Reference for its default, precedence, and the override.
 The two coordination limits apply to `jit claim acquire --ttl 0`. Choose a
 finite lease duration on each claim with `--ttl`; for an indefinite lease, run
-`jit claim heartbeat <lease-id>` explicitly while it is active. An omitted
+`jit claim heartbeat <issue-id>` explicitly while it is active. An omitted
 `--ttl` falls back to the built-in claim lease TTL listed in
 [Runtime Defaults](../reference/runtime-defaults.md).
 
@@ -316,19 +316,19 @@ jit claim status --agent agent:worker-1
 jit claim list
 
 # Force evict
-jit claim force-evict <lease-id> --reason "agent crashed"
+jit claim force-evict <issue-id> --reason "agent crashed"
 
 # Validate repository state
 jit validate --fix
 ```
 
-### Corrupted Control Plane
+### Stale Coordination State
 
 ```bash
 # Clear dead locks, evict expired leases, reclaim stale indefinite ones
 jit recover
 
-# Validate everything
+# Validate repository data
 jit validate
 ```
 
