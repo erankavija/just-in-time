@@ -339,3 +339,23 @@ fn test_blocked_by_missing_dependency_json_reports_missing_state() {
     assert_eq!(blocker["issue_id"], missing_id);
     assert_eq!(blocker["state"], "missing");
 }
+
+#[test]
+fn test_issue_update_classified_failure_reports_its_code_in_json_and_human_modes() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Gated"]).unwrap();
+    let update = |json: bool| {
+        let mut args = vec!["issue", "update", &id, "--add-gate", "unregistered-gate"];
+        args.extend(json.then_some("--json"));
+        cli.command(args).output().unwrap()
+    };
+    let expected = jit::output::ErrorCode::GateNotFound;
+
+    let json_run = update(true);
+    let human_run = update(false);
+
+    let envelope: serde_json::Value = serde_json::from_slice(&json_run.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], String::from(expected));
+    assert_eq!(json_run.status.code(), Some(expected.exit_code().code()));
+    assert_eq!(human_run.status.code(), json_run.status.code());
+}

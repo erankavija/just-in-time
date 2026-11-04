@@ -128,6 +128,16 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             suggestions: vec![INVALID_LABEL_PATTERN_SUGGESTION.to_owned()],
         };
     }
+    if let Some(refused) = error.downcast_ref::<crate::errors::DeletionNotConfirmedError>() {
+        let id = refused.issue_id();
+        return Guidance {
+            details: Some(serde_json::json!({ "id": id })),
+            suggestions: vec![format!(
+                "Set JIT_ALLOW_DELETION=1 environment variable to proceed: \
+                 JIT_ALLOW_DELETION=1 jit issue delete {id}"
+            )],
+        };
+    }
     if let Some(refusal) = error.downcast_ref::<LinkedCheckoutWriteRefusedError>() {
         // The checkout, the stance that refused it, and how to permit the
         // operation (jit:f52567ed REQ-02).
