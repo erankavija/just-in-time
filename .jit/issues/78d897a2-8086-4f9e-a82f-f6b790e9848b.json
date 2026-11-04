@@ -17,9 +17,9 @@
   ],
   "gates_status": {
     "doc-review": {
-      "run_id": "56585f22-d6a7-46dd-91ad-e95f2279e7f3",
+      "run_id": "1208f465-f8be-4b30-a42e-b5186fdffff9",
       "status": "failed",
-      "updated_at": "2026-11-04T09:42:12.514009564Z",
+      "updated_at": "2026-11-04T09:46:52.393467685Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validation and gate references describe views as report selections",
-  "updated_at": "2026-11-04T09:42:12.514009564Z"
+  "updated_at": "2026-11-04T09:46:52.393467685Z"
 }
