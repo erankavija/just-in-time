@@ -23813,3 +23813,4 @@
 {"id":"de6d7a7a-72be-43a7-953c-1952eefec875","issue_id":"420bc076-e7f7-44bb-ad8f-487f106c5534","timestamp":"2026-11-04T07:11:13.234887943Z","type":"issue_completed"}
 {"from":"ready","id":"e5fc3a2a-38fe-4a97-8153-8e8a8a776bfd","issue_id":"4466395d-342d-46c0-b6c8-27d7fd4ab879","timestamp":"2026-11-04T07:11:27.968965419Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"5c523f09-b17a-4c7c-8ade-e5a65647c64f","issue_id":"4466395d-342d-46c0-b6c8-27d7fd4ab879","timestamp":"2026-11-04T07:11:27.968965419Z","type":"issue_claimed"}
+{"fields":["description"],"id":"d13dbc99-46cc-466c-bb33-516ae137d7ac","issue_id":"728ecfb0-ac90-480c-9122-c34cf5187031","timestamp":"2026-11-04T07:17:34.113323615Z","type":"issue_updated","updated_by":"issue-update"}
