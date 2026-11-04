@@ -23811,3 +23811,5 @@
 {"gate_key":"holistic-review","id":"98d605da-742d-4d04-9883-baca231a4b99","issue_id":"420bc076-e7f7-44bb-ad8f-487f106c5534","timestamp":"2026-11-04T07:11:04.607358218Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"43824445-ec06-464c-b844-bc6d6a4f64bb","issue_id":"420bc076-e7f7-44bb-ad8f-487f106c5534","timestamp":"2026-11-04T07:11:13.234887943Z","to":"done","type":"issue_state_changed"}
 {"id":"de6d7a7a-72be-43a7-953c-1952eefec875","issue_id":"420bc076-e7f7-44bb-ad8f-487f106c5534","timestamp":"2026-11-04T07:11:13.234887943Z","type":"issue_completed"}
+{"from":"ready","id":"e5fc3a2a-38fe-4a97-8153-8e8a8a776bfd","issue_id":"4466395d-342d-46c0-b6c8-27d7fd4ab879","timestamp":"2026-11-04T07:11:27.968965419Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"5c523f09-b17a-4c7c-8ade-e5a65647c64f","issue_id":"4466395d-342d-46c0-b6c8-27d7fd4ab879","timestamp":"2026-11-04T07:11:27.968965419Z","type":"issue_claimed"}
