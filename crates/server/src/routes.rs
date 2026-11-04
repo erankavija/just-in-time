@@ -66,7 +66,6 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::WorktreeInfoError
         | ErrorCode::WorktreeListError
         | ErrorCode::WorktreeStoreDivergenceError
-        | ErrorCode::HooksInstallError
         | ErrorCode::GenericError
         | ErrorCode::RecoveryFailed
         | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,

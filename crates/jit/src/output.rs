@@ -21,6 +21,7 @@ mod dep;
 mod emit;
 mod events;
 pub mod failure;
+pub mod hooks;
 mod init;
 mod invariant;
 mod item;
@@ -990,8 +991,6 @@ wire_vocabulary! {
         WorktreeListError = "WORKTREE_LIST_ERROR",
         /// Cross-checkout store comparison failed.
         WorktreeStoreDivergenceError = "WORKTREE_STORE_DIVERGENCE_ERROR",
-        /// Repository hook installation failed.
-        HooksInstallError = "HOOKS_INSTALL_ERROR",
         /// A command failed without a more specific public classification.
         GenericError = "GENERIC_ERROR",
         /// Repository recovery failed.
@@ -1046,7 +1045,6 @@ impl ErrorCode {
             | ErrorCode::WorktreeInfoError
             | ErrorCode::WorktreeListError
             | ErrorCode::WorktreeStoreDivergenceError
-            | ErrorCode::HooksInstallError
             | ErrorCode::GenericError
             | ErrorCode::RecoveryFailed
             | ErrorCode::ServerExited => ExitCode::GenericError,
@@ -1119,7 +1117,6 @@ impl ErrorCode {
             ErrorCode::WorktreeInfoError => "Worktree identity inspection failed.",
             ErrorCode::WorktreeListError => "Worktree enumeration failed.",
             ErrorCode::WorktreeStoreDivergenceError => "Cross-checkout store comparison failed.",
-            ErrorCode::HooksInstallError => "Repository hook installation failed.",
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
             }
@@ -3607,7 +3604,6 @@ mod tests {
                 ErrorCode::WorktreeStoreDivergenceError,
                 ExitCode::GenericError,
             ),
-            (ErrorCode::HooksInstallError, ExitCode::GenericError),
             (ErrorCode::GenericError, ExitCode::GenericError),
             (ErrorCode::RecoveryFailed, ExitCode::GenericError),
             (ErrorCode::ServerExited, ExitCode::GenericError),
@@ -3763,7 +3759,6 @@ mod tests {
             ErrorCode::WorktreeInfoError,
             ErrorCode::WorktreeListError,
             ErrorCode::WorktreeStoreDivergenceError,
-            ErrorCode::HooksInstallError,
             ErrorCode::GenericError,
             ErrorCode::RecoveryFailed,
             ErrorCode::ServerExited,

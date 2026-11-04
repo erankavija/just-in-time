@@ -121,6 +121,15 @@ fn output_in_form(cli: &JitCli, args: &[&str], json: bool) -> Output {
     command.output().unwrap()
 }
 
+fn output_hooks_in_form(cli: &JitCli, json: bool) -> Output {
+    let mut command = cli.command(["hooks", "install"]);
+    command.env("GIT_CEILING_DIRECTORIES", cli.root().parent().unwrap());
+    if json {
+        command.arg("--json");
+    }
+    command.output().unwrap()
+}
+
 /// Bind one projected row to both public invocation forms.
 ///
 /// The expected status comes from the generated projection, not a second
@@ -780,6 +789,58 @@ fn invoke_search_unspawnable_ripgrep(json: bool) -> Vec<Output> {
     vec![command.output().unwrap()]
 }
 
+/// `jit hooks install` outside a Git checkout is an untyped generic failure.
+fn invoke_hooks_without_git(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_hooks_in_form(&cli, json)]
+}
+
+/// A dangling hook target makes installation return an I/O `NotFound` error.
+#[cfg(unix)]
+fn invoke_hooks_target_not_found(json: bool) -> Vec<Output> {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    cli.run(["init"]).unwrap();
+    std::os::unix::fs::symlink(
+        cli.root().join("missing/parent/pre-commit"),
+        cli.root().join(".git/hooks/pre-commit"),
+    )
+    .unwrap();
+    vec![output_hooks_in_form(&cli, json)]
+}
+
+/// A non-writable hooks directory makes installation return `PermissionDenied`.
+#[cfg(unix)]
+fn invoke_hooks_permission_denied(json: bool) -> Vec<Output> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    cli.run(["init"]).unwrap();
+    let hooks = cli.root().join(".git/hooks");
+    let mut permissions = fs::metadata(&hooks).unwrap().permissions();
+    permissions.set_mode(0o555);
+    fs::set_permissions(&hooks, permissions).unwrap();
+
+    let output = output_hooks_in_form(&cli, json);
+
+    let mut permissions = fs::metadata(&hooks).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&hooks, permissions).unwrap();
+    vec![output]
+}
+
+/// A file at `.git/hooks` makes hook installation return `NotADirectory`.
+fn invoke_hooks_external_io_failure(json: bool) -> Vec<Output> {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    cli.run(["init"]).unwrap();
+    let hooks = cli.root().join(".git/hooks");
+    fs::remove_dir_all(&hooks).unwrap();
+    fs::write(hooks, "not a directory").unwrap();
+    vec![output_hooks_in_form(&cli, json)]
+}
+
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
@@ -818,6 +879,12 @@ row_bindings! {
     test_command_exit_codes_search_missing_ripgrep_emits_1: ("search", 1, false) => invoke_search_missing_ripgrep;
     #[cfg(unix)]
     test_command_exit_codes_search_unspawnable_ripgrep_emits_10: ("search", 10, false) => invoke_search_unspawnable_ripgrep;
+    test_command_exit_codes_hooks_install_without_git_emits_1: ("hooks install", 1, false) => invoke_hooks_without_git;
+    #[cfg(unix)]
+    test_command_exit_codes_hooks_install_target_not_found_emits_3: ("hooks install", 3, false) => invoke_hooks_target_not_found;
+    #[cfg(unix)]
+    test_command_exit_codes_hooks_install_permission_denied_emits_5: ("hooks install", 5, false) => invoke_hooks_permission_denied;
+    test_command_exit_codes_hooks_install_external_io_failure_emits_10: ("hooks install", 10, false) => invoke_hooks_external_io_failure;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one

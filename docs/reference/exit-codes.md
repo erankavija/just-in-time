@@ -44,6 +44,10 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
 | `snapshot export` | `6` | The snapshot output path already exists. |  |
 | `claim` | `10` | A lease subcommand was run outside a git repository (leases require git for worktree identity). |  |
+| `hooks install` | `1` | The invocation is outside a git repository, or hook installation failed without a more specific classification. |  |
+| `hooks install` | `3` | A repository path needed to install hooks was not found. |  |
+| `hooks install` | `5` | Filesystem permissions denied hook installation. |  |
+| `hooks install` | `10` | A filesystem or subprocess operation needed to install hooks failed. |  |
 | `gate evaluate, gate evaluate-all, gate evaluate-many` | `4` | A checker ran and its verdict was fail. | yes |
 | `gate evaluate, gate evaluate-all, gate evaluate-many` | `10` | A checker could not run to a verdict (timeout, crash, command not found, or exit status 75). | yes |
 | `validate` | `4` | Repository-integrity, scope, or drift validation found error-severity findings. | yes |
