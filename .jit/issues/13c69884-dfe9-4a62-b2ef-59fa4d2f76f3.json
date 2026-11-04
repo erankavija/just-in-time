@@ -10,10 +10,16 @@
   "documents": [],
   "first_ready_at": "2026-07-18T17:02:52.891543843Z",
   "gates_required": [
-    "tests",
-    "code-review"
+    "code-review",
+    "cargo-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-11-04T22:10:26.296258595Z",
+      "updated_by": null
+    }
+  },
   "id": "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
   "labels": [
     "epic:production-polish",
@@ -23,5 +29,5 @@
   "priority": "low",
   "state": "backlog",
   "title": "Interactive Web UI for Issue Management",
-  "updated_at": "2026-09-19T20:28:56.419904872Z"
+  "updated_at": "2026-11-04T22:10:26.296258595Z"
 }
