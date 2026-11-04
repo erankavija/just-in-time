@@ -563,12 +563,6 @@ impl CommandSchema {
                 "IssueUpdateResponse",
             ),
 
-            // Gate commands
-            "gate_evaluate-many" => (
-                Some(schema_to_value::<GateEvaluateManyResponse>()),
-                "GateEvaluateManyResponse",
-            ),
-
             // Default: no specific schema
             _ => (None, "CommandResponse"),
         };
@@ -1637,26 +1631,6 @@ mod tests {
         assert!(
             output.success_schema.is_some(),
             "gate status-all success_schema should be present"
-        );
-    }
-
-    #[test]
-    fn test_schema_gate_evaluate_many_has_output_schema() {
-        let schema = CommandSchema::generate();
-        let evaluate_many = schema
-            .commands
-            .get("gate")
-            .and_then(|command| command.subcommands.as_ref())
-            .and_then(|commands| commands.get("evaluate-many"))
-            .expect("gate evaluate-many subcommand");
-        let output = evaluate_many
-            .output
-            .as_ref()
-            .expect("gate evaluate-many should have an output schema");
-        assert_eq!(output.success, "GateEvaluateManyResponse");
-        assert!(
-            output.success_schema.is_some(),
-            "gate evaluate-many success_schema should be present"
         );
     }
 

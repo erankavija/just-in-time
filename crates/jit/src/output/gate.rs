@@ -1,9 +1,9 @@
 //! Typed gate definition and preset responses and human rendering.
 
 use super::{
-    render_gate_run_status, GateCheckAllResponse, GateDefinition, GateFindingsResponse,
-    GateFlatReportResponse, GateListResponse, GatePresetListResponse, GateRunHistoryResponse,
-    GateRunLine, GateRunSummary, HumanRender, OutputMode,
+    render_gate_run_status, GateCheckAllResponse, GateDefinition, GateEvaluateManyResponse,
+    GateFindingsResponse, GateFlatReportResponse, GateListResponse, GatePresetListResponse,
+    GateRunHistoryResponse, GateRunLine, GateRunSummary, HumanRender, OutputMode,
 };
 use crate::declarations::GateChecker;
 use crate::domain::identity::{GateKey, IssueId};
@@ -33,11 +33,7 @@ impl GateMutationResponse {
 
 impl HumanRender for GateMutationResponse {
     fn render_human(&self, mode: OutputMode) -> String {
-        if mode.quiet {
-            String::new()
-        } else {
-            format!("{}\n", self.message)
-        }
+        render_line(&self.message, mode)
     }
 }
 
@@ -76,11 +72,7 @@ impl HumanRender for GateDefinitionResponse {
     fn render_human(&self, mode: OutputMode) -> String {
         let gate = &self.definition;
         if self.updated {
-            return if mode.quiet {
-                String::new()
-            } else {
-                format!("Updated gate '{}'\n", gate.key)
-            };
+            return render_line(&format!("Updated gate '{}'", gate.key), mode);
         }
         let mut text = format!(
             "Gate: {}\n  Title: {}\n  Description: {}\n  Stage: {}\n  Mode: {}\n",
@@ -329,6 +321,155 @@ impl HumanRender for GatePresetApplyResponse {
             }
         }
         text
+    }
+}
+
+const PASS_VERDICT: &str = "pass";
+
+/// One line per non-quiet message.
+fn render_line(message: &str, mode: OutputMode) -> String {
+    if mode.quiet {
+        String::new()
+    } else {
+        format!("{message}\n")
+    }
+}
+
+/// Response of `jit gate evaluate`: the gate passed.
+#[derive(Serialize, JsonSchema)]
+pub struct GateEvaluateResponse {
+    issue_id: String,
+    key: GateKey,
+    status: GateStatus,
+    verdict: &'static str,
+    message: String,
+}
+
+impl GateEvaluateResponse {
+    pub fn new(issue_id: String, key: GateKey) -> Self {
+        Self {
+            message: render_gate_run_status(GateRunLine::Passed, &key, &issue_id),
+            issue_id,
+            key,
+            status: GateStatus::Passed,
+            verdict: PASS_VERDICT,
+        }
+    }
+}
+
+impl HumanRender for GateEvaluateResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        render_line(&self.message, mode)
+    }
+}
+
+/// One passed gate of `jit gate evaluate-all`.
+#[derive(Serialize, JsonSchema)]
+pub struct GatePassedEntry {
+    key: GateKey,
+    status: GateStatus,
+    verdict: &'static str,
+}
+
+/// Response of `jit gate evaluate-all`: every required gate passed, in order.
+#[derive(Serialize, JsonSchema)]
+pub struct GateEvaluateAllResponse {
+    issue_id: String,
+    status: GateStatus,
+    verdict: &'static str,
+    gates: Vec<GatePassedEntry>,
+    message: String,
+}
+
+impl GateEvaluateAllResponse {
+    pub fn new(issue_id: String, keys: Vec<GateKey>) -> Self {
+        Self {
+            message: format!(
+                "Passed {} required gate(s) for issue {issue_id}",
+                keys.len()
+            ),
+            issue_id,
+            status: GateStatus::Passed,
+            verdict: PASS_VERDICT,
+            gates: keys
+                .into_iter()
+                .map(|key| GatePassedEntry {
+                    key,
+                    status: GateStatus::Passed,
+                    verdict: PASS_VERDICT,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl HumanRender for GateEvaluateAllResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        if self.gates.is_empty() {
+            return render_line(
+                &format!("No required gates for issue {}", self.issue_id),
+                mode,
+            );
+        }
+        self.gates
+            .iter()
+            .map(|gate| {
+                render_line(
+                    &render_gate_run_status(GateRunLine::Passed, &gate.key, &self.issue_id),
+                    mode,
+                )
+            })
+            .collect()
+    }
+}
+
+impl HumanRender for GateEvaluateManyResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        self.items
+            .iter()
+            .map(|result| match &result.error {
+                None => render_line(
+                    &render_gate_run_status(
+                        GateRunLine::Passed,
+                        &result.key,
+                        result.target.as_str(),
+                    ),
+                    mode,
+                ),
+                Some(error) => format!(
+                    "Failed gate '{}' for issue {}: {}\n",
+                    result.key,
+                    result.target.as_str(),
+                    error["message"].as_str().unwrap_or_default()
+                ),
+            })
+            .collect()
+    }
+}
+
+/// Response of `jit gate fail`: the gate was recorded as failed.
+#[derive(Serialize, JsonSchema)]
+pub struct GateFailResponse {
+    issue_id: String,
+    key: GateKey,
+    status: GateStatus,
+    message: String,
+}
+
+impl GateFailResponse {
+    pub fn new(issue_id: String, key: GateKey) -> Self {
+        Self {
+            message: format!("Failed gate '{key}' for issue {issue_id}"),
+            issue_id,
+            key,
+            status: GateStatus::Failed,
+        }
+    }
+}
+
+impl HumanRender for GateFailResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        render_line(&self.message, mode)
     }
 }
 
