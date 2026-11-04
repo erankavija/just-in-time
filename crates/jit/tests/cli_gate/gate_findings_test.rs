@@ -12,7 +12,7 @@
 //! data across the gate views, while keeping raw stdout available. A checker
 //! that emits no block degrades gracefully (no findings field, no error).
 
-use crate::{create_issue_requiring, define_auto_gate, run_gate_forced};
+use super::{create_issue_requiring, define_auto_gate, run_gate_forced};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;

@@ -1,7 +1,3 @@
-//! `cli_gate` integration-test suite. Aggregates former per-file
-//! integration targets as modules under one Cargo test target so Cargo links
-//! and runs them as a single executable (jit:8d4f7084).
-
 mod bracket_coverage_gate_run_test;
 mod gate_cli_integration_test;
 mod gate_definition_dispatch_test;

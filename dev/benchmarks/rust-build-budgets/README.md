@@ -86,8 +86,9 @@ readelf -SW target/debug/deps/cli_issue-f703e0db7d2b86eb
 The executable-byte budget now uses **at most 10% headroom, rounded down to a
 whole MiB**: `floor(1,177,006,296 × 1.10 / 1,048,576) = 1,234 MiB`, or
 1,293,942,784 bytes (9.935078% headroom). This replaces the historical byte
-budget and its rounding rule below; the target-count and suite-clock budgets
-retain their existing derivations.
+budget and its rounding rule below. The suite consolidation measurement below
+supersedes this byte limit and the earlier target-count derivation; the suite-clock
+budget retains its existing derivation.
 
 ### Panic backtrace reproduction
 
@@ -109,6 +110,107 @@ are relative to `crates/jit`):
 
 The test passed with its expected panic. Keep the generated `.dwo` files in the
 build tree when using these executables for source-line backtraces.
+
+## Two integration suites (jit:b22aabce)
+
+Measured on 2026-11-04 in the same isolated worktree, starting from the unchanged
+`795c63acad811ddc027502f3813d2c0b17763d92` tree with unpacked debug information.
+The after tree changes test topology and its focused commands and budgets;
+production Rust is unchanged. Both artifact captures use the same Rust toolchain,
+`CARGO_INCREMENTAL=0`, `CARGO_CI_NO_SCCACHE=1`, the worktree's `target/` cache,
+and disk-backed scratch at
+`/mnt/nvme/jit/tmp/df129d9e-workers/home/vkaskivuo/Projects/just-in-time/agent-b22aabce`.
+The final full `cargo-ci` validation uses RAM-backed scratch at
+`/dev/shm/jit-ci/b22aabce`; build and fixture caches remain in the worktree.
+These are executable-size measurements, not a comparison of suite timings.
+
+| build | workspace integration targets | active executables | executable bytes |
+| --- | ---: | ---: | ---: |
+| before | 10 | 14 | 1,177,002,600 |
+| two suites | 3 | 7 | 673,455,960 |
+
+The executable reduction is **42.782118%**. The integration-target budget is the
+new workspace count: two `jit` suites plus `server_integration`, with no spare
+entry point. The byte limit follows the existing at-most-10%-headroom rule:
+`floor(673,455,960 × 1.10 / 1,048,576) = 706 MiB`, or 740,294,656 bytes
+(9.924732% headroom). The checker self-test exercises the exact target/byte
+boundaries and one beyond each using its declared limits.
+
+`cli.rs` and `contracts.rs` retain every former target as a module. Their entry
+files move from `main.rs` to `mod.rs` within the same directories, preserving
+fixture paths and property-test regression files. For each row, a former test
+`<path>` becomes `<module>::<path>` under the named target; these are the only
+test-identity changes:
+
+| former target/module | new target | renamed tests |
+| --- | --- | ---: |
+| `cli_gate` | `cli` | 146 |
+| `cli_issue` | `cli` | 309 |
+| `cli_item_validate` | `cli` | 114 |
+| `cli_query_graph` | `cli` | 133 |
+| `cli_repo_workflow` | `cli` | 478 |
+| `fast_docs_templates` | `contracts` | 187 |
+| `fast_issue` | `contracts` | 142 |
+| `fast_rules` | `contracts` | 143 |
+| `scratch_build` | `contracts` | 32 |
+
+Before and after `cargo nextest list --workspace --message-format=json`
+inventories compare **exactly equal** after applying only those moves to the
+before inventory. Both contain 5,038 tests: 1,684 renamed and 3,354 unchanged,
+with zero missing, unexpected, ignored, or filtered tests. The normalized rows
+include binary identity, full test name, and unchanged testcase metadata. Their
+SHA-256 (sorted rows, JSON with sorted keys and compact separators) is
+`68f2947cb00b9fc7453f05e53f056ed7b45b6a9baec590a90b6c12c1f5f10f8b`.
+
+To capture each phase, run these commands before and after the topology edit
+with `phase=before` or `phase=after`, under the environment above:
+
+```sh
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh --cargo test --workspace --no-run --message-format=json > "$phase-artifacts.jsonl"
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh --cargo nextest list --workspace --message-format=json > "$phase-inventory.json"
+flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/rust-build-budget.sh --artifacts-json "$phase-artifacts.jsonl"
+```
+
+The comparison normalizes no names within a former module:
+
+```python
+import hashlib, json
+from pathlib import Path
+
+moves = {name: "cli" for name in (
+    "cli_gate", "cli_issue", "cli_item_validate", "cli_query_graph", "cli_repo_workflow")}
+moves.update({name: "contracts" for name in (
+    "fast_docs_templates", "fast_issue", "fast_rules", "scratch_build")})
+
+def inventory(phase):
+    data = json.loads(Path(f"{phase}-inventory.json").read_text())
+    rows = []
+    for binary, suite in data["rust-suites"].items():
+        assert suite["status"] == "listed"
+        module = binary.removeprefix("jit::")
+        moved = phase == "before" and module in moves
+        for name, case in suite["testcases"].items():
+            assert not case["ignored"]
+            assert case["filter-match"] == {"status": "matches"}
+            rows.append([f"jit::{moves[module]}" if moved else binary,
+                         f"{module}::{name}" if moved else name, case])
+    assert len(rows) == data["test-count"]
+    assert len({tuple(row[:2]) for row in rows}) == len(rows)
+    return sorted(rows, key=lambda row: row[:2])
+
+before, after = inventory("before"), inventory("after")
+assert before == after
+print(len(before), hashlib.sha256(json.dumps(
+    before, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
+```
+
+The normal libtest invocation `cargo test -p jit --test cli --test contracts`
+also passes all 1,180 CLI and 504 contract tests with default thread parallelism,
+so former targets coexist within each suite process. The existing process-state
+policy test still scans all Rust sources recursively. The path audit found no
+process environment or working-directory mutations, target-name nextest filters,
+or fixture paths requiring relocation. CI's focused profile-adoption command now
+selects the `cli` target and `cli_repo_workflow::profile_acceptance_tests::`.
 
 ## Historical gate measurements (2026-10-01)
 
@@ -227,7 +329,9 @@ in `crates/jit/tests/scratch_build/build_profile_policy_tests.rs`.
 
 REQ-02 was measured on 2026-11-04 from a clean `target` directory. With
 `CARGO_CI_NO_SCCACHE=1`, a disk-backed `TMPDIR`, and the shared exclusive Cargo
-locks, both commands ran with `CARGO_INCREMENTAL` unset:
+locks, both commands ran with `CARGO_INCREMENTAL` unset. The commands below preserve
+the former target name at measurement time; current focused commands select
+`contracts` with the `scratch_build::` module prefix:
 
 ```sh
 env -u CARGO_INCREMENTAL ./scripts/cargo-ci.sh --cargo test --workspace --no-run

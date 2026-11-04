@@ -1,7 +1,3 @@
-//! `cli_issue` integration-test suite. Aggregates former per-file
-//! integration targets as modules under one Cargo test target so Cargo links
-//! and runs them as a single executable (jit:8d4f7084).
-
 mod batch_create_tests;
 mod bulk_update_cli_tests;
 mod command_alias_tests;

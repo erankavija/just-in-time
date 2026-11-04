@@ -1,6 +1,6 @@
 //! JSON preset application reports a partial batch as an error envelope.
 
-use crate::create_titled_issue;
+use super::create_titled_issue;
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 

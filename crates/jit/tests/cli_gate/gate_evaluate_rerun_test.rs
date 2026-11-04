@@ -1,7 +1,7 @@
 //! Integration tests for `jit gate evaluate` over a prior pass: an automated
 //! checker executes again, and a manual gate requires a fresh attestation.
 
-use crate::add_auto_gate_issue;
+use super::add_auto_gate_issue;
 use jit::test_cli::JitCli;
 use std::fs;
 

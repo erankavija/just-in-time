@@ -1,7 +1,7 @@
 //! Verify `jit gate status-all --json` omits stdout/stderr for passing runs
 //! by default, retains them for failing runs, and restores them under --full.
 
-use crate::add_auto_gate_issue;
+use super::add_auto_gate_issue;
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 
