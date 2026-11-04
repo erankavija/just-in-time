@@ -8,9 +8,9 @@ Done: 32 of 38 impl tasks. Progress, dispatch log, rework counts and escalations
 
 | Task | State | Notes |
 |---|---|---|
-| 09ca911e storage-record reference docs | landing (my queue job) | committed `ab4647e0e` on its branch |
+| 09ca911e storage-record reference docs | not landed | committed `ab4647e0e` on its branch; three CI attempts failed only the host-load budget (load ~14); re-land when the host is quieter |
 | 725af076 capture refuses whole event-log reads | landing after 09ca911e | committed `fa48c2012`; lead decided the two tests owning removed whole-log arms change (materialize closure, overlay) |
-| 7244ecb2 lease interruption matrix | worker told to stop and commit | if it reports partial, its branch holds the WIP; finish or redispatch |
+| 7244ecb2 lease interruption matrix | implemented, not landed | branch head `06db8e2b3` (impl `035cf6f8e`, main merged); REQ-01..04 done with focused tests passing; the full test run after the merge was not finished, so land it through `land-issue.sh` (its CI is the full run) |
 | 4466395d history isolation test | backlog | |
 | ac8f07c2 storage-format history docs | backlog | 1630015d already updated the storage-format directory tree |
 | f0a5b90a lease operator docs | backlog | owns user docs still showing `<lease-id>` (614a6f97 left claim.md, cli-command-grammar.md, multi-agent-coordination.md, troubleshooting.md, guarantees.md, parallel-work-worktrees.md to it) |
