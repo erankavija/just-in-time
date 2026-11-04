@@ -42,13 +42,12 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `gate preset apply` | `3` | One or more preset targets failed; the findings report retains successful targets and per-target errors. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `gate evaluate, gate evaluate-all` | `4` | A quality-gate checker did not pass. |  |
+| `gate evaluate-many` | `2` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `gate evaluate-many` | `3` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `gate evaluate-many` | `4` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
-| `gate evaluate-many` | `2` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
-| `gate evaluate-many` | `6` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `1` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `gate evaluate-many` | `10` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `gate evaluate-many` | `5` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
-| `gate evaluate-many` | `1` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `gate evaluate-many` | `11` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `profile diff` | `4` | The difference report found targets or final validation that prevent publication. | yes |

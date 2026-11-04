@@ -571,6 +571,25 @@ fn evaluate_all<S: HandlerStore>(
     Ok(Outcome::from(GateEvaluateAllResponse::new(id, keys)).with_warnings(warnings))
 }
 
+// Resolution, gate/transition checks, and repository read/publication failures.
+const EVALUATION_FAILURE_CODES: &[ErrorCode] = &[
+    ErrorCode::InvalidIdPrefix,
+    ErrorCode::AmbiguousId,
+    ErrorCode::IssueNotFound,
+    ErrorCode::GateNotFound,
+    ErrorCode::InvalidArgument,
+    ErrorCode::GateFailed,
+    ErrorCode::Blocked,
+    ErrorCode::ValidationFailed,
+    ErrorCode::ParseError,
+    ErrorCode::GenericError,
+    ErrorCode::IoError,
+    ErrorCode::PermissionDenied,
+    ErrorCode::RepositoryNotFound,
+    ErrorCode::RepositoryFormatUnsupported,
+    ErrorCode::LockTimeout,
+];
+
 /// Each requested issue in argument order, an unresolved id failing its own
 /// entry; any failure makes the batch findings under the first failure's code.
 /// Another agent's lease on any issue refuses the whole batch.
@@ -686,7 +705,7 @@ command_group! {
         "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force)
             raises [GateFailed] -> GateEvaluateAllResponse,
         "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force)
-            findings [ErrorCode::ALL] "The first failing target determines the classified code and status; the findings report retains every target's result."
+            findings [EVALUATION_FAILURE_CODES] "The first failing target determines the classified code and status; the findings report retains every target's result."
             -> GateEvaluateManyResponse,
         "gate_fail" => GateCommands::Fail { id, gate_key, by } => fail(id, gate_key, by) -> GateFailResponse,
     },

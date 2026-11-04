@@ -402,7 +402,7 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// After the handler call, a leaf may declare `raises [Code, ...]`, the
 /// non-universal [`ErrorCode`]s its typed failures classify to, and
 /// one `findings Code "condition"` per code its findings outcome reports
-/// under, or `findings [ErrorCode::ALL] "condition"` for classified batch
+/// under, or `findings [CODES] "condition"` for classified batch
 /// failures. The exit-code projection derives the leaf's rows from these, and
 /// `dispatch` refuses a findings outcome under an undeclared code
 /// ([`LeafCodes::admit`]).
@@ -514,7 +514,7 @@ macro_rules! command_group {
         }
     };
     (@findings $code:ident) => { &[$crate::output::ErrorCode::$code] };
-    (@findings [$codes:expr]) => { &$codes };
+    (@findings [$codes:expr]) => { $codes };
     (@call $handler:ident [$($handler_args:tt)*] ($($arg:expr),*)) => {
         $handler($($handler_args)* $($arg),*)
     };
