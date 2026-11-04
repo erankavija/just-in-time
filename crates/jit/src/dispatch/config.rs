@@ -21,7 +21,7 @@ fn get<S: IssueStore>(
     key: String,
 ) -> anyhow::Result<Outcome<ConfigGetResponse>> {
     Ok(Outcome::Success {
-        response: ctx.executor.config().get_config(&key)?.into(),
+        response: ConfigGetResponse(ctx.executor.config().get_config(&key)?),
         message: None,
     })
 }
@@ -32,7 +32,7 @@ fn set<S: IssueStore + RepositoryStateStore>(
     value: String,
 ) -> anyhow::Result<Outcome<ConfigSetResponse>> {
     Ok(Outcome::Success {
-        response: ctx.executor.config().set_config(&key, &value)?.into(),
+        response: ConfigSetResponse(ctx.executor.config().set_config(&key, &value)?),
         message: None,
     })
 }
@@ -42,8 +42,8 @@ fn set<S: IssueStore + RepositoryStateStore>(
 fn validate<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<ConfigValidateResponse>> {
-    let response = ConfigValidateResponse::from(ctx.executor.config().validate()?);
-    Ok(if response.valid {
+    let response = ConfigValidateResponse(ctx.executor.config().validate()?);
+    Ok(if response.0.valid {
         Outcome::Success {
             response,
             message: Some("Configuration is valid".to_owned()),
@@ -53,7 +53,7 @@ fn validate<S: IssueStore>(
             code: ErrorCode::ValidationFailed,
             message: format!(
                 "Configuration validation failed with {} error(s)",
-                response.errors.len()
+                response.0.errors.len()
             ),
             report: Box::new(response),
         }

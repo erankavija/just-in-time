@@ -18,13 +18,14 @@
 use super::*;
 use crate::config::{EffectiveConfig, JitConfig};
 use crate::errors::InvalidArgumentError;
+use schemars::JsonSchema;
 use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
 /// Returned by [`ConfigOps::set_config`]. `file` is the config file that
 /// was written.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigSetOutcome {
     /// The `section.field` key that was set.
     pub key: String,
@@ -40,7 +41,7 @@ pub struct ConfigSetOutcome {
 /// [`serde_json::Value`] resolved at `key` — a scalar for a leaf, or an
 /// object/array for an intermediate key (`jit config get documentation`
 /// returns the whole section).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigGetOutcome {
     /// The dotted key that was resolved.
     pub key: String,
@@ -49,11 +50,23 @@ pub struct ConfigGetOutcome {
 }
 
 /// Result of `jit config validate`: one message per invalid configuration
-/// source. Empty when every source loads and carries valid values.
-#[derive(Debug, Default)]
+/// source. Valid when no source failed.
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigValidationReport {
+    /// Whether every configuration source loaded with valid values.
+    pub valid: bool,
     /// One message per failing source, in check order.
     pub errors: Vec<String>,
+}
+
+impl ConfigValidationReport {
+    /// Build the report from the failing sources' messages.
+    pub fn new(errors: Vec<String>) -> Self {
+        Self {
+            valid: errors.is_empty(),
+            errors,
+        }
+    }
 }
 
 /// Error resolving a dotted `jit config get` key against an assembled
@@ -347,7 +360,7 @@ impl<S: IssueStore> ConfigOps<'_, S> {
         if let Err(e) = crate::config_manager::ConfigManager::invocation_write_override() {
             errors.push(e.to_string());
         }
-        Ok(ConfigValidationReport { errors })
+        Ok(ConfigValidationReport::new(errors))
     }
 
     /// The type hierarchy declared by the repository's namespace configuration.
