@@ -29,7 +29,7 @@ issue (fetch the body with `jit issue show`):
 }
 ```
 
-After clap accepts the arguments, a JIT-handled failure under `--json` emits
+After arguments are parsed, a command failure under `--json` emits
 exactly one error envelope on stdout and nothing on stderr. A findings outcome
 places its report in `error.details` in that envelope, and the envelope's code
 determines the process exit status. The reported `error.code` is a registered
@@ -46,7 +46,7 @@ through directly, and jit returns the child's status. Its `--json` option shapes
 only wrapper failures; see [worktree exec](worktree-validate.md#jit-worktree-exec).
 
 Parser failures do not use the JSON envelope. A wrong verb prints its hint and
-clap's diagnostic to stderr and exits 2, with or without `--json`.
+the parser's diagnostic to stderr and exits 2, with or without `--json`.
 
 Error responses use a stable top-level `error` object:
 
