@@ -119,19 +119,19 @@
       "issues": [
         {
           "short_id": "5d5a1794",
-          "status": "dispatched",
+          "status": "landed 308aa9485; cargo-ci passed; rework 1 for code-review F1 (create output from returned findings, JSON included); REQ-02 amended by steward",
           "worker": "claude opus",
           "worker_reason": "produces creation-findings; shared helper over five copies"
         },
         {
           "short_id": "8b56c215",
-          "status": "dispatched",
+          "status": "reviewed; pipeline after 5d5a1794",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "mechanical vocabulary"
         },
         {
           "short_id": "ccd6e1fb",
-          "status": "dispatched",
+          "status": "done 9da1c873a",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "multi-file evaluation change"
         }
@@ -223,12 +223,14 @@
   "rework_counts": {
     "c92f4011": 2,
     "ea843d26": 1,
-    "f968dfe1": 1
+    "f968dfe1": 1,
+    "5d5a1794": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
-    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch"
+    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
+    "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone"
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
