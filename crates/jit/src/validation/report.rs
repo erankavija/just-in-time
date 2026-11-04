@@ -32,7 +32,7 @@ wire_vocabulary! {
 /// local rule, or the issue named in a graph-rule message; it is `None` for a
 /// finding that is not attributable to a single issue. The remaining fields
 /// mirror the originating [`Finding`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ReportedFinding {
     /// Full id of the issue this finding concerns, when attributable.
     pub issue_id: Option<IssueId>,

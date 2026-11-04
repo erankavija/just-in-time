@@ -2531,14 +2531,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Publish `draft`, whose id `context` derived, as a new issue, with its
-    /// advisory local-rule findings and the graph-rule findings attributed to it.
+    /// advisory local-rule findings, then the graph-rule findings attributed to
+    /// it, and the count of local-rule findings.
     fn publish_issue_creation(
         &self,
         context: &crate::repository_state::MutationContext,
         draft: Issue,
         explicit_type: bool,
         force: bool,
-    ) -> Result<(Issue, Vec<crate::validation::ReportedFinding>)>
+    ) -> Result<(Issue, Vec<crate::validation::ReportedFinding>, usize)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2623,7 +2624,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 })
                 .collect();
             let plan = finalize(&layout, &image, context, &intents)?;
-            Ok(SessionStep::Apply(plan, (created, findings)))
+            Ok(SessionStep::Apply(
+                plan,
+                (created, findings, validation.warnings.len()),
+            ))
         })
     }
 

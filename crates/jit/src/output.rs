@@ -1766,6 +1766,14 @@ impl From<&MinimalIssue> for UnmetDependency {
     }
 }
 
+/// Response for `issue create`: the created issue's view and its findings.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueCreateResponse {
+    #[serde(flatten)]
+    pub issue: IssueShowResponse,
+    pub findings: Vec<crate::validation::ReportedFinding>,
+}
+
 /// Response for `issue show` command with enriched dependencies
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {

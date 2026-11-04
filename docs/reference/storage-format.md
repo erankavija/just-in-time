@@ -52,7 +52,7 @@ redo record. Initialization writes it and `jit validate --fix` restores it,
 each preserving every line outside that region, and the repository's root
 ignore file is neither read nor written. The store's fixed lock set under
 `.jit/` is
-`.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
+`.repo-write.lock`, `.index.lock` and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
 complete the fixed set, and each checkout over a data root outside every

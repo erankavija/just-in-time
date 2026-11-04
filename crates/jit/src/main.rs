@@ -1829,71 +1829,49 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let jit::commands::IssueCreation { issue, findings } =
-                        executor.issues().create_issue(
-                            title,
-                            description,
-                            prio,
-                            gate,
-                            label,
-                            content_format,
-                            issue_type,
-                            force,
-                        )?;
-
-                    // Local-rule findings print here; graph findings below.
-                    let rules = executor.effective_rules()?;
-                    for finding in findings.iter().filter(|finding| {
-                        !rules.rules.iter().any(|rule| {
-                            rule.name == finding.rule
-                                && rule.scope == jit::declarations::rules::RuleScope::Graph
-                        })
-                    }) {
+                    let creation = executor.issues().create_issue(
+                        title,
+                        description,
+                        prio,
+                        gate,
+                        label,
+                        content_format,
+                        issue_type,
+                        force,
+                    )?;
+                    let (local_findings, graph_findings) = creation.split_findings();
+                    for finding in local_findings {
                         eprintln!("Warning: [{}] {}", finding.rule, finding.message);
                     }
 
                     let output_ctx = OutputContext::new(quiet, json);
 
                     if json {
+                        let issue = creation.issue;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
-                        let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-                        let (gate_runs, _) = executor
-                            .gates()
-                            .get_last_gate_runs_for_issue(&issue.id)
-                            .with_context(|| {
-                                format!("Failed to load gate runs for issue {}", issue.id)
-                            })?;
-                        let response = jit::output::IssueShowResponse::from_issue(
-                            issue,
-                            enriched_deps,
-                            &gate_runs,
-                        );
+                        // A new issue has no dependencies and no gate runs.
+                        let response = jit::output::IssueCreateResponse {
+                            issue: jit::output::IssueShowResponse::from_issue(issue, vec![], &[]),
+                            findings: creation.findings,
+                        };
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // In quiet mode, output just the ID for scripting
                         if quiet {
-                            println!("{}", issue.id);
+                            println!("{}", creation.issue.id);
                         } else {
-                            println!("Created issue: {}", issue.id);
+                            println!("Created issue: {}", creation.issue.id);
                         }
 
-                        // Surface workflow type-hierarchy warnings
-                        // (`TypeHierarchyKind` checks) for the new issue
-                        // unless --force or --quiet. These are GRAPH rule
-                        // findings produced by the rule engine, not a hard-coded
-                        // check. `--orphan` suppresses the orphan-leaf hint
-                        // (acknowledged intentional orphan).
+                        // Graph-rule findings print unless --force or --quiet;
+                        // `--orphan` acknowledges an intentional orphan.
                         if !force && !quiet {
-                            let issues = storage.list_issues()?;
-                            let graph_findings =
-                                executor.validation().evaluate_graph_rules(&issues)?;
-                            for gf in graph_findings.iter().filter(|gf| {
-                                gf.issue_id.as_ref() == Some(&issue.id)
-                                    && !(orphan && gf.finding.rule == "orphan-leaf")
-                            }) {
-                                let _ =
-                                    output_ctx.print_warning(format!("\n{}", gf.finding.message));
+                            for finding in graph_findings
+                                .iter()
+                                .filter(|finding| !(orphan && finding.rule == "orphan-leaf"))
+                            {
+                                let _ = output_ctx.print_warning(format!("\n{}", finding.message));
                             }
                         }
                     }
