@@ -9,6 +9,7 @@
   ],
   "description": "Aggregate the work that makes repository validation one pure function in the validation layer, over records parsed once, with its resolvers, defaults and compiled rules stated once.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure validation-layer function computes the repository report from a captured validation and injected inputs, the history verdicts among them only when its caller is a named history reader.\n- [hard] REQ-02: The validation layer's production code imports nothing from `commands`.\n- [hard] REQ-03: Item links resolve against one address index with item kinds resolved once; issue-id prefixes match container pointers and coverage labels without allocating.\n- [hard] REQ-04: Whole-repository validation parses the index and each issue file once, through one loader, and every pass, record fidelity included, consumes those parsed issues; each schema compiles once per report.\n- [hard] REQ-05: Plan-document references, the content-format default and the strictness default each come from one function.\n\n## Notes\n\n`crates/jit/src/validation/record_fidelity.rs` adds a record-fidelity pass to whole-repository `jit validate`: stored index, issue, gate-run and event-log records must decode and reproduce what the writer would publish. It reads every gate run and the whole event log, so only whole `jit validate` and the built-in `repository_validation` gate checker run it, as the history readers f8a6b298 names under its DEC-19. It reaches the report with document-reference resolution as an optional history input, and the repository checker judges through the same function, history included, so a gate cannot pass where `jit validate` fails.",
   "documents": [],
+  "done_at": "2026-11-04T07:11:13.234887943Z",
   "first_ready_at": "2026-11-04T05:16:37.210567270Z",
   "gates_required": [
     "cargo-ci",
@@ -19,6 +20,12 @@
       "run_id": "9f969641-16df-4c05-9f96-74425c844ae0",
       "status": "passed",
       "updated_at": "2026-11-04T07:07:01.349252774Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "130f863b-aa47-4587-b456-bc5dac5fd4dc",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:11:04.607358218Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +40,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "One pure validation report over parsed records",
-  "updated_at": "2026-11-04T07:07:01.349252774Z"
+  "updated_at": "2026-11-04T07:11:13.234887943Z"
 }
