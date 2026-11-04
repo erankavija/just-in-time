@@ -16,7 +16,14 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c5c68fd5-9966-4c41-86b2-651e506de760",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:47:23.280053722Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "09ca911e-0518-4545-b516-b13cdbfd6834",
   "labels": [
     "type:task",
@@ -32,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The storage-record reference describes verdict and archive-evidence records",
-  "updated_at": "2026-11-04T05:16:50.553130621Z"
+  "updated_at": "2026-11-04T07:47:23.280053722Z"
 }
