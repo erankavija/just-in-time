@@ -719,6 +719,12 @@ impl<T: Serialize> JsonOutput<T> {
         self
     }
 
+    /// Add the warnings listed as the top-level `warnings` array.
+    pub fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = warnings;
+        self
+    }
+
     /// Serialize to JSON string with pretty formatting (returns raw data, no envelope).
     /// A set message is injected as `message`, and non-empty warnings as the
     /// `warnings` array, into the top-level object.

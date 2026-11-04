@@ -988,7 +988,7 @@
       "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
-      "note": "worker holding for 12c0f3fb; resume with its landing commit"
+      "note": "resumed: merge main after 9529b9ac"
     },
     "66790c84": {
       "status": "landing",
@@ -1066,7 +1066,7 @@
       "status": "in_progress",
       "vendor": "Codex gpt-6.1-sol (high)",
       "reason": "self-contained migration without sockets",
-      "note": "WIP 86c4ab98c; waits for 9529b9ac (warnings on findings)"
+      "note": "Codex resume r3 on current forms; lead merged main first (1ac651c7 conflict markers left for Codex to resolve)"
     },
     "06ee9b67": {
       "status": "landing",
@@ -1097,13 +1097,13 @@
       "status": "in_progress",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
-      "note": "waits for 9529b9ac, then Codex resume"
+      "note": "Codex resume r3 on current forms; lead merged main first (1ac651c7 conflict markers left for Codex to resolve)"
     },
     "cd8e04cc": {
       "status": "in_progress",
       "vendor": "Codex gpt-6-astra (default)",
       "reason": "self-contained migration without sockets",
-      "note": "waits for 9529b9ac, then Codex resume"
+      "note": "Codex resume r3 on current forms; lead merged main first (1ac651c7 conflict markers left for Codex to resolve)"
     },
     "8e91126b": {
       "status": "landing",
@@ -1117,7 +1117,7 @@
       "reason": "shared handler contract forms (D-38..D-41); one worker, lands before its dependents"
     },
     "9529b9ac": {
-      "status": "rework",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it",
       "note": "on main f1e434642; code-review F1/F2; rework 1 drops AssetListScope.warnings and the exemption list (D-49)"
