@@ -333,19 +333,6 @@ pub struct GateState {
     pub run_id: Option<GateRunId>,
 }
 
-impl GateState {
-    /// The run of `gate_key` among `runs` this status was projected from.
-    pub fn projected_run<'a>(
-        &self,
-        gate_key: &GateKey,
-        runs: &'a [GateRunResult],
-    ) -> Option<&'a GateRunResult> {
-        let run_id = self.run_id.as_ref()?;
-        runs.iter()
-            .find(|run| &run.run_id == run_id && &run.gate_key == gate_key)
-    }
-}
-
 /// An issue representing a unit of work
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "IssueWire")]
@@ -1012,18 +999,6 @@ impl GateRunResult {
             evaluation_stability: GateEvaluationStability::Stable,
         }
     }
-}
-
-/// The most recently started run among `runs`, or `None` when empty.
-///
-/// Ties on the start instant fall back to the run id so one repository state
-/// always selects one run.
-pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
-    runs.into_iter().max_by(|left, right| {
-        left.started_at
-            .cmp(&right.started_at)
-            .then_with(|| left.run_id.cmp(&right.run_id))
-    })
 }
 
 /// Where a recorded gate verdict came from.

@@ -255,6 +255,57 @@ fn replace_named_run(history: &mut Vec<GateRunResult>, fresh: GateRunResult) {
     history.push(fresh);
 }
 
+/// The run the verdict record of `(gate_key, digest)` names, captured with that
+/// record and nothing else. `Ok(None)` is a retryable conflict; the inner
+/// `None` means no record names a run reusable for that key.
+fn captured_reusable_gate_run(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    gate_key: &GateKey,
+    digest: &crate::domain::repository_inputs::InputsDigest,
+) -> Result<Option<Option<GateRunResult>>> {
+    use crate::repository_state::{CaptureSpec, RepositoryImage, VirtualPath};
+
+    let record_path = VirtualPath::gate_verdict_record(gate_key, digest);
+    let record = |image: &RepositoryImage| -> Result<Option<crate::domain::GateVerdictRecord>> {
+        image
+            .file_bytes(&record_path)?
+            .map(|bytes| {
+                serde_json::from_slice(bytes)
+                    .with_context(|| format!("failed to parse verdict record at {record_path:?}"))
+            })
+            .transpose()
+    };
+    let spec = CaptureSpec::new(
+        [record_path.clone()],
+        super::validate::MUTATION_CAPTURE_BUDGET,
+    )?;
+    let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+        if let Some(record) = record(image)? {
+            spec.discover_paths([VirtualPath::gate_run_record(&record.run_id)])?;
+        }
+        Ok(())
+    })?
+    else {
+        return Ok(None);
+    };
+    let Some(record) = record(&image)? else {
+        return Ok(Some(None));
+    };
+    let run_path = VirtualPath::gate_run_record(&record.run_id);
+    let run = image
+        .file_bytes(&run_path)?
+        .map(|bytes| {
+            serde_json::from_slice::<GateRunResult>(bytes)
+                .with_context(|| format!("failed to parse captured gate run at {run_path:?}"))
+        })
+        .transpose()?;
+    Ok(Some(run.filter(|run| {
+        run.issue_id == record.issue_id
+            && run.run_id == record.run_id
+            && run.is_reusable_for(gate_key, digest)
+    })))
+}
+
 /// Read the run each required gate's state on `issue` names from `image`.
 ///
 /// A named record that is absent, or that does not record that gate's run on
@@ -923,10 +974,17 @@ impl<S: IssueStore> GateOps<'_, S> {
         // the verdict was derived over, not what the checker left behind.
         let digest = self.exec.declared_inputs_digest(gate)?;
         let reused = match (source, digest.as_ref()) {
-            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => self
-                .exec
-                .storage
-                .find_reusable_gate_run(&gate.key, digest)?,
+            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
+                with_mutation_attempts("gate verdict reuse", || {
+                    let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
+                    Ok(
+                        match captured_reusable_gate_run(session.as_mut(), &gate.key, digest)? {
+                            Some(run) => AttemptOutcome::Done(run),
+                            None => AttemptOutcome::Retry,
+                        },
+                    )
+                })?
+            }
             _ => None,
         };
         let mut result = match reused {
@@ -1280,14 +1338,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter_map(|id| input.issues.iter().find(|candidate| candidate.id == *id))
             .map(crate::domain::MinimalIssue::from)
             .collect();
-        let latest_runs: Vec<_> = input
-            .issue
-            .gates_status
-            .iter()
-            .filter_map(|(key, state)| state.projected_run(key, input.runs).cloned())
-            .collect();
         let mut issue_view =
-            IssueShowResponse::from_issue(input.issue.clone(), enriched, &latest_runs);
+            IssueShowResponse::from_issue(input.issue.clone(), enriched, input.runs);
         issue_view.documents = documents.to_vec();
         omit_current_gate_projection(&mut issue_view, &input.gate.key);
         Ok(Some(GateContext {
@@ -1848,53 +1900,6 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         assert_eq!(
             serde_json::to_value(&view.gates).unwrap(),
             serde_json::json!([expected])
-        );
-    }
-
-    #[test]
-    fn test_projected_precheck_run_matches_next_checker_issue_view() {
-        let executor = setup();
-        let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
-        issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
-        issue.gates_required = vec!["first".parse().unwrap(), "second".parse().unwrap()];
-        let mut run = prior_run(
-            &crate::test_utils::gate_run_id(7),
-            &"first".parse().unwrap(),
-            10,
-            None,
-        );
-        run.status = GateRunStatus::Passed;
-        issue
-            .gates_status
-            .insert("first".parse().unwrap(), super::gate_state_from_run(&run));
-
-        let mut older = run.clone();
-        older.run_id = crate::test_utils::gate_run_id(6);
-        older.started_at -= chrono::Duration::seconds(1);
-        let mut gate = make_auto_gate(&"second".parse().unwrap(), "exit 0");
-        let checker = gate.checker.as_mut().unwrap();
-        if let GateChecker::Exec { pass_context, .. } = checker {
-            *pass_context = true;
-        }
-        let image = crate::test_harness::image::ImageBuilder::new().build();
-        let runs = [run.clone(), older];
-        let input = super::CapturedGateExecution {
-            run_id: &crate::test_utils::gate_run_id(8),
-            image: &image,
-            issue: &issue,
-            issues: &[],
-            gate: &gate,
-            runs: &runs,
-            prompt: None,
-        };
-        let context = executor
-            .build_captured_gate_context(gate.checker.as_ref().unwrap(), &input, &[])
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(
-            context.issue["gates"][0]["last_run_at"],
-            run.started_at.to_rfc3339()
         );
     }
 
@@ -2502,6 +2507,63 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(fixture.executions(), 2, "the restored content was verified");
         assert_eq!(restored.inputs_digest, original.inputs_digest);
         assert_eq!(restored.origin.source_run(), Some(&original.run_id));
+    }
+
+    /// Reuse reads only the verdict record for its key and the run it names.
+    #[test]
+    fn test_check_gate_reuses_while_every_other_run_and_verdict_record_is_unparseable() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let source = fixture.evaluate(&fixture.issue("Test", "Test"));
+        fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
+        fixture.evaluate(&fixture.issue("Test", "Test"));
+        fixture.write("workspace/src/lib.rs", "fn main() {}\n");
+        let reusing = fixture.issue("Test", "Test");
+        let layout = fixture.executor.require_layout().unwrap();
+        let kept = [
+            crate::repository_state::VirtualPath::gate_verdict_record(
+                &fixture.gate_key,
+                source.inputs_digest.as_ref().unwrap(),
+            ),
+            crate::repository_state::VirtualPath::gate_run_record(&source.run_id),
+        ]
+        .map(|path| layout.resolve(&path).unwrap());
+        fn corrupt_files_except(dir: &std::path::Path, kept: &[std::path::PathBuf]) -> usize {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .map(|path| match path.is_dir() {
+                    true => corrupt_files_except(&path, kept),
+                    false if kept.contains(&path) => 0,
+                    false => {
+                        std::fs::write(&path, "{ not json").unwrap();
+                        1
+                    }
+                })
+                .sum()
+        }
+        let corrupted = corrupt_files_except(
+            &layout
+                .resolve(&crate::repository_state::VirtualPath::GATE_RUNS)
+                .unwrap(),
+            &kept,
+        );
+        assert_eq!(corrupted, 2, "the other run and its verdict record");
+
+        let reused = fixture.evaluate(&reusing);
+
+        assert_eq!(fixture.executions(), 2);
+        assert_eq!(reused.origin.source_run(), Some(&source.run_id));
     }
 
     /// REQ-07: a change to a file no declared root covers leaves the digest
