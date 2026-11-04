@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-10-20T20:13:19.897488383Z",
   "context": {},
@@ -16,102 +17,18 @@
   "description": "Compute validation once per captured repository image and derive every validation view from that one report. Per-issue, scope and `--explain` validation and the built-in gate checkers currently run their own copies of the same passes, disagree in what they read, and the per-issue view is slower than validating the whole repository.\n\n## Background\n\nWhole-repository `jit validate` runs `validation::repository::validate_repository_with_materializations` over a captured image. The other views run separate pipelines:\n\n- **Executor copies.** Per-issue validation (`run_rules`, `crates/jit/src/commands/validate.rs:1643`), `--scope` (`validate_scope`, `validate.rs:1833`) and `--explain` (`explain_rules`, `validate.rs:1993`) read through storage and the executor's disk-backed caches. They use executor-side copies of the dangling-link pass (`validate.rs:1326` against `validation/repository.rs:670`), the enforcement-drift pass (`validate.rs:1430,1470` against `repository.rs:576`) and the review-placeholder pass (`validate.rs:1766` against `repository.rs:607`).\n- **Gate-checker copies.** `captured_issue_rule_report` and `captured_scope_rule_report` (`crates/jit/src/commands/gate_check.rs:423,487`) repeat the per-issue and scope logic over the image. Each then runs the full `validate_repository` (`gate_check.rs:413-421`) only to keep its dangling-link and drift findings. `rule_validation_outcome` (`validate.rs:1114`) repeats the same setup prelude a third time.\n- **Inverted dependency.** `validation/repository.rs` imports the built-in rule-name constants and `validate_claims_index_at` from `commands` (`repository.rs:522,598,622,733,787`).\n- **History.** Whole validation also judges record fidelity over the whole event log and every gate run, read through `RepositoryMutationSession::read_history_log` outside the capture spec (`validate.rs:969-994`), and resolves each document reference in its own capture (`validate.rs:940-964`). Both reach the report as separate `Result` arguments (`repository.rs:208-209`). Only whole `jit validate` and the `repository_validation` gate checker read that history, as f8a6b298 records under its DEC-19.\n\nMeasured costs on a copy of this repository (1,863 issue files, release build, medians of nine interleaved runs at load average 5–7):\n\n- **Per-issue validation.** `jit validate <id>` takes 5.81 s; whole-repository `jit validate` takes 4.53 s, history included; `--scope <epic>` takes 1.86 s and `--explain` 0.155 s. The per-issue path resolves every link label in the repository through `resolve_link_label` (`crates/jit/src/commands/item.rs:559`), which re-resolves the item kinds and the item address for each label, and only then filters to the one issue.\n- **Capture growth.** Each `CaptureSpec` growth method clones the spec and revalidates every held entry (`crates/jit/src/repository_state/image.rs:586-652,732-753`), so growing a spec one request at a time is quadratic, and the capture's discovery closure re-applies its base requests every round (`validate.rs:408-411`). `--fix` captures the repository more than once.\n- **Repeated parsing.** Whole-repository validation decodes every issue file four times: during capture (`effective_issues`, `validate.rs:785`), for the divergence view and document references (`captured_active_issues`, `crates/jit/src/commands/mod.rs:2161`), in the report's records pass (`repository.rs:378`) and in record fidelity (`crates/jit/src/validation/record_fidelity.rs:74`); the index is parsed by the records pass and again by record fidelity. Local rule evaluation creates a `SchemaEngine` per issue (`crates/jit/src/validation/local.rs:290`), so every JSON Schema recompiles for every issue. Matching an issue-id prefix allocates a normalised copy of every candidate id (`crates/jit/src/domain/identity.rs:345-347`), once per container pointer and candidate issue.\n- **Issue create warnings.** Human-mode `issue create` lists every issue and evaluates every graph rule after the mutation commits, to print warnings for the one new issue (`crates/jit/src/main.rs:1874-1886`). That recaptures a whole validation image: 241 ms against 107 ms with `--quiet` in one run. The JSON path computes no warnings at all.\n- **Fix mode.** `validate --fix` runs a full validation first and uses it only when it applied no fix (`validate.rs:70,101-107`), then publishes each hierarchy fix and each readiness correction as its own mutation.\n- **Link checking.** Document link checking probes external URLs serially, with a new HTTP agent per URL and no deduplication (`crates/jit/src/commands/document.rs:1102-1105,1282`).\n\nSmaller duplication sits on the same paths. Plan-document resolution is written three times (`validate.rs:998,1056`; `repository.rs:633`) and plan content has two readers (`validate.rs:1033,1056`). The content-format default is still reached through two forwarding wrappers (`crates/jit/src/repository_state/projection_render.rs:244`, `commands/mod.rs:2727`).\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one function computes the validation report: a pure function in the validation layer that takes a captured repository image, plus the history verdicts when its caller is a named history reader, and produces the whole-repository report.\n- [hard] REQ-02: Whole-repository, single-issue, container-scope, single-rule and `--explain` validation are each that report filtered by a selection, computed over one capture per view. Only whole-repository validation reads history (the event log and gate runs), as a named history reader (f8a6b298 DEC-19); every other view reads nothing outside its one captured image.\n- [hard] REQ-03: The built-in validation gate checkers report the selected subset of the same report. For a given image, each checker's findings equal the findings `jit validate` reports for the same selection.\n- [hard] REQ-04: One test owns the selection contract: for generated images and selections, the selected report equals the whole report restricted to that selection.\n- [hard] REQ-05: No executor-side copy of the dangling-link, enforcement-drift or review-placeholder pass remains, and no gate checker calls whole-repository validation to extract a subset of its findings.\n- [hard] REQ-06: The validation layer imports nothing from `commands`. Rule names and planning-node resolution live in the validation or domain layer, and the claims-index check receives its inputs from its caller.\n- [hard] REQ-07: Item-link findings resolve every label against one address index built once per report, with item kinds resolved once per report.\n- [hard] REQ-08: On this repository, measured with a release build, `jit validate <id>` takes no longer than whole-repository `jit validate`.\n- [hard] REQ-09: Adding paths to a capture spec validates only the added entries, and a capture applies its base requests once rather than in every discovery round.\n- [hard] REQ-10: A whole-repository validation parses the index and each issue file once, through one loader, and every pass, record fidelity included, consumes those parsed issues.\n- [hard] REQ-11: Each JSON Schema in the rule set compiles once per report.\n- [hard] REQ-12: One function resolves plan-document references for every caller, and the content-format and strictness defaults each come from one configuration accessor.\n- [hard] REQ-13: `issue create` derives its advisory findings for the new issue from the image its mutation captured, reports the same findings in human and JSON output, and performs no repository read or capture after the mutation publishes.\n- [hard] REQ-14: `validate --fix` computes no report before deriving its fixes, publishes every fix through one mutation, and always reports the result of one report computed after the fixes, including when it applied none.\n- [hard] REQ-15: Document link checking probes each distinct external URL once per run, through one HTTP agent with a request timeout and bounded concurrency.\n\n## Notes\n\n- Serves `@/charter/D-20` (one computation per capability), `@/charter/D-18` (unify mechanism rather than add it) and `@/charter/D-19` (history is read only by the commands that report it).\n- Restores `@/inv/convention-convergence` and `@/inv/architecture-dependency-direction`.\n- REQ-04 follows `@/inv/orthogonal-tests`: the selection behavior is proven once against the report, and each view proves only its wiring.",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "a564ca8f948d564e6a61a85679f790e51902d0c664a613f9406414863fce6dad",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "audit.md",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/audit.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "c6380626fb1f220e98643177ab4839373dfc6346b2f5855ccd10a3d3839b9125",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "23afc5dce0c488c9ddb14ac17d4383490645a625face85e9e2eabdbc631d8a2f",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "plan.md",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/plan.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "df6ac1d7d7aecb92784235baf2b7af6b433e5143755de796e7b002820a0a8231",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "evidence-70ac98fc-ci-ancestry.md",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/evidence-70ac98fc-ci-ancestry.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "c37aaee437656e9f60f38c1022d1edaeb9db4a5a007259130b2d207ea3c9a7f9",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "f5a8cfe506e1680121f2a618c0b00c572aae9dfd076cf2c28648c36c29d349f4",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "progress.json",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/progress.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "0d4737a4b1619592fdf587c9f242b8e005d2b26ebfcee88ac67c37c202ba5fac",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "land-pipeline.zsh",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/land-pipeline.zsh"
-        }
-      ],
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session 1 handoff",
-      "path": "dev/active/9876a23a-one-validation-report/handoff.md"
+      "path": "dev/archive/9876a23a-one-validation-report/active/handoff.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "76673a6a1d1b7d06b00478f890a517aebd702d7cf0994bf3f2664cf9961f0b85",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "progress.json",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/progress.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "fff1ffc8b033e9ec6aec6ac65bf18ce8345ee132044ecae3c302637f4a99beb1",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "benchmark/README.md",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/benchmark/README.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "4881598d6038ad2375d7214c4c86efec4b5cc7914dbb2583ae77dfc2cb0a7e29",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "handoff.md",
-          "resolved_path": "dev/active/9876a23a-one-validation-report/handoff.md"
-        }
-      ],
       "commit": null,
       "doc_type": "completion-report",
       "format": "markdown",
       "label": "Completion Report",
-      "path": "dev/active/9876a23a-one-validation-report/completion-report.md"
+      "path": "dev/archive/9876a23a-one-validation-report/active/completion-report.md"
     }
   ],
   "done_at": "2026-11-04T13:28:28.145007507Z",
@@ -146,7 +63,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "archived",
   "title": "Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-04T13:28:28.145007507Z"
+  "updated_at": "2026-11-04T13:29:05.488724168Z"
 }
