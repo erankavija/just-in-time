@@ -341,7 +341,7 @@ EOF
   check "selected sccache fails compiles: the gate exits with the infrastructure status" \
     test "$rc" -eq 75
   check "selected sccache fails compiles: the diagnosis names the wrapper" \
-    grep -qE "compiler wrapper '[^']*sccache-caller-tmpdir.sh'" "$out"
+    grep -qF "compiler wrapper 'sccache'" "$out"
   check "selected sccache fails compiles: the diagnosis carries the wrapper's error" \
     grep -qF "Failed to create temp dir" "$out"
   check "selected sccache fails compiles: no verdict on repository content" \
@@ -582,6 +582,7 @@ EOF
     mkdir -p "$caller"
     (
       cd "$fixture/repo" || exit 3
+      [ -z "$explicit_wrapper" ] || export RUSTC_WRAPPER="$explicit_wrapper"
       PATH="$fixture/bin:$PATH" TMPDIR="$caller" \
         SELFTEST_CARGO_VERSION="$real_cargo_version" \
         SELFTEST_SEEN="$fixture/seen-$name" \
@@ -592,7 +593,14 @@ EOF
     ) >"$fixture/out-$name" 2>&1
     rc=$?
   }
-  local rc caller
+  local rc caller explicit_wrapper=""
+  caller="$fixture/caller-explicit"
+  cp "$fixture/bin/sccache" "$fixture/bin/explicit-wrapper"
+  explicit_wrapper="$fixture/bin/explicit-wrapper"
+  owned_run explicit "$caller" 0 --suite
+  explicit_wrapper=""
+  check "explicit RUSTC_WRAPPER: the caller's wrapper starts with the caller's TMPDIR, in the probe and a compile" \
+    test "$(sort -u "$fixture/server-explicit")" = "$caller" -a "$(wc -l <"$fixture/server-explicit")" -ge 2
   for status in 0 1; do
     caller="$fixture/caller-$status"
     owned_run "suite-$status" "$caller" "$status" --suite

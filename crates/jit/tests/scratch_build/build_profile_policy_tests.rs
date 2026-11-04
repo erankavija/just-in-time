@@ -228,16 +228,17 @@ fn test_cargo_build_scripts_share_the_host_lock_and_enable_available_sccache() {
         gate.contains("CARGO_CI_NO_SCCACHE")
             && gate.contains("[ -z \"${RUSTC_WRAPPER:-}\" ]")
             && gate.contains("command -v sccache")
-            && gate.contains("sccache-caller-tmpdir.sh\"")
+            && gate.contains("caller-tmpdir-wrapper.sh\"")
+            && gate.contains("export CARGO_CI_CALLER_RUSTC_WRAPPER=\"$RUSTC_WRAPPER\"")
             && gate.contains("export RUSTC_WRAPPER"),
-        "the gate must select host sccache through the caller-TMPDIR wrapper when available while preserving an explicit wrapper and an opt-out"
+        "the gate must route host sccache or an explicit wrapper through the caller-TMPDIR wrapper while preserving the explicit wrapper and an opt-out"
     );
     assert!(
-        root.join("scripts/sccache-caller-tmpdir.sh").is_file()
-            && fs::read_to_string(root.join("scripts/sccache-caller-tmpdir.sh"))
-                .expect("read scripts/sccache-caller-tmpdir.sh")
-                .contains("exec sccache \"$@\""),
-        "the sccache wrapper must exist and hand every invocation to sccache"
+        root.join("scripts/caller-tmpdir-wrapper.sh").is_file()
+            && fs::read_to_string(root.join("scripts/caller-tmpdir-wrapper.sh"))
+                .expect("read scripts/caller-tmpdir-wrapper.sh")
+                .contains("exec \"${CARGO_CI_CALLER_RUSTC_WRAPPER:-sccache}\" \"$@\""),
+        "the wrapper must exist and hand every invocation to the caller's wrapper, or sccache"
     );
     assert!(
         gate.contains("[ \"${1:-}\" = \"--cargo\" ]")

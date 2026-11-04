@@ -20,8 +20,8 @@ set -euo pipefail
 # The run owns and removes its temporary directory: every Cargo, rustc and test
 # process, the wrapper probe and `--cargo` included, runs with TMPDIR set to a
 # directory made inside the caller's TMPDIR, and the directory goes on every
-# exit, including a trapped INT, TERM or HUP. A compiler-cache server the
-# run starts keeps the caller's TMPDIR (scripts/sccache-caller-tmpdir.sh).
+# exit, including a trapped INT, TERM or HUP. A compiler-wrapper daemon the
+# run starts keeps the caller's TMPDIR (scripts/caller-tmpdir-wrapper.sh).
 #
 # Exit codes:
 #   0 — all steps passed
@@ -286,10 +286,18 @@ ensure_real_cargo
 # deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
 # changes Cargo fingerprints, so operators should clean a large pre-existing
 # target directory before opting an established checkout into this default.
+# Whichever wrapper runs goes through one script that restores the caller's
+# TMPDIR, because a daemon it starts or restarts mid-run outlives the run's own.
+# Its stable path keeps Cargo fingerprints stable across runs.
+unset CARGO_CI_CALLER_RUSTC_WRAPPER
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  export CARGO_CI_CALLER_RUSTC_WRAPPER="$RUSTC_WRAPPER"
+fi
 if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
-  # Its server inherits the environment of the compile that starts it, so a
-  # stable-path wrapper restores the caller's TMPDIR for it.
-  RUSTC_WRAPPER="$(cd "$(dirname "$0")" && pwd)/sccache-caller-tmpdir.sh"
+  RUSTC_WRAPPER=sccache
+fi
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  RUSTC_WRAPPER="$(cd "$(dirname "$0")" && pwd)/caller-tmpdir-wrapper.sh"
   export RUSTC_WRAPPER
 fi
 
@@ -316,6 +324,8 @@ ensure_compiler_wrapper_runs() {
     wrapper=$(grep -oE "(process didn't exit successfully: |could not execute process )\`[^\`]*" "$probe/out" |
       tail -1 | sed "s/^[^\`]*\`//" |
       awk '{ for (i = 1; i <= NF && $i !~ /(^|\/)rustc$/; i++) printf "%s%s", (i > 1 ? " " : ""), $i }' || true)
+    [ -z "${RUSTC_WRAPPER:-}" ] || [ "$wrapper" != "$RUSTC_WRAPPER" ] ||
+      wrapper="${CARGO_CI_CALLER_RUSTC_WRAPPER:-sccache}"
     echo "cargo-ci: infrastructure fault (exit 75): compiler wrapper '$wrapper' cannot compile an empty crate; no step ran"
     tail -20 "$probe/out"
     echo "       Repair the wrapper and retry: a shared daemon may need stopping"
