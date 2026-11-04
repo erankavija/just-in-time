@@ -439,6 +439,10 @@
     {
       "item": "735949ef holistic-review 2413b19d F1: story REQ-03 \"validation capture no other issue run records\" vs epic REQ-13 whole-repo validate as history reader. Recommend (a) amend story REQ-03",
       "status": "resolved: steward (a), DEC-27, 735949ef D-1; one rerun over amended story"
+    },
+    {
+      "item": "5ee85aed holistic-review 0dbcc3b2 and f7396783 F1: external-repo cutover evidence is self-attested by construction; options (a) raw bundle, (b) ruling, (c) reviewer with checkouts",
+      "status": "pending with just-in-time-6a"
     }
   ],
   "rework_counts": {

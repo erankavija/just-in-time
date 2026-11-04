@@ -349,13 +349,41 @@ behavior depends on the arguments.
   not fail the run. A built-in `repository_validation` gate runs this same
   computation and never passes where it fails; see
   [gate presets](gate-presets.md) for its `failed` and `error` runs.
-- **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
-  issue. The id accepts a full UUID, 8-char short id, or unique prefix.
+- **Per-issue** (`jit validate <id>`): reports the findings concerning that
+  one issue. The id accepts a full UUID, 8-char short id, or unique prefix.
 - **Selected rule** (`jit validate <id> --rule <rule>`): applies exactly one
   configured graph rule with that issue as its sole firing subject. The complete
   repository remains graph and identifier-resolution context only; a missing,
   disabled, non-graph, or non-matching rule is an error rather than a vacuous
   pass.
+- **Explain** (`jit validate <id> --explain`): every configured rule's outcome
+  for that issue; a matched rule fails exactly when the per-issue view holds a
+  finding of it.
+- **Scope** (`jit validate --scope <id>`): the findings of a container's bracket
+  scope, the issues in its transitive dependency closure bounded at its
+  template's breakdown node, excluding the graph rules that need the whole
+  repository at transition time. It is shaped as a deterministic gate checker.
+
+#### Views
+
+Every mode above except whole-repository validation is a view: a selection of
+the one whole-repository report. Rules evaluate over the whole repository, and
+the view keeps the findings its selection admits, so a coverage child or
+dependency target outside the selected issue or scope still counts. Views skip
+the history reads. Selections differ only in what they admit:
+
+- **Unloadable rule set.** The per-issue, selected-rule, and scope views report
+  it as the `rules-file` finding; `--explain` fails with that finding's message.
+- **Enforcement drift.** `enforcement-drift` findings appear in the scope view
+  and never in the per-issue, explain, or selected-rule views.
+- **Graph-rule configuration errors.** The per-issue and explain views admit
+  one when the rule applies to the issue and the error concerns that issue or
+  no single issue. The selected-rule view admits the selected rule's error under
+  the same condition. The scope view admits one that concerns a scope member, or
+  concerns no single issue and comes from a rule that applies to a member.
+
+Each built-in validation gate checker reports what its view reports; see
+[gate presets](gate-presets.md#portable-checker-types).
 
 `--fix` additionally repairs the auto-fixable findings (type-hierarchy label
 fixes, transitive-reduction violations, pending state transitions) and
@@ -375,8 +403,8 @@ for expiry and references to missing worktrees or issues.
 |--------|-------------|
 | `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
-| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)). Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
-| `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
+| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`; findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)). Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
+| `--scope <ID>` | Report the findings of a container's bracket scope as a deterministic gate checker. Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
@@ -453,13 +481,15 @@ its repairs complete). It signals findings by exiting non-zero:
 It fails as a usage error when `--dry-run` is given without `--fix`, and on the
 hidden `--divergence` stub, which errors and redirects to `--branch-drift` or
 `jit query divergence`. It fails as not-found when the positional issue id or the
-`--scope` container does not resolve.
+`--scope` container does not resolve. A rule pass that fails, such as a rule
+reading a planning document that is missing, fails every view with that error
+rather than reporting a clean selection; whole-repository validation reports it
+as a structural failure beside the findings collected before it.
 
 For `--rule`, a missing, disabled, non-graph, or non-matching configured rule is
-a `VALIDATION_FAILED` finding and exits `4`, just like an uncovered selected application
-([exit-code reference](exit-codes.md#command-specific-mappings)). Only invalid
-flag combinations or a missing required positional issue id are usage errors
-and exit `2`.
+a `VALIDATION_FAILED` finding and exits `4`, just like an uncovered selected
+application ([exit-code reference](exit-codes.md#command-specific-mappings)). Only invalid flag combinations or a missing required positional issue id are
+usage errors and exit `2`.
 
 The code each outcome exits with — including the codes that signal findings
 rather than errors — is in the [Exit Codes reference](exit-codes.md).

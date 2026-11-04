@@ -56,9 +56,9 @@
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "0dbcc3b2-46a0-44f9-826a-ac4c56d617a8",
+      "run_id": "f7396783-9407-412d-8622-679ca7bba941",
       "status": "failed",
-      "updated_at": "2026-11-04T09:35:24.489233732Z",
+      "updated_at": "2026-11-04T09:39:18.274878809Z",
       "updated_by": "auto:executor"
     }
   },
@@ -75,5 +75,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Leases are per-issue records under one lease sequence",
-  "updated_at": "2026-11-04T09:36:28.587949931Z"
+  "updated_at": "2026-11-04T09:39:18.274878809Z"
 }

@@ -42,9 +42,11 @@ rules.
 - **Local (per-issue) rules** run on the **write path** — issue create and
   update — against the issue's final shape. An `error` finding from an
   `enforce = true` local rule blocks the write (exit 4).
-- **Graph rules** run in three places:
-  - **`jit validate`** evaluates them across the **whole repository**.
-  - **Gate checkers** can run them as a quality gate.
+- **Graph rules** run in two places:
+  - **`jit validate`** evaluates them across the **whole repository**. Its
+    per-issue, explain, selected-rule, and scope views and the built-in
+    validation gate checkers are selections of that one evaluation
+    ([views](../reference/worktree-validate.md#views)).
   - **State transitions** evaluate the graph rules applicable to the issue **in
     its target state** (so `when = { state = "done" }` runs only at the done
     transition), scoped to the issue's **dependency neighborhood** (the issue
