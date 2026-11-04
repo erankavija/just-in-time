@@ -153,9 +153,9 @@ pub enum GateRegistryEditError {
 pub(crate) use overlay::overlaid_issue_ids;
 pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
-    repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, VirtualPath, BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
-    RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
+    is_graph_relevant_data_path, repository_relative_path, RepositoryLayout, RepositoryLayoutError,
+    RepositoryRootClass, RepositoryRootEvidence, VirtualPath, BOOTSTRAP_LOCK_FILE,
+    EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
 };
 pub use profile_apply::{
     compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,
