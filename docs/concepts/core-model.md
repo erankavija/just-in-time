@@ -915,9 +915,6 @@ Projects add their own types alongside these. This repository, for example,
 declares `bug`, `enhancement`, `planning`, and `breakdown`; the research example
 under `docs/examples/research/` uses `goal` and `experiment` instead.
 
-`--orphan` concerns missing parent membership labels for leaf issues; it is not a
-type-label exception.
-
 ### Common Label Namespaces
 
 **Organization labels** (optional but recommended):

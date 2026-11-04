@@ -1804,7 +1804,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     label,
                     content_format,
                     force,
-                    orphan: _,
                 } => {
                     let gate = parse_gate_keys(gate, json)?;
 
