@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4e65c5b1-e126-48b9-8a29-9a3345cc449c",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:46:41.791319011Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5e1ba005-b066-4473-9a23-d414a17038c7",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive preview reads the per-target evidence record",
-  "updated_at": "2026-11-04T02:11:18.833120692Z"
+  "updated_at": "2026-11-04T02:46:41.791319011Z"
 }
