@@ -126,12 +126,12 @@ sequenceDiagram
     A2->>L: jit claim acquire abc123
     L-->>A1: lock acquired
     Note over A2: blocked waiting for lock
-    A1->>A1: read claims index
+    A1->>A1: read the issue's lease record
     A1->>A1: verify no active lease
     A1->>A1: write new claim
     A1->>L: release lock
     L-->>A2: lock acquired
-    A2->>A2: read claims index
+    A2->>A2: read the issue's lease record
     A2->>A2: verify no active lease
     Note over A2: ERROR: Already claimed
 ```
@@ -411,9 +411,10 @@ worktree of the repository.
 └── events.jsonl              # Append-only event log
 
 .git/jit/
-├── claims.jsonl              # Claim log (append-only); `jit claim heartbeat` appends here and updates the index
-├── claims.index.json         # Active claims (exclusive lock)
-└── locks/claims.lock         # Advisory lock guarding claim-log operations
+├── leases/{issue-id}.json    # The issue's lease (changed under the lock)
+├── claims.seq                # Last claim-log sequence number
+├── claims.jsonl              # Claim history (append-only)
+└── locks/claims.lock         # Advisory lock serializing lease changes
 ```
 
 **Synchronization points:**

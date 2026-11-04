@@ -578,6 +578,14 @@ impl ArchiveOps<'_, JsonFileStorage> {
                     .clone(),
             },
         };
+        let evidence_path =
+            crate::repository_state::VirtualPath::archive_evidence_record(&plan_target);
+        if !capture_more(session, &mut image, |spec| {
+            spec.discover_paths(evidence_path.ancestor_directories()?)?;
+            Ok(spec.discover_paths([evidence_path])?)
+        })? {
+            return Ok(None);
+        }
         let legacy = artifact_destination_root(&plan_target, &policy.archive_root);
         let mut conflicts = Vec::new();
         let destination = if let Some(id) = root_id.as_ref() {

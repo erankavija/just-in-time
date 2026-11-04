@@ -1020,6 +1020,11 @@ mod tests {
         let records = [
             VirtualPath::EVENTS,
             VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(1)),
+            VirtualPath::archive_evidence_record(
+                &crate::domain::artifact_plan::PlanTarget::Document {
+                    path: "doc.md".into(),
+                },
+            ),
             VirtualPath::INDEX,
         ];
         let written = records

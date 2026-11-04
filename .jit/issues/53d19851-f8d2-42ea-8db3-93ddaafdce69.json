@@ -25,10 +25,11 @@
     "enforces:@/invariant/canonical-cutover",
     "satisfies:f8a6b298/REQ-07",
     "satisfies:f8a6b298/REQ-12",
-    "component:validation"
+    "component:validation",
+    "resolution:merged-into-2f563673"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Claims-index rebuild machinery is gone",
-  "updated_at": "2026-11-02T23:40:46.530618346Z"
+  "updated_at": "2026-11-04T00:44:19.032721446Z"
 }

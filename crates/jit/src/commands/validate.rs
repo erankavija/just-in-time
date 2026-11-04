@@ -926,7 +926,8 @@ fn capture_document_reference_validation(
     Ok(Some(Ok(())))
 }
 
-/// Capture every gate-run and verdict record, read the whole event log, and judge the
+/// Capture every gate-run, verdict and archive-evidence record, read the whole
+/// event log, and judge the
 /// stored records against `image`. Whole-repository validation pays these
 /// reads; no other capture does.
 fn capture_record_fidelity_validation(
@@ -934,15 +935,16 @@ fn capture_record_fidelity_validation(
     image: &crate::repository_state::RepositoryImage,
 ) -> Result<Option<Result<()>>> {
     let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
-    let Some(gate_runs) = super::capture_discovering(session, spec, |image, spec| {
-        super::discover_gate_records(image, spec)
+    let Some(records) = super::capture_discovering(session, spec, |image, spec| {
+        super::discover_gate_records(image, spec)?;
+        discover_archive_evidence_records(image, spec)
     })?
     else {
         return Ok(None);
     };
     let events = session.read_history_log()?;
     let drift =
-        crate::validation::record_fidelity::record_drift(image, &gate_runs, events.as_deref())?;
+        crate::validation::record_fidelity::record_drift(image, &records, events.as_deref())?;
     Ok(Some(match drift.is_empty() {
         true => Ok(()),
         false => Err(
@@ -954,6 +956,37 @@ fn capture_record_fidelity_validation(
             .into(),
         ),
     }))
+}
+
+fn discover_archive_evidence_records(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+) -> Result<()> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let root = VirtualPath::ARCHIVE_EVIDENCE;
+    spec.discover_paths([root.clone()])?;
+    spec.discover_listing(root.clone())?;
+    for (directory, listing) in image.directory_listings().iter().filter(|(path, _)| {
+        path.root_class() == root.root_class()
+            && (path == &&root
+                || path.relative().as_path().parent() == Some(root.relative().as_path()))
+    }) {
+        let paths = listing
+            .names()
+            .iter()
+            .filter(|name| directory == &root || name.ends_with(".json"))
+            .map(|name| VirtualPath::data(directory.relative().as_path().join(name)))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        spec.discover_paths(paths)?;
+    }
+    spec.discover_listings(image.entries().iter().filter_map(|(path, entry)| {
+        (path.root_class() == root.root_class()
+            && path.relative().as_path().parent() == Some(root.relative().as_path())
+            && matches!(entry, RepositoryEntry::Directory { .. }))
+        .then_some(path.clone())
+    }))?;
+    Ok(())
 }
 
 /// Each breakable container's linked plan-document path.
@@ -2158,7 +2191,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
 
     /// Validate all active leases are consistent and not stale.
     ///
-    /// Checks claims.index.json for:
+    /// Checks every lease record for:
     /// - Expired leases (TTL exceeded)
     /// - Leases referencing non-existent worktrees
     /// - Leases referencing non-existent issues
@@ -2411,6 +2444,32 @@ mod tests {
         );
         let repaired = stale.replacen(STALE_LABEL_ASSERTION, DEFAULT_LABEL_ASSERTION, 1);
         (stale, repaired)
+    }
+
+    #[test]
+    fn test_validate_silent_captures_archive_evidence_for_record_fidelity() {
+        use crate::domain::artifact_plan::PlanTarget;
+        use crate::repository_state::VirtualPath;
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config("").unwrap();
+        for target in [
+            PlanTarget::Document {
+                path: "docs/plan.md".into(),
+            },
+            PlanTarget::Container {
+                id: crate::test_utils::issue_id(1),
+            },
+        ] {
+            let path = VirtualPath::archive_evidence_record(&target);
+            let physical = executor.storage.root().join(path.relative().as_path());
+            std::fs::create_dir_all(physical.parent().unwrap()).unwrap();
+            std::fs::write(&physical, b"not json").unwrap();
+            let error = executor.validation().validate_silent().unwrap_err();
+            assert!(
+                format!("{error:#}").contains(&path.repository_relative()),
+                "{error:#}"
+            );
+            std::fs::remove_file(physical).unwrap();
+        }
     }
 
     #[test]

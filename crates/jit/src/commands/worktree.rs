@@ -228,7 +228,7 @@ pub fn execute_worktree_list(
 /// source injected.
 ///
 /// This holds the real command logic (running `git worktree list`, loading the
-/// claims index, resolving each worktree's identity, and counting active
+/// leases, resolving each worktree's identity, and counting active
 /// claims); the public wrapper supplies the invocation's authoritative `paths`
 /// and a [`SystemClock`](crate::storage::clock::SystemClock). `now` for every
 /// per-worktree expiry check is read once from `clock`, so a test can drive
@@ -562,7 +562,6 @@ mod tests {
                 acquired_at: now,
                 expires_at: None,
                 last_beat: now,
-                stale: false,
             })
             .collect();
 

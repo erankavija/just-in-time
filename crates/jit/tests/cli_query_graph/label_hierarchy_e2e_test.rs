@@ -151,8 +151,7 @@ fn test_type_hierarchy_warnings() {
         .expect("Should succeed with --force flag");
     }
 
-    // Create an orphaned task (no epic or milestone label)
-    // Should succeed with --orphan flag
+    // Create an orphaned task (no epic or milestone label); orphans are allowed.
     cli.run([
         "issue",
         "create",
@@ -160,9 +159,8 @@ fn test_type_hierarchy_warnings() {
         "Orphaned Task",
         "--label",
         &task_type,
-        "--orphan",
     ])
-    .expect("Should succeed with --orphan flag");
+    .expect("an orphaned task is created");
 }
 
 #[test]

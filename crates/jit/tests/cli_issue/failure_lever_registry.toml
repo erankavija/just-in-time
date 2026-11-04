@@ -45,8 +45,8 @@ confirmation = "invoked"
 [[arms]]
 path = "claim renew"
 argv = ["claim", "renew", "00000000-0000-0000-0000-000000000000", "--json"]
-setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease"]
-setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating lease storage and its locks before the missing lease lookup."
+setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease"]
+setup_notes = "claim:active-lease seeds one valid issue and acquires a finite lease for it, creating its lease record and the claims lock before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
 expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
@@ -54,8 +54,8 @@ confirmation = "invoked"
 [[arms]]
 path = "claim heartbeat"
 argv = ["claim", "heartbeat", "00000000-0000-0000-0000-000000000000", "--json"]
-setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease"]
-setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating lease storage and its locks before the missing lease lookup."
+setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease"]
+setup_notes = "claim:active-lease seeds one valid issue and acquires a finite lease for it, creating its lease record and the claims lock before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
 expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
@@ -63,26 +63,26 @@ confirmation = "invoked"
 [[arms]]
 path = "claim status"
 argv = ["claim", "status", "--json"]
-setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:index-with-active-lease", "malformed-claim-index"]
-setup_notes = "malformed-claim-index uses test_lease_store to corrupt the issue's lease storage with invalid JSON after claim:index-with-active-lease has created it."
-expected_failure = "PARSE_ERROR: Failed to parse claims index"
+setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease", "malformed-lease-record"]
+setup_notes = "malformed-lease-record uses test_lease_store to corrupt the issue's lease record with invalid JSON after claim:active-lease has created it."
+expected_failure = "PARSE_ERROR: Failed to parse lease record"
 expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
 path = "claim list"
 argv = ["claim", "list", "--json"]
-setup = ["init", "git:repository-with-head", "claim:index-with-active-lease", "malformed-claim-index"]
-setup_notes = "malformed-claim-index uses test_lease_store to corrupt the issue's lease storage with invalid JSON after claim:index-with-active-lease has created it."
-expected_failure = "PARSE_ERROR: Failed to parse claims index"
+setup = ["init", "git:repository-with-head", "claim:active-lease", "malformed-lease-record"]
+setup_notes = "malformed-lease-record uses test_lease_store to corrupt the issue's lease record with invalid JSON after claim:active-lease has created it."
+expected_failure = "PARSE_ERROR: Failed to parse lease record"
 expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
 path = "claim force-evict"
 argv = ["claim", "force-evict", "00000000-0000-0000-0000-000000000000", "--reason", "probe", "--json"]
-setup = ["init", "git:repository-with-head", "claim:index-with-active-lease"]
-setup_notes = "claim:index-with-active-lease seeds one valid issue and acquires a finite lease for it, creating lease storage and its locks before the missing lease lookup."
+setup = ["init", "git:repository-with-head", "claim:active-lease"]
+setup_notes = "claim:active-lease seeds one valid issue and acquires a finite lease for it, creating its lease record and the claims lock before the missing lease lookup."
 expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
 expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"

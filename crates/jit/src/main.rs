@@ -1804,7 +1804,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     label,
                     content_format,
                     force,
-                    orphan,
                 } => {
                     let gate = parse_gate_keys(gate, json)?;
 
@@ -1864,15 +1863,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             println!("Created issue: {}", creation.issue.id);
                         }
 
-                        // Graph-rule findings print unless --force or --quiet;
-                        // `--orphan` acknowledges an intentional orphan.
-                        if !force && !quiet {
-                            for finding in graph_findings
-                                .iter()
-                                .filter(|finding| !(orphan && finding.rule == "orphan-leaf"))
-                            {
-                                let _ = output_ctx.print_warning(format!("\n{}", finding.message));
-                            }
+                        for finding in graph_findings {
+                            let _ = output_ctx.print_warning(format!("\n{}", finding.message));
                         }
                     }
                 }
@@ -7095,7 +7087,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 }
 
 /// Render one lease for plain-text `claim status` and `claim list`.
-fn print_lease(lease: &jit::storage::Lease) {
+fn print_lease(listed: &jit::commands::claim::ListedLease) {
+    let lease = &listed.lease;
     let now = chrono::Utc::now();
     println!("Lease: {}", lease.lease_id);
     println!("  Issue:    {}", lease.issue_id);
@@ -7123,7 +7116,7 @@ fn print_lease(lease: &jit::storage::Lease) {
             lease.last_beat,
             since_beat.num_seconds()
         );
-        if lease.stale {
+        if listed.stale {
             println!(
                 "  STALE: Lease marked stale (no heartbeat for {} minutes)",
                 since_beat.num_minutes()
