@@ -959,7 +959,8 @@
     "4a01ccba": 2,
     "10fdad38": 1,
     "9be5b0de": 2,
-    "3b696589": 1
+    "3b696589": 1,
+    "24a982b7": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1368,10 +1369,10 @@
       "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114"
     },
     "24a982b7": {
-      "status": "landing",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
-      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44)"
+      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker."
     },
     "ceaaf0ab": {
       "status": "done",
@@ -1384,6 +1385,11 @@
       "status": "dispatched",
       "vendor": "Claude Opus",
       "reason": "largest remaining move (~580 main.rs lines, 10 leaves)"
+    },
+    "5d09e74b": {
+      "status": "landing",
+      "review": "lead PASS at ec563eba2: domain/relative_path.rs, all importers moved, stale comment gone, structural test; +27 (b697a3f7 ledger)",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
