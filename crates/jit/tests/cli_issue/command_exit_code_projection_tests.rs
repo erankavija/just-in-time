@@ -923,6 +923,45 @@ fn invoke_worktree_identity_io_failure(json: bool) -> Vec<Output> {
     worktree_inspection_outputs(&cli, json)
 }
 
+/// A linked checkout whose store `worktree store-divergence` compares against
+/// the primary checkout's, with the linked store selected on the child alone.
+fn linked_store_divergence_repo() -> JitCli {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.git(["worktree", "add", "linked"]).unwrap();
+    cli
+}
+
+fn store_divergence_output(cli: &JitCli, json: bool) -> Output {
+    let selected = cli.root().join("linked/.jit");
+    let mut command = cli.command_with_env(
+        ["worktree", "store-divergence"],
+        [("JIT_DATA_DIR", selected.as_os_str())],
+    );
+    if json {
+        command.arg("--json");
+    }
+    command.output().unwrap()
+}
+
+/// A primary store root that cannot be searched denies reading its records.
+#[cfg(unix)]
+fn invoke_store_divergence_permission_denied(json: bool) -> Vec<Output> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let cli = linked_store_divergence_repo();
+    let primary_store = cli.root().join(".jit");
+    let original = fs::metadata(&primary_store).unwrap().permissions();
+    let mut denied = original.clone();
+    denied.set_mode(0o600);
+    fs::set_permissions(&primary_store, denied).unwrap();
+
+    let output = store_divergence_output(&cli, json);
+
+    fs::set_permissions(&primary_store, original).unwrap();
+    vec![output]
+}
+
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
@@ -971,6 +1010,8 @@ row_bindings! {
     #[cfg(unix)]
     test_command_exit_codes_worktree_identity_permission_denied_emits_5: ("worktree info, worktree list", 5, false) => invoke_worktree_identity_permission_denied;
     test_command_exit_codes_worktree_identity_io_failure_emits_10: ("worktree info, worktree list", 10, false) => invoke_worktree_identity_io_failure;
+    #[cfg(unix)]
+    test_command_exit_codes_store_divergence_permission_denied_emits_5: ("worktree store-divergence", 5, false) => invoke_store_divergence_permission_denied;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7159f86a36028ff69d00a780d11584dcd1fadb4e",
+  "completed_at": "2026-11-04T10:32:48.411441276Z",
+  "duration_ms": 250076,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/9876a23a-one-validation-report/audit.md",
+        "id": "F1",
+        "line": 7,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "The historical audit's timing and line-count figures lack a retained raw result or other second source; current benchmark artifacts record a later run only."
+      }
+    ],
+    "summary": "All hard criteria are met; one advisory evidence-traceability gap remains in pre-execution audit prose.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "b3ef68b5-ae91-4747-a2b2-49ac92cce1ba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "87342d5c-eaaf-4231-aa0b-29d5519e60ca",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:28:38.334851983Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [low, advisory] Historical timing and line-count figures in `audit.md` lack retained raw output or a second source; the benchmark artifacts substantiate a later run, not those audit values.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; one advisory evidence-traceability gap remains in pre-execution audit prose.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The historical audit's timing and line-count figures lack a retained raw result or other second source; current benchmark artifacts record a later run only.\",\"file\":\"dev/active/9876a23a-one-validation-report/audit.md\",\"line\":7}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
