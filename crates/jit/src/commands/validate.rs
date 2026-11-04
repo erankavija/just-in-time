@@ -922,7 +922,8 @@ fn capture_document_reference_validation(
     Ok(Some(Ok(())))
 }
 
-/// Capture every gate-run and archive-evidence record, read the whole event log, and judge the
+/// Capture every gate-run, verdict and archive-evidence record, read the whole
+/// event log, and judge the
 /// stored records against `image`. Whole-repository validation pays these
 /// reads; no other capture does.
 fn capture_record_fidelity_validation(
@@ -931,7 +932,7 @@ fn capture_record_fidelity_validation(
 ) -> Result<Option<Result<()>>> {
     let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
     let Some(records) = super::capture_discovering(session, spec, |image, spec| {
-        super::discover_gate_run_results(image, spec)?;
+        super::discover_gate_records(image, spec)?;
         discover_archive_evidence_records(image, spec)
     })?
     else {

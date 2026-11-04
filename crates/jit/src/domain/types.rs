@@ -929,6 +929,17 @@ pub struct GateRunResult {
     pub evaluation_stability: GateEvaluationStability,
 }
 
+/// The reuse source for one gate over one inputs digest, as persisted to
+/// `.jit/gate-runs/verdicts/<gate-key>/<inputs-digest>.json`: the latest
+/// recorded run that [`GateRunResult::is_reusable_for`] that key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GateVerdictRecord {
+    /// Issue the named run was recorded against
+    pub issue_id: IssueId,
+    /// The run whose verdict an evaluation over this key may carry
+    pub run_id: GateRunId,
+}
+
 impl GateRunResult {
     /// Whether an evaluation of `gate_key` over inputs digesting to `digest`
     /// may carry this run's verdict.
@@ -949,6 +960,14 @@ impl GateRunResult {
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
             && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
+    }
+
+    /// The inputs digest under which this run is a reuse source
+    /// ([`is_reusable_for`](Self::is_reusable_for) its own gate), or `None`.
+    pub fn reusable_digest(&self) -> Option<&crate::domain::repository_inputs::InputsDigest> {
+        self.inputs_digest
+            .as_ref()
+            .filter(|digest| self.is_reusable_for(&self.gate_key, digest))
     }
 
     /// The draft record of a manual gate's attestation of `status` by `by`.

@@ -215,7 +215,8 @@ pub use self::identity::VirtualPath;
 /// [`gate_run_record`](VirtualPath::gate_run_record) are the infallible derived
 /// paths, whose canonical UUID components make their descendants safe by
 /// construction. [`archive_evidence_record`](VirtualPath::archive_evidence_record)
-/// uses a canonical UUID or a hexadecimal digest.
+/// uses a canonical UUID or a hexadecimal digest, and the gate-verdict paths a
+/// lowercase-kebab gate key and a lowercase-hex digest.
 ///
 /// Only this module can write the raw struct literal needed for const identities
 /// and the well-formed record descendants. It is therefore kept to the
@@ -227,7 +228,8 @@ mod identity {
         RepositoryLayoutError, RepositoryRootClass, RootRelativePath, GATE_RUN_RECORD_FILE,
     };
     use crate::domain::artifact_plan::{normalize_artifact_path, PlanTarget};
-    use crate::domain::identity::{GateRunId, IssueId};
+    use crate::domain::identity::{GateKey, GateRunId, IssueId};
+    use crate::domain::repository_inputs::InputsDigest;
     use serde::Serialize;
     use sha2::{Digest, Sha256};
     use std::borrow::Cow;
@@ -272,6 +274,25 @@ mod identity {
                 relative: Self::gate_run_directory(id)
                     .relative
                     .join(GATE_RUN_RECORD_FILE),
+            }
+        }
+
+        /// Construct the data-root directory holding one gate's verdict records.
+        pub fn gate_verdict_directory(gate_key: &GateKey) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::GATE_VERDICTS.relative().join(gate_key.as_str()),
+            }
+        }
+
+        /// Construct the data-root path of the verdict record for `gate_key`
+        /// over inputs digesting to `digest`.
+        pub fn gate_verdict_record(gate_key: &GateKey, digest: &InputsDigest) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::gate_verdict_directory(gate_key)
+                    .relative
+                    .join(&[digest.as_str(), ".json"].concat()),
             }
         }
 
@@ -393,6 +414,9 @@ mod identity {
         ISSUES: Data = "issues";
         /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
         GATE_RUNS: Data = "gate-runs";
+        /// Per-key gate verdict records under the data root
+        /// (`.jit/gate-runs/verdicts`).
+        GATE_VERDICTS: Data = "gate-runs/verdicts";
         /// JSON Schema directory under the data root (`.jit/schemas`).
         SCHEMAS: Data = "schemas";
         /// Nested configuration directory under the data root (`.jit/config`).
@@ -986,6 +1010,36 @@ mod tests {
             Some(VirtualPath::GATE_RUNS.relative().as_path())
         );
         assert_eq!(directory.file_name(), Some(id.as_str()));
+        assert_eq!(
+            VirtualPath::data(path.relative().as_path()).unwrap(),
+            path,
+            "the derived path is the path parsing yields"
+        );
+    }
+
+    #[test]
+    fn test_virtual_path_gate_verdict_record_nests_under_its_gate_in_the_verdicts_directory() {
+        let gate_key: crate::domain::identity::GateKey = "cargo-ci".parse().unwrap();
+        let digest =
+            crate::domain::repository_inputs::InputsDigest::try_from("a".repeat(64)).unwrap();
+        let path = VirtualPath::gate_verdict_record(&gate_key, &digest);
+
+        assert_eq!(
+            path.ancestor_directories().unwrap(),
+            vec![
+                VirtualPath::GATE_RUNS,
+                VirtualPath::GATE_VERDICTS,
+                VirtualPath::gate_verdict_directory(&gate_key),
+            ]
+        );
+        assert_eq!(
+            VirtualPath::gate_verdict_directory(&gate_key).file_name(),
+            Some(gate_key.as_str())
+        );
+        assert_eq!(
+            path.file_name().and_then(|name| name.strip_suffix(".json")),
+            Some(digest.as_str())
+        );
         assert_eq!(
             VirtualPath::data(path.relative().as_path()).unwrap(),
             path,

@@ -942,6 +942,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             })?,
         };
         result.inputs_digest = digest;
+        let record_paths = run_paths
+            .iter()
+            .cloned()
+            .chain(super::gate_verdict_record_paths(&result)?)
+            .collect::<Vec<_>>();
 
         with_mutation_attempts("gate evaluation record", || {
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
@@ -949,7 +954,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 session.as_mut(),
                 &target_id.clone(),
                 gate_key,
-                &run_paths,
+                &record_paths,
             )?
             else {
                 return Ok(AttemptOutcome::Retry);
@@ -2609,6 +2614,91 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(
             forced.inputs_digest, executed.inputs_digest,
             "a forced run still records the digest it was derived over"
+        );
+    }
+
+    /// Replaces a verdict record at the first commit check, as an evaluation
+    /// racing to record the same key would.
+    struct RacingVerdictWriter {
+        path: std::path::PathBuf,
+        bytes: Vec<u8>,
+        commit_checks: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::storage::MutationInterruptionInjector for RacingVerdictWriter {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            use std::sync::atomic::Ordering;
+            if point == &MutationPoint::BeforeCommitCheck
+                && self.commit_checks.fetch_add(1, Ordering::SeqCst) == 0
+            {
+                std::fs::write(&self.path, &self.bytes)?;
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_check_gate_with_retries_a_verdict_record_replaced_by_a_racing_evaluation() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let first = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let layout = fixture.executor.require_layout().unwrap();
+        let record = layout
+            .resolve(&crate::repository_state::VirtualPath::gate_verdict_record(
+                &fixture.gate_key,
+                first.inputs_digest.as_ref().unwrap(),
+            ))
+            .unwrap();
+        let racer = Arc::new(RacingVerdictWriter {
+            path: record.clone(),
+            bytes: crate::repository_state::serialize_gate_verdict(
+                &crate::domain::GateVerdictRecord {
+                    issue_id: first.issue_id.clone(),
+                    run_id: crate::test_utils::gate_run_id(9),
+                },
+            )
+            .unwrap(),
+            commit_checks: Default::default(),
+        });
+        let racing = CommandExecutor::new(JsonFileStorage::with_mutation_interruptions(
+            fixture.executor.storage.root(),
+            racer.clone(),
+        ))
+        .with_layout(layout);
+
+        let forced = racing
+            .gates()
+            .check_gate_with(
+                &fixture.issue("Test", "Test"),
+                &fixture.gate_key,
+                super::VerdictSource::Execute,
+            )
+            .expect("the evaluation retries its record");
+
+        let stored: crate::domain::GateVerdictRecord =
+            serde_json::from_slice(&std::fs::read(record).unwrap()).unwrap();
+        assert_eq!(stored.run_id, forced.run_id);
+        assert_eq!(
+            fixture.executions(),
+            2,
+            "the retry reuses the checker's verdict"
+        );
+        assert!(
+            racer
+                .commit_checks
+                .load(std::sync::atomic::Ordering::SeqCst)
+                > 1,
+            "the replaced record must fail the first commit check"
         );
     }
 
