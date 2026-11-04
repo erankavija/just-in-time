@@ -333,9 +333,12 @@ pub fn render_issue_list<'a, I: ListedIssue + 'a>(
     }
     if quiet {
         lines.truncate(lines.trim_end_matches('\n').len());
+        if !lines.is_empty() {
+            lines.push('\n');
+        }
         lines
     } else {
-        format!("{header}\n{lines}\nTotal: {total}")
+        format!("{header}\n{lines}\nTotal: {total}\n")
     }
 }
 
@@ -351,7 +354,7 @@ pub fn print_issue_list<'a, I: ListedIssue + 'a>(
     if ctx.json || (ctx.quiet && rendered.is_empty()) {
         return Ok(());
     }
-    writeln_safe(&rendered)
+    writeln_safe(rendered.trim_end_matches('\n'))
 }
 
 /// Which run-status line [`render_gate_run_status`] renders.
@@ -518,7 +521,7 @@ mod issue_list_render_tests {
         assert_eq!(
             rendered,
             format!(
-                "Header:\n  {} | First | {state} | {priority}\n    - waits on x\n  {} | Second | {state} | {priority}\n\nTotal: 2", issues[0].id, issues[1].id
+                "Header:\n  {} | First | {state} | {priority}\n    - waits on x\n  {} | Second | {state} | {priority}\n\nTotal: 2\n", issues[0].id, issues[1].id
             )
         );
     }
@@ -534,7 +537,7 @@ mod issue_list_render_tests {
 
         assert_eq!(
             rendered,
-            format!("H\n  {} | First\n\nTotal: 1", issues[0].id)
+            format!("H\n  {} | First\n\nTotal: 1\n", issues[0].id)
         );
     }
 
@@ -554,7 +557,7 @@ mod issue_list_render_tests {
 
         assert_eq!(
             rendered,
-            format!("  {} | First | {}", issues[0].id, issues[0].priority)
+            format!("  {} | First | {}\n", issues[0].id, issues[0].priority)
         );
     }
 
@@ -562,7 +565,7 @@ mod issue_list_render_tests {
     fn test_render_issue_list_empty_prints_header_and_zero_total() {
         assert_eq!(
             render_issue_list::<Issue>("H", [], &[], false),
-            "H\n\nTotal: 0"
+            "H\n\nTotal: 0\n"
         );
     }
 }
@@ -1276,16 +1279,6 @@ impl JsonError {
         .with_details(serde_json::json!({"issue_id": requested}))
         .with_suggestion("Run 'jit query all' to see available issues")
         .with_suggestion("Check if the issue ID is correct")
-    }
-
-    pub fn gate_not_found(gate_key: &GateKey) -> Self {
-        Self::new(
-            ErrorCode::GateNotFound,
-            format!("Gate not found: {}", gate_key),
-        )
-        .with_details(serde_json::json!({"key": gate_key}))
-        .with_suggestion("Run 'jit gate list' to see available gates")
-        .with_suggestion("Add the gate to the registry first with 'jit gate define'")
     }
 
     /// Preserve the rejected target request text alongside the resolved source.

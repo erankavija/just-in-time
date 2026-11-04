@@ -146,26 +146,20 @@ pub fn resolve_gate_key(
     flag: Option<String>,
     command: &str,
 ) -> anyhow::Result<String> {
-    let value = match (positional, flag) {
-        (Some(value), None) | (None, Some(value)) => value,
+    let usage = format!(
+        "Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+         Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+    );
+    let message = match (positional, flag) {
+        (Some(value), None) | (None, Some(value)) => return Ok(value),
         (Some(_), Some(_)) => {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "provide the gate key as a positional argument OR via --gate, not both.\n\
-             Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
-             Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
-            ))
-            .into())
+            "provide the gate key as a positional argument OR via --gate, not both."
         }
         (None, None) => {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "a gate key is required; provide it as a positional argument or via --gate.\n\
-             Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
-             Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
-            ))
-            .into())
+            "a gate key is required; provide it as a positional argument or via --gate."
         }
     };
-    Ok(value)
+    Err(crate::errors::InvalidArgumentError::new(format!("{message}\n{usage}")).into())
 }
 
 /// Select and parse one positional-or-flag gate key.
