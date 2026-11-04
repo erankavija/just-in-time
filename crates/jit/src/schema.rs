@@ -536,7 +536,6 @@ impl CommandSchema {
     /// Legacy output schema table for leaves not yet registered with a
     /// handler group (e.g., "issue_show", "query_available").
     pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
-        use crate::domain::Issue;
         use crate::output::*;
 
         // Helper to convert schemars schema to serde_json Value
@@ -547,24 +546,6 @@ impl CommandSchema {
         let (schema, type_name) = match cmd_path {
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
-
-            // Issue commands
-            //
-            // `issue create --json` returns the `issue show` projection with its
-            // findings, so its gate list is the `gates` array, not the raw
-            // stored record.
-            "issue_create" => (
-                Some(schema_to_value::<crate::output::IssueCreateResponse>()),
-                "IssueCreateResponse",
-            ),
-            // Lifecycle mutation confirmations echo the raw stored record, so the
-            // gate list stays under gates_required / gates_status.
-            "issue_assign" | "issue_unassign" | "issue_reject" | "issue_release"
-            | "issue_claim" | "issue_claim-next" => (Some(schema_to_value::<Issue>()), "Issue"),
-            "issue_update" => (
-                Some(schema_to_value::<IssueUpdateResponse>()),
-                "IssueUpdateResponse",
-            ),
 
             // Gate commands
             "gate_status" => {

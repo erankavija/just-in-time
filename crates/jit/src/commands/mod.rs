@@ -91,7 +91,9 @@ pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
-pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueMutation, IssueOps};
+pub use issue::{
+    DescriptionUpdate, IssueCreation, IssueDeletion, IssueLocalUpdate, IssueMutation, IssueOps,
+};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
     parse_profile_selector, parse_profile_selectors, parse_profile_variable_assignments,

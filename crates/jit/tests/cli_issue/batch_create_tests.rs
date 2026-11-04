@@ -70,21 +70,20 @@ fn test_batch_create_valid_creates_issues_and_edges() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // The success `--json` output is EXACTLY the pure `{key: full_id}` map:
-    // every top-level entry is a symbolic key, with no envelope/`message` key.
+    // The success envelope carries the `{key: full_id}` map under `ids`.
     let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    let obj = v
+    assert!(
+        v["message"].as_str().is_some_and(|m| m.contains('3')),
+        "the envelope message counts the created issues: {stdout}"
+    );
+    let obj = v["ids"]
         .as_object()
-        .expect("top-level value must be the key->id object");
+        .expect("`ids` must be the key->id object");
     let keys: std::collections::BTreeSet<&str> = obj.keys().map(String::as_str).collect();
     assert_eq!(
         keys,
         ["impl", "spec", "test"].into_iter().collect(),
-        "top-level object must contain ONLY the symbolic keys (no 'message'): {stdout}"
-    );
-    assert!(
-        !obj.contains_key("message"),
-        "no 'message' key allowed: {stdout}"
+        "`ids` must contain exactly the symbolic keys: {stdout}"
     );
 
     let spec_id = obj.get("spec").unwrap().as_str().unwrap().to_string();

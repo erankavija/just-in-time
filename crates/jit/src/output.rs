@@ -49,7 +49,9 @@ pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 pub use issue::{
+    BatchCreateResponse, IssueBatchCreateOutput, IssueDeleteResponse, IssueLifecycleResponse,
     IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput, IssueStatusOutput,
+    IssueUpdateOutput,
 };
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};
