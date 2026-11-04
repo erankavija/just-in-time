@@ -534,29 +534,12 @@ impl CommandSchema {
     }
 
     /// Legacy output schema table for leaves not yet registered with a
-    /// handler group (e.g., "issue_create").
-    pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
-        use crate::output::*;
-
-        // Helper to convert schemars schema to serde_json Value
-        fn schema_to_value<T: JsonSchema>() -> Value {
-            serde_json::to_value(schema_for!(T)).unwrap_or(json!({}))
-        }
-
-        let (schema, type_name) = match cmd_path {
-            // Gate commands
-            "gate_evaluate-many" => (
-                Some(schema_to_value::<GateEvaluateManyResponse>()),
-                "GateEvaluateManyResponse",
-            ),
-
-            // Default: no specific schema
-            _ => (None, "CommandResponse"),
-        };
-
+    /// handler group; it has no rows left, so every such leaf takes the
+    /// untyped `CommandResponse`.
+    pub(crate) fn get_output_schema_for_command(_cmd_path: &str) -> Option<OutputSchema> {
         Some(OutputSchema {
-            success_schema: schema,
-            success: type_name.to_string(),
+            success_schema: None,
+            success: "CommandResponse".to_string(),
             error: "ErrorResponse".to_string(),
         })
     }
@@ -1587,14 +1570,6 @@ mod tests {
         assert!(mismatched.is_empty(), "mismatched: {mismatched:?}");
     }
 
-    #[test]
-    fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("gate_evaluate-many").unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("gate_evaluate-many").unwrap();
-        assert_eq!(resolved.success, legacy.success);
-        assert_eq!(resolved.success_schema, legacy.success_schema);
-    }
-
     /// Regression (jit:c505031a): `gate status-all`'s output schema lookup
     /// key must match its canonical clap subcommand path (`gate_status-all`),
     /// not a retired alias spelling (`gate_check-all`). The lookup key is
@@ -1618,26 +1593,6 @@ mod tests {
         assert!(
             output.success_schema.is_some(),
             "gate status-all success_schema should be present"
-        );
-    }
-
-    #[test]
-    fn test_schema_gate_evaluate_many_has_output_schema() {
-        let schema = CommandSchema::generate();
-        let evaluate_many = schema
-            .commands
-            .get("gate")
-            .and_then(|command| command.subcommands.as_ref())
-            .and_then(|commands| commands.get("evaluate-many"))
-            .expect("gate evaluate-many subcommand");
-        let output = evaluate_many
-            .output
-            .as_ref()
-            .expect("gate evaluate-many should have an output schema");
-        assert_eq!(output.success, "GateEvaluateManyResponse");
-        assert!(
-            output.success_schema.is_some(),
-            "gate evaluate-many success_schema should be present"
         );
     }
 

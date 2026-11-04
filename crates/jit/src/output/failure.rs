@@ -2,19 +2,24 @@
 //!
 //! [`classify`] is the one library classifier shared by every consumer: it maps
 //! a typed failure to its registered [`ErrorCode`], whose
-//! [`ErrorCode::exit_code`] is the process status, and to the details and
-//! suggestions its type determines.
+//! [`ErrorCode::exit_code`] is the process status, and to the details,
+//! suggestions and warnings its type determines.
 
 use super::{ErrorCode, ExitCode, JsonError};
 
 /// Classify a propagated failure by its typed cause.
 ///
-/// The envelope carries the registered code, the error's message, and the
-/// details and suggestions its type determines; its [`JsonError::exit_code`] is
-/// that code's [`ErrorCode::exit_code`], so the reported code and the process
-/// status cannot drift.
+/// The envelope carries the registered code, the error's message, the
+/// details and suggestions its type determines, and the warnings it carries;
+/// its [`JsonError::exit_code`] is that code's [`ErrorCode::exit_code`], so the
+/// reported code and the process status cannot drift.
 pub fn classify(error: &anyhow::Error) -> JsonError {
-    derive_guidance(error).apply(JsonError::new(classify_code(error), error.to_string()))
+    let json =
+        derive_guidance(error).apply(JsonError::new(classify_code(error), error.to_string()));
+    match error.downcast_ref::<crate::commands::GatePassFailed>() {
+        Some(failure) => json.with_warnings(failure.warnings.clone()),
+        None => json,
+    }
 }
 
 /// The details and suggestions a failure's type determines.
@@ -69,7 +74,6 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
                 "status": "failed",
                 "verdict": verdict,
                 "checker_result": super::GateRunSummary::full(&failure.result),
-                "warnings": failure.warnings,
             })),
             suggestions: vec![
                 format!("Inspect the checker result with: jit gate status {issue} {key}"),
@@ -802,7 +806,7 @@ mod exit_code_projection_tests {
             status,
             exit_code: Some(1),
             result,
-            warnings: Vec::new(),
+            warnings: vec!["lease warning".to_owned()],
         }
         .into()
     }
@@ -1459,7 +1463,7 @@ mod derived_guidance_tests {
             assert_eq!(checker["exit_code"], 1);
             assert_eq!(checker["command"], "false");
             assert_eq!(details["status"], "failed");
-            assert_eq!(details["warnings"], serde_json::json!([]));
+            assert_eq!(json.warnings, ["lease warning"]);
             assert_suggestions(
                 &json,
                 &[

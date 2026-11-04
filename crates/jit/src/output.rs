@@ -1463,6 +1463,8 @@ collection_keys! {
     /// Collection key of [`GateCheckAllResponse`].
     GateReadinessKey = "gates" as "GateCheckAllResponse";
     ResultsKey = "results";
+    /// Collection key of [`GateEvaluateManyResponse`].
+    GateEvaluationsKey = "results" as "GateEvaluateManyResponse";
     /// Collection key of [`ArtifactConformanceResponse`].
     ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
     /// Collection key of [`NamespacesResponse`].
@@ -2739,24 +2741,56 @@ pub struct GateEvaluateManyResult {
     pub target: BatchTarget,
     /// Gate key evaluated for this issue.
     pub key: GateKey,
-    /// [`GateStatus::Passed`] token when a verdict was recorded as passing,
-    /// otherwise the [`GateStatus::Failed`] token.
-    pub status: String,
+    /// `passed` when the gate passed, otherwise `failed`.
+    pub status: GateStatus,
     /// `pass` or `fail`/`error` when a checker produced a verdict. Pre-verdict
     /// lookup and argument errors leave this absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verdict: Option<String>,
-    /// Advisory warnings from the gate evaluation.
-    pub warnings: Vec<String>,
-    /// The single-issue gate error envelope's `error` object, when evaluation failed.
+    /// The classified `error` object of the entry's failure.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
 }
 
-/// JSON payload of `jit gate evaluate-many --json`.
+impl GateEvaluateManyResult {
+    pub fn passed(target: BatchTarget, key: GateKey) -> Self {
+        Self {
+            target,
+            key,
+            status: GateStatus::Passed,
+            verdict: Some("pass".to_owned()),
+            error: None,
+        }
+    }
+
+    /// A failed entry carrying `failure`, the classified envelope of its error.
+    pub fn failed(
+        target: BatchTarget,
+        key: GateKey,
+        failure: &JsonError,
+    ) -> serde_json::Result<Self> {
+        let verdict = failure
+            .error
+            .details
+            .as_ref()
+            .and_then(|details| details.get("verdict"))
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        Ok(Self {
+            target,
+            key,
+            status: GateStatus::Failed,
+            verdict,
+            error: Some(serde_json::to_value(&failure.error)?),
+        })
+    }
+}
+
+/// Report of `jit gate evaluate-many`: the success payload, or `error.details`
+/// when an entry failed.
 ///
 /// `results` holds one entry per requested issue, in argument order.
-pub type GateEvaluateManyResponse = ListEnvelope<ResultsKey, GateEvaluateManyResult>;
+pub type GateEvaluateManyResponse = ListEnvelope<GateEvaluationsKey, GateEvaluateManyResult>;
 
 /// JSON payload of `jit gate status --all` / `--limit` (the history view).
 ///

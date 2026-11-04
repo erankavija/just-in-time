@@ -154,6 +154,29 @@ fn test_gate_evaluate_issue_not_found_reports_no_verdict() {
 }
 
 #[test]
+fn test_gate_evaluate_invalid_id_prefix_reports_its_classified_code_in_json_and_human_modes() {
+    // Formerly reported as the GATE_ERROR fallback under --json only.
+    let temp = JitCli::initialised().unwrap();
+    let code = jit::output::ErrorCode::InvalidIdPrefix;
+
+    for json in [true, false] {
+        let mut args = vec!["gate", "evaluate", "!", "test-gate"];
+        args.extend(json.then_some("--json"));
+        let output = temp.command(args).output().unwrap();
+
+        assert_eq!(
+            output.status.code(),
+            Some(code.exit_code().code()),
+            "{json}"
+        );
+        if json {
+            let printed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(printed["error"]["code"], code.as_str());
+        }
+    }
+}
+
+#[test]
 fn test_gate_evaluate_gate_not_required_reports_no_verdict() {
     let temp = JitCli::initialised().unwrap();
 

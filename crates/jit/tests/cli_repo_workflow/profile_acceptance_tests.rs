@@ -665,7 +665,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         path,
     );
     assert_eq!(coverage["status"], "passed");
-    assert_eq!(coverage["warnings"], Value::Array(Vec::new()));
+    assert!(coverage.get("warnings").is_none(), "{coverage}");
     let breakdown_review = success_json_with_path(
         &repo,
         &[
