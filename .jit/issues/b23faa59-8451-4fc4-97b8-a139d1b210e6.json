@@ -21,6 +21,12 @@
       "updated_at": "2026-11-04T02:17:17.303806828Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "7d8b1bac-38c2-4f2b-bbc9-a78c8651275b",
+      "status": "failed",
+      "updated_at": "2026-11-04T02:24:30.051481612Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "run_id": "78a7a267-5eb3-4edc-b520-7491c03bda48",
       "status": "failed",
@@ -45,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Invariant command moves to a library handler",
-  "updated_at": "2026-11-04T02:17:58.727464570Z"
+  "updated_at": "2026-11-04T02:24:30.051481612Z"
 }
