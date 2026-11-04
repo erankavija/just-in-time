@@ -8,6 +8,7 @@
   ],
   "description": "The binary imports its existing library modules and drops unused manifest dependencies.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary imports library modules without redeclaring them; unused server dependencies are removed and existing server tests compile and run once.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:33:23.244807767Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "cargo-ci",
@@ -21,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "22e72871-42f0-40ea-9d23-f091fbbddeec",
-      "status": "failed",
-      "updated_at": "2026-11-04T23:19:47.446435484Z",
+      "run_id": "30f89ff4-02e8-4fb3-8483-993271004345",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:32:40.657798175Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +38,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Compile server modules through the library",
-  "updated_at": "2026-11-04T23:27:46.201675760Z"
+  "updated_at": "2026-11-04T23:33:23.244807767Z"
 }
