@@ -83,7 +83,7 @@ mod tests {
         assert_eq!(printed["namespaces"].as_array().unwrap().len(), 2);
         assert!(printed.get("namespace").is_none());
         assert_eq!(printed["message"], "2 namespace(s)");
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert!(err.is_empty());
         assert_eq!(
             registered_output_schema("label_namespaces")
@@ -127,7 +127,7 @@ mod tests {
         assert_eq!(printed["values"], serde_json::json!([]));
         assert_eq!(printed["namespace"], "type");
         assert_eq!(printed["message"], "0 value(s)");
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert!(err.is_empty());
         let schema = registered_output_schema("label_values").unwrap();
         assert_eq!(schema.success, "LabelValuesResponse");

@@ -1,6 +1,7 @@
 //! The one renderer of a handler [`Outcome`](crate::dispatch::Outcome).
 
-use super::{ErrorCode, ExitCode, JsonError, JsonOutput, OutputMode};
+use super::failure::classify;
+use super::{ErrorCode, ExitCode, JsonError, JsonOutput, OutputMode, RunStatus};
 use crate::dispatch::Outcome;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -47,14 +48,15 @@ fn write_warnings(err: &mut dyn Write, warnings: &[String], mode: OutputMode) ->
 /// returns [`ExitCode::Success`]. Findings write the failure envelope with the report
 /// as `error.details` and non-empty `warnings` beside `error` (`--json`), or the
 /// report's rendering to `out`, the outcome's `message` as one unprefixed line
-/// and the `Warning:` lines to `err`, and return the code's [`ErrorCode::exit_code`]. A closed pipe yields
+/// and the `Warning:` lines to `err`, and return the code's [`ErrorCode::exit_code`].
+/// `Exited` writes nothing and returns the child's status. A closed pipe yields
 /// [`ExitCode::BrokenPipe`]; the caller owns process exit.
 pub fn emit_outcome<R: Response>(
     outcome: &Outcome<R>,
     mode: OutputMode,
     out: &mut dyn Write,
     err: &mut dyn Write,
-) -> anyhow::Result<ExitCode> {
+) -> anyhow::Result<RunStatus> {
     let (written, status) = match outcome {
         Outcome::Success {
             response,
@@ -68,7 +70,7 @@ pub fn emit_outcome<R: Response>(
             };
             (
                 writeln!(out, "{}", envelope.to_json_string()?),
-                ExitCode::Success,
+                ExitCode::Success.into(),
             )
         }
         Outcome::Success {
@@ -76,7 +78,7 @@ pub fn emit_outcome<R: Response>(
         } => (
             out.write_all(response.render_human(mode).as_bytes())
                 .and_then(|()| write_warnings(err, warnings, mode)),
-            ExitCode::Success,
+            ExitCode::Success.into(),
         ),
         Outcome::Findings {
             code,
@@ -89,7 +91,7 @@ pub fn emit_outcome<R: Response>(
                 .with_warnings(warnings.clone());
             (
                 writeln!(out, "{}", envelope.to_json_string()?),
-                envelope.exit_code(),
+                envelope.exit_code().into(),
             )
         }
         Outcome::Findings {
@@ -101,14 +103,45 @@ pub fn emit_outcome<R: Response>(
             out.write_all(report.render_human(mode).as_bytes())
                 .and_then(|()| writeln!(err, "{message}"))
                 .and_then(|()| write_warnings(err, warnings, mode)),
-            ErrorCode::exit_code(*code),
+            ErrorCode::exit_code(*code).into(),
         ),
+        Outcome::Exited(status) => (Ok(()), RunStatus::Passthrough(*status)),
     };
+    Ok(status_after(written, status)?)
+}
+
+/// `status` once `written` succeeded, or [`ExitCode::BrokenPipe`] when the
+/// reader closed the pipe; any other write failure is returned.
+pub(crate) fn status_after(written: io::Result<()>, status: RunStatus) -> io::Result<RunStatus> {
     match written {
-        Ok(()) => Ok(status),
-        Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(ExitCode::BrokenPipe),
-        Err(error) => Err(error.into()),
+        Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(ExitCode::BrokenPipe.into()),
+        written => written.map(|()| status),
     }
+}
+
+/// Render a failure that escaped dispatch and return its exit status.
+///
+/// `--json` writes the [`classify`] envelope to `out`; otherwise its warnings
+/// (none under `-q`) and an `Error: <error>` line go to `err`. A closed pipe
+/// yields [`ExitCode::BrokenPipe`]; any other write failure keeps the
+/// failure's own status.
+pub fn emit_failure(
+    error: &anyhow::Error,
+    mode: OutputMode,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> RunStatus {
+    let failure = classify(error);
+    let written = if mode.json {
+        failure
+            .to_json_string()
+            .map_err(io::Error::from)
+            .and_then(|json| writeln!(out, "{json}"))
+    } else {
+        write_warnings(err, &failure.warnings, mode).and_then(|()| writeln!(err, "Error: {error}"))
+    };
+    let status = failure.exit_code().into();
+    status_after(written, status).unwrap_or(status)
 }
 
 #[cfg(test)]
@@ -208,7 +241,7 @@ mod tests {
             &mut io::sink(),
         )
         .unwrap();
-        assert_eq!(status, ExitCode::BrokenPipe);
+        assert_eq!(status, ExitCode::BrokenPipe.into());
     }
 
     #[derive(Serialize, JsonSchema)]
@@ -289,5 +322,68 @@ mod tests {
 
         assert_eq!(loud, "failed\nWarning: w\n");
         assert_eq!(quiet, "failed\n");
+    }
+
+    #[test]
+    fn test_emit_outcome_exited_writes_nothing_and_passes_the_child_status_through() {
+        let outcome = Outcome::<Framed>::Exited(7);
+
+        let (out, err) = rendered(OutputMode::default(), &outcome);
+        let status = emit_outcome(
+            &outcome,
+            OutputMode {
+                json: true,
+                quiet: false,
+            },
+            &mut ClosedPipe,
+            &mut ClosedPipe,
+        )
+        .unwrap();
+
+        assert!(out.is_empty() && err.is_empty());
+        assert_eq!(status, RunStatus::Passthrough(7));
+    }
+
+    #[test]
+    fn test_emit_failure_renders_the_classified_envelope_or_error_line_with_its_exit_code() {
+        let error = anyhow::Error::new(crate::errors::InvalidArgumentError::new("bad"));
+        let failed = |mode: OutputMode| {
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let status = emit_failure(&error, mode, &mut out, &mut err);
+            (
+                status,
+                String::from_utf8(out).unwrap(),
+                String::from_utf8(err).unwrap(),
+            )
+        };
+        let classified = classify(&error);
+
+        let (json_status, json_out, json_err) = failed(OutputMode {
+            json: true,
+            quiet: false,
+        });
+        let (human_status, human_out, human_err) = failed(OutputMode::default());
+
+        assert_eq!(json_status, classified.exit_code().into());
+        assert_eq!(human_status, classified.exit_code().into());
+        let envelope: serde_json::Value = serde_json::from_str(&json_out).unwrap();
+        assert_eq!(envelope["error"]["code"], classified.error.code.as_str());
+        assert!(json_err.is_empty() && human_out.is_empty());
+        assert_eq!(human_err, format!("Error: {error}\n"));
+    }
+
+    #[test]
+    fn test_emit_failure_closed_pipe_returns_broken_pipe_status() {
+        let error = anyhow::anyhow!("failed");
+        let status = emit_failure(
+            &error,
+            OutputMode {
+                json: true,
+                quiet: false,
+            },
+            &mut ClosedPipe,
+            &mut io::sink(),
+        );
+        assert_eq!(status, ExitCode::BrokenPipe.into());
     }
 }

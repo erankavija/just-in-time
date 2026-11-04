@@ -820,8 +820,8 @@ mod exit_code_projection_tests {
     /// command-family mapping to runtime behavior: a row whose condition is raised
     /// by a typed error is verified here against the classifier that command's
     /// dispatch actually runs. The rows whose conditions are raised by
-    /// crate-private errors (`TransitionBlockedError`) or by direct
-    /// `std::process::exit` sites are bound end-to-end instead, by the subprocess
+    /// crate-private errors (`TransitionBlockedError`) or by findings
+    /// envelopes are bound end-to-end instead, by the subprocess
     /// tests in `tests/command_exit_code_projection_tests.rs`; the guard there
     /// asserts every row is covered by one binding or the other.
     fn classifier_cases() -> Vec<(anyhow::Error, i32, &'static str)> {

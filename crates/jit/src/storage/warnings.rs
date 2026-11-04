@@ -10,7 +10,7 @@
 //! must only own persistence, so `--json` callers would see human-formatted
 //! noise on stderr. Instead, storage now returns [`StorageWarning`] values and
 //! the output layer decides whether and how to render them (see
-//! `OutputWriter::print_warning` and the `recover` command's JSON/text output).
+//! `Outcome::with_warnings` and the `recover` command's JSON/text output).
 //!
 //! [`StorageWarning`] implements [`Display`](std::fmt::Display) so it plugs
 //! straight into the output layer, and [`Serialize`](serde::Serialize) so it

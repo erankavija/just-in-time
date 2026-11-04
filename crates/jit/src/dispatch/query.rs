@@ -6,7 +6,7 @@ use crate::cli::{CountDimension, IssueFilterArgs, QueryArgs, QueryCommands};
 use crate::domain::Issue;
 use crate::errors::InvalidArgumentError;
 use crate::output::{
-    BlockedListing, DivergenceResponse, ExitCode, IssueListing, QuerySubset, StateRollup,
+    BlockedListing, DivergenceResponse, IssueListing, QuerySubset, RunStatus, StateRollup,
     SubsetListing,
 };
 use crate::storage::IssueStore;
@@ -200,7 +200,7 @@ pub fn run<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     out: &mut dyn std::io::Write,
     err: &mut dyn std::io::Write,
-) -> anyhow::Result<ExitCode> {
+) -> anyhow::Result<RunStatus> {
     let QueryArgs {
         filters,
         subcommand,
@@ -219,7 +219,7 @@ pub fn run<S: IssueStore>(
 mod tests {
     use super::*;
     use crate::dispatch::registered_output_schema;
-    use crate::output::OutputMode;
+    use crate::output::{ExitCode, OutputMode};
     use crate::test_harness::TestHarness;
     use serde_json::Value;
 
@@ -227,7 +227,7 @@ mod tests {
         harness: &TestHarness,
         args: QueryArgs,
         json: bool,
-    ) -> (anyhow::Result<ExitCode>, String) {
+    ) -> (anyhow::Result<RunStatus>, String) {
         let ctx = CommandContext {
             executor: &harness.executor,
             mode: OutputMode { json, quiet: false },
@@ -302,7 +302,7 @@ mod tests {
             true,
         );
 
-        assert_eq!(status.unwrap(), ExitCode::Success);
+        assert_eq!(status.unwrap(), ExitCode::Success.into());
         let printed: Value = serde_json::from_str(&out).unwrap();
         assert_eq!(printed["message"], "Found 1 issue(s)");
         assert_eq!(printed["issues"].as_array().unwrap().len(), 1);
