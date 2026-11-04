@@ -1,4 +1,4 @@
-//! Invariant enforcement drift over captured repository declarations.
+//! Invariant enforcement drift over repository declarations.
 
 use super::*;
 use crate::validation::drift::DriftFinding;
@@ -23,26 +23,34 @@ impl InvariantCheckResult {
     }
 }
 
-impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
-    /// Compute drift from one captured image, rejecting unloadable declarations
-    /// except rules, whose bindings remain reportable drift.
+impl<S: IssueStore> ItemOps<'_, S> {
+    /// Load declarations once without a writer session; unloadable rules remain drift.
     pub fn check_invariants(&self) -> Result<InvariantCheckResult> {
-        let layout = self.exec.require_layout()?;
-        with_mutation_session(self.exec.storage(), &layout, "invariant check", |session| {
-            let Some(image) = self.exec.capture_proposed_base(
-                session,
-                &std::collections::BTreeMap::new(),
-                &[],
-                None,
-            )?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let declarations = crate::repository_state::validation_declarations_from_image(&image)?;
-            Ok(SessionStep::Done(InvariantCheckResult::new(
-                crate::validation::drift::from_declarations(&declarations),
-            )))
-        })
+        use crate::validation::drift::{enforcement_drift, SourceState};
+        use std::collections::BTreeSet;
+
+        let config = self.exec.cached_config()?;
+        let rules = self.exec.effective_rules().ok();
+        let rule_names: Option<BTreeSet<&str>> =
+            rules.map(|set| set.rules.iter().map(|rule| rule.name.as_str()).collect());
+        let rules_state = match &rule_names {
+            Some(names) => SourceState::Loaded(names),
+            None => SourceState::Unloadable,
+        };
+        let gates = self
+            .exec
+            .storage
+            .load_gate_registry()
+            .context("failed to load .jit/gates.toml")?
+            .gates
+            .into_keys()
+            .collect();
+
+        Ok(InvariantCheckResult::new(enforcement_drift(
+            &config.invariants.invariants,
+            rules_state,
+            &gates,
+        )))
     }
 }
 
