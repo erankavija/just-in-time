@@ -173,67 +173,69 @@ impl HumanRender for AssetListResult {
                 .as_ref()
                 .is_some_and(|path| scope.worktree_root.join(path).exists())
         };
-        let local = |shared: bool| {
+        let section = |rendered: &mut String,
+                       heading: &str,
+                       assets: Vec<&Asset>,
+                       line: &dyn Fn(&Asset) -> String| {
+            if !assets.is_empty() {
+                let _ = writeln!(rendered, "\n{heading}:");
+                assets
+                    .into_iter()
+                    .for_each(|asset| rendered.push_str(&line(asset)));
+            }
+        };
+        let of = |local: Option<bool>, asset_type: AssetType| {
             self.items
                 .iter()
-                .filter(move |a| a.is_shared == shared && a.asset_type == AssetType::Local)
+                .filter(|a| {
+                    a.asset_type == asset_type && local.is_none_or(|shared| a.is_shared == shared)
+                })
+                .collect::<Vec<_>>()
         };
-        let of_type = |asset_type: AssetType| {
-            self.items
-                .iter()
-                .filter(move |a| a.asset_type == asset_type)
+        let located = |asset: &Asset, with_mime: bool| {
+            let mut line = format!(
+                "  {} {}\n",
+                if exists(asset) { "ok" } else { "missing" },
+                asset.original_path
+            );
+            if let Some(resolved) = &asset.resolved_path {
+                let _ = writeln!(line, "     → {}", resolved.display());
+            }
+            if let (true, Some(mime)) = (with_mime, &asset.mime_type) {
+                let _ = writeln!(line, "     MIME: {mime}");
+            }
+            line
         };
-
-        let per_doc = local(false).collect::<Vec<_>>();
-        if !per_doc.is_empty() {
-            rendered.push_str("\nPer-document assets:\n");
-            for asset in per_doc {
-                let _ = writeln!(
-                    rendered,
-                    "  {} {}",
-                    if exists(asset) { "ok" } else { "missing" },
-                    asset.original_path
-                );
-                if let Some(resolved) = &asset.resolved_path {
-                    let _ = writeln!(rendered, "     → {}", resolved.display());
+        section(
+            &mut rendered,
+            "Per-document assets",
+            of(Some(false), AssetType::Local),
+            &|a| located(a, true),
+        );
+        section(
+            &mut rendered,
+            "Shared assets",
+            of(Some(true), AssetType::Local),
+            &|a| located(a, false),
+        );
+        section(
+            &mut rendered,
+            "External URLs",
+            of(None, AssetType::External),
+            &|a| format!("  remote {}\n", a.original_path),
+        );
+        section(
+            &mut rendered,
+            "Missing assets",
+            of(None, AssetType::Missing),
+            &|a| {
+                let mut line = format!("  missing {}\n", a.original_path);
+                if let Some(resolved) = &a.resolved_path {
+                    let _ = writeln!(line, "     Expected at: {}", resolved.display());
                 }
-                if let Some(mime) = &asset.mime_type {
-                    let _ = writeln!(rendered, "     MIME: {mime}");
-                }
-            }
-        }
-        let shared = local(true).collect::<Vec<_>>();
-        if !shared.is_empty() {
-            rendered.push_str("\nShared assets:\n");
-            for asset in shared {
-                let _ = writeln!(
-                    rendered,
-                    "  {} {}",
-                    if exists(asset) { "ok" } else { "missing" },
-                    asset.original_path
-                );
-                if let Some(resolved) = &asset.resolved_path {
-                    let _ = writeln!(rendered, "     → {}", resolved.display());
-                }
-            }
-        }
-        let external = of_type(AssetType::External).collect::<Vec<_>>();
-        if !external.is_empty() {
-            rendered.push_str("\nExternal URLs:\n");
-            for asset in external {
-                let _ = writeln!(rendered, "  remote {}", asset.original_path);
-            }
-        }
-        let missing = of_type(AssetType::Missing).collect::<Vec<_>>();
-        if !missing.is_empty() {
-            rendered.push_str("\nMissing assets:\n");
-            for asset in missing {
-                let _ = writeln!(rendered, "  missing {}", asset.original_path);
-                if let Some(resolved) = &asset.resolved_path {
-                    let _ = writeln!(rendered, "     Expected at: {}", resolved.display());
-                }
-            }
-        }
+                line
+            },
+        );
         let summary = &scope.summary;
         let _ = writeln!(
             rendered,
