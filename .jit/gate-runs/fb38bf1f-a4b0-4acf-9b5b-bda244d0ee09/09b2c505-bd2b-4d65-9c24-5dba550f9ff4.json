@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "70457e502b2d0eff4c887a596298b857926843c1",
+  "completed_at": "2026-11-04T22:11:16.560638952Z",
+  "duration_ms": 312595,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The command/output dependency boundary, structural guard, and preserved output behavior satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "09b2c505-bd2b-4d65-9c24-5dba550f9ff4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:06:03.964997541Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c894ed3e, bf5bfe3c; current unrelated `.jit` changes excluded\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/active/df129d9e-rust-code-quality/plan.md\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml); @/issue/fb38bf1f/decision/D-01 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T22:03:49Z); code-review pending (no run)\nTruncation recovery: per-commit/path patch reads; output.rs read in bounded chunks; issue.rs tail and policy sources reread narrowly\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The command/output dependency boundary, structural guard, and preserved output behavior satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1510,9 +1510,22 @@
       "note": "merged fad481d3e; code-review F1 stale archive execution field in cli-commands.md:417; lead fixed"
     },
     "fb38bf1f": {
-      "status": "in_progress",
+      "status": "done",
       "note": "bf5bfe3c3 landed; merged cargo-ci5039+25pass; independent review running",
-      "production_delta": 37
+      "production_delta": 37,
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and independent code-review passed; MCP-only gate retired by user-authorized D-23 reconciliation",
+        "criteria": {
+          "REQ-01": "zero crate::output under commands; results owned inward and rendering remains output",
+          "REQ-02": "recursive structural guard red then green, reports each offending file",
+          "REQ-03": "5039tests25doctests and registered contracts unchanged"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "moved type references updated; no output re-export compatibility aliases",
+        "deferred_items": "no linked design documents; MCP retirement owns removed surface",
+        "holistic": "existing DTOs moved; divergence projection unified; production delta+37"
+      }
     },
     "578ed10d": {
       "status": "done",
@@ -1919,10 +1932,10 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "fb38bf1f review",
       "487f45a9 review",
       "f35c86de rework1",
-      "0eca332a implementation"
+      "0eca332a implementation",
+      "0546fc82 read-only documentation audit"
     ],
     "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
