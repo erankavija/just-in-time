@@ -14,7 +14,14 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ab121c9e-529b-4eee-b180-7b3be16dbc17",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:03:23.463351353Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "03c59566-093f-4a7c-a3a6-65098a4b28de",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue creation output shows its findings, with no read after the mutation commits",
-  "updated_at": "2026-11-04T01:00:10.848190472Z"
+  "updated_at": "2026-11-04T01:03:23.463351353Z"
 }
