@@ -302,7 +302,9 @@ Reuse reads that record and the run it names. See
 The target key is `container/<issue-id>` or
 `document/<sha256-of-normalized-path>`, with the document digest taken over its
 normalized repository-relative path. Archive preview and execution read this
-record for prior evidence. See
+record for prior evidence. Each execution records the source and destination
+paths it had at the time, so those paths are historical and may not exist in
+the current tree. See
 [Archive Evidence Records](storage-records.md#archive-evidence-records) for the
 fields.
 
