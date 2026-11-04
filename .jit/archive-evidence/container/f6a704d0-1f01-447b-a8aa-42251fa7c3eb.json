@@ -1,0 +1,29 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/f6a704d0-validation-engine",
+      "planned_deletions": [],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "3cb590516e521efcddf186a8f42cc773425c1cffe67a1c851e733d1337e7e067"
+          },
+          "destination": "dev/archive/f6a704d0-validation-engine/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+    "kind": "container"
+  }
+}

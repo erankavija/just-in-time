@@ -1,0 +1,37 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 10575,
+            "sha256": "ba0fa446ab51ed1b59e7b86731f8602e5a96d6a734bd68b7d71cb461ac7f1dba"
+          },
+          "source": "dev/active/c639cfb5-jit-profiles-complete/completion-report.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10575,
+            "sha256": "ba0fa446ab51ed1b59e7b86731f8602e5a96d6a734bd68b7d71cb461ac7f1dba"
+          },
+          "destination": "dev/archive/active/c639cfb5-jit-profiles-complete/completion-report.md",
+          "source": "dev/active/c639cfb5-jit-profiles-complete/completion-report.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "kind": "document",
+        "path": "dev/active/c639cfb5-jit-profiles-complete/completion-report.md"
+      }
+    }
+  ],
+  "target": {
+    "kind": "document",
+    "path": "dev/active/c639cfb5-jit-profiles-complete/completion-report.md"
+  }
+}
