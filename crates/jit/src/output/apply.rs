@@ -24,21 +24,18 @@ impl HumanRender for TemplateApplyResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::TemplateApplyResult;
 
     fn response(quiet: bool) -> TemplateApplyResponse {
-        let id = crate::test_utils::issue_id(1);
-        TemplateApplyResponse::new(
-            TemplateApplyResult {
-                template: "plan".to_owned(),
-                anchor_bindings: Default::default(),
-                created_node_ids_by_role: [("review".to_owned(), id)].into(),
-                created_issues: Default::default(),
-                anchor_dependency_snapshots: Default::default(),
-            },
-            crate::test_utils::issue_id(2),
+        TemplateApplyResponse {
+            template: "plan".to_owned(),
+            container: crate::test_utils::issue_id(2),
+            anchor_bindings: Default::default(),
+            created_node_ids_by_role: [("review".to_owned(), crate::test_utils::issue_id(1))]
+                .into(),
+            anchor_dependency_snapshots: Default::default(),
+            created_issues: Default::default(),
             quiet,
-        )
+        }
     }
 
     #[test]

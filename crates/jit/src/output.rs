@@ -1441,27 +1441,10 @@ pub struct TemplateApplyResponse {
     /// Whether `--quiet` reduces the human rendering to the created ids.
     #[serde(skip)]
     #[schemars(skip)]
-    quiet: bool,
+    pub quiet: bool,
 }
 
 impl TemplateApplyResponse {
-    /// The response for `result` applied to `container`.
-    pub fn new(
-        result: crate::commands::TemplateApplyResult,
-        container: IssueId,
-        quiet: bool,
-    ) -> Self {
-        Self {
-            template: result.template,
-            container,
-            anchor_bindings: result.anchor_bindings,
-            created_node_ids_by_role: result.created_node_ids_by_role,
-            anchor_dependency_snapshots: result.anchor_dependency_snapshots,
-            created_issues: result.created_issues,
-            quiet,
-        }
-    }
-
     /// The `--json` envelope's `message`.
     pub fn message(&self) -> String {
         format!("Applied template '{}' to {}", self.template, self.container)

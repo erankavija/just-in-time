@@ -38,15 +38,9 @@ fn init<S: IssueStore + RepositoryStateStore>(
     warnings
         .iter()
         .try_for_each(|warning| output.print_warning(warning))?;
-    let data_dir = ctx
-        .executor
-        .repository_layout()?
-        .data_root()
-        .display()
-        .to_string();
     let response = InitResponse {
         repository_root: invocation.repository_root.display().to_string(),
-        data_dir,
+        data_dir: ctx.executor.storage().root().display().to_string(),
         repository_id: identity.map(|identity| identity.worktree_id.to_string()),
         gitattributes_status: init_result.gitattributes,
         created_paths: init_result.created_paths,

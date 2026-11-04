@@ -38,7 +38,15 @@ fn apply<S: IssueStore + RepositoryStateStore>(
     warnings
         .iter()
         .for_each(|warning| eprintln!("Warning: {warning}"));
-    let response = TemplateApplyResponse::new(result, container, ctx.mode.quiet);
+    let response = TemplateApplyResponse {
+        template: result.template,
+        container,
+        anchor_bindings: result.anchor_bindings,
+        created_node_ids_by_role: result.created_node_ids_by_role,
+        anchor_dependency_snapshots: result.anchor_dependency_snapshots,
+        created_issues: result.created_issues,
+        quiet: ctx.mode.quiet,
+    };
     let message = Some(response.message());
     Ok(Outcome::Success { response, message })
 }
