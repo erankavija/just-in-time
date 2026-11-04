@@ -3,7 +3,7 @@
 use super::*;
 use crate::domain::identity::IssueId;
 use crate::graph::Direction;
-use crate::output::DependencyTreeNode;
+use crate::output::{DependencyTreeNode, GraphExportOutput, GraphExportText};
 use std::collections::{HashMap, HashSet};
 
 /// Serialization format for `jit graph export`.
@@ -224,7 +224,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
         format: GraphExportFormat,
         full: bool,
         scope: Option<&IssueId>,
-    ) -> Result<String> {
+    ) -> Result<GraphExportOutput> {
         let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -264,15 +264,23 @@ impl<S: IssueStore> GraphOps<'_, S> {
         let graph = DependencyGraph::new(&selected);
 
         Ok(match format {
-            GraphExportFormat::Dot => crate::visualization::export_dot(&graph),
-            GraphExportFormat::Mermaid => crate::visualization::export_mermaid(&graph),
-            GraphExportFormat::Json if full => crate::visualization::export_json_full(
-                &graph,
-                resolution
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("Missing hierarchy resolution for full JSON"))?,
-            ),
-            GraphExportFormat::Json => crate::visualization::export_json(&graph),
+            GraphExportFormat::Dot => {
+                GraphExportOutput::Text(GraphExportText(crate::visualization::export_dot(&graph)))
+            }
+            GraphExportFormat::Mermaid => GraphExportOutput::Text(GraphExportText(
+                crate::visualization::export_mermaid(&graph),
+            )),
+            GraphExportFormat::Json if full => {
+                GraphExportOutput::Full(crate::visualization::full_document(
+                    &graph,
+                    resolution.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!("Missing hierarchy resolution for full JSON")
+                    })?,
+                ))
+            }
+            GraphExportFormat::Json => {
+                GraphExportOutput::Summary(crate::visualization::summary_document(&graph))
+            }
             GraphExportFormat::Batch => {
                 return Err(anyhow::anyhow!(
                     "batch format is handled by export_graph_batch, not export_graph"

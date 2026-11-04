@@ -15,9 +15,11 @@ use thiserror::Error;
 
 mod emit;
 pub mod failure;
+mod graph;
 mod invariant;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
@@ -232,20 +234,58 @@ pub enum IssueColumn {
     Priority,
 }
 
+/// The fields a human issue-list row shows.
+pub trait ListedIssue {
+    fn id(&self) -> &IssueId;
+    fn title(&self) -> &str;
+    fn state(&self) -> State;
+    fn priority(&self) -> Priority;
+}
+
+impl ListedIssue for Issue {
+    fn id(&self) -> &IssueId {
+        &self.id
+    }
+    fn title(&self) -> &str {
+        &self.title
+    }
+    fn state(&self) -> State {
+        self.state
+    }
+    fn priority(&self) -> Priority {
+        self.priority
+    }
+}
+
+impl ListedIssue for MinimalIssue {
+    fn id(&self) -> &IssueId {
+        &self.id
+    }
+    fn title(&self) -> &str {
+        &self.title
+    }
+    fn state(&self) -> State {
+        self.state
+    }
+    fn priority(&self) -> Priority {
+        self.priority
+    }
+}
+
 /// One row of a human issue list: the issue and its optional reason lines.
-pub type IssueListRow<'a> = (&'a Issue, Vec<String>);
+pub type IssueListRow<'a, I = Issue> = (&'a I, Vec<String>);
 
 /// Rows with no reason lines.
-pub fn plain_issue_rows(issues: &[Issue]) -> impl Iterator<Item = IssueListRow<'_>> {
+pub fn plain_issue_rows<I: ListedIssue>(issues: &[I]) -> impl Iterator<Item = IssueListRow<'_, I>> {
     issues.iter().map(|issue| (issue, Vec::new()))
 }
 
 /// Render a human issue list: `header`, two-space-indented rows (`id | title`
 /// plus `columns`, then one `    - reason` line per reason), and a blank-line
 /// separated `Total: N` footer. `quiet` drops the header and footer.
-pub fn render_issue_list<'a>(
+pub fn render_issue_list<'a, I: ListedIssue + 'a>(
     header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
     columns: &[IssueColumn],
     quiet: bool,
 ) -> String {
@@ -255,11 +295,11 @@ pub fn render_issue_list<'a>(
     let mut total = 0usize;
     for (issue, reasons) in rows {
         total += 1;
-        let _ = write!(lines, "  {} | {}", issue.id, issue.title);
+        let _ = write!(lines, "  {} | {}", issue.id(), issue.title());
         for column in columns {
             let _ = match column {
-                IssueColumn::State => write!(lines, " | {}", issue.state),
-                IssueColumn::Priority => write!(lines, " | {}", issue.priority),
+                IssueColumn::State => write!(lines, " | {}", issue.state()),
+                IssueColumn::Priority => write!(lines, " | {}", issue.priority()),
             };
         }
         lines.push('\n');
@@ -277,10 +317,10 @@ pub fn render_issue_list<'a>(
 
 /// Print [`render_issue_list`]; quiet mode prints the rows alone and an empty
 /// quiet list prints nothing.
-pub fn print_issue_list<'a>(
+pub fn print_issue_list<'a, I: ListedIssue + 'a>(
     ctx: &OutputContext,
     header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
     columns: &[IssueColumn],
 ) -> io::Result<()> {
     let rendered = render_issue_list(header, rows, columns, ctx.quiet);
@@ -496,7 +536,10 @@ mod issue_list_render_tests {
 
     #[test]
     fn test_render_issue_list_empty_prints_header_and_zero_total() {
-        assert_eq!(render_issue_list("H", [], &[], false), "H\n\nTotal: 0");
+        assert_eq!(
+            render_issue_list::<Issue>("H", [], &[], false),
+            "H\n\nTotal: 0"
+        );
     }
 }
 
@@ -1372,9 +1415,6 @@ macro_rules! collection_keys {
 
 collection_keys! {
     IssuesKey = "issues";
-    DependentsKey = "dependents";
-    RootsKey = "roots";
-    NodesKey = "nodes";
     DivergencesKey = "divergences";
     ByStateKey = "by_state";
     GatesKey = "gates";
@@ -1489,6 +1529,38 @@ pub enum BlockedReasonType {
 // Graph Response Types
 // ============================================================================
 
+/// Collection key of [`GraphDownstreamResponse`].
+pub enum DependentsKey {}
+
+impl CollectionKey for DependentsKey {
+    const KEY: &'static str = "dependents";
+    const SCHEMA_NAME: Option<&'static str> = Some("GraphDownstreamResponse");
+}
+
+/// Collection key of [`GraphRootsResponse`].
+pub enum RootsKey {}
+
+impl CollectionKey for RootsKey {
+    const KEY: &'static str = "roots";
+    const SCHEMA_NAME: Option<&'static str> = Some("GraphRootsResponse");
+}
+
+/// Collection key of [`GraphDepsTreeResponse`].
+pub enum GraphDepsNodesKey {}
+
+impl CollectionKey for GraphDepsNodesKey {
+    const KEY: &'static str = "nodes";
+    const SCHEMA_NAME: Option<&'static str> = Some("GraphDepsTreeResponse");
+}
+
+/// Collection key of [`GraphTreeResponse`].
+pub enum GraphTreeNodesKey {}
+
+impl CollectionKey for GraphTreeNodesKey {
+    const KEY: &'static str = "nodes";
+    const SCHEMA_NAME: Option<&'static str> = Some("GraphTreeResponse");
+}
+
 /// Response for `graph downstream` command
 pub type GraphDownstreamResponse = ListEnvelope<DependentsKey, MinimalIssue, IssueScope>;
 
@@ -1548,7 +1620,8 @@ impl DependencyTreeNode {
 /// `count` is the number of top-level entries in `nodes` (the immediate
 /// dependency nodes; each may carry nested `children`). This differs from
 /// `summary.total`, which counts every unique dependency across the whole tree.
-pub type GraphDepsTreeResponse = ListEnvelope<NodesKey, DependencyTreeNode, DependencyTreeScope>;
+pub type GraphDepsTreeResponse =
+    ListEnvelope<GraphDepsNodesKey, DependencyTreeNode, DependencyTreeScope>;
 
 /// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1658,7 +1731,7 @@ pub struct HierarchyNodeView {
 /// assert_eq!(json["root"], serde_json::Value::Null);
 /// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
 /// ```
-pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>;
+pub type GraphTreeResponse = ListEnvelope<GraphTreeNodesKey, HierarchyNodeView, TreeRoot>;
 
 /// The scope of a [`GraphTreeResponse`]. `nodes` are ordered by ascending short id.
 #[derive(Debug, Serialize, JsonSchema)]
