@@ -43,10 +43,9 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `claim` | `10` | A lease subcommand was run outside a git repository (leases require git for worktree identity). |  |
 | `gate evaluate, gate evaluate-all, gate evaluate-many` | `4` | A checker ran and its verdict was fail. | yes |
 | `gate evaluate, gate evaluate-all, gate evaluate-many` | `10` | A checker could not run to a verdict (timeout, crash, command not found, or exit status 75). | yes |
-| `validate` | `4` | Repository-integrity, scope, or drift validation found error-severity findings. | yes |
-| `validate` | `1` | Rule evaluation reported error-severity findings. | yes |
-| `validate --branch-drift` | `1` | Branch-drift validation failed: the check reported drift from the upstream branch or could not run. | yes |
-| `validate --leases` | `1` | Lease validation found one or more invalid leases, or the lease check could not run. | yes |
+| `validate` | `4` | Repository, scope, issue, selected-rule, or explanation validation reported error-severity findings. | yes |
+| `validate --branch-drift` | `4` | Branch-drift validation failed: the check reported drift from the upstream branch or could not run. | yes |
+| `validate --leases` | `4` | Lease validation found one or more invalid leases, or the lease check could not run. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. |  |
