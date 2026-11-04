@@ -1,6 +1,6 @@
 //! `jit search` handler.
 
-use super::{CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::SearchArgs;
 use crate::output::{SearchHit, SearchQuery, SearchResponse};
 use crate::search::SearchOptions;
@@ -28,7 +28,7 @@ fn search<S: IssueStore>(
         file_patterns: Vec::new(),
     };
     let matches = ctx.executor.queries().search_content(&query, options)?;
-    let message = format!("Found {} result(s)", matches.len());
+    let message = count_message(matches.len(), "Found ", " result(s)");
     let items = matches
         .into_iter()
         .map(|found| SearchHit {

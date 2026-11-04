@@ -1,6 +1,6 @@
 //! `jit profile` handlers.
 
-use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
+use super::{count_message, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ProfileCommands;
 use crate::commands::{
     parse_profile_selectors, parse_profile_variable_assignments, ProfileVariableOptions,
@@ -56,7 +56,7 @@ fn diff<S: HandlerStore>(
             result,
         )
     } else {
-        let message = format!("{} profile(s) can be published", result.count());
+        let message = count_message(result.count(), "", " profile(s) can be published");
         Outcome::success_with(result, message)
     })
 }
