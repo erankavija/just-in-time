@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "88c1b728-f274-4311-830a-8413174befcb",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:21:05.288672974Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1eb949a5-7b70-4b32-92f3-aa5e2f703d44",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Measure per-test durations and derive the per-test limits",
-  "updated_at": "2026-11-03T23:10:01.652271147Z"
+  "updated_at": "2026-11-04T02:21:05.288672974Z"
 }
