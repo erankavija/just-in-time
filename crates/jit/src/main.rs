@@ -19,8 +19,9 @@ use clap::Parser;
 use jit::cli::{Cli, Commands, GateCommands, IssueCommands, ProfileCommands};
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, archive, claim, config, dep, doc, events, graph, hooks, init, invariant, item, label,
-    project, resolve_issue, search, serve, snapshot, validate, version, CommandContext,
+    apply, archive, claim, config, dep, doc, events, graph, hooks, init, invariant, issue, item,
+    label, project, resolve_issue, search, serve, snapshot, validate, version, CommandContext,
+    Dispatched,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -29,7 +30,7 @@ use jit::output::{
     plain_issue_rows, print_issue_list, ErrorCode, ExitCode, IssueColumn, JsonError, JsonOutput,
     OutputContext, OutputMode,
 };
-use jit::storage::{IssueStore, JsonFileStorage};
+use jit::storage::JsonFileStorage;
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -677,154 +678,6 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
 }
 
-/// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
-/// issue id.
-///
-/// Shared by the multi-id `--json` array path and the multi-id non-JSON loop so
-/// each issue renders from the same shape as `issue show --json`.
-fn build_issue_show_response<S: IssueStore>(
-    executor: &CommandExecutor<S>,
-    id: &IssueId,
-) -> Result<jit::output::IssueShowResponse> {
-    let issue = executor
-        .issues()
-        .show_issue(id)
-        .with_context(|| format!("Failed to load issue {}", id))?;
-    executor.issues().show_response(issue)
-}
-
-/// Render a single resolved addressable item as a JSON envelope or a short block.
-///
-/// Used by the `jit issue show <issue>/<self-id>` qualified-id path; the human
-/// block is the item response's own rendering.
-fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bool) -> Result<()> {
-    use jit::output::HumanRender;
-    if json {
-        let output = JsonOutput::success(result);
-        println!("{}", output.to_json_string()?);
-    } else {
-        print!("{}", result.render_human(OutputMode { json, quiet }));
-    }
-    Ok(())
-}
-
-/// Run the `query all` listing, shared by `jit query all` and `jit issue list`.
-///
-/// Both commands take identical filters/flags and must produce identical output,
-/// so they delegate to this single implementation.
-fn run_query_all<S: IssueStore>(
-    executor: &CommandExecutor<S>,
-    quiet: bool,
-    filters: jit::cli::IssueFilterArgs,
-    full: bool,
-    json: bool,
-) -> Result<()> {
-    let output_ctx = OutputContext::new(quiet, json);
-    let filters = filters.parse()?;
-    let issues = executor.queries().query_all(
-        filters.state,
-        filters.assignee,
-        filters.priority,
-        filters.labels,
-    )?;
-
-    if json {
-        use jit::domain::MinimalIssue;
-        use jit::output::{IssueListFullResponse, IssueListResponse, JsonOutput};
-
-        let msg = format!("Found {} issue(s)", issues.len());
-        // `--full` hands back complete stored records (gate list under the
-        // storage names `gates_required`/`gates_status`); the default shape emits
-        // lean `MinimalIssue` entries. Both go through their typed response so the
-        // emitted shape stays in lockstep with the schema derived from the same
-        // struct (jit:f40f1b0a).
-        let output = if full {
-            let response = IssueListFullResponse::new(issues);
-            JsonOutput::success(serde_json::to_value(response)?)
-        } else {
-            let minimal: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
-            let response = IssueListResponse::new(minimal);
-            JsonOutput::success(serde_json::to_value(response)?)
-        }
-        .with_message(msg);
-        println!("{}", output.to_json_string()?);
-    } else {
-        print_issue_list(
-            &output_ctx,
-            "All issues (filtered):",
-            plain_issue_rows(&issues),
-            &[IssueColumn::State, IssueColumn::Priority],
-        )?;
-    }
-    Ok(())
-}
-
-/// Print the human-readable `issue show` view for an already-built response.
-///
-/// Single source of the `issue show` human field rendering: both the single-id
-/// non-JSON branch and the multi-id non-JSON loop delegate here so the field
-/// set, order, and document/`[HEAD]` formatting stay identical.
-fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
-    println!("ID: {}", response.id);
-    println!("Title: {}", response.title);
-    println!("Description: {}", response.description);
-    println!("State: {}", response.state);
-    println!("Priority: {}", response.priority);
-    println!("Assignee: {:?}", response.assignee);
-
-    if response.dependencies.is_empty() {
-        println!("Dependencies: None");
-    } else {
-        let met_count = response
-            .dependencies
-            .iter()
-            .filter(|d| jit::domain::is_dependency_met(d.state, d.archived_from))
-            .count();
-        println!(
-            "Dependencies ({}/{} met):",
-            met_count,
-            response.dependencies.len()
-        );
-        for dep in &response.dependencies {
-            println!("  {} - {} [{}]", dep.short_id(), dep.title, dep.state);
-        }
-    }
-
-    if response.gates.is_empty() {
-        println!("Gates: (none)");
-    } else {
-        println!("Gates:");
-        for gate in &response.gates {
-            let last_run = gate.last_run_at.as_deref().unwrap_or("never run");
-            println!(
-                "  - {} [{}] (last run: {})",
-                gate.key, gate.status, last_run
-            );
-        }
-    }
-    if !response.created_at.is_empty() {
-        println!("Created: {}", response.created_at);
-    }
-    if !response.updated_at.is_empty() {
-        println!("Updated: {}", response.updated_at);
-    }
-    if !response.documents.is_empty() {
-        println!("Documents:");
-        for doc in &response.documents {
-            print!("  - {}", doc.path);
-            if let Some(ref label) = doc.label {
-                print!(" ({})", label);
-            }
-            if let Some(ref commit) = doc.commit {
-                print!(" [{}]", &commit[..7.min(commit.len())]);
-            } else {
-                print!(" [HEAD]");
-            }
-            println!();
-        }
-    }
-}
-
 /// Reject parent-level `jit query` filters when a subcommand is present.
 ///
 /// The bare `jit query` form carries its own filter flags (`--state`,
@@ -1246,7 +1099,20 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         }
         Commands::Version => unreachable!("version is handled before repository validation"),
         Commands::Issue(issue_cmd) => {
+            let issue_cmd =
+                match issue::dispatch(issue_cmd, &ctx, &mut io::stdout(), &mut io::stderr())? {
+                    Dispatched::Handled(code) => return Ok(code),
+                    Dispatched::Unhandled(rest) => rest,
+                };
             match issue_cmd {
+                IssueCommands::Show { .. }
+                | IssueCommands::List { .. }
+                | IssueCommands::Search { .. }
+                | IssueCommands::Status { .. }
+                | IssueCommands::Children { .. }
+                | IssueCommands::Progress { .. } => {
+                    unreachable!("the issue read commands are served by dispatch::issue")
+                }
                 IssueCommands::Create {
                     positional_title,
                     title,
@@ -1359,356 +1225,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                             .print_info(format!("Created {} issue(s):", outcome.key_to_id.len()));
                         for (key, id) in &outcome.key_to_id {
                             println!("  {key} -> {id}");
-                        }
-                    }
-                }
-                IssueCommands::Search {
-                    query,
-                    filters,
-                    full,
-                } => {
-                    let output_ctx = OutputContext::new(quiet, json);
-
-                    let filters = filters.parse()?;
-
-                    // The positional query is optional only when at least one
-                    // filter narrows the search; otherwise the command would
-                    // dump every issue, which is almost never intended.
-                    let has_filter = filters.state.is_some()
-                        || filters.assignee.is_some()
-                        || filters.priority.is_some()
-                        || !filters.labels.is_empty();
-                    if query.is_none() && !has_filter {
-                        return Err(jit::errors::InvalidArgumentError::new(
-                            "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)",
-                        )
-                        .into());
-                    }
-
-                    let issues = executor.queries().search_issues_with_filters(
-                        query.as_deref().unwrap_or(""),
-                        filters.priority,
-                        filters.state,
-                        filters.assignee,
-                        filters.labels,
-                    )?;
-
-                    if json {
-                        use jit::output::{
-                            IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse,
-                            JsonOutput,
-                        };
-
-                        let count = issues.len();
-                        let msg = match &query {
-                            Some(q) => format!("Found {count} issue(s) matching '{q}'"),
-                            None => format!("Found {count} issue(s)"),
-                        };
-                        // `--full` returns complete stored records (gate list under
-                        // the storage names `gates_required`/`gates_status`); the
-                        // default shape returns lean `MinimalIssue` entries. Both go
-                        // through their typed response so the emitted shape stays in
-                        // lockstep with the schema derived from the same struct
-                        // (jit:f40f1b0a).
-                        let output_data = if full {
-                            serde_json::to_value(IssueSearchFullResponse::with_extras(
-                                issues,
-                                IssueSearchQuery {
-                                    query: query.clone(),
-                                },
-                            ))?
-                        } else {
-                            use jit::domain::MinimalIssue;
-                            let minimal_issues: Vec<MinimalIssue> =
-                                issues.iter().map(MinimalIssue::from).collect();
-                            serde_json::to_value(IssueSearchResponse::with_extras(
-                                minimal_issues,
-                                IssueSearchQuery {
-                                    query: query.clone(),
-                                },
-                            ))?
-                        };
-
-                        let output = JsonOutput::success(output_data).with_message(msg);
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        print_issue_list(
-                            &output_ctx,
-                            &format!("Found {} issue(s):", issues.len()),
-                            plain_issue_rows(&issues),
-                            &[IssueColumn::State, IssueColumn::Priority],
-                        )?;
-                    }
-                }
-                IssueCommands::Show {
-                    ids,
-                    summary,
-                    field,
-                    fields,
-                } => {
-                    let projecting = field.is_some() || !fields.is_empty();
-
-                    // Projection targets a single issue: `--field`/`--fields`
-                    // with multiple ids is ambiguous, so reject it.
-                    if projecting && ids.len() > 1 {
-                        return Err(jit::errors::InvalidArgumentError::new(format!(
-                            "invalid arguments: --field/--fields require exactly one issue id (got {})",
-                            ids.len()
-                        ))
-                        .into());
-                    }
-
-                    // Multi-id: return the uniform list envelope
-                    // `{"count": N, "issues": [...]}` with full issue objects in
-                    // argument order. Without --json, fall through to printing
-                    // each issue's human view in order.
-                    if ids.len() > 1 && json {
-                        let responses = ids
-                            .iter()
-                            .map(|id| {
-                                build_issue_show_response(&executor, &resolve_issue(&storage, id)?)
-                            })
-                            .collect::<Result<Vec<_>>>()?;
-                        let output = jit::output::JsonOutput::success(serde_json::to_value(
-                            jit::output::IssueShowListResponse::new(responses),
-                        )?);
-                        println!("{}", output.to_json_string()?);
-                        return Ok(ExitCode::Success);
-                    }
-
-                    if ids.len() > 1 {
-                        // Non-JSON multi-id: print each issue's human view.
-                        for id in &ids {
-                            let response = build_issue_show_response(
-                                &executor,
-                                &resolve_issue(&storage, id)?,
-                            )?;
-                            print_issue_show_human(&response);
-                        }
-                        return Ok(ExitCode::Success);
-                    }
-
-                    // Single id (guaranteed by clap `required = true`).
-                    let requested = &ids[0];
-
-                    // A `<issue>/<self-id>` argument addresses an item, not an
-                    // issue (issue ids never contain '/'). Resolve and render the
-                    // addressed item through the same item resolver as
-                    // `jit item show`, honoring --json (REQ-04 / concept).
-                    if !projecting && !summary && requested.contains('/') {
-                        match executor.items().show_item(requested) {
-                            Ok(result) => {
-                                print_item_show(&result, json, quiet)?;
-                                return Ok(ExitCode::Success);
-                            }
-                            Err(e) => {
-                                // `handle_json_error!` either prints the JSON error
-                                // and exits, or returns `Err` (non-JSON path).
-                                handle_json_error!(
-                                    json,
-                                    e,
-                                    command_json_error(&e, jit::output::ErrorCode::ItemNotFound)
-                                );
-                            }
-                        }
-                    }
-
-                    match resolve_issue(&storage, requested)
-                        .and_then(|id| executor.issues().show_issue(&id))
-                    {
-                        Ok(issue) => {
-                            // Field projection: print the named field(s) and return.
-                            if projecting {
-                                let response = executor.issues().show_response(issue)?;
-                                let value = serde_json::to_value(&response).with_context(|| {
-                                    "Failed to serialize issue for field projection".to_string()
-                                })?;
-
-                                if let Some(name) = field {
-                                    let rendered = jit::output::project_field(&value, &name)
-                                        .ok_or_else(|| {
-                                            jit::errors::InvalidArgumentError::new(format!(
-                                                "invalid field: unknown field '{}' for issue show",
-                                                name
-                                            ))
-                                        })?;
-                                    println!("{}", rendered);
-                                } else {
-                                    let rendered = jit::output::project_fields(&value, &fields)
-                                        .map_err(|unknown| {
-                                            jit::errors::InvalidArgumentError::new(format!(
-                                                "invalid field: unknown field '{}' for issue show",
-                                                unknown.0
-                                            ))
-                                        })?;
-                                    println!("{}", rendered);
-                                }
-                                return Ok(ExitCode::Success);
-                            }
-
-                            if summary && json {
-                                let summary_response =
-                                    jit::output::IssueShowSummaryResponse::from(&issue);
-                                let msg = format!(
-                                    "Issue {}: {} [{}]",
-                                    summary_response.short_id,
-                                    summary_response.title,
-                                    summary_response.state
-                                );
-                                let output = jit::output::JsonOutput::success(summary_response)
-                                    .with_message(msg);
-                                println!("{}", output.to_json_string()?);
-                                return Ok(ExitCode::Success);
-                            }
-                            let response = executor.issues().show_response(issue)?;
-
-                            let show_msg = format!(
-                                "Issue {}: {} [{}]",
-                                response.id.short_id(),
-                                response.title,
-                                response.state
-                            );
-                            output_data!(quiet, json, response, show_msg, {
-                                print_issue_show_human(&response);
-                            });
-                        }
-                        Err(e) => {
-                            handle_json_error!(
-                                json,
-                                e,
-                                jit::output::JsonError::issue_not_found(requested)
-                            );
-                        }
-                    }
-                }
-                IssueCommands::Status { ids } => {
-                    // One compact status per id, in argument order. Each status is
-                    // projected from the same enriched show response so the unmet
-                    // dependency set stays byte-for-byte consistent with
-                    // `issue show --json`.
-                    //
-                    // Resolve each id inline (not via `build_issue_show_response`,
-                    // which wraps the lookup error in `.with_context` and would
-                    // hide the typed id-resolution error from `refine_id_error`'s
-                    // downcast). A bad id is routed through `handle_json_error!`
-                    // exactly like `issue show`: under `--json` it prints the
-                    // refined error envelope (the id-lookup `ErrorCode` with its
-                    // matching exit code) and exits, so a
-                    // multi-id run fails fast on the first bad id.
-                    let mut statuses = Vec::with_capacity(ids.len());
-                    for id in &ids {
-                        match resolve_issue(&storage, id)
-                            .and_then(|full_id| executor.issues().show_issue(&full_id))
-                        {
-                            Ok(issue) => {
-                                statuses.push(executor.issues().issue_status_response(issue)?);
-                            }
-                            Err(e) => {
-                                handle_json_error!(
-                                    json,
-                                    e,
-                                    jit::output::JsonError::issue_not_found(id)
-                                );
-                            }
-                        }
-                    }
-
-                    if json {
-                        if statuses.len() == 1 {
-                            // Single id stays a bare object, mirroring `issue show`.
-                            let output = jit::output::JsonOutput::success(&statuses[0]);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            let output = jit::output::JsonOutput::success(serde_json::to_value(
-                                jit::output::IssueStatusListResponse::new(statuses),
-                            )?);
-                            println!("{}", output.to_json_string()?);
-                        }
-                    } else {
-                        for status in &statuses {
-                            println!("{}", status.to_line());
-                        }
-                    }
-                }
-                IssueCommands::Children { id } => {
-                    // Orchestration (child resolution, dangling classification)
-                    // lives in `IssueOps::issue_children`; this arm only
-                    // dispatches, renders, and routes an id failure through the
-                    // JSON error path.
-                    match resolve_issue(&storage, &id)
-                        .and_then(|full_id| executor.issues().issue_children(&full_id))
-                    {
-                        Ok(response) => {
-                            if json {
-                                let output = jit::output::JsonOutput::success(&response);
-                                println!("{}", output.to_json_string()?);
-                            } else {
-                                for child in &response.items {
-                                    println!("{}", child.to_line());
-                                }
-                                if !response.extras.dangling.is_empty() {
-                                    println!(
-                                        "dangling: {}",
-                                        response
-                                            .extras
-                                            .dangling
-                                            .iter()
-                                            .map(IssueId::as_str)
-                                            .collect::<Vec<_>>()
-                                            .join(",")
-                                    );
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            handle_json_error!(
-                                json,
-                                e,
-                                jit::output::JsonError::issue_not_found(&id)
-                            );
-                        }
-                    }
-                }
-                IssueCommands::Progress { id } => {
-                    // Orchestration lives in `IssueOps::issue_progress`;
-                    // this arm dispatches, renders, and routes an id failure
-                    // through the JSON error path.
-                    match resolve_issue(&storage, &id)
-                        .and_then(|full_id| executor.issues().issue_progress(&full_id))
-                    {
-                        Ok(response) => {
-                            if json {
-                                let output = jit::output::JsonOutput::success(&response);
-                                println!("{}", output.to_json_string()?);
-                            } else {
-                                println!(
-                                    "{} [{}] title: {}",
-                                    response.container.short_id,
-                                    response.container.state.as_str(),
-                                    response.container.title
-                                );
-                                for line in response.rollup.to_lines() {
-                                    println!("{}", line);
-                                }
-                                if !response.dangling.is_empty() {
-                                    println!(
-                                        "dangling: {}",
-                                        response
-                                            .dangling
-                                            .iter()
-                                            .map(IssueId::as_str)
-                                            .collect::<Vec<_>>()
-                                            .join(",")
-                                    );
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            handle_json_error!(
-                                json,
-                                e,
-                                jit::output::JsonError::issue_not_found(&id)
-                            );
                         }
                     }
                 }
@@ -2190,9 +1706,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", issue.id));
                     }
-                }
-                IssueCommands::List { filters, full } => {
-                    run_query_all(&executor, quiet, filters, full, json)?;
                 }
             }
         }
@@ -3606,7 +3119,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             filters: bare_filters,
             full: bare_full,
         } => match subcommand {
-            None => run_query_all(&executor, quiet, bare_filters, bare_full, json)?,
+            None => {
+                return issue::emit_list(
+                    &ctx,
+                    bare_filters,
+                    bare_full,
+                    &mut io::stdout(),
+                    &mut io::stderr(),
+                )
+            }
             Some(query_cmd) => {
                 // Parent-level filters only apply to the bare `jit query` form.
                 // When a subcommand is present they would be silently ignored
@@ -3623,7 +3144,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 )?;
                 match query_cmd {
                     jit::cli::QueryCommands::All { filters, full } => {
-                        run_query_all(&executor, quiet, filters, full, json)?;
+                        return issue::emit_list(
+                            &ctx,
+                            filters,
+                            full,
+                            &mut io::stdout(),
+                            &mut io::stderr(),
+                        );
                     }
                     jit::cli::QueryCommands::Available { filters, full } => {
                         let output_ctx = OutputContext::new(quiet, json);
