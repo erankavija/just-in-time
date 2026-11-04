@@ -26,7 +26,11 @@ FAILED=0
 rm -rf "$DRY"
 mkdir -p "$DRY/logs"
 
-tree_digest() { (cd "$1" && find .jit .git/jit -type f -print0 | sort -z | xargs -0 sha256sum; find .jit .git/jit -type d | sort) | sha256sum; }
+tree_digest() {
+  local jit_dir
+  jit_dir=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)/jit
+  (cd "$1" && find .jit "$jit_dir" -type f -print0 | sort -z | xargs -0 sha256sum; find .jit "$jit_dir" -type d | sort) | sha256sum
+}
 json_count() { python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["count"])' "$1" 2>/dev/null || echo "?"; }
 # The issue with the most runs, and its gate with the most runs.
 busiest_gate() {
@@ -65,7 +69,9 @@ for repo in "$@"; do
   if ! { git clone --quiet --no-hardlinks --no-checkout "$repo" "$copy" &&
     git -C "$copy" checkout --quiet --detach "$(git -C "$repo" rev-parse HEAD)" &&
     rm -rf "$copy/.jit" && cp -a "$repo/.jit" "$copy/.jit" &&
-    { [ ! -d "$repo/.git/jit" ] || cp -a "$repo/.git/jit" "$copy/.git/jit"; }; }; then
+    src_jit=$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/jit &&
+    dst_jit=$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)/jit &&
+    { [ ! -d "$src_jit" ] || cp -a "$src_jit" "$dst_jit"; }; }; then
     echo "| $name | copy failed |"; FAILED=1; continue
   fi
   RESULT=""
