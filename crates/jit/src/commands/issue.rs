@@ -3800,6 +3800,43 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
+    fn test_update_issue_restores_archived_done_with_retired_gate() {
+        let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
+        let mut issue = crate::test_utils::fixture_issue("Closed".into(), String::new());
+        issue.state = State::Archived;
+        issue.archived_from = Some(State::Done);
+        let key: crate::domain::identity::GateKey = "retired".parse().unwrap();
+        issue.gates_required.push(key.clone());
+        issue.gates_status.insert(
+            key,
+            crate::domain::GateState {
+                status: crate::domain::GateStatus::Passed,
+                updated_by: None,
+                updated_at: chrono::Utc::now(),
+                run_id: None,
+            },
+        );
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        executor
+            .issues()
+            .update_issue(
+                &id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        assert_eq!(executor.storage.load_issue(&id).unwrap().state, State::Done);
+    }
+
+    #[test]
     fn test_update_issue_reopening_with_retired_gate_fails_without_mutation() {
         let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
         let mut issue = crate::test_utils::fixture_issue("Closed".into(), String::new());

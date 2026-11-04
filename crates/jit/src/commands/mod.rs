@@ -1269,7 +1269,9 @@ fn derive_state_transition(
         });
     }
 
-    if target != State::Rejected && target != State::Archived {
+    let restores_done =
+        old_state == State::Archived && target == State::Done && issue.is_effectively_terminal();
+    if target != State::Rejected && target != State::Archived && !restores_done {
         let missing = issue
             .gates_required
             .iter()
