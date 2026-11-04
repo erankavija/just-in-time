@@ -226,7 +226,9 @@ pub(crate) enum SessionRaceAction {
 
 /// Performs one repository write when a session reaches `point` for the
 /// `trigger`th time, standing in for a concurrent writer at that boundary.
+/// Every moment first reaches the interruptions the raced store already had.
 struct SessionRace {
+    inner: Arc<dyn crate::storage::MutationInterruptionInjector>,
     point: MutationPoint,
     trigger: usize,
     hits: std::sync::atomic::AtomicUsize,
@@ -236,6 +238,7 @@ struct SessionRace {
 
 impl crate::storage::MutationInterruptionInjector for SessionRace {
     fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        self.inner.check(point)?;
         if point == &self.point
             && self.hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == self.trigger
         {
@@ -252,14 +255,16 @@ impl crate::storage::MutationInterruptionInjector for SessionRace {
     }
 }
 
-/// Race `action` against the `trigger`th session open, before that session
-/// captures anything.
+/// Race `action` against the `trigger`th session open crossing `point`
+/// ([`MutationPoint::SessionOpen`] or [`MutationPoint::ReadSessionOpen`]),
+/// before that session captures anything.
 pub(crate) fn with_open_race(
     storage: InMemoryStorage,
+    point: MutationPoint,
     trigger: usize,
     action: SessionRaceAction,
 ) -> InMemoryStorage {
-    with_session_race(storage, MutationPoint::SessionOpen, trigger, action)
+    with_session_race(storage, point, trigger, action)
 }
 
 /// Race `action` against the first apply, after its session captured the read
@@ -278,6 +283,7 @@ fn with_session_race(
     action: SessionRaceAction,
 ) -> InMemoryStorage {
     let race = Arc::new(SessionRace {
+        inner: storage.mutation_interruptions(),
         point,
         trigger,
         hits: std::sync::atomic::AtomicUsize::new(0),

@@ -1471,6 +1471,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::Ready;
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
+            crate::storage::MutationPoint::SessionOpen,
             2,
             crate::commands::test_helpers::SessionRaceAction::Save(Box::new(issue)),
         );
@@ -2462,6 +2463,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
+            crate::storage::MutationPoint::SessionOpen,
             2,
             crate::commands::test_helpers::SessionRaceAction::WriteRepoFile {
                 path: ".jit/config.toml".to_string(),
@@ -2499,6 +2501,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_2222_2222);
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
+            crate::storage::MutationPoint::SessionOpen,
             2,
             crate::commands::test_helpers::SessionRaceAction::Save(Box::new(collision.clone())),
         );

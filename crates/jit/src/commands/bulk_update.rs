@@ -2248,7 +2248,12 @@ mod tests {
         // requested target before that retry's own capture reads it.
         let mut changed = noop_issue;
         changed.priority = Priority::Low;
-        let storage = with_open_race(storage, 2, SessionRaceAction::Save(Box::new(changed)));
+        let storage = with_open_race(
+            storage,
+            crate::storage::MutationPoint::SessionOpen,
+            2,
+            SessionRaceAction::Save(Box::new(changed)),
+        );
         // Force exactly one retry on the shared verification session's own
         // (empty-delta) apply, as if its natural optimistic check had itself
         // found the concurrent mutation.
