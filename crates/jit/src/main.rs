@@ -2522,23 +2522,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         }
-        Commands::Apply {
-            template,
-            container,
-            anchor,
-            force,
-        } => {
-            return apply::dispatch(
-                apply::Invocation {
-                    template: &template,
-                    container: &container,
-                    anchors: &anchor,
-                    force,
-                },
-                &ctx,
-                &mut io::stdout(),
-                &mut io::stderr(),
-            );
+        Commands::Apply(args) => {
+            return apply::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {

@@ -81,6 +81,26 @@ impl IssueFilterArgs {
     }
 }
 
+/// Arguments of `jit apply`.
+#[derive(Args)]
+pub struct ApplyArgs {
+    /// Template name to apply (must be declared in `.jit/templates.toml`)
+    pub template: String,
+
+    /// Container issue ID to apply the template to
+    pub container: String,
+
+    /// Bind a template anchor: `role=id` (repeatable). The repository's
+    /// container anchor is auto-bound to `<container>`; binding it explicitly
+    /// overrides that.
+    #[arg(long, value_name = "ROLE=ID")]
+    pub anchor: Vec<String>,
+
+    /// Bypass validation warnings and refresh an already-applied template
+    #[arg(long)]
+    pub force: bool,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
@@ -145,23 +165,7 @@ pub enum Commands {
     ///   jit apply plan epic-123                       # Apply the `plan` template
     ///   jit apply plan epic-123 --json                # Machine-readable result
     ///   jit apply plan epic-123 --anchor container=epic-123 --force
-    Apply {
-        /// Template name to apply (must be declared in `.jit/templates.toml`)
-        template: String,
-
-        /// Container issue ID to apply the template to
-        container: String,
-
-        /// Bind a template anchor: `role=id` (repeatable). The repository's
-        /// container anchor is auto-bound to `<container>`; binding it explicitly
-        /// overrides that.
-        #[arg(long, value_name = "ROLE=ID")]
-        anchor: Vec<String>,
-
-        /// Bypass validation warnings and refresh an already-applied template
-        #[arg(long)]
-        force: bool,
-    },
+    Apply(ApplyArgs),
 
     /// Dependency management commands
     #[command(subcommand, visible_alias = "dependency")]
@@ -2656,7 +2660,7 @@ impl Commands {
     /// the generated-command guard required by the universal recovery boundary.
     pub fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Init { .. } | Self::Apply { .. } | Self::Recover { .. } => true,
+            Self::Init { .. } | Self::Apply(_) | Self::Recover { .. } => true,
             Self::Profile(command) => command.requires_recovery_dispatch(),
             Self::Issue(command) => command.requires_recovery_dispatch(),
             Self::Dep(command) => command.requires_recovery_dispatch(),
@@ -2717,7 +2721,7 @@ impl Commands {
             Self::Recover => true,
             Self::Init { .. }
             | Self::List { .. }
-            | Self::Apply { .. }
+            | Self::Apply(_)
             | Self::Rdeps { .. }
             | Self::Query {
                 subcommand: None, ..

@@ -1,20 +1,12 @@
 //! `jit apply` handler.
 
 use super::{CommandContext, Outcome};
+use crate::cli::ApplyArgs;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::output::TemplateApplyResponse;
 use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::anyhow;
 use std::collections::BTreeMap;
-
-/// The parsed arguments of `jit apply`.
-pub struct Invocation<'a> {
-    pub template: &'a str,
-    pub container: &'a str,
-    /// Repeatable `role=id` anchor bindings.
-    pub anchors: &'a [String],
-    pub force: bool,
-}
 
 fn apply<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
@@ -52,10 +44,10 @@ fn apply<S: IssueStore + RepositoryStateStore>(
 }
 
 command_group! {
-    command: Invocation<'_>,
+    command: ApplyArgs,
     storage: [IssueStore + RepositoryStateStore],
     leaves: {
-        "apply" => Invocation { template, container, anchors, force } => apply(template, container, anchors, force) -> TemplateApplyResponse,
+        "apply" => ApplyArgs { template, container, anchor, force } => apply(&template, &container, &anchor, force) -> TemplateApplyResponse,
     }
 }
 
@@ -73,12 +65,12 @@ mod tests {
             executor: &executor,
             mode: OutputMode::default(),
         };
-        let anchors = [anchor.to_owned()];
+        let anchors = vec![anchor.to_owned()];
         dispatch(
-            Invocation {
-                template: "plan",
-                container: "abcdef12",
-                anchors: &anchors,
+            ApplyArgs {
+                template: "plan".to_owned(),
+                container: "abcdef12".to_owned(),
+                anchor: anchors,
                 force: false,
             },
             &ctx,
