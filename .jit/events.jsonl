@@ -24811,3 +24811,7 @@
 {"gate_key":"code-review","id":"3d791c7a-abb1-42d1-a720-f9b163c2bcc9","issue_id":"1cdf5965-226b-4eb0-8707-33b35a7854d5","timestamp":"2026-11-04T23:21:33.770897588Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"d0d6f836-df9c-47b2-9b6e-29b1a2df440a","issue_id":"1cdf5965-226b-4eb0-8707-33b35a7854d5","timestamp":"2026-11-04T23:22:20.335407686Z","to":"done","type":"issue_state_changed"}
 {"id":"b42b8d69-e31e-4eb6-9eee-e1966974d61b","issue_id":"1cdf5965-226b-4eb0-8707-33b35a7854d5","timestamp":"2026-11-04T23:22:20.335407686Z","type":"issue_completed"}
+{"id":"f9f33b76-c86d-48ac-842c-7734cc678d3c","issue_id":"ab168296-45d1-44cb-9ee1-6bdf53b9488c","priority":"normal","timestamp":"2026-11-04T23:26:00.051673379Z","title":"Issue listing renders directly through the shared output contract","type":"issue_created"}
+{"fields":["dependencies"],"id":"8f83031e-4e5d-4d72-afaf-4a2244d64323","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-04T23:26:08.138933922Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"17e8edf8-1b47-4f56-9a5f-82ac9f7f2e4b","issue_id":"ab168296-45d1-44cb-9ee1-6bdf53b9488c","timestamp":"2026-11-04T23:26:08.371357826Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:df129d9e-lead","id":"03c7a1ce-e5d6-4deb-ad76-3c92350ccdf1","issue_id":"ab168296-45d1-44cb-9ee1-6bdf53b9488c","timestamp":"2026-11-04T23:26:08.371357826Z","type":"issue_claimed"}
