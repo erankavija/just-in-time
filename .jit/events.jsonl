@@ -24216,3 +24216,4 @@
 {"fields":["description"],"id":"76c2869f-a475-4ed1-a795-0b93dd527f18","issue_id":"df129d9e-c795-4d92-9ee5-ffd776339252","timestamp":"2026-11-04T12:35:03.000220356Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"b21462a9-c619-46f2-9332-65c4215a130c","issue_id":"a08c4b38-f5c2-4589-a195-a5ba1a8e6324","timestamp":"2026-11-04T12:35:03.125697184Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["assignee"],"id":"3165c0dc-9fdc-4669-9edb-6cafc4021800","issue_id":"a08c4b38-f5c2-4589-a195-a5ba1a8e6324","timestamp":"2026-11-04T12:35:03.162155446Z","type":"issue_updated","updated_by":"issue-unassign"}
+{"fields":["documents"],"id":"eab9f422-e64e-4a06-a90e-8f892fde3f32","issue_id":"4a01ccba-b6b9-46db-ae4a-cf92a98c9279","timestamp":"2026-11-04T12:35:32.306042341Z","type":"issue_updated","updated_by":"doc-add"}
