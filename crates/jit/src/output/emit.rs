@@ -185,10 +185,10 @@ mod tests {
         let findings = || Outcome::findings(ErrorCode::ValidationFailed, "failed", Object {});
 
         let warned = [
-            printed(&Outcome::success(Object {}).with_warnings(["a", "b"])),
+            printed(&Outcome::from(Object {}).with_warnings(["a", "b"])),
             printed(&findings().with_warnings(["a", "b"])),
         ];
-        let clean = [printed(&Outcome::success(Object {})), printed(&findings())];
+        let clean = [printed(&Outcome::from(Object {})), printed(&findings())];
 
         assert!(warned
             .iter()
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn test_emit_outcome_closed_pipe_returns_broken_pipe_status() {
         let status = emit_outcome(
-            &Outcome::success(Unit),
+            &Outcome::from(Unit),
             OutputMode::default(),
             &mut ClosedPipe,
             &mut io::sink(),
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_emit_outcome_quiet_mode_hides_the_lines_a_rendering_marks_quiet_sensitive() {
-        let outcome = Outcome::success(Framed);
+        let outcome = Outcome::from(Framed);
         let human = OutputMode::default();
 
         let (loud, _) = rendered(human, &outcome);
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_emit_outcome_warnings_print_on_stderr_only_in_human_non_quiet_mode() {
-        let outcome = Outcome::success(Framed).with_warnings(["first", "second"]);
+        let outcome = Outcome::from(Framed).with_warnings(["first", "second"]);
         let human = OutputMode::default();
 
         let (_, loud) = rendered(human, &outcome);

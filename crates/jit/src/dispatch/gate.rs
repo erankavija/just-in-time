@@ -157,7 +157,7 @@ fn remove<S: HandlerStore>(
 ) -> HandlerResult<GateMutationResponse> {
     let key = key.parse()?;
     let warnings = ctx.executor.gates().remove_gate_definition(&key)?;
-    Ok(Outcome::success(GateMutationResponse::new(key, "Removed")).with_warnings(warnings))
+    Ok(Outcome::from(GateMutationResponse::new(key, "Removed")).with_warnings(warnings))
 }
 
 fn add<S: HandlerStore>(
@@ -172,7 +172,7 @@ fn add<S: HandlerStore>(
     let full_id = resolve_issue(ctx.executor.storage(), &id)?;
     let (result, warnings) = ctx.executor.gates().add_gates(&full_id, &keys)?;
     Ok(
-        Outcome::success(GateAddResponse::new(id, result.added, result.already_exist))
+        Outcome::from(GateAddResponse::new(id, result.added, result.already_exist))
             .with_warnings(warnings),
     )
 }

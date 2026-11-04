@@ -83,7 +83,7 @@ fn apply<S: HandlerStore>(
             assignments,
         },
     )?;
-    Ok(Outcome::success(if dry_run {
+    Ok(Outcome::from(if dry_run {
         ctx.executor.profiles().plan_profiles(&selection)?
     } else {
         ctx.executor.profiles().apply_profiles(&selection)?
@@ -106,7 +106,7 @@ fn pack<S: HandlerStore>(
             .profiles()
             .pack_profile_package(&invocation_dir, &source, &output)?
     };
-    Ok(Outcome::success(result).with_warnings(warnings))
+    Ok(Outcome::from(result).with_warnings(warnings))
 }
 
 fn add<S: HandlerStore>(
@@ -116,7 +116,7 @@ fn add<S: HandlerStore>(
     dry_run: bool,
 ) -> HandlerResult<ProfileAddResult> {
     let invocation_dir = std::env::current_dir()?;
-    Ok(Outcome::success(if dry_run {
+    Ok(Outcome::from(if dry_run {
         ctx.executor
             .profiles()
             .plan_profile_add(&invocation_dir, &archive, &destination)?

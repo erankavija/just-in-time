@@ -149,7 +149,7 @@ fn export<S: HandlerStore>(
         }
         _ => document,
     };
-    Ok(Outcome::success(response).with_warnings(warnings))
+    Ok(Outcome::from(response).with_warnings(warnings))
 }
 
 command_group! {

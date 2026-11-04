@@ -54,7 +54,7 @@ struct EchoArgs {
 }
 
 fn echo_of(args: EchoArgs) -> Outcome<Echo> {
-    Outcome::success(Echo { word: args.word }).with_warnings(["careful"])
+    Outcome::from(Echo { word: args.word }).with_warnings(["careful"])
 }
 
 fn mode(json: bool, quiet: bool) -> OutputMode {
@@ -217,7 +217,7 @@ mod split {
     }
 
     fn owned() -> HandlerResult<Echo> {
-        Ok(Outcome::success(Echo {
+        Ok(Outcome::from(Echo {
             word: "owned".to_owned(),
         }))
     }

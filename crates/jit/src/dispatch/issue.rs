@@ -49,7 +49,7 @@ fn show<S: IssueStore>(
             .iter()
             .map(|id| show_response(ctx, id))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        return Ok(Outcome::success(IssueShowOutput::Many(
+        return Ok(Outcome::from(IssueShowOutput::Many(
             IssueShowListResponse::new(shown),
         )));
     };

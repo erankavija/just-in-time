@@ -10,7 +10,7 @@
 //! migrated group one arm,
 //! `return group::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr())`;
 //! the returned [`ExitCode`](crate::output::ExitCode) becomes the process
-//! status in `main()`. Handlers build successes with [`Outcome::success`] and
+//! status in `main()`. Handlers build successes with `Outcome::from` (or `.into()`) and
 //! [`Outcome::success_with`]; a `message` becomes the `--json` envelope's
 //! top-level `message`, and [`Outcome::with_warnings`] attaches warnings the
 //! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
@@ -57,22 +57,18 @@ pub enum Outcome<R> {
     },
 }
 
+/// A success with no `--json` message.
 impl<R> From<R> for Outcome<R> {
     fn from(response: R) -> Self {
-        Self::success(response)
-    }
-}
-
-impl<R> Outcome<R> {
-    /// A success with no `--json` message.
-    pub fn success(response: R) -> Self {
         Self::Success {
             response,
             message: None,
             warnings: Vec::new(),
         }
     }
+}
 
+impl<R> Outcome<R> {
     /// A success whose `--json` envelope carries `message`.
     pub fn success_with(response: R, message: impl Into<String>) -> Self {
         Self::Success {
