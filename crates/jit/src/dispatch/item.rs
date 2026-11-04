@@ -1,6 +1,6 @@
 //! `jit item` handlers.
 
-use super::{CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::ItemCommands;
 use crate::commands::{ItemListResult, ItemShowResult};
 use crate::storage::IssueStore;
@@ -10,7 +10,8 @@ fn list<S: IssueStore>(
     kind: Option<String>,
 ) -> HandlerResult<ItemListResult> {
     let response = ctx.executor.items().list_items(kind.as_deref())?;
-    Ok(list_outcome(response))
+    let message = count_message(response.count(), "Found ", " item(s)");
+    Ok(Outcome::success_with(response, message))
 }
 
 fn search<S: IssueStore>(
@@ -19,13 +20,8 @@ fn search<S: IssueStore>(
     kind: Option<String>,
 ) -> HandlerResult<ItemListResult> {
     let response = ctx.executor.items().search_items(&query, kind.as_deref())?;
-    Ok(list_outcome(response))
-}
-
-/// A list's `--json` success carries its count as the top-level message.
-fn list_outcome(response: ItemListResult) -> Outcome<ItemListResult> {
-    let message = format!("Found {} item(s)", response.count());
-    Outcome::success_with(response, message)
+    let message = count_message(response.count(), "Found ", " item(s)");
+    Ok(Outcome::success_with(response, message))
 }
 
 fn show<S: IssueStore>(

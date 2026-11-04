@@ -122,6 +122,7 @@ use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::queries::ReadinessScope;
 use crate::domain::{
     is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
@@ -1435,25 +1436,23 @@ impl DerivedReadiness {
     }
 }
 
-/// Map the readiness corrections the edit from `base` to `projected` demands
-/// ([`ReadinessScope::Affected`](crate::domain::queries::ReadinessScope)) to
-/// mutation intents. A promotion passes graph rules through
-/// [`derive_state_transition`]; a refused one records its `transition_blocked`
-/// events and keeps the record. A demotion applies directly.
+/// Map readiness corrections to intents for `scope`. Promotions pass graph
+/// rules; refusals record `transition_blocked` and keep the record, while
+/// demotions apply directly.
 fn derive_readiness_intents(
     base: &[Issue],
     projected: &[Issue],
     graph: &CapturedGraphEvidence<'_>,
+    scope: ReadinessScope,
 ) -> Result<DerivedReadiness> {
-    use crate::domain::queries::{derive_readiness_corrections, ReadinessScope};
+    use crate::domain::queries::derive_readiness_corrections;
     use crate::repository_state::MutationIntent;
 
     let mut issues = projected.to_vec();
     let mut events = Vec::new();
     let mut updates = Vec::new();
     let mut error_after_apply = None;
-    for (id, correction) in derive_readiness_corrections(base, projected, ReadinessScope::Affected)
-    {
+    for (id, correction) in derive_readiness_corrections(base, projected, scope) {
         let position = issues
             .iter()
             .position(|issue| issue.id == id)
@@ -1786,7 +1785,12 @@ fn derive_field_update(
                 }
             })
             .collect::<Vec<_>>();
-        let readiness = derive_readiness_intents(evidence.issues, &projected, evidence.graph)?;
+        let readiness = derive_readiness_intents(
+            evidence.issues,
+            &projected,
+            evidence.graph,
+            ReadinessScope::Affected,
+        )?;
         (readiness.intents, readiness.error_after_apply)
     } else {
         (Vec::new(), None)

@@ -1,6 +1,6 @@
 //! `jit doc` handlers.
 
-use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
+use super::{count_message, resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{AssetCommands, DocCommands};
 use crate::commands::{
     AssetListResult, DocumentAddResult, DocumentContentResult, DocumentDiffResult, DocumentHistory,
@@ -43,7 +43,7 @@ fn list<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> HandlerResult<D
         .executor
         .documents()
         .list_document_references(&issue(ctx, id)?)?;
-    let message = format!("{} document(s) attached", result.count());
+    let message = count_message(result.count(), "", " document(s) attached");
     Ok(Outcome::success_with(result, message))
 }
 
@@ -107,7 +107,7 @@ fn history<S: IssueStore>(
         .executor
         .documents()
         .document_history(&issue(ctx, id)?, path)?;
-    let message = format!("{} commits in history", result.commits.len());
+    let message = count_message(result.commits.len(), "", " commits in history");
     Ok(Outcome::success_with(result, message))
 }
 
@@ -135,7 +135,7 @@ fn assets_list<S: HandlerStore>(
         ctx.executor
             .documents()
             .list_document_assets(&issue(ctx, id)?, path, rescan)?;
-    let message = format!("{} assets found", result.extras.summary.total);
+    let message = count_message(result.extras.summary.total, "", " assets found");
     Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 

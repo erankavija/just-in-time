@@ -1,6 +1,6 @@
 //! `jit project` handlers.
 
-use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
+use super::{count_message, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ProjectCommands;
 use crate::commands::ProjectRenderResult;
 
@@ -9,7 +9,7 @@ fn render<S: HandlerStore>(
     name: Option<String>,
 ) -> HandlerResult<ProjectRenderResult> {
     let response = ctx.executor.items().project_render(name.as_deref())?;
-    let message = format!("Rendered {} projection(s)", response.count());
+    let message = count_message(response.count(), "Rendered ", " projection(s)");
     Ok(Outcome::success_with(response, message))
 }
 
