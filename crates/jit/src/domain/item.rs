@@ -189,6 +189,77 @@ pub struct KindSegmentedAddress {
     pub self_id: String,
 }
 
+/// Canonical item addresses and issue-prefix candidates captured for one validation.
+pub struct ItemAddressIndex<'a> {
+    addresses: HashSet<String>,
+    issue_scopes: HashMap<String, Vec<&'a Issue>>,
+}
+
+impl<'a> ItemAddressIndex<'a> {
+    pub fn new(issues: &'a [Issue]) -> Self {
+        let mut issue_scopes: HashMap<String, Vec<&Issue>> = HashMap::new();
+        for issue in issues {
+            let prefix = IssueIdPrefix::from(&issue.id);
+            for length in IssueIdPrefix::MIN_ID_PREFIX_LENGTH..=prefix.normalised().len() {
+                issue_scopes
+                    .entry(prefix.normalised()[..length].to_string())
+                    .or_default()
+                    .push(issue);
+            }
+        }
+        Self {
+            addresses: HashSet::new(),
+            issue_scopes,
+        }
+    }
+
+    /// Resolve a qualified address, accepting configured aliases and issue sugar.
+    pub fn contains(
+        &self,
+        value: &str,
+        kinds: &[ItemKind],
+        local_project_name: Option<&str>,
+    ) -> Result<bool, ItemError> {
+        let address = if value.starts_with('@') {
+            parse_kind_segmented_address(value)?
+        } else {
+            expand_sugar_address(value, kinds)?
+        };
+        let scope = match address.scope.bind_local(local_project_name)? {
+            Scope::Project => Scope::Project,
+            Scope::Issue(prefix) => {
+                match self
+                    .issue_scopes
+                    .get(prefix.normalised())
+                    .map(Vec::as_slice)
+                {
+                    Some([owner]) => Scope::Issue(owner.id.short_id().parse()?),
+                    None | Some([]) => return Err(ItemError::IssueScopeNotFound { prefix }),
+                    Some(owners) => {
+                        return Err(ItemError::AmbiguousIssueScope {
+                            prefix,
+                            matches: owners
+                                .iter()
+                                .map(|owner| format!("{} | {}", owner.short_id(), owner.title))
+                                .collect(),
+                        });
+                    }
+                }
+            }
+        };
+        let kind = resolve_kind_alias(kinds, &address.kind).unwrap_or(&address.kind);
+        Ok(self
+            .addresses
+            .contains(&qualified_id(&scope, kind, &address.self_id)))
+    }
+}
+
+impl Extend<String> for ItemAddressIndex<'_> {
+    fn extend<T: IntoIterator<Item = String>>(&mut self, addresses: T) {
+        self.addresses.extend(addresses);
+    }
+}
+
 /// Parse a kind-segmented address into its `(scope, kind, self-id)` components.
 ///
 /// Recognizes exactly three explicit `@`-prefixed forms:
@@ -406,6 +477,13 @@ impl KindScope {
 pub enum ItemError {
     #[error(transparent)]
     InvalidIssuePrefix(#[from] InvalidIdPrefixError),
+    #[error("Issue not found: {prefix}")]
+    IssueScopeNotFound { prefix: IssueIdPrefix },
+    #[error("Ambiguous ID '{prefix}' matches multiple issues:\n  {}", .matches.join("\n  "))]
+    AmbiguousIssueScope {
+        prefix: IssueIdPrefix,
+        matches: Vec<String>,
+    },
     /// A declared item kind omits one or more required configuration fields.
     #[error("item kind '{kind}' is missing required field(s): {missing}")]
     MissingRequiredFields {
@@ -1596,6 +1674,84 @@ mod tests {
     /// The four canonical kinds, in name order (the package-supplied set).
     fn canonical_kinds() -> Vec<ItemKind> {
         vec![decision_kind(), invariant_kind(), req_kind(), risk_kind()]
+    }
+
+    #[test]
+    fn test_address_index_resolves_project_address() {
+        let mut index = ItemAddressIndex::new(&[]);
+        index.extend(["@/invariant/example".to_string()]);
+        assert!(index
+            .contains("@/invariant/example", &[invariant_kind()], None)
+            .unwrap());
+    }
+
+    #[test]
+    fn test_address_index_resolves_alias_like_canonical_address() {
+        let mut kind = invariant_kind();
+        kind.aliases = vec!["inv".to_string()];
+        let kinds = [kind];
+        let mut index = ItemAddressIndex::new(&[]);
+        index.extend(["@/invariant/example".to_string()]);
+        assert_eq!(
+            index.contains("@/inv/example", &kinds, None).unwrap(),
+            index.contains("@/invariant/example", &kinds, None).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_address_index_resolves_issue_prefix_and_sugar() {
+        let mut issue = crate::test_utils::fixture_issue("Owner".to_string(), String::new());
+        issue.id = "abcd1234-0000-0000-0000-000000000001".parse().unwrap();
+        let issues = [issue];
+        let kinds = [req_kind()];
+        let mut index = ItemAddressIndex::new(&issues);
+        index.extend([format!(
+            "@/issue/{}/requirement/REQ-01",
+            issues[0].short_id()
+        )]);
+        for address in [
+            "@/issue/abcd/requirement/REQ-01".to_string(),
+            "ABCD-1234/REQ-01".to_string(),
+            format!("@/issue/{}/requirement/REQ-01", issues[0].id),
+        ] {
+            assert!(index.contains(&address, &kinds, None).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_address_index_rejects_ambiguous_issue_scope_even_without_items() {
+        let issues: Vec<_> = [
+            "abcd1234-0000-0000-0000-000000000001",
+            "abcd5678-0000-0000-0000-000000000002",
+        ]
+        .into_iter()
+        .map(|id| {
+            let mut issue = crate::test_utils::fixture_issue("Owner".to_string(), String::new());
+            issue.id = id.parse().unwrap();
+            issue
+        })
+        .collect();
+        let index = ItemAddressIndex::new(&issues);
+        assert!(matches!(
+            index.contains("@/issue/abcd/requirement/REQ-01", &[req_kind()], None),
+            Err(ItemError::AmbiguousIssueScope { .. })
+        ));
+    }
+
+    #[test]
+    fn test_address_index_rejects_dangling_address() {
+        let index = ItemAddressIndex::new(&[]);
+        let kinds = [invariant_kind()];
+        assert!(!index.contains("@/invariant/missing", &kinds, None).unwrap());
+    }
+
+    #[test]
+    fn test_address_index_rejects_unknown_issue_scope() {
+        let index = ItemAddressIndex::new(&[]);
+        assert!(matches!(
+            index.contains("@/issue/abcd/requirement/REQ-01", &[req_kind()], None),
+            Err(ItemError::IssueScopeNotFound { .. })
+        ));
     }
 
     #[test]
