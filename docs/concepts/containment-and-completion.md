@@ -80,8 +80,8 @@ facts compose:
    terminality-preserving, so a dependency archived from `Done` or `Rejected`
    also counts as met, while one archived from a non-terminal state does not.
 3. A blocked issue never becomes workable: `jit query available` returns only
-   unassigned issues in state `Ready` that are unblocked, and a `Backlog` issue
-   auto-promotes to `Ready` exactly when it stops being blocked.
+   unassigned issues in state `Ready` that are unblocked, and stored readiness
+   [follows the graph](core-model.md#issue-lifecycle).
 
 Compose them: a container is blocked while any issue it contains is not
 effectively terminal. Because blocking follows the edges transitively, an epic

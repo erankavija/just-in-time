@@ -1447,34 +1447,145 @@ fn test_apply_template_leaves_no_node_ready_while_it_carries_an_unmet_dependency
     assert!(!container.dependencies.is_empty());
 }
 
-/// REQ-01: the demotion the apply performs is auditable — each node it moves out
-/// of `Ready` appends its own `Ready → Backlog` state-change event.
+/// REQ-01: the demotion the apply performs on the container it wires is
+/// auditable: it appends its own `Ready → Backlog` state-change event.
 #[test]
-fn test_apply_template_appends_a_state_change_event_for_every_node_it_demotes() {
+fn test_apply_template_appends_a_state_change_event_for_the_container_it_demotes() {
     let h = TestHarness::new();
     let template = plan_template();
     let epic = create_epic(&h, "Demotion event epic");
 
-    let (result, _w) = h
-        .executor
+    h.executor
         .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
-    let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
-    let container_id = h.get_issue(&epic).id;
 
-    let events = h.storage.read_events().unwrap();
-    for demoted in [&container_id, &breakdown_id] {
-        assert!(
-            events.iter().any(|event| matches!(
+    assert!(
+        h.storage
+            .read_events()
+            .unwrap()
+            .iter()
+            .any(|event| matches!(
                 event.body(),
                 jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
-                    if issue_id == demoted
+                    if *issue_id == epic
                         && *from == jit::domain::State::Ready
                         && *to == jit::domain::State::Backlog
             )),
-            "no Ready → Backlog event recorded for the demoted node {demoted}"
-        );
+        "no Ready → Backlog event recorded for the demoted container"
+    );
+}
+
+/// A rule refusing a `Ready` node of `node_type` that carries no `req:` label.
+fn ready_node_needs_req(node_type: &str) -> String {
+    format!(
+        r#"
+[[rules]]
+name = "ready-node-needs-req"
+when = {{ type = "{node_type}", state = "ready" }}
+severity = "error"
+enforce = true
+assert = {{ require-label = {{ label = "req:*", min = 1 }} }}
+"#
+    )
+}
+
+/// A node blocked by another node of the same application is created `Backlog`
+/// and validated as `Backlog`: it is never `Ready`, so it records no demotion
+/// and no `first_ready_at`, while the node with no dependency is created `Ready`.
+#[test]
+fn test_apply_template_creates_a_node_blocked_inside_the_application_in_backlog() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Blocked node epic");
+    h.storage
+        .add_data_file("rules.toml", &ready_node_needs_req("breakdown"));
+
+    let (result, _) = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .expect("the breakdown node is validated as Backlog, which the rule ignores");
+
+    let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
+    let breakdown = h.get_issue(&result.created_node_ids_by_role["breakdown"]);
+    assert_eq!(planning.state, jit::domain::State::Ready);
+    assert_eq!(breakdown.state, jit::domain::State::Backlog);
+    assert!(breakdown.first_ready_at.is_none());
+    assert!(
+        !h.storage.read_events().unwrap().iter().any(|event| matches!(
+            event.body(),
+            jit::domain::EventBody::IssueStateChanged { issue_id, .. } if *issue_id == breakdown.id
+        )),
+        "the breakdown node records no state change"
+    );
+}
+
+/// A rule keyed on `Ready` sees the created state of a node nothing blocks.
+#[test]
+fn test_apply_template_validates_an_unblocked_node_as_ready() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Ready rule epic");
+    h.storage
+        .add_data_file("rules.toml", &ready_node_needs_req("planning"));
+    let before = h.all_issues().len();
+
+    h.executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .expect_err("the planning node is validated as Ready, which the rule refuses");
+
+    assert_eq!(h.all_issues().len(), before);
+}
+
+/// A node moved onto the container's upstream dependencies is created `Ready`
+/// when they are all terminal and `Backlog` when one is open.
+#[test]
+fn test_apply_template_derives_a_node_state_from_the_upstreams_moved_onto_it() {
+    let template = TemplateRegistry::from_toml_str(
+        r#"
+[[template]]
+name        = "move"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#,
+        &HIERARCHY,
+    )
+    .unwrap()
+    .get("move")
+    .unwrap()
+    .clone();
+    for (upstream_state, expected) in [
+        (jit::domain::State::Done, jit::domain::State::Ready),
+        (jit::domain::State::Rejected, jit::domain::State::Ready),
+        (jit::domain::State::InProgress, jit::domain::State::Backlog),
+    ] {
+        let h = TestHarness::new();
+        let epic = create_epic(&h, "Moved upstream epic");
+        let upstream = h.create_issue("Upstream");
+        add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
+        let mut closed = h.get_issue(&upstream);
+        closed.state = upstream_state;
+        jit::test_harness::seed_memory_issue(&h.storage, &closed);
+
+        let (result, _) = h
+            .executor
+            .templates()
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap();
+
+        let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
+        assert_eq!(planning.dependencies, [upstream]);
+        assert_eq!(planning.state, expected, "upstream {upstream_state:?}");
     }
 }
 

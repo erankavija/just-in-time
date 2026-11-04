@@ -966,7 +966,9 @@
     "01a88d32": 1,
     "b674382e": 1,
     "c517b88b": 1,
-    "6acd7a05": 1
+    "6acd7a05": 1,
+    "8b3cce62": 1,
+    "635f23c7": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1477,13 +1479,15 @@
       "epic": "b697a3f7"
     },
     "635f23c7": {
-      "status": "dispatched",
+      "status": "rework 1",
       "vendor": "Claude Opus",
-      "epic": "b697a3f7"
+      "epic": "b697a3f7",
+      "note": "merged ce7406bbd; code-review F1 rejection same-session proof, F2 batch first_ready_at/no-demotion assertions"
     },
     "8b3cce62": {
-      "status": "dispatched",
-      "vendor": "Claude Opus"
+      "status": "rework 1",
+      "vendor": "Claude Opus",
+      "note": "merged 87938c3d3 (cargo-ci, mcp-ci passed); code-review F1: admit exempts universal codes from findings declarations"
     },
     "0bc448fb": {
       "status": "done",

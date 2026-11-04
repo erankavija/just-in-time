@@ -262,7 +262,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 .unwrap_or_default()
         };
 
-        let mut entered_terminal = false;
         for issue in matched {
             if confirmed_skips.contains(&issue.id) {
                 result
@@ -272,7 +271,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
             }
             match self.apply_operations_to_issue(issue, operations, force) {
                 Ok(outcome) => {
-                    entered_terminal |= outcome.entered_terminal;
                     for msg in outcome.warnings {
                         result.warnings.push((issue.id.clone(), msg));
                     }
@@ -288,12 +286,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     result.errors.push((issue.id.clone(), e.to_string()));
                 }
             }
-        }
-
-        // One cascade after the batch, as the single-issue update runs after
-        // its terminal change.
-        if entered_terminal {
-            self.exec.check_auto_transitions()?;
         }
 
         result.compute_summary();
@@ -1688,6 +1680,61 @@ mod tests {
         .is_provable_noop(&issue));
     }
 
+    /// Bulk-update a `Ready` blocker to `Done`, optionally with a `Backlog`
+    /// dependent; returns the session opens the update took and the
+    /// dependent's state.
+    fn bulk_complete_blocker(with_dependent: bool) -> (usize, Option<State>) {
+        use crate::commands::test_helpers::{memory_executor, seed_issue, SessionOpenCounter};
+        use crate::storage::InMemoryStorage;
+
+        let counter = SessionOpenCounter::new();
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
+        let mut blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+        blocker.state = State::Ready;
+        let blocker_id = blocker.id.clone();
+        seed_issue(&storage, blocker);
+        let dependent_id = with_dependent.then(|| {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.dependencies.push(blocker_id.clone());
+            let id = dependent.id.clone();
+            seed_issue(&storage, dependent);
+            id
+        });
+        let executor = memory_executor(storage);
+        let opened = counter.count();
+
+        let result = executor
+            .issues()
+            .apply_bulk_update(
+                &crate::query_engine::QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    state: Some(State::Done),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(result.modified, [blocker_id]);
+        (
+            counter.count() - opened,
+            dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
+        )
+    }
+
+    #[test]
+    fn test_apply_bulk_update_completing_a_blocker_promotes_its_dependent_in_the_same_publication()
+    {
+        let (baseline, _) = bulk_complete_blocker(false);
+        let (sessions, dependent) = bulk_complete_blocker(true);
+
+        assert_eq!(dependent, Some(State::Ready));
+        assert_eq!(
+            sessions, baseline,
+            "the dependent's promotion must add no session to the blocker's update"
+        );
+    }
+
     // -- Session budget (REQ-01, REQ-04) ---------------------------------
 
     /// REQ-01, REQ-04 (amended, D-1): sessions open only for matched issues
@@ -1695,11 +1742,8 @@ mod tests {
     /// session whenever at least one skip candidate exists. `C` (the
     /// per-mutation session constant) is derived from a single-issue baseline
     /// run rather than hardcoded, session opens are counted via the
-    /// once-per-session-open failure-point probe shared with the
-    /// automatic-transitions budget test
-    /// (`crate::commands::issue::tests::test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues`),
-    /// and the assertion is the semantic relationship `C * J + 1`, not a
-    /// copied constant.
+    /// once-per-session-open failure-point probe, and the assertion is the
+    /// semantic relationship `C * J + 1`, not a copied constant.
     #[test]
     fn test_apply_bulk_update_session_budget_scales_with_issues_needing_change() {
         use crate::commands::test_helpers::SessionOpenCounter;

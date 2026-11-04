@@ -1,13 +1,12 @@
 //! `jit invariant` handlers.
 
-use super::{CommandContext, HandlerResult, Outcome};
+use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::InvariantCommands;
 use crate::commands::InvariantCheckResult;
 use crate::output::ErrorCode;
-use crate::storage::IssueStore;
 
 /// Enforcement drift is a findings outcome; a clean registry succeeds.
-fn check<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<InvariantCheckResult> {
+fn check<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<InvariantCheckResult> {
     let result = ctx.executor.items().check_invariants()?;
     Ok(if result.has_drift() {
         Outcome::findings(
@@ -22,7 +21,7 @@ fn check<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<InvariantC
 
 command_group! {
     command: InvariantCommands,
-    storage: [IssueStore],
+    storage: [HandlerStore],
     leaves: {
         "invariant_check" => InvariantCommands::Check => check()
             findings ValidationFailed "Enforcement drift was found (declared enforcement not backed by an enforcing rule)." -> InvariantCheckResult,

@@ -14,7 +14,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f4a973dd-a8b9-4534-9776-c060843b72e3",
+      "status": "passed",
+      "updated_at": "2026-11-04T18:24:05.795100493Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "11c3afb1-59a2-49e6-95b2-a7748f68ee9b",
+      "status": "failed",
+      "updated_at": "2026-11-04T18:28:33.721296181Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "8aeca5c9-5259-4c43-ba11-1a9256227406",
+      "status": "passed",
+      "updated_at": "2026-11-04T18:24:23.043601759Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8b3cce62-28e5-4871-9303-3d114191af16",
   "labels": [
     "epic:rust-code-quality",
@@ -26,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive per-command exit-code rows from the handler registry",
-  "updated_at": "2026-11-04T17:39:06.371511585Z"
+  "updated_at": "2026-11-04T18:28:33.721296181Z"
 }

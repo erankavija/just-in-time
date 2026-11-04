@@ -1058,8 +1058,8 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 ```
 
 **Bulk operation semantics:**
-- **Literal updates:** Sets exactly what you specify (no auto-transitions)
-- **Atomic per-issue:** Each issue update publishes its own redo record
+- **Literal updates:** Sets exactly what you specify on each matched issue
+- **Atomic per-issue:** Each issue update publishes its own redo record, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle)
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
 
@@ -1975,7 +1975,7 @@ jit gate evaluate abc123 --gate tests --force
 - For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required.
 - A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
 - The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
-- A pass that clears the last unpassed gate of a `gated` issue moves it to `done` and promotes its dependents; an enforcing `done` rule that blocks the move is reported and leaves it `gated`. A failed gate, or a pass on an issue in any other state, leaves the state unchanged.
+- A pass that clears the last unpassed gate of a `gated` issue moves it to `done`, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle); an enforcing `done` rule that blocks the move is reported and leaves it `gated`. A failed gate, or a pass on an issue in any other state, leaves the state unchanged.
 - `jit issue update <id> --state done` completes an `in_progress` issue whose required gates have passed, and succeeds without change on an issue already `done`.
 
 **Verdict reuse over unchanged declared inputs:**
