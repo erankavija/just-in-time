@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Test builds no longer produce incremental-compilation state by default, so a build that omits an environment override cannot fill the disk with it.\n\n## Background\n\nThe workspace `Cargo.toml` declares `incremental = true` under both `[profile.dev]` and `[profile.test]`. Worker briefs ask for `CARGO_INCREMENTAL=0`, but any invocation that misses the variable writes `target/<profile>/incremental` state. A sandboxed shell or a single `cargo doc` run is enough. On 2026-11-04 that state reached hundreds of gigabytes per worktree and spread through the shared worktree cache.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace test profile does not enable incremental compilation, and its comment states why.\n- [hard] REQ-02: A worker-style build and test run without `CARGO_INCREMENTAL` set (`cargo test --workspace --no-run`, then one targeted test) leaves zero bytes under `target/*/incremental` for workspace crates, measured from a clean target directory and reported with the measurement command.\n- [hard] REQ-03: The build profile policy test asserts the profile setting, and the existing build-budget checks pass.\n- [hard] REQ-04: `dev/TESTING.md` and the build-budget README describe the setting, with no remaining instruction that depends on remembering the environment variable.\n",
   "documents": [],
+  "done_at": "2026-11-04T20:38:13.813565825Z",
   "first_ready_at": "2026-11-04T19:09:02.716236454Z",
   "gates_required": [
     "cargo-ci",
@@ -16,6 +17,12 @@
       "run_id": "04f91c6e-39a5-4e5f-b732-0672d3ff1bdc",
       "status": "passed",
       "updated_at": "2026-11-04T20:34:38.959125347Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3b90dbdf-dc9e-44b9-8eab-bae9b82271d1",
+      "status": "passed",
+      "updated_at": "2026-11-04T20:37:55.009142708Z",
       "updated_by": "auto:executor"
     }
   },
@@ -28,7 +35,7 @@
     "type:task"
   ],
   "priority": "critical",
-  "state": "in_progress",
+  "state": "done",
   "title": "Test builds produce no incremental-compilation state by default",
-  "updated_at": "2026-11-04T20:34:38.959125347Z"
+  "updated_at": "2026-11-04T20:38:13.813565825Z"
 }

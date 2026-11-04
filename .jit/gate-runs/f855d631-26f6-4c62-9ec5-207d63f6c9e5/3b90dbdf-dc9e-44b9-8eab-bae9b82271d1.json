@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "437c7ccfd3ed35b996c5f2f3ea2d4ca07e136fed",
+  "completed_at": "2026-11-04T20:37:55.007377248Z",
+  "duration_ms": 177716,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed test-profile policy, regression coverage, measurement record, documentation, and passing build-budget evidence satisfy all hard requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f855d631-26f6-4c62-9ec5-207d63f6c9e5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3b90dbdf-dc9e-44b9-8eab-bae9b82271d1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T20:34:57.290396336Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `4335fcd81` (`jit:f855d631`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/f855d631/requirement/REQ-01`–`REQ-04` (issue); `@/invariant/bounded-rust-build-footprint`, `@/invariant/essential-code-prose` (.jit/invariants.toml); `@/gate/cargo-ci` (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T20:32:40Z); code-review pending\nTruncation recovery: recovered broad-search truncation with bounded per-commit patch, consumer, documentation, policy, and gate-projection reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed test-profile policy, regression coverage, measurement record, documentation, and passing build-budget evidence satisfy all hard requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

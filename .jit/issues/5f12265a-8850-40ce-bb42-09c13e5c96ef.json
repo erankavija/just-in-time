@@ -11,7 +11,14 @@
     "worktree-cache-test",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "worktree-cache-test": {
+      "run_id": "02417e70-b842-4662-af2b-c2b644e1f172",
+      "status": "passed",
+      "updated_at": "2026-11-04T20:37:22.705532805Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5f12265a-8850-40ce-bb42-09c13e5c96ef",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +30,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "Worktree reclaim harvests only reusable, current build artifacts",
-  "updated_at": "2026-11-04T20:25:49.793909413Z"
+  "updated_at": "2026-11-04T20:37:22.705532805Z"
 }
