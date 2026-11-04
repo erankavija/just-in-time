@@ -4,10 +4,12 @@
 # so the next wave starts warm. Counterpart of dispatch-worker-worktree.sh,
 # which seeds each new worktree from that pool.
 #
-# Toolchain-agnostic: harvests every top-level directory the worktree's git
-# ignores (build outputs and caches are ignored by definition) into
-# "$pool/<name>", newest file wins, or exactly the space-separated names in
-# LEAD_CACHE_DIRS. Pool: LEAD_CACHE_POOL, default <repo>/.agents/cache-pool.
+# Harvests git-ignored top-level directories, or the space-separated names in
+# LEAD_CACHE_DIRS, into "$pool/<name>", newest file wins. Excludes incremental
+# directories and prunes existing ones. Cargo deps retain only the newest hash
+# per target and artifact kind within each profile; companions stay together.
+# The cp fallback uses tar to preserve directory metadata without copying contents.
+# Pool: LEAD_CACHE_POOL, default <repo>/.agents/cache-pool.
 # Removes each worktree's temporary directory at
 # <LEAD_WORKTREE_TMP_ROOT>/<repo-path>/agent-<short-id>, defaulting
 # LEAD_WORKTREE_TMP_ROOT to /tmp/lead-worker-tmp. Use the same override as
@@ -59,6 +61,42 @@ cache_dirs_for() {
     done | git -C "$wt" check-ignore --stdin 2>/dev/null || true
 }
 
+prune_cache() {
+    local entry directory stem key hash kind extension
+    local -A newest=()
+    local -a obsolete=()
+    find "$1" -type d -name incremental -prune -exec rm -rf -- {} +
+    # Rank generations by their newest companion, keeping profile paths distinct.
+    while IFS= read -r -d '' entry; do
+        entry="${entry#* }"
+        [[ "$entry" =~ ^(.*/deps/)([^/]+)-([[:xdigit:]]{16})(\.(rlib|rmeta|d|so|dylib|dll|a|lib|exe))?$ ]] || continue
+        directory="${BASH_REMATCH[1]}" stem="${BASH_REMATCH[2]}"
+        hash="${BASH_REMATCH[3]}" kind="${BASH_REMATCH[5]:-}"
+        # Library dep-info lacks the library artifact's `lib` prefix.
+        if [[ "$kind" == d && ! -f "$directory$stem-$hash" && ! -f "$directory$stem-$hash.exe" ]]; then
+            for extension in rlib rmeta so dylib a; do
+                if [[ -f "${directory}lib$stem-$hash.$extension" ]]; then
+                    stem="lib$stem" kind="$extension"
+                    break
+                fi
+            done
+        fi
+        case "$kind" in
+            rlib|rmeta) kind=library ;;
+            ''|d|exe) kind=executable ;;
+        esac
+        key="$directory$stem:$kind"
+        if [[ "${newest[$key]:-$hash}" == "$hash" ]]; then
+            newest["$key"]="$hash"
+        else
+            obsolete+=("$entry")
+        fi
+    done < <(find "$1" -type f -path '*/deps/*' -printf '%T@ %p\0' | LC_ALL=C sort -zrn)
+    if [[ "${#obsolete[@]}" -gt 0 ]]; then
+        printf '%s\0' "${obsolete[@]}" | xargs -0 rm -f --
+    fi
+}
+
 for sid in "$@"; do
     wt_path=".agents/worktrees/agent-${sid}"
     wt_branch="worktree-agent-${sid}"
@@ -95,10 +133,16 @@ for sid in "$@"; do
         # Both branches replace the destination file, leaving any hardlink
         # sibling of the old file untouched.
         if command -v rsync > /dev/null; then
-            rsync -a --update "$src/" "$pool/$name/"
+            rsync -a --update --exclude='incremental/' "$src/" "$pool/$name/"
         else
-            cp -au --remove-destination "$src/." "$pool/$name/"
+            destination="$(cd "$pool/$name" && pwd)"
+            (cd "$src"
+                find . -type d -name incremental -prune -o ! -type d \
+                    -exec cp -au --parents --remove-destination -t "$destination" -- {} +
+                find . -type d -name incremental -prune -o -type d -print0 \
+                    | tar --null --no-recursion -T - -cf - | tar -xf - -C "$destination")
         fi
+        prune_cache "$pool/$name"
         echo "[ok] harvested $src -> $pool/$name"
     done
 
