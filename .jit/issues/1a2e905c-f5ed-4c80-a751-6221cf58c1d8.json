@@ -16,9 +16,6 @@
   "id": "1a2e905c-f5ed-4c80-a751-6221cf58c1d8",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:storage",
     "component:cli",
     "per:@/charter/D-19",
@@ -29,5 +26,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Lease status reports staleness computed at read time",
-  "updated_at": "2026-11-02T23:41:50.261960378Z"
+  "updated_at": "2026-11-04T22:42:43.066127794Z"
 }

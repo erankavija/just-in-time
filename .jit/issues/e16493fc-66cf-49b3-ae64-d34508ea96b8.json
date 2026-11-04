@@ -15,9 +15,6 @@
   "id": "e16493fc-66cf-49b3-ae64-d34508ea96b8",
   "labels": [
     "type:task",
-    "epic:one-validation-report",
-    "milestone:v1.0",
-    "story:report-side-paths",
     "component:validation",
     "component:core",
     "per:@/charter/D-20",
@@ -27,5 +24,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Validation capture requests a round's document references as one batch",
-  "updated_at": "2026-11-03T23:04:33.299470754Z"
+  "updated_at": "2026-11-04T22:42:45.656107797Z"
 }

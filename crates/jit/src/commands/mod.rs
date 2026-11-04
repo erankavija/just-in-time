@@ -2855,7 +2855,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Get reference to the storage backend
-    pub(crate) fn storage(&self) -> &S {
+    fn storage(&self) -> &S {
         &self.storage
     }
 

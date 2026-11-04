@@ -15,9 +15,6 @@
   "id": "e0d8af37-e7cf-4cfe-96ea-25b944f18cf6",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:storage",
     "enforces:@/invariant/canonical-cutover",
     "satisfies:f8a6b298/REQ-09",
@@ -26,5 +23,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "This repository's archived targets get evidence records",
-  "updated_at": "2026-11-02T23:41:54.759261780Z"
+  "updated_at": "2026-11-04T22:42:45.554455561Z"
 }

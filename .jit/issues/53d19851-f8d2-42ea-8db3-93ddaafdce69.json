@@ -16,9 +16,6 @@
   "id": "53d19851-f8d2-42ea-8db3-93ddaafdce69",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:storage",
     "component:cli",
     "per:@/charter/D-18",
@@ -31,5 +28,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Claims-index rebuild machinery is gone",
-  "updated_at": "2026-11-04T00:44:19.032721446Z"
+  "updated_at": "2026-11-04T22:42:43.495776846Z"
 }

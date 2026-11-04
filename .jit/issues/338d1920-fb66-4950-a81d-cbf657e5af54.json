@@ -16,9 +16,6 @@
   "id": "338d1920-fb66-4950-a81d-cbf657e5af54",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:testing",
     "per:@/charter/D-19",
     "satisfies:f8a6b298/REQ-13",
@@ -27,5 +24,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Test images capture the event log as a tail",
-  "updated_at": "2026-11-02T23:41:52.675278425Z"
+  "updated_at": "2026-11-04T22:42:43.281026200Z"
 }
