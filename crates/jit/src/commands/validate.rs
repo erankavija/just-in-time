@@ -1764,26 +1764,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         Ok(RuleReport { findings })
     }
 
-    /// Evaluate one configured graph rule with one selected issue as its sole
-    /// firing subject.
-    ///
-    /// The complete issue set is retained as graph and identifier-resolution
-    /// context, but it cannot become an additional rule subject. Missing,
-    /// disabled, non-graph, and non-matching selections return error findings
-    /// rather than an empty passing report.
-    pub fn validate_rule(
-        &self,
-        issue_id: &IssueId,
-        rule_name: &str,
-    ) -> Result<crate::validation::report::RuleReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let image = self.exec.capture_validation_image()?;
-        rule_validation_outcome(&image, issue_id, rule_name)
-            .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
-    }
-
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.exec.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
