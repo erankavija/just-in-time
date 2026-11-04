@@ -1804,7 +1804,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     label,
                     content_format,
                     force,
-                    orphan,
+                    orphan: _,
                 } => {
                     let gate = parse_gate_keys(gate, json)?;
 
@@ -1864,15 +1864,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             println!("Created issue: {}", creation.issue.id);
                         }
 
-                        // Graph-rule findings print unless --force or --quiet;
-                        // `--orphan` acknowledges an intentional orphan.
-                        if !force && !quiet {
-                            for finding in graph_findings
-                                .iter()
-                                .filter(|finding| !(orphan && finding.rule == "orphan-leaf"))
-                            {
-                                let _ = output_ctx.print_warning(format!("\n{}", finding.message));
-                            }
+                        for finding in graph_findings {
+                            let _ = output_ctx.print_warning(format!("\n{}", finding.message));
                         }
                     }
                 }
