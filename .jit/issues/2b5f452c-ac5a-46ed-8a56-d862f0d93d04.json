@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "903fdf92-096f-45cf-9740-f83b3effc70b",
-      "status": "passed",
-      "updated_at": "2026-11-04T02:56:16.312950985Z",
+      "run_id": "4ac6596b-7c0b-4b22-bf78-522c466d9199",
+      "status": "failed",
+      "updated_at": "2026-11-04T04:17:01.770349803Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "72ea2776-fd87-4276-a13a-244fd871470c",
+      "run_id": "ae42d9de-c360-4182-bb8a-309aa5650a59",
       "status": "failed",
-      "updated_at": "2026-11-04T02:59:57.926022244Z",
+      "updated_at": "2026-11-04T04:21:57.800693128Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validation capture hands its parsed records to the report",
-  "updated_at": "2026-11-04T03:09:51.401729153Z"
+  "updated_at": "2026-11-04T04:21:57.800693128Z"
 }
