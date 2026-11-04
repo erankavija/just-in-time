@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T07:53:41.597529638Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -28,5 +28,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Single-rule validation selects from the report",
-  "updated_at": "2026-11-04T07:53:41.597529638Z"
+  "updated_at": "2026-11-04T08:21:00.277034970Z"
 }
