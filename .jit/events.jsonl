@@ -24692,3 +24692,6 @@
 {"from":"in_progress","id":"80afdbd2-ec07-4cae-9c79-7b2992d5033e","issue_id":"4d844e61-f310-4395-b938-81247a964c81","timestamp":"2026-11-04T22:33:04.024463275Z","to":"done","type":"issue_state_changed"}
 {"id":"3fffec96-0aac-4cbc-8932-d7da2dc38f40","issue_id":"4d844e61-f310-4395-b938-81247a964c81","timestamp":"2026-11-04T22:33:04.024463275Z","type":"issue_completed"}
 {"gate_key":"docs-mechanical","id":"7eb0998a-0e9c-4a2d-92b5-5b2b0ac6f882","issue_id":"b4ca051c-e241-45a5-b0ae-6f9016ada867","timestamp":"2026-11-04T22:34:16.649401763Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"805ff0f0-2e2f-4204-ba81-94af7558d883","issue_id":"b4ca051c-e241-45a5-b0ae-6f9016ada867","timestamp":"2026-11-04T22:35:55.962774568Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"ce043c53-4fa7-4e8f-aadc-c5cc02373912","issue_id":"c06daf50-c151-402a-851a-fa71a9e6d764","timestamp":"2026-11-04T22:36:46.012785929Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:df129d9e-lead","id":"a9829170-f117-40e5-bb15-2bfa237c73fc","issue_id":"c06daf50-c151-402a-851a-fa71a9e6d764","timestamp":"2026-11-04T22:36:46.012785929Z","type":"issue_claimed"}
