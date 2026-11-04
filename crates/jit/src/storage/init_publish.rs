@@ -10,10 +10,9 @@
 
 use crate::repository_state::RepositoryAction;
 use crate::storage::atomic_write::{rename_noreplace_cap, sync_capability_directory};
+use crate::storage::capability_fs::{open_child_dir_nofollow, open_or_create_capability_parent};
 use crate::storage::redo_apply::write_staged_file;
-use crate::storage::repository_state_store::{
-    open_child_dir_nofollow, open_or_create_capability_parent, RepositoryStateStoreError,
-};
+use crate::storage::repository_state_store::RepositoryStateStoreError;
 use cap_std::fs::Dir;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};

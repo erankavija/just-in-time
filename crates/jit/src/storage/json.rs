@@ -18,7 +18,7 @@ use crate::repository_state::{
 use crate::storage::{
     FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
     RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
-    RepositoryNotFoundError, RepositoryStateStore, RepositoryStateStoreError, WorktreePaths,
+    RepositoryNotFoundError, RepositoryStateStore, WorktreePaths,
 };
 use anyhow::{anyhow, Context, Result};
 use std::cell::RefCell;
@@ -70,9 +70,9 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
     let data_root = layout.data_root();
     let issues_path = layout.resolve(&VirtualPath::ISSUES)?;
     let events_path = layout.resolve(&VirtualPath::EVENTS)?;
-    let data = match super::repository_state_store::open_absolute_dir_nofollow(data_root) {
+    let data = match super::capability_fs::open_absolute_dir_nofollow(data_root) {
         Ok(data) => data,
-        Err(RepositoryStateStoreError::Io(error))
+        Err(super::capability_fs::CapabilityFsError::Io(error))
             if error.kind() == std::io::ErrorKind::NotFound =>
         {
             return Ok(ExactStoreSnapshot::default())
@@ -90,7 +90,7 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
             )
         }
         Ok(_) => {
-            let issue_dir = super::repository_state_store::open_child_dir_nofollow(
+            let issue_dir = super::capability_fs::open_child_dir_nofollow(
                 &data,
                 VirtualPath::ISSUES.relative().as_str(),
             )?;
@@ -118,12 +118,11 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
                             path.display()
                         );
                     }
-                    let mut file = super::repository_state_store::open_regular_file_nofollow(
-                        &issue_dir, &leaf,
-                    )
-                    .with_context(|| {
-                        format!("Failed to open issue record at {}", path.display())
-                    })?;
+                    let mut file =
+                        super::capability_fs::open_regular_file_nofollow(&issue_dir, &leaf)
+                            .with_context(|| {
+                                format!("Failed to open issue record at {}", path.display())
+                            })?;
                     let mut bytes = Vec::new();
                     file.read_to_end(&mut bytes).with_context(|| {
                         format!("Failed to read issue record at {}", path.display())
@@ -146,7 +145,7 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
             )
         }
         Ok(_) => {
-            let mut file = super::repository_state_store::open_regular_file_nofollow(
+            let mut file = super::capability_fs::open_regular_file_nofollow(
                 &data,
                 VirtualPath::EVENTS.relative().as_str(),
             )
@@ -863,19 +862,16 @@ impl super::gate_run_reader::GateRunTree for JsonFileStorage {
         let root = self.class_root(directory)?;
         let relative = directory.relative().as_path();
         let opened =
-            super::repository_state_store::open_absolute_dir_nofollow(&root).and_then(|root| {
-                match relative.as_os_str().is_empty() {
-                    true => Ok(Some(root)),
-                    false => {
-                        super::repository_state_store::open_capability_parent(&root, relative)?
-                            .map(|(parent, leaf)| {
-                                super::repository_state_store::open_child_dir_nofollow(
-                                    &parent, leaf,
-                                )
-                            })
-                            .transpose()
-                    }
-                }
+            super::capability_fs::open_absolute_dir_nofollow(&root).and_then(|root| match relative
+                .as_os_str()
+                .is_empty()
+            {
+                true => Ok(Some(root)),
+                false => super::capability_fs::open_capability_parent(&root, relative)?
+                    .map(|(parent, leaf)| {
+                        super::capability_fs::open_child_dir_nofollow(&parent, leaf)
+                    })
+                    .transpose(),
             });
         let names = |directory: cap_std::fs::Dir| -> Result<Vec<String>> {
             directory
@@ -894,27 +890,27 @@ impl super::gate_run_reader::GateRunTree for JsonFileStorage {
     }
 
     fn read_regular_file(&self, file: &VirtualPath) -> Result<TreeNode<Vec<u8>>> {
-        tree_node(
-            super::repository_state_store::read_repository_file_nofollow(
-                &self.class_root(file)?,
-                file.relative(),
-            ),
-        )
+        tree_node(super::capability_fs::read_repository_file_nofollow(
+            &self.class_root(file)?,
+            file.relative(),
+        ))
     }
 }
 
 /// Classify a no-follow read: a missing path or ancestor is absent, and a
 /// target refused as unsafe is an occupant of another kind.
-fn tree_node<T>(read: Result<Option<T>, RepositoryStateStoreError>) -> Result<TreeNode<T>> {
+fn tree_node<T>(
+    read: Result<Option<T>, super::capability_fs::CapabilityFsError>,
+) -> Result<TreeNode<T>> {
     match read {
         Ok(Some(found)) => Ok(TreeNode::Present(found)),
         Ok(None) => Ok(TreeNode::Absent),
-        Err(RepositoryStateStoreError::Io(error))
+        Err(super::capability_fs::CapabilityFsError::Io(error))
             if error.kind() == std::io::ErrorKind::NotFound =>
         {
             Ok(TreeNode::Absent)
         }
-        Err(RepositoryStateStoreError::UnsafeTarget(_)) => Ok(TreeNode::OtherKind),
+        Err(super::capability_fs::CapabilityFsError::UnsafeTarget(_)) => Ok(TreeNode::OtherKind),
         Err(error) => Err(error.into()),
     }
 }
@@ -1150,12 +1146,12 @@ impl IssueStore for JsonFileStorage {
         target: &crate::domain::artifact_plan::PlanTarget,
     ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>> {
         let path = VirtualPath::archive_evidence_record(target);
-        let contents = match crate::storage::repository_state_store::read_repository_file_confined(
+        let contents = match crate::storage::capability_fs::read_repository_file_confined(
             &self.root,
             path.relative(),
         ) {
             Ok(contents) => contents,
-            Err(RepositoryStateStoreError::Io(error))
+            Err(super::capability_fs::CapabilityFsError::Io(error))
                 if error.kind() == std::io::ErrorKind::NotFound =>
             {
                 None
@@ -1211,7 +1207,7 @@ impl IssueStore for JsonFileStorage {
             crate::repository_state::RepositoryRootClass::Worktree => layout.worktree_root(),
             crate::repository_state::RepositoryRootClass::Data => layout.data_root(),
         };
-        crate::storage::repository_state_store::read_repository_file_confined(root, path.relative())
+        crate::storage::capability_fs::read_repository_file_confined(root, path.relative())
             .map_err(|error| map_confined_read_error(error, rel_path))?
             .map(|bytes| {
                 String::from_utf8(bytes)
@@ -1281,26 +1277,26 @@ impl IssueStore for JsonFileStorage {
         } else {
             let relative = crate::domain::relative_path::RootRelativePath::parse(path)
                 .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
-            crate::storage::repository_state_store::read_repository_file_confined(
-                repo_root, &relative,
-            )
-            .map_err(|error| map_confined_read_error(error, path))?
-            .map(|bytes| (bytes, "working-tree".to_string()))
-            .ok_or_else(|| PathReadError::NotFound(path.to_string()))
+            crate::storage::capability_fs::read_repository_file_confined(repo_root, &relative)
+                .map_err(|error| map_confined_read_error(error, path))?
+                .map(|bytes| (bytes, "working-tree".to_string()))
+                .ok_or_else(|| PathReadError::NotFound(path.to_string()))
         }
     }
 }
 
 fn map_confined_read_error(
-    error: RepositoryStateStoreError,
+    error: super::capability_fs::CapabilityFsError,
     relative: &str,
 ) -> crate::storage::PathReadError {
     use crate::storage::PathReadError;
     match error {
-        RepositoryStateStoreError::UnsafeTarget(_) => {
+        super::capability_fs::CapabilityFsError::UnsafeTarget(_) => {
             PathReadError::OutsideRepoRoot(relative.to_string())
         }
-        RepositoryStateStoreError::Io(error) if error.kind() == std::io::ErrorKind::NotFound => {
+        super::capability_fs::CapabilityFsError::Io(error)
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
             PathReadError::NotFound(relative.to_string())
         }
         error => PathReadError::Other(error.into()),
@@ -1592,18 +1588,15 @@ mod tests {
         )
         .unwrap();
 
-        let data_handle =
-            super::super::repository_state_store::open_absolute_dir_nofollow(&data).unwrap();
-        let gate_runs_handle = super::super::repository_state_store::open_child_dir_nofollow(
+        let data_handle = super::super::capability_fs::open_absolute_dir_nofollow(&data).unwrap();
+        let gate_runs_handle = super::super::capability_fs::open_child_dir_nofollow(
             &data_handle,
             VirtualPath::GATE_RUNS.relative().as_str(),
         )
         .unwrap();
-        let run_handle = super::super::repository_state_store::open_child_dir_nofollow(
-            &gate_runs_handle,
-            issue.as_str(),
-        )
-        .unwrap();
+        let run_handle =
+            super::super::capability_fs::open_child_dir_nofollow(&gate_runs_handle, issue.as_str())
+                .unwrap();
 
         fs::rename(
             &original_run,
@@ -1633,11 +1626,9 @@ mod tests {
             b"outside-root",
             "the ambient path must demonstrate that the parent swap took effect"
         );
-        let mut held_file = super::super::repository_state_store::open_regular_file_nofollow(
-            &run_handle,
-            record_name,
-        )
-        .unwrap();
+        let mut held_file =
+            super::super::capability_fs::open_regular_file_nofollow(&run_handle, record_name)
+                .unwrap();
         let mut held_bytes = Vec::new();
         held_file.read_to_end(&mut held_bytes).unwrap();
         assert_eq!(held_bytes, b"inside");
