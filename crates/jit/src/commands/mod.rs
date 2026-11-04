@@ -94,9 +94,9 @@ pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueMutation, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
-    parse_profile_selector, ProfileApplyError, ProfileNotFoundError, ProfileOps,
-    ProfileResolutionError, ProfileSelection, ProfileSelectorError, ProfileVariableOptions,
-    SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
+    parse_profile_selector, parse_profile_selectors, parse_profile_variable_assignments,
+    ProfileApplyError, ProfileNotFoundError, ProfileOps, ProfileResolutionError, ProfileSelection,
+    ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;

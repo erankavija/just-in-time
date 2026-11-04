@@ -547,6 +547,16 @@ fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
     )]
 }
 
+/// `jit init` over a `--values-file` path that cannot be read.
+fn invoke_init_missing_values_file(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_in_form(
+        &cli,
+        &["init", "--values-file", "missing-values.toml"],
+        json,
+    )]
+}
+
 /// `jit serve --status` (like the daemon start and `--stop`) classifies a
 /// malformed PID file as `PARSE_ERROR`, whose registered status is 1.
 fn invoke_serve_daemon_error(json: bool) -> Vec<Output> {
@@ -752,6 +762,7 @@ row_bindings! {
     test_command_exit_codes_invariant_check_emits_4: ("invariant check", Some(4), true) => invoke_invariant_check;
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", Some(4), false) => invoke_config_validate;
     test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", Some(1), true) => invoke_doc_check_links;
+    test_command_exit_codes_init_missing_values_file_emits_2: ("init", Some(2), false) => invoke_init_missing_values_file;
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", Some(3), false) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", Some(1), false) => invoke_serve_daemon_error;
     #[cfg(unix)]

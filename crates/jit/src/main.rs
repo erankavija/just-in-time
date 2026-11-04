@@ -20,11 +20,9 @@ use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
     GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
 };
-use jit::commands::{
-    parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
-};
+use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    config, invariant, resolve_issue, resolve_issue_filter, version, CommandContext,
+    apply, config, init, invariant, resolve_issue, resolve_issue_filter, version, CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -32,11 +30,9 @@ use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
 use jit::output::{
-    plain_issue_rows, print_issue_list, ErrorCode, ExitCode, InitResponse, IssueColumn, JsonError,
-    JsonOutput, OutputContext, OutputMode,
+    plain_issue_rows, print_issue_list, ErrorCode, ExitCode, IssueColumn, JsonError, JsonOutput,
+    OutputContext, OutputMode,
 };
-use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
-use jit::repository_state::VirtualPath;
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::io;
@@ -143,51 +139,6 @@ fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::Json
     }
 }
 
-/// Print the outcome of a graph-template apply (`jit apply <template> <container>`).
-///
-/// In `--json` mode emits the structured
-/// [`TemplateApplyResult`](jit::commands::TemplateApplyResult) (template name,
-/// resolved anchor bindings, created/refreshed node ids by role, and the
-/// pre-apply anchor dependency snapshots) plus the returned created
-/// issues, keyed by role. In quiet mode prints just the created node ids (one per
-/// line, role-ordered) for scripting; otherwise a short human summary.
-fn print_apply_result(
-    result: &jit::commands::TemplateApplyResult,
-    container: &IssueId,
-    quiet: bool,
-    json: bool,
-) -> Result<()> {
-    if json {
-        let response = jit::output::TemplateApplyResponse {
-            template: result.template.clone(),
-            container: container.clone(),
-            anchor_bindings: result.anchor_bindings.clone(),
-            created_node_ids_by_role: result.created_node_ids_by_role.clone(),
-            anchor_dependency_snapshots: result.anchor_dependency_snapshots.clone(),
-            created_issues: result.created_issues.clone(),
-        };
-        let msg = format!("Applied template '{}' to {}", result.template, container);
-        let output = JsonOutput::success(response).with_message(msg);
-        println!("{}", output.to_json_string()?);
-    } else if quiet {
-        for id in result.created_node_ids_by_role.values() {
-            println!("{}", id);
-        }
-    } else {
-        let roles = result
-            .created_node_ids_by_role
-            .iter()
-            .map(|(role, id)| format!("{role}={id}"))
-            .collect::<Vec<_>>()
-            .join(" ");
-        println!(
-            "Applied template '{}' to {}: {}",
-            result.template, container, roles
-        );
-    }
-    Ok(())
-}
-
 /// Resolve the gate key from the CLI's positional-or-flag pair (REQ-03).
 ///
 /// Exactly one of `positional` and `flag` must be `Some`. Supplying both or
@@ -273,40 +224,6 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
     jit::errors::InvalidArgumentError::new(message).into()
 }
 
-/// Parse the one ordered selector stream accepted by profile commands.
-fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<PathBuf>> {
-    values
-        .iter()
-        .map(|value| {
-            parse_profile_selector(value)
-                .map_err(|error| invalid_argument(format!("{error}"), json))
-        })
-        .collect()
-}
-
-/// Parse command-line profile assignments before entering command orchestration.
-fn parse_profile_variable_assignments(
-    values: &[String],
-    json: bool,
-) -> Result<Vec<ProfileVariableAssignment>> {
-    values
-        .iter()
-        .map(|assignment| {
-            let (name, value) = assignment.split_once('=').ok_or_else(|| {
-                invalid_argument(
-                    format!(
-                        "invalid profile variable assignment '{assignment}'; expected NAME=VALUE"
-                    ),
-                    json,
-                )
-            })?;
-            let name = ProfileVariableName::try_from(name.to_string())
-                .map_err(|error| invalid_argument(error, json))?;
-            Ok(ProfileVariableAssignment::new(name, value))
-        })
-        .collect()
-}
-
 /// One invocation of `jit profile apply`, as the CLI parsed it.
 struct ProfileApplyInvocation<'a> {
     /// Repeatable raw `--profile` selectors in occurrence order.
@@ -333,8 +250,8 @@ fn run_profile_apply(
         dry_run,
         json,
     } = invocation;
-    let selectors = parse_profile_selectors(profile, json)?;
-    let assignments = parse_profile_variable_assignments(set, json)?;
+    let selectors = jit::commands::parse_profile_selectors(profile)?;
+    let assignments = jit::commands::parse_profile_variable_assignments(set)?;
     if selectors.is_empty() {
         return Err(invalid_argument(
             "profile apply requires at least one --profile DIR selector".to_string(),
@@ -1364,6 +1281,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         return version::dispatch((), mode, &mut io::stdout(), &mut io::stderr());
     }
 
+    // Initialization opens the repository itself: it creates the data root.
+    let command = match command {
+        Commands::Init(args) => {
+            return init::dispatch(args, mode, &mut io::stdout(), &mut io::stderr());
+        }
+        other => other,
+    };
+
     let current_dir = env::current_dir()?;
     // The per-invocation write stance is read before any repository work, so an
     // unusable token fails the invocation rather than being silently dropped by a
@@ -1383,13 +1308,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     } = jit::commands::open_repository(jit::commands::RepositoryInvocation {
         current_dir: current_dir.clone(),
         data_dir_override: env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
-        is_init: matches!(&command, Commands::Init { .. }),
+        is_init: false,
         opens_mutation_session: command.requires_recovery_dispatch(),
         coordinates_claims_first: command.coordinates_claims_first(),
-        is_validation_exempt: matches!(
-            &command,
-            Commands::Init { .. } | Commands::Profile(ProfileCommands::Show { .. })
-        ),
+        is_validation_exempt: matches!(&command, Commands::Profile(ProfileCommands::Show { .. })),
         is_recover: matches!(&command, Commands::Recover),
         write_override: invocation_write_override,
     })
@@ -1405,93 +1327,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         mode,
     };
 
-    if let Commands::Init {
-        profile,
-        values_file,
-        set,
-    } = &command
-    {
-        let output_ctx = OutputContext::new(quiet, json);
-        let selectors = parse_profile_selectors(profile, json)?;
-        let assignments = parse_profile_variable_assignments(set, json)?;
-        let selection = profile_result(
-            executor.profiles().select_profiles(
-                &selectors,
-                &ProfileVariableOptions {
-                    values_file: values_file.clone(),
-                    assignments,
-                },
-            ),
-            json,
-        )?;
-
-        // Every init and re-init — plain, profiled, or over an existing root —
-        // publishes through one mutation session: initialization fills
-        // only the missing neutral scaffold state (authored config/gates/rules
-        // preserved), seeds `[project]` and `rules.toml` when absent, computes
-        // the worktree `.gitattributes` merge-driver claim, and routes
-        // config/rules/schemas through one redo record. Unifying the
-        // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
-        // profiled init, closing the prior re-init gap.
-        let init_result = profile_result(
-            executor
-                .profiles()
-                .initialize_fresh_repository(&current_dir, Some(&selection)),
-            json,
-        )?;
-        // Machine-local worktree identity (gitignored, not repository state)
-        // is created after the scaffold is published.
-        let (worktree_identity, init_warnings) = executor
-            .profiles()
-            .initialize_worktree_identity(&worktree_paths)?;
-        for warning in &init_warnings {
-            output_ctx.print_warning(warning)?;
-        }
-
-        // The worktree `.gitattributes` merge-driver claim is part of the init
-        // plan itself (every init and re-init); its typed
-        // outcome is reported here directly and drives the `--json`
-        // created/modified path lists.
-        let gitattributes_outcome = init_result.gitattributes;
-
-        // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
-        // plan when absent; the applied plan is the sole preimage
-        // authority for whether this run created it.
-        let rules_path = VirtualPath::RULES.repository_relative();
-        let scaffolded = init_result
-            .created_paths
-            .iter()
-            .any(|path| path == &rules_path);
-        if scaffolded {
-            let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
-        }
-        let profile_result = init_result.profile;
-
-        let message = if let Some(ref identity) = worktree_identity {
-            format!(
-                "Initialized jit repository (worktree: {})",
-                identity.worktree_id
-            )
-        } else {
-            "Initialized jit repository".to_string()
-        };
-        let _ = output_ctx.print_success(&message);
-
-        if json {
-            let payload = InitResponse {
-                repository_root: current_dir.display().to_string(),
-                data_dir: jit_dir.display().to_string(),
-                repository_id: worktree_identity.map(|identity| identity.worktree_id.to_string()),
-                gitattributes_status: gitattributes_outcome,
-                created_paths: init_result.created_paths,
-                modified_paths: init_result.modified_paths,
-                profile: profile_result,
-            };
-            let output = JsonOutput::success(payload).with_message(message);
-            println!("{}", output.to_json_string()?);
-        }
-    }
-
     // Normalize top-level first-guess aliases into their canonical noun/verb form
     // so `jit rdeps <id>` and `jit list` resolve to `jit graph rdeps` /
     // `jit issue list` and reuse those handlers verbatim.
@@ -1502,12 +1337,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     };
 
     match command {
-        Commands::Init { .. } => {
-            // Already handled above
-        }
+        Commands::Init(_) => {}
         Commands::Profile(profile_cmd) => match profile_cmd {
             ProfileCommands::Show { profile } => {
-                let selectors = parse_profile_selectors(&profile, json)?;
+                let selectors = jit::commands::parse_profile_selectors(&profile)?;
                 match executor.profiles().show_profiles(&selectors) {
                     Ok(result) => {
                         if json {
@@ -1549,8 +1382,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 values_file,
                 set,
             } => {
-                let selectors = parse_profile_selectors(&profile, json)?;
-                let assignments = parse_profile_variable_assignments(&set, json)?;
+                let selectors = jit::commands::parse_profile_selectors(&profile)?;
+                let assignments = jit::commands::parse_profile_variable_assignments(&set)?;
                 if selectors.is_empty() {
                     return Err(invalid_argument(
                         "profile diff requires at least one --profile DIR selector".to_string(),
@@ -2639,38 +2472,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         }
-        Commands::Apply {
-            template,
-            container,
-            anchor,
-            force,
-        } => {
-            // Parse the repeatable `--anchor role=id` pairs. Named apply resolves
-            // the positional container's default anchor from its captured
-            // template declaration; these explicit bindings override that
-            // default.
-            let mut bindings: std::collections::BTreeMap<String, IssueId> =
-                std::collections::BTreeMap::new();
-            for pair in &anchor {
-                let (role, id) = pair.split_once('=').ok_or_else(|| {
-                    anyhow!("malformed --anchor '{pair}'; expected role=id (with an '=')")
-                })?;
-                if role.is_empty() {
-                    return Err(anyhow!(
-                        "malformed --anchor '{pair}'; the role (left of '=') must not be empty"
-                    ));
-                }
-                bindings.insert(role.to_string(), resolve_issue(&storage, id)?);
-            }
-
-            let container = resolve_issue(&storage, &container)?;
-            let (result, warnings) = executor
-                .templates()
-                .apply_template(&template, &container, &bindings, force)?;
-            for warning in &warnings {
-                eprintln!("Warning: {}", warning);
-            }
-            print_apply_result(&result, &container, quiet, json)?;
+        Commands::Apply(args) => {
+            return apply::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {

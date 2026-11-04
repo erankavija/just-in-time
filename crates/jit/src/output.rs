@@ -13,9 +13,11 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod apply;
 pub mod config;
 mod emit;
 pub mod failure;
+mod init;
 mod invariant;
 mod version;
 
@@ -1434,6 +1436,13 @@ pub struct TemplateApplyResponse {
     pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
     pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
+}
+
+impl TemplateApplyResponse {
+    /// The `--json` envelope's `message`.
+    pub fn message(&self) -> String {
+        format!("Applied template '{}' to {}", self.template, self.container)
+    }
 }
 
 /// Response for blocked query with reasons (minimal issue + reasons)

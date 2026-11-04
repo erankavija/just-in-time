@@ -523,9 +523,6 @@ impl CommandSchema {
         }
 
         let (schema, type_name) = match cmd_path {
-            // Repository initialization.
-            "init" => (Some(schema_to_value::<InitResponse>()), "InitResponse"),
-
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
@@ -691,14 +688,6 @@ impl CommandSchema {
                 });
                 (Some(union), "BlockedListResponse")
             }
-
-            // `jit apply` echoes each created node's raw stored record under
-            // `created_issues`, so their gate lists are carried under
-            // gates_required / gates_status.
-            "apply" => (
-                Some(schema_to_value::<TemplateApplyResponse>()),
-                "TemplateApplyResponse",
-            ),
 
             // Graph commands
             "graph_deps" => (
@@ -1008,6 +997,7 @@ impl CommandSchema {
                  created.",
                 false,
             ),
+            row("init", 2, "The `--values-file` path cannot be read.", false),
             row(
                 "issue update, issue claim, issue claim-next",
                 4,
@@ -1675,8 +1665,8 @@ mod tests {
 
     #[test]
     fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("init").unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("init").unwrap();
+        let resolved = CommandSchema::resolve_output_schema("status").unwrap();
+        let legacy = CommandSchema::get_output_schema_for_command("status").unwrap();
         assert_eq!(resolved.success, legacy.success);
         assert_eq!(resolved.success_schema, legacy.success_schema);
     }
