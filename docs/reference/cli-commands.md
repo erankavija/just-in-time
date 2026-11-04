@@ -924,8 +924,8 @@ jit issue create --title <TITLE> [OPTIONS]
 | `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
-| `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
-| `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
+| `--force` | Create the issue despite blocking (`enforce = true`) rule failures; each bypassed failure is recorded as a `local_rule_bypassed` event, not reported in `findings`. Non-blocking findings are reported either way. |
+| `--json` | Emit the created issue as the `issue show` object, plus `findings` and a `message` field. |
 
 ```bash
 jit issue create "Fix login bug"
@@ -942,9 +942,16 @@ afterwards (`jit dep add`) is what moves it back to `Backlog` until the
 dependency becomes effectively terminal (done, rejected, or archived from one
 of those).
 
+**Findings.** Creation reports the rule findings concerning the new issue: the
+non-blocking local-rule findings, then the graph-rule findings over the
+repository with the issue added. Reported findings never block creation; a
+blocking rule failure refuses it unless `--force` bypasses that failure, which is
+then recorded as an event rather than reported. JSON carries the findings as
+`findings`; human output prints one `<severity> [<rule>] <message>` line per
+finding after the created id.
+
 Under `--quiet` the command prints only the new issue's id, which is what
-scripts capture. Validation warnings go to stderr, so they never pollute that
-capture.
+scripts capture.
 
 ### Updating Issues (`jit issue update`)
 
@@ -2861,6 +2868,12 @@ broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the outp
 result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
 with a broken link they arrive as the failure envelope's `error.details`.
 
+An external URL asset is probed with one HTTP `HEAD` request per distinct URL,
+however many documents cite it. A success or redirect status counts as
+reachable; any other status, a transport failure, or no answer within the
+request timeout is an `unreachable_url` error. Probes run concurrently over a
+bounded pool of workers.
+
 The documents in scope include each issue's derived documents, which are also
 tracked link targets. Each reference is checked at the version it names, the same version `jit
 validate` resolves it against. A reference pinned to a commit is read at that
@@ -3276,7 +3289,7 @@ jit validate --branch-drift [--leases] [--json]
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`; findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)); invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
-| `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
+| `--fix` | Publish every automatic rule/graph/state fix and derived-state repair through one mutation, then report over the fixed repository as plain `validate` does, exit status included, whether or not a fix applied. `--dry-run` reports what would be fixed and writes nothing. See [repairs](worktree-validate.md#repairs). |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
 
@@ -3302,7 +3315,7 @@ mirrored in this command's advisory `divergence_count`.
 Every successful JSON validation mode emits its normal mode-specific report. A
 failing invocation emits the canonical error envelope and retains that same
 report under `error.details`. This applies to whole-repository, per-issue,
-`--explain`, `--scope`, `--rule`, `--branch-drift`, and `--leases` validation. For example,
+`--explain`, `--scope`, `--rule`, `--fix`, `--branch-drift`, and `--leases` validation. For example,
 a whole-repository rule failure reports:
 
 ```json

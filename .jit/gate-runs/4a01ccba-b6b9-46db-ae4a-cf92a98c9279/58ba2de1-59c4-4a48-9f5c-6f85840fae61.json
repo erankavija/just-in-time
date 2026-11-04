@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "db15b3915c14a823fd8592c265236ced87b45188",
+  "completed_at": "2026-11-04T12:55:25.450512869Z",
+  "duration_ms": 23648,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "83bbd4948c0148b466bd14a0da972badaf9f20c040cdfe5ea41301c14071c3d2",
+  "issue_id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "58ba2de1-59c4-4a48-9f5c-6f85840fae61",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:55:01.802050739Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ fmt: ok (1650 ms)\n  ✓ clippy: ok (229 ms)\n  ✓ suite-build: built in 570 ms, warmed 18 executables (2139867952 bytes) in 756 ms (1329 ms)\n  ✓ test: 4979 passed, 0 failed, 0 skipped (12495 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (7587 ms)\n  ✓ suite-clock: 20101 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1727419312/2147483648 profile=line-tables-only dep-features=pruned suite-duration=20101ms (101 ms)\n\n"
+}
