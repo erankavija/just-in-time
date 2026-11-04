@@ -204,7 +204,7 @@ fn test_validate_json_rule_failure_emits_one_registered_envelope() {
         .expect("run rule failure fixture");
 
     let (envelope, code) = parse_single_error(&output);
-    assert_eq!(code, ErrorCode::GenericError);
+    assert_eq!(code, ErrorCode::ValidationFailed);
     assert!(!output.status.success());
     assert_eq!(envelope["error"]["details"]["valid"], false);
     assert!(envelope["error"]["details"]["integrity_error"].is_null());
@@ -230,7 +230,7 @@ fn test_validate_json_branch_drift_failure_emits_one_registered_envelope() {
         .expect("run branch-drift failure fixture");
 
     let (envelope, code) = parse_single_error(&output);
-    assert_eq!(code, ErrorCode::GenericError);
+    assert_eq!(code, ErrorCode::ValidationFailed);
     assert!(!output.status.success());
     assert_eq!(envelope["error"]["details"]["valid"], false);
     assert_eq!(

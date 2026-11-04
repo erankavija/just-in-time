@@ -28,7 +28,10 @@ mod item;
 mod project;
 mod search;
 mod serve;
+mod validate;
 mod version;
+
+pub use validate::*;
 
 pub use archive::ArchiveTargetResponse;
 pub use claim::{

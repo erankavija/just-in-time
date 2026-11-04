@@ -435,16 +435,21 @@ fn invoke_validate_rule_findings(json: bool) -> Vec<Output> {
     fs::write(rules_path, rules).unwrap();
     // An epic missing its `req:*` label violates the error-severity rule; the
     // `epic:auth` identity label keeps the finding to the rule under test.
-    cli.create_issue([
-        "--title",
-        "An epic",
-        "--label",
-        "type:epic",
-        "--label",
-        "epic:auth",
-    ])
-    .unwrap();
-    vec![output_in_form(&cli, &["validate"], json)]
+    let id = cli
+        .create_issue([
+            "--title",
+            "An epic",
+            "--label",
+            "type:epic",
+            "--label",
+            "epic:auth",
+        ])
+        .unwrap();
+    vec![
+        output_in_form(&cli, &["validate"], json),
+        output_in_form(&cli, &["validate", &id], json),
+        output_in_form(&cli, &["validate", &id, "--explain"], json),
+    ]
 }
 
 /// `jit validate --branch-drift`; with no git upstream the check cannot succeed.
@@ -866,9 +871,9 @@ row_bindings! {
     test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", 10, true) => invoke_gate_evaluate_runner_error;
     test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
     test_command_exit_codes_validate_integrity_emits_4: ("validate", 4, true) => invoke_validate_integrity;
-    test_command_exit_codes_validate_rule_findings_emits_1: ("validate", 1, true) => invoke_validate_rule_findings;
-    test_command_exit_codes_validate_branch_drift_emits_1: ("validate --branch-drift", 1, true) => invoke_validate_branch_drift;
-    test_command_exit_codes_validate_leases_emits_1: ("validate --leases", 1, true) => invoke_validate_leases;
+    test_command_exit_codes_validate_rule_findings_emits_4: ("validate", 4, true) => invoke_validate_rule_findings;
+    test_command_exit_codes_validate_branch_drift_emits_4: ("validate --branch-drift", 4, true) => invoke_validate_branch_drift;
+    test_command_exit_codes_validate_leases_emits_4: ("validate --leases", 4, true) => invoke_validate_leases;
     test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
     test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
     test_command_exit_codes_item_failures_emit_2: ("item list, item search, item show, item resolve", 2, false) => invoke_item_failures;

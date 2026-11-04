@@ -673,13 +673,6 @@ pub fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> JsonError {
     JsonError::new(code, error.to_string())
 }
 
-/// Preserve a `validate --fix` failure's complete cause chain and its exact
-/// typed classification. The envelope's registered code owns the process
-/// status; callers must not retain a parallel exit-code projection.
-pub fn validate_fix_json_error(error: &anyhow::Error) -> JsonError {
-    JsonError::new(classify_code(error), format!("{error:#}"))
-}
-
 /// Build the JSON error envelope for a failed profile command: the code the
 /// profile command family assigns, with the details and suggestions the
 /// failure's type determines.
@@ -810,7 +803,7 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::{classify, validate_fix_json_error};
+    use super::classify;
     use crate::declarations::GateStage;
     use crate::domain::{GateRunResult, GateRunStatus};
     use crate::output::ErrorCode;
@@ -1062,49 +1055,6 @@ mod exit_code_projection_tests {
             classify(&error).exit_code(),
             ErrorCode::ParseError.exit_code()
         );
-    }
-
-    #[test]
-    fn test_validate_fix_json_error_uses_typed_code_as_status_authority() {
-        use std::io::{Error as IoError, ErrorKind};
-
-        let cases = [
-            (
-                crate::errors::ValidationFailedError::new("invalid repository").into(),
-                ErrorCode::ValidationFailed,
-            ),
-            (
-                crate::errors::InvalidArgumentError::new("bad repair option").into(),
-                ErrorCode::InvalidArgument,
-            ),
-            (
-                crate::errors::AlreadyExistsError::new("occupied repair target").into(),
-                ErrorCode::AlreadyExists,
-            ),
-            (
-                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
-                ErrorCode::PermissionDenied,
-            ),
-            (
-                crate::storage::RepositoryFormatUnsupportedError::new(9999, 1).into(),
-                ErrorCode::RepositoryFormatUnsupported,
-            ),
-            (
-                anyhow::anyhow!("untyped repair failure"),
-                ErrorCode::GenericError,
-            ),
-            (
-                IoError::new(ErrorKind::BrokenPipe, "closed repair output").into(),
-                ErrorCode::IoError,
-            ),
-        ];
-
-        for (error, expected_code) in cases {
-            let envelope = validate_fix_json_error(&error);
-            assert_eq!(envelope.error.code, expected_code);
-            assert_eq!(envelope.exit_code(), expected_code.exit_code());
-            assert_eq!(envelope.exit_code(), classify(&error).exit_code());
-        }
     }
 
     #[test]
