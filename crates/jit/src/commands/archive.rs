@@ -1935,7 +1935,7 @@ mod tests {
     }
 
     #[test]
-    fn test_publication_only_execution_records_one_event() {
+    fn test_permanent_document_archive_writes_no_copy_and_leaves_the_source() {
         let config = format!(
             "{}\n[documentation]\ndevelopment_root = \"dev\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"dev/guides\"]\narchive_root = \"archive\"\n",
             test_taxonomy().config_fragment()
@@ -1947,48 +1947,43 @@ mod tests {
             .archive()
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
-        assert!(result.event_appended);
-        assert_eq!(result.publications.len(), 1);
+        assert!(!result.event_appended);
+        assert!(result.publications.is_empty());
         assert!(result.reference_changes.is_empty());
         assert!(result.planned_deletions.is_empty());
-        assert!(repo.path().join("dev/guides/permanent.md").exists());
-        assert!(repo.path().join("archive/guides/permanent.md").exists());
-        assert_eq!(stored_archive_executions(&executor.storage).len(), 1);
+        assert_eq!(
+            fs::read(repo.path().join("dev/guides/permanent.md")).unwrap(),
+            b"permanent"
+        );
+        assert!(!repo.path().join("archive/guides/permanent.md").exists());
     }
 
     #[test]
-    fn test_preexisting_identical_permanent_copy_is_adopted_once_without_deletion() {
+    fn test_permanent_document_archive_ignores_a_differing_preexisting_copy() {
         let config = format!(
             "{}\n[documentation]\ndevelopment_root = \"dev\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"dev/guides\"]\narchive_root = \"archive\"\n",
             test_taxonomy().config_fragment()
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
-        fs::create_dir_all(repo.path().join("archive/guides")).unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
-        fs::write(
-            repo.path().join("archive/guides/permanent.md"),
-            b"permanent",
-        )
-        .unwrap();
-        let first = executor
+        fs::create_dir_all(repo.path().join("archive/guides")).unwrap();
+        fs::write(repo.path().join("archive/guides/permanent.md"), b"frozen").unwrap();
+        let result = executor
             .archive()
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
-        assert!(first.event_appended);
-        assert!(first.planned_deletions.is_empty());
-        assert!(first.deleted_sources.is_empty());
-        assert!(first.publications.iter().any(|publication| {
-            publication.destination == "archive/guides/permanent.md" && publication.adopted
-        }));
-        assert!(repo.path().join("dev/guides/permanent.md").exists());
-        let second = executor
-            .archive()
-            .execute_archive_document("dev/guides/permanent.md")
-            .unwrap();
-        assert!(!second.event_appended);
-        assert!(second.publications.is_empty());
-        assert_eq!(stored_archive_executions(&executor.storage).len(), 1);
+        assert!(!result.event_appended);
+        assert!(result.publications.is_empty());
+        assert_eq!(
+            fs::read(repo.path().join("archive/guides/permanent.md")).unwrap(),
+            b"frozen"
+        );
+        assert_eq!(
+            fs::read(repo.path().join("dev/guides/permanent.md")).unwrap(),
+            b"permanent"
+        );
+        assert!(stored_archive_executions(&executor.storage).is_empty());
     }
 
     #[test]
