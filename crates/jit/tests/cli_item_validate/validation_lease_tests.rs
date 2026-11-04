@@ -46,52 +46,6 @@ fn test_validate_leases_without_lease_records_is_valid() {
 }
 
 #[test]
-fn test_validate_repository_detects_invalid_claims_index() {
-    let (primary, _linked) = JitCli::linked_checkouts().unwrap();
-    let paths =
-        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
-    // The index is recovery's claims-log replay, not lease storage.
-    std::fs::create_dir_all(&paths.shared_jit).unwrap();
-    std::fs::write(
-        paths.shared_jit.join("claims.index.json"),
-        serde_json::to_vec(&jit::storage::claim_coordinator::ClaimsIndex {
-            schema_version: 2,
-            ..Default::default()
-        })
-        .unwrap(),
-    )
-    .unwrap();
-
-    let output = primary
-        .command(["validate"])
-        .env_remove("JIT_TEST_MODE")
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stderr),
-        String::from_utf8_lossy(&output.stdout)
-    );
-    assert!(
-        combined.contains("Claims index validation failed"),
-        "{combined}"
-    );
-    assert!(combined.contains("Invalid schema version"), "{combined}");
-
-    let skipped = primary
-        .command_with_env(["validate"], [("JIT_TEST_MODE", "1")])
-        .output()
-        .unwrap();
-    assert!(
-        skipped.status.success(),
-        "JIT_TEST_MODE must preserve the established claims-check bypass: {}",
-        String::from_utf8_lossy(&skipped.stderr)
-    );
-}
-
-#[test]
 fn test_validate_leases_detects_expired_lease() {
     let (primary, linked) = JitCli::linked_checkouts().unwrap();
     let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]

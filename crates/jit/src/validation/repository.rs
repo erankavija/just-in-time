@@ -13,9 +13,8 @@ use crate::document::content_parser_for;
 use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
 use crate::domain::item::{
-    expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
-    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
-    unqualified_link_message, AddressScope, ProjectSource, RawScopeItem,
+    index_items, index_project_sources, is_qualified_reference, load_toml_scope_items,
+    unqualified_link_message, ItemAddressIndex, ItemError, ItemKind, ProjectSource, RawScopeItem,
 };
 use crate::domain::{Issue, ReadinessCorrection};
 use crate::graph::DependencyGraph;
@@ -27,7 +26,6 @@ use crate::validation::engine::{Finding, SchemaEngine};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::path::Path;
 
 /// One named stage in whole-repository validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -279,12 +277,7 @@ pub(crate) fn validate_repository_with_materializations(
                 structural_error = Some(error);
             }
         } else if structural_error.is_none() {
-            structural_error = validate_machine_local_claims(image.layout().worktree_root())
-                .context("repository-integrity validation pass")
-                .err();
-            if structural_error.is_none() {
-                passes.push(RepositoryValidationPass::RepositoryIntegrity);
-            }
+            passes.push(RepositoryValidationPass::RepositoryIntegrity);
         }
     }
 
@@ -322,7 +315,12 @@ pub(crate) fn validate_repository_with_materializations(
         } else {
             HashSet::new()
         };
-        match collect_item_link_findings(read, issues, &config, &credit_namespaces)
+        match declarations
+            .item_kinds()
+            .map_err(anyhow::Error::from)
+            .and_then(|kinds| {
+                collect_item_link_findings(read, issues, &config, kinds, &credit_namespaces)
+            })
             .context("item-links validation pass")
         {
             Ok(item_findings) => {
@@ -511,25 +509,6 @@ fn validate_integrity(
     Ok(())
 }
 
-/// Validate the machine-local claims control plane selected by the repository
-/// root. This boundary intentionally sits beside the captured repository image:
-/// claims live in `.git/jit`, not in the planned `.jit` byte set, so overlays
-/// delegate to the same coordination state without reopening repository storage.
-fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
-    if !crate::test_mode::is_enabled() {
-        let index_issues = crate::commands::validate_claims_index_at(repository_root)
-            .context("Failed to validate claims index")?;
-        if !index_issues.is_empty() {
-            return Err(RepositoryJudgedInvalid(format!(
-                "Claims index validation failed:\n  {}",
-                index_issues.join("\n  ")
-            ))
-            .into());
-        }
-    }
-    Ok(())
-}
-
 fn collect_rule_findings(
     read: &ReadBytes<'_>,
     issues: &[Issue],
@@ -670,14 +649,14 @@ fn collect_item_link_findings(
     read: &ReadBytes<'_>,
     issues: &[Issue],
     config: &JitConfig,
+    kinds: &[ItemKind],
     credit_namespaces: &HashSet<String>,
 ) -> Result<Vec<ReportedFinding>> {
-    let kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
     if kinds.is_empty() && credit_namespaces.is_empty() {
         return Ok(Vec::new());
     }
     let repo_format = config.content_format();
-    let mut addresses = HashSet::new();
+    let mut addresses = ItemAddressIndex::new(issues);
     let issue_kinds: Vec<_> = kinds
         .iter()
         .filter(|kind| !kind.kind_scope().is_project())
@@ -718,13 +697,18 @@ fn collect_item_link_findings(
         .iter()
         .flat_map(|kind| kind.link_namespaces().iter().map(String::as_str))
         .collect();
+    let local_project = config
+        .project
+        .as_ref()
+        .and_then(|project| project.name.as_ref())
+        .map(crate::config::ProjectName::as_str);
     for issue in issues {
         for label in &issue.labels {
             let Some((namespace, value)) = label.split_once(':') else {
                 continue;
             };
             if let Some(message) =
-                unqualified_link_message(&issue.id, namespace, value, &kinds, credit_namespaces)
+                unqualified_link_message(&issue.id, namespace, value, kinds, credit_namespaces)
             {
                 findings.push(ReportedFinding::new(
                     Some(issue.id.clone()),
@@ -741,45 +725,12 @@ fn collect_item_link_findings(
             if !link_namespaces.contains(namespace) || !is_qualified_reference(value) {
                 continue;
             }
-            let canonical = (|| -> Result<String> {
-                let address = if value.starts_with('@') {
-                    parse_kind_segmented_address(value)?
-                } else {
-                    expand_sugar_address(value, &kinds)?
-                };
-                match address.scope {
-                    AddressScope::Project => Ok(format!("@/{}/{}", address.kind, address.self_id)),
-                    AddressScope::NamedProject(name) => {
-                        let declared = config
-                            .project
-                            .as_ref()
-                            .and_then(|project| project.name.as_ref())
-                            .map(crate::config::ProjectName::as_str);
-                        if declared != Some(name.as_str()) {
-                            return Err(anyhow!(
-                                "addresses project '{name}', not the local project"
-                            ));
-                        }
-                        Ok(format!("@/{}/{}", address.kind, address.self_id))
-                    }
-                    AddressScope::Issue(issue_ref) => {
-                        let owner_id = crate::storage::resolve_issue_id_among(&issue_ref, issues)?;
-                        let owner = issues
-                            .iter()
-                            .find(|issue| issue.id == owner_id)
-                            .ok_or_else(|| anyhow!("missing issue '{owner_id}'"))?;
-                        Ok(format!(
-                            "@/issue/{}/{}/{}",
-                            owner.short_id(),
-                            address.kind,
-                            address.self_id
-                        ))
-                    }
+            let detail = match addresses.contains(value, kinds, local_project) {
+                Ok(true) => continue,
+                Ok(false) => format!("the qualified id '{value}' resolves to no addressable item"),
+                Err(ItemError::NotResolvable { project }) => {
+                    format!("addresses project '{project}', not the local project")
                 }
-            })();
-            let detail = match canonical {
-                Ok(canonical) if addresses.contains(&canonical) => continue,
-                Ok(_) => format!("the qualified id '{value}' resolves to no addressable item"),
                 Err(error) => error.to_string(),
             };
             findings.push(ReportedFinding::new(
@@ -1136,6 +1087,31 @@ mod tests {
         assert!(!report
             .passes
             .contains(&RepositoryValidationPass::Projections));
+    }
+
+    #[test]
+    fn test_captured_item_kinds_preserve_effective_configuration_error() {
+        let image = crate::test_harness::image::ImageBuilder::new()
+            .files(&[
+                (
+                    ".jit/config.toml",
+                    Some("[item_kinds.custom]\nsection = \"Items\""),
+                ),
+                (".jit/gates.toml", None),
+                (".jit/rules.toml", None),
+            ])
+            .build();
+        let declarations =
+            crate::repository_state::validation_declarations_from_image(&image).unwrap();
+        let expected = declarations.config().validate_item_kinds().unwrap_err();
+        let failure =
+            validate_repository_with_materializations(&image, &declarations, None, Ok(()), Ok(()))
+                .unwrap_err();
+        assert_eq!(
+            failure.to_string(),
+            format!("effective-config validation pass: {expected}")
+        );
+        assert!(failure.report().passes.is_empty());
     }
 
     #[test]

@@ -404,9 +404,8 @@ pub enum Commands {
     /// session opens, then in sequence:
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - In a Git repository: cleans up stale claim locks from crashed processes
-    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
-    ///   evicts expired leases, and reclaims indefinite leases whose heartbeat is
-    ///   stale; without Git, skips these with a warning
+    ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
+    ///   heartbeat is stale; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never

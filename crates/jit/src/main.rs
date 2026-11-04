@@ -1838,13 +1838,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         issue_type,
                         force,
                     )?;
-                    let (local_findings, graph_findings) = creation.split_findings();
-                    for finding in local_findings {
-                        eprintln!("Warning: [{}] {}", finding.rule, finding.message);
-                    }
-
-                    let output_ctx = OutputContext::new(quiet, json);
-
                     if json {
                         let issue = creation.issue;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
@@ -1861,10 +1854,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             println!("{}", creation.issue.id);
                         } else {
                             println!("Created issue: {}", creation.issue.id);
-                        }
-
-                        for finding in graph_findings {
-                            let _ = output_ctx.print_warning(format!("\n{}", finding.message));
+                            jit::output::render_validation_findings(&creation.findings, None)
+                                .print();
                         }
                     }
                 }
@@ -6298,7 +6289,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             "success": true,
                             "redo_records_applied": redo_records_applied,
                             "stale_locks_cleaned": report.stale_locks_cleaned,
-                            "index_rebuilt": report.index_rebuilt,
                             "expired_leases_evicted": report.expired_leases_evicted,
                             "stale_leases_reclaimed": report.stale_leases_reclaimed,
                             "temp_files_removed": report.temp_files_removed,
@@ -6312,7 +6302,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!("Recovery complete:");
                         println!("  • Redo records applied: {redo_records_applied}");
                         println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
-                        println!("  • Index rebuilt: {}", report.index_rebuilt);
                         println!(
                             "  • Expired leases evicted: {}",
                             report.expired_leases_evicted

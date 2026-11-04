@@ -580,8 +580,6 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 pub struct RecoveryReport {
     /// Number of stale locks cleaned up
     pub stale_locks_cleaned: usize,
-    /// Whether the claims index was rebuilt
-    pub index_rebuilt: bool,
     /// Number of expired leases evicted
     pub expired_leases_evicted: usize,
     /// Number of indefinite leases reclaimed for a stale heartbeat
@@ -668,18 +666,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
         report.stale_locks_cleaned = locks_before.saturating_sub(locks_after);
     }
 
-    // 2. Rebuild index if corrupted.
-    let (consistent, verify_warnings) = coordinator.verify_index_consistency()?;
-    report.warnings.extend(verify_warnings);
-    if !consistent {
-        report.warnings.push(StorageWarning::IndexRebuilt);
-        let index = coordinator.rebuild_index_from_log()?;
-        report.warnings.extend(index.warnings());
-        coordinator.write_index_atomic(&index)?;
-        report.index_rebuilt = true;
-    }
-
-    // 3. Evict expired leases and reclaim stale indefinite ones.
+    // 2. Evict expired leases and reclaim stale indefinite ones.
     let lapsed = coordinator.evict_lapsed()?;
     report.expired_leases_evicted = lapsed.expired;
     report.stale_leases_reclaimed = lapsed.reclaimed;
@@ -694,9 +681,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
     /// when its session opens, before this runs. The routines, in sequence:
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - With claims coordination: cleans up stale claim locks from crashed processes
-    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
-    ///   evicts expired leases, and reclaims indefinite leases whose heartbeat is
-    ///   stale; without Git, skips these with a warning
+    ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
+    ///   heartbeat is stale; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never
