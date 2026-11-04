@@ -221,19 +221,29 @@
         {
           "short_id": "1f24e3e9",
           "classification": "implementation",
-          "status": "landed 9af61dd1f (-61); cargo-ci re-run (42 s budget overrun was host noise: 728ecfb0 gate on the same tree 18.2 s)",
+          "status": "done 9af61dd1f (-61; reworks 2)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "multi-file fix derivation over one capture"
         },
         {
           "short_id": "86f7e6eb",
-          "status": "landing (-5)",
+          "status": "done 6c94d48c4 (-5)",
           "worker": "codex gpt-6-luna xhigh"
         },
         {
           "short_id": "208edf4c",
-          "status": "reviewed (-100; D-02, REQ-05); lands after 86f7e6eb",
+          "status": "done 7fedf7f93 (-100)",
           "worker": "claude opus"
+        },
+        {
+          "short_id": "a106d1be",
+          "status": "landed 77e9b4337; code-review F1 (same-image parity) rework 1",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "2f12d920",
+          "status": "landing (+17)",
+          "worker": "codex gpt-6-luna xhigh"
         }
       ]
     }
@@ -392,7 +402,8 @@
     "2b5f452c": 3,
     "3acaa5a3": 2,
     "612ee9d4": 1,
-    "1f24e3e9": 2
+    "1f24e3e9": 2,
+    "a106d1be": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",

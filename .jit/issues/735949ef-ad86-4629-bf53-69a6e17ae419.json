@@ -14,7 +14,14 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c28450b5-813a-437c-a98b-861d7bad14f6",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:20:03.125396749Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "735949ef-ad86-4629-bf53-69a6e17ae419",
   "labels": [
     "type:story",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Gate runs are addressed per issue, per gate and per inputs digest",
-  "updated_at": "2026-11-04T08:42:45.512468882Z"
+  "updated_at": "2026-11-04T09:20:03.125396749Z"
 }
