@@ -5373,12 +5373,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 let (validation_report, divergence_report) = executor
                     .validation()
                     .validate_repository_report_with_divergences()?;
-                let integrity_error = validation_report.structural_failure.map(|error| {
+                let (structural_failure, rule_report) = validation_report.into_parts();
+                let integrity_error = structural_failure.map(|error| {
                     anyhow::Error::new(jit::errors::ValidationFailedError::new(format!(
                         "Invalid repository: {error:#}"
                     )))
                 });
-                let rule_report = validation_report.rule_report;
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // The view-derived report contains the declarative local/graph
