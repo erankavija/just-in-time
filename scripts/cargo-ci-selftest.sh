@@ -967,7 +967,7 @@ readonly MIXED_BLOCK='        FAIL [   0.200s] jit gate_tests::test_digest
 log: write failed: No space left on device (os error 28)
 --- STDERR: jit gate_tests::test_digest ---
 thread test_digest panicked at crates/jit/tests/digest.rs:9:5:
-assertion `left == right` failed
+assertion left == right failed
   left: Stable
  right: InputsMoved
 note: run with RUST_BACKTRACE=1 environment variable to display a backtrace
