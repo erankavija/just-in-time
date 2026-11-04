@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "04f91c6e-39a5-4e5f-b732-0672d3ff1bdc",
+      "status": "passed",
+      "updated_at": "2026-11-04T20:34:38.959125347Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f855d631-26f6-4c62-9ec5-207d63f6c9e5",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +30,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "Test builds produce no incremental-compilation state by default",
-  "updated_at": "2026-11-04T20:25:49.981720547Z"
+  "updated_at": "2026-11-04T20:34:38.959125347Z"
 }
