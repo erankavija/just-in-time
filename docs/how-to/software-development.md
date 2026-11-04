@@ -542,15 +542,16 @@ fi
 # Read readiness across EVERY required gate (auto + manual)
 jit gate status-all $ISSUE_ID --json > gate-results.json || true
 
-# `.all_passed` is true only when every required gate is green. `.results` holds
-# recorded runs only, so filtering it would miss gates never evaluated; `.gates`
-# lists every required gate with its status.
-if [ "$(jq -r '.all_passed' gate-results.json)" = "true" ]; then
+# `.all_passed` is true only when every required gate is green; when one is not,
+# the report sits under `.error.details`. `.results` holds recorded runs only, so
+# filtering it would miss gates never evaluated; `.gates` lists every required
+# gate with its status.
+if [ "$(jq -r '.all_passed // false' gate-results.json)" = "true" ]; then
   echo "ok: All required gates passed"
   exit 0
 else
   echo "error: Required gates not all passed:"
-  jq -r '.gates[] | select(.status != "passed") | "  - \(.key): \(.status)"' gate-results.json
+  jq -r '.error.details.gates[] | select(.status != "passed") | "  - \(.key): \(.status)"' gate-results.json
   exit 1
 fi
 ```

@@ -1459,6 +1459,8 @@ collection_keys! {
     /// Collection key of [`StateRollup`].
     ByStateKey = "by_state" as "StateRollup";
     GatesKey = "gates";
+    /// Collection key of [`GateCheckAllResponse`].
+    GateReadinessKey = "gates" as "GateCheckAllResponse";
     ResultsKey = "results";
     /// Collection key of [`ArtifactConformanceResponse`].
     ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
@@ -2700,7 +2702,7 @@ impl GateStatusEntry {
 /// `count` is the length of the `gates` collection (one entry per required
 /// gate). It equals `total` whenever every required gate has a status entry;
 /// `total`/`passed` remain the readiness tallies.
-pub type GateCheckAllResponse = ListEnvelope<GatesKey, GateStatusEntry, GateCheckSummary>;
+pub type GateCheckAllResponse = ListEnvelope<GateReadinessKey, GateStatusEntry, GateCheckSummary>;
 
 /// Fields of [`GateCheckAllResponse`] beside its `gates`.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -2803,6 +2805,23 @@ pub struct GateFindingsResponse {
     pub summary: Option<String>,
     /// Individual findings; empty when no block was emitted.
     pub findings: Vec<crate::domain::gate_findings::GateFinding>,
+}
+
+impl GateFindingsResponse {
+    /// The findings view of `run`.
+    pub fn of_run(run: &GateRunResult) -> Self {
+        Self {
+            key: run.gate_key.clone(),
+            run_id: run.run_id.clone(),
+            has_findings: run.findings.is_some(),
+            verdict: run.findings.as_ref().map(|f| f.verdict.clone()),
+            summary: run.findings.as_ref().map(|f| f.summary.clone()),
+            findings: run
+                .findings
+                .as_ref()
+                .map_or_else(Vec::new, |f| f.findings.clone()),
+        }
+    }
 }
 
 // ============================================================================

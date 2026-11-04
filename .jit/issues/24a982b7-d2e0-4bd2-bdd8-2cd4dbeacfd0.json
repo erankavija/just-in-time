@@ -15,7 +15,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "de55babd-b73f-4c3c-ace5-0441e848902b",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:55:41.449954516Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "993773cc-3628-4f4f-b857-5ca599448399",
+      "status": "failed",
+      "updated_at": "2026-11-04T15:01:09.746187034Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "291fcf80-c81f-443b-8824-e26451ab9b25",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:55:59.394149990Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
   "labels": [
     "type:task",
@@ -33,5 +52,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Query and status commands move to library handlers",
-  "updated_at": "2026-11-04T14:30:31.418951627Z"
+  "updated_at": "2026-11-04T15:01:09.746187034Z"
 }

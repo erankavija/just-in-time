@@ -12,8 +12,9 @@
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
     RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
+    RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
+use crate::domain::relative_path::RootRelativePath;
 use std::collections::BTreeSet;
 
 /// One file a tree publication writes, addressed relative to the tree root.

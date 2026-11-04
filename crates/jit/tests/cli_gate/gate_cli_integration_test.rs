@@ -982,7 +982,8 @@ fn test_gate_status_all_json_output_reports_not_run_gates() {
         .stdout
         .clone();
 
-    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let envelope: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let json = &envelope["error"]["details"];
     assert_eq!(json["total"].as_u64(), Some(2));
     assert_eq!(json["passed"].as_u64(), Some(1));
     assert_eq!(json["results"].as_array().map(Vec::len), Some(1));

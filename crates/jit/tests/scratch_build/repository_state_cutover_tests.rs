@@ -1062,6 +1062,27 @@ fn test_known_projection_renderer_definitions_keep_canonical_owners() {
     }
 }
 
+#[test]
+fn test_domain_layer_names_nothing_in_repository_state() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/domain");
+    let offenders: Vec<_> = production_sources(&source_root)
+        .into_iter()
+        .filter(|(_, source)| {
+            source.lines().any(|line| {
+                let code = line.trim_start();
+                !code.starts_with("//")
+                    && (code.contains("crate::repository_state")
+                        || code.contains("repository_state::"))
+            })
+        })
+        .map(|(path, _)| path)
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "domain sources name repository_state: {offenders:?}"
+    );
+}
+
 /// The package lifecycle has one decoder and one runtime model. These
 /// ownership checks guard only declarations that can become a competing format
 /// authority.

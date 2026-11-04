@@ -638,11 +638,11 @@ fn schema_file_path(path: &VirtualPath) -> Option<VirtualPath> {
         return None;
     }
     match path.relative() {
-        crate::repository_state::RootRelativePath::Descendant(rel) => {
+        crate::domain::relative_path::RootRelativePath::Descendant(rel) => {
             let schema_path = VirtualPath::schema_reference(rel.as_ref()).ok()?;
             schema_path.eq(path).then_some(schema_path)
         }
-        crate::repository_state::RootRelativePath::Root => None,
+        crate::domain::relative_path::RootRelativePath::Root => None,
     }
 }
 
