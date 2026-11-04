@@ -871,7 +871,7 @@
     "5962427b": 1,
     "1539da29": 2,
     "abe555e9": 1,
-    "b23faa59": 1
+    "b23faa59": 2
   },
   "surfaced_pitfalls": [
     {
@@ -941,7 +941,7 @@
     "head_rev": "b5bd434e8"
   },
   "wave_notes": {
-    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host."
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line)."
   },
   "post_release_followups": [
     "After 1eb949a5 lands: implement 26307dfd (D-36), then re-evaluate b23faa59 mcp-ci (fresh, inputs changed) and close it; delete land-one's PATH workaround (already removed).",
@@ -949,6 +949,17 @@
     "Then implement 8c67b21a and delete the private dispatch.sh copy."
   ],
   "issues": {
-    "b23faa59": {}
+    "b23faa59": {
+      "status": "rework",
+      "note": "code-review F1 schema name InvariantCheckResult, F2 human findings stderr Error: prefix in shared emitter; rework 2 of 2 (Claude Sonnet); mcp-ci awaits 26307dfd"
+    },
+    "1eb949a5": {
+      "status": "done"
+    },
+    "26307dfd": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "steward-assigned standalone task; node/process-spawning tests rule out the Codex sandbox"
+    }
   }
 }
