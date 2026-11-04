@@ -390,7 +390,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 }
             };
         let mut issues = None::<Vec<Issue>>;
-        let mut capture_precheck_history = false;
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
             base(spec)?;
             if spec != image.capture_spec() {
@@ -453,7 +452,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     purpose,
                     BaseCapturePurpose::Validation | BaseCapturePurpose::Mutation { .. }
                 ) {
-                    capture_precheck_history = discover_issue_closure(
+                    discover_issue_closure(
                         image,
                         spec,
                         &parsed,
@@ -463,9 +462,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     )?;
                 }
                 issues = Some(parsed);
-            }
-            if capture_precheck_history {
-                super::discover_gate_run_results(image, spec)?;
             }
             Ok(())
         };
@@ -804,10 +800,8 @@ fn effective_templates(
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and a
-/// precheck target's prompt files.
-///
-/// Returns whether a precheck gate consumes the gate-run history, which the
-/// round then reads as well.
+/// precheck target's prompt files and, when one of its precheck gates consumes
+/// run history, the runs its required gates' states name.
 fn discover_issue_closure(
     image: &crate::repository_state::RepositoryImage,
     spec: &mut crate::repository_state::CaptureSpec,
@@ -815,12 +809,12 @@ fn discover_issue_closure(
     config: &JitConfig,
     effective: &EffectiveVirtualPath<'_>,
     precheck_target: Option<&IssueId>,
-) -> Result<bool> {
+) -> Result<()> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
     let mut full_config = config.clone();
     full_config.templates = effective_templates(image, config, effective)?;
-    let precheck = match precheck_target {
+    let (issue, precheck) = match precheck_target {
         Some(raw_target) => {
             let target = super::require_issue_in_capture(issues, raw_target)?;
             let issue = issues
@@ -831,15 +825,16 @@ fn discover_issue_closure(
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
             };
-            issue
+            let precheck = issue
                 .gates_required
                 .iter()
                 .filter_map(|key| gates.gates.get(key))
                 .filter(|gate| gate.stage == GateStage::Precheck)
                 .cloned()
-                .collect()
+                .collect();
+            (Some(issue), precheck)
         }
-        None => Vec::new(),
+        None => (None, Vec::new()),
     };
     spec.discover_paths(plan_document_paths(issues, &full_config)?)?;
     let automated = || {
@@ -866,7 +861,14 @@ fn discover_issue_closure(
             })
             .collect::<Result<Vec<_>>>()?,
     )?;
-    Ok(automated().any(super::checker_consumes_run_history))
+    if let Some(issue) = issue.filter(|_| automated().any(super::checker_consumes_run_history)) {
+        spec.discover_paths(
+            super::named_gate_run_records(issue)
+                .map(|(_, _, path)| path)
+                .collect::<Vec<_>>(),
+        )?;
+    }
+    Ok(())
 }
 
 /// Capture budget for mutation bases and preflights.
