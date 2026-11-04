@@ -16,7 +16,14 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "a6d6a349-2c87-47bc-a2da-c897ad896128",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:42:26.621276878Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d774061-61dd-4eb4-a4c9-faaa347c9cae",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Measure validation views on this repository",
-  "updated_at": "2026-11-04T09:39:16.698691141Z"
+  "updated_at": "2026-11-04T09:42:26.621276878Z"
 }
