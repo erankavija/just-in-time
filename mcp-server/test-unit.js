@@ -478,11 +478,12 @@ await runTest('$ref to a genuinely missing definition still warns (diagnostic st
     `dangling $ref should still warn, got: ${JSON.stringify(messages)}`);
 });
 
-await runTest('real schema: tools with success_schema get outputSchema', () => {
+await runTest('real schema: every generated tool gets outputSchema', () => {
 
   const tools = generateTools(realSchema);
   const withOutput = tools.filter(t => t.outputSchema);
   assert.ok(withOutput.length >= 10, `should have 10+ tools with outputSchema, got ${withOutput.length}`);
+  assert.strictEqual(withOutput.length, tools.length, 'every generated tool should have outputSchema');
   // All must have type: object at root
   for (const tool of withOutput) {
     assert.strictEqual(tool.outputSchema.type, 'object',

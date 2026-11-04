@@ -181,6 +181,7 @@ fn test_schema_declares_list_envelope_outputs_for_count_bearing_commands() {
         (&["claim", "status"], "LeaseListResponse"),
         (&["claim", "list"], "LeaseListResponse"),
         (&["graph", "rdeps"], "GraphDownstreamResponse"),
+        (&["rdeps"], "GraphDownstreamResponse"),
     ] {
         let output = declared(path);
         assert_eq!(output.success, response, "output of {path:?}");

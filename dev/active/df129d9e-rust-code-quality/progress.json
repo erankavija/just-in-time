@@ -964,7 +964,8 @@
     "f87f9b00": 1,
     "d58f80c9": 1,
     "01a88d32": 1,
-    "b674382e": 1
+    "b674382e": 1,
+    "c517b88b": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1438,10 +1439,11 @@
       "epic": "b697a3f7"
     },
     "c517b88b": {
-      "status": "dispatched",
+      "status": "landing rework 1",
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track B; large (plan context, files_published event, both backends); worker checks criteria first",
-      "epic": "b697a3f7"
+      "epic": "b697a3f7",
+      "note": "F1 fixed (context.begin before files_published); gate-run ID overlap checked: all three gate-run plan paths (mod.rs captured issue mutation, precheck error, release) carry gate events, so the generic event never shares a plan with a gate run"
     },
     "5687e281": {
       "status": "done",

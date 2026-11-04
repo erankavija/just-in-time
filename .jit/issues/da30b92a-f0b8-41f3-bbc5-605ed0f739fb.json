@@ -15,7 +15,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ad3be569-fa1f-42e6-892a-54015835f4ac",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:14:56.442736396Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0a2de734-06a8-4091-b1db-820f8219ea5e",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:18:27.943971363Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "8371aab9-b4d9-4f1e-a56f-038f60f26c44",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:15:14.086913873Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "da30b92a-f0b8-41f3-bbc5-605ed0f739fb",
   "labels": [
     "type:task",
@@ -29,5 +48,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive output schemas from the handler registry",
-  "updated_at": "2026-11-04T16:44:17.009851633Z"
+  "updated_at": "2026-11-04T17:18:27.943971363Z"
 }

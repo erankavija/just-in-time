@@ -1492,6 +1492,22 @@ mod tests {
     }
 
     #[test]
+    fn test_materialization_plan_new_rebuilds_the_same_publication_from_a_reused_context() {
+        let config = VirtualPath::CONFIG;
+        let image = ImageBuilder::new().file(config.clone(), b"old").build();
+        let delta = RepositoryDelta::new(image.layout(), vec![write(&config, b"new")]).unwrap();
+        let context = MutationContext::deterministic(
+            [7; 32],
+            chrono::DateTime::from_timestamp(1, 0).unwrap(),
+        );
+
+        let first = MaterializationPlan::new(&image, delta.clone(), &context).unwrap();
+        let retried = MaterializationPlan::new(&image, delta, &context).unwrap();
+
+        assert_eq!(first.publication(), retried.publication());
+    }
+
+    #[test]
     fn test_materialization_plan_new_publishes_the_derived_delta_when_no_generic_event_is_due() {
         let config = VirtualPath::CONFIG;
         let present = ImageBuilder::new().file(config.clone(), b"old").build();

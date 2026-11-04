@@ -1309,8 +1309,9 @@ pub(super) fn publication_of(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect();
-    // Allocation continues the context's order: a finalizer pass that wrote
-    // without an event may already hold identifiers.
+    // Restart the frozen order so a retry over the reused context rebuilds the
+    // same publication.
+    context.begin();
     let append = compose_event_action(
         image,
         context,
