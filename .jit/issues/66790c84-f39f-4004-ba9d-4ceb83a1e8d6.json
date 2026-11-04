@@ -17,21 +17,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "21d8bb7a-33e6-49dc-a154-8bd53758050c",
+      "run_id": "66467ef5-11d7-4a78-a8a7-38cd3d0bf267",
       "status": "passed",
-      "updated_at": "2026-11-04T09:13:32.658312181Z",
+      "updated_at": "2026-11-04T10:49:24.733791803Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "cdebd1af-5645-4418-a1e7-af6c51509962",
-      "status": "failed",
-      "updated_at": "2026-11-04T09:18:57.300244847Z",
+      "run_id": "982b7693-51c1-4f46-8402-37c7c08e7edc",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:54:08.962524493Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "run_id": "52cdd51e-9211-416c-af99-88ed2dd0bb9d",
+      "run_id": "69838d6d-88fc-4ca2-956f-145556964968",
       "status": "passed",
-      "updated_at": "2026-11-04T09:13:32.788221287Z",
+      "updated_at": "2026-11-04T10:49:41.675113033Z",
       "updated_by": "auto:executor"
     }
   },
@@ -53,5 +53,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Claim and recover commands move to library handlers",
-  "updated_at": "2026-11-04T09:41:19.720435976Z"
+  "updated_at": "2026-11-04T10:54:08.962524493Z"
 }

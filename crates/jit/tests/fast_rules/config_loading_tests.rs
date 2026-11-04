@@ -99,7 +99,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
     let executor = CommandExecutor::new(storage).with_layout(layout);
 
     // Create a task without parent labels (orphaned at a leaf level).
-    let issue_id = executor
+    let created = executor
         .issues()
         .create_issue(
             "Orphaned task".to_string(),
@@ -111,17 +111,12 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
             None,
             false,
         )
-        .unwrap()
-        .issue
-        .id;
+        .unwrap();
 
-    let issues = executor.storage().list_issues().unwrap();
-    let warnings: Vec<_> = executor
-        .validation()
-        .evaluate_graph_rules(&issues)
-        .unwrap()
+    let warnings: Vec<_> = created
+        .findings
         .into_iter()
-        .filter(|gf| gf.issue_id.as_ref() == Some(&issue_id))
+        .filter(|finding| finding.issue_id.as_ref() == Some(&created.issue.id))
         .collect();
     assert!(
         warnings.is_empty(),

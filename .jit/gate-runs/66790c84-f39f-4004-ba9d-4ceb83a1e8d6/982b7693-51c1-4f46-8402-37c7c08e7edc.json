@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "42373fb828eeaf4d191821a2c25e09f337cc4f49",
+  "completed_at": "2026-11-04T10:54:08.960613162Z",
+  "duration_ms": 267169,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped criteria are satisfied; prior blocking findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "982b7693-51c1-4f46-8402-37c7c08e7edc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:49:41.791419469Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:66790c84 commits b01b1fa0, 756036fa, d08675a, 527badc, d72551d, 1f50f71c, 4ad4175c, 3919dfb3\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19; @/issue/66790c84/decision/D-01; @/invariant/architecture-dependency-direction; @/invariant/orthogonal-tests; @/invariant/essential-code-prose\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T10:47:51Z); mcp-ci passed (exit 0, 2026-11-04T10:49:24Z)\nTruncation recovery: re-read current handler/output/tests, per-commit relevant patches, schema/docs, and resolved-item records in bounded path-specific calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped criteria are satisfied; prior blocking findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "170f5859c15bc2ef7983b064aaa4d68c33f6cebe",
+  "completed_at": "2026-11-04T10:27:51.439322755Z",
+  "duration_ms": 298598,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/schema.rs",
+        "id": "F1",
+        "line": 796,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/cd8e04cc/requirement/REQ-04",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "worktree store-divergence is omitted from its changed exit-code mappings."
+      }
+    ],
+    "summary": "The worktree store-divergence exit-code mapping is missing from schema and generated documentation.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cd8e04cc-1f52-40a5-935a-b2b77a67240e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0989acfc-3997-4642-b217-f993bcb97673",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:22:52.840348507Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 22811 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a615-404f-7c32-9394-67d49cb1322b\n--------\nuser\n--- 22798 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2cb30f0ac, e69f46779, eed453f70 (`jit:cd8e04cc`; uncommitted `.jit/` changes excluded)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/cd8e04cc/requirement/REQ-04 (.jit/issues/cd8e04cc-1f52-40a5-935a-b2b77a67240e.json); @/issue/cd8e04cc/requirement/REQ-06 (same); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T10:21:02Z); mcp-ci passed (exit 0, 2026-11-04T10:22:35Z)\nTruncation recovery: narrowed tagged merge diffs, current handler/schema/docs/tests, and classifier reads by path and line range\n\n1. [blocking, issue-impact] `e69f46779` drops `worktree store-divergence` from the three command-specific exit-code rows. The handler now propagates its exact-store read failures into the shared classifier, where filesystem errors can exit 3, 5, or 10, but [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:796) and [exit-codes.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:28) document only `worktree info, worktree list`. This leaves the changed divergence leaf undocumented and violates hard REQ-04.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The worktree store-divergence exit-code mapping is missing from schema and generated documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"worktree store-divergence is omitted from its changed exit-code mappings.\",\"file\":\"crates/jit/src/schema.rs\",\"line\":796,\"references\":[\"@/issue/cd8e04cc/requirement/REQ-04\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

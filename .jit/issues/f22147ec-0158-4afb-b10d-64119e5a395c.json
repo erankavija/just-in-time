@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T10:27:32.894675757Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -10,12 +10,26 @@
   ],
   "description": "Delete the executor's whole-repository graph-rule evaluation, the validation captures only it used, and the single-rule graph entry points that only the replaced rule view and checker called.\n\n## Background\n\n- `evaluate_graph_rules` (`crates/jit/src/commands/validate.rs:1557-1600`) evaluates every graph rule over a caller-supplied issue list with rules and namespaces from the executor's disk caches, and `image_plan_content` (`:1614-1623`) captures a whole validation image to read plan documents for it. `capture_validation_image` (`:164-166`, private) serves `image_plan_content` and the former rule view (`:1967`); `capture_validation_image_with` (`:180-200`, `pub(crate)`) serves it and test fixtures (`commands/gate_check.rs` tests at `:2194,3061,3548`; the overlay tests in `crates/jit/src/validation/repository.rs` at `:931,949,959`).\n- `validation::graph::evaluate_graph_rule` (`crates/jit/src/validation/graph.rs:490-500`) and `graph_rule_plan_source_ids` (`:431-454`) were called only by `rule_validation_outcome`, which served the former rule view and rule checker. Both are public, so the build does not flag them.\n- Their remaining caller is `test_rule_scoped_evaluation_isolates_firing_issue_from_repository_context` (`graph.rs:4040`), whose property the Rule clause of the selection property test owns.\n- Remaining test callers of `evaluate_graph_rules`: `test_evaluate_graph_rules_preserves_invalid_hierarchy_error` (`commands/validate.rs:2530`) and one call in `crates/jit/tests/fast_rules/config_loading_tests.rs:121`.\n- f8a6b298's read-driver work (578ed10d) moves `capture_validation_image_with` onto the read session and follows this change, so it moves only what remains.\n\n## Success Criteria\n\n- [hard] REQ-01: `evaluate_graph_rules`, `image_plan_content`, `capture_validation_image` and `capture_validation_image_with` no longer exist; their test callers capture through the validation capture the views use.\n- [hard] REQ-02: `evaluate_graph_rule`, `graph_rule_plan_source_ids` and the `graph.rs` test that calls them no longer exist; the removed case is owned by the Rule clause of the selection property test.\n- [hard] REQ-03: The migrated `evaluate_graph_rules` callers assert the same properties through the report or the findings issue creation returns.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T10:55:21.005422200Z",
   "first_ready_at": "2026-11-04T10:27:19.869056021Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "05e1ed98-b24c-4d0f-a938-b544ca844c25",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:51:12.119569617Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2dc01294-000c-4b36-8427-c702fa01c2bc",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:54:48.337606702Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f22147ec-0158-4afb-b10d-64119e5a395c",
   "labels": [
     "type:task",
@@ -28,7 +42,7 @@
     "satisfies:9876a23a/REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the executor's graph evaluation and the single-rule graph entry points",
-  "updated_at": "2026-11-04T10:27:32.894675757Z"
+  "updated_at": "2026-11-04T10:55:21.005422200Z"
 }
