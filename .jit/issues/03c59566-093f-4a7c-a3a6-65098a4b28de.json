@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T01:03:23.463351353Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "39c42c51-97fe-4b8b-8d8a-1a3c853e8f47",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:06:56.969117353Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "03c59566-093f-4a7c-a3a6-65098a4b28de",
@@ -33,7 +39,7 @@
     "satisfies:9876a23a/REQ-13"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "gated",
   "title": "Issue creation output shows its findings, with no read after the mutation commits",
-  "updated_at": "2026-11-04T01:03:23.463351353Z"
+  "updated_at": "2026-11-04T01:07:08.738612014Z"
 }
