@@ -1369,10 +1369,10 @@
       "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114"
     },
     "24a982b7": {
-      "status": "rework",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
-      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker."
+      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker. Rework 1 at 3c9dd70af: lead PASS; StatusSummary restored, From into output; +35 on top of the first landing's -8."
     },
     "ceaaf0ab": {
       "status": "done",
@@ -1453,6 +1453,7 @@
   ],
   "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
   "notes_for_tasks": {
-    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)"
+    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
+    "fb38bf1f": "pre-existing commands->output imports (query, graph, validate, issue, document, worktree); proposed scope amendment sent to 6a"
   }
 }
