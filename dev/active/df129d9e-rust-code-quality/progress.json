@@ -1494,6 +1494,11 @@
     "fb38bf1f": {
       "status": "ready",
       "note": "rescoped by plan D-59 to commands-import-no-output (REQ-01..03)"
+    },
+    "578ed10d": {
+      "status": "dispatched",
+      "vendor": "Claude Opus",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
