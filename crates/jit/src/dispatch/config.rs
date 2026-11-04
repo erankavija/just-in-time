@@ -44,14 +44,14 @@ fn validate<S: IssueStore>(
     Ok(if response.0.valid {
         Outcome::success_with(response, "Configuration is valid")
     } else {
-        Outcome::Findings {
-            code: ErrorCode::ValidationFailed,
-            message: format!(
+        Outcome::findings(
+            ErrorCode::ValidationFailed,
+            format!(
                 "Configuration validation failed with {} error(s)",
                 response.0.errors.len()
             ),
-            report: Box::new(response),
-        }
+            response,
+        )
     })
 }
 
