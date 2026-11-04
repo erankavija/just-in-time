@@ -1407,12 +1407,13 @@
       "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger) Branch CI: archive preview/execute fail beside an unreadable subtree (regression). Rework 1 to same worker. Rework 1 at fd8febcf6: is_permission_denied also matches CapabilityFsError::Io PermissionDenied; lead checked remaining RepositoryStateStoreError downcasts (lock timeout, leftover record) are unaffected. +31 (b697a3f7 ledger)."
     },
     "b23b1bf3": {
-      "status": "dispatched",
+      "status": "merging",
       "vendor": "Claude Opus",
-      "reason": "last handler move; empties the legacy schema table"
+      "reason": "last handler move; empties the legacy schema table",
+      "review": "lead PASS on substance at b13b90778: gate evaluate/evaluate-all/evaluate-many/fail leaves, unmigrated clause gone, GateError/GateCheckError unconstructed; -26. Merging main empties the legacy table; worker deletes the obsolete legacy-table test, lookup left to da30b92a."
     },
     "01a88d32": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after d58f80c9; worker checks criteria first",
       "epic": "b697a3f7",
