@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-01T08:16:18.031864637Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -14,7 +14,14 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9f969641-16df-4c05-9f96-74425c844ae0",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:07:01.349252774Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "420bc076-e7f7-44bb-ad8f-487f106c5534",
   "labels": [
     "type:story",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "One pure validation report over parsed records",
-  "updated_at": "2026-11-04T05:16:37.210567270Z"
+  "updated_at": "2026-11-04T07:07:01.349252774Z"
 }
