@@ -126,6 +126,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    config::output_schema,
     invariant::output_schema,
     #[cfg(test)]
     test_group::output_schema,
@@ -312,6 +313,7 @@ macro_rules! command_group {
     };
 }
 
+pub mod config;
 pub mod invariant;
 #[cfg(test)]
 mod test_forms;

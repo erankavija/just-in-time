@@ -1,0 +1,48 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T04:32:29.795323146Z",
+  "context": {},
+  "created_at": "2026-11-04T04:31:37.219813690Z",
+  "dependencies": [],
+  "description": "`cargo-ci.sh` records a step that failed because the disk was full as a verdict on repository content, so digest reuse replays the failure until a forced rerun. This makes an out-of-space failure environment-sensitive.\n\n## Background\n\n`scripts/cargo-ci.sh` exits 1 for a verdict and 75 (EX_TEMPFAIL, recorded as an `error` gate run and never reused through digest reuse) when every failing step is environment-sensitive and the host was loaded. Its header lists the environment-sensitive cases: a `test` step with nextest TIMEOUT results and no FAIL or ABORT, and a `budget` step whose only violation is the suite-duration budget. On this host `/tmp` is a shared tmpfs, and under parallel CI it fills: tests then fail with \"No space left on device\" (os error 28), for example `profile_cli_tests::test_profile_pack_and_add_carry_a_package_at_the_model_limits`, and the run is classified as exit 1. The `cargo-ci` gate description in `.jit/gates.toml` restates the classification and is projected into `docs/reference/rules-and-gates.md`. `scripts/cargo-ci-selftest.sh` owns the classifier's behaviour.\n\n## Success Criteria\n\n- [hard] REQ-01: A run in which a failing step's output reports ENOSPC (\"No space left on device\" or os error 28) exits 75 whatever the load baseline, and its message names ENOSPC as the cause.\n- [hard] REQ-02: A run whose failing steps include a failure not caused by ENOSPC, or any other verdict step, still exits 1.\n- [hard] REQ-03: The exit-code header of `scripts/cargo-ci.sh` and the `cargo-ci` gate description in `.jit/gates.toml` list ENOSPC as environment-sensitive, and the generated rules-and-gates projection is re-rendered.\n- [hard] REQ-04: `scripts/cargo-ci-selftest.sh` covers both cases: a step failing only with ENOSPC exits 75, and an ENOSPC failure alongside a genuine test FAIL exits 1.\n\n## Notes\n\nSteward request (2026-11-04). Lands before f487aeef, which also edits `cargo-ci.sh`'s classification header.\n",
+  "documents": [],
+  "done_at": "2026-11-04T04:57:41.547274611Z",
+  "first_ready_at": "2026-11-04T04:31:37.219813690Z",
+  "gates_required": [
+    "cargo-ci",
+    "cargo-ci-selftest",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7180301a-99ac-45c7-b2da-efbefe7d4154",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:54:09.550219618Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci-selftest": {
+      "run_id": "808d5207-2d82-418e-8827-65931393473c",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:54:15.890239717Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "eae1288c-d2fc-4466-b842-adb76ad1059d",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:57:34.067593191Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "8a14e8e9-689d-4d78-ac1e-d9b312966faa",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "cargo-ci classifies out-of-space failures as environment faults",
+  "updated_at": "2026-11-04T04:57:41.547274611Z"
+}
