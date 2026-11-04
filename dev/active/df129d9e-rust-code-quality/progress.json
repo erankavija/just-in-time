@@ -961,7 +961,8 @@
     "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence.",
     "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
     "Some code-review evaluations recorded two runs a minute apart with different verdicts (8e91126b, 1a4f2ebd); cause unknown.",
-    "A for-loop over gate-one.sh continues past a failing issue; the lead assumed it stopped and started a second runner, doubling code-review runs. Break on failure or check ps before starting another runner."
+    "A for-loop over gate-one.sh continues past a failing issue; the lead assumed it stopped and started a second runner, doubling code-review runs. Break on failure or check ps before starting another runner.",
+    "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1044,7 +1045,7 @@
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
-      "review": "code-review cdebd1af: F1 heartbeat/force-evict issue_id = main 614a6f97 (escalated), F2 restating rustdoc (rework) D-01 (614a6f97). F2 rework to Codex gpt-6-astra."
+      "review": "code-review cdebd1af: F1 heartbeat/force-evict issue_id = main 614a6f97 (escalated), F2 restating rustdoc (rework) D-01 (614a6f97). F2 rework to Codex gpt-6-astra. F2 rework at 3919dfb3c, lead PASS."
     },
     "8c46fc85": {
       "status": "done",
@@ -1106,7 +1107,7 @@
       "reason": "small single-group migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
-      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code) D-01 (fb38bf1f). F2 docs rework to Codex gpt-6-astra; code retirement is 0eca332a."
+      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code) D-01 (fb38bf1f). F2 docs rework to Codex gpt-6-astra; code retirement is 0eca332a. F2 docs rework at defce1739, lead PASS."
     },
     "98cc2097": {
       "status": "done",
@@ -1164,7 +1165,7 @@
       "vendor": "Claude Sonnet",
       "reason": "completion: snapshot export only; reconcile lines; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve e1bff4aae; +68 lines to reconcile",
-      "review": "lead PASS (7c) at 8449ca2ac; REQ-03 via ListEnvelope; lines +11 vs main"
+      "review": "lead PASS (7c) at 8449ca2ac; REQ-03 via ListEnvelope; lines +11 vs main Landing branch CI failed on main's own red test (gate-presets.md hand-edited by 62f836117, b9); held."
     },
     "cd8e04cc": {
       "status": "reviewed",
