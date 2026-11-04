@@ -23618,3 +23618,5 @@
 {"fields":["description"],"id":"692b9f17-5038-47f2-bf02-a5a9975606cd","issue_id":"1f24e3e9-43bb-44da-aa8c-b4b90d157e94","timestamp":"2026-11-04T03:09:51.292059720Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"c9ff3576-3845-4c35-ba67-1625c48ae3ec","issue_id":"2b5f452c-ac5a-46ed-8a56-d862f0d93d04","timestamp":"2026-11-04T03:09:51.401729153Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"e3195498-2bae-43db-8832-67832cdca668","issue_id":"8c46fc85-284a-4491-aa5c-57a5b22f96db","timestamp":"2026-11-04T03:13:42.828978326Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["dependencies"],"id":"1f889543-3dd9-4343-b3c1-aa3e6d82446f","issue_id":"3cf69ecf-5ec1-4cb1-855f-100aa76f7520","timestamp":"2026-11-04T03:14:13.770588477Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"9bad641f-92a4-4dad-a203-02f24fc1b903","issue_id":"c9103fcf-aa0c-4642-8531-5360f5fdd58d","timestamp":"2026-11-04T03:14:14.078708109Z","type":"issue_updated","updated_by":"dependency-add"}
