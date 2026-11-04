@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T16:17:21.232050846Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -30,6 +31,7 @@
   ],
   "description": "With every command group handled in the library, `crates/jit/src/main.rs` shrinks to the thin entry the architecture describes and becomes the crate's only process-exit site.\n\n## Background\n\n`main.rs` historically held `run()` (about 6,400 lines), the classifier, about fifteen JSON-error emitters, and about 75 `std::process::exit` calls, which skip `Drop` for the `RetainedMutationSessionGuard` and the `DispatchMutationAnnotation` guard. Command groups now return `anyhow::Result<Outcome<R>>` from handlers in `crates/jit/src/dispatch/`, failures classify through `jit::output::failure::classify`, the output mode is one global flag, and a library function opens the repository and returns the executor with its retained-session guard. Leftovers remain: `writeln_safe` and `writeln_safe_stderr` in the output module call `std::process::exit(ExitCode::BrokenPipe.code())`, `handle_json_error!` in `crates/jit/src/output_macros.rs` expands to an exit, the clap parse failure exits through `error.exit()`, and whatever helper, emitter or storage call no handler migration removed.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `main.rs` contains parsing, one call to the library repository bootstrap, one group dispatch, one rendering of the `Outcome` or failure, and exit; it holds no classifier, JSON-error emitter, macro use or storage call.\n- [hard] REQ-02: The crate's production code calls `std::process::exit` from exactly one site, in `main()`; broken-pipe writes and clap parse failures return values that reach it, and parse failures keep clap's diagnostic and exit status.\n- [hard] REQ-03: The retained mutation session and the linked-checkout annotation guard are dropped before that exit.\n- [hard] REQ-04: `handle_json_error!` no longer exists, and `output_macros.rs` keeps only macros with a remaining use.\n- [hard] REQ-05: No function in `main.rs` exceeds 500 lines.\n- [hard] REQ-06: A broken stdout pipe still exits with `ExitCode::BrokenPipe`, asserted by a test, and the existing CLI suites pass without weakened assertions.\n- [hard] REQ-07: The exit-code projection in `crates/jit/src/schema.rs` describes findings and failures as exiting through the one exit site with the envelope's code, keeps no per-command `std::process::exit` exception, and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-08: `command_group!` has no pass-through form: the transitional form 12c0f3fb adds for split groups is removed from the macro itself, not only its uses.\n\n## Decisions\n\n- D-01: REQ-08 was added by steward ruling (2026-11-04): 12c0f3fb's pass-through form for split groups is interim, and this task removes it so the macro ends with no interim arm.\n\n## Notes\n\n842b0ac6 REQ-15 also removes dead output macros; whichever lands second resolves `output_macros.rs`. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T16:16:17.918001201Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -48,7 +50,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reduce main.rs to parse, bootstrap, dispatch, render and exit",
-  "updated_at": "2026-11-04T03:18:43.332213793Z"
+  "updated_at": "2026-11-04T16:17:21.232050846Z"
 }

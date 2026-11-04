@@ -1437,6 +1437,14 @@
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track B; large (plan context, files_published event, both backends); worker checks criteria first",
       "epic": "b697a3f7"
+    },
+    "5687e281": {
+      "status": "dispatched",
+      "vendor": "Claude Opus"
+    },
+    "da30b92a": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6.1-sol"
     }
   },
   "handoff": {
