@@ -1393,11 +1393,11 @@
       "epic": "b697a3f7"
     },
     "d58f80c9": {
-      "status": "blocked",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
       "epic": "b697a3f7",
-      "review": "worker stopped before coding: REQ-01 moves inspect_capability_leaf (needs session helpers; cycle), REQ-03 lacks retryable-conflict variant. Amendments proposed to 6a."
+      "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger)"
     }
   },
   "handoff": {
