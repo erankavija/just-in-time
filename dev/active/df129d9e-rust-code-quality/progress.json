@@ -1070,12 +1070,13 @@
         "8fbf8c43": -31,
         "24a982b7": 27,
         "f87f9b00": -114,
-        "3f816619": -105
+        "3f816619": -105,
+        "b23b1bf3": -53
       },
       "epic_net_running": 951,
-      "epic_net_latest": 512,
-      "merges_latest": 92,
-      "crate_main_latest": 73585,
+      "epic_net_latest": 459,
+      "merges_latest": 93,
+      "crate_main_latest": 73532,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)"
     },
@@ -1412,7 +1413,7 @@
       "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger) Branch CI: archive preview/execute fail beside an unreadable subtree (regression). Rework 1 to same worker. Rework 1 at fd8febcf6: is_permission_denied also matches CapabilityFsError::Io PermissionDenied; lead checked remaining RepositoryStateStoreError downcasts (lock timeout, leftover record) are unaffected. +31 (b697a3f7 ledger)."
     },
     "b23b1bf3": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Opus",
       "reason": "last handler move; empties the legacy schema table",
       "review": "lead PASS on substance at b13b90778: gate evaluate/evaluate-all/evaluate-many/fail leaves, unmigrated clause gone, GateError/GateCheckError unconstructed; -26. Merging main empties the legacy table; worker deletes the obsolete legacy-table test, lookup left to da30b92a.",
@@ -1426,7 +1427,7 @@
       "review": "lead R1 FAIL: deleted the fsync-before-write test leaving the property unowned (orthogonal-tests); rest PASS (DataRoot handle commit, -3). Rework 1 at 41838806d: lead PASS; DataRoot::sync with cfg(test) refusal seam, test owns fsync-before-write; rebind argument sound; -1 (b697a3f7 ledger)."
     },
     "945f9181": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track A start (large); after 3f816619",
       "epic": "b697a3f7"
