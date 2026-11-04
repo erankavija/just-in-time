@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T17:39:06.268293614Z",
   "context": {},
   "created_at": "2026-11-04T12:32:05.407284708Z",
   "dependencies": [
@@ -23,7 +24,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Derive per-command exit-code rows from the handler registry",
-  "updated_at": "2026-11-04T17:25:30.546457362Z"
+  "updated_at": "2026-11-04T17:39:06.371511585Z"
 }

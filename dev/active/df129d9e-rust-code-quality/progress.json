@@ -1075,12 +1075,13 @@
         "3f816619": -105,
         "b23b1bf3": -53,
         "5687e281": -175,
-        "da30b92a": -8
+        "da30b92a": -8,
+        "ae3f4f8b": -13
       },
       "epic_net_running": 951,
-      "epic_net_latest": 276,
-      "merges_latest": 95,
-      "crate_main_latest": 73504,
+      "epic_net_latest": 263,
+      "merges_latest": 96,
+      "crate_main_latest": 73491,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)",
       "b697a3f7_merges": {
@@ -1464,7 +1465,7 @@
       "epic": "b697a3f7"
     },
     "ae3f4f8b": {
-      "status": "dispatched",
+      "status": "done",
       "vendor": "Codex gpt-6-astra"
     },
     "eaca3f52": {
@@ -1476,6 +1477,10 @@
       "status": "dispatched",
       "vendor": "Claude Opus",
       "epic": "b697a3f7"
+    },
+    "8b3cce62": {
+      "status": "dispatched",
+      "vendor": "Claude Opus"
     }
   },
   "handoff": {
