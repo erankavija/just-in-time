@@ -15,7 +15,7 @@ use crate::domain::artifact_discovery::{
     ArtifactEvidenceMap, ArtifactListingScope,
 };
 use crate::domain::artifact_execution::{
-    archive_executions, ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult,
+    ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult,
 };
 use crate::domain::artifact_inventory::{
     inventory_explicit_roots, member_derived_documents, member_document_directories,
@@ -287,8 +287,23 @@ impl<S: IssueStore> ArchiveOps<'_, S> {
             }
             None => inventory,
         };
-        let archive_executions =
-            archive_executions(&self.exec.storage.read_artifact_archive_events()?);
+        let archive_evidence = self
+            .exec
+            .storage
+            .read_archive_evidence_record(&target_for_layout)?
+            .unwrap_or_else(|| ArchiveEvidenceRecord {
+                target: target_for_layout.clone(),
+                executions: Vec::new(),
+            });
+        if archive_evidence.target != target_for_layout
+            || archive_evidence
+                .executions
+                .iter()
+                .any(|execution| execution.target != archive_evidence.target)
+        {
+            bail!("Archive evidence record does not match target {target_for_layout:?}");
+        }
+        let archive_executions = archive_evidence.executions;
         let (discovered, embedded_owners) = discover_archive_artifacts(
             &self.exec.storage,
             inventory,
@@ -1037,6 +1052,10 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
 
+    fn stored_archive_executions<S: IssueStore>(storage: &S) -> Vec<ArchiveExecution> {
+        crate::domain::artifact_execution::archive_executions(&storage.read_events().unwrap())
+    }
+
     #[test]
     fn test_archive_candidates_propagates_invalid_hierarchy_error() {
         let (repo, executor) =
@@ -1110,6 +1129,117 @@ mod tests {
         }));
         assert_eq!(executor.storage.list_issues().unwrap(), issues_before);
         assert_eq!(executor.storage.read_events().unwrap(), events_before);
+    }
+
+    #[test]
+    fn test_archive_candidates_ignore_unparseable_event_log() {
+        let storage = crate::storage::InMemoryStorage::new();
+        let mut issue =
+            crate::test_utils::fixture_issue("Archived portfolio".into(), String::new());
+        issue.state = State::Done;
+        issue.labels = vec!["type:portfolio".into()];
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
+        let target = PlanTarget::Container { id: id.clone() };
+        storage.add_repository_bytes(
+            crate::repository_state::VirtualPath::archive_evidence_record(&target),
+            &serde_json::to_vec(&ArchiveEvidenceRecord {
+                target,
+                executions: Vec::new(),
+            })
+            .unwrap(),
+        );
+        storage.add_repository_bytes(
+            crate::repository_state::VirtualPath::EVENTS,
+            b"{not-json}\n",
+        );
+        let config = format!(
+            "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"{}\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+            storage.root().file_name().unwrap().to_string_lossy()
+        );
+        let executor = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
+
+        let report = executor.archive().archive_candidates().unwrap();
+
+        assert_eq!(report.candidates().len(), 1);
+        assert_eq!(
+            report.candidates()[0].target(),
+            &PlanTarget::Container { id }
+        );
+    }
+
+    #[test]
+    fn test_preview_archive_document_rearchive_uses_evidence_with_unparseable_event_log() {
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let source = "fixtures/root.md";
+        let destination = "archive/fixtures/root.md";
+        fs::create_dir_all(repo.path().join("fixtures")).unwrap();
+        fs::create_dir_all(repo.path().join("archive/fixtures")).unwrap();
+        fs::write(repo.path().join(source), b"edited residue\n").unwrap();
+        fs::write(repo.path().join(destination), b"original\n").unwrap();
+
+        let target = PlanTarget::Document {
+            path: source.into(),
+        };
+        let execution = ArchiveExecution {
+            target: target.clone(),
+            destination_root: "archive".into(),
+            publications: vec![crate::domain::artifact_execution::ArchivePublication {
+                source: Some(source.into()),
+                destination: destination.into(),
+                content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                    b"original\n",
+                ),
+                adopted: false,
+            }],
+            reference_changes: Vec::new(),
+            planned_deletions: Vec::new(),
+            reconciling: false,
+        };
+        let event = crate::test_utils::stamped_event(
+            EventBody::draft_artifact_archive_executed(execution.clone()),
+            "historical-archive",
+            chrono::DateTime::UNIX_EPOCH,
+        );
+        let evidence_path = crate::repository_state::VirtualPath::archive_evidence_record(&target);
+        let evidence_file = repo
+            .path()
+            .join(".jit")
+            .join(evidence_path.relative().as_str());
+        fs::create_dir_all(evidence_file.parent().unwrap()).unwrap();
+        fs::write(
+            evidence_file,
+            serde_json::to_vec(&ArchiveEvidenceRecord {
+                target,
+                executions: vec![execution],
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let mut valid_event = serde_json::to_vec(&event).unwrap();
+        valid_event.push(b'\n');
+        fs::write(&events_path, valid_event).unwrap();
+
+        let before = executor.archive().preview_archive_document(source).unwrap();
+        assert!(before.eligible());
+        assert_eq!(before.count(), 1);
+        assert_eq!(before.artifacts()[0].source(), source);
+
+        fs::write(&events_path, b"{not-json}\n").unwrap();
+        let after = executor.archive().preview_archive_document(source).unwrap();
+
+        assert_eq!(after, before);
     }
 
     /// Seed an exact file-backed issue precondition without exercising command mutation behavior.
@@ -1251,14 +1381,7 @@ mod tests {
         let issue = executor.storage.load_issue(&id).unwrap();
         assert_eq!(issue.documents[0].path, "archive/fixtures/root.md");
         assert!(issue.documents[0].assets.is_empty());
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
+        assert_eq!(stored_archive_executions(&executor.storage).len(), 1);
 
         let second = executor
             .archive()
@@ -1266,14 +1389,7 @@ mod tests {
             .unwrap();
         assert!(!second.event_appended);
         assert!(second.publications.is_empty());
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
+        assert_eq!(stored_archive_executions(&executor.storage).len(), 1);
     }
 
     #[test]
@@ -1709,100 +1825,6 @@ mod tests {
     }
 
     #[test]
-    fn test_archive_event_reader_accepts_final_and_multiple_nested_brace_torn_prefixes() {
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
-            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-            test_taxonomy().config_fragment()
-        ))
-        .unwrap();
-        fs::create_dir(repo.path().join("fixtures")).unwrap();
-        fs::write(repo.path().join("fixtures/root.md"), "event tails").unwrap();
-        let events_path = repo.path().join(".jit/events.jsonl");
-        let nested_torn = concat!(
-            "{\"type\":\"artifact_archive_executed\",",
-            "\"target\":{\"kind\":\"document\",\"path\":\"fixtures/root.md\"}"
-        );
-        fs::write(&events_path, nested_torn).unwrap();
-        assert!(executor
-            .storage
-            .read_artifact_archive_events()
-            .unwrap()
-            .is_empty());
-
-        let valid = crate::test_utils::stamped_event(
-            EventBody::draft_artifact_archive_executed(ArchiveExecution {
-                target: PlanTarget::Document {
-                    path: "fixtures/root.md".into(),
-                },
-                destination_root: "archive".into(),
-                publications: Vec::new(),
-                reference_changes: Vec::new(),
-                planned_deletions: Vec::new(),
-                reconciling: true,
-            }),
-            "valid-archive",
-            chrono::DateTime::UNIX_EPOCH,
-        );
-        let valid_json = serde_json::to_string(&valid).unwrap();
-        fs::write(&events_path, format!("{nested_torn}\n{valid_json}\n")).unwrap();
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
-        fs::write(
-            &events_path,
-            format!("{nested_torn}\n{{\"type\":\"issue_created\"\n{nested_torn}\n{valid_json}\n"),
-        )
-        .unwrap();
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
-        fs::write(&events_path, format!("{{not-json}}\n{valid_json}\n")).unwrap();
-        assert!(executor.storage.read_artifact_archive_events().is_err());
-
-        let retired_document_event = concat!(
-            "{\"type\":\"document_",
-            "archived\",\"id\":\"historical\",",
-            "\"timestamp\":\"2025-01-01T00:00:00Z\",",
-            "\"source\":\"dev/old.md\",\"destination\":\"dev/archive/old.md\",",
-            "\"category\":\"design\",\"issues_updated\":1}"
-        );
-        fs::write(
-            &events_path,
-            format!("{retired_document_event}\n{valid_json}\n"),
-        )
-        .unwrap();
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1,
-            "unrelated historical event variants must not block archive recovery"
-        );
-
-        fs::write(
-            &events_path,
-            format!("{{\"type\":\"artifact_archive_executed\"}}\n{valid_json}\n"),
-        )
-        .unwrap();
-        assert!(executor.storage.read_artifact_archive_events().is_err());
-
-        fs::write(&events_path, format!("{{}}\n{valid_json}\n")).unwrap();
-        assert!(executor.storage.read_artifact_archive_events().is_err());
-    }
-
-    #[test]
     fn test_execution_preserves_positive_relative_and_root_relative_multi_edge_layout() {
         let config = format!(
             "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
@@ -1931,14 +1953,7 @@ mod tests {
         assert!(result.planned_deletions.is_empty());
         assert!(repo.path().join("dev/guides/permanent.md").exists());
         assert!(repo.path().join("archive/guides/permanent.md").exists());
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
+        assert_eq!(stored_archive_executions(&executor.storage).len(), 1);
     }
 
     #[test]
@@ -1973,14 +1988,7 @@ mod tests {
             .unwrap();
         assert!(!second.event_appended);
         assert!(second.publications.is_empty());
-        assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
-            1
-        );
+        assert_eq!(stored_archive_executions(&executor.storage).len(), 1);
     }
 
     #[test]
@@ -2051,22 +2059,14 @@ mod tests {
             .documents
             .iter()
             .all(|document| document.path.starts_with(&destination_root)));
-        let event_count = executor
-            .storage
-            .read_artifact_archive_events()
-            .unwrap()
-            .len();
+        let event_count = stored_archive_executions(&executor.storage).len();
 
         let second = executor.archive().execute_archive_container(&id).unwrap();
         assert!(!second.event_appended);
         assert!(second.publications.is_empty());
         assert!(second.reference_changes.is_empty());
         assert_eq!(
-            executor
-                .storage
-                .read_artifact_archive_events()
-                .unwrap()
-                .len(),
+            stored_archive_executions(&executor.storage).len(),
             event_count
         );
     }
@@ -2677,7 +2677,10 @@ mod tests {
             chrono::DateTime::UNIX_EPOCH,
         );
         let events_path = repo.path().join(".jit/events.jsonl");
-        let execution = archive_executions(std::slice::from_ref(&historical_event)).remove(0);
+        let EventBody::ArtifactArchiveExecuted(execution) = historical_event.body() else {
+            panic!("historical event must be an archive execution");
+        };
+        let execution = execution.clone();
         let evidence_path =
             crate::repository_state::VirtualPath::archive_evidence_record(&execution.target);
         let evidence_file = repo
@@ -2726,9 +2729,12 @@ mod tests {
                 .iter()
                 .any(|document| document.commit.is_none() && document.path == canonical_destination)
         }));
-        assert_eq!(
-            executor.storage.read_artifact_archive_events().unwrap()[0],
-            historical_event,
+        assert!(
+            executor
+                .storage
+                .read_events()
+                .unwrap()
+                .contains(&historical_event),
             "the immutable historical event must retain its pre-cutover destination"
         );
     }
