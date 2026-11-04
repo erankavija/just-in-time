@@ -35,11 +35,8 @@
           "short_id": "d7cce445",
           "title": "Issue reads stop consulting git HEAD",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "0102769f",
-            "e1a6c8c2"
-          ]
+          "status": "done",
+          "external_blockers": []
         }
       ]
     },
@@ -51,7 +48,7 @@
           "short_id": "81664a6a",
           "title": "Storage-owned git module with a one-process probe",
           "classification": "implementation",
-          "status": "merged_regate_pending",
+          "status": "done",
           "external_blockers": []
         },
         {
@@ -67,7 +64,7 @@
           "short_id": "b4ca051c",
           "title": "Issue visibility pages describe two read sources",
           "classification": "documentation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -88,7 +85,7 @@
           "short_id": "07663984",
           "title": "Layout detection uses the module's one-process probe",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "external_blockers": []
         },
         {
@@ -96,7 +93,7 @@
           "short_id": "09974ad1",
           "title": "Base comparison operation in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -104,7 +101,7 @@
           "short_id": "24d3b460",
           "title": "User name query in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -112,7 +109,7 @@
           "short_id": "3a3b86cf",
           "title": "Dirty-path query in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "external_blockers": []
         },
         {
@@ -120,7 +117,7 @@
           "short_id": "437907da",
           "title": "One worktree listing in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -128,7 +125,7 @@
           "short_id": "46a89061",
           "title": "Pinned revision reads move into the git module behind a bridge",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -136,7 +133,7 @@
           "short_id": "4ba18af4",
           "title": "One head lookup in the git module",
           "classification": "implementation",
-          "status": "reviewed_unmerged_on_branch",
+          "status": "in_progress",
           "external_blockers": []
         },
         {
@@ -144,7 +141,7 @@
           "short_id": "bb5040a8",
           "title": "Origin URL query in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -152,7 +149,7 @@
           "short_id": "cc9f213e",
           "title": "Path history query in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         }
       ]
@@ -165,7 +162,7 @@
           "short_id": "7297f922",
           "title": "CLI test bounds the git processes of issue reads",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -173,7 +170,7 @@
           "short_id": "732f7afb",
           "title": "Init records the worktree branch through the module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -181,7 +178,7 @@
           "short_id": "9de4c09c",
           "title": "Worktree info reads its branch through the module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -189,7 +186,7 @@
           "short_id": "c16c834c",
           "title": "Storage pinned inspection runs on a module checkout",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -197,7 +194,7 @@
           "short_id": "c5062e21",
           "title": "Server detects its layout once from the selected data root",
           "classification": "implementation",
-          "status": "pending",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -205,17 +202,15 @@
           "short_id": "e3c38fea",
           "title": "Worktree list reads worktrees through the module",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "c3e3e2ff"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
           "short_id": "ec9e812c",
           "title": "Pinned-read behaviour suite moves into the git module suite",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -223,20 +218,16 @@
           "short_id": "f649c144",
           "title": "Lease validation lists worktrees once per run",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "614a6f97"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "f6eaba42-e756-4b94-b66e-ea1f46838bde",
           "short_id": "f6eaba42",
           "title": "Claims take their branch and git requirement from the module",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "614a6f97"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         }
       ]
     },
@@ -248,7 +239,7 @@
           "short_id": "d48e28bf",
           "title": "Object reader and presence check in the git module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -256,7 +247,7 @@
           "short_id": "d5cae9e3",
           "title": "CLI tests for commands with no git executable",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -264,7 +255,7 @@
           "short_id": "d68150e2",
           "title": "Storage and executor stop re-detecting the layout",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -272,7 +263,7 @@
           "short_id": "ea4b7363",
           "title": "Release actor reads git user.name through the module",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         }
       ]
@@ -285,18 +276,15 @@
           "short_id": "3f8da8c4",
           "title": "Gate runs take commit and branch evidence from the module",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "417be079",
-            "79aa3aa7"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "47d62472-731b-48a9-b27c-136cf86804ee",
           "short_id": "47d62472",
           "title": "Branch drift validation compares in the selected worktree",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -304,17 +292,15 @@
           "short_id": "83c8632f",
           "title": "Document history comes from the module's path history",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "855d027d"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "92afc5d8-ddeb-405b-a708-b4b97f19d024",
           "short_id": "92afc5d8",
           "title": "Init reads git classification from the invocation's layout",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -322,48 +308,39 @@
           "short_id": "9ecde705",
           "title": "Link checks test asset presence through one git process",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "855d027d"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
           "short_id": "a273667c",
           "title": "Path reads at a commit go through the git module",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "22189592"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
           "short_id": "c140921c",
           "title": "Snapshot source and repository facts come from the module",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "855d027d"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "d9ba0029-2a1b-4b1b-a408-11035f534c1e",
           "short_id": "d9ba0029",
           "title": "Archive planning reads pinned evidence through one git process",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "5e1ba005",
-            "f8f80eea"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "dcf88b6f-b6d8-4e3d-b4c9-8cb718487b04",
           "short_id": "dcf88b6f",
           "title": "Pinned target inspection reads blobs through the object reader",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -371,10 +348,8 @@
           "short_id": "fb5e8e8d",
           "title": "Main-history guard runs against the selected worktree",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "417be079"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         }
       ]
     },
@@ -386,27 +361,23 @@
           "short_id": "1acfa592",
           "title": "Document show reads through storage at the version it names",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "855d027d"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
           "short_id": "5046408a",
           "title": "Configurable worktree root independent of the data root",
           "classification": "implementation",
-          "status": "pending",
-          "external_blockers": [
-            "a807e699"
-          ]
+          "status": "backlog",
+          "external_blockers": []
         },
         {
           "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
           "short_id": "7cd27db8",
           "title": "Snapshot export reads committed files through one git process",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -414,7 +385,7 @@
           "short_id": "e6ec58f3",
           "title": "Remove the revision resolver bridge",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         }
       ]
@@ -427,7 +398,7 @@
           "short_id": "933ff852",
           "title": "Document diff reads both versions through one git process",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -435,7 +406,7 @@
           "short_id": "cd603c8e",
           "title": "Document command reference states the show and history semantics",
           "classification": "documentation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         }
       ]
@@ -448,7 +419,7 @@
           "short_id": "6fdb2d53",
           "title": "Remove the libgit2 binding from the workspace",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         }
       ]
@@ -461,7 +432,7 @@
           "short_id": "23b48cf0",
           "title": "Git requirement pages name the git executable",
           "classification": "documentation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -469,7 +440,7 @@
           "short_id": "34851181",
           "title": "Trim the layout and git module surface to production callers",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -477,7 +448,7 @@
           "short_id": "78cb05ed",
           "title": "Build-policy check rejects native git and OpenSSL linkage",
           "classification": "implementation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         },
         {
@@ -485,7 +456,7 @@
           "short_id": "caceed7d",
           "title": "Contributor documents stop presenting libgit2 as the git integration",
           "classification": "documentation",
-          "status": "pending",
+          "status": "backlog",
           "external_blockers": []
         }
       ]
@@ -559,6 +530,13 @@
       "effort": "xhigh",
       "tier": "low",
       "reason": "Well-specified module primitive with exact criteria."
+    },
+    {
+      "issue": "4ba18af4",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Bounded reconciliation of existing head lookup with current storage types and module behavior.",
+      "agent": "/root/head_lookup"
     }
   ],
   "dispatch_policy": "Alternate implementation dispatches between Claude sub-agents and Codex workers (user instruction relayed by just-in-time-05); tier within each family by difficulty. Codex workers cannot commit; the lead reviews and commits.",
@@ -566,5 +544,11 @@
     "date": "2026-10-24",
     "reason": "user wind-down",
     "main_red": "cli_gate test_issue_show_errors_on_corrupt_gate_run since df129d9e 46a747fc2; just-in-time-db fixing"
-  }
+  },
+  "resumed_at": "2026-11-04",
+  "resume_notes": [
+    "Live JIT supersedes October handoff. All formerly listed external dependencies are terminal; overlap holds with df129d9e remain coordination constraints, not new DAG edges.",
+    "Steward directs storage/git primitives first; independent documentation deferred from old wave 2. Serialize git.rs edits.",
+    "4ba18af4 old implementation refreshed against main c76f9ea33; worker resolving two merge conflicts. No source merge before peer coordination."
+  ]
 }

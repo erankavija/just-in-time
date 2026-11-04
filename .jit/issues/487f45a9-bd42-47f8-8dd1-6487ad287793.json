@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T21:46:31.400299600Z",
   "context": {},
   "created_at": "2026-11-04T07:35:53.439740031Z",
   "dependencies": [
@@ -23,7 +24,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "One requires-Git error for every command family",
-  "updated_at": "2026-11-04T09:38:21.015159219Z"
+  "updated_at": "2026-11-04T21:46:31.400299600Z"
 }

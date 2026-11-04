@@ -233,7 +233,7 @@
           "short_id": "f4d9502a",
           "title": "Reach git through one storage-owned CLI module instead of libgit2",
           "wave": 4,
-          "status": "planned"
+          "status": "executing"
         },
         {
           "id": "9876a23a-8535-45ad-83f8-ca237f017e70",
@@ -268,7 +268,7 @@
           "short_id": "0f8efc37",
           "title": "Run the server, web UI and MCP bridge on the core's shared mechanisms",
           "wave": 4,
-          "status": "pending"
+          "status": "planning"
         },
         {
           "id": "16c53cc2-f324-4e1e-8881-039bce61d96d",
@@ -595,7 +595,9 @@
     "2026-10-22 ~18:15: c780514e's a3dd995a and 9a07026e fixed the recurring fixture timeouts (bounded 12 s lock wait with a named error; cli_warnings now in-process at ~0.03 s). The force-rerun exemption for that signature is withdrawn. Suite clock is 23.6-23.7 s at load 10-17.",
     "2026-10-22 ~18:40: a3dd995a's fix is incomplete. The first full run after a crate change builds the cold fixture key under contention for longer than the 12 s wait (lock timeout plus a 20 s TIMEOUT; suite 31.6 s). The force exemption is restored for exactly that signature; the fix is routed to c780514e as top priority.",
     "2026-10-22 ~19:00: pre-merge rule. Every merge into main first passes `cargo nextest run --workspace` and `cargo test --doc --workspace` on the branch with main merged in (under the shared CI lock; unbudgeted). Main went red 5 times today from subset testing; the latest was c780514e's 22355a56, reverted at cf274f369.",
-    "2026-10-22 ~19:30: c780514e's d423752b fixed the cold-fixture timeouts at the root (nextest setup-script filters now cover every fixture consumer; slowest cold consumer 1.2 s at load ~11; gate suite clock 22.3 s). The force exemption is retired for good."
+    "2026-10-22 ~19:30: c780514e's d423752b fixed the cold-fixture timeouts at the root (nextest setup-script filters now cover every fixture consumer; slowest cold consumer 1.2 s at load ~11; gate suite clock 22.3 s). The force exemption is retired for good.",
+    "2026-11-04: User-appointed steward thread 01a1a886-d199-7093-b096-7acbab6adb48 resumes coordination. One epic per execution lead: df129d9e stays with 01a1a837-aabe-7fe1-a763-6aee5aaaa927; waiting session 01a1a88a-3bda-7302-8fdf-0662e2095cc1 resumes f4d9502a only. Live planning 28ccf9a9 and breakdown b0d0cdbd are done with all gates passed. Existing peer-session execution resumes with isolated implementation workers and serialized cross-lead landings/gates; f4d9502a starts storage/git primitives and coordinates overlapping consumers with df129d9e. Each worker model and effort is explicitly selected by task difficulty. No new b697a3f7 work is assigned to either lead; external dependencies return to the steward. This is a session handoff, not acceptance or advancement of the historical milestone waves.",
+    "2026-11-04: Newly available session 01a1a88d-d433-7032-b70a-eb7c4c59d62f assigned planning and breakdown ONLY for 0f8efc37 via jit-planning-lead. Verify current code, preserve hard criteria unless steward resolves a material change, produce reviewed plan/manifest and gated full breakdown, then stop for a fresh execution lead. Coordinate df129d9e result/error/dispatch/bootstrap/search ownership and f4d9502a Git/document contracts; no product implementation or second epic. Worker model/effort selected explicitly by difficulty. Both active execution leads notified."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
