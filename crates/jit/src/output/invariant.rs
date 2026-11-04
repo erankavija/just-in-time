@@ -1,10 +1,10 @@
 //! Human rendering of the `jit invariant` responses.
 
-use super::HumanRender;
+use super::{HumanRender, OutputMode};
 use crate::commands::InvariantCheckResult;
 
 impl HumanRender for InvariantCheckResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         if self.items.is_empty() {
             return "No enforcement drift\n".to_owned();
         }

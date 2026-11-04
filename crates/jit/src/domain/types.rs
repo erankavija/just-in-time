@@ -839,11 +839,12 @@ pub struct GateContext {
 
 /// Record-format version stamped into every [`GateRunResult`] a gate execution
 /// records, and the version this binary writes into
-/// `.jit/gate-runs/<run-id>/result.json`.
+/// `.jit/gate-runs/<issue-id>/<run-id>.json`.
 pub const GATE_RUN_SCHEMA_VERSION: u32 = 1;
 
 /// Result of a gate execution, as persisted to
-/// `.jit/gate-runs/<run-id>/result.json`.
+/// `.jit/gate-runs/<issue-id>/<run-id>.json`; an issue's run history is one
+/// listing of its `.jit/gate-runs/<issue-id>/` directory.
 ///
 /// `JsonSchema` is derived so the storage reference's freshness guard can read
 /// this record's field set off the derived schema
