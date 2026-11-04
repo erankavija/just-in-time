@@ -2691,8 +2691,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.rules
             .get_or_init(|| {
                 let config =
-                    self.config_manager
-                        .load()
+                    self.cached_config()
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?;
@@ -2701,7 +2700,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?,
-                    &config,
+                    config,
                 )
             })
             .as_ref()

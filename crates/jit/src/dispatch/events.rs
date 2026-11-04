@@ -15,10 +15,11 @@ fn tail<S: IssueStore>(
     n: usize,
 ) -> anyhow::Result<Outcome<EventListResponse>> {
     let events = ctx.executor.queries().tail_events(n)?;
-    Ok(Outcome::Success {
-        message: Some(event_count_message(events.len())),
-        response: EventListResponse::new(events),
-    })
+    let message = event_count_message(events.len());
+    Ok(Outcome::success_with(
+        EventListResponse::new(events),
+        message,
+    ))
 }
 
 fn query<S: IssueStore>(
@@ -34,10 +35,11 @@ fn query<S: IssueStore>(
         .executor
         .queries()
         .query_events(event_type, issue, limit)?;
-    Ok(Outcome::Success {
-        message: Some(event_count_message(events.len())),
-        response: EventListResponse::new(events),
-    })
+    let message = event_count_message(events.len());
+    Ok(Outcome::success_with(
+        EventListResponse::new(events),
+        message,
+    ))
 }
 
 command_group! {

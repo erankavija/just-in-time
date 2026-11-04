@@ -1265,11 +1265,11 @@ mod tests {
             .get_last_gate_run(&id, &gate_key)
             .unwrap()
             .unwrap();
-        let result = std::fs::read_dir(temp.path().join(".jit/gate-runs"))
-            .unwrap()
-            .map(|entry| entry.unwrap().path().join("result.json"))
-            .find(|path| path.is_file())
-            .unwrap();
+        let result = temp.path().join(".jit").join(
+            jit::repository_state::VirtualPath::gate_run_record(&id, &run.run_id)
+                .relative()
+                .as_path(),
+        );
         std::fs::write(result, "{").unwrap();
         let failure = executor
             .gates()
