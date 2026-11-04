@@ -750,6 +750,13 @@
       "id": "f0a5b90a-r1",
       "vendor": "lead",
       "reason": "doc-review 802cc1ad F1: drop bad-claims-index from validate failure modes"
+    },
+    {
+      "id": "ac8f07c2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "storage-format and concepts docs derived from current code"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
