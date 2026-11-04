@@ -1,0 +1,26 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "./scripts/workflow-contract-selftest.sh",
+  "commit": null,
+  "completed_at": "2026-11-01T11:24:32.591818660Z",
+  "duration_ms": 0,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "workflow-contract-selftest",
+  "inputs_digest": "140011417310fd0f45a4390d806f56aae464fdd6f06fba10bd3a9fd64c1a45d4",
+  "issue_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_issue": "4269f866-4107-429d-ae5b-06dfdfd290de",
+    "source_run": "276cb815-5bf3-49f2-aa40-1f44471cf906"
+  },
+  "run_id": "e3edeca2-fe18-4cdb-80f9-3c77232727d3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T11:24:32.591818660Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

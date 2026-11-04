@@ -1,0 +1,89 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/7095769d-code-smell-cleanup",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 9534,
+            "sha256": "1feb812d2c9549a1aa4042690e1af5ab036dc65039d401ca31950e700f09bd0d"
+          },
+          "source": "dev/active/7095769d-smell-hunt-report.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9534,
+            "sha256": "1feb812d2c9549a1aa4042690e1af5ab036dc65039d401ca31950e700f09bd0d"
+          },
+          "destination": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-smell-hunt-report.md",
+          "source": "dev/active/7095769d-smell-hunt-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "232e773c940f1c3c76e30969d7e3fe44363941b886ba9822a85f046b53dc8656"
+          },
+          "destination": "dev/archive/7095769d-code-smell-cleanup/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/7095769d-smell-hunt-report.md",
+          "issue": "7095769d-0487-417d-a807-233845433a76",
+          "to_path": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-smell-hunt-report.md"
+        }
+      ],
+      "target": {
+        "id": "7095769d-0487-417d-a807-233845433a76",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/7095769d-code-smell-cleanup",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 19189,
+            "sha256": "7c7b20f3becf3c903dbb67323957a09881b896d486ffd4aa713a0b2cceb9677b"
+          },
+          "source": "dev/active/7095769d-progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 19189,
+            "sha256": "7c7b20f3becf3c903dbb67323957a09881b896d486ffd4aa713a0b2cceb9677b"
+          },
+          "destination": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-progress.json",
+          "source": "dev/active/7095769d-progress.json"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 1,
+          "from_path": "dev/active/7095769d-progress.json",
+          "issue": "7095769d-0487-417d-a807-233845433a76",
+          "to_path": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-progress.json"
+        }
+      ],
+      "target": {
+        "id": "7095769d-0487-417d-a807-233845433a76",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "7095769d-0487-417d-a807-233845433a76",
+    "kind": "container"
+  }
+}

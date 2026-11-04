@@ -2,8 +2,8 @@
 
 use axum::{
     body::Body,
-    extract::{Path, Query, State},
-    http::{HeaderValue, StatusCode},
+    extract::{FromRequestParts, State},
+    http::{request::Parts, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -14,8 +14,9 @@ use tokio_util::sync::CancellationToken;
 
 use jit::commands::CommandExecutor;
 use jit::declarations::GateDefinition;
-use jit::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
+use jit::domain::identity::{GateKey, GateRunId, IssueId, IssueIdPrefix};
 use jit::domain::{Issue, Priority, State as IssueState};
+use jit::errors::InvalidArgumentError;
 use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::failure::classify;
 use jit::output::{ErrorCode, GateRunSummary};
@@ -58,23 +59,15 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::PresetError
         | ErrorCode::ItemCommandFailed
         | ErrorCode::InvariantCommandFailed
-        | ErrorCode::ProjectCommandFailed
         | ErrorCode::ProfileError
         | ErrorCode::SearchFailed
         | ErrorCode::RipgrepNotFound
         | ErrorCode::WorktreeInfoError
         | ErrorCode::WorktreeListError
         | ErrorCode::WorktreeStoreDivergenceError
-        | ErrorCode::HooksInstallError
         | ErrorCode::GenericError
         | ErrorCode::RecoveryFailed
-        | ErrorCode::ClaimAcquireError
-        | ErrorCode::ClaimReleaseError
-        | ErrorCode::ClaimRenewError
-        | ErrorCode::ClaimHeartbeatError
-        | ErrorCode::ClaimStatusError
-        | ErrorCode::ClaimListError
-        | ErrorCode::ClaimForceEvictError => StatusCode::INTERNAL_SERVER_ERROR,
+        | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -90,6 +83,34 @@ fn reject(error: impl Into<anyhow::Error>) -> StatusCode {
     tracing::warn!(%status, "request failed: {error:#}");
     status
 }
+
+/// Declares an extractor that reports a malformed request through [`reject`],
+/// so the rejection takes its status from the classification like any failure.
+macro_rules! classified_extractor {
+    ($name:ident, $extractor:ident) => {
+        struct $name<T>(T);
+
+        #[axum::async_trait]
+        impl<T, S> FromRequestParts<S> for $name<T>
+        where
+            axum::extract::$extractor<T>: FromRequestParts<S>,
+            <axum::extract::$extractor<T> as FromRequestParts<S>>::Rejection: std::fmt::Display,
+            S: Send + Sync,
+        {
+            type Rejection = StatusCode;
+
+            async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, StatusCode> {
+                axum::extract::$extractor::<T>::from_request_parts(parts, state)
+                    .await
+                    .map(|axum::extract::$extractor(value)| Self(value))
+                    .map_err(|rejection| reject(InvalidArgumentError::new(rejection.to_string())))
+            }
+        }
+    };
+}
+
+classified_extractor!(Path, Path);
+classified_extractor!(Query, Query);
 
 /// Shared application state
 #[derive(Clone)]
@@ -972,9 +993,10 @@ async fn list_gates<S: IssueStore>(
 
 /// Get a single gate definition by key
 async fn get_gate_definition<S: IssueStore>(
-    Path(key): Path<jit::domain::identity::GateKey>,
+    Path(key): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateDefinition>, StatusCode> {
+    let key = key.parse::<GateKey>().map_err(reject)?;
     state
         .executor
         .gates()
@@ -986,7 +1008,7 @@ async fn get_gate_definition<S: IssueStore>(
 /// Query parameters for gate runs
 #[derive(Debug, Deserialize)]
 struct GateRunsQuery {
-    gate_key: Option<jit::domain::identity::GateKey>,
+    gate_key: Option<String>,
 }
 
 /// List gate run results for an issue (summaries without stdout/stderr for passing runs).
@@ -996,10 +1018,15 @@ async fn list_gate_runs<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
     let id = resolve_issue_path_id(&state.executor, &id)?;
+    let gate_key = params
+        .gate_key
+        .map(|key| key.parse::<GateKey>())
+        .transpose()
+        .map_err(reject)?;
     let runs = state
         .executor
         .gates()
-        .list_gate_runs(&id, params.gate_key.as_ref())
+        .list_gate_runs(&id, gate_key.as_ref())
         .map_err(reject)?;
 
     Ok(Json(runs.iter().map(GateRunSummary::lean).collect()))
@@ -1007,10 +1034,11 @@ async fn list_gate_runs<S: IssueStore>(
 
 /// Get a single gate run result with full stdout/stderr
 async fn get_gate_run<S: IssueStore>(
-    Path((id, run_id)): Path<(String, GateRunId)>,
+    Path((id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
     let id = resolve_issue_path_id(&state.executor, &id)?;
+    let run_id = run_id.parse::<GateRunId>().map_err(reject)?;
     state
         .executor
         .gates()
@@ -1365,6 +1393,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_search_reports_a_malformed_query_parameter_as_a_bad_request() {
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
+        let expected = status_of_error(InvalidArgumentError::new("limit is not a number"));
+
+        let response = server
+            .get("/search")
+            .add_query_param("q", "x")
+            .add_query_param("limit", "many")
+            .await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
     async fn test_health_check() {
         let server = test_app(memory_executor_declaring(
             InMemoryStorage::new(),
@@ -1461,10 +1510,9 @@ mod tests {
     #[tokio::test]
     async fn test_gate_key_routes_reject_malformed_tokens_at_extraction() {
         let (server, id, _) = dependent_pair_server();
-        server
-            .get("/gates/Bad_Key")
-            .await
-            .assert_status(StatusCode::BAD_REQUEST);
+        let malformed = status_of_error("Bad_Key".parse::<GateKey>().unwrap_err());
+        assert_eq!(malformed, StatusCode::BAD_REQUEST);
+        server.get("/gates/Bad_Key").await.assert_status(malformed);
         server
             .get("/gates/unknown-gate")
             .await
@@ -1473,7 +1521,7 @@ mod tests {
             .get(&format!("/issues/{id}/gate-runs"))
             .add_query_param("gate_key", "Bad_Key")
             .await
-            .assert_status(StatusCode::BAD_REQUEST);
+            .assert_status(malformed);
         server
             .get(&format!("/issues/{id}/gate-runs"))
             .add_query_param("gate_key", "unknown-gate")
@@ -1518,13 +1566,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_gate_run_refuses_a_malformed_id_and_reports_an_unknown_one_missing() {
+    async fn test_get_gate_run_reports_a_malformed_run_id_as_a_bad_request_and_an_unknown_one_missing(
+    ) {
         let (server, id, _) = dependent_pair_server();
+        let malformed = status_of_error("not-a-run-id".parse::<GateRunId>().unwrap_err());
+        assert_eq!(malformed, StatusCode::BAD_REQUEST);
 
         server
             .get(&format!("/issues/{id}/gate-runs/not-a-run-id"))
             .await
-            .assert_status(StatusCode::BAD_REQUEST);
+            .assert_status(malformed);
         server
             .get(&format!(
                 "/issues/{id}/gate-runs/{}",

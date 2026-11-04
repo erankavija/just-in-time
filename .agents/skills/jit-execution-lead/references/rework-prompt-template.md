@@ -14,14 +14,11 @@ Previous work on issue **[ISSUE_TITLE]** ([SHORT_ID]) failed the lead's quality 
 
 ```bash
 # 1. Enumerate every prior code-review failure for this issue
-jit gate status [SHORT_ID] code-review --all
-python3 -c 'import json,sys
-for path in sys.argv[2:]:
-    record=json.load(open(path, encoding="utf-8"))
-    if record.get("gate_key")=="code-review" and record.get("status")=="failed" and record.get("issue_id","").startswith(sys.argv[1]):
+jit gate status [SHORT_ID] code-review --all --json | python3 -c 'import json,sys
+for record in json.load(sys.stdin)["results"]:
+    if record.get("status")=="failed":
         for finding in (record.get("findings") or {}).get("findings",[]):
-            print("[{}] {}: {} ({}:{})".format(finding.get("severity","-"),finding.get("id","-"),finding.get("summary",""),finding.get("file","-"),finding.get("line","-")))' \
-  [SHORT_ID] .jit/gate-runs/*/result.json
+            print("[{}] {}: {} ({}:{})".format(finding.get("severity","-"),finding.get("id","-"),finding.get("summary",""),finding.get("file","-"),finding.get("line","-")))'
 
 # 2. List every design doc the worker produced for this issue
 jit doc list [SHORT_ID]

@@ -57,7 +57,7 @@ const EXEMPT: &[&str] = &[
 ];
 
 /// Mutating leaves that write no existing issue record, run in order against one
-/// repository; `{lease}` and `{w-lease}` expand to the fixture's leases.
+/// repository.
 const NO_RECORD_WRITERS: &[(&str, &str, &str)] = &[
     (
         "config set",
@@ -85,13 +85,13 @@ const NO_RECORD_WRITERS: &[(&str, &str, &str)] = &[
     ("profile apply", OTHER, "profile apply --profile packages/p"),
     ("project render", OTHER, "project render"),
     ("snapshot export", OTHER, "snapshot export --out snapshot"),
-    ("claim renew", OWNER, "claim renew {lease}"),
-    ("claim heartbeat", OWNER, "claim heartbeat {lease}"),
+    ("claim renew", OWNER, "claim renew {x}"),
+    ("claim heartbeat", OWNER, "claim heartbeat {x}"),
     ("claim release", OTHER, "claim release {x}"),
     (
         "claim force-evict",
         OTHER,
-        "claim force-evict {w-lease} --reason crashed",
+        "claim force-evict {w} --reason crashed",
     ),
     (
         "issue batch-create",
@@ -624,19 +624,10 @@ fn test_mutating_leaves_classified_as_no_record_leave_every_issue_record_alone()
     let repo = Repo::new();
     repo.owner(&["dep", "add", &repo.y, &repo.z]);
     repo.owner(&["dep", "add", &repo.w, &repo.z]);
-    let lease_of = |id: &str| {
-        let leases = repo.run(OWNER, &["claim", "status", "--issue", id, "--json"]);
-        let leases: Value = serde_json::from_slice(&leases.stdout).unwrap();
-        leases["leases"][0]["lease_id"].as_str().unwrap().to_owned()
-    };
-    let (lease, w_lease) = (lease_of(&repo.x), lease_of(&repo.w));
     let before = repo.snapshot().0;
 
     for (leaf, agent, argv) in NO_RECORD_WRITERS {
-        let line = argv
-            .replace("{lease}", &lease)
-            .replace("{w-lease}", &w_lease);
-        let args = repo.expand(&line);
+        let args = repo.expand(argv);
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
         let parsed =
             Cli::try_parse_from(std::iter::once("jit").chain(args.iter().copied())).unwrap();
@@ -765,18 +756,37 @@ fn test_off_mode_another_agents_lease_refuses_nothing() {
 }
 
 #[test]
-fn test_warn_mode_dep_add_warns_and_writes() {
+fn test_warn_mode_dependency_writes_warn_only_in_human_non_quiet_mode() {
     let repo = Repo::new();
     repo.set_mode("warn");
 
-    let output = repo.other(&["dep", "add", &repo.x, &repo.y]);
-
-    assert_ok(&output);
-    assert!(stderr(&output).contains(OWNER), "{}", stderr(&output));
-    assert!(repo.record(&repo.x)["dependencies"]
-        .as_array()
-        .unwrap()
-        .contains(&repo.y.clone().into()));
+    for flags in [&[][..], &["--quiet"][..], &["--json"][..]] {
+        for verb in ["add", "rm"] {
+            let args = ["dep", verb, &repo.x, &repo.y]
+                .into_iter()
+                .chain(flags.iter().copied())
+                .collect::<Vec<_>>();
+            let output = repo.other(&args);
+            assert_ok(&output);
+            if flags.is_empty() {
+                assert!(stderr(&output).contains(OWNER), "{}", stderr(&output));
+            } else {
+                assert!(output.stderr.is_empty(), "{}", stderr(&output));
+            }
+            if flags.contains(&"--json") {
+                let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+                let collection = if verb == "add" { "added" } else { "removed" };
+                assert_eq!(response[collection], serde_json::json!([repo.y]));
+            }
+            assert_eq!(
+                repo.record(&repo.x)["dependencies"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&repo.y.clone().into()),
+                verb == "add"
+            );
+        }
+    }
 }
 
 #[test]

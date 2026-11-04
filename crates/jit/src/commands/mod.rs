@@ -79,6 +79,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use claim::ClaimOps;
 pub use config::{
     resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigOps, ConfigSetOutcome,
+    ConfigValidationReport,
 };
 pub use document::DocumentOps;
 pub use gate::{
@@ -93,9 +94,9 @@ pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueMutation, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
-    parse_profile_selector, ProfileApplyError, ProfileNotFoundError, ProfileOps,
-    ProfileResolutionError, ProfileSelection, ProfileSelectorError, ProfileVariableOptions,
-    SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
+    parse_profile_selector, parse_profile_selectors, parse_profile_variable_assignments,
+    ProfileApplyError, ProfileNotFoundError, ProfileOps, ProfileResolutionError, ProfileSelection,
+    ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
@@ -938,12 +939,6 @@ enum CapturedLifecycleMutation {
     AutoReady {
         issue_id: IssueId,
     },
-    /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`,
-    /// restoring agreement between stored readiness and the dependency graph
-    /// (`@/invariant/derived-state-coherence`). The inverse of [`Self::AutoReady`].
-    AutoBacklog {
-        issue_id: IssueId,
-    },
     AutoDone {
         issue_id: IssueId,
     },
@@ -955,7 +950,6 @@ impl CapturedLifecycleMutation {
             Self::Claim { issue_id, .. }
             | Self::Release { issue_id, .. }
             | Self::AutoReady { issue_id }
-            | Self::AutoBacklog { issue_id }
             | Self::AutoDone { issue_id } => issue_id,
         }
     }
@@ -988,7 +982,7 @@ struct CapturedFieldUpdate {
     state: Option<State>,
     add_labels: Vec<String>,
     remove_labels: Vec<String>,
-    label_edit: Option<CapturedLabelEdit>,
+    append_label: Option<String>,
     content_format: Option<Option<crate::domain::ContentFormat>>,
     issue_type: Option<String>,
     add_gates: Vec<GateKey>,
@@ -1000,12 +994,6 @@ struct CapturedFieldUpdate {
     enforce_lease: bool,
     /// Rejection: skips rule enforcement and promotes the dependents it unblocks.
     rejection: bool,
-}
-
-#[derive(Clone)]
-enum CapturedLabelEdit {
-    AppendUnchecked(String),
-    ReplaceExact { old: String, new: String },
 }
 
 impl CapturedFieldUpdate {
@@ -1025,7 +1013,7 @@ impl CapturedFieldUpdate {
             state: operations.state,
             add_labels: operations.add_labels.clone(),
             remove_labels: operations.remove_labels.clone(),
-            label_edit: None,
+            append_label: None,
             content_format: None,
             issue_type: None,
             add_gates: operations.add_gates.clone(),
@@ -1084,7 +1072,7 @@ impl CapturedFieldUpdate {
             state: None,
             add_labels: Vec::new(),
             remove_labels: Vec::new(),
-            label_edit: None,
+            append_label: None,
             content_format: None,
             issue_type: None,
             add_gates: Vec::new(),
@@ -1098,20 +1086,13 @@ impl CapturedFieldUpdate {
         }
     }
 
-    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
-        Self {
-            label_edit: Some(label_edit),
-            ..Self::new(issue_id)
-        }
-    }
-
     /// Reject the issue, appending `resolution` when given.
     fn rejection(issue_id: IssueId, resolution: Option<String>) -> Self {
         Self {
             state: Some(State::Rejected),
             enforce_lease: true,
             rejection: true,
-            label_edit: resolution.map(CapturedLabelEdit::AppendUnchecked),
+            append_label: resolution,
             ..Self::new(issue_id)
         }
     }
@@ -1407,16 +1388,8 @@ fn derive_field_update(
         }
         issue.labels.retain(|candidate| candidate != label);
     }
-    match &request.label_edit {
-        Some(CapturedLabelEdit::AppendUnchecked(label)) => issue.labels.push(label.clone()),
-        Some(CapturedLabelEdit::ReplaceExact { old, new })
-            if issue.labels.iter().any(|label| label == old) =>
-        {
-            issue.labels.retain(|label| label != old);
-            issue.labels.push(new.clone());
-        }
-        Some(CapturedLabelEdit::ReplaceExact { .. }) => {}
-        None => {}
+    if let Some(label) = &request.append_label {
+        issue.labels.push(label.clone());
     }
     let missing_gates = request
         .add_gates
@@ -1502,8 +1475,8 @@ fn derive_field_update(
     if let Some(target) = target {
         projected.state = target;
     }
-    let validation = match (&request.label_edit, request.rejection) {
-        (Some(CapturedLabelEdit::AppendUnchecked(_)), _) | (None, true) => {
+    let validation = match (&request.append_label, request.rejection) {
+        (Some(_), _) | (None, true) => {
             let repo_format = evidence.graph.declarations.config().content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
@@ -1521,10 +1494,6 @@ fn derive_field_update(
                 bypassed_rules: Vec::new(),
             }
         }
-        (Some(CapturedLabelEdit::ReplaceExact { .. }), _) => WriteValidation {
-            warnings: Vec::new(),
-            bypassed_rules: Vec::new(),
-        },
         (None, false) => {
             derive_write_validation(&projected, &evidence.graph.declarations, request.force)?
         }
@@ -1599,7 +1568,7 @@ fn derive_field_update(
             ));
         }
     }
-    if !changed_fields.is_empty() && request.label_edit.is_none() {
+    if !changed_fields.is_empty() && request.append_label.is_none() {
         events.push((
             5,
             EventBody::draft_issue_updated(
@@ -1949,7 +1918,7 @@ fn unpassed_gate_blockers(
 }
 
 /// Information about a git commit
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct CommitInfo {
     pub sha: String,
     pub author: String,
@@ -1975,6 +1944,7 @@ pub enum DocumentsKey {}
 
 impl CollectionKey for DocumentsKey {
     const KEY: &'static str = "documents";
+    const SCHEMA_NAME: Option<&'static str> = Some("DocumentListResult");
 }
 
 /// Result of listing document references for an issue
@@ -1988,7 +1958,7 @@ pub struct DocumentListScope {
 }
 
 /// Git history for a document
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentHistory {
     pub path: String,
     pub commits: Vec<CommitInfo>,
@@ -1999,6 +1969,7 @@ pub enum AssetsKey {}
 
 impl CollectionKey for AssetsKey {
     const KEY: &'static str = "assets";
+    const SCHEMA_NAME: Option<&'static str> = Some("AssetListResult");
 }
 
 /// Result of listing assets for a document
@@ -2007,14 +1978,16 @@ pub type AssetListResult = ListEnvelope<AssetsKey, crate::document::Asset, Asset
 /// Fields of an [`AssetListResult`] beside its `assets`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct AssetListScope {
+    /// Worktree root the human rendering checks asset paths against.
+    #[serde(skip)]
+    pub worktree_root: std::path::PathBuf,
     pub issue_id: IssueId,
     pub document_path: String,
     pub summary: AssetSummary,
-    pub warnings: Vec<String>,
 }
 
 /// Document content display result
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentContentResult {
     pub path: String,
     pub label: Option<String>,
@@ -2024,7 +1997,7 @@ pub struct DocumentContentResult {
 }
 
 /// Document diff result
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentDiffResult {
     pub path: String,
     pub from_commit: String,
@@ -2033,7 +2006,7 @@ pub struct DocumentDiffResult {
 }
 
 /// Result of adding a document reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentAddResult {
     pub issue_id: IssueId,
     pub document: crate::domain::DocumentReference,
@@ -2043,7 +2016,7 @@ pub struct DocumentAddResult {
 }
 
 /// Result of removing a document reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentRemoveResult {
     pub issue_id: IssueId,
     pub path: String,
@@ -2070,18 +2043,18 @@ pub struct SnapshotExportResult {
 }
 
 /// Result of checking document links
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LinkCheckResult {
     pub valid: bool,
     pub errors: Vec<serde_json::Value>,
-    pub warnings: Vec<serde_json::Value>,
+    pub link_warnings: Vec<serde_json::Value>,
     #[serde(skip)]
     pub scope: String,
     pub summary: LinkCheckSummary,
 }
 
 /// Summary of link check results
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LinkCheckSummary {
     pub total_documents: usize,
     pub valid: usize,
@@ -2177,20 +2150,6 @@ pub(crate) fn image_virtual_bytes(
     path: &crate::repository_state::VirtualPath,
 ) -> Result<Option<Vec<u8>>> {
     Ok(image.file_bytes(path)?.map(<[u8]>::to_vec))
-}
-
-/// Project a delta finalized over `image` to the file-overlay validation reads
-/// ([`crate::repository_state::action_overrides`]). This is the exact proposed
-/// repository state — only what the delta writes — used by init/profile to
-/// validate their proposed state under one coherent captured image.
-pub(crate) fn validation_overlay(
-    image: &crate::repository_state::RepositoryImage,
-    delta: &crate::repository_state::RepositoryDelta,
-) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
-    Ok(crate::repository_state::action_overrides(
-        image,
-        delta.actions(),
-    )?)
 }
 
 /// Parse the issues the captured listing names, in listing order, reporting a
@@ -2348,6 +2307,8 @@ pub struct CommandExecutor<S: IssueStore> {
     /// The CLI injects its dispatch-time value; non-dispatch library callers
     /// lazily derive it from their selected repository layout.
     worktree_paths: OnceLock<Result<crate::storage::WorktreePaths, String>>,
+    /// Leftover redo records the opening of this repository applied.
+    recovered_records: usize,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -2373,6 +2334,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             namespaces: OnceLock::new(),
             layout: None,
             worktree_paths: OnceLock::new(),
+            recovered_records: 0,
         }
     }
 
@@ -2392,6 +2354,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Construct this executor with the selected data root's worktree authority.
     pub fn with_worktree_paths(mut self, paths: crate::storage::WorktreePaths) -> Self {
         self.worktree_paths = OnceLock::from(Ok(paths));
+        self
+    }
+
+    /// Record the leftover redo records startup recovery applied.
+    pub fn with_recovered_records(mut self, count: usize) -> Self {
+        self.recovered_records = count;
         self
     }
 
@@ -2570,7 +2538,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if derived.intents.is_empty() {
                     return Ok(SessionStep::Done((issue_result, derived.outcome)));
                 }
-                let plan = finalize(&layout, &image, &context, &derived.intents)?;
+                let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
                 Ok(SessionStep::Apply(plan, (issue_result, derived.outcome)))
             },
         )
@@ -2668,7 +2636,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     crate::validation::ReportedFinding::new(Some(issue_id.clone()), finding)
                 })
                 .collect();
-            let plan = finalize(&layout, &image, context, &intents)?;
+            let plan = finalize(&layout, &image, context, &intents, None)?;
             Ok(SessionStep::Apply(plan, (created, findings)))
         })
     }
@@ -2846,7 +2814,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     })),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -2910,9 +2878,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let request = match target {
             State::Ready => CapturedLifecycleMutation::AutoReady {
-                issue_id: issue_id.clone(),
-            },
-            State::Backlog => CapturedLifecycleMutation::AutoBacklog {
                 issue_id: issue_id.clone(),
             },
             State::Done => CapturedLifecycleMutation::AutoDone {
@@ -3130,7 +3095,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                 }))
                 .collect::<Vec<_>>();
-                let plan = finalize(&layout, &image, &context, &intents)?;
+                let plan = finalize(&layout, &image, &context, &intents, None)?;
                 if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                     return Ok(AttemptOutcome::Retry);
                 }
@@ -3195,18 +3160,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }));
                     }
                     State::Ready
-                }
-                CapturedLifecycleMutation::AutoBacklog { .. } => {
-                    let resolved = crate::domain::queries::build_issue_map(&issues);
-                    if issue.derive_readiness_correction(&resolved)
-                        != Some(ReadinessCorrection::Demote)
-                    {
-                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            issue,
-                            changed: false,
-                        }));
-                    }
-                    State::Backlog
                 }
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
@@ -3318,7 +3271,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     changed,
                 }));
             }
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -3857,11 +3810,8 @@ mod tests {
 
     fn captured_issue_spec(id: &IssueId) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        let paths = std::collections::BTreeSet::from([
-            VirtualPath::issue_record(id),
-            VirtualPath::data("events.jsonl").unwrap(),
-        ]);
-        CaptureSpec::new(
+        let paths = std::collections::BTreeSet::from([VirtualPath::issue_record(id)]);
+        let mut spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3869,7 +3819,9 @@ mod tests {
                 max_depth: 4,
             },
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
     }
 
     /// The capture of an issue mutation over `id` whose gate-run records
@@ -3881,11 +3833,10 @@ mod tests {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let mut paths = std::collections::BTreeSet::from([
             VirtualPath::issue_record(id),
-            VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
         paths.extend(gate_run_record_paths(context, id, 1));
-        CaptureSpec::new(
+        let mut spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3893,7 +3844,9 @@ mod tests {
                 max_depth: 4,
             },
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
     }
 
     fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &IssueId) -> Issue {
@@ -3964,7 +3917,7 @@ mod tests {
             &context,
         )
         .unwrap();
-        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents, None).unwrap();
 
         // Model an unrelated writer between capture and apply. The stale plan
         // conflicts instead of replacing that writer's label.
@@ -3986,7 +3939,7 @@ mod tests {
             &context,
         )
         .unwrap();
-        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents, None).unwrap();
         retry_session.apply(&retry_plan).unwrap();
 
         let updated = storage.load_issue(&id).unwrap();
@@ -4076,7 +4029,7 @@ mod tests {
             )
             .unwrap();
             let first_plan =
-                finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
+                finalize(&layout, &first_image, &first_context, &first.intents, None).unwrap();
             first_session.apply(&first_plan).unwrap();
             drop(first_session);
             assert_eq!(
@@ -4100,8 +4053,14 @@ mod tests {
                 &second_context,
             )
             .unwrap();
-            let second_plan =
-                finalize(&layout, &second_image, &second_context, &second.intents).unwrap();
+            let second_plan = finalize(
+                &layout,
+                &second_image,
+                &second_context,
+                &second.intents,
+                None,
+            )
+            .unwrap();
             assert_ne!(event_bytes(&first_plan), event_bytes(&second_plan));
             second_session.apply(&second_plan).unwrap();
 
@@ -4214,7 +4173,7 @@ mod tests {
             &context,
         )
         .unwrap();
-        drop(finalize(&layout, &first_image, &context, &first.intents).unwrap());
+        drop(finalize(&layout, &first_image, &context, &first.intents, None).unwrap());
         drop(first_session);
 
         crate::commands::test_helpers::seed_gate_registry(

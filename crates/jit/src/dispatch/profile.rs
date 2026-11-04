@@ -48,14 +48,14 @@ fn diff<S: IssueStore + RepositoryStateStore>(
     let result = ctx.executor.profiles().diff_profiles(&selection)?;
     let conflicted = result.conflicted().count();
     Ok(if conflicted > 0 {
-        Outcome::Findings {
-            code: ErrorCode::ValidationFailed,
-            message: format!(
+        Outcome::findings(
+            ErrorCode::ValidationFailed,
+            format!(
                 "{conflicted} of {} profile(s) decided targets that cannot be published",
                 result.count()
             ),
-            report: Box::new(result),
-        }
+            result,
+        )
     } else {
         let message = format!("{} profile(s) can be published", result.count());
         Outcome::success_with(result, message)

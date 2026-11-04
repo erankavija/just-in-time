@@ -265,11 +265,31 @@ pub(crate) fn drive_recorded_failure(
     drive_recorded_failure_from(invocation, None)
 }
 
+pub(crate) fn drive_named_failure_with_args(path: &str, argv: Vec<String>) -> ForcedFailure {
+    let invocation = failure_lever_registry()
+        .arms
+        .into_iter()
+        .find_map(|lever| match lever {
+            FailureLever::Invocation(invocation) if invocation.path == path => Some(invocation),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("failure-lever registry has no invocation `{path}`"));
+    drive_recorded_failure_from_args(&invocation, None, &argv)
+}
+
 fn drive_recorded_failure_from(
     invocation: &super::failure_lever_registry::FailureLeverInvocation,
     init_baseline: Option<&Path>,
 ) -> ForcedFailure {
-    assert_recorded_invocation_parses(&invocation.path, &invocation.argv);
+    drive_recorded_failure_from_args(invocation, init_baseline, &invocation.argv)
+}
+
+fn drive_recorded_failure_from_args(
+    invocation: &super::failure_lever_registry::FailureLeverInvocation,
+    init_baseline: Option<&Path>,
+    argv: &[String],
+) -> ForcedFailure {
+    assert_recorded_invocation_parses(&invocation.path, argv);
     let mut fixture = FailureFixture::new(
         JitCli::uninitialised().expect("create failure-probe repository"),
         init_baseline,
@@ -281,12 +301,12 @@ fn drive_recorded_failure_from(
         );
     });
 
-    let output = fixture.run_jit(&invocation.argv);
+    let output = fixture.run_jit(argv);
     let repository_root = fixture.root().to_path_buf();
 
     ForcedFailure {
         path: invocation.path.clone(),
-        argv: invocation.argv.clone(),
+        argv: argv.to_vec(),
         expected_failure: invocation.expected_failure.clone(),
         expected_code: invocation.expected_code,
         stdout: output.stdout,
@@ -949,7 +969,19 @@ fn test_failure_probe_fixture_keeps_git_absent_from_inheriting_tmp_ancestor() {
             assert!(!result.status.success());
             let envelope: serde_json::Value = serde_json::from_slice(&result.stdout)
                 .expect("git-absent hook probe emits a JSON error envelope");
-            assert_eq!(envelope["error"]["code"], "HOOKS_INSTALL_ERROR");
+            assert_eq!(envelope["error"]["code"], "INVALID_ARGUMENT");
+            assert_eq!(result.status.code(), Some(2));
+
+            let human = drive_named_failure_with_args(
+                "hooks install",
+                vec!["hooks".to_owned(), "install".to_owned()],
+            );
+            assert!(!human.status.success());
+            assert_eq!(human.status.code(), result.status.code());
+            assert_eq!(
+                String::from_utf8(human.stderr).unwrap(),
+                "Error: Not in a git repository (no .git directory found)\n"
+            );
         }
         RecordedFailure::Exempt { .. } => panic!("hooks install has a recorded invocation"),
     }

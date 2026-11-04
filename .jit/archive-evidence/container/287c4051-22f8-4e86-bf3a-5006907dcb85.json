@@ -1,0 +1,29 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/287c4051-docs-accuracy",
+      "planned_deletions": [],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "2739a418c67c91e16a4093ecf7eb1747cac5c7892d135e5671c682019c5314f0"
+          },
+          "destination": "dev/archive/287c4051-docs-accuracy/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
+    "kind": "container"
+  }
+}

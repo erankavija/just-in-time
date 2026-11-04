@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f2e1aefd6afcf6525c64925ce3cbd41d37b7bc35",
+  "completed_at": "2026-11-04T05:09:45.438975375Z",
+  "duration_ms": 232122,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Captured validation now reuses parsed records and values across report views and fidelity; the prior duplicate-key regression is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "29af1067-0ff1-4bfb-a66f-05ba8c23f9db",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T05:05:53.316820330Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 532b649b, a55545bc, c4b4cbc2, 26beb70e, 240ff34d, fdb92575, 755dd0df (plus tagged workflow-record commits)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-10 and @/issue/2b5f452c/decision/D-01,D-02 (issue descriptions); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed at 2026-11-04T05:05:52Z; code-review failed at 2026-11-04T04:17:02Z, with its duplicate-key finding addressed by 26beb70e\nTruncation recovery: reread current capture, divergence, fidelity, decoder, policy, and individual changed-path patches in narrower calls\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Captured validation now reuses parsed records and values across report views and fidelity; the prior duplicate-key regression is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

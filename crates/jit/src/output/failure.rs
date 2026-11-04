@@ -79,6 +79,18 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             ],
         };
     }
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return derive_guidance(&failed.cause);
+    }
+    if let Some(exited) = error.downcast_ref::<crate::commands::serve::ForegroundServerExited>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "port": exited.port,
+                "exit_code": exited.status.code(),
+            })),
+            suggestions: Vec::new(),
+        };
+    }
     if let Some(not_required) = error.downcast_ref::<GateNotRequiredError>() {
         let (issue, key) = (&not_required.issue_id, &not_required.gate_key);
         return Guidance {
@@ -214,11 +226,23 @@ pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
 /// The registered code of a failure. Human message text is deliberately absent
 /// from this cascade, and its order is semantic.
 fn classify_code(error: &anyhow::Error) -> ErrorCode {
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return classify_code(&failed.cause);
+    }
     // A rejected `jit dep add` batch (jit:c8518f2a) wraps every rejected edge's
     // own typed error; classify by the batch's dominant edge rather than this
     // wrapper itself, so a mixed batch still maps to the right exit code.
     if let Some(batch) = error.downcast_ref::<crate::errors::DependencyBatchRejectedError>() {
         return dependency_batch_error_code(batch);
+    }
+    // `jit recover` failing to apply the leftover redo record or run its
+    // repairs is `recovery_failed`, unless it was contention.
+    if let Some(failure) = error.downcast_ref::<crate::commands::RecoveryFailedError>() {
+        return if crate::storage::is_lock_timeout(&failure.0) {
+            ErrorCode::LockTimeout
+        } else {
+            ErrorCode::RecoveryFailed
+        };
     }
     // A lock wait that expired is contention, not the command's own failure:
     // the command changed nothing and may be retried.
@@ -236,6 +260,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     }
     // Targeting a gate the issue does not require is an argument/lookup error,
     // classified before the run path, never reported as a runner error.
+    if error.is::<crate::commands::serve::ForegroundServerExited>() {
+        return ErrorCode::ServerExited;
+    }
     if error
         .downcast_ref::<crate::commands::GateNotRequiredError>()
         .is_some()
@@ -526,6 +553,12 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::errors::InvalidArgumentError>()
         .is_some()
         || error
+            .downcast_ref::<crate::domain::identity::InvalidGateKeyError>()
+            .is_some()
+        || error
+            .downcast_ref::<crate::domain::identity::InvalidGateRunIdError>()
+            .is_some()
+        || error
             .downcast_ref::<crate::domain::AssigneeParseError>()
             .is_some()
         || error
@@ -619,6 +652,12 @@ fn dependency_batch_error_code(batch: &crate::errors::DependencyBatchRejectedErr
         .iter()
         .map(|(_, error)| classify_code(error))
         .find(|code| code.exit_code() != ExitCode::ValidationFailed)
+        .or_else(|| {
+            batch
+                .rejected()
+                .first()
+                .map(|(_, error)| classify_code(error))
+        })
         .unwrap_or(ErrorCode::ValidationFailed)
 }
 
@@ -632,60 +671,6 @@ pub fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> JsonError {
         code
     };
     JsonError::new(code, error.to_string())
-}
-
-/// Build the JSON error envelope for a failed claim/lease command.
-///
-/// A specific typed class always wins over the command fallback. This keeps
-/// permission, external-I/O, no-Git, parsing, and lookup failures aligned with
-/// the human path, which uses [`classify`]. Only a genuinely unclassified
-/// failure retains the command-specific registered code.
-pub fn claim_json_error(error: &anyhow::Error, fallback_code: ErrorCode) -> JsonError {
-    let classified = classify_code(error);
-    let code = if classified == ErrorCode::GenericError {
-        fallback_code
-    } else {
-        classified
-    };
-    JsonError::new(code, error.to_string())
-}
-
-/// Preserve a `validate --fix` failure's complete cause chain and its exact
-/// typed classification. The envelope's registered code owns the process
-/// status; callers must not retain a parallel exit-code projection.
-pub fn validate_fix_json_error(error: &anyhow::Error) -> JsonError {
-    JsonError::new(classify_code(error), format!("{error:#}"))
-}
-
-/// Build the JSON error envelope for a failed profile command: the code the
-/// profile command family assigns, with the details and suggestions the
-/// failure's type determines.
-pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
-    use crate::commands::ProfileApplyError;
-
-    let code = if matches!(
-        error.downcast_ref::<ProfileApplyError>(),
-        Some(ProfileApplyError::UncommittedTargets { .. })
-    ) {
-        ErrorCode::ProfileUncommittedTargets
-    } else if error
-        .downcast_ref::<crate::profile::ProfileClaimError>()
-        .is_some()
-        || error.is::<ProfileApplyError>()
-        // The single sanctioned downcast of the anyhow CLI transport to the typed
-        // repository-state error: every refused target decision is a conflict;
-        // every other variant, an unreadable or unparseable registry included,
-        // keeps the generic profile-error code.
-        || matches!(
-            error.downcast_ref::<crate::repository_state::RepositoryStateError>(),
-            Some(crate::repository_state::RepositoryStateError::ProfileTargetConflicts(_))
-        )
-    {
-        ErrorCode::ProfileConflict
-    } else {
-        ErrorCode::ProfileError
-    };
-    Ok(derive_guidance(error).apply(command_json_error(error, code)))
 }
 
 /// Build the `jit dep add` envelope for a rejected batch (jit:c8518f2a).
@@ -787,7 +772,7 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::{claim_json_error, classify, validate_fix_json_error};
+    use super::classify;
     use crate::declarations::GateStage;
     use crate::domain::{GateRunResult, GateRunStatus};
     use crate::output::ErrorCode;
@@ -830,15 +815,6 @@ mod exit_code_projection_tests {
             warnings: Vec::new(),
         }
         .into()
-    }
-
-    #[test]
-    fn test_claim_json_error_keeps_registered_fallback_for_unclassified_failure() {
-        let error = anyhow::anyhow!("claim-specific failure without a typed cause");
-        let json = claim_json_error(&error, ErrorCode::ClaimRenewError);
-
-        assert_eq!(json.error.code, ErrorCode::ClaimRenewError);
-        assert_eq!(json.exit_code(), ErrorCode::ClaimRenewError.exit_code());
     }
 
     /// Representative typed errors, each paired with the exit code the classifier
@@ -1051,49 +1027,6 @@ mod exit_code_projection_tests {
     }
 
     #[test]
-    fn test_validate_fix_json_error_uses_typed_code_as_status_authority() {
-        use std::io::{Error as IoError, ErrorKind};
-
-        let cases = [
-            (
-                crate::errors::ValidationFailedError::new("invalid repository").into(),
-                ErrorCode::ValidationFailed,
-            ),
-            (
-                crate::errors::InvalidArgumentError::new("bad repair option").into(),
-                ErrorCode::InvalidArgument,
-            ),
-            (
-                crate::errors::AlreadyExistsError::new("occupied repair target").into(),
-                ErrorCode::AlreadyExists,
-            ),
-            (
-                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
-                ErrorCode::PermissionDenied,
-            ),
-            (
-                crate::storage::RepositoryFormatUnsupportedError::new(9999, 1).into(),
-                ErrorCode::RepositoryFormatUnsupported,
-            ),
-            (
-                anyhow::anyhow!("untyped repair failure"),
-                ErrorCode::GenericError,
-            ),
-            (
-                IoError::new(ErrorKind::BrokenPipe, "closed repair output").into(),
-                ErrorCode::IoError,
-            ),
-        ];
-
-        for (error, expected_code) in cases {
-            let envelope = validate_fix_json_error(&error);
-            assert_eq!(envelope.error.code, expected_code);
-            assert_eq!(envelope.exit_code(), expected_code.exit_code());
-            assert_eq!(envelope.exit_code(), classify(&error).exit_code());
-        }
-    }
-
-    #[test]
     fn test_invalid_label_pattern_keeps_specific_registered_code() {
         let error = anyhow::Error::new(crate::errors::InvalidLabelPatternError::new(
             "bad label pattern",
@@ -1119,7 +1052,7 @@ mod exit_code_projection_tests {
                 schema
                     .command_exit_codes
                     .iter()
-                    .any(|c| c.command == row && c.code == Some(actual)),
+                    .any(|c| c.command == row && c.code == actual),
                 "classifier emits code {actual} for `{error}`, but the \
                  command_exit_codes projection has no `{row}` row documenting it"
             );
@@ -1130,12 +1063,11 @@ mod exit_code_projection_tests {
 #[cfg(test)]
 mod repository_state_classifier_tests {
     //! REQ-01/REQ-02: pin the exhaustive `RepositoryStateError` exit-code mapping
-    //! and the profile `--json` variant classification to their real classifiers
-    //! ([`classify`] and [`profile_json_error`]). Each representative
+    //! to the real classifier ([`classify`]). Each representative
     //! variant is asserted so a reclassification (or a mis-mapped newly added
     //! variant) fails here rather than silently changing a command's exit status.
 
-    use super::{classify, profile_json_error};
+    use super::classify;
     use crate::domain::identity::ProfileId;
     use crate::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, Contribution, GateRegistryEditError,
@@ -1222,27 +1154,33 @@ mod repository_state_classifier_tests {
     }
 
     #[test]
-    fn test_profile_json_error_classifies_repository_state_variants() {
-        // Every refused profile decision — a target or a declaration — is a
-        // profile conflict (validation exit 4); an unreadable registry and an
-        // unrelated variant keep the generic profile-error code (exit 1).
-        let conflict_cases: Vec<RepositoryStateError> = vec![target_conflicts().into()];
-        for state_error in conflict_cases {
-            let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error).expect("a conflict renders a JSON error");
-            assert_eq!(json.error.code, crate::output::ErrorCode::ProfileConflict);
-            assert_eq!(json.exit_code().code(), 4);
-        }
-
-        let error_cases: Vec<RepositoryStateError> = vec![
-            ProducerError::ProfileRegistryNotFile { target: "t".into() }.into(),
-            RepositoryLayoutError::LexicalEscape("p".into()).into(),
+    fn test_classify_profile_repository_state_failures_report_their_classified_code() {
+        // A refused profile decision is a validation failure (exit 4); an
+        // unreadable registry keeps the generic code (exit 1); a layout rejection
+        // is an argument error. None is substituted with `PROFILE_ERROR`.
+        let cases: Vec<(RepositoryStateError, crate::output::ErrorCode, i32)> = vec![
+            (
+                target_conflicts().into(),
+                crate::output::ErrorCode::ValidationFailed,
+                4,
+            ),
+            (
+                ProducerError::ProfileRegistryNotFile { target: "t".into() }.into(),
+                crate::output::ErrorCode::GenericError,
+                1,
+            ),
+            (
+                RepositoryLayoutError::LexicalEscape("p".into()).into(),
+                crate::output::ErrorCode::InvalidArgument,
+                2,
+            ),
         ];
-        for state_error in error_cases {
+        for (state_error, code, exit) in cases {
             let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error).expect("a profile error renders a JSON error");
-            assert_eq!(json.error.code, crate::output::ErrorCode::ProfileError);
-            assert_eq!(json.exit_code().code(), 1);
+            let json = classify(&error);
+            assert_eq!(json.error.code, code, "{error}");
+            assert_ne!(json.error.code, crate::output::ErrorCode::ProfileError);
+            assert_eq!(json.exit_code().code(), exit, "{error}");
         }
     }
 
@@ -1253,14 +1191,14 @@ mod repository_state_classifier_tests {
     /// carrying every fact its structured form carries so a reader of either
     /// acts on the same evidence.
     #[test]
-    fn test_profile_json_error_conflict_keeps_its_code_exit_and_message_stable() {
+    fn test_classify_profile_conflict_keeps_its_code_exit_and_message_stable() {
         let state_error: RepositoryStateError = target_conflicts().into();
         let error = anyhow::Error::new(state_error);
         let rendered = error.to_string();
 
-        let json = profile_json_error(&error).expect("a conflict renders a JSON error");
+        let json = classify(&error);
 
-        assert_eq!(json.error.code, crate::output::ErrorCode::ProfileConflict);
+        assert_eq!(json.error.code, crate::output::ErrorCode::ValidationFailed);
         assert_eq!(json.exit_code().code(), 4);
         assert_eq!(json.error.message, rendered);
         for expected in [
@@ -1280,11 +1218,11 @@ mod repository_state_classifier_tests {
     /// beside its conflict class and the packages defining it differently, and
     /// suggests no resolution.
     #[test]
-    fn test_profile_json_error_conflict_attaches_structured_details_without_remedies() {
+    fn test_classify_profile_conflict_attaches_structured_details_without_remedies() {
         let state_error: RepositoryStateError = target_conflicts().into();
         let error = anyhow::Error::new(state_error);
 
-        let json = profile_json_error(&error).expect("a conflict renders a JSON error");
+        let json = classify(&error);
 
         let details = json.error.details.expect("a conflict attaches details");
         let conflicts = details["conflicts"]
@@ -1311,10 +1249,9 @@ mod repository_state_classifier_tests {
     }
 
     #[test]
-    fn test_profile_json_error_conflict_details_conform_to_the_published_schema() {
+    fn test_classify_profile_conflict_details_conform_to_the_published_schema() {
         let error = anyhow::Error::new(RepositoryStateError::from(target_conflicts()));
-        let details = profile_json_error(&error)
-            .expect("a conflict renders a JSON error")
+        let details = classify(&error)
             .error
             .details
             .expect("a conflict attaches details");
@@ -1370,19 +1307,17 @@ mod repository_state_classifier_tests {
 
         for variant in variants {
             let error = anyhow::Error::new(variant);
-            let json = profile_json_error(&error).expect("a graph refusal renders a JSON error");
-            for rendered in [classify(&error), json] {
-                assert_eq!(
-                    rendered.error.code,
-                    crate::output::ErrorCode::ProfileError,
-                    "{error}"
-                );
-                assert_eq!(
-                    rendered.exit_code(),
-                    crate::output::ExitCode::GenericError,
-                    "{error}"
-                );
-            }
+            let rendered = classify(&error);
+            assert_eq!(
+                rendered.error.code,
+                crate::output::ErrorCode::ProfileError,
+                "{error}"
+            );
+            assert_eq!(
+                rendered.exit_code(),
+                crate::output::ExitCode::GenericError,
+                "{error}"
+            );
         }
     }
 }
@@ -1411,6 +1346,22 @@ mod lock_timeout_classification_tests {
     fn test_classify_reports_wrapped_session_lock_timeout() {
         assert_eq!(
             classify(&session_lock_timeout()).error.code,
+            ErrorCode::LockTimeout
+        );
+    }
+
+    #[test]
+    fn test_classify_recovery_failed_error_is_recovery_failed_unless_contention() {
+        use crate::commands::RecoveryFailedError;
+        let failed = RecoveryFailedError(anyhow::anyhow!("redo record"));
+        let contended = RecoveryFailedError(session_lock_timeout());
+
+        assert_eq!(
+            classify(&failed.into()).error.code,
+            ErrorCode::RecoveryFailed
+        );
+        assert_eq!(
+            classify(&contended.into()).error.code,
             ErrorCode::LockTimeout
         );
     }
@@ -1775,6 +1726,7 @@ mod derived_guidance_tests {
         let classified = classify(&error);
         let dedicated = dependency_batch_json_error(batch_error);
 
+        assert_eq!(classified.error.code, dedicated.error.code);
         assert_eq!(classified.exit_code(), dedicated.exit_code());
         assert_eq!(classified.error.details, dedicated.error.details);
         assert_eq!(classified.error.suggestions, dedicated.error.suggestions);
@@ -1940,5 +1892,32 @@ mod path_read_classification_tests {
         .code;
         assert_eq!(code_of(PathReadError::Other(inner.into())), expected);
         assert_eq!(expected, ErrorCode::PermissionDenied);
+    }
+}
+
+#[cfg(test)]
+mod malformed_identity_classification_tests {
+    //! A malformed gate key or gate-run id is an invalid argument.
+
+    use super::classify;
+    use crate::domain::identity::{GateKey, GateRunId};
+    use crate::output::ErrorCode;
+
+    #[test]
+    fn test_classify_malformed_gate_run_id_is_invalid_argument() {
+        let error = "not-a-run-id".parse::<GateRunId>().unwrap_err();
+        assert_eq!(
+            classify(&error.into()).error.code,
+            ErrorCode::InvalidArgument
+        );
+    }
+
+    #[test]
+    fn test_classify_malformed_gate_key_is_invalid_argument() {
+        let error = "Bad_Key".parse::<GateKey>().unwrap_err();
+        assert_eq!(
+            classify(&error.into()).error.code,
+            ErrorCode::InvalidArgument
+        );
     }
 }

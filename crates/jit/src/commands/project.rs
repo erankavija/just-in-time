@@ -44,6 +44,7 @@ pub enum ProjectionsKey {}
 
 impl CollectionKey for ProjectionsKey {
     const KEY: &'static str = "projections";
+    const SCHEMA_NAME: Option<&'static str> = Some("ProjectRenderResult");
 }
 
 /// The result of a `jit project render` run over one or all projections: one
@@ -86,7 +87,10 @@ fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<V
         Some(requested) if registry.is_some_and(|entries| entries.contains_key(requested)) => {
             Ok(vec![requested.to_string()])
         }
-        Some(requested) => Err(anyhow!("unknown projection '{requested}'")),
+        Some(requested) => Err(crate::errors::InvalidArgumentError::new(format!(
+            "unknown projection '{requested}'"
+        ))
+        .into()),
         None => Ok(registry
             .into_iter()
             .flat_map(|entries| entries.keys().cloned())

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dbbb1cb8b4c595cd03d9b1f12dbbd46e86e93f48",
+  "completed_at": "2026-11-04T07:46:24.634789765Z",
+  "duration_ms": 250566,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard requirements are satisfied; the prior documentation finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b51291e4-8f88-44fe-92e6-90790e235ca3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "caf8d746-bf6e-4e51-b733-ad8d85de79e2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T07:42:14.068714682Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: af138a794, 64a2866c4, 5734d9772 (all reachable from main)\nPolicy sources: AGENTS.md\nResolved items: @/issue/b51291e4/requirement/REQ-01–REQ-04 (issue description, markdown-first); @/invariant/single-source-prose, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml, registry-first)\nGate evidence: worktree-cache-test passed (exit 0, 2026-11-04T07:42:13Z); prior code-review finding F1 is resolved by 5734d9772\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard requirements are satisfied; the prior documentation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

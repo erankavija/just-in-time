@@ -9,6 +9,7 @@
   ],
   "description": "Each lease is one record changed by one lock-load-change-publish sequence, and claims decide their event from the issue record, so no lease or claim operation reads the claims log or the event log's records.\n\n## Background\n\nThe claims control plane keeps every lease in one index that is a second authority beside a replayed log, repeats its lock and publish steps in each operation, and keeps test-only APIs. The claim command parses the whole event log to decide its event. This story stores one record per lease, runs every lease change through one held lease lock, reads listings without that lock, addresses every lease command by issue, and makes a claim's event follow the assignee.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading or changing one issue's lease reads only that issue's lease record, and no lease operation reads the claims log.\n- [hard] REQ-02: An interrupted lease operation leaves the prior or the next lease, and nothing rebuilds lease state from the log.\n- [hard] REQ-03: A claim appends its event exactly when the assignee changes and parses no event-log record.\n- [hard] REQ-04: Checkouts' leases are carried into lease records, and the lease docs describe them.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T08:42:45.397338234Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -25,7 +26,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Leases are per-issue records under one lease sequence",
-  "updated_at": "2026-11-02T23:40:59.647530111Z"
+  "updated_at": "2026-11-04T08:42:45.397338234Z"
 }

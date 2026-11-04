@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "64709af9075cf2c57022101c563486241c052117",
+  "completed_at": "2026-11-04T05:26:01.565810591Z",
+  "duration_ms": 120839,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's documented gate provenance, gate-run lookup, and default search-history behavior are accurate and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ba4c6054-4117-4ab8-8810-d5b74dea0a35",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6c825752-6240-41b7-8b6b-015f4c3c5809",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T05:24:00.726496543Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf (level 4; no resolved children). Reviewed its sole tagged commit, `7a0e70579` (`jit:ba4c6054`), individually. Current docs and CLI behavior agree: provenance names `source_issue` and `source_run`; gate-history lookup uses `jit gate status ... --all --json`; default search excludes history unless explicitly globbed.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's documented gate provenance, gate-run lookup, and default search-history behavior are accurate and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

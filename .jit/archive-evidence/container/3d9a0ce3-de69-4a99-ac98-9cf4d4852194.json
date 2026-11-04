@@ -1,0 +1,269 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/3d9a0ce3-lead-friction",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 12425,
+            "sha256": "57e8616a7b74605bf0ad83492d3d2433880bcb3b409b4cd23f9eb9712fbf53a6"
+          },
+          "source": "dev/active/2a504b17/research-format3-rewrite.py"
+        },
+        {
+          "content_identity": {
+            "byte_size": 107866,
+            "sha256": "ba65b768ef1ddeb132ae584a12f8f04b0da0d5eadeaa8a53e424e9ac47404144"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 9610,
+            "sha256": "52bc9986fcd323315268d4869d65201dab66b5327f0da58708341588e0e838e5"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 3988,
+            "sha256": "7a5480c02515077dbea5d17099f0dcc514646f7096140acb12abd0175f3acfd7"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/format3-rewrite.py"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4527,
+            "sha256": "32ef6de89371003847c039ce0d991479abb8c916c33ae9c08376b810a11013ad"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/format3-window.sh"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4611,
+            "sha256": "1d12adc60c9b782f634792ba84f854b6e1f85133f8a658aef35e5a9a57d03cfd"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff-2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 5897,
+            "sha256": "5a5c28c38621e943488264a3b290a68aa16b7b1732b20d51c621a54da5c3cd6e"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff-3.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 5763,
+            "sha256": "a5a33f19db1eaad80cf482619eae2a074e172e4885c93e92c3b9c94a0317e91a"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff-4.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1771,
+            "sha256": "3e5d8b4d6fe4e3796b9d70671680798ca6472dfd5a20c200c732f94d9210aff0"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 39397,
+            "sha256": "eb4188988af13ec6b2c29890333e8a376799c2c7d0b75094ee5021040ce5dd65"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/investigation-children.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 51713,
+            "sha256": "2fbd2fca2d0cc3fbe1bb95c6da9311a0dc599374665a1b8a704718cf201241a5"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/investigation-profile.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 32314,
+            "sha256": "d1b07e80df3b9cd82e44fc6f3e2e427995b2e3ff590a5c8d58e4b18ff31833f5"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 21310,
+            "sha256": "b9150baba9521c9b12766bcf60a47c5365aabdb863cbbf263748ce779e0ddda1"
+          },
+          "source": "dev/active/3d9a0ce3-lead-friction/progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 12425,
+            "sha256": "57e8616a7b74605bf0ad83492d3d2433880bcb3b409b4cd23f9eb9712fbf53a6"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/2a504b17/research-format3-rewrite.py",
+          "source": "dev/active/2a504b17/research-format3-rewrite.py"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 107866,
+            "sha256": "ba65b768ef1ddeb132ae584a12f8f04b0da0d5eadeaa8a53e424e9ac47404144"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/breakdown.json",
+          "source": "dev/active/3d9a0ce3-lead-friction/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9610,
+            "sha256": "52bc9986fcd323315268d4869d65201dab66b5327f0da58708341588e0e838e5"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/completion-report.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3988,
+            "sha256": "7a5480c02515077dbea5d17099f0dcc514646f7096140acb12abd0175f3acfd7"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/format3-rewrite.py",
+          "source": "dev/active/3d9a0ce3-lead-friction/format3-rewrite.py"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4527,
+            "sha256": "32ef6de89371003847c039ce0d991479abb8c916c33ae9c08376b810a11013ad"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/format3-window.sh",
+          "source": "dev/active/3d9a0ce3-lead-friction/format3-window.sh"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4611,
+            "sha256": "1d12adc60c9b782f634792ba84f854b6e1f85133f8a658aef35e5a9a57d03cfd"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/handoff-2.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff-2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5897,
+            "sha256": "5a5c28c38621e943488264a3b290a68aa16b7b1732b20d51c621a54da5c3cd6e"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/handoff-3.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff-3.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5763,
+            "sha256": "a5a33f19db1eaad80cf482619eae2a074e172e4885c93e92c3b9c94a0317e91a"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/handoff-4.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff-4.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1771,
+            "sha256": "3e5d8b4d6fe4e3796b9d70671680798ca6472dfd5a20c200c732f94d9210aff0"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/handoff.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/handoff.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 39397,
+            "sha256": "eb4188988af13ec6b2c29890333e8a376799c2c7d0b75094ee5021040ce5dd65"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/investigation-children.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/investigation-children.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 51713,
+            "sha256": "2fbd2fca2d0cc3fbe1bb95c6da9311a0dc599374665a1b8a704718cf201241a5"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/investigation-profile.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/investigation-profile.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 32314,
+            "sha256": "d1b07e80df3b9cd82e44fc6f3e2e427995b2e3ff590a5c8d58e4b18ff31833f5"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/plan.md",
+          "source": "dev/active/3d9a0ce3-lead-friction/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 21310,
+            "sha256": "b9150baba9521c9b12766bcf60a47c5365aabdb863cbbf263748ce779e0ddda1"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/active/progress.json",
+          "source": "dev/active/3d9a0ce3-lead-friction/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "3e45edfc925008c3c0eeffbaafb024e436353ac0e76c23188afb4edaa20b5b5e"
+          },
+          "destination": "dev/archive/3d9a0ce3-lead-friction/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/3d9a0ce3-lead-friction/handoff.md",
+          "issue": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
+          "to_path": "dev/archive/3d9a0ce3-lead-friction/active/handoff.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/3d9a0ce3-lead-friction/investigation-profile.md",
+          "issue": "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051",
+          "to_path": "dev/archive/3d9a0ce3-lead-friction/active/investigation-profile.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/3d9a0ce3-lead-friction/investigation-children.md",
+          "issue": "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051",
+          "to_path": "dev/archive/3d9a0ce3-lead-friction/active/investigation-children.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/3d9a0ce3-lead-friction/plan.md",
+          "issue": "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051",
+          "to_path": "dev/archive/3d9a0ce3-lead-friction/active/plan.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/3d9a0ce3-lead-friction/breakdown.json",
+          "issue": "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051",
+          "to_path": "dev/archive/3d9a0ce3-lead-friction/active/breakdown.json"
+        }
+      ],
+      "target": {
+        "id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
+    "kind": "container"
+  }
+}

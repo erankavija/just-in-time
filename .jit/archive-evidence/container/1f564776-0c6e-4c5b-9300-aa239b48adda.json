@@ -1,0 +1,29 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/1f564776-skill-suite-maintenance",
+      "planned_deletions": [],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "15b1fd15b86be41efa0987921483ad401f5f12340c499849619d864f98559edf"
+          },
+          "destination": "dev/archive/1f564776-skill-suite-maintenance/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "id": "1f564776-0c6e-4c5b-9300-aa239b48adda",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "1f564776-0c6e-4c5b-9300-aa239b48adda",
+    "kind": "container"
+  }
+}

@@ -81,28 +81,132 @@ impl IssueFilterArgs {
     }
 }
 
+/// Arguments of `jit init`.
+#[derive(Args)]
+pub struct InitArgs {
+    /// Select a worktree package directory by its path.
+    /// Repeatable; occurrence order is preserved.
+    #[arg(
+        long,
+        value_name = "SELECTOR",
+        action = ArgAction::Append
+    )]
+    pub profile: Vec<String>,
+
+    /// Optional TOML file containing the `[variables]` value map.
+    #[arg(long, value_name = "PATH")]
+    pub values_file: Option<std::path::PathBuf>,
+
+    /// Set one declared profile variable; repeatable and last-wins.
+    #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+    pub set: Vec<String>,
+}
+
+/// Arguments of `jit apply`.
+#[derive(Args)]
+pub struct ApplyArgs {
+    /// Template name to apply (must be declared in `.jit/templates.toml`)
+    pub template: String,
+
+    /// Container issue ID to apply the template to
+    pub container: String,
+
+    /// Bind a template anchor: `role=id` (repeatable). The repository's
+    /// container anchor is auto-bound to `<container>`; binding it explicitly
+    /// overrides that.
+    #[arg(long, value_name = "ROLE=ID")]
+    pub anchor: Vec<String>,
+
+    /// Bypass validation warnings and refresh an already-applied template
+    #[arg(long)]
+    pub force: bool,
+}
+
+/// Arguments of the top-level `search` command.
+#[derive(clap::Args)]
+pub struct SearchArgs {
+    /// Search query string
+    pub query: String,
+
+    /// Use regex pattern matching
+    #[arg(short, long)]
+    pub regex: bool,
+
+    /// Case sensitive search
+    #[arg(short = 'C', long)]
+    pub case_sensitive: bool,
+
+    /// Show N lines of context
+    #[arg(short = 'c', long, default_value = "0")]
+    pub context: usize,
+
+    /// Maximum results to return
+    #[arg(short = 'n', long)]
+    pub limit: Option<usize>,
+
+    /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
+    #[arg(short = 'g', long)]
+    pub glob: Option<String>,
+}
+
+/// Arguments for the `validate` command.
+#[derive(Args)]
+pub struct ValidateArgs {
+    /// Issue id to validate (runs local + graph rules for this issue only).
+    /// When omitted, validates the whole repository.
+    pub id: Option<String>,
+
+    /// Explain rule outcomes for the issue: which rules matched and whether
+    /// each passed or failed (requires an issue id)
+    #[arg(long)]
+    pub explain: bool,
+
+    /// Validate a container's bracket subtree as a deterministic gate
+    /// checker: report the findings, from rules evaluated over the whole
+    /// repository, of the issues in the container's transitive dependency
+    /// closure (bounded at the template's breakdown node), excluding
+    /// whole-repo rules.
+    /// Exits 4 with findings shown when an enforcing rule fails, 0 when
+    /// clean. Mutually exclusive with a positional id and with
+    /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
+    #[arg(long, value_name = "ID")]
+    pub scope: Option<String>,
+
+    /// Evaluate one configured graph rule with the positional issue as its
+    /// sole firing subject. Repository issues remain resolution context.
+    #[arg(long, value_name = "RULE")]
+    pub rule: Option<String>,
+
+    /// Repair safe findings; derived-state repairs publish through one redo
+    /// record
+    #[arg(long)]
+    pub fix: bool,
+
+    /// Show what would be fixed without applying changes (requires --fix)
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Validate that git's `origin/main` is an ancestor of the current
+    /// branch, so the branch still sits on top of it. This is the git
+    /// concern; membership labels the DAG does not back are reported by
+    /// `jit query divergence`. Requires git.
+    #[arg(long)]
+    pub branch_drift: bool,
+
+    /// Hidden stub: fails with a hint naming `--branch-drift`
+    #[arg(long, hide = true)]
+    pub divergence: bool,
+
+    /// Validate active leases are consistent and not stale
+    #[arg(long)]
+    pub leases: bool,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
     /// staged complete and published without replacing an occupied destination
-    Init {
-        /// Select a worktree package directory by its path.
-        /// Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-    },
+    Init(InitArgs),
 
     /// Inspect and apply repository profiles
     #[command(subcommand)]
@@ -145,23 +249,7 @@ pub enum Commands {
     ///   jit apply plan epic-123                       # Apply the `plan` template
     ///   jit apply plan epic-123 --json                # Machine-readable result
     ///   jit apply plan epic-123 --anchor container=epic-123 --force
-    Apply {
-        /// Template name to apply (must be declared in `.jit/templates.toml`)
-        template: String,
-
-        /// Container issue ID to apply the template to
-        container: String,
-
-        /// Bind a template anchor: `role=id` (repeatable). The repository's
-        /// container anchor is auto-bound to `<container>`; binding it explicitly
-        /// overrides that.
-        #[arg(long, value_name = "ROLE=ID")]
-        anchor: Vec<String>,
-
-        /// Bypass validation warnings and refresh an already-applied template
-        #[arg(long)]
-        force: bool,
-    },
+    Apply(ApplyArgs),
 
     /// Dependency management commands
     #[command(subcommand, visible_alias = "dependency")]
@@ -316,30 +404,7 @@ pub enum Commands {
     /// Search issues and documents
     ///
     /// JSON output uses the list envelope `{"count": N, "results": [...]}`.
-    Search {
-        /// Search query string
-        query: String,
-
-        /// Use regex pattern matching
-        #[arg(short, long)]
-        regex: bool,
-
-        /// Case sensitive search
-        #[arg(short = 'C', long)]
-        case_sensitive: bool,
-
-        /// Show N lines of context
-        #[arg(short = 'c', long, default_value = "0")]
-        context: usize,
-
-        /// Maximum results to return
-        #[arg(short = 'n', long)]
-        limit: Option<usize>,
-
-        /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
-        #[arg(short = 'g', long)]
-        glob: Option<String>,
-    },
+    Search(SearchArgs),
 
     /// Show CLI version and build metadata
     Version,
@@ -348,55 +413,7 @@ pub enum Commands {
     Status,
 
     /// Validate repository integrity and diagnose declared derived-state drift
-    Validate {
-        /// Issue id to validate (runs local + graph rules for this issue only).
-        /// When omitted, validates the whole repository.
-        id: Option<String>,
-
-        /// Explain rule outcomes for the issue: which rules matched and whether
-        /// each passed or failed (requires an issue id)
-        #[arg(long)]
-        explain: bool,
-
-        /// Validate a container's bracket subtree as a deterministic gate
-        /// checker: evaluate the rules whose selector matches each issue in the
-        /// container's transitive dependency closure (including the
-        /// `type:breakdown` node, bounded there), excluding whole-repo rules.
-        /// Exits 4 with findings shown when an enforcing rule fails, 0 when
-        /// clean. Mutually exclusive with a positional id and with
-        /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
-        #[arg(long, value_name = "ID")]
-        scope: Option<String>,
-
-        /// Evaluate one configured graph rule with the positional issue as its
-        /// sole firing subject. Repository issues remain resolution context.
-        #[arg(long, value_name = "RULE")]
-        rule: Option<String>,
-
-        /// Repair safe findings; derived-state repairs publish through one redo
-        /// record
-        #[arg(long)]
-        fix: bool,
-
-        /// Show what would be fixed without applying changes (requires --fix)
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Validate that git's `origin/main` is an ancestor of the current
-        /// branch, so the branch still sits on top of it. This is the git
-        /// concern; membership labels the DAG does not back are reported by
-        /// `jit query divergence`. Requires git.
-        #[arg(long)]
-        branch_drift: bool,
-
-        /// Hidden stub: fails with a hint naming `--branch-drift`
-        #[arg(long, hide = true)]
-        divergence: bool,
-
-        /// Validate active leases are consistent and not stale
-        #[arg(long)]
-        leases: bool,
-    },
+    Validate(ValidateArgs),
 
     /// Run recovery: apply a leftover redo record, then the repair routines
     ///
@@ -405,7 +422,8 @@ pub enum Commands {
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - In a Git repository: cleans up stale claim locks from crashed processes
     ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
-    ///   heartbeat is stale; without Git, skips these with a warning
+    ///   heartbeat is stale, and removes interrupted lease operations' stage
+    ///   files; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never
@@ -428,32 +446,36 @@ pub enum Commands {
     ///   jit serve --stop           # Stop the running server
     ///   jit serve --fg             # Run in foreground (for debugging)
     ///   jit serve --json           # Machine-readable output
-    Serve {
-        /// Preferred port to listen on (auto-selects from 3000–3099 if
-        /// taken; pass 0 for any OS-assigned free port)
-        #[arg(long, default_value = "3000")]
-        port: u16,
+    Serve(ServeArgs),
+}
 
-        /// Stop the running server for this repository
-        #[arg(long, conflicts_with_all = ["status", "fg"])]
-        stop: bool,
+/// Arguments of `jit serve`.
+#[derive(Args)]
+pub struct ServeArgs {
+    /// Preferred port to listen on (auto-selects from 3000–3099 if
+    /// taken; pass 0 for any OS-assigned free port)
+    #[arg(long, default_value = "3000")]
+    pub port: u16,
 
-        /// Show server status and exit
-        #[arg(long, conflicts_with_all = ["stop", "fg"])]
-        status: bool,
+    /// Stop the running server for this repository
+    #[arg(long, conflicts_with_all = ["status", "fg"])]
+    pub stop: bool,
 
-        /// Run in foreground instead of daemonizing (useful for debugging)
-        #[arg(long)]
-        fg: bool,
+    /// Show server status and exit
+    #[arg(long, conflicts_with_all = ["stop", "fg"])]
+    pub status: bool,
 
-        /// Write server output to this file [default: .jit/server.log]
-        #[arg(long)]
-        log: Option<String>,
+    /// Run in foreground instead of daemonizing (useful for debugging)
+    #[arg(long)]
+    pub fg: bool,
 
-        /// Directory containing built web UI static files (auto-detected if omitted)
-        #[arg(long)]
-        web_dir: Option<String>,
-    },
+    /// Write server output to this file [default: .jit/server.log]
+    #[arg(long)]
+    pub log: Option<String>,
+
+    /// Directory containing built web UI static files (auto-detected if omitted)
+    #[arg(long)]
+    pub web_dir: Option<String>,
 }
 
 /// Addressable structured item subcommands.
@@ -2349,36 +2371,37 @@ pub enum ClaimCommands {
         issue_id: String,
     },
 
-    /// Renew a lease
+    /// Renew your lease on an issue
     ///
-    /// Extends the expiry time of an existing lease. Allows agents to continue
-    /// working on an issue beyond the original TTL.
+    /// Extends the expiry time of your lease on the issue. Allows agents to
+    /// continue working on an issue beyond the original TTL. An indefinite
+    /// lease gets a heartbeat instead.
     ///
     /// Examples:
-    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 600   # Extend by 10 minutes
-    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 3600  # Extend by 1 hour
-    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41                   # Extend by the default TTL
+    ///   jit claim renew abc123 --extension 600   # Extend by 10 minutes
+    ///   jit claim renew abc123 --extension 3600  # Extend by 1 hour
+    ///   jit claim renew abc123                   # Extend by the default TTL
     Renew {
-        /// Lease ID to renew
-        lease_id: crate::domain::identity::LeaseId,
+        /// Issue ID whose lease to renew (short ids accepted)
+        issue_id: String,
 
         /// How many seconds to extend the lease by
         #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
         extension: u64,
     },
 
-    /// Send heartbeat for an indefinite lease
+    /// Send a heartbeat for your lease on an issue
     ///
     /// Updates the last_beat timestamp without changing expiration.
     /// Used to signal the agent is still actively working on the issue.
     /// Only needed for TTL=0 (indefinite) leases to prevent staleness.
     ///
     /// Examples:
-    ///   jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41       # Send heartbeat
-    ///   jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41 --json
+    ///   jit claim heartbeat abc123       # Send heartbeat
+    ///   jit claim heartbeat abc123 --json
     Heartbeat {
-        /// Lease ID to heartbeat
-        lease_id: crate::domain::identity::LeaseId,
+        /// Issue ID whose lease to heartbeat (short ids accepted)
+        issue_id: String,
     },
 
     /// Show active lease status
@@ -2415,18 +2438,20 @@ pub enum ClaimCommands {
     /// JSON output uses the list envelope `{"count": N, "leases": [...]}`.
     List,
 
-    /// Force-evict a lease (admin operation)
+    /// Force-evict the lease on an issue (admin operation)
     ///
-    /// Removes a lease immediately, regardless of who owns it. This is an
-    /// administrative operation for handling stale leases or emergency situations.
-    /// The eviction is logged with the provided reason for audit trail.
+    /// Removes the issue's lease immediately, regardless of who owns it. This is
+    /// an administrative operation for handling stale leases or emergency
+    /// situations. The issue ID is matched against stored leases, not issues,
+    /// so a lease whose issue was deleted can still be evicted. The eviction is
+    /// logged with the provided reason for audit trail.
     ///
     /// Examples:
-    ///   jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Stale after crash"
-    ///   jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Admin override" --json
+    ///   jit claim force-evict abc123 --reason "Stale after crash"
+    ///   jit claim force-evict abc123 --reason "Admin override" --json
     ForceEvict {
-        /// Lease ID to evict
-        lease_id: crate::domain::identity::LeaseId,
+        /// Issue ID whose lease to evict (short ids accepted)
+        issue_id: String,
 
         /// Reason for eviction (required for audit trail)
         #[arg(long)]
@@ -2656,7 +2681,7 @@ impl Commands {
     /// the generated-command guard required by the universal recovery boundary.
     pub fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Init { .. } | Self::Apply { .. } | Self::Recover { .. } => true,
+            Self::Init(_) | Self::Apply(_) | Self::Recover { .. } => true,
             Self::Profile(command) => command.requires_recovery_dispatch(),
             Self::Issue(command) => command.requires_recovery_dispatch(),
             Self::Dep(command) => command.requires_recovery_dispatch(),
@@ -2669,8 +2694,8 @@ impl Commands {
             Self::Invariant(command) => command.requires_recovery_dispatch(),
             Self::Project(command) => command.requires_recovery_dispatch(),
             Self::Snapshot(command) => command.requires_recovery_dispatch(),
-            Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
-            Self::Serve { status, .. } => !*status,
+            Self::Validate(args) => args.fix && !args.dry_run,
+            Self::Serve(args) => !args.status,
             Self::List { .. }
             | Self::Events(_)
             | Self::Graph(_)
@@ -2679,7 +2704,7 @@ impl Commands {
             | Self::Label(_)
             | Self::Worktree(_)
             | Self::Item(_)
-            | Self::Search { .. }
+            | Self::Search(_)
             | Self::Version { .. }
             | Self::Status { .. } => false,
         }
@@ -2715,16 +2740,16 @@ impl Commands {
             Self::Invariant(command) => command.coordinates_claims_first(),
             Self::Project(command) => command.coordinates_claims_first(),
             Self::Recover => true,
-            Self::Init { .. }
+            Self::Init(_)
             | Self::List { .. }
-            | Self::Apply { .. }
+            | Self::Apply(_)
             | Self::Rdeps { .. }
             | Self::Query {
                 subcommand: None, ..
             }
-            | Self::Search { .. }
-            | Self::Validate { .. }
-            | Self::Serve { .. }
+            | Self::Search(_)
+            | Self::Validate(_)
+            | Self::Serve(_)
             | Self::Version { .. }
             | Self::Status { .. } => false,
         }
@@ -3129,38 +3154,6 @@ mod recovery_dispatch_tests {
     use clap::{CommandFactory, Parser};
     use std::collections::BTreeSet;
 
-    #[test]
-    fn test_claim_lease_arguments_parse_to_lease_ids_before_dispatch() {
-        let canonical = "b53beeba-32f2-4671-a407-2d94e4d13d41";
-        for command in ["renew", "heartbeat", "force-evict"] {
-            let suffix = if command == "force-evict" {
-                vec!["--reason", "test"]
-            } else {
-                vec![]
-            };
-            let args = |id| {
-                ["jit", "claim", command, id]
-                    .into_iter()
-                    .chain(suffix.iter().copied())
-            };
-            let cli = Cli::try_parse_from(args(canonical)).unwrap();
-            let Some(Commands::Claim(command)) = cli.command else {
-                panic!("expected claim command")
-            };
-            let lease_id = match command {
-                ClaimCommands::Renew { lease_id, .. }
-                | ClaimCommands::Heartbeat { lease_id }
-                | ClaimCommands::ForceEvict { lease_id, .. } => lease_id,
-                _ => panic!("expected lease argument"),
-            };
-            assert_eq!(lease_id.as_str(), canonical);
-            assert_eq!(
-                Cli::try_parse_from(args("lease-id")).err().unwrap().kind(),
-                clap::error::ErrorKind::ValueValidation
-            );
-        }
-    }
-
     const CLI_LEAF_COMMANDS: &[&str] = &[
         "apply",
         "archive candidates",
@@ -3346,13 +3339,13 @@ mod recovery_dispatch_tests {
 
     #[test]
     fn test_representative_writer_and_reader_classification() {
-        assert!(Commands::Init {
+        assert!(Commands::Init(InitArgs {
             profile: Vec::new(),
             values_file: None,
             set: Vec::new(),
-        }
+        })
         .requires_recovery_dispatch());
-        assert!(Commands::Validate {
+        assert!(Commands::Validate(ValidateArgs {
             id: None,
             explain: false,
             scope: None,
@@ -3362,7 +3355,7 @@ mod recovery_dispatch_tests {
             branch_drift: false,
             divergence: false,
             leases: false,
-        }
+        })
         .requires_recovery_dispatch());
         assert!(!Commands::Status.requires_recovery_dispatch());
         assert!(!Commands::Issue(IssueCommands::BatchCreate {
@@ -3370,14 +3363,14 @@ mod recovery_dispatch_tests {
             dry_run: true,
         })
         .requires_recovery_dispatch());
-        assert!(!Commands::Serve {
+        assert!(!Commands::Serve(ServeArgs {
             port: 3000,
             stop: false,
             status: true,
             fg: false,
             log: None,
             web_dir: None,
-        }
+        })
         .requires_recovery_dispatch());
     }
 
