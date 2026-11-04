@@ -568,24 +568,6 @@ impl CommandSchema {
 
             // Issue commands
             //
-            // `issue show --json` returns `IssueShowResponse` by default and
-            // `IssueShowSummaryResponse` when `--summary` is set. Expose both
-            // shapes via a JSON Schema `oneOf` so MCP clients see an honest
-            // contract.
-            "issue_show" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueShowResponse>(),
-                        schema_to_value::<IssueShowSummaryResponse>(),
-                        schema_to_value::<IssueShowListResponse>(),
-                    ],
-                    "description": "Single id: a bare IssueShowResponse \
-                        (IssueShowSummaryResponse with --summary). Multiple ids: \
-                        the {count, issues} envelope of full IssueShowResponse \
-                        objects in argument order."
-                });
-                (Some(union), "IssueShowResponse")
-            }
             // `issue create --json` returns the `issue show` projection with its
             // findings, so its gate list is the `gates` array, not the raw
             // stored record.
@@ -600,30 +582,6 @@ impl CommandSchema {
             "issue_update" => (
                 Some(schema_to_value::<IssueUpdateResponse>()),
                 "IssueUpdateResponse",
-            ),
-            // `issue status` projects each issue's gate list under the compact
-            // `gates` array, the same field name `issue show` uses.
-            "issue_status" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueStatusResponse>(),
-                        schema_to_value::<IssueStatusListResponse>(),
-                    ],
-                    "description": "Single id: a bare IssueStatusResponse. \
-                        Multiple ids: the {count, issues} envelope of \
-                        IssueStatusResponse objects in argument order."
-                });
-                (Some(union), "IssueStatusResponse")
-            }
-            // `issue children` wraps one `IssueStatusResponse` per child, so the
-            // same compact `gates` array reaches each entry.
-            "issue_children" => (
-                Some(schema_to_value::<IssueChildrenResponse>()),
-                "IssueChildrenResponse",
-            ),
-            "issue_progress" => (
-                Some(schema_to_value::<ContainerProgressResponse>()),
-                "ContainerProgressResponse",
             ),
 
             // Gate commands
@@ -657,11 +615,9 @@ impl CommandSchema {
             // complete stored records (gate list under `gates_required` /
             // `gates_status`). Declaring both via `oneOf` lets a consumer attribute
             // a missing gate field to the summary projection rather than the data.
-            // `issue list` and its top-level `list` alias share the query shape.
             // Bare `jit query` (no subcommand) is documented as equivalent to
             // `query all`, so it declares the same contract.
-            "query" | "query_available" | "query_all" | "query_strategic" | "query_closed"
-            | "issue_list" | "list" => {
+            "query" | "query_available" | "query_all" | "query_strategic" | "query_closed" => {
                 let union = json!({
                     "oneOf": [
                         schema_to_value::<IssueListResponse>(),
@@ -673,20 +629,6 @@ impl CommandSchema {
                         is carried under gates_required / gates_status."
                 });
                 (Some(union), "IssueListResponse")
-            }
-            // `issue search` mirrors the list surfaces, plus an echoed `query`.
-            "issue_search" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueSearchResponse>(),
-                        schema_to_value::<IssueSearchFullResponse>(),
-                    ],
-                    "description": "Default shape: lean MinimalIssue entries with no \
-                        gate fields, plus the echoed query. With --full: complete \
-                        stored issue records, whose gate list is carried under \
-                        gates_required / gates_status."
-                });
-                (Some(union), "IssueSearchResponse")
             }
             // `query blocked` is the one query whose --full variant is NOT a
             // record dump: both shapes build on MinimalIssue and carry no
