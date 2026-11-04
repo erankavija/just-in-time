@@ -41,6 +41,19 @@ describe('computeClusterPositions', () => {
     expect(positions.get('epic2')!.x).toBeLessThan(positions.get('epic1')!.x);
   });
 
+  it('orders collapsed containers using dependencies between their children', () => {
+    const collapsed: SubgraphCluster[] = ['A', 'B'].map(id => ({
+      containerId: id, containerLevel: 2, parentClusterId: null,
+      nodes: [graphNode(id), graphNode(`${id}-child`)],
+      internalEdges: [], outgoingEdges: [], incomingEdges: [],
+    }));
+    const positions = computeClusterPositions(
+      [], [{ from: 'A-child', to: 'B-child' }],
+      [graphNode('A'), graphNode('B')], [], collapsed
+    );
+    expect(positions.get('B')!.x).toBeLessThan(positions.get('A')!.x);
+  });
+
   it('should handle clusters with no cross-cluster dependencies', () => {
     const clusters: SubgraphCluster[] = [
       {
