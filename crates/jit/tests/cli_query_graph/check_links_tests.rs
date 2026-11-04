@@ -13,29 +13,33 @@ use jit::test_cli::JitCli;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
-/// Spawn a minimal loopback HTTP server that answers every request with
-/// `200 OK`, returning its base URL (e.g. `http://127.0.0.1:PORT`).
-///
-/// Used instead of a live external service (previously `httpbin.org`) so the
-/// external-URL reachability test is deterministic and works offline: the `jit`
-/// subprocess issues its HEAD request to this in-process loopback listener.
-fn spawn_ok_server() -> String {
+/// Serve and count loopback requests without external network access.
+fn spawn_http_server(status: &'static str) -> (String, Arc<AtomicUsize>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock HTTP server");
     let addr = listener.local_addr().expect("mock server local addr");
+    let requests = Arc::new(AtomicUsize::new(0));
+    let counter = requests.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else { continue };
             // Drain the request head (a HEAD request carries no body), then
-            // reply 200 and close. Path/method are ignored — any request is OK.
+            // reply with the configured status and close.
             let mut buf = [0u8; 1024];
             let _ = stream.read(&mut buf);
-            let _ = stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            counter.fetch_add(1, Ordering::SeqCst);
+            let _ = stream.write_all(
+                format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            );
             let _ = stream.flush();
         }
     });
-    format!("http://{addr}")
+    (format!("http://{addr}"), requests)
 }
 
 #[test]
@@ -317,7 +321,7 @@ fn test_external_urls_are_validated() {
 
     // Document with a reachable external URL, served by a local loopback mock so
     // the test is deterministic and offline-safe (no dependency on httpbin.org).
-    let base = spawn_ok_server();
+    let (base, _) = spawn_http_server("200 OK");
     fs::create_dir_all(cli.root().join("docs")).unwrap();
     fs::write(
         cli.root().join("docs/external.md"),
@@ -346,41 +350,27 @@ fn test_external_urls_are_validated() {
 }
 
 #[test]
-fn test_unreachable_external_urls_error() {
-    let cli = JitCli::uninitialised().unwrap();
-    cli.init_git().unwrap().run(["init"]).unwrap();
-
+fn test_check_document_links_probes_shared_url_once_and_reports_each_document() {
+    let cli = JitCli::initialised().unwrap();
     let issue_id = cli
-        .create_issue(["--title", "Test issue", "--description", "Description"])
+        .create_issue(["--title", "Shared URL", "--description", "Description"])
         .unwrap();
+    let (base, requests) = spawn_http_server("404 Not Found");
+    let url = format!("{base}/missing.png");
+    let documents = ["first.md", "second.md"];
+    for document in documents {
+        fs::write(cli.root().join(document), format!("![Remote]({url})\n")).unwrap();
+        cli.run(["doc", "add", &issue_id, document]).unwrap();
+    }
 
-    // Document with unreachable external URL
-    fs::create_dir_all(cli.root().join("docs")).unwrap();
-    fs::write(
-        cli.root().join("docs/bad_url.md"),
-        "# Bad URL\n\n![Remote](https://this-domain-definitely-does-not-exist-12345.com/image.png)\n",
-    )
-    .unwrap();
-
-    cli.run([
-        "doc",
-        "add",
-        &issue_id,
-        "docs/bad_url.md",
-        "--label",
-        "Test",
-    ])
-    .unwrap();
-
-    // Unreachable external URLs should error
-    let output = cli
-        .command(["doc", "check-links", "--scope", "all"])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Errors found"));
-    assert!(stdout.contains("unreachable"));
+    let report = check_links_report(&cli);
+    assert_eq!(requests.load(Ordering::SeqCst), 1);
+    for document in documents {
+        let errors = errors_for_document(&report, document);
+        assert_eq!(errors.len(), 1, "{report}");
+        assert_eq!(errors[0]["type"], "unreachable_url");
+        assert_eq!(errors[0]["asset"], url);
+    }
 }
 
 #[test]

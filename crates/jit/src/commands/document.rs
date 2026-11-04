@@ -2,6 +2,9 @@
 
 use super::*;
 
+const EXTERNAL_URL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const EXTERNAL_URL_WORKERS: usize = 4;
+
 /// Bounds for one document reference edit, which mutates one named issue while
 /// also reading the document and its assets: the shared issue-mutation bounds
 /// at the depth those worktree paths reach.
@@ -1096,29 +1099,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         })
     }
 
-    /// Validate that an external URL is reachable
-    ///
-    /// Returns Ok(true) if URL is reachable, Ok(false) if not reachable,
-    /// or Err if validation failed (network error, timeout, etc.)
-    fn validate_external_url(url: &str) -> Result<bool> {
-        // Quick HEAD request
-        // In ureq 3.x, use Agent for configuration
-        let agent = ureq::Agent::new_with_defaults();
-        let response = agent.head(url).call();
-
-        match response {
-            Ok(resp) => {
-                // Check if status is success or redirection (2xx or 3xx)
-                let status = resp.status();
-                Ok(status.is_success() || status.is_redirection())
-            }
-            Err(_e) => {
-                // Any error (IO, DNS, SSL, HTTP 4xx/5xx, etc.) means unreachable
-                // Note: ureq 3.x doesn't distinguish between error types easily
-                // We consider all errors as "unreachable"
-                Ok(false)
-            }
-        }
+    fn validate_external_url(agent: &ureq::Agent, url: &str) -> bool {
+        agent.head(url).call().is_ok_and(|response| {
+            response.status().is_success() || response.status().is_redirection()
+        })
     }
 
     /// Check document links and assets for validity
@@ -1192,6 +1176,37 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // Read every reference at the version it names, before any classification.
         let readings =
             self.read_documents_at_named_versions(&layout, &all_documents, &link_validator)?;
+
+        let mut urls = all_documents
+            .iter()
+            .zip(&readings)
+            .filter(|(_, reading)| !matches!(reading, CheckedDocument::Unresolved(_)))
+            .flat_map(|((_, document), _)| &document.assets)
+            .filter(|asset| asset.asset_type == AssetType::External)
+            .map(|asset| asset.original_path.as_str())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .map(|url| (url, false))
+            .collect::<Vec<_>>();
+        let agent = ureq::Agent::new_with_config(
+            ureq::Agent::config_builder()
+                .timeout_global(Some(EXTERNAL_URL_TIMEOUT))
+                .build(),
+        );
+        let chunk_size = urls.len().div_ceil(EXTERNAL_URL_WORKERS).max(1);
+        std::thread::scope(|scope| {
+            urls.chunks_mut(chunk_size).for_each(|urls| {
+                let agent = &agent;
+                scope.spawn(move || {
+                    urls.iter_mut().for_each(|(url, reachable)| {
+                        *reachable = Self::validate_external_url(agent, url);
+                    });
+                });
+            });
+        });
+        let reachable = urls
+            .into_iter()
+            .collect::<std::collections::BTreeMap<_, _>>();
 
         // Validate each document
         let mut errors = Vec::new();
@@ -1279,34 +1294,14 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                         }));
                     }
                     AssetType::External => {
-                        // Validate external URLs
-                        match Self::validate_external_url(&asset.original_path) {
-                            Ok(true) => {
-                                // URL is reachable - all good
-                            }
-                            Ok(false) => {
-                                // URL exists but returned error or is unreachable
-                                errors.push(serde_json::json!({
-                                    "issue_id": issue_id,
-                                    "document": doc.path,
-                                    "type": "unreachable_url",
-                                    "asset": asset.original_path,
-                                    "message": format!("External URL is unreachable: {}", asset.original_path),
-                                }));
-                            }
-                            Err(e) => {
-                                // Validation failed (network error, timeout, etc.)
-                                warnings.push(serde_json::json!({
-                                    "issue_id": issue_id,
-                                    "document": doc.path,
-                                    "type": "url_validation_failed",
-                                    "asset": asset.original_path,
-                                    "message": format!(
-                                        "Could not validate external URL ({}): {}",
-                                        e, asset.original_path
-                                    ),
-                                }));
-                            }
+                        if reachable.get(asset.original_path.as_str()) != Some(&true) {
+                            errors.push(serde_json::json!({
+                                "issue_id": issue_id,
+                                "document": doc.path,
+                                "type": "unreachable_url",
+                                "asset": asset.original_path,
+                                "message": format!("External URL is unreachable: {}", asset.original_path),
+                            }));
                         }
                     }
                 }
@@ -1979,6 +1974,38 @@ mod tests {
     };
     use crate::test_utils::document_reference;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn test_validate_external_url_times_out_when_server_never_answers() {
+        use std::net::TcpListener;
+        use std::time::{Duration, Instant};
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/stalled", listener.local_addr().unwrap());
+        let (release, waiting) = std::sync::mpsc::channel();
+        let timeout = Duration::from_millis(50);
+        let agent = ureq::Agent::new_with_config(
+            ureq::Agent::config_builder()
+                .timeout_global(Some(timeout))
+                .build(),
+        );
+        std::thread::scope(|scope| {
+            scope.spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                let _ = waiting.recv_timeout(Duration::from_secs(1));
+                drop(stream);
+            });
+            let started = Instant::now();
+            let reachable = DocumentOps::<InMemoryStorage>::validate_external_url(&agent, &url);
+            let elapsed = started.elapsed();
+            let _ = release.send(());
+            assert!(!reachable);
+            assert!(
+                elapsed < Duration::from_millis(500),
+                "probe took {elapsed:?}"
+            );
+        });
+    }
 
     #[test]
     fn test_report_artifact_conformance_propagates_invalid_hierarchy_error() {

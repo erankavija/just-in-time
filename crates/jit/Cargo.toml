@@ -59,7 +59,7 @@ tar = "0.4"
 pulldown-cmark = { workspace = true }
 # Remote document access (external-link reachability checks, commands::document)
 # needs exactly one TLS backend (jit:3398bc19), and Rustls is the only reachable
-# one: ureq's `Agent::new_with_defaults()` — the only call site — builds its
+# one: the timed `Agent::config_builder()` uses the default TLS provider, building its
 # `TlsConfig` from `TlsProvider::default()`, which is unconditionally Rustls, and
 # ureq's native-tls provider docs state that choice "is never picked up
 # automatically" (selecting it would take an explicit `.provider(...)` code
