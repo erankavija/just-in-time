@@ -944,7 +944,8 @@
       "id": "pool-runner-timeouts",
       "summary": "cargo-pool-run waits for a jobserver token inside nextest's per-test timer, so millisecond tests TIMEOUT at 20 s under parallel load. Not content failures; land-one retries TIMEOUT-only failures. f487aeef must not tighten limits until settled (D-43).",
       "status": "with the user via steward"
-    }
+    },
+    "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1147,11 +1148,11 @@
       "review": "lead PASS (7c) at 8449ca2ac; REQ-03 via ListEnvelope; lines +11 vs main"
     },
     "cd8e04cc": {
-      "status": "dispatched",
+      "status": "reviewed",
       "vendor": "Claude Sonnet",
       "reason": "rework 1: exit-code row bindings, split render line; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve 2cb30f0ac",
-      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge)."
+      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge). Rework 1 at e69f46779: lead PASS; rows narrowed to worktree info/list with one binding each; WorktreesKey moved into collection_keys!. Whole-tree run left to branch CI (worker's locked run starved behind gate runs)."
     },
     "8e91126b": {
       "status": "landed_gating",
