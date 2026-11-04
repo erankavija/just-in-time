@@ -1,0 +1,61 @@
+path dependencies
+  jit-binary     /mnt/nvme/jit/agents/worktrees/agent-5d774061/target/release/jit
+  git            /usr/bin/git
+  rsync          /usr/bin/rsync
+  python3        /usr/bin/python3
+  gf2-repo       /home/vkaskivuo/Projects/gf2
+  gf2-log        /home/vkaskivuo/Projects/gf2/.jit/events.jsonl
+  jit-repo       /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5d774061
+  jit-log        /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5d774061/.jit/events.jsonl
+  work-root      /mnt/nvme/jit/tmp/9876-workers/bench/bench-run
+
+build and sources
+  jit-version    jit 1.0.0 (profile release)
+  jit-sha256     19562138db8c3ea40a0047201720df431dc22fca34e780d4bce4cad31a882798
+  jit-head       4ef3977ab2911a4a8906861e6596a100450f9069
+
+fixtures
+  jit <- /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5d774061 (log x1)
+
+fixture sizes
+  fixture    source-log  fixture-log  multiple  issues  leases
+  jit           5328789      5328789     1.00x    1861  source [worktree] section
+
+machine
+  cpu            AMD Ryzen 9 5900X 12-Core Processor
+  cores          24
+  kernel         7.2.11-arch1-1
+  fixture-fs     ext4
+  max-load       2.0 (BENCH_MAX_LOAD)
+  loadavg-start  1.98 2.48 4.56 1/1863 530060
+
+runs (5 per scenario)
+jit      pair 1  whole-first  whole  3406 ms  issue   281 ms  diff  -3125 ms  (exits 0,0)
+jit      pair 2  issue-first  whole  3413 ms  issue   286 ms  diff  -3127 ms  (exits 0,0)
+jit      pair 3  whole-first  whole  3411 ms  issue   290 ms  diff  -3121 ms  (exits 0,0)
+jit      pair 4  issue-first  whole  3450 ms  issue   289 ms  diff  -3161 ms  (exits 0,0)
+jit      pair 5  whole-first  whole  3451 ms  issue   292 ms  diff  -3159 ms  (exits 0,0)
+jit      pair 6  issue-first  whole  3442 ms  issue   295 ms  diff  -3147 ms  (exits 0,0)
+jit      pair 7  whole-first  whole  3435 ms  issue   283 ms  diff  -3152 ms  (exits 0,0)
+jit      validate-scope             286 ms  (runs: 285, 290, 286, 283, 293; exits 0,0,0,0,0)
+jit      validate-explain           280 ms  (runs: 280, 284, 287, 279, 276; exits 0,0,0,0,0)
+jit      validate-fix-dry-run      3564 ms  (runs: 3598, 3576, 3520, 3563, 3564; exits 0,0,0,0,0)
+jit      issue-create-human         126 ms  (runs: 143, 126, 127, 125, 123; exits 0,0,0,0,0)
+jit      issue-create-json          125 ms  (runs: 125, 124, 127, 126, 122; exits 0,0,0,0,0)
+jit      issue-create-quiet         127 ms  (runs: 125, 124, 129, 129, 127; exits 0,0,0,0,0)
+  loadavg-end    2.45 2.55 4.47 1/1833 575305
+
+pairs: validate (whole) against validate 9876a23a (issue), ms
+  whole-median               3435
+  issue-median               289
+  diff-median                -3147
+  diff-range (min..max)      -3161 -3121
+  bound (diff-median <= 0)   met
+
+median ms
+  validate-scope             286
+  validate-explain           280
+  validate-fix-dry-run      3564
+  issue-create-human         126
+  issue-create-json          125
+  issue-create-quiet         127
