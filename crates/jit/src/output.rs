@@ -102,7 +102,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
         counts.pending_deletions
     );
     render_diagnostics(&mut rendered, "Blockers", plan.blockers());
-    render_diagnostics(&mut rendered, "Warnings", plan.warnings());
+    render_diagnostics(&mut rendered, "Warnings", plan.plan_warnings());
 
     let _ = writeln!(rendered, "Artifacts ({}):", plan.count());
     for artifact in plan.artifacts() {
@@ -200,7 +200,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
             }
         }
         render_diagnostics(&mut rendered, "    blockers", artifact.blockers());
-        render_diagnostics(&mut rendered, "    warnings", artifact.warnings());
+        render_diagnostics(&mut rendered, "    warnings", artifact.plan_warnings());
     }
     if !plan.eligible() {
         let _ = writeln!(
@@ -247,7 +247,7 @@ pub fn render_archive_execution(
         result.reference_changes.len(),
         result.deleted_sources.len()
     );
-    for warning in &result.warnings {
+    for warning in &result.plan_warnings {
         let _ = writeln!(
             rendered,
             "warning: {}{}",
@@ -590,7 +590,7 @@ mod archive_render_tests {
             BlockerCode::DestinationConflict,
             Some("dev/archive/page.md"),
         )])
-        .with_warnings(vec![PlanWarning::new(
+        .with_plan_warnings(vec![PlanWarning::new(
             WarningCode::MissingEdgeTarget,
             Some("dev/active/missing.png"),
         )]);
@@ -3171,7 +3171,7 @@ mod tests {
     fn test_render_archive_execution_lists_counts_and_warnings_or_none() {
         use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
         use crate::domain::artifact_plan::{ContentIdentity, PlanTarget, PlanWarning, WarningCode};
-        let result = |warnings| ArchiveExecutionResult {
+        let result = |plan_warnings| ArchiveExecutionResult {
             schema_version: 1,
             target: PlanTarget::Document {
                 path: "docs/a.md".into(),
@@ -3186,7 +3186,7 @@ mod tests {
             reference_changes: Vec::new(),
             planned_deletions: Vec::new(),
             deleted_sources: vec!["docs/a.md".into()],
-            warnings,
+            plan_warnings,
             event_appended: true,
             reconciling: false,
         };

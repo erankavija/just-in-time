@@ -343,7 +343,7 @@ fn test_archive_plan_schema_v1_golden_fields() {
             "count",
             "artifacts",
             "blockers",
-            "warnings",
+            "plan_warnings",
         ])
     );
     assert_eq!(
@@ -363,7 +363,7 @@ fn test_archive_plan_schema_v1_golden_fields() {
             "pending_deletions",
             "evidence",
             "blockers",
-            "warnings",
+            "plan_warnings",
         ])
     );
     assert_eq!(

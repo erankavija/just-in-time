@@ -248,7 +248,7 @@ fn test_markdown_links_preserve_relative_and_root_relative_edge_metadata() {
             && edge.resolution_mode == EdgeResolutionMode::RootRelative
     }));
     assert!(root
-        .warnings()
+        .plan_warnings()
         .iter()
         .any(|warning| warning.code == WarningCode::ExternalEdge));
 }
@@ -325,12 +325,12 @@ fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
         .iter()
         .find(|entry| entry.source() == "docs/missing.png")
         .unwrap();
-    assert!(root.warnings().iter().any(|warning| {
+    assert!(root.plan_warnings().iter().any(|warning| {
         warning.code == WarningCode::MissingEdgeTarget
             && warning.path.as_deref() == Some("docs/missing.png")
     }));
     assert!(!missing
-        .warnings()
+        .plan_warnings()
         .iter()
         .any(|warning| warning.code == WarningCode::MissingEdgeTarget));
     assert_eq!(missing.destination(), None);
@@ -372,7 +372,7 @@ fn test_directory_link_target_is_navigation_while_regular_link_target_stays_an_a
         .iter()
         .any(|edge| edge.target.as_deref() == Some("docs/section")));
     assert!(!root
-        .warnings()
+        .plan_warnings()
         .iter()
         .any(|warning| warning.code == WarningCode::UnsupportedEdgeTarget));
     assert!(discovered
@@ -616,7 +616,7 @@ fn assert_dynamic_loading_warning(path: &str, content: &str) {
     let entry = &discovered.artifacts[0];
     assert!(
         entry
-            .warnings()
+            .plan_warnings()
             .iter()
             .any(|warning| warning.code == WarningCode::DynamicLoadingSuspected),
         "missing warning for {path}: {content}"
@@ -636,7 +636,7 @@ fn assert_no_dynamic_loading_warning(path: &str, content: &str) {
     let entry = &discovered.artifacts[0];
     assert!(
         !entry
-            .warnings()
+            .plan_warnings()
             .iter()
             .any(|warning| warning.code == WarningCode::DynamicLoadingSuspected),
         "unexpected warning for {path}: {content}"

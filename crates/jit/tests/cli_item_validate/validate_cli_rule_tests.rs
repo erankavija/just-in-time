@@ -585,7 +585,7 @@ fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
     let json: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(json["valid"], true);
     assert_eq!(json["warning_count"], 1);
-    assert_eq!(json["warnings"][0]["rule"], "review-placeholder");
+    assert_eq!(json["validation_warnings"][0]["rule"], "review-placeholder");
     assert_eq!(json["rule_findings"][0]["rule"], "review-placeholder");
 }
 

@@ -186,7 +186,7 @@ pub struct ValidationWarning {
 pub struct RepositoryValidationResponse {
     pub valid: bool,
     pub integrity_error: Option<String>,
-    pub warnings: Vec<ValidationWarning>,
+    pub validation_warnings: Vec<ValidationWarning>,
     pub warning_count: usize,
     pub membership_divergences: Vec<DivergenceView>,
     pub divergence_count: usize,
