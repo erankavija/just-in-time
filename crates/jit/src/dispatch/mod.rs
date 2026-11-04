@@ -46,6 +46,7 @@ pub enum Outcome<R> {
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    archive::output_schema,
     invariant::output_schema,
     #[cfg(test)]
     test_group::output_schema,
@@ -72,6 +73,9 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// }
 /// ```
 ///
+/// `storage: [Bounds]` makes the group generic over `S: Bounds`; `storage: Type`
+/// binds it to one concrete store, for operations only that store implements.
+///
 /// It generates `dispatch(command, ctx, out, err) -> anyhow::Result<ExitCode>`,
 /// which runs the leaf's handler and renders its outcome through
 /// [`crate::output::emit_outcome`], and `output_schema(cmd_path)`, which
@@ -81,13 +85,26 @@ macro_rules! command_group {
     (
         command: $command:ty,
         storage: [$($bound:tt)+],
-        leaves: {
+        leaves: { $($leaves:tt)+ }
+    ) => {
+        command_group!(@generate [<S: $($bound)+>] S, $command, { $($leaves)+ });
+    };
+    (
+        command: $command:ty,
+        storage: $storage:ty,
+        leaves: { $($leaves:tt)+ }
+    ) => {
+        command_group!(@generate [] $storage, $command, { $($leaves)+ });
+    };
+    (
+        @generate [$($generics:tt)*] $storage:ty, $command:ty,
+        {
             $( $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? ) -> $response:ty ),+ $(,)?
         }
     ) => {
-        pub fn dispatch<S: $($bound)+>(
+        pub fn dispatch $($generics)* (
             command: $command,
-            ctx: &$crate::dispatch::CommandContext<'_, S>,
+            ctx: &$crate::dispatch::CommandContext<'_, $storage>,
             out: &mut dyn ::std::io::Write,
             err: &mut dyn ::std::io::Write,
         ) -> ::anyhow::Result<$crate::output::ExitCode> {
@@ -108,6 +125,7 @@ macro_rules! command_group {
     };
 }
 
+pub mod archive;
 pub mod invariant;
 #[cfg(test)]
 mod test_group;

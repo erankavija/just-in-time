@@ -13,10 +13,12 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod archive;
 mod emit;
 pub mod failure;
 mod invariant;
 
+pub use archive::ArchiveTargetResponse;
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 
 use crate::declarations::{GateMode, GateStage};

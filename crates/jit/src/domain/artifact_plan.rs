@@ -37,6 +37,7 @@ enum CandidatesKey {}
 
 impl CollectionKey for CandidatesKey {
     const KEY: &'static str = "candidates";
+    const SCHEMA_NAME: Option<&'static str> = Some("ArchiveCandidates");
 }
 
 /// The wire schema version an archive envelope carries beside its collection.
@@ -939,6 +940,7 @@ enum ArtifactsKey {}
 
 impl CollectionKey for ArtifactsKey {
     const KEY: &'static str = "artifacts";
+    const SCHEMA_NAME: Option<&'static str> = Some("ArtifactPlan");
 }
 
 /// Fields of an [`ArtifactPlan`] beside its `artifacts`.

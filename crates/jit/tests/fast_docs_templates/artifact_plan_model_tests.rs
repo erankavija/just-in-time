@@ -1,8 +1,8 @@
 use jit::config::DocumentationConfig;
 use jit::domain::artifact_plan::{
-    ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion, BlockerCode, ContentIdentity,
-    PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
-    ARCHIVE_PLAN_SCHEMA_VERSION,
+    ArchiveCandidates, ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion,
+    BlockerCode, ContentIdentity, PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus,
+    WarningCode, ARCHIVE_PLAN_SCHEMA_VERSION,
 };
 use jit::domain::identity::IssueId;
 use jit::test_utils::issue_id;
@@ -377,4 +377,30 @@ fn test_archive_plan_schema_v1_golden_fields() {
             "pending_deletions",
         ])
     );
+}
+
+#[test]
+fn test_archive_candidates_envelope_derives_count_and_rejects_a_mismatched_count() {
+    let candidates = ArchiveCandidates::new(vec![configured_plan(
+        &issue_id(1),
+        vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
+        Vec::new(),
+        Vec::new(),
+    )]);
+    let wire = serde_json::to_value(&candidates).unwrap();
+
+    assert_eq!(
+        object_keys(&wire),
+        BTreeSet::from(["count", "candidates", "schema_version"])
+    );
+    assert_eq!(wire["count"], 1);
+    assert_eq!(wire["schema_version"], 1);
+    assert_eq!(
+        serde_json::from_value::<ArchiveCandidates>(wire.clone()).unwrap(),
+        candidates
+    );
+
+    let mut mismatched = wire;
+    mismatched["count"] = json!(2);
+    assert!(serde_json::from_value::<ArchiveCandidates>(mismatched).is_err());
 }
