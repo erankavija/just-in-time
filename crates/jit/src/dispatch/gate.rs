@@ -256,7 +256,12 @@ fn preset_apply<S: IssueStore + RepositoryStateStore>(
     let mut warnings = Vec::new();
     let mut lock_timed_out = false;
     for id in ids {
-        match resolve_issue(ctx.executor.storage(), &id).and_then(|id| {
+        let resolved = resolve_issue(ctx.executor.storage(), &id);
+        if let Ok(issue) = &resolved {
+            // A foreign lease is an authorization failure, not a per-gate error.
+            ctx.executor.refuse_foreign_lease(issue)?;
+        }
+        match resolved.and_then(|id| {
             ctx.executor.gates().apply_gate_preset(
                 &id,
                 &report.preset,
