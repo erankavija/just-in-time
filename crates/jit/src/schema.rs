@@ -706,12 +706,6 @@ impl CommandSchema {
                 "TemplateApplyResponse",
             ),
 
-            // Top-level `rdeps` runs the `graph rdeps` leaf and shares its response.
-            "rdeps" => (
-                Some(schema_to_value::<GraphDownstreamResponse>()),
-                "GraphDownstreamResponse",
-            ),
-
             "gate_list" => (
                 Some(schema_to_value::<GateListResponse>()),
                 "GateListResponse",

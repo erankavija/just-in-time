@@ -127,6 +127,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     graph::output_schema,
+    graph::rdeps::output_schema,
     invariant::output_schema,
     #[cfg(test)]
     test_group::output_schema,

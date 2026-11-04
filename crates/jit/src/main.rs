@@ -18,7 +18,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
+    GateCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
@@ -1462,7 +1462,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     // so `jit rdeps <id>` and `jit list` resolve to `jit graph rdeps` /
     // `jit issue list` and reuse those handlers verbatim.
     let command = match command {
-        Commands::Rdeps { id, depth } => Commands::Graph(GraphCommands::Rdeps { id, depth }),
         Commands::List { filters, full } => Commands::Issue(IssueCommands::List { filters, full }),
         other => other,
     };
@@ -1650,8 +1649,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Rdeps { .. } | Commands::List { .. } => {
-            unreachable!("top-level rdeps/list are normalized to canonical commands above")
+        Commands::List { .. } => {
+            unreachable!("top-level list is normalized to its canonical command above")
         }
         Commands::Version => unreachable!("version is handled before repository validation"),
         Commands::Issue(issue_cmd) => {
@@ -4181,6 +4180,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         },
         Commands::Graph(graph_cmd) => {
             return graph::dispatch(graph_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
+        Commands::Rdeps { id, depth } => {
+            return graph::rdeps::dispatch(
+                graph::RdepsArgs { id, depth },
+                &ctx,
+                &mut io::stdout(),
+                &mut io::stderr(),
+            );
         }
         Commands::Events(event_cmd) => match event_cmd {
             EventCommands::Tail { n } => {

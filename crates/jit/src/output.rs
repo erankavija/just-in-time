@@ -1403,17 +1403,26 @@ pub struct IssueSearchQuery {
 
 /// Declares the [`CollectionKey`] marker for each list-envelope collection key.
 macro_rules! collection_keys {
-    ($($(#[$meta:meta])* $marker:ident = $key:literal;)+) => {$(
+    ($($(#[$meta:meta])* $marker:ident = $key:literal $(as $schema:literal)?;)+) => {$(
         $(#[$meta])*
         pub enum $marker {}
 
         impl CollectionKey for $marker {
             const KEY: &'static str = $key;
+            $(const SCHEMA_NAME: Option<&'static str> = Some($schema);)?
         }
     )+};
 }
 
 collection_keys! {
+    /// Collection key of [`GraphDownstreamResponse`].
+    DependentsKey = "dependents" as "GraphDownstreamResponse";
+    /// Collection key of [`GraphRootsResponse`].
+    RootsKey = "roots" as "GraphRootsResponse";
+    /// Collection key of [`GraphDepsTreeResponse`].
+    GraphDepsNodesKey = "nodes" as "GraphDepsTreeResponse";
+    /// Collection key of [`GraphTreeResponse`].
+    GraphTreeNodesKey = "nodes" as "GraphTreeResponse";
     IssuesKey = "issues";
     DivergencesKey = "divergences";
     ByStateKey = "by_state";
@@ -1528,38 +1537,6 @@ pub enum BlockedReasonType {
 // ============================================================================
 // Graph Response Types
 // ============================================================================
-
-/// Collection key of [`GraphDownstreamResponse`].
-pub enum DependentsKey {}
-
-impl CollectionKey for DependentsKey {
-    const KEY: &'static str = "dependents";
-    const SCHEMA_NAME: Option<&'static str> = Some("GraphDownstreamResponse");
-}
-
-/// Collection key of [`GraphRootsResponse`].
-pub enum RootsKey {}
-
-impl CollectionKey for RootsKey {
-    const KEY: &'static str = "roots";
-    const SCHEMA_NAME: Option<&'static str> = Some("GraphRootsResponse");
-}
-
-/// Collection key of [`GraphDepsTreeResponse`].
-pub enum GraphDepsNodesKey {}
-
-impl CollectionKey for GraphDepsNodesKey {
-    const KEY: &'static str = "nodes";
-    const SCHEMA_NAME: Option<&'static str> = Some("GraphDepsTreeResponse");
-}
-
-/// Collection key of [`GraphTreeResponse`].
-pub enum GraphTreeNodesKey {}
-
-impl CollectionKey for GraphTreeNodesKey {
-    const KEY: &'static str = "nodes";
-    const SCHEMA_NAME: Option<&'static str> = Some("GraphTreeResponse");
-}
 
 /// Response for `graph downstream` command
 pub type GraphDownstreamResponse = ListEnvelope<DependentsKey, MinimalIssue, IssueScope>;

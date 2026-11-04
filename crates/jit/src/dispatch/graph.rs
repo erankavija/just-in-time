@@ -14,6 +14,13 @@ use crate::storage::{IssueStore, RepositoryStateStore};
 use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
 use std::path::Path;
 
+/// The arguments of the top-level `jit rdeps <id>` alias, which runs the
+/// `graph rdeps` leaf.
+pub struct RdepsArgs {
+    pub id: String,
+    pub depth: u32,
+}
+
 fn deps<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
@@ -108,15 +115,19 @@ fn export<S: IssueStore + RepositoryStateStore>(
     // so no crossing edge is dropped silently (REQ-06).
     let (document, warnings) = if format == GraphExportFormat::Batch {
         let export = ctx.executor.graph().export_graph_batch(scope.as_ref())?;
-        let warnings: Vec<String> = export
-            .boundary_edges
-            .iter()
-            .map(|edge| {
-                format!(
-                    "excluded edge crossing the scope boundary: {} -> {}",
-                    edge.from, edge.to
+        // The old arm printed this block to stderr; as one warning it keeps the
+        // edges together and is reported under the `Warning:` prefix.
+        let warnings: Vec<String> = (!export.boundary_edges.is_empty())
+            .then(|| {
+                export.boundary_edges.iter().fold(
+                    format!(
+                        "Excluded {} edge(s) crossing the scope boundary:",
+                        export.boundary_edges.len()
+                    ),
+                    |block, edge| format!("{block}\n  {} -> {}", edge.from, edge.to),
                 )
             })
+            .into_iter()
             .collect();
         let text = GraphExportText(serde_json::to_string_pretty(&export.defs)?);
         (GraphExportOutput::Text(text), warnings)
@@ -158,6 +169,19 @@ command_group! {
     }
 }
 
+/// The top-level `rdeps` alias, registered under its own schema path.
+pub mod rdeps {
+    use super::*;
+
+    command_group! {
+        command: RdepsArgs,
+        storage: [IssueStore],
+        leaves: {
+            "rdeps" => args => rdeps(args.id, args.depth) -> GraphDownstreamResponse,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::dispatch::registered_output_schema;
@@ -171,10 +195,19 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_output_schema_top_level_rdeps_names_downstream_envelope() {
-        let resolved = CommandSchema::resolve_output_schema("rdeps").unwrap();
+    fn test_output_schema_top_level_rdeps_names_downstream_envelope() {
+        let registered = registered_output_schema("rdeps").unwrap();
 
-        assert_eq!(resolved.success, "GraphDownstreamResponse");
+        assert_eq!(registered.success, "GraphDownstreamResponse");
+    }
+
+    #[test]
+    fn test_resolve_output_schema_top_level_rdeps_matches_graph_rdeps() {
+        let top_level = CommandSchema::resolve_output_schema("rdeps").unwrap();
+        let graph = CommandSchema::resolve_output_schema("graph_rdeps").unwrap();
+
+        assert_eq!(top_level.success, graph.success);
+        assert_eq!(top_level.success_schema, graph.success_schema);
     }
 
     #[test]
