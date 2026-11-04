@@ -14,21 +14,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "a3ca6ca4-8c15-464d-8243-c88cd27bf76a",
+      "run_id": "bf940158-24a8-41ab-a5bf-297ae71dec2b",
       "status": "passed",
-      "updated_at": "2026-11-04T07:35:45.571452214Z",
+      "updated_at": "2026-11-04T07:49:36.734127409Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-selftest": {
-      "run_id": "595e38ee-5c83-4699-a5f8-14c2495c3a4f",
+      "run_id": "2941b142-816c-44fd-aa2e-e904109ea40e",
       "status": "passed",
-      "updated_at": "2026-11-04T07:35:52.416470349Z",
+      "updated_at": "2026-11-04T07:49:43.677584525Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "9c1a9f5c-7f3d-42e2-95c6-cafccb83f3ac",
-      "status": "failed",
-      "updated_at": "2026-11-04T07:39:01.505074466Z",
+      "run_id": "e85bd3ea-ce21-4b74-8dbc-c2431eff51db",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:53:02.923864632Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "ready",
   "title": "CI runs own and remove their temporary directory",
-  "updated_at": "2026-11-04T07:39:47.037168680Z"
+  "updated_at": "2026-11-04T07:53:02.923864632Z"
 }
