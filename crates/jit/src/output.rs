@@ -739,6 +739,9 @@ impl<T: Serialize> JsonOutput<T> {
 #[derive(Debug, Serialize)]
 pub struct JsonError {
     pub error: ErrorDetail,
+    /// Serialized as the top-level `warnings` array only when non-empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 impl JsonError {
@@ -754,7 +757,14 @@ impl JsonError {
                 details: None,
                 suggestions: Vec::new(),
             },
+            warnings: Vec::new(),
         }
+    }
+
+    /// Add the warnings listed beside `error`.
+    pub fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = warnings;
+        self
     }
 
     /// Add details to the error

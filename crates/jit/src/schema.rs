@@ -129,16 +129,19 @@ impl OutputSchema {
             {
                 properties
                     .entry(crate::output::WARNINGS_FIELD)
-                    .or_insert_with(|| {
-                        json!({
-                            "type": "array",
-                            "items": { "type": "string" },
-                            "description": "Warnings the command reported; present only when non-empty."
-                        })
-                    });
+                    .or_insert_with(Self::warnings_property);
             }
         }
         self
+    }
+
+    /// The optional `warnings` property of success and failure envelopes.
+    fn warnings_property() -> Value {
+        json!({
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Warnings the command reported; present only when non-empty."
+        })
     }
 
     /// The output schema of a command whose success response is `T`.
@@ -932,6 +935,7 @@ impl CommandSchema {
                 "type": "object",
                 "properties": {
                     "success": { "type": "boolean", "const": false },
+                    "warnings": OutputSchema::warnings_property(),
                     "error": {
                         "type": "object",
                         "properties": {

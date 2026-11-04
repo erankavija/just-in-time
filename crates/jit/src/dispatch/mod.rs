@@ -40,11 +40,13 @@ pub enum Outcome<R> {
         warnings: Vec<String>,
     },
     /// Findings that fail the command: `code` is the envelope code and exit
-    /// status, and `report` is the envelope's `error.details`.
+    /// status, and `report` is the envelope's `error.details`. `warnings`
+    /// render as on a success, beside `error` under `--json`.
     Findings {
         code: ErrorCode,
         message: String,
         report: Box<dyn Report>,
+        warnings: Vec<String>,
     },
 }
 
@@ -67,16 +69,30 @@ impl<R> Outcome<R> {
         }
     }
 
-    /// This outcome with `warnings` appended when it is a success.
+    /// Findings that fail the command, with no warnings.
+    pub fn findings(
+        code: ErrorCode,
+        message: impl Into<String>,
+        report: impl Report + 'static,
+    ) -> Self {
+        Self::Findings {
+            code,
+            message: message.into(),
+            report: Box::new(report),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// This outcome with `warnings` appended.
     #[must_use]
     pub fn with_warnings<I>(mut self, warnings: I) -> Self
     where
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        if let Self::Success { warnings: own, .. } = &mut self {
-            own.extend(warnings.into_iter().map(Into::into));
-        }
+        let (Self::Success { warnings: own, .. } | Self::Findings { warnings: own, .. }) =
+            &mut self;
+        own.extend(warnings.into_iter().map(Into::into));
         self
     }
 }

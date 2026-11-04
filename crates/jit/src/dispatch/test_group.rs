@@ -52,11 +52,11 @@ fn flag<S: IssueStore>(
     _ctx: &CommandContext<'_, S>,
     reason: String,
 ) -> anyhow::Result<Outcome<CountResponse>> {
-    Ok(Outcome::Findings {
-        code: FINDINGS_CODE,
-        message: format!("flagged because {reason}"),
-        report: Box::new(FlagReport { reason }),
-    })
+    Ok(Outcome::findings(
+        FINDINGS_CODE,
+        format!("flagged because {reason}"),
+        FlagReport { reason },
+    ))
 }
 
 fn fail<S: IssueStore>(_ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<FlagReport>> {
