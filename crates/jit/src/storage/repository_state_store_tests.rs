@@ -1972,7 +1972,7 @@ fn put_file(path: VirtualPath, bytes: &[u8]) -> PutFile {
     }
 }
 
-/// An append at `offset`, the log length the mutation read.
+/// An append at `offset`, the log's committed length when the mutation read it.
 fn event_append(offset: u64) -> Option<EventAppend> {
     Some(EventAppend {
         offset,
@@ -2516,7 +2516,7 @@ impl crate::storage::MutationInterruptionInjector for InterruptAtMoment {
     }
 }
 
-/// One data file published and one event appended at the log length the
+/// One data file published and one event appended at the committed length the
 /// interrupted mutation captured.
 fn leftover_record() -> RedoRecord {
     RedoRecord::new(

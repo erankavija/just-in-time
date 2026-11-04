@@ -66,9 +66,9 @@ pub use materialize::{
 pub(crate) use mutation::MutationContextFactory;
 pub(crate) use mutation::{canonical_json, captured_gate_run_ids, created_issue, mutated_issue};
 pub use mutation::{
-    finalize, fresh_index_bytes, prefix_has_torn_tail, serialize_event, serialize_gate_run,
-    serialize_issue, IdAuthority, MutationClock, MutationContext, MutationContextAnnotation,
-    MutationError, MutationIntent, SystemMutationClock,
+    finalize, fresh_index_bytes, serialize_event, serialize_gate_run, serialize_issue, IdAuthority,
+    MutationClock, MutationContext, MutationContextAnnotation, MutationError, MutationIntent,
+    SystemMutationClock,
 };
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,

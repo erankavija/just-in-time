@@ -2959,7 +2959,7 @@ template = true
             chrono::DateTime::UNIX_EPOCH,
         ))
         .unwrap();
-        for tail in [b"{\"torn\":".as_slice(), &complete_record] {
+        for tail in [b"{\"partial\":".as_slice(), &complete_record] {
             let (temp, _) = setup_test_repo().unwrap();
             let executor = file_executor(temp.path()).unwrap();
             let package = package_read_from(&temp, FIXTURE_LOCATION);

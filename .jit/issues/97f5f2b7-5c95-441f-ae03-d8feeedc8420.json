@@ -17,15 +17,29 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "a13574e0-a497-41fe-98ec-87ebabdc9442",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:54:11.698154128Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e06accf0-8a3c-421e-a9bf-ecbcd8038fd5",
+      "status": "failed",
+      "updated_at": "2026-11-04T00:59:57.036655432Z",
+      "updated_by": "auto:executor"
+    },
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-11-02T23:39:49.585143444Z",
-      "updated_by": null
+      "run_id": "e1a3b095-5e12-41a1-8c4f-ece62edceccf",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:56:05.437692647Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-11-02T23:39:49.585143444Z",
-      "updated_by": null
+      "run_id": "08825b97-9bdb-4c6f-98b9-0f8fb4a52d5b",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:56:08.713780638Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "97f5f2b7-5c95-441f-ae03-d8feeedc8420",
@@ -45,5 +59,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The profile torn-tail marker is gone",
-  "updated_at": "2026-11-04T00:02:41.399934998Z"
+  "updated_at": "2026-11-04T00:59:57.036655432Z"
 }
