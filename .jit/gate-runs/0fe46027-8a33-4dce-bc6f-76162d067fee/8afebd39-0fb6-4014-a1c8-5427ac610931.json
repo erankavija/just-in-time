@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:31:32.961737082Z",
+  "duration_ms": 318281,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable dependency-handler requirements are met; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0fe46027-8a33-4dce-bc6f-76162d067fee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8afebd39-0fb6-4014-a1c8-5427ac610931",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:26:14.680064007Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6bb2023b6; 71aa20c1b\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown); @/invariant/dag-acyclic, architecture-dependency-direction, orthogonal-tests, essential-code-prose, single-source-prose (invariants registry); @/charter/D-4, D-13 (vision charter)\nGate evidence: cargo-ci passed (2026-11-04T09:14:58Z); mcp-ci passed (2026-11-04T09:14:58Z); code-review pending\nTruncation recovery: Re-read the tagged implementation per path; inspected the merge’s combined diff and parent-specific comparisons. Mainline-only second-parent changes were outside this issue’s impact cone.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable dependency-handler requirements are met; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

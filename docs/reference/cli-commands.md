@@ -3272,13 +3272,18 @@ jit validate --branch-drift [--leases] [--json]
 | Mode | What it does |
 |------|--------------|
 | (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence) plus every local and graph rule. |
-| `<ID>` | The local and graph rules for that issue only. |
+| `<ID>` | The findings concerning that issue. |
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
-| `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Rules evaluate over the whole repository, so coverage children and dependency targets outside the closure count. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
+| `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
+
+The per-issue, `--rule`, `--explain`, and `--scope` modes are views: selections
+of the one whole-repository report, with rules evaluated over the whole
+repository. What each view admits and how it fails is specified under
+[views](worktree-validate.md#views).
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
 `--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`. `--rule` requires a
@@ -3525,7 +3530,8 @@ jit invariant check [--json]
 
 Reports enforcement drift in the declared-but-unenforced direction: an invariant
 whose `enforced-by` names a rule or gate that does not load. Bindings are
-declarations, and this check never executes them. Exits `4` when any drift is
+declarations, and this check never executes them. An unloadable rule set makes
+every rule binding drift; an unloadable gate registry fails the command. Exits `4` when any drift is
 present (see the [exit-code reference](exit-codes.md#command-specific-mappings)).
 With no drift, JSON uses the list envelope `{"count": 0, "findings": []}`. Drift
 under `--json` returns the `VALIDATION_FAILED` error envelope and preserves the

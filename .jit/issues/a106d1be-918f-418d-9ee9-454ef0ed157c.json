@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T08:33:00.132264421Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -9,12 +9,26 @@
   ],
   "description": "Make each built-in validation gate checker compute the one report over its captured image and report the selection the plan's `checker-selections` contract assigns it, deleting the checkers' private pipelines.\n\n## Background\n\n- Dispatch: `execute_builtin_checker_with_repository_view` (`crates/jit/src/commands/gate_check.rs:1052-1200`). The repository checker calls `validate_repository_report` (`:1083-1086`), the whole capture that also reads every gate run and the whole event log for record fidelity; it is one of the two history readers f8a6b298 names under its DEC-19. The issue checker calls `captured_issue_rule_report` (`:423-485`), the label-target checker `label_target_report` (`:643-674`) and then `captured_scope_rule_report` (`:487-564`), and both call `repository_rule_report` (`:413-421`), a full repository validation, only to keep its dangling-link and drift findings. The rule checker calls `rule_validation_outcome` (`crates/jit/src/commands/validate.rs:1114-1174`) and records its `RuleSelectionFault` as an `error` run (`gate_check.rs:1089-1093`); the CLI rule view, its other caller, already selects from the report.\n- The label-target checker evaluates graph rules over the scope slice (`evaluate_graph_scoped`, `gate_check.rs:536`); the issue checker keeps every configuration error of a rule matching the issue (`:469-472`).\n- Built-in checker faults record `error` runs (`builtin_fault_run`, `:678`), while findings about repository content record `failed`. A missing or repeated target label, an empty namespace and an unresolvable or ambiguous target are faults today (`:659-673`), as is an unloadable rule set.\n- Tests that re-prove filtering: `gate_check.rs:3186` (`test_repository_validation_warns_for_sorted_placeholder_gate_keys`, which calls `review_placeholder_findings`), `:3213,3238,3258,3282,3316` (label target), `:3347,3445,3508` (rule validation); `run_rules(None)` comparisons at `:2979,3415`. The fault classification is asserted at `:3531,3568`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the repository, issue, rule and label-target checkers computes one report over its image and converts the selection the contract assigns it; `repository_rule_report`, `captured_issue_rule_report`, `captured_scope_rule_report` and `rule_validation_outcome` no longer exist. The repository checker keeps its history-reading capture; the issue, rule and label-target checkers read no event-log history and no gate-run listing.\n- [hard] REQ-02: One harness test shows, for one image and each checker kind, that the checker's findings equal the findings `jit validate` reports for the same selection.\n- [hard] REQ-03: A run's status keeps the fault classification: an unloadable rule set, a `RuleSelectionFault`, and a missing, repeated, unresolvable or ambiguous target label record `error`; a content finding records `failed`.\n- [hard] REQ-04: The listed checker tests are reduced to that wiring or removed where the selection tests own the property, and they no longer call the executor's placeholder pass or `run_rules`.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: REQ-01's \"read no event-log history and no gate-run listing\" concerns the report's inputs. The shared gate-evaluation capture that discovers the gate-run listing and event tail to publish the run (`capture_gate_evaluation_image`) is outside it and stays.\n\n## Notes\n\n- Behaviour changes: the label-target checker evaluates rules over the whole repository, so coverage children and dependency targets outside the target's subtree count; the issue checker's configuration errors narrow to the gated issue's subject or rule. With an unloadable rule set the issue checker keeps recording an `error` run, where `jit validate <id>` reports the `rules-file` finding.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T09:34:30.380238780Z",
   "first_ready_at": "2026-11-04T08:29:20.183040762Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0df58df7-2a4b-4deb-8e54-838ea0dadf15",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:29:13.377120958Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "03896858-9db4-45b0-83c3-f1091ab6e6d1",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:34:06.219143775Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a106d1be-918f-418d-9ee9-454ef0ed157c",
   "labels": [
     "type:task",
@@ -28,7 +42,7 @@
     "satisfies:9876a23a/REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Built-in validation gate checkers select from the report",
-  "updated_at": "2026-11-04T08:33:00.132264421Z"
+  "updated_at": "2026-11-04T09:34:30.380238780Z"
 }

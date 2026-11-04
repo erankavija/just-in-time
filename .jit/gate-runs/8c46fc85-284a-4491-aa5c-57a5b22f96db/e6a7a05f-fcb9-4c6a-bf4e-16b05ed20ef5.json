@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a8ccd1175f8b4eef00faceeb1d4687c4a209a3a5",
+  "completed_at": "2026-11-04T09:27:32.968907481Z",
+  "duration_ms": 369567,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Serve handler migration satisfies the issue-scoped criteria with typed output, error classification, schema, documentation, and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8c46fc85-284a-4491-aa5c-57a5b22f96db",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e6a7a05f-fcb9-4c6a-bf4e-16b05ed20ef5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:21:23.401226904Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ddce91a4b, a30b6b580, 4079fa5c3, 2c008abc0, cad19bb90, c3d5c52a5, 0812f4bc7 (uncommitted changes excluded)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: REQ-01, REQ-02, REQ-09, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 (issue markdown); D-01, D-02 (issue markdown); @/inv/architecture-dependency-direction, @/inv/canonical-cutover, @/inv/essential-code-prose, @/inv/orthogonal-tests, @/inv/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:14:57Z); mcp-ci passed (2026-11-04T09:14:57Z)\nTruncation recovery: split truncated patch/source searches into per-file and line-range reads; excluded unrelated merge paths outside the serve impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Serve handler migration satisfies the issue-scoped criteria with typed output, error classification, schema, documentation, and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

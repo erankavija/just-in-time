@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2894302d320815926d9f17a26b15e529c0cf96e1",
+  "completed_at": "2026-11-04T09:21:23.183875274Z",
+  "duration_ms": 386180,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The init and apply handler migration meets the issue-scoped dispatch, response, schema, failure, exit-code, and regression criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8f297e60-a74e-4efa-bdcc-54659f9959a4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "52e58de7-249b-44bb-a132-88ac03a8c4d0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:14:57.003614611Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 196488227, 844e5262a, 3a15d9ebe, 8f3bdb4e8, 0e3e6379b, 2a758ab62, 097aa2ce3, 07459d8d8\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 (issue description); @/invariant/architecture-dependency-direction, essential-code-prose, orthogonal-tests, shared-test-contracts, semantic-test-assertions, canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-11-04T09:14:56.741300366+00:00); mcp-ci passed (exit code unavailable, 2026-11-04T09:14:56.878689844+00:00)\nTruncation recovery: reread tagged commits in path-scoped diffs; inspected current dispatch/output/template/schema/test paths; excluded historical gate logs and unrelated workflow records outside the footprint.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The init and apply handler migration meets the issue-scoped dispatch, response, schema, failure, exit-code, and regression criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
