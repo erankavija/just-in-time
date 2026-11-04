@@ -1388,8 +1388,14 @@
       "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing."
     },
     "5d09e74b": {
-      "status": "landing",
+      "status": "done",
       "review": "lead PASS at ec563eba2: domain/relative_path.rs, all importers moved, stale comment gone, structural test; +27 (b697a3f7 ledger)",
+      "epic": "b697a3f7"
+    },
+    "d58f80c9": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
       "epic": "b697a3f7"
     }
   },
