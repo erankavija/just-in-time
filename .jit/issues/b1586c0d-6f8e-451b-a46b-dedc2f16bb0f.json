@@ -27,23 +27,71 @@
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "2668e2a8d6e8ceb61d86915a076fa804531d42baa541c1e4bed4f93088df760a",
+          "content_hash": "dbe76daf6a7c9de12a0d131aaeebfd59cccadd39468626d96554a6fcd7a5cc0d",
           "is_shared": false,
           "mime_type": "text/markdown",
-          "original_path": "../../mcp-server/README.md",
-          "resolved_path": "mcp-server/README.md"
+          "original_path": "../how-to/validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md"
         },
         {
           "asset_type": "local",
-          "content_hash": "c0085e1647fc1454b9d830f682993b601abedc1da14fe6814dbd70d1c67ea2e7",
+          "content_hash": "b0a9ab138f026b9ae68a2a2a536a595f4ac5db04772d59f96493d301758084a8",
           "is_shared": false,
           "mime_type": "text/markdown",
-          "original_path": "../how-to/custom-gates.md",
-          "resolved_path": "docs/how-to/custom-gates.md"
+          "original_path": "storage-records.md",
+          "resolved_path": "docs/reference/storage-records.md"
         },
         {
           "asset_type": "local",
-          "content_hash": "d5cca4b888cdd11e52c98b106899bab88ab6483bbe8d7aa70ba904028b8184b0",
+          "content_hash": "493169f855cfea1b98acbf4770ac3162c95d7580c5fd193153875c14ed1d4141",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "298120e93582b6e91bdb30f0f5233f3444cd781a7de2b1d8b538a22946f7604e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/planning-bracket.md",
+          "resolved_path": "docs/concepts/planning-bracket.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "19ab3a5bdaaa09eb26676243f57441187092379292f9f8147c904de1f2258f2c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "claim.md",
+          "resolved_path": "docs/reference/claim.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e9c30e6e8a97e496d96229ba4c0cc896311af3fe365b53bf1c51a59dc11fe1d1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "error-codes.md",
+          "resolved_path": "docs/reference/error-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2ac943330b6dce1fc114e4fa621636f0e31b01a69be33e37562e2a771c6deb81",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "configuration.md",
+          "resolved_path": "docs/reference/configuration.md"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/BurntSushi/ripgrep",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "fc75aedff6ce4a033e4cf1001fe9d6582ba0191cf81c8d7be1b38ec4569b1306",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "../tutorials/quickstart.md",
@@ -51,7 +99,63 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "087619fd5f3258d5a81a19d03f3abb3435f2a9df61a635bbef39f5c36dea4dbd",
+          "content_hash": "a75f123fe3bf0eef09727cd2e6a73b72eea46c07f3d69a491e0d7111d0be3491",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/hierarchy-resolution.md",
+          "resolved_path": "docs/concepts/hierarchy-resolution.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "cd2aac8552a2ab988ad3e138c9d1b2a1a2614ea1d487b0798eb588d8183a798e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "gate-presets.md",
+          "resolved_path": "docs/reference/gate-presets.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1757f25c7959dbdba7753ace273bed62d395dd8353b477851bce7129d5b663f4",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../mcp-server/curated-tools.json",
+          "resolved_path": "mcp-server/curated-tools.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b78ae7c78a2bde2c702338c62e277bfb0feb51a3c19677b7e01904d925f1ee46",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "events.md",
+          "resolved_path": "docs/reference/events.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "c99802b9b1a2aebc42af28313d3135957942b9d703bdf171aef71b3e9398c133",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "44a80a739cc9872461be49fd31be5131db9932ebb801cc3b4077c845ec0f5911",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "65f78747d7e144d665959fb1640c6d9b200031598dab49d54a162f93a9058ee3",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "45c4cbf1c6d56a3584c557825cb33f05b3fbca1203b592b127e387ad0cd3c717",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "../concepts/core-model.md",
@@ -59,14 +163,38 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "6d41681da21ef225de0f993461c1097a0804f5af790f26b155217a6d224a69dc",
+          "content_hash": "74d8fa8df7ba9a61fada7d41534922b85c7b0ad37b508ebe5c8150d34461b71c",
           "is_shared": false,
           "mime_type": "text/markdown",
-          "original_path": "../concepts/planning-bracket.md",
-          "resolved_path": "docs/concepts/planning-bracket.md"
+          "original_path": "../how-to/mcp-integration.md",
+          "resolved_path": "docs/how-to/mcp-integration.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "705d112e5115ac04314f4f73e000dd179a9b19a811440356e5e249ad1de6fb59",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2bce1afe18a76d4b1cea56ec56ee1e0b688d0f2edca3832f2c755f41d629f02f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../mcp-server/README.md",
+          "resolved_path": "mcp-server/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8468c02ac01e5b17fe15eab6079f0e2695ed4f6e9551440e10d68428b351fdd5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "worktree-validate.md",
+          "resolved_path": "docs/reference/worktree-validate.md"
         }
       ],
-      "commit": null,
+      "commit": "f0add631d58304738db38e1746e6151969626dc2",
       "doc_type": "reference",
       "format": "markdown",
       "label": "unified gate key/status JSON shape",
@@ -101,5 +229,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Unify gate field naming across JSON outputs",
-  "updated_at": "2026-07-05T19:51:13.058871658Z"
+  "updated_at": "2026-11-04T22:16:24.833415928Z"
 }
