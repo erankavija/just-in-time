@@ -27,6 +27,14 @@ fn assert_one_head_lookup(stand_in: &jit::test_harness::git::GitStandIn, root: &
     );
 }
 
+#[cfg(unix)]
+fn assert_one_origin_url_lookup(stand_in: &jit::test_harness::git::GitStandIn, root: &Path) {
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(root));
+    assert_eq!(invocations[0].args(), ["remote", "get-url", "origin"]);
+}
+
 fn committed_repository(dir: &TempDir) -> GitRepository {
     let repository = GitRepository::init(dir.path().join("primary"));
     repository.write("README.md", "readme");
@@ -224,6 +232,52 @@ fn test_head_unstartable_program_returns_unavailable_error() {
         .unwrap_err();
 
     assert!(matches!(error, GitError::Unavailable { program: named, .. } if named == program));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_origin_url_existing_remote_returns_url_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("repo"));
+    let url = "https://example.test/team/repo.git";
+    repository.git(&["remote", "add", "origin", url]);
+    let stand_in = GitStandIn::new();
+
+    let result = checkout(Git::with_program(stand_in.program()), repository.root())
+        .origin_url()
+        .unwrap();
+
+    assert_eq!(result.as_deref(), Some(url));
+    assert_one_origin_url_lookup(&stand_in, repository.root());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_origin_url_missing_remote_returns_none_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("repo"));
+    let stand_in = GitStandIn::new();
+
+    let result = checkout(Git::with_program(stand_in.program()), repository.root())
+        .origin_url()
+        .unwrap();
+
+    assert_eq!(result, None);
+    assert_one_origin_url_lookup(&stand_in, repository.root());
+}
+
+#[test]
+fn test_origin_url_git_failure_returns_typed_error() {
+    let dir = TempDir::new().unwrap();
+    let missing = dir.path().join("missing");
+
+    let error = checkout(Git::default(), &missing).origin_url().unwrap_err();
+
+    assert!(matches!(error, GitError::UnexpectedOutput { .. }));
 }
 
 fn dirty_paths(repository: &GitRepository) -> BTreeSet<PathBuf> {
