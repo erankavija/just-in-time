@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ce5a9302-ffe7-4262-beb0-58dae9ba839f",
-      "status": "failed",
-      "updated_at": "2026-11-04T02:32:33.347076405Z",
+      "run_id": "ce2510fd-07e0-474b-9fa1-43072708b5c8",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:35:09.184406652Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -51,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Invariant command moves to a library handler",
-  "updated_at": "2026-11-04T02:32:33.347076405Z"
+  "updated_at": "2026-11-04T02:35:09.184406652Z"
 }
