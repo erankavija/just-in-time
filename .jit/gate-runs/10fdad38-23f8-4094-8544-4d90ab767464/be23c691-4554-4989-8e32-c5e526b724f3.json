@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9c5ea46cc9eb734edd5227ae95c1e73ba19bea80",
+  "completed_at": "2026-11-04T13:49:53.099054279Z",
+  "duration_ms": 276532,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; prior F1 is resolved by binding decision D-01.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "10fdad38-23f8-4094-8544-4d90ab767464",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "be23c691-4554-4989-8e32-c5e526b724f3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:45:16.566917391Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d7ce0ce (claim), a69d0f5 (refactor), 9c5ea46 (D-01 record)\nPolicy sources: AGENTS.md\nResolved items: REQ-01–REQ-05 and D-01 (issue description); @/invariant/canonical-cutover, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T13:38:07Z); prior code-review failed (exit 1, F1), superseded by binding D-01\nTruncation recovery: reread truncated refactor patches by individual source and test paths; targeted current-tree searches and production-line counts performed\n\n1. No findings. The shared test-support fixture directly calls `add_dependencies_with_policy`, as D-01 authorizes; all named wrappers are absent, output behavior is preserved, and production lines fell by 221.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; prior F1 is resolved by binding decision D-01.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
