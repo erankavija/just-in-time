@@ -127,9 +127,10 @@
           "short_id": "46a89061",
           "title": "Pinned revision reads move into the git module behind a bridge",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "pinned_configured_gates_running"
+          "worker_status": "merged_and_gated",
+          "source_merge": "734d7bdb497c08668f4e19353d6c70cde0460bf3"
         },
         {
           "id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
@@ -631,7 +632,8 @@
     "24d3b460 lead found extra PATH-resolved env executable introduced into default GitStandIn behavior. Worker replacing it with validated quoted shell environment assignments and direct absolute Git exec; no new private runner.",
     "Steward chooses D-19 over branch-listing history scan: head phase2 may experimentally use at most two direct Git processes with no unrelated ref/history/worktree walk or lazy network fetch. No Git minimum or criterion budget change yet approved; reconcile after evidence. Experiment report currently scratch /tmp/f4d9502a-lead/head-experiment-results.md.",
     "Steward temp policy: new focused tests use short unique owned /dev/shm TMPDIR and cleanup on exit; build caches remain disk. Pause new heavy launches/report if /tmp free inodes below20% or free bytes below4GiB. Do not alter running directories or generic /tmp contents.",
-    "df487 exact error-name corrections now landed05b00219f. Planning refresh remains required beforec506 and should include pending head contract reconciliation. Frontend lead owns fallible layout binding9c3; c506 will consume landed API, no concurrent server changes here."
+    "df487 exact error-name corrections now landed05b00219f. Planning refresh remains required beforec506 and should include pending head contract reconciliation. Frontend lead owns fallible layout binding9c3; c506 will consume landed API, no concurrent server changes here.",
+    "46a89061 completed after source734d7bdb4 and mergedCargo b768913f. Source slot releases directly to8cdispatchguard/install, then root061 and frontendabf per steward. Plan refresh native validation passes under approved DEC-24 existing-graph policy; independent planning review pending."
   ],
   "planning_reviews_pending": [
     {
@@ -688,6 +690,23 @@
       "deferred_items": "No linked documents.",
       "holistic": "Uses shared JitCli/GitStandIn; child-only PATH; adds module under existing CLI target.",
       "integration": "Merged source unchanged; intervening graph-validation and invalid-command hint changes do not alter reviewed process-budget logic. Actual pinned review evidence integrated; merged configured Cargo gate passed stable."
+    },
+    "46a89061": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "b768913f-35d2-4db0-a8d1-2819c0aec198",
+        "code-review": "a7e4e0e3-c3c6-459e-acdd-aa48f86d5ad9"
+      },
+      "reviewed_source": "1bba6d91f5eea5589f3e3c5ede055c09490fd20a",
+      "criteria": {
+        "REQ-01": "Pinned operations/results/error variants now canonical in storage Git module, using shared -C process constructor.",
+        "REQ-02": "git_revision.rs contains only delegating bridge and canonical reexports; no spawn.",
+        "REQ-03": "Existing behavior/capture/archive suites unchanged and full configured Cargo passed after merge."
+      },
+      "prior_findings": "None; first review.",
+      "stale_narrative": "Investigation and old handoff are historical evidence; current plan explicitly specifies producer/bridge and tracked removers.",
+      "deferred_items": "No issue-linked design documents or in-scope deferrals. Object-reader evolution and consumer migration remain distinct declared tasks.",
+      "holistic": "Single revision implementation and single process constructor; batch concurrent I/O preserved. Actual stable branch review evidence merged; integrated Cargo passed."
     }
   }
 }
