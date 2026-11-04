@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "860d8207e7761e5ee31866382b91403745fd9156",
+  "completed_at": "2026-11-04T11:08:42.952565853Z",
+  "duration_ms": 304504,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/gate.rs",
+        "id": "F1",
+        "line": 278,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1ac651c7/requirement/REQ-06",
+          "@/issue/1ac651c7/decision/D-01"
+        ],
+        "severity": "high",
+        "summary": "Preset-apply successful-target warnings changed format despite REQ-06."
+      }
+    ],
+    "summary": "Preset-apply warning formatting regressed outside the accepted D-01 output change.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1ac651c7-665b-40a5-b214-9abbc14e0534",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c543e28a-b11f-4a74-baa7-3142b7c9816e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T11:03:38.447939231Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 22881 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a63a-9163-7753-b835-fe66bf7f0093\n--------\nuser\n--- 22868 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 86c4ab98c, ac9220229, c269f5554, dede3af31, ac03aa9f1 (`jit:1ac651c7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/1ac651c7/requirement/REQ-06 and D-01, @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue descriptions); @/invariant/architecture-dependency-direction, orthogonal-tests, essential-code-prose, single-source-prose (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T11:01:43Z); code-review pending; mcp-ci passed (exit 0, 2026-11-04T11:03:21Z)\nTruncation recovery: path-scoped stats, name-status, and patches for tagged merges; separate bounded reads of core, tests, historical outputs, and linked plan/investigation sections\n\n1. **Blocking — issue-impact:** `gate preset apply` changes successful-target warning text from `Warning (<id>): <warning>` to `Warning: (<id>): <warning>` at [crates/jit/src/dispatch/gate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/gate.rs:278), because the common emitter adds its own colon. D-01 permits moving only the per-gate error list; it does not permit this warning-format change. The new test checks merely for `Warning:` and misses the regression. This violates REQ-06. References: @/issue/1ac651c7/requirement/REQ-06, @/issue/1ac651c7/decision/D-01.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Preset-apply warning formatting regressed outside the accepted D-01 output change.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Preset-apply successful-target warnings changed format despite REQ-06.\",\"file\":\"crates/jit/src/dispatch/gate.rs\",\"line\":278,\"references\":[\"@/issue/1ac651c7/requirement/REQ-06\",\"@/issue/1ac651c7/decision/D-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
