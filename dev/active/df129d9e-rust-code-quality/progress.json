@@ -919,7 +919,7 @@
     "b51291e4": 2,
     "1ac651c7": 2,
     "cd8e04cc": 2,
-    "cc4ea8a9": 1,
+    "cc4ea8a9": 2,
     "1a4f2ebd": 1
   },
   "surfaced_pitfalls": [
@@ -1146,12 +1146,12 @@
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "cc4ea8a9": {
-      "status": "reviewed",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "resume after 8f297e60 on main; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "review_note": "8f297e60 (2a758ab62) made an unreadable --values-file an InvalidArgumentError: profile apply's plain form now exits 2 (was 3); its --json form still exits 1 via profile_json_error until this issue migrates the arm. On review: both forms should exit 2, with a profile apply row and dual-form binding.",
       "note": "lead-preserve b7827c17a; waits for 8f297e60 on main",
-      "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT. Lead merged main (additive; unused imports dropped)."
+      "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT. Lead merged main (additive; unused imports dropped). Branch CI failed: profile add missing archive -> GENERIC_ERROR (untyped anyhow string at commands/profile.rs ~1368, hidden before by profile_json_error). Rework 2 of 2 to Codex gpt-6.1-sol: type it via ProfileResolutionError."
     },
     "52110fb4": {
       "status": "done",
