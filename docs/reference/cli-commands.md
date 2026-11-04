@@ -3586,10 +3586,11 @@ JSON uses the list envelope, with the query echoed back:
 
 `path` is the file's path as the matcher reports it, and `issue_id` is the issue
 the file belongs to, or `null` for a file that is not an issue record. `matches`
-gives each match's byte offsets within `line_text`. A missing ripgrep
-returns the error envelope with code `RIPGREP_NOT_FOUND`; any other matcher
-failure returns `SEARCH_FAILED`. Both exit `10` (external dependency failed; see
-the [exit-code reference](exit-codes.md)).
+gives each match's byte offsets within `line_text`. Missing ripgrep and other
+matcher failures use `RIPGREP_NOT_FOUND` and `SEARCH_FAILED`, respectively; see
+the generated [error-code reference](error-codes.md) and
+[command-specific exit-code mappings](exit-codes.md#command-specific-mappings)
+for their canonical meanings and statuses.
 
 To search issue fields rather than raw storage lines, use
 [`jit issue search`](#searching-issues-jit-issue-search); to search addressable
