@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "acabe5453bfaaabff23e873c140885e6edbc380c",
+  "completed_at": "2026-11-04T20:42:27.818758546Z",
+  "duration_ms": 286547,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh",
+        "id": "F1",
+        "line": 72,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/5f12265a/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Hashed WebAssembly artifacts are excluded from generation pruning."
+      }
+    ],
+    "summary": "Hashed WebAssembly artifacts are excluded from generation pruning.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f12265a-8850-40ce-bb42-09c13e5c96ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "89856a23-bd7f-4854-b73a-4b06e9d19d8b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T20:37:41.270847427Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2625 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a848-2005-72b2-a034-e14e562b13d7\n--------\nuser\n--- 2612 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 27f5fa4c6 `fix(jit:5f12265a): retain only current reusable cache artifacts`\nPolicy sources: AGENTS.md\nResolved items: @/issue/5f12265a/requirement/REQ-01–REQ-05 (.jit/issues/5f12265a-8850-40ce-bb42-09c13e5c96ef.json, markdown-first); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/worktree-cache-test (.jit/gates.toml)\nGate evidence: worktree-cache-test passed (exit 0; 116 passed, 0 failed); code-review pending\nTruncation recovery: Re-read test-worktree-cache.sh lines 165–292 after the combined current-file read truncated.\n\n1. **[blocking][issue-impact] F1:** `prune_cache` recognizes only a fixed extension list, so hashed Cargo artifacts such as `foo-<hash>.wasm` never match a generation key and are never pruned. Reclaiming successive WebAssembly builds therefore retains superseded generations, violating REQ-02. Add grouping for these artifact suffixes and fixture coverage. `.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh:72` (`@/issue/5f12265a/requirement/REQ-02`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Hashed WebAssembly artifacts are excluded from generation pruning.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Hashed WebAssembly artifacts are excluded from generation pruning.\",\"file\":\".agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh\",\"line\":72,\"references\":[\"@/issue/5f12265a/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

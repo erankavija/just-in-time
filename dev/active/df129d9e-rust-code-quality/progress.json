@@ -60,7 +60,7 @@
           "short_id": "f7f01654",
           "title": "Introduce the generic ListEnvelope type",
           "classification": "implementation",
-          "status": "done (REQ-04 void per steward ruling, D-25)"
+          "status": "done"
         }
       ]
     },
@@ -73,7 +73,7 @@
           "short_id": "d8176fd3",
           "title": "One global --json flag carried as OutputMode",
           "classification": "implementation",
-          "status": "done (merged f767033dc+78975ecf1; cargo-ci, mcp-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "list-envelope-adoption",
@@ -81,7 +81,7 @@
           "short_id": "650e6a56",
           "title": "Express output-module count structs as ListEnvelope instantiations",
           "classification": "implementation",
-          "status": "done (code-review R1 failed on restating marker rustdoc; lead fix 79713c95a)"
+          "status": "done"
         },
         {
           "key": "schema-omits-hidden",
@@ -102,7 +102,7 @@
           "short_id": "27f0a575",
           "title": "Issue lifecycle methods behind an issues facade",
           "classification": "implementation",
-          "status": "done (merged d144d3d84; doctest fix be0d9ab53 after cargo-ci caught stale doc examples; cargo-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "issue-list-renderer",
@@ -110,7 +110,7 @@
           "short_id": "2f15d48d",
           "title": "Render issue lists through one output renderer",
           "classification": "implementation",
-          "status": "done (merged b1df0b2f4; cargo-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "gate-run-status-renderer",
@@ -118,7 +118,7 @@
           "short_id": "9fa12e75",
           "title": "Render gate run status lines through one output renderer",
           "classification": "implementation",
-          "status": "done (merged 12d718456; code-review R1 failed: JSON never-run used human renderer; lead fix ce437049d; cargo-ci, code-review passed)"
+          "status": "done"
         },
         {
           "key": "validation-report-renderer",
@@ -126,7 +126,7 @@
           "short_id": "9cc3056a",
           "title": "One output renderer for validation findings",
           "classification": "implementation",
-          "status": "done (merged 145091232; cargo-ci, code-review passed; closed after interrupted-session recovery ee3fcbc84)"
+          "status": "done"
         },
         {
           "key": "serve-foreground-command",
@@ -134,7 +134,7 @@
           "short_id": "d4373d07",
           "title": "Foreground serve as a commands-layer operation",
           "classification": "implementation",
-          "status": "done (merged 8cf19175a + rework 8c6d518bc; REQ-02 exit clause amended by user 9f201b611; code-review R1 failed on stale rustdoc, R2 passed; cargo-ci passed)",
+          "status": "done",
           "model_tier": "opus (rework 1)",
           "tier_reason": "escalated one tier after a failed review attempt"
         },
@@ -144,7 +144,7 @@
           "short_id": "2e7e1348",
           "title": "One output renderer for archive execution summaries",
           "classification": "implementation",
-          "status": "done (merged 10fde232e; cargo-ci, code-review passed)",
+          "status": "done",
           "model_tier": "haiku",
           "tier_reason": "mechanical: byte-identical renderer extraction following three established renderer tasks"
         },
@@ -154,7 +154,7 @@
           "short_id": "a807e699",
           "title": "Library repository bootstrap for the CLI",
           "classification": "implementation",
-          "status": "done (merged 853d1cfc8 + rework b834fcbae; code-review R1 failed on recover mapping left in main.rs, R2 passed; cargo-ci passed)",
+          "status": "done",
           "model_tier": "opus",
           "tier_reason": "storage-coupled: mutation-session retention, recovery ordering and linked-checkout write policy",
           "vendor": "claude"
@@ -165,7 +165,7 @@
           "short_id": "5d0a9a90",
           "title": "Keep stderr empty for --json failures",
           "classification": "implementation",
-          "status": "done (merged 46a747fc2 + fix 1d998db27; first merge broke cli_gate test, gates failed; codex attempts 3-4 fixed; full cargo-ci on branch then cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-luna xhigh",
           "tier_reason": "well-specified: five exact criteria, narrow footprint in main() and one test file"
@@ -181,7 +181,7 @@
           "short_id": "d84a7bfa",
           "title": "Item, invariant and projection methods behind an items facade",
           "classification": "implementation",
-          "status": "done (merged 99b8ae0dd; first branch CI missed the suite-clock budget during a concurrent rsync, rerun passed at 17009 ms; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -192,7 +192,7 @@
           "short_id": "5962427b",
           "title": "Validation methods behind a validation facade",
           "classification": "implementation",
-          "status": "done (merged 7f257f027; cargo-ci, code-review passed; rework 1 (authorized &mut self -> &self); claim.rs conflict and a post-merge unused mut fixed by Haiku workers)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "mechanical facade move; Claude/Codex alternation"
@@ -203,7 +203,7 @@
           "short_id": "6f49f3b3",
           "title": "Profile and init methods behind a profiles facade",
           "classification": "implementation",
-          "status": "done (merged d7729e1ca; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -214,7 +214,7 @@
           "short_id": "7a7d0bfe",
           "title": "Query, search and event methods behind a queries facade",
           "classification": "implementation",
-          "status": "done (merged 876eae0af; cargo-ci, code-review passed; merge-main conflict resolved by a Haiku worker)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "mechanical facade move; Claude/Codex alternation"
@@ -225,7 +225,7 @@
           "short_id": "fd2073b7",
           "title": "Gate definition and attachment methods behind a gates facade",
           "classification": "implementation",
-          "status": "done (merged 58b9b90dc; cargo-ci, code-review passed; conflict with storage epic gate-run addressing resolved by a Haiku worker)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -236,7 +236,7 @@
           "short_id": "93aaba24",
           "title": "Graph and dependency methods behind a graph facade",
           "classification": "implementation",
-          "status": "done (merged 226db21cc; cargo-ci, code-review passed; first branch CI missed the suite-clock budget (30471 ms) as host load rose mid-run; rerun 16740 ms; one rustdoc conflict resolved by a Haiku worker)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "mechanical facade move; Claude/Codex alternation"
@@ -247,7 +247,7 @@
           "short_id": "f79d2510",
           "title": "Label and batch issue methods onto the issues facade",
           "classification": "implementation",
-          "status": "done (merged 6f110c219; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -258,7 +258,7 @@
           "short_id": "a24b11aa",
           "title": "Gate check methods onto the gates facade",
           "classification": "implementation",
-          "status": "done (merged 67df5d08a; cargo-ci, code-review passed; conflict with ValidationOps resolved by a Haiku worker)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "mechanical facade move; Claude/Codex alternation"
@@ -269,7 +269,7 @@
           "short_id": "985c2b15",
           "title": "Document methods behind a documents facade",
           "classification": "implementation",
-          "status": "done (merged 3aa8182c5; cargo-ci, code-review passed; first land refused on another lead's uncommitted file on main)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "mechanical facade move; Claude/Codex alternation"
@@ -280,7 +280,7 @@
           "short_id": "dbd05242",
           "title": "Config methods behind a config facade",
           "classification": "implementation",
-          "status": "done (merged 8b4ca7956; cargo-ci, code-review passed; two merge-main conflicts resolved by Haiku workers)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -291,7 +291,7 @@
           "short_id": "083c9a91",
           "title": "Claim and recover operations behind a claims facade",
           "classification": "implementation",
-          "status": "done (merged 0fbd890c3; cargo-ci passed; code-review R1 failed F1 'cargo-ci pass predates 2174da3a'; user ruled one rerun with factual ancestry evidence linked to the issue (44f5177fc); R2 passed, 0 findings; closed fd902dc8a)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "recover session ordering is concurrency-sensitive (plan D-28)"
@@ -302,7 +302,7 @@
           "short_id": "1002524a",
           "title": "Template methods behind a templates facade",
           "classification": "implementation",
-          "status": "done (merged 55e6ce46f; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "mechanical facade move; Claude/Codex alternation"
@@ -313,7 +313,7 @@
           "short_id": "a015dcbb",
           "title": "Archive and snapshot methods behind an archive facade",
           "classification": "implementation",
-          "status": "done (merged 18a5a57b0; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -329,7 +329,7 @@
           "short_id": "1539da29",
           "title": "Derive failure details and suggestions from the error type",
           "classification": "implementation",
-          "status": "done (merged 5934d9658, rework merged 788a891f3; rework 1: deleted text-code guard replaced by test_main_emits_no_literal_error_codes; code-review R1 failed F1 suggestion tests too loose (semantic-test-assertions), rework 2 asserts each suggestion by action marker; R2 passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "typed errors across many call sites; moderate design"
@@ -340,7 +340,7 @@
           "short_id": "a3a99cf8",
           "title": "Shared IssueFilterArgs group for issue filters",
           "classification": "implementation",
-          "status": "done (merged 2f76a56e7; Codex stopped on stale Background, lead decision note; Background corrected per 6a, plan D-29; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "CLI contract change over ~14 sites; alternation"
@@ -351,7 +351,7 @@
           "short_id": "8b7f2973",
           "title": "Issue creation returns the created issue",
           "classification": "implementation",
-          "status": "done (merged d28cc53a8; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "compiler-driven rewrite of ~900 call sites; needs stamina"
@@ -362,7 +362,7 @@
           "short_id": "334c12e7",
           "title": "Template application returns the created issues",
           "classification": "implementation",
-          "status": "done (merged fbbaa2ba4; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "narrow return-shape change; alternation"
@@ -373,7 +373,7 @@
           "short_id": "d05b5639",
           "title": "CLI search runs through the executor",
           "classification": "implementation",
-          "status": "done (merged 92858ba2d; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "one executor entry point and one arm"
@@ -389,7 +389,7 @@
           "short_id": "abe555e9",
           "title": "Library-side command handler contract",
           "classification": "implementation",
-          "status": "done (merged 968119b03, rework merged e106ff343; code-review R1 failed F1: test group not in the real registry; rework 1 registers it under cfg(test); R2 passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "opus",
           "tier_reason": "contract-setting: every handler migration copies it"
@@ -400,7 +400,7 @@
           "short_id": "2e0f276b",
           "title": "Issue mutations return the updated issue",
           "classification": "implementation",
-          "status": "done (merged 6c0549aba; Codex stopped on IssueId vs IssueIdPrefix, lead decision plan D-31; one post-merge call site fixed by a Haiku worker; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "return-shape change over seven mutations; alternation"
@@ -411,7 +411,7 @@
           "short_id": "22189592",
           "title": "Classify document path-read failures by variant",
           "classification": "implementation",
-          "status": "done (merged d11ed6ed8; doc history/diff missing-document code also becomes DOCUMENT_NOT_FOUND; cargo-ci, code-review passed)",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "new error code, generated reference, CLI contract change"
@@ -427,7 +427,7 @@
           "short_id": "10751360",
           "title": "Issue read commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-dep",
@@ -435,7 +435,7 @@
           "short_id": "0fe46027",
           "title": "Dependency commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-graph",
@@ -443,7 +443,7 @@
           "short_id": "20fc3b92",
           "title": "Graph commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-gate-definitions",
@@ -451,7 +451,7 @@
           "short_id": "1ac651c7",
           "title": "Gate definition and preset commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-doc",
@@ -459,7 +459,7 @@
           "short_id": "c9103fcf",
           "title": "Document commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-validate",
@@ -467,7 +467,7 @@
           "short_id": "06ee9b67",
           "title": "Validate command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-config",
@@ -475,7 +475,7 @@
           "short_id": "153c9851",
           "title": "Config commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-hooks",
@@ -483,7 +483,7 @@
           "short_id": "71f5296c",
           "title": "Hooks command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-claim-recover",
@@ -491,7 +491,7 @@
           "short_id": "66790c84",
           "title": "Claim and recover commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-serve",
@@ -499,7 +499,7 @@
           "short_id": "8c46fc85",
           "title": "Serve command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-profile",
@@ -507,7 +507,7 @@
           "short_id": "cc4ea8a9",
           "title": "Profile commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-init-apply",
@@ -515,7 +515,7 @@
           "short_id": "8f297e60",
           "title": "Init and apply commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-label",
@@ -523,7 +523,7 @@
           "short_id": "52110fb4",
           "title": "Label commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-events",
@@ -531,7 +531,7 @@
           "short_id": "b25c2e54",
           "title": "Events commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-snapshot-migrate",
@@ -539,7 +539,7 @@
           "short_id": "182f4c03",
           "title": "Snapshot and migrate commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-archive",
@@ -547,7 +547,7 @@
           "short_id": "3cf69ecf",
           "title": "Archive commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-worktree",
@@ -555,7 +555,7 @@
           "short_id": "cd8e04cc",
           "title": "Worktree commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-item",
@@ -563,7 +563,7 @@
           "short_id": "1a4f2ebd",
           "title": "Item commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-invariant",
@@ -571,7 +571,7 @@
           "short_id": "b23faa59",
           "title": "Invariant command moves to a library handler",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "opus",
           "tier_reason": "pathfinder: first real group sets the main.rs glue and registration form the other wave 7 handlers copy"
@@ -582,7 +582,7 @@
           "short_id": "8e91126b",
           "title": "Project command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-search",
@@ -590,7 +590,7 @@
           "short_id": "98cc2097",
           "title": "Top-level search command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-version",
@@ -598,7 +598,7 @@
           "short_id": "f930acf2",
           "title": "Version command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "server-status-from-classification",
@@ -606,7 +606,7 @@
           "short_id": "e5d618ee",
           "title": "Derive server HTTP statuses from the library classification",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "test-speed-measure",
@@ -614,7 +614,7 @@
           "short_id": "1eb949a5",
           "title": "Measure per-test durations and derive the per-test limits",
           "classification": "research",
-          "status": "in_progress",
+          "status": "done",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "measurement and limit derivation; needs judgment, runs under the cargo-ci host lock"
@@ -630,7 +630,7 @@
           "short_id": "3f816619",
           "title": "Issue write commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-gate-status",
@@ -638,7 +638,7 @@
           "short_id": "f87f9b00",
           "title": "Gate status commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "handlers-query-status",
@@ -646,7 +646,7 @@
           "short_id": "24a982b7",
           "title": "Query and status commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "test-speed-refactor",
@@ -654,7 +654,7 @@
           "short_id": "4a01ccba",
           "title": "Refactor every test over the per-test limit",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -667,7 +667,7 @@
           "short_id": "b23b1bf3",
           "title": "Gate evaluation commands move to library handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "test-speed-enforce",
@@ -675,7 +675,7 @@
           "short_id": "f487aeef",
           "title": "Enforce the per-test limits and retire the whole-suite budget",
           "classification": "implementation",
-          "status": "pending"
+          "status": "ready"
         }
       ]
     },
@@ -688,7 +688,7 @@
           "short_id": "5687e281",
           "title": "Reduce main.rs to parse, bootstrap, dispatch, render and exit",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "executor-kernel-closure",
@@ -696,7 +696,7 @@
           "short_id": "0bc448fb",
           "title": "Crate-private executor kernel",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "retire-unproduced-error-codes",
@@ -704,7 +704,7 @@
           "short_id": "0eca332a",
           "title": "Retire error codes that nothing produces",
           "classification": "implementation",
-          "status": "pending"
+          "status": "ready"
         },
         {
           "key": "schema-registry-derivation",
@@ -712,7 +712,7 @@
           "short_id": "da30b92a",
           "title": "Derive output schemas from the handler registry",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "command-dispatch",
@@ -720,7 +720,7 @@
           "short_id": "c06daf50",
           "title": "Library-side command dispatch for crates/jit",
           "classification": "story",
-          "status": "pending"
+          "status": "ready"
         },
         {
           "key": "test-speed-ci-lock",
@@ -728,7 +728,7 @@
           "short_id": "fba8d478",
           "title": "Decide whether concurrent cargo-ci runs can drop the host lock",
           "classification": "implementation",
-          "status": "pending"
+          "status": "backlog"
         }
       ]
     },
@@ -741,7 +741,7 @@
           "short_id": "f9977efd",
           "title": "Enforce a main.rs production-line ceiling in the budget script",
           "classification": "implementation",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "cli-contract-docs",
@@ -749,7 +749,7 @@
           "short_id": "0546fc82",
           "title": "State the CLI output contract once in the command reference",
           "classification": "documentation",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "error-boundary",
@@ -757,7 +757,7 @@
           "short_id": "fe3ad1b0",
           "title": "One library error boundary for the CLI and the server",
           "classification": "story",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "executor-surface",
@@ -765,7 +765,7 @@
           "short_id": "f35c86de",
           "title": "Narrow executor surface and storage-free CLI entry",
           "classification": "story",
-          "status": "pending"
+          "status": "ready"
         }
       ]
     },
@@ -778,7 +778,7 @@
           "short_id": "a08c4b38",
           "title": "Write the df129d9e completion report",
           "classification": "documentation",
-          "status": "pending"
+          "status": "backlog"
         },
         {
           "key": "output-contract",
@@ -786,7 +786,7 @@
           "short_id": "46fe7593",
           "title": "One stated output and schema contract for the CLI",
           "classification": "story",
-          "status": "pending"
+          "status": "backlog"
         }
       ]
     },
@@ -799,7 +799,7 @@
           "short_id": "fb2dc5c3",
           "title": "Build hygiene and measured completion for crates/jit",
           "classification": "story",
-          "status": "pending"
+          "status": "backlog"
         }
       ]
     }
@@ -969,7 +969,8 @@
     "6acd7a05": 2,
     "8b3cce62": 1,
     "635f23c7": 1,
-    "578ed10d": 1
+    "578ed10d": 1,
+    "5f12265a": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1155,7 +1156,7 @@
       "review": "lead PASS (7c) at c8e1e7ed4; one HumanRender for ItemShowResult (main's); IssueRow duplicate removed; lines +60 vs main Lead merged main (a9e5985da, additive registration lines only). Landed and gated; closed 15643c2e0."
     },
     "c9103fcf": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "resumed: merge main after 9529b9ac"
@@ -1518,12 +1519,36 @@
       "note": "merged 56626345e; code-review F1 missing ReadSessionOpen race test (REQ-04)"
     },
     "5f12265a": {
-      "status": "ready",
-      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+      "status": "in_progress",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session",
+      "model": "gpt-6.1-sol",
+      "review": {
+        "verdict": "FAIL",
+        "gate": "code-review 89856a23",
+        "finding": "F1: hashed .wasm artifacts excluded from pruning; REQ-02 unmet",
+        "prior_findings": "first review, F1 open",
+        "deferred_items": "no linked documents",
+        "action": "rework 1 dispatched; other criteria met"
+      }
     },
     "f855d631": {
-      "status": "ready",
-      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+      "status": "done",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session",
+      "model": "gpt-6-luna",
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and code-review passed",
+        "criteria": {
+          "REQ-01": "Cargo.toml test incremental=false with reason",
+          "REQ-02": "clean build and one targeted test with override unset; zero incremental file bytes",
+          "REQ-03": "policy test and build budgets pass",
+          "REQ-04": "testing guide and budget README describe manifest policy"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "no live stale policy in changed surfaces; prior benchmark explicitly historical",
+        "deferred_items": "no linked design documents",
+        "holistic": "same manifest policy governs ordinary and gate builds; no production Rust change"
+      }
     },
     "75b46be9": {
       "status": "ready",
@@ -1532,6 +1557,168 @@
     "b22aabce": {
       "status": "ready",
       "note": "critical; filed 2026-11-04 by user ruling; first next session"
+    },
+    "0546fc82": {
+      "status": "backlog"
+    },
+    "083c9a91": {
+      "status": "done"
+    },
+    "0ba00a6f": {
+      "status": "done"
+    },
+    "0eca332a": {
+      "status": "ready"
+    },
+    "1002524a": {
+      "status": "done"
+    },
+    "1539da29": {
+      "status": "done"
+    },
+    "1874e265": {
+      "status": "done"
+    },
+    "22189592": {
+      "status": "done"
+    },
+    "233f4a09": {
+      "status": "done"
+    },
+    "27387b92": {
+      "status": "done"
+    },
+    "27f0a575": {
+      "status": "done"
+    },
+    "2e0f276b": {
+      "status": "done"
+    },
+    "2e7e1348": {
+      "status": "done"
+    },
+    "2f15d48d": {
+      "status": "done"
+    },
+    "334c12e7": {
+      "status": "done"
+    },
+    "46fe7593": {
+      "status": "backlog"
+    },
+    "487f45a9": {
+      "status": "ready"
+    },
+    "5962427b": {
+      "status": "done"
+    },
+    "5d0a9a90": {
+      "status": "done"
+    },
+    "650e6a56": {
+      "status": "done"
+    },
+    "6f49f3b3": {
+      "status": "done"
+    },
+    "719a5501": {
+      "status": "done"
+    },
+    "7a7d0bfe": {
+      "status": "done"
+    },
+    "83e6cb8d": {
+      "status": "done"
+    },
+    "8b7f2973": {
+      "status": "done"
+    },
+    "93aaba24": {
+      "status": "done"
+    },
+    "985c2b15": {
+      "status": "done"
+    },
+    "9ca31c64": {
+      "status": "done"
+    },
+    "9cc3056a": {
+      "status": "done"
+    },
+    "9fa12e75": {
+      "status": "done"
+    },
+    "a015dcbb": {
+      "status": "done"
+    },
+    "a08c4b38": {
+      "status": "backlog"
+    },
+    "a24b11aa": {
+      "status": "done"
+    },
+    "a3a99cf8": {
+      "status": "done"
+    },
+    "a807e699": {
+      "status": "done"
+    },
+    "abe555e9": {
+      "status": "done"
+    },
+    "bc7eb715": {
+      "status": "done"
+    },
+    "c06daf50": {
+      "status": "ready"
+    },
+    "d05b5639": {
+      "status": "done"
+    },
+    "d4373d07": {
+      "status": "done"
+    },
+    "d8176fd3": {
+      "status": "done"
+    },
+    "d84a7bfa": {
+      "status": "done"
+    },
+    "dbd05242": {
+      "status": "done"
+    },
+    "df129d9e": {
+      "status": "backlog"
+    },
+    "ef9897ab": {
+      "status": "done"
+    },
+    "f35c86de": {
+      "status": "ready"
+    },
+    "f487aeef": {
+      "status": "ready"
+    },
+    "f79d2510": {
+      "status": "done"
+    },
+    "f7f01654": {
+      "status": "done"
+    },
+    "f9977efd": {
+      "status": "backlog"
+    },
+    "fb2dc5c3": {
+      "status": "backlog"
+    },
+    "fba8d478": {
+      "status": "backlog"
+    },
+    "fd2073b7": {
+      "status": "done"
+    },
+    "fe3ad1b0": {
+      "status": "backlog"
     }
   },
   "handoff": {
@@ -1593,7 +1780,7 @@
       "status": "cancelled by 6a 2026-11-04 (gf2 session closed); 03:30 timer disarmed; full parallelism"
     }
   ],
-  "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
+  "f487aeef_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
   "notes_for_tasks": {
     "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
@@ -1628,6 +1815,22 @@
       "5f12265a": "gpt-6.1-sol high: cache generation selection and shell tests",
       "f855d631": "gpt-6-luna high: bounded profile policy and documentation"
     },
-    "timing_hold": "Awaiting user confirmation of cargo-pool-run fix"
+    "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
+    "status": "cache rework 1; test profile complete",
+    "measurements": {
+      "f855d631": {
+        "merge": "437c7ccfd",
+        "production_delta": 0,
+        "incremental_bytes": 0,
+        "branch_tests": 5037,
+        "branch_doctests": 25
+      },
+      "5f12265a": {
+        "branch_commit": "27f5fa4c6",
+        "shell_assertions_passed": 116
+      }
+    },
+    "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
+    "ownership_reconciliation": "Awaiting approval of proposed REQ-01/plan wording to match D-59"
   }
 }
