@@ -219,8 +219,8 @@ So reading `gates_required` from `jit issue show --json` finds nothing. `jit
 `first_ready_at`, `claimed_at`, and `done_at` record when an issue first passed
 each lifecycle milestone. They are written **once**, at the transition:
 
-- `first_ready_at` — set the first time the issue enters `ready`, including the
-  auto-promotion of a dependency-free issue at creation.
+- `first_ready_at` — set the first time the issue enters `ready`, including
+  creation in `ready`.
 - `claimed_at` — set at the first claim or assignment.
 - `done_at` — set the first time the issue reaches `done`. **Re-opening and
   re-completing does not overwrite it** ("first occurrence" semantics apply to

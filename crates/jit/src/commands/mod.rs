@@ -1020,9 +1020,6 @@ enum CapturedLifecycleMutation {
         reason: String,
         released_by: crate::domain::Assignee,
     },
-    AutoReady {
-        issue_id: IssueId,
-    },
     AutoDone {
         issue_id: IssueId,
     },
@@ -1033,7 +1030,6 @@ impl CapturedLifecycleMutation {
         match self {
             Self::Claim { issue_id, .. }
             | Self::Release { issue_id, .. }
-            | Self::AutoReady { issue_id }
             | Self::AutoDone { issue_id } => issue_id,
         }
     }
@@ -1076,7 +1072,7 @@ struct CapturedFieldUpdate {
     bulk: bool,
     force: bool,
     enforce_lease: bool,
-    /// Rejection: skips rule enforcement and promotes the dependents it unblocks.
+    /// Rejection: skips rule enforcement.
     rejection: bool,
 }
 
@@ -1184,9 +1180,6 @@ impl CapturedFieldUpdate {
 
 struct DerivedFieldUpdate {
     changed: bool,
-    /// The update moved the issue from a non-terminal into a terminal state,
-    /// which is what makes dependents eligible for readiness.
-    entered_terminal: bool,
     warnings: Vec<String>,
     intents: Vec<crate::repository_state::MutationIntent>,
     error_after_apply: Option<crate::errors::TransitionBlockedError>,
@@ -1196,7 +1189,6 @@ struct DerivedFieldUpdate {
 struct CapturedFieldUpdateOutcome {
     issue: Issue,
     changed: bool,
-    entered_terminal: bool,
     warnings: Vec<String>,
 }
 
@@ -1418,7 +1410,7 @@ fn derive_state_transition(
     })
 }
 
-/// The readiness changes a graph edit publishes in its own plan.
+/// The readiness changes a mutation publishes in its own plan.
 struct DerivedReadiness {
     /// Each corrected record, then its events.
     intents: Vec<crate::repository_state::MutationIntent>,
@@ -1517,6 +1509,46 @@ fn derive_readiness_intents(
         intents: updates,
         error_after_apply,
     })
+}
+
+/// The readiness corrections replacing `updated`'s captured record in `base`
+/// demands of the issues that change affects.
+fn derive_dependent_readiness(
+    base: &[Issue],
+    updated: &Issue,
+    graph: &CapturedGraphEvidence<'_>,
+) -> Result<DerivedReadiness> {
+    let projected = base
+        .iter()
+        .map(|issue| {
+            if issue.id == updated.id {
+                updated.clone()
+            } else {
+                issue.clone()
+            }
+        })
+        .collect::<Vec<_>>();
+    derive_readiness_intents(base, &projected, graph, ReadinessScope::Affected)
+}
+
+/// The new issues of `projected`, those absent from `base`, the readiness
+/// derivation promotes. A draft has no prior state, so its caller sets it
+/// `Ready` directly, with no state-change event or graph-rule transition.
+fn derive_draft_promotions(
+    base: &[Issue],
+    projected: &[Issue],
+) -> std::collections::HashSet<IssueId> {
+    let existing = base
+        .iter()
+        .map(|issue| &issue.id)
+        .collect::<std::collections::HashSet<_>>();
+    crate::domain::queries::derive_readiness_corrections(base, projected, ReadinessScope::Affected)
+        .into_iter()
+        .filter(|(id, correction)| {
+            *correction == ReadinessCorrection::Promote && !existing.contains(id)
+        })
+        .map(|(id, _)| id)
+        .collect()
 }
 
 fn derive_field_update(
@@ -1728,7 +1760,6 @@ fn derive_field_update(
             } => {
                 return Ok(DerivedFieldUpdate {
                     changed: false,
-                    entered_terminal: false,
                     warnings,
                     intents: blocked_events
                         .into_iter()
@@ -1744,7 +1775,6 @@ fn derive_field_update(
     }
 
     let changed = staged || !changed_fields.is_empty() || issue.state != original.state;
-    let entered_terminal = !original.state.is_terminal() && issue.state.is_terminal();
     if issue.assignee != original.assignee {
         if let Some(assignee) = issue.assignee.clone() {
             events.push((
@@ -1773,28 +1803,7 @@ fn derive_field_update(
             EventBody::draft_local_rule_bypassed(issue.id.clone(), rule),
         )
     }));
-    let (promotions, blocked) = if request.rejection && entered_terminal {
-        let projected = evidence
-            .issues
-            .iter()
-            .map(|candidate| {
-                if candidate.id == issue.id {
-                    issue.clone()
-                } else {
-                    candidate.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-        let readiness = derive_readiness_intents(
-            evidence.issues,
-            &projected,
-            evidence.graph,
-            ReadinessScope::Affected,
-        )?;
-        (readiness.intents, readiness.error_after_apply)
-    } else {
-        (Vec::new(), None)
-    };
+    let readiness = derive_dependent_readiness(evidence.issues, &issue, evidence.graph)?;
     let intents = changed
         .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -1808,14 +1817,13 @@ fn derive_field_update(
                     event: Box::new(event),
                 }),
         )
-        .chain(promotions)
+        .chain(readiness.intents)
         .collect();
     Ok(DerivedFieldUpdate {
         changed,
-        entered_terminal,
         warnings,
         intents,
-        error_after_apply: gate_error.or(blocked),
+        error_after_apply: gate_error.or(readiness.error_after_apply),
     })
 }
 
@@ -2738,6 +2746,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             let graph = CapturedGraphEvidence::capture(&image, &issues, context)?;
             let declarations = &graph.declarations;
             let mut final_draft = draft.clone();
+            // Local rules see the created state, so readiness precedes validation.
+            let projected = issues
+                .iter()
+                .cloned()
+                .chain([final_draft.clone()])
+                .collect::<Vec<_>>();
+            if derive_draft_promotions(&issues, &projected).contains(&issue_id) {
+                final_draft.state = State::Ready;
+            }
             if label_utils::type_label_value(&final_draft.labels).is_none() {
                 if let Some(default_type) = declarations
                     .config()
@@ -2974,7 +2991,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
                         issue: issue_result,
                         changed: derived.changed,
-                        entered_terminal: derived.entered_terminal,
                         warnings: derived.warnings,
                     })),
                 };
@@ -2988,7 +3004,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
                     issue: issue_result,
                     changed: derived.changed,
-                    entered_terminal: derived.entered_terminal,
                     warnings: derived.warnings,
                 })),
             }
@@ -3035,27 +3050,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 released_by,
             })?;
         Ok(outcome.issue)
-    }
-
-    fn publish_captured_auto_transition(&self, issue_id: &IssueId, target: State) -> Result<bool>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let request = match target {
-            State::Ready => CapturedLifecycleMutation::AutoReady {
-                issue_id: issue_id.clone(),
-            },
-            State::Done => CapturedLifecycleMutation::AutoDone {
-                issue_id: issue_id.clone(),
-            },
-            _ => {
-                return Err(anyhow!(
-                    "unsupported automatic transition target '{}'",
-                    target.as_str()
-                ))
-            }
-        };
-        Ok(self.publish_captured_lifecycle_mutation(request)?.changed)
     }
 
     fn publish_captured_lifecycle_mutation(
@@ -3316,16 +3310,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         issue.state
                     }
                 }
-                CapturedLifecycleMutation::AutoReady { .. } => {
-                    let resolved = crate::domain::queries::build_issue_map(&issues);
-                    if !issue.should_auto_transition_to_ready(&resolved) {
-                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            issue,
-                            changed: false,
-                        }));
-                    }
-                    State::Ready
-                }
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
@@ -3403,6 +3387,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             let changed = update.is_some();
+            let readiness = update
+                .as_ref()
+                .map(|updated| derive_dependent_readiness(&issues, updated, &graph))
+                .transpose()?;
+            let (readiness, readiness_error) = readiness
+                .map(|readiness| (readiness.intents, readiness.error_after_apply))
+                .unwrap_or_default();
+            let blocked = blocked.or(readiness_error);
             let intents = update
                 .into_iter()
                 .map(|issue| MutationIntent::UpdateIssue {
@@ -3423,6 +3415,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             event: Box::new(event),
                         }),
                 )
+                .chain(readiness)
                 .collect::<Vec<_>>();
             let issue_result = crate::repository_state::mutated_issue(
                 &image,

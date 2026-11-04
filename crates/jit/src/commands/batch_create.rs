@@ -14,9 +14,9 @@
 //!   created and a [`BatchValidationError`] enumerating every offending entry is
 //!   returned (mapped to exit code 2, `InvalidArgument`).
 //! - **Publication is atomic.** Each draft carries the id the mutation context
-//!   derived for its entry; the finalizer resolves every symbolic edge to those
-//!   ids and publishes issues and audit events in
-//!   one recoverable repository delta.
+//!   derived for its entry, its dependencies resolved to those ids, and its
+//!   derived readiness; the finalizer publishes issues and audit events in one
+//!   recoverable repository delta.
 
 use super::*;
 use crate::domain::identity::GateKey;
@@ -286,11 +286,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
 
         self.validate_batch_from_json(&defs)?;
 
-        let positions = defs
-            .iter()
-            .enumerate()
-            .map(|(index, def)| (def.key.as_str(), index))
-            .collect::<HashMap<_, _>>();
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         let created_issue_ids = batch_issue_ids(&context, defs.len());
@@ -305,7 +300,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             &layout,
             "batch issue creation",
             |session| {
-                let Some(crate::commands::validate::MutationBase { image, .. }) = self
+                let Some(crate::commands::validate::MutationBase { image, issues }) = self
                     .exec
                     .capture_mutation_base(session, &issue_paths, None)?
                 else {
@@ -316,52 +311,20 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     &defs,
                     &created_issue_ids,
                     &declarations,
+                    &issues,
                 )?;
                 if !problems.is_empty() {
                     return Err(BatchValidationError { problems }.into());
                 }
-                let dependencies = defs.iter().enumerate().try_fold(
-                    Vec::new(),
-                    |mut edges, (dependent, def)| {
-                        for dependency in &def.depends_on {
-                            let dependency =
-                                positions.get(dependency.as_str()).copied().ok_or_else(|| {
-                                    anyhow!("validated batch contains an unresolved dependency")
-                                })?;
-                            edges.push((dependent, dependency));
-                        }
-                        Ok::<_, anyhow::Error>(edges)
-                    },
-                )?;
-                let credit = Self::batch_credit_namespaces(&declarations)?;
-                let issue_id_of = |key: &str| {
-                    positions
-                        .get(key)
-                        .map(|&index| created_issue_ids[index].clone())
-                };
-                let drafts = defs
-                    .iter()
-                    .zip(&created_issue_ids)
-                    .map(|(def, id)| {
-                        let def = &BatchIssueDef {
-                            labels: resolve_labels(def, &credit, issue_id_of).map_err(|_| {
-                                anyhow!("validated batch contains an unresolved label key")
-                            })?,
-                            ..def.clone()
-                        };
-                        let priority = def.priority.unwrap_or(Priority::Normal);
-                        Ok(Self::batch_candidate_issue(
-                            def,
-                            id.clone(),
-                            priority,
-                            declarations.config(),
-                        ))
+                let drafts = Self::batch_drafts(&defs, &created_issue_ids, &declarations, &issues)?
+                    .into_iter()
+                    .map(|draft| {
+                        draft.map_err(|_| {
+                            anyhow!("validated batch contains an unresolved label key")
+                        })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                let intents = [MutationIntent::CreateIssueBatch {
-                    drafts,
-                    dependencies,
-                }];
+                let intents = [MutationIntent::CreateIssueBatch { drafts }];
                 let plan = finalize(&layout, &image, &context, &intents, None)?;
                 Ok(SessionStep::Apply(
                     plan,
@@ -386,6 +349,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         defs: &[BatchIssueDef],
         ids: &[IssueId],
         declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+        issues: &[Issue],
     ) -> Result<Vec<BatchValidationProblem>> {
         let mut problems = Vec::new();
 
@@ -406,16 +370,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // 2a. Unknown keys referenced by coverage-credit labels. Each known key
         //     resolves to its entry's short id, so write validation below sees the
         //     final label shape.
-        let credit = Self::batch_credit_namespaces(declarations)?;
-        let issue_ids = defs
-            .iter()
-            .zip(ids)
-            .map(|(def, id)| (def.key.as_str(), id))
-            .collect::<HashMap<_, _>>();
-        let resolved_labels: Vec<Option<Vec<String>>> = defs
-            .iter()
-            .map(|def| {
-                resolve_labels(def, &credit, |key| issue_ids.get(key).copied().cloned())
+        let drafts: Vec<Option<Issue>> = Self::batch_drafts(defs, ids, declarations, issues)?
+            .into_iter()
+            .zip(defs)
+            .map(|(draft, def)| {
+                draft
                     .map_err(|unknown| {
                         problems.extend(unknown.into_iter().map(|(label, missing)| {
                             BatchValidationProblem::UnknownLabelKey {
@@ -463,9 +422,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             });
         let gate_registry = declarations.gates();
 
-        for ((def, labels), id) in defs.iter().zip(resolved_labels).zip(ids) {
-            let priority = def.priority.unwrap_or(Priority::Normal);
-
+        for (def, draft) in defs.iter().zip(drafts) {
             // Type validity: only enforced when the project configures a type
             // hierarchy; an empty set means any type is accepted. (The write-time
             // `type-hierarchy-known` rule (origin = "default") only WARNS, so this
@@ -496,15 +453,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
             // publication, so all entry-attributed problems are reported together.
             // This derivation does not save; a blocking finding is returned as an
             // error whose message we attribute to this entry's key.
-            let Some(labels) = labels else {
+            let Some(candidate) = draft else {
                 continue;
             };
-            let resolved = BatchIssueDef {
-                labels,
-                ..def.clone()
-            };
-            let candidate =
-                Self::batch_candidate_issue(&resolved, id.clone(), priority, declarations.config());
             if let Err(err) = derive_write_validation(&candidate, declarations, false) {
                 problems.push(BatchValidationProblem::WriteValidation {
                     key: def.key.clone(),
@@ -516,18 +467,64 @@ impl<S: IssueStore> IssueOps<'_, S> {
         Ok(problems)
     }
 
-    /// Build the candidate [`Issue`] for an entry EXACTLY as
-    /// [`create_issue`](crate::commands::IssueOps::create_issue) assembles it before validating, so
-    /// pre-validation sees the shape that would actually be persisted: the config
-    /// default `type:<t>` label applied when the entry carries no `type:` label,
-    /// the requested priority / gates / labels / content format, and the state
-    /// implied by its declared dependencies.
-    fn batch_candidate_issue(
-        def: &BatchIssueDef,
-        id: IssueId,
-        priority: Priority,
-        config: &JitConfig,
-    ) -> Issue {
+    /// Each entry's draft at its position's id in `ids`, or the label key
+    /// references it leaves unresolved. Readiness is derived over `issues` plus
+    /// the drafts, so write validation sees the persisted shape.
+    fn batch_drafts(
+        defs: &[BatchIssueDef],
+        ids: &[IssueId],
+        declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+        issues: &[Issue],
+    ) -> Result<Vec<BatchDraft>> {
+        let credit = Self::batch_credit_namespaces(declarations)?;
+        let issue_ids = defs
+            .iter()
+            .zip(ids)
+            .map(|(def, id)| (def.key.as_str(), id))
+            .collect::<HashMap<_, _>>();
+        let mut drafts = defs
+            .iter()
+            .zip(ids)
+            .map(|(def, id)| {
+                let labels =
+                    resolve_labels(def, &credit, |key| issue_ids.get(key).copied().cloned())?;
+                let mut draft = Self::batch_candidate_issue(
+                    &BatchIssueDef {
+                        labels,
+                        ..def.clone()
+                    },
+                    id.clone(),
+                    declarations.config(),
+                );
+                draft.dependencies = def
+                    .depends_on
+                    .iter()
+                    .filter_map(|key| issue_ids.get(key.as_str()).copied().cloned())
+                    .collect();
+                draft.dependencies.sort();
+                draft.dependencies.dedup();
+                Ok(draft)
+            })
+            .collect::<Vec<_>>();
+        let projected = issues
+            .iter()
+            .cloned()
+            .chain(drafts.iter().flatten().cloned())
+            .collect::<Vec<_>>();
+        let promoted = super::derive_draft_promotions(issues, &projected);
+        drafts
+            .iter_mut()
+            .flatten()
+            .filter(|draft| promoted.contains(&draft.id))
+            .for_each(|draft| draft.state = State::Ready);
+        Ok(drafts)
+    }
+
+    /// Build the `Backlog` candidate [`Issue`] for an entry as
+    /// [`create_issue`](crate::commands::IssueOps::create_issue) assembles it:
+    /// the config default `type:<t>` label applied when the entry carries no
+    /// `type:` label, and the requested priority / gates / labels.
+    fn batch_candidate_issue(def: &BatchIssueDef, id: IssueId, config: &JitConfig) -> Issue {
         // Assemble labels as the write path does: the `type` field becomes a
         // `type:<t>` label, followed by the entry's explicit labels.
         let mut labels: Vec<String> = def
@@ -552,17 +549,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
         }
 
         let mut issue = Issue::draft(id, def.title.clone(), def.description.clone());
-        issue.priority = priority;
+        issue.priority = def.priority.unwrap_or(Priority::Normal);
         issue.gates_required = def.gates.clone();
         issue.labels = labels;
-        issue.content_format = None;
-        // The finalizer publishes this same dependency-derived state while wiring
-        // all symbolic edges in the aggregate delta.
-        issue.state = if def.depends_on.is_empty() {
-            State::Ready
-        } else {
-            State::Backlog
-        };
         issue
     }
 
@@ -587,19 +576,22 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .exec
             .storage
             .open_mutation_session(self.exec.require_layout()?)?;
-        let image = self
+        let crate::commands::validate::MutationBase { image, issues } = self
             .exec
             .capture_mutation_base(session.as_mut(), &[], None)?
-            .ok_or_else(|| anyhow!("batch validation capture conflicted"))?
-            .image;
+            .ok_or_else(|| anyhow!("batch validation capture conflicted"))?;
         let declarations = crate::repository_state::declarations_from_image(&image)?;
         let ids = batch_issue_ids(
             &crate::repository_state::MutationContext::preview(),
             defs.len(),
         );
-        Self::collect_batch_problems_from_declarations(defs, &ids, &declarations)
+        Self::collect_batch_problems_from_declarations(defs, &ids, &declarations, &issues)
     }
 }
+
+/// An entry's draft, or the `(label, missing key)` references it leaves
+/// unresolved.
+type BatchDraft = std::result::Result<Issue, Vec<(String, String)>>;
 
 /// The ids `context` derives for a batch of `count` created issues, in entry
 /// order.
