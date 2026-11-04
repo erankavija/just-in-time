@@ -13,6 +13,27 @@ use std::sync::{
     Arc, Mutex,
 };
 
+/// Kernel inspection for tests that own executor storage and rule fixtures.
+pub trait ExecutorTestAccess<S: IssueStore> {
+    fn storage(&self) -> &S;
+    fn rules(&self) -> Result<&super::RuleSet, &super::RuleConfigError>;
+    fn effective_rules(&self) -> anyhow::Result<&super::RuleSet>;
+}
+
+impl<S: IssueStore> ExecutorTestAccess<S> for CommandExecutor<S> {
+    fn storage(&self) -> &S {
+        CommandExecutor::storage(self)
+    }
+
+    fn rules(&self) -> Result<&super::RuleSet, &super::RuleConfigError> {
+        CommandExecutor::rules(self)
+    }
+
+    fn effective_rules(&self) -> anyhow::Result<&super::RuleSet> {
+        CommandExecutor::effective_rules(self)
+    }
+}
+
 /// Seed one exact repository-file precondition in the aggregate memory image.
 pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &str) {
     let layout = storage.repository_layout();

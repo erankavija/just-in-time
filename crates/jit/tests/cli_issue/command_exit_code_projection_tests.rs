@@ -1,11 +1,6 @@
-//! REQ-02: bind every `command_exit_codes` row to the runtime behavior it
-//! documents, so no mapping in the generated reference is hand-authored.
-//!
-//! Each projected row is bound here by one case that runs a real subprocess in
-//! both public invocation forms. The classifier tests in `output::failure`
-//! remain useful unit coverage, but cannot substitute for a command-level
-//! binding because they do not exercise parsing, dispatch, or `--json` output
-//! selection.
+//! Bind every `command_exit_codes` row, universal or derived from a leaf's
+//! declared codes, to one case that runs a real subprocess in both public
+//! invocation forms.
 //!
 //! `test_command_exit_codes_every_row_is_verified` compares the projection with
 //! the rows the binding cases declare: a row without a case, or with two, fails.
@@ -115,15 +110,6 @@ type Invoke = fn(bool) -> Vec<Output>;
 /// Run `args` in `cli`, with `--json` in the machine-readable form.
 fn output_in_form(cli: &JitCli, args: &[&str], json: bool) -> Output {
     let mut command = cli.command(args);
-    if json {
-        command.arg("--json");
-    }
-    command.output().unwrap()
-}
-
-fn output_hooks_in_form(cli: &JitCli, json: bool) -> Output {
-    let mut command = cli.command(["hooks", "install"]);
-    command.env("GIT_CEILING_DIRECTORIES", cli.root().parent().unwrap());
     if json {
         command.arg("--json");
     }
@@ -379,14 +365,13 @@ fn invoke_gate_evaluate_failure(json: bool) -> Vec<Output> {
     )]
 }
 
-/// A checker that cannot run to a verdict is the gate-evaluation runner-error
-/// row. The unique command is intentionally absent from the test environment.
-fn invoke_gate_evaluate_runner_error(json: bool) -> Vec<Output> {
+/// `gate evaluate-many` over a target whose checker ran and failed.
+fn invoke_gate_evaluate_many_failure(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
-    let id = setup_auto_gate_issue(&cli, "jit-projection-command-does-not-exist");
+    let id = setup_auto_gate_issue(&cli, "false");
     vec![output_in_form(
         &cli,
-        &["gate", "evaluate", &id, "projection-gate", "--force"],
+        &["gate", "evaluate-many", "projection-gate", &id, "--force"],
         json,
     )]
 }
@@ -403,12 +388,18 @@ fn invoke_apply_prospective_cycle(json: bool) -> Vec<Output> {
     )]
 }
 
-/// `jit validate` on repository-integrity findings and on error-severity rule
-/// findings: the one `validate` row covers both.
+/// `jit validate` on repository-integrity findings, error-severity rule
+/// findings, branch drift and invalid leases: the one `validate` row covers all.
 fn invoke_validate(json: bool) -> Vec<Output> {
-    let mut outputs = invoke_validate_integrity(json);
-    outputs.extend(invoke_validate_rule_findings(json));
-    outputs
+    [
+        invoke_validate_integrity,
+        invoke_validate_rule_findings,
+        invoke_validate_branch_drift,
+        invoke_validate_leases,
+    ]
+    .iter()
+    .flat_map(|invoke| invoke(json))
+    .collect()
 }
 
 fn invoke_validate_integrity(json: bool) -> Vec<Output> {
@@ -524,29 +515,6 @@ fn invoke_config_validate(json: bool) -> Vec<Output> {
     vec![output_in_form(&cli, &["config", "validate"], json)]
 }
 
-/// `jit item` over an unreadable config (list, search) and over a value that is
-/// not a qualified id (show, resolve).
-fn invoke_item_failures(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    fs::write(cli.root().join(".jit/config.toml"), "not = valid = toml").unwrap();
-    let mut outputs = vec![
-        output_in_form(&cli, &["item", "list"], json),
-        output_in_form(&cli, &["item", "search", "survey"], json),
-    ];
-    fs::write(cli.root().join(".jit/config.toml"), "").unwrap();
-    outputs.push(output_in_form(
-        &cli,
-        &["item", "show", "not-a-qualified-address"],
-        json,
-    ));
-    outputs.push(output_in_form(
-        &cli,
-        &["item", "resolve", "not-a-qualified-address"],
-        json,
-    ));
-    outputs
-}
-
 /// `jit doc check-links` on a broken link.
 fn invoke_doc_check_links(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
@@ -566,12 +534,6 @@ fn invoke_doc_check_links(json: bool) -> Vec<Output> {
     )]
 }
 
-fn invoke_gate_registry_parse_failure(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    fs::write(cli.root().join(".jit/gates.toml"), "[[gates]").unwrap();
-    vec![output_in_form(&cli, &["gate", "list"], json)]
-}
-
 /// `jit gate preset apply` on a well-formed but nonexistent id, which fails
 /// as a preset findings outcome.
 fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
@@ -581,37 +543,6 @@ fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
         &["gate", "preset", "apply", "plan-review", "0000000000000000"],
         json,
     )]
-}
-
-/// `jit init` over a `--values-file` path that cannot be read.
-fn invoke_init_missing_values_file(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    vec![output_in_form(
-        &cli,
-        &["init", "--values-file", "missing-values.toml"],
-        json,
-    )]
-}
-
-/// `jit project render` when the requested projection name is not configured.
-fn invoke_project_render_unknown_name(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    vec![output_in_form(
-        &cli,
-        &["project", "render", "--name", "no-such-projection"],
-        json,
-    )]
-}
-
-/// `jit serve --status` (like the daemon start and `--stop`) classifies a
-/// malformed PID file as `PARSE_ERROR`, whose registered status is 1.
-fn invoke_serve_daemon_error(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    // A malformed PID file makes `server_status` (via `read_pid_file`) error, so
-    // the `--status` arm routes the typed parser failure through the shared
-    // classifier.
-    fs::write(cli.root().join(".jit/server.pid.json"), "not json").unwrap();
-    vec![output_in_form(&cli, &["serve", "--status"], json)]
 }
 
 /// Copy the real CLI beside a deterministic fake `jit-server` child.
@@ -721,7 +652,18 @@ fn invoke_blocked_transition(json: bool) -> Vec<Output> {
     vec![update, claim, claim_next]
 }
 
-/// `jit gate define` when the key is already registered.
+/// A gate key, a pack archive and a snapshot output that already exist.
+fn invoke_occupied_target(json: bool) -> Vec<Output> {
+    [
+        invoke_gate_define_duplicate,
+        invoke_profile_pack_occupied_output,
+        invoke_snapshot_export_occupied,
+    ]
+    .iter()
+    .flat_map(|invoke| invoke(json))
+    .collect()
+}
+
 fn invoke_gate_define_duplicate(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     let define = [
@@ -745,29 +687,6 @@ fn invoke_issue_delete_unconfirmed(json: bool) -> Vec<Output> {
     vec![output_in_form(&cli, &["issue", "delete", &id], json)]
 }
 
-/// `jit issue batch-create` when pre-validation rejects the file (an entry
-/// depending on a key the file never defines).
-fn invoke_batch_create_prevalidation(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    let batch = cli.root().join("batch.json");
-    fs::write(
-        &batch,
-        r#"[{"key": "a", "title": "A", "depends_on": ["ghost"]}]"#,
-    )
-    .unwrap();
-    vec![output_in_form(
-        &cli,
-        &[
-            "issue",
-            "batch-create",
-            "--from-json",
-            batch.to_str().unwrap(),
-        ],
-        json,
-    )]
-}
-
-/// `jit snapshot export` when the output path is already occupied.
 fn invoke_snapshot_export_occupied(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     cli.create_issue(["--title", "Snapshot me"]).unwrap();
@@ -799,92 +718,6 @@ fn invoke_search_missing_ripgrep(json: bool) -> Vec<Output> {
         command.arg("--json");
     }
     vec![command.output().unwrap()]
-}
-
-/// `search`/10: an executable `rg` the kernel cannot run (no shebang, so
-/// `ENOEXEC`) passes the `PATH` lookup and fails at spawn, an I/O failure that
-/// classifies to `IO_ERROR`, which exits 10.
-#[cfg(unix)]
-fn invoke_search_unspawnable_ripgrep(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    let tools = TempDir::new().unwrap();
-    jit::test_utils::write_executable(&tools.path().join("rg"), "not a program\n").unwrap();
-    let mut command =
-        cli.command_with_env(["search", "needle"], [("PATH", tools.path().as_os_str())]);
-    if json {
-        command.arg("--json");
-    }
-    vec![command.output().unwrap()]
-}
-
-/// `jit hooks install` outside a Git checkout is an invalid invocation.
-fn invoke_hooks_without_git(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    vec![output_hooks_in_form(&cli, json)]
-}
-
-/// A dangling hook target makes installation return an I/O `NotFound` error.
-#[cfg(unix)]
-fn invoke_hooks_target_not_found(json: bool) -> Vec<Output> {
-    let cli = JitCli::uninitialised().unwrap();
-    cli.init_git().unwrap();
-    cli.run(["init"]).unwrap();
-    std::os::unix::fs::symlink(
-        cli.root().join("missing/parent/pre-commit"),
-        cli.root().join(".git/hooks/pre-commit"),
-    )
-    .unwrap();
-    vec![output_hooks_in_form(&cli, json)]
-}
-
-/// A non-writable hooks directory makes installation return `PermissionDenied`.
-#[cfg(unix)]
-fn invoke_hooks_permission_denied(json: bool) -> Vec<Output> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let cli = JitCli::uninitialised().unwrap();
-    cli.init_git().unwrap();
-    cli.run(["init"]).unwrap();
-    let hooks = cli.root().join(".git/hooks");
-    let mut permissions = fs::metadata(&hooks).unwrap().permissions();
-    permissions.set_mode(0o555);
-    fs::set_permissions(&hooks, permissions).unwrap();
-
-    let output = output_hooks_in_form(&cli, json);
-
-    let mut permissions = fs::metadata(&hooks).unwrap().permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&hooks, permissions).unwrap();
-    vec![output]
-}
-
-/// A file at `.git/hooks` makes hook installation return `NotADirectory`.
-fn invoke_hooks_external_io_failure(json: bool) -> Vec<Output> {
-    let cli = JitCli::uninitialised().unwrap();
-    cli.init_git().unwrap();
-    cli.run(["init"]).unwrap();
-    let hooks = cli.root().join(".git/hooks");
-    fs::remove_dir_all(&hooks).unwrap();
-    fs::write(hooks, "not a directory").unwrap();
-    vec![output_hooks_in_form(&cli, json)]
-}
-
-fn invoke_profile_apply_missing_values_file(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
-    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
-    vec![output_in_form(
-        &cli,
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            "packages/profile",
-            "--values-file",
-            "absent.toml",
-        ],
-        json,
-    )]
 }
 
 fn invoke_profile_conflict(command: &str, json: bool) -> Vec<Output> {
@@ -990,111 +823,7 @@ fn invoke_profile_add_occupied_destination(json: bool) -> Vec<Output> {
     )]
 }
 
-/// A repository whose worktree identity record exists, in a Git checkout.
-fn worktree_identity_repo() -> JitCli {
-    let cli = JitCli::initialised().unwrap();
-    cli.init_git().unwrap().commit("Initial commit").unwrap();
-    cli.run(["worktree", "info"]).unwrap();
-    cli
-}
-
-/// Both inspection commands that read the identity record, in one form.
-fn worktree_inspection_outputs(cli: &JitCli, json: bool) -> Vec<Output> {
-    [["worktree", "info"], ["worktree", "list"]]
-        .iter()
-        .map(|args| output_in_form(cli, args, json))
-        .collect()
-}
-
-/// Without a `git` executable the branch and worktree queries fail `NotFound`.
-fn invoke_worktree_git_missing(json: bool) -> Vec<Output> {
-    let cli = worktree_identity_repo();
-    [["worktree", "info"], ["worktree", "list"]]
-        .iter()
-        .map(|args| {
-            let mut command = cli.command(args);
-            command.env("PATH", cli.root().join("no-such-bin"));
-            if json {
-                command.arg("--json");
-            }
-            command.output().unwrap()
-        })
-        .collect()
-}
-
-/// An unreadable worktree identity record is a denied filesystem operation.
-#[cfg(unix)]
-fn invoke_worktree_identity_permission_denied(json: bool) -> Vec<Output> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let cli = worktree_identity_repo();
-    let record = cli.root().join(".jit/worktree.json");
-    let mut denied = fs::metadata(&record).unwrap().permissions();
-    denied.set_mode(0o000);
-    fs::set_permissions(&record, denied).unwrap();
-
-    let outputs = worktree_inspection_outputs(&cli, json);
-
-    let mut restored = fs::metadata(&record).unwrap().permissions();
-    restored.set_mode(0o644);
-    fs::set_permissions(&record, restored).unwrap();
-    outputs
-}
-
-/// A directory at the worktree identity record is a non-permission I/O failure.
-fn invoke_worktree_identity_io_failure(json: bool) -> Vec<Output> {
-    let cli = worktree_identity_repo();
-    let record = cli.root().join(".jit/worktree.json");
-    fs::remove_file(&record).unwrap();
-    fs::create_dir(&record).unwrap();
-    worktree_inspection_outputs(&cli, json)
-}
-
-/// A linked checkout whose store `worktree store-divergence` compares against
-/// the primary checkout's, with the linked store selected on the child alone.
-fn linked_store_divergence_repo() -> JitCli {
-    let cli = JitCli::initialised().unwrap();
-    cli.init_git().unwrap().commit("Initial commit").unwrap();
-    cli.git(["worktree", "add", "linked"]).unwrap();
-    cli
-}
-
-fn store_divergence_output(cli: &JitCli, json: bool) -> Output {
-    let selected = cli.root().join("linked/.jit");
-    let mut command = cli.command_with_env(
-        ["worktree", "store-divergence"],
-        [("JIT_DATA_DIR", selected.as_os_str())],
-    );
-    if json {
-        command.arg("--json");
-    }
-    command.output().unwrap()
-}
-
-/// A primary store root that cannot be searched denies reading its records.
-#[cfg(unix)]
-fn invoke_store_divergence_permission_denied(json: bool) -> Vec<Output> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let cli = linked_store_divergence_repo();
-    let primary_store = cli.root().join(".jit");
-    let original = fs::metadata(&primary_store).unwrap().permissions();
-    let mut denied = original.clone();
-    denied.set_mode(0o600);
-    fs::set_permissions(&primary_store, denied).unwrap();
-
-    let output = store_divergence_output(&cli, json);
-
-    fs::set_permissions(&primary_store, original).unwrap();
-    vec![output]
-}
-
 row_bindings! {
-    test_command_exit_codes_profile_apply_missing_values_file_emits_2: ("profile apply", 2, false) => invoke_profile_apply_missing_values_file;
-    test_command_exit_codes_profile_apply_repository_state_conflict_emits_4: ("profile apply", 4, false) => invoke_profile_apply_conflict;
-    test_command_exit_codes_profile_diff_conflicting_findings_emit_4: ("profile diff", 4, true) => invoke_profile_diff_conflict;
-    test_command_exit_codes_profile_pack_occupied_output_emits_6: ("profile pack", 6, false) => invoke_profile_pack_occupied_output;
-    test_command_exit_codes_profile_add_occupied_destination_emits_4: ("profile add", 4, false) => invoke_profile_add_occupied_destination;
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
     test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
@@ -1104,47 +833,27 @@ row_bindings! {
     test_command_exit_codes_unsupported_format_emits_10: ("*", 10, false) => invoke_unsupported_format;
     test_command_exit_codes_expired_lock_wait_emits_11: ("*", 11, false) => invoke_expired_lock_wait;
     test_command_exit_codes_broken_pipe_emits_141: ("*", 141, true) => invoke_broken_pipe;
-    test_command_exit_codes_enforcing_write_rule_emits_4: ("any command that writes an issue", 4, false) => invoke_enforcing_write_rule;
-    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all, gate evaluate-many", 4, true) => invoke_gate_evaluate_failure;
-    test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", 10, true) => invoke_gate_evaluate_runner_error;
     test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
-    test_command_exit_codes_validate_findings_emits_4: ("validate", 4, true) => invoke_validate;
-    test_command_exit_codes_validate_branch_drift_emits_4: ("validate --branch-drift", 4, true) => invoke_validate_branch_drift;
-    test_command_exit_codes_validate_leases_emits_4: ("validate --leases", 4, true) => invoke_validate_leases;
-    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
-    test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
-    test_command_exit_codes_item_failures_emit_2: ("item list, item search, item show, item resolve", 2, false) => invoke_item_failures;
-    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, false) => invoke_config_validate;
-    test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
-    test_command_exit_codes_init_missing_values_file_emits_2: ("init", 2, false) => invoke_init_missing_values_file;
-    test_command_exit_codes_gate_handlers_use_classified_failures: ("gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create", 1, false) => invoke_gate_registry_parse_failure;
-    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;
-    test_command_exit_codes_project_render_unknown_projection_emits_2: ("project render", 2, false) => invoke_project_render_unknown_name;
-    test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", 1, false) => invoke_serve_daemon_error;
-    #[cfg(unix)]
-    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve --fg", 1, false) => invoke_serve_foreground_exit;
+    test_command_exit_codes_claim_without_git_emits_10: ("claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict", 10, false) => invoke_claim_without_git;
+    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, true) => invoke_config_validate;
     test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", 4, false) => invoke_dep_add_cycle;
+    test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
+    test_command_exit_codes_occupied_target_emits_6: ("gate define, profile pack, snapshot export", 6, false) => invoke_occupied_target;
+    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
+    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all", 4, false) => invoke_gate_evaluate_failure;
+    test_command_exit_codes_gate_evaluate_many_failure_emits_4: ("gate evaluate-many", 4, true) => invoke_gate_evaluate_many_failure;
+    test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
+    test_command_exit_codes_profile_diff_conflicting_findings_emit_4: ("profile diff", 4, true) => invoke_profile_diff_conflict;
+    test_command_exit_codes_profile_apply_conflict_emits_4: ("profile apply", 4, false) => invoke_profile_apply_conflict;
+    test_command_exit_codes_profile_add_occupied_destination_emits_4: ("profile add", 4, false) => invoke_profile_add_occupied_destination;
+    test_command_exit_codes_enforcing_write_rule_emits_4: ("issue create", 4, false) => invoke_enforcing_write_rule;
     test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", 4, false) => invoke_blocked_transition;
-    test_command_exit_codes_gate_define_duplicate_emits_6: ("gate define", 6, false) => invoke_gate_define_duplicate;
     test_command_exit_codes_issue_delete_unconfirmed_emits_2: ("issue delete", 2, false) => invoke_issue_delete_unconfirmed;
-    test_command_exit_codes_batch_create_prevalidation_emits_2: ("issue batch-create", 2, false) => invoke_batch_create_prevalidation;
-    test_command_exit_codes_snapshot_export_occupied_emits_6: ("snapshot export", 6, false) => invoke_snapshot_export_occupied;
-    test_command_exit_codes_claim_without_git_emits_10: ("claim", 10, false) => invoke_claim_without_git;
     test_command_exit_codes_search_missing_ripgrep_emits_1: ("search", 1, false) => invoke_search_missing_ripgrep;
     #[cfg(unix)]
-    test_command_exit_codes_search_unspawnable_ripgrep_emits_10: ("search", 10, false) => invoke_search_unspawnable_ripgrep;
-    test_command_exit_codes_hooks_install_without_git_emits_2: ("hooks install", 2, false) => invoke_hooks_without_git;
-    #[cfg(unix)]
-    test_command_exit_codes_hooks_install_target_not_found_emits_3: ("hooks install", 3, false) => invoke_hooks_target_not_found;
-    #[cfg(unix)]
-    test_command_exit_codes_hooks_install_permission_denied_emits_5: ("hooks install", 5, false) => invoke_hooks_permission_denied;
-    test_command_exit_codes_hooks_install_external_io_failure_emits_10: ("hooks install", 10, false) => invoke_hooks_external_io_failure;
-    test_command_exit_codes_worktree_git_missing_emits_3: ("worktree info, worktree list", 3, false) => invoke_worktree_git_missing;
-    #[cfg(unix)]
-    test_command_exit_codes_worktree_identity_permission_denied_emits_5: ("worktree info, worktree list", 5, false) => invoke_worktree_identity_permission_denied;
-    test_command_exit_codes_worktree_identity_io_failure_emits_10: ("worktree info, worktree list", 10, false) => invoke_worktree_identity_io_failure;
-    #[cfg(unix)]
-    test_command_exit_codes_store_divergence_permission_denied_emits_5: ("worktree store-divergence", 5, false) => invoke_store_divergence_permission_denied;
+    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve", 1, false) => invoke_serve_foreground_exit;
+    test_command_exit_codes_validate_findings_emits_4: ("validate", 4, true) => invoke_validate;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one

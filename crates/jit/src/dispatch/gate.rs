@@ -668,7 +668,8 @@ command_group! {
     command: GateCommands,
     storage: [HandlerStore],
     leaves: {
-        "gate_define" => GateCommands::Define { key, title, description, stage, mode, auto, checker_command, timeout, working_dir, pass_context, prompt, prompt_file, env, priority } => define(key, title, description, stage, mode, auto, checker_command, timeout, working_dir, pass_context, prompt, prompt_file, env, priority) -> GateMutationResponse,
+        "gate_define" => GateCommands::Define { key, title, description, stage, mode, auto, checker_command, timeout, working_dir, pass_context, prompt, prompt_file, env, priority } => define(key, title, description, stage, mode, auto, checker_command, timeout, working_dir, pass_context, prompt, prompt_file, env, priority)
+            raises [AlreadyExists] -> GateMutationResponse,
         "gate_update" => GateCommands::Update { key, title, description, stage, mode, auto, checker_command, timeout, working_dir, clear_working_dir, pass_context, prompt, clear_prompt, prompt_file, clear_prompt_file, env, clear_env, priority } => update(key, title, description, stage, mode, auto, checker_command, timeout, working_dir, clear_working_dir, pass_context, prompt, clear_prompt, prompt_file, clear_prompt_file, env, clear_env, priority) -> GateDefinitionResponse,
         "gate_remove" => GateCommands::Remove { key } => remove(key) -> GateMutationResponse,
         "gate_add" => GateCommands::Add { id, gate_keys } => add(id, gate_keys) -> GateAddResponse,
@@ -676,15 +677,20 @@ command_group! {
         "gate_show" => GateCommands::Show { key } => show(key) -> GateDefinitionResponse,
         "gate_preset_list" => GateCommands::Preset(PresetCommands::List) => preset_list() -> GatePresetListResponse,
         "gate_preset_show" => GateCommands::Preset(PresetCommands::Show { name }) => preset_show(name) -> GatePresetShowResponse,
-        "gate_preset_apply" => GateCommands::Preset(PresetCommands::Apply { name, ids, timeout, no_precheck, no_postcheck, except }) => preset_apply(name, ids, timeout, no_precheck, no_postcheck, except) -> GatePresetApplyResponse,
+        "gate_preset_apply" => GateCommands::Preset(PresetCommands::Apply { name, ids, timeout, no_precheck, no_postcheck, except }) => preset_apply(name, ids, timeout, no_precheck, no_postcheck, except)
+            findings PresetError "One or more preset targets failed; the findings report retains successful targets and per-target errors." -> GatePresetApplyResponse,
         "gate_preset_create" => GateCommands::Preset(PresetCommands::Create { from_issue, name }) => preset_create(from_issue, name) -> GatePresetCreateResponse,
         "gate_status" => GateCommands::Status { id, gate_key, gate_flag, all, limit, status, stdout, stderr, tail, findings } => gate_status(id, gate_key, gate_flag, all, limit, status, stdout, stderr, tail, findings) -> GateStatusOutput
             as union [GateRunSummary, GateRunHistoryResponse, GateFlatReportResponse, GateFindingsResponse, GateNeverRun]
             "Default shape: the gate's latest run. With --all or --limit: the count-wrapped run history. With --stdout, --stderr or --tail: the stored report text. With --findings: the structured findings and verdict. GateNeverRun when the selected gate has not run.",
-        "gate_status-all" => GateCommands::StatusAll { id, full } => status_all(id, full) -> ForIssue<GateCheckAllResponse>,
-        "gate_evaluate" => GateCommands::Evaluate { id, gate_key, gate_flag, by, force } => evaluate(id, gate_key, gate_flag, by, force) -> GateEvaluateResponse,
-        "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force) -> GateEvaluateAllResponse,
-        "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force) -> GateEvaluateManyResponse,
+        "gate_status-all" => GateCommands::StatusAll { id, full } => status_all(id, full)
+            findings GateFailed "One or more required gates have not passed." -> ForIssue<GateCheckAllResponse>,
+        "gate_evaluate" => GateCommands::Evaluate { id, gate_key, gate_flag, by, force } => evaluate(id, gate_key, gate_flag, by, force)
+            raises [GateFailed] -> GateEvaluateResponse,
+        "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force)
+            raises [GateFailed] -> GateEvaluateAllResponse,
+        "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force)
+            findings GateFailed "A target's checker ran and its verdict was fail; the batch reports under its first failing target's code." -> GateEvaluateManyResponse,
         "gate_fail" => GateCommands::Fail { id, gate_key, by } => fail(id, gate_key, by) -> GateFailResponse,
     },
 }

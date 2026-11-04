@@ -14,6 +14,7 @@
 //! pre-apply upstream deps move onto P), yielding the acyclic, transitively
 //! reduced spine C→B→P→upstream.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::declarations::{GateChecker, GateMode};
 use jit::domain::identity::IssueId;
 use jit::domain::Priority;

@@ -238,6 +238,26 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> ConfigOps<'_, S> {
+    /// The repository's declared hierarchy and label associations.
+    pub fn get_hierarchy_config(&self) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
+        crate::config_manager::get_hierarchy_config(self.exec.storage())
+    }
+
+    /// The repository's label namespace declarations.
+    pub fn get_namespaces(&self) -> Result<LabelNamespaces> {
+        self.exec.config_manager.get_namespaces()
+    }
+
+    /// Icons resolved from the repository's hierarchy and icon configuration.
+    pub fn get_hierarchy_icons(&self) -> Result<std::collections::HashMap<String, String>> {
+        self.exec.config_manager.get_hierarchy_icons()
+    }
+
+    /// The explicit layout selected when the executor was constructed.
+    pub fn repository_layout(&self) -> Result<&crate::repository_state::RepositoryLayout> {
+        self.exec.repository_layout()
+    }
+
     /// Set a `section.field` key in the repository `config.toml`, returning
     /// what the CLI needs to print.
     ///

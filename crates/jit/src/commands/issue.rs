@@ -158,6 +158,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> IssueOps<'_, S> {
+    /// Resolve a full issue ID or unique prefix in this repository.
+    pub fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<IssueId> {
+        self.exec.storage.resolve_issue_id(prefix)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create_issue(
         &self,

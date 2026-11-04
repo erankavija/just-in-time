@@ -294,7 +294,8 @@ command_group! {
     command: ValidateArgs,
     storage: [HandlerStore],
     leaves: {
-        "validate" => args => validate(args) -> ValidateResponse
+        "validate" => args => validate(args)
+            findings ValidationFailed "Repository, scope, issue, selected-rule, or explanation validation reported error-severity findings, or a `--branch-drift` or `--leases` check failed or could not run." -> ValidateResponse
             as union [
                 RuleReport,
                 crate::validation::report::ExplainReport,

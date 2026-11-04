@@ -3,8 +3,8 @@
 //! A handler takes a [`CommandContext`] and its parsed arguments and returns
 //! [`HandlerResult<R>`] for its registered response type `R`. Each
 //! group declares its leaves once with `command_group!`, which generates the
-//! group's `dispatch` and its `output_schema` lookup; a group joins the schema
-//! by adding that lookup to [`REGISTERED_GROUPS`].
+//! group's `dispatch` and its `GROUP` registration; a group joins the schema
+//! by adding that registration to [`REGISTERED_GROUPS`].
 //!
 //! `main.rs` opens the repository with [`bootstrap`] and hands it to
 //! [`dispatch`], which routes the command to its group; the returned
@@ -283,49 +283,97 @@ pub fn resolve_gate_key_for(
     Ok(resolve_gate_key(positional, flag, command)?.parse()?)
 }
 
-/// The `output_schema` lookup of every group, consulted by
-/// [`crate::CommandSchema::generate`]. Test builds
-/// also register the test-only groups, whose leaf paths no real command uses.
-pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
-    apply::output_schema,
-    archive::output_schema,
-    claim::output_schema,
-    claim::recover::output_schema,
-    config::output_schema,
-    dep::output_schema,
-    doc::output_schema,
-    events::output_schema,
-    gate::output_schema,
-    graph::output_schema,
-    graph::rdeps::output_schema,
-    hooks::output_schema,
-    init::output_schema,
-    invariant::output_schema,
-    profile::output_schema,
-    query::output_schema,
-    query::bare::output_schema,
-    query::status::output_schema,
-    issue::output_schema,
-    issue::alias_output_schema,
-    snapshot::output_schema,
-    item::output_schema,
-    label::output_schema,
-    project::output_schema,
-    search::output_schema,
-    serve::output_schema,
-    validate::output_schema,
-    version::output_schema,
-    worktree::output_schema,
+/// One leaf's declared failure codes beyond the universal ones.
+pub struct LeafCodes {
+    /// The leaf's schema path.
+    pub path: &'static str,
+    /// Typed codes the leaf raises through the shared classifier.
+    pub raises: &'static [ErrorCode],
+    /// The code and condition of the leaf's findings outcome.
+    pub findings: Option<(ErrorCode, &'static str)>,
+}
+
+impl LeafCodes {
+    /// Pass `outcome` through unless it reports findings under a code that is
+    /// neither this leaf's declared findings code nor universal.
+    ///
+    /// # Errors
+    ///
+    /// The undeclared findings code, naming the leaf.
+    pub fn admit<R>(&self, outcome: Outcome<R>) -> anyhow::Result<Outcome<R>> {
+        match &outcome {
+            Outcome::Findings { code, .. }
+                if !code.is_universal()
+                    && self.findings.map(|(declared, _)| declared) != Some(*code) =>
+            {
+                Err(anyhow!(
+                    "`{}` reported findings under undeclared code {}",
+                    self.path,
+                    code.as_str()
+                ))
+            }
+            _ => Ok(outcome),
+        }
+    }
+}
+
+/// One group's `output_schema` lookup and its leaves' declared codes.
+pub struct RegisteredGroup {
+    pub output_schema: fn(&str) -> Option<OutputSchema>,
+    pub leaves: &'static [LeafCodes],
+}
+
+/// Every command group, consulted by [`crate::CommandSchema::generate`]. Test
+/// builds also register the test-only groups' schemas, whose leaf paths no real
+/// command uses, without their codes.
+pub const REGISTERED_GROUPS: &[RegisteredGroup] = &[
+    apply::GROUP,
+    archive::GROUP,
+    claim::GROUP,
+    claim::recover::GROUP,
+    config::GROUP,
+    dep::GROUP,
+    doc::GROUP,
+    events::GROUP,
+    gate::GROUP,
+    graph::GROUP,
+    graph::rdeps::GROUP,
+    hooks::GROUP,
+    init::GROUP,
+    invariant::GROUP,
+    profile::GROUP,
+    query::GROUP,
+    query::bare::GROUP,
+    query::status::GROUP,
+    issue::GROUP,
+    issue::ALIAS_GROUP,
+    snapshot::GROUP,
+    item::GROUP,
+    label::GROUP,
+    project::GROUP,
+    search::GROUP,
+    serve::GROUP,
+    validate::GROUP,
+    version::GROUP,
+    worktree::GROUP,
     #[cfg(test)]
-    test_group::output_schema,
+    RegisteredGroup {
+        output_schema: test_group::output_schema,
+        leaves: &[],
+    },
     #[cfg(test)]
-    test_forms::output_schema,
+    RegisteredGroup {
+        output_schema: test_forms::output_schema,
+        leaves: &[],
+    },
 ];
 
 /// The registered success schema of the leaf at `cmd_path`, if any group
 /// registers it.
 pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
-    REGISTERED_GROUPS.iter().find_map(|lookup| lookup(cmd_path))
+    REGISTERED_GROUPS
+        .iter()
+        .find_map(|group| (group.output_schema)(cmd_path))
 }
 
 /// Register one command group from its single leaf list.
@@ -343,11 +391,18 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// }
 /// ```
 ///
+/// After the handler call, a leaf may declare `raises [Code, ...]`, the
+/// non-universal [`ErrorCode`]s its typed failures classify to, and
+/// `findings Code "condition"`, its findings outcome. The exit-code projection
+/// derives the leaf's rows from these, and `dispatch` refuses a findings
+/// outcome under an undeclared, non-universal code ([`LeafCodes::admit`]).
+///
 /// The `storage:` entry picks the group's form, which generates
-/// `dispatch(command, ctx, out, err) -> anyhow::Result<RunStatus>` and
-/// `output_schema(cmd_path)`. `dispatch` runs the leaf's handler and renders
-/// its outcome through [`crate::output::emit_outcome`]; `output_schema`
-/// returns the leaf's response schema.
+/// `dispatch(command, ctx, out, err) -> anyhow::Result<RunStatus>`,
+/// `output_schema(cmd_path)` and the [`RegisteredGroup`] `GROUP`. `dispatch`
+/// runs the leaf's handler and renders its outcome through
+/// [`crate::output::emit_outcome`]; `output_schema` returns the leaf's
+/// response schema.
 ///
 /// - `storage: [Bounds]`: handlers are generic over `S: Bounds` and take the
 ///   [`CommandContext`] first.
@@ -401,7 +456,10 @@ macro_rules! command_group {
         command $command:ty,
         leaves {
             $(
-                $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? ) -> $response:ty
+                $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? )
+                    $(raises [$($raised:ident),+ $(,)?])?
+                    $(findings $finding:ident $condition:literal)?
+                    -> $response:ty
                     $(as union [$($member:ty),+ $(,)?] $description:expr)?
             ),+ $(,)?
         }
@@ -417,6 +475,8 @@ macro_rules! command_group {
                 $( $pattern => {
                     let outcome: $crate::dispatch::Outcome<$response> =
                         command_group!(@call $handler $handler_args ($($arg),*))?;
+                    let outcome = command_group!(@codes $path [$($($raised),+)?] $($finding $condition)?)
+                        .admit(outcome)?;
                     $crate::output::emit_outcome(&outcome, $mode, out, err)
                 } )+
             }
@@ -428,6 +488,24 @@ macro_rules! command_group {
                 _ => None,
             }
         }
+
+        // Test-only groups register their schema lookup without their codes.
+        #[allow(dead_code)]
+        pub const GROUP: $crate::dispatch::RegisteredGroup = $crate::dispatch::RegisteredGroup {
+            output_schema,
+            leaves: &[$(command_group!(@codes $path [$($($raised),+)?] $($finding $condition)?)),+],
+        };
+    };
+    (@codes $path:literal [$($raised:ident),*] $($finding:ident $condition:literal)?) => {
+        $crate::dispatch::LeafCodes {
+            path: $path,
+            raises: &[$($crate::output::ErrorCode::$raised),*],
+            findings: command_group!(@findings $($finding $condition)?),
+        }
+    };
+    (@findings) => { None };
+    (@findings $finding:ident $condition:literal) => {
+        Some(($crate::output::ErrorCode::$finding, $condition))
     };
     (@call $handler:ident [$($handler_args:tt)*] ($($arg:expr),*)) => {
         $handler($($handler_args)* $($arg),*)
@@ -474,7 +552,18 @@ pub mod worktree;
 
 #[cfg(test)]
 mod tests {
-    use super::count_message;
+    use super::{count_message, REGISTERED_GROUPS};
+
+    #[test]
+    fn test_registered_groups_no_leaf_raises_a_universal_code() {
+        let restated: Vec<_> = REGISTERED_GROUPS
+            .iter()
+            .flat_map(|group| group.leaves)
+            .flat_map(|leaf| leaf.raises.iter().map(move |code| (leaf.path, *code)))
+            .filter(|(_, code)| code.is_universal())
+            .collect();
+        assert!(restated.is_empty(), "{restated:?}");
+    }
 
     #[test]
     fn test_count_message_preserves_count_and_surrounding_text() {
