@@ -1098,7 +1098,8 @@
         "b674382e": 21,
         "eaca3f52": 248,
         "635f23c7": -99,
-        "578ed10d": 79
+        "578ed10d": 79,
+        "635f23c7-r1": 0
       }
     },
     "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision.",
@@ -1484,7 +1485,7 @@
       "epic": "b697a3f7"
     },
     "635f23c7": {
-      "status": "rework 1",
+      "status": "done",
       "vendor": "Claude Opus",
       "epic": "b697a3f7",
       "note": "merged ce7406bbd; code-review F1 rejection same-session proof, F2 batch first_ready_at/no-demotion assertions"
