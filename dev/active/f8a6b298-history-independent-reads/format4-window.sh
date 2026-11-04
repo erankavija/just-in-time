@@ -3,10 +3,11 @@
 #
 # Usage:
 #   format4-window.sh install <green-sha>
-#       Copies ~/.cargo/bin/jit and jit-server to a rollback directory, then
-#       installs both from this checkout's HEAD. <green-sha> is a commit whose
-#       cargo-ci passed; the code at HEAD must match it. A running jit-server
-#       keeps running on its old image.
+#       Checks <green-sha> out into a temporary worktree under target/, runs
+#       ./scripts/cargo-ci.sh there under the exclusive full-CI lock, and only
+#       when it passes copies ~/.cargo/bin/jit and jit-server to a rollback
+#       directory and installs both from that tree. A running jit-server keeps
+#       running on its old image.
 #   format4-window.sh rewrite <repository> <head-sha-from-the-quiet-check>
 #       Rewrites the repository's .jit and <common-dir>/jit with
 #       format4-rewrite.py, validates with the installed jit, and commits the
@@ -32,24 +33,29 @@ COMMITTED=none
 die() { echo "WINDOW STOPPED: $*"; echo "committed: $COMMITTED"; exit 1; }
 
 install() {
-  local green=$1
-  git -C "$ROOT" diff --quiet "$green" HEAD -- crates Cargo.toml Cargo.lock ||
-    die "code at HEAD differs from the green commit $green; nothing was changed"
-  [ -z "$(git -C "$ROOT" status --short --untracked-files=no -- crates Cargo.toml Cargo.lock)" ] ||
-    die "this checkout has uncommitted code changes; nothing was changed"
+  local green
+  green=$(git -C "$ROOT" rev-parse --verify "$1^{commit}") || die "$1 names no commit; nothing was changed"
   [ "$(df --output=avail -B1G "$ROOT" | tail -1 | tr -d ' ')" -ge 60 ] ||
     die "below the 60 GiB guard; nothing was changed"
+  local tree=$ROOT/target/format4-install-${green:0:12}
+  [ ! -e "$tree" ] || die "$tree exists; remove it with git worktree remove; nothing was changed"
+  git -C "$ROOT" worktree add --quiet --detach "$tree" "$green" || die "worktree add $green; nothing was changed"
+  cd "$tree" || die "cd $tree"
+  echo "== cargo-ci at $(git rev-parse --short HEAD) $(date +%T) in $tree"
+  CARGO_INCREMENTAL=0 flock -w 900 -E 76 -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh >"$tree.cargo-ci.out" 2>&1 ||
+    die "cargo-ci at $green failed, rc=$?; log $tree.cargo-ci.out; worktree $tree kept; nothing was installed"
+  tail -3 "$tree.cargo-ci.out"
   local rollback
-  rollback=$(mktemp -d "$HOME/.cache/jit-format4-rollback.XXXXXX") || die "rollback directory"
+  rollback=$(mktemp -d "$HOME/.cache/jit-format4-rollback.XXXXXX") || die "rollback directory; nothing was installed"
   { cp "$BIN/jit" "$rollback/jit" && cp "$BIN/jit-server" "$rollback/jit-server"; } ||
     die "rollback copy failed; nothing was installed"
-  echo "== install from $(git -C "$ROOT" rev-parse --short HEAD), code of green $green, $(date +%T); rollback in $rollback"
-  cd "$ROOT" || die "cd $ROOT"
+  echo "== install from $green, $(date +%T); rollback in $rollback"
   CARGO_INCREMENTAL=0 flock -w 900 -E 76 -o /tmp/jit-ci-turnstile.lock \
     flock -w 900 -E 76 -o -s /tmp/jit-full-ci.lock \
-    bash -c 'cargo install --quiet --force --path crates/jit && cargo install --quiet --force --path crates/server' ||
-    die "install failed, rc=$?; old binaries in $rollback (restore both with cp)"
-  echo "INSTALLED $(date +%T); rollback binaries in $rollback"
+    bash -c 'cargo install --quiet --force --locked --path crates/jit && cargo install --quiet --force --locked --path crates/server' ||
+    die "install failed, rc=$?; old binaries in $rollback (restore both with cp); worktree $tree kept"
+  cd "$ROOT" && git worktree remove --force "$tree" || echo "note: worktree $tree left in place"
+  echo "INSTALLED $green $(date +%T); rollback binaries in $rollback; cargo-ci log $tree.cargo-ci.out"
 }
 
 rewrite() {
