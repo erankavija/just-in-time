@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0980d45094a1629187c6a8f1275d2e9e5870a5ec",
+  "completed_at": "2026-11-04T09:25:05.585088079Z",
+  "duration_ms": 302307,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 1143,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Whole-repository validation captures and enumerates every issue's gate-run and verdict records, contrary to REQ-03."
+      }
+    ],
+    "summary": "Whole-repository validation violates REQ-03's requirement that validation capture no other issue's gate-run records.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "735949ef-ad86-4629-bf53-69a6e17ae419",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2413b19d-5e77-42e3-ad8b-a82d87164175",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:20:03.277684424Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15125 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5db-bb5d-7083-afca-ed225ad97b63\n--------\nuser\n--- 15112 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — High, blocking:** REQ-03 is unmet. Whole-repository validation explicitly captures every gate-run and verdict record, then enumerates every issue directory and record; it therefore captures other issues’ run records rather than only the evaluated issue’s named runs. Evidence: `crates/jit/src/commands/validate.rs:1143` and `crates/jit/src/commands/mod.rs:2189`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Whole-repository validation violates REQ-03's requirement that validation capture no other issue's gate-run records.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Whole-repository validation captures and enumerates every issue's gate-run and verdict records, contrary to REQ-03.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":1143}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

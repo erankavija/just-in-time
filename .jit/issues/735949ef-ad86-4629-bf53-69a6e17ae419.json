@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T09:20:03.125396749Z",
       "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "2413b19d-5e77-42e3-ad8b-a82d87164175",
+      "status": "failed",
+      "updated_at": "2026-11-04T09:25:05.587204082Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "735949ef-ad86-4629-bf53-69a6e17ae419",
@@ -35,5 +41,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Gate runs are addressed per issue, per gate and per inputs digest",
-  "updated_at": "2026-11-04T09:20:03.125396749Z"
+  "updated_at": "2026-11-04T09:25:05.587204082Z"
 }
