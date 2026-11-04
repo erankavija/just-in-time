@@ -187,6 +187,9 @@
      "touches": [
       "crates/jit/src/storage/worktree_paths.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The already-completed layout adapter owns WorktreePaths wiring and its regression; the shared probe behavior belongs to its separate producer. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -463,7 +466,7 @@
     "REQ-05",
     "DEC-10",
     "DEC-18",
-    "DEC-23"
+    "DEC-25"
    ],
    "terminal": {
     "consumer_family": "head lookup",
@@ -474,6 +477,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The assigned head producer owns bounded commit validation and the failure matrix shared by claims, init, worktree info, gate evidence and snapshots; those adapters have distinct ownership. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -574,6 +580,9 @@
       "crates/jit/src/commands/worktree.rs",
       "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated worktree-info adapter owns current-branch reporting and CLI error composition; the head producer owns Git failure semantics. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -620,6 +629,9 @@
      "touches": [
       "crates/jit/src/commands/mod.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated init adapter owns identity persistence and detached/unborn defaults; it does not own the shared head protocol. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -672,6 +684,9 @@
       "crates/jit/src/commands/claim.rs",
       "crates/jit/src/storage/claim_coordinator.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated claims family owns typed Git requirements and coordinator branch wiring across command and storage boundaries; shared head behavior remains producer-owned. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -714,7 +729,9 @@
     "footprint": {
      "touches": [
       "crates/jit/src/storage/git.rs",
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs",
+      "crates/jit/src/test_harness/git.rs",
+      "crates/jit/src/test_harness/git_tests.rs"
      ]
     }
    }
@@ -762,6 +779,9 @@
      "touches": [
       "crates/jit/src/commands/claim.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated release-actor adapter owns fallback precedence in claim commands; it consumes the separately assigned config-query primitive. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -808,6 +828,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The already-reviewed listing producer owns porcelain parsing and path fidelity for both command listing and lease validation, which have separate consumer behavior. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -854,6 +877,9 @@
       "crates/jit/src/commands/worktree.rs",
       "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated list adapter owns CLI filtering/errors and removal of its private parser; module parsing is shared with lease validation. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -954,6 +980,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated producer owns the three-outcome comparison contract shared by drift validation and the main-history guard, whose command policies differ. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1499,6 +1528,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated object-reader producer owns incremental subprocess I/O and presence semantics shared by document, snapshot and pinned-inspection consumers. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1544,6 +1576,9 @@
      "touches": [
       "crates/jit/src/storage/git.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated pinned-inspection migration removes the prior batch parser and preserves target-classification behavior after the shared reader contract exists. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1792,6 +1827,9 @@
       "crates/jit/src/commands/document.rs",
       "crates/jit/tests/cli_repo_workflow/document_history_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated diff adapter owns two command variants and exact rendered output; the object-reader producer and document-show adapter do not own diff composition. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1839,6 +1877,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The assigned history producer owns Git simplification and record parsing; the document-history adapter separately owns command output composition. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1983,6 +2024,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The completed dirty-path producer is also consumed outside this epic; preserving its recorded identity avoids rewriting accepted implementation history. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -2027,6 +2071,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The assigned origin-query producer owns absence/failure semantics and process-count coverage; snapshot metadata owns composition of several repository facts. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -2081,6 +2128,9 @@
      "touches": [
       "crates/jit/src/commands/snapshot.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated metadata adapter owns source selection, branch/origin/dirtiness composition and helper deletion; each shared Git primitive has its own behavior owner. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -2129,6 +2179,9 @@
       "crates/jit/src/commands/snapshot.rs",
       "crates/jit/tests/cli_issue/snapshot_export_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated snapshot capture adapter owns exporter lifetime/batching and capture assembly; the shared object-reader protocol is independently owned. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }

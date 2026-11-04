@@ -1,10 +1,12 @@
 {
-  "assignee": null,
+  "assignee": "agent:dispatch-8c67b21a",
+  "claimed_at": "2026-11-04T23:07:34.794383726Z",
   "context": {},
   "created_at": "2026-11-04T00:51:18.309349543Z",
   "dependencies": [],
   "description": "The dispatch script refuses whenever main's tracker has uncommitted changes, so leads bypass it in three different ways. This lets dispatch proceed over uncommitted data-root changes while every other uncommitted tracked change still blocks.\n\n## Background\n\n`.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` exits 1 when `git diff --quiet` or `git diff --cached --quiet` fails on main. On a shared checkout the data root (`.jit/` in this repository) is almost always dirty, because sessions append tracker events and leave them uncommitted until their next tracker commit. A worktree branches from main's commit and never reads main's uncommitted tracker state, so that dirt cannot reach a worker. Leads currently work around the guard three ways: a private copy that excludes `.jit/` by path, a tracker commit made only to pass the guard, and the same private copy in earlier sessions. The script's pre-dispatch snapshot already records every dirty path, so the leak check keeps its baseline. `references/worktree-dispatch-protocol.md` Step 1 states that main must be clean. jit resolves the data root from `JIT_DATA_DIR` or by discovery (`crates/jit/src/main.rs`), and no jit command reports the resolved path today: `jit worktree info --json` names the checkout root but not the data root. Scope extended by the steward's ruling (option a, 2026-11-04): this task exposes the resolved data root once through `jit worktree info`, so tools stop re-deriving jit's discovery rules.\n\n## Success Criteria\n\n- [hard] REQ-01: `dispatch-worker-worktree.sh` dispatches when the only uncommitted changes, staged or unstaged, are under the repository's data root, which it obtains from `jit worktree info` rather than embedding a path, and still exits 1 naming the paths when any other tracked file has an uncommitted change.\n- [hard] REQ-02: `jit worktree info` reports the absolute resolved data root as one read-only field in its JSON output, with a matching human output line, and the `--schema` contract for the command includes the field.\n- [hard] REQ-03: `test-worktree-cache.sh`, the script's existing self-test, covers both cases: a dirty data root dispatches, and a dirty tracked file outside it refuses.\n- [hard] REQ-04: The script's header, its success message and `references/worktree-dispatch-protocol.md` describe the guard as it now behaves.\n\n## Notes\n\nRequested by the steward session under `@/inv/convention-convergence`: the guard changes at its source. Once this lands, leads delete private copies of the script.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:24:15.487796278Z",
   "first_ready_at": "2026-11-04T00:51:18.309349543Z",
   "gates_required": [
     "worktree-cache-test",
@@ -13,9 +15,22 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-11-04T00:53:21.443032275Z",
-      "updated_by": null
+      "run_id": "e727cc14-819b-4d22-969e-39ac6760b486",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:40:42.196424203Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "201be919-bc44-4b42-b383-ece65e7edcda",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:23:40.146494235Z",
+      "updated_by": "auto:executor"
+    },
+    "worktree-cache-test": {
+      "run_id": "e6ece3dc-20a4-41de-8a6d-e4082c7e9b34",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:41:31.162294499Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "8c67b21a-3672-46b2-ab71-db1d0a268da8",
@@ -25,7 +40,7 @@
     "component:core"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Dispatch over an uncommitted tracker on main",
-  "updated_at": "2026-11-04T00:53:21.443032275Z"
+  "updated_at": "2026-11-04T23:41:31.162294499Z"
 }

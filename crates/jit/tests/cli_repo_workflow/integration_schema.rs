@@ -3,6 +3,24 @@
 use serde_json::Value;
 
 #[test]
+fn test_schema_worktree_info_exposes_resolved_data_root() {
+    let schema = jit::schema::CommandSchema::generate();
+    let info = &schema.commands["worktree"].subcommands.as_ref().unwrap()["info"];
+    let success = info
+        .output
+        .as_ref()
+        .unwrap()
+        .success_schema
+        .as_ref()
+        .unwrap();
+    assert_eq!(success["properties"]["data_root"]["type"], "string");
+    assert!(success["required"]
+        .as_array()
+        .unwrap()
+        .contains(&Value::from("data_root")));
+}
+
+#[test]
 fn test_schema_dependency_leaves_publish_response_types() {
     let schema = jit::schema::CommandSchema::generate();
     let leaves = schema.commands["dep"].subcommands.as_ref().unwrap();
