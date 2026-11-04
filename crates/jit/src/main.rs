@@ -6571,179 +6571,29 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Worktree(worktree_cmd) => match worktree_cmd {
-            jit::cli::WorktreeCommands::Info => {
-                use jit::commands::worktree::execute_worktree_info;
-                use jit::output::{JsonOutput, OutputContext};
-
-                match execute_worktree_info(&worktree_paths) {
-                    Ok((info, warnings)) => {
-                        if json {
-                            let response = serde_json::json!({
-                                "worktree_id": info.worktree_id,
-                                "branch": info.branch,
-                                "root_path": info.root_path,
-                                "is_main_worktree": info.is_main_worktree,
-                                "common_dir": info.common_dir,
-                                "warnings": warnings,
-                            });
-                            let output = JsonOutput::success(response).with_message(format!(
-                                "Worktree {} on branch {}",
-                                info.worktree_id, info.branch
-                            ));
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Worktree Information:");
-                            println!("  ID:         {}", info.worktree_id);
-                            println!("  Branch:     {}", info.branch);
-                            println!("  Root:       {}", info.root_path);
-                            println!(
-                                "  Type:       {}",
-                                if info.is_main_worktree {
-                                    "main worktree"
-                                } else {
-                                    "secondary worktree"
-                                }
-                            );
-                            println!("  Common dir: {}", info.common_dir);
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
+        Commands::Worktree(command) => {
+            match jit::dispatch::worktree::dispatch(
+                command,
+                &ctx,
+                &mut io::stdout(),
+                &mut io::stderr(),
+            )? {
+                jit::dispatch::Dispatched::Handled(code) => return Ok(code),
+                jit::dispatch::Dispatched::Unhandled(command) => match command {
+                    jit::cli::WorktreeCommands::Exec { command } => {
+                        let (program, args) = command.split_first().context("no command to run")?;
+                        let status = jit::commands::worktree::execute_worktree_exec(
+                            &storage,
+                            &executor_layout,
+                            program,
+                            args,
+                        )?;
+                        std::process::exit(status);
                     }
-                    Err(e) => {
-                        if json {
-                            let json_error = command_json_error(&e, ErrorCode::WorktreeInfoError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
+                    _ => unreachable!("registered worktree leaves are handled"),
+                },
             }
-            jit::cli::WorktreeCommands::List => {
-                use jit::commands::worktree::execute_worktree_list;
-                use jit::output::{JsonOutput, OutputContext, WorktreeListResponse};
-
-                match execute_worktree_list(&worktree_paths) {
-                    Ok((worktrees, warnings)) => {
-                        if json {
-                            let count = worktrees.len();
-                            let response = WorktreeListResponse::new(worktrees);
-                            let mut value = serde_json::to_value(&response)?;
-                            if let serde_json::Value::Object(map) = &mut value {
-                                map.insert(
-                                    "warnings".to_string(),
-                                    serde_json::to_value(&warnings)?,
-                                );
-                            }
-                            let output = JsonOutput::success(value)
-                                .with_message(format!("{} worktree(s)", count));
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            // Human-readable table format
-                            println!(
-                                "{:<16} {:<25} {:<50} {:>6}",
-                                "WORKTREE ID", "BRANCH", "PATH", "CLAIMS"
-                            );
-                            println!("{}", "-".repeat(100));
-
-                            for entry in worktrees {
-                                println!(
-                                    "{:<16} {:<25} {:<50} {:>6}",
-                                    entry.worktree_id,
-                                    entry.branch,
-                                    entry.path,
-                                    entry.active_claims
-                                );
-                            }
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = command_json_error(&e, ErrorCode::WorktreeListError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::WorktreeCommands::Exec { command } => {
-                let (program, args) = command.split_first().context("no command to run")?;
-                let status = jit::commands::worktree::execute_worktree_exec(
-                    &storage,
-                    &executor_layout,
-                    program,
-                    args,
-                )?;
-                std::process::exit(status);
-            }
-            jit::cli::WorktreeCommands::StoreDivergence => {
-                use jit::commands::worktree::execute_worktree_store_divergence;
-                use jit::output::{JsonOutput, WorktreeStoreDivergenceResponse};
-
-                match execute_worktree_store_divergence(&worktree_paths) {
-                    Ok(report) => {
-                        let count = report.divergences.len();
-                        if json {
-                            let response = WorktreeStoreDivergenceResponse::with_extras(
-                                report.divergences,
-                                jit::output::StoreComparison {
-                                    checkout_store: report.checkout_store,
-                                    reference_store: report.reference_store,
-                                },
-                            );
-                            let output = JsonOutput::success(serde_json::to_value(&response)?)
-                                .with_message(format!("{} divergence(s)", count));
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Checkout store:  {}", report.checkout_store);
-                            match &report.reference_store {
-                                Some(reference) => println!("Reference store: {}", reference),
-                                None => println!(
-                                    "Reference store: none (this checkout has no other store to compare against)"
-                                ),
-                            }
-                            println!();
-                            if report.divergences.is_empty() {
-                                println!("No divergent records.");
-                            } else {
-                                println!("{:<8} {:<16} ID", "RECORD", "CLASS");
-                                println!("{}", "-".repeat(72));
-                                for divergence in &report.divergences {
-                                    println!(
-                                        "{:<8} {:<16} {}",
-                                        divergence.record.as_str(),
-                                        divergence.class.as_str(),
-                                        divergence.id
-                                    );
-                                }
-                                println!();
-                                println!("{} divergence(s)", count);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error =
-                                command_json_error(&e, ErrorCode::WorktreeStoreDivergenceError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-        },
+        }
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {
                 out,

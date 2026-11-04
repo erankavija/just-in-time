@@ -151,8 +151,8 @@ path = "worktree info"
 argv = ["worktree", "info", "--json"]
 setup = ["init", "git:repository-with-head", "malformed-worktree-identity"]
 setup_notes = "Create the worktree identity with one successful `worktree info` invocation, then replace .jit/worktree.json with `{ invalid json` before invoking."
-expected_failure = "WORKTREE_INFO_ERROR: Failed to parse worktree.json"
-expected_code = "WORKTREE_INFO_ERROR"
+expected_failure = "PARSE_ERROR: Failed to parse worktree.json"
+expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
@@ -160,8 +160,8 @@ path = "worktree list"
 argv = ["worktree", "list", "--json"]
 setup = ["init", "git:repository-with-head", "malformed-worktree-identity"]
 setup_notes = "Create the worktree identity with one successful `worktree info` invocation, then replace .jit/worktree.json with `{ invalid json` before invoking."
-expected_failure = "WORKTREE_LIST_ERROR: Failed to load worktree identity from <repository>/.jit"
-expected_code = "WORKTREE_LIST_ERROR"
+expected_failure = "PARSE_ERROR: Failed to load worktree identity from <repository>/.jit"
+expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
@@ -169,8 +169,8 @@ path = "worktree store-divergence"
 argv = ["worktree", "store-divergence", "--json"]
 setup = ["init", "git:repository-with-head", "worktree:linked-selected", "malformed-issue-record:deadbeef"]
 setup_notes = "Add a linked checkout and select its store with JIT_DATA_DIR so the arm has a primary store to compare against, then write `not-json` to the primary store's issues/deadbeef.json so reading the reference store fails."
-expected_failure = "WORKTREE_STORE_DIVERGENCE_ERROR: Failed to deserialize issue record at <repository>/.jit/issues/deadbeef.json"
-expected_code = "WORKTREE_STORE_DIVERGENCE_ERROR"
+expected_failure = "PARSE_ERROR: Failed to deserialize issue record at <repository>/.jit/issues/deadbeef.json"
+expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]

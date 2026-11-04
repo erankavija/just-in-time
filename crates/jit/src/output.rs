@@ -17,6 +17,7 @@ pub mod config;
 mod emit;
 pub mod failure;
 mod invariant;
+mod worktree;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 
@@ -1408,11 +1409,17 @@ collection_keys! {
     ResultsKey = "results";
     ArtifactsKey = "artifacts";
     NamespacesKey = "namespaces";
-    WorktreesKey = "worktrees";
     PresetsKey = "presets";
     EventsKey = "events";
     ValuesKey = "values";
     LeasesKey = "leases";
+}
+
+pub enum WorktreesKey {}
+
+impl CollectionKey for WorktreesKey {
+    const KEY: &'static str = "worktrees";
+    const SCHEMA_NAME: Option<&'static str> = Some("WorktreeListResponse");
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)

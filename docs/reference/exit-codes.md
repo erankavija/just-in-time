@@ -25,6 +25,9 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 
 | Command | Code | Condition | Exception |
 |---------|------|-----------|-----------|
+| `worktree info, worktree list, worktree store-divergence` | `3` | A required filesystem path was not found. |  |
+| `worktree info, worktree list, worktree store-divergence` | `5` | A filesystem operation was denied. |  |
+| `worktree info, worktree list, worktree store-divergence` | `10` | An I/O failure prevented worktree inspection. |  |
 | `*` | `0` | Command completed successfully. |  |
 | `*` | `1` | No typed classifier matched the failure (generic error). |  |
 | `*` | `2` | Invalid arguments or usage error, including an unresolvable, ambiguous, or too-short id prefix. |  |

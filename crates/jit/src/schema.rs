@@ -804,14 +804,6 @@ impl CommandSchema {
                 Some(schema_to_value::<LeaseListResponse>()),
                 "LeaseListResponse",
             ),
-            "worktree_list" => (
-                Some(schema_to_value::<WorktreeListResponse>()),
-                "WorktreeListResponse",
-            ),
-            "worktree_store-divergence" => (
-                Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
-                "WorktreeStoreDivergenceResponse",
-            ),
             "doc_list" => (
                 Some(schema_to_value::<crate::commands::DocumentListResult>()),
                 "DocumentListResult",
@@ -978,6 +970,24 @@ impl CommandSchema {
             exception,
         };
         vec![
+            row(
+                "worktree info, worktree list, worktree store-divergence",
+                3,
+                "A required filesystem path was not found.",
+                false,
+            ),
+            row(
+                "worktree info, worktree list, worktree store-divergence",
+                5,
+                "A filesystem operation was denied.",
+                false,
+            ),
+            row(
+                "worktree info, worktree list, worktree store-divergence",
+                10,
+                "An I/O failure prevented worktree inspection.",
+                false,
+            ),
             // Universal: any command reaches these — `0` on successful completion,
             // the failure codes through the shared classifier.
             row("*", 0, "Command completed successfully.", false),

@@ -172,7 +172,7 @@ fn test_worktree_info_stable_across_invocations() {
     assert_eq!(id1, id2, "Worktree ID should be stable");
 }
 
-/// Relocation must surface as a typed warning on the `worktree info` command
+/// Relocation must surface as a shared success warning on the `worktree info` command
 /// path (regression guard: storage no longer prints it, the output layer does).
 /// Previously this condition was an `eprintln!` from storage on every command;
 /// it must still surface here, not only via `recover`.
@@ -201,12 +201,14 @@ fn test_worktree_info_surfaces_relocation_warning() {
     let json: Value = serde_json::from_slice(&json_output.stdout).unwrap();
     let warnings = json["warnings"].as_array().expect("warnings array present");
     assert!(
-        warnings.iter().any(|w| w["kind"] == "worktree_relocated"),
+        warnings.iter().any(|w| w
+            .as_str()
+            .is_some_and(|text| text.contains("Worktree relocated"))),
         "worktree info --json must include the relocation warning, got {warnings:?}"
     );
     let json_stderr = String::from_utf8_lossy(&json_output.stderr);
     assert!(
-        !json_stderr.contains("relocated"),
+        json_stderr.is_empty(),
         "relocation diagnostic must not leak to stderr under --json, got: {json_stderr}"
     );
 
@@ -768,4 +770,27 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
             .all(|kind| records.iter().any(|record| record == kind.as_str())),
         "both issue records and event records are compared: {machine}"
     );
+}
+
+#[test]
+fn test_worktree_info_failure_uses_shared_classifier_in_both_modes() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.command(["worktree", "info"]).assert().success();
+    fs::write(cli.root().join(".jit/worktree.json"), "{").unwrap();
+    let human = cli.command(["worktree", "info"]).output().unwrap();
+    let json = cli
+        .command(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+    let failure: Value = serde_json::from_slice(&json.stdout).unwrap();
+    let expected = jit::output::failure::classify(&anyhow::Error::new(
+        serde_json::from_str::<Value>("{").unwrap_err(),
+    ));
+    assert_eq!(failure["error"]["code"], expected.error.code.as_str());
+    assert_eq!(human.status.code(), Some(expected.exit_code().code()));
+    assert_eq!(human.status.code(), json.status.code());
+    assert!(String::from_utf8_lossy(&human.stderr)
+        .contains(failure["error"]["message"].as_str().unwrap()));
+    assert!(json.stderr.is_empty());
 }
