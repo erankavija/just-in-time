@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "04459c10c179625145bec160594d9662b48ecad7",
+  "completed_at": "2026-11-04T09:15:48.067982976Z",
+  "duration_ms": 399243,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 3276,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Selected-rule validation documentation remains stale: it says failures exit 1 although the handler and canonical exit-code reference use VALIDATION_FAILED with exit 4."
+      }
+    ],
+    "summary": "Selected-rule validation documentation still advertises exit 1 rather than the implemented exit 4.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06ee9b67-07c3-48ad-a938-179a83d12564",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d4f538b0-68b8-4c14-b8ca-c1d7fdad3a58",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:09:08.824511379Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 23190 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5d1-bfc0-7ce3-b64b-99a662276c95\n--------\nuser\n--- 23177 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e5755970a, b68e9eab9, be080d3d6, e21e28fe8, dccad565d, 30aec0565f, 172d781250, 04459c10c, a8b53a01a\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown); @/issue/06ee9b67/decision/D-01, D-02 (issue Markdown); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (0); mcp-ci passed (0); prior code-review findings reviewed\nTruncation recovery: narrowed tagged merge patches to validate handler, output, tests, schema, and documentation paths\n\n1. [blocking][issue-impact][medium] `docs/reference/cli-commands.md:3276` still says `jit validate <ID> --rule <RULE>` failures exit `1`. The handler returns `VALIDATION_FAILED` for rule findings (`crates/jit/src/dispatch/validate.rs:248`), which exits 4, matching the canonical generated exit-code reference (`docs/reference/exit-codes.md:53`). Update this stale duplicate contract (and the related fixture prose at `crates/jit/tests/fixtures/steering/README.md:89`). References: @/invariant/single-source-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Selected-rule validation documentation still advertises exit 1 rather than the implemented exit 4.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Selected-rule validation documentation remains stale: it says failures exit 1 although the handler and canonical exit-code reference use VALIDATION_FAILED with exit 4.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3276,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

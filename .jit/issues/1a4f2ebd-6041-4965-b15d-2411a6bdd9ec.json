@@ -14,7 +14,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ff54f494-c8df-4c9f-a712-9cf71d757136",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.457236935Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "39d8ad8f-92f4-41c2-8aa4-1d3a98c7903a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.597770282Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Item commands move to library handlers",
-  "updated_at": "2026-11-04T03:15:08.849323099Z"
+  "updated_at": "2026-11-04T09:14:57.597770282Z"
 }

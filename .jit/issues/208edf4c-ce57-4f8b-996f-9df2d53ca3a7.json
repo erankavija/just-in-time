@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "eb10bdf9-b484-488f-9660-247c6efa8999",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.164824338Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "208edf4c-ce57-4f8b-996f-9df2d53ca3a7",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Scope validation selects from the report",
-  "updated_at": "2026-11-04T08:35:04.544878409Z"
+  "updated_at": "2026-11-04T09:14:59.164824338Z"
 }

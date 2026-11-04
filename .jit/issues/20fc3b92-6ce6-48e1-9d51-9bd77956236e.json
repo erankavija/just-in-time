@@ -16,7 +16,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c1680bbe-fa51-458a-bede-6e5eeef538f8",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:15:00.314000544Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "4603b9bf-32c8-4064-9314-a2cb175731d4",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:15:00.437740275Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "20fc3b92-6ce6-48e1-9d51-9bd77956236e",
   "labels": [
     "type:task",
@@ -34,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Graph commands move to library handlers",
-  "updated_at": "2026-11-04T04:03:13.245823189Z"
+  "updated_at": "2026-11-04T09:15:00.437740275Z"
 }

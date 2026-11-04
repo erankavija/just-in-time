@@ -14,7 +14,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d4a7108e-158d-40a0-8d38-92727c5a37d4",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.342895250Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "aae12fa6-2c49-4271-92fb-10edecdd3226",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.479089332Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "71f5296c-7de3-498b-b088-75a2f052014c",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Hooks command moves to a library handler",
-  "updated_at": "2026-11-04T07:36:39.006290771Z"
+  "updated_at": "2026-11-04T09:14:59.479089332Z"
 }

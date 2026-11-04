@@ -15,7 +15,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0784e730-e1ce-435f-bc42-73fb757a8e2a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.106158440Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a3f64ffb-4ab0-44b4-9016-2729c2abdff6",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:18:23.595751080Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "6a79d9f9-812d-4488-bf29-24423118e5a8",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.239973608Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b25c2e54-2614-4d87-b967-0f2cb25c37f9",
   "labels": [
     "type:task",
@@ -33,5 +52,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Events commands move to library handlers",
-  "updated_at": "2026-11-04T02:40:56.357478928Z"
+  "updated_at": "2026-11-04T09:18:23.595751080Z"
 }

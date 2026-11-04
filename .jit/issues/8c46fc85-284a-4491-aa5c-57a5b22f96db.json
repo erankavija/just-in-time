@@ -15,7 +15,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5aceb5a5-0f3e-4031-8e73-e3be5dbb227c",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.833007402Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "290ca41b-9e0b-4aea-9eec-5ac61085ef95",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:57.974030722Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8c46fc85-284a-4491-aa5c-57a5b22f96db",
   "labels": [
     "type:task",
@@ -35,5 +48,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Serve command moves to a library handler",
-  "updated_at": "2026-11-04T03:13:42.828978326Z"
+  "updated_at": "2026-11-04T09:14:57.974030722Z"
 }

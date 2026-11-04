@@ -15,7 +15,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "21d8bb7a-33e6-49dc-a154-8bd53758050c",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:13:32.658312181Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "52cdd51e-9211-416c-af99-88ed2dd0bb9d",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:13:32.788221287Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
   "labels": [
     "type:task",
@@ -34,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Claim and recover commands move to library handlers",
-  "updated_at": "2026-11-04T02:59:46.500674312Z"
+  "updated_at": "2026-11-04T09:13:32.788221287Z"
 }
