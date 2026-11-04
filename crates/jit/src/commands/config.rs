@@ -187,11 +187,11 @@ pub fn resolve_dotted_key(
 }
 
 /// Apply one `section.field = value` edit to a config `DocumentMut`, typing the
-/// value and rejecting a post-edit document that does not parse as configuration
+/// value and rejecting a post-edit document that fails configuration assembly
 /// as an invalid argument.
 ///
 /// The edit is preservation-safe (toml_edit keeps every unrelated byte, comment,
-/// and ordering). Parsing the POST-mutation document makes a valid replacement
+/// and ordering). Assembling the POST-mutation document makes a valid replacement
 /// the repair path, while any edit over a document already holding an invalid
 /// value or unknown key is rejected; nothing is mutated on disk until the caller
 /// persists the returned document.
@@ -220,7 +220,7 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
 
     doc[section][field] = parsed_value;
 
-    crate::declarations::parse_configuration(doc.to_string().as_bytes())
+    crate::declarations::assemble_configuration(Some(doc.to_string().as_bytes()), None, None)
         .map_err(|e| InvalidArgumentError::new(e.to_string()))?;
     Ok(())
 }
@@ -242,8 +242,8 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// what the CLI needs to print.
     ///
     /// Edits a formatting-preserving TOML document and publishes it through the
-    /// mutation session. The edited document is parsed as configuration BEFORE
-    /// the write, so an edit that would not load is rejected and the file is
+    /// mutation session. The edited document is assembled as configuration
+    /// BEFORE the write, so an edit that would not load is rejected and the file is
     /// left untouched. Numeric (`*_secs`/`*_pct`/`max_*`) keys are parsed into
     /// TOML integers; any other key is stored as a string.
     pub fn set_config(&self, key: &str, value: &str) -> Result<ConfigSetOutcome>

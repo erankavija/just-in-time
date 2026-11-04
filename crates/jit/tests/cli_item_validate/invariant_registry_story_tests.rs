@@ -299,10 +299,8 @@ fn req04_missing_statement_fails_with_typed_error() {
         let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
             .expect_err("missing statement must fail config load");
 
-        // `JitConfig::load` wraps the underlying parse error with anyhow context
-        // ("invalid .jit/invariants.toml"), so `err.to_string()` gives the context
-        // layer.  The full chain (via `{err:#}`) carries the underlying TOML error
-        // that names both the file (context layer) and the missing field (cause).
+        // The assembly error names the file; the full chain (via `{err:#}`) also
+        // carries the underlying TOML error naming the missing field.
         let full = format!("{err:#}");
         assert!(
             full.contains("invariants.toml"),

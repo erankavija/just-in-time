@@ -3372,8 +3372,6 @@ mod tests {
 
         let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
         let config: JitConfig = toml::from_str(&config_text).unwrap();
-        let configuration =
-            crate::declarations::parse_configuration(config_text.as_bytes()).unwrap();
         let rules = RuleSet {
             rules: vec![Rule {
                 name: "graph-probe".to_string(),
@@ -3398,7 +3396,6 @@ mod tests {
             }],
         };
         let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
-            configuration,
             config,
             crate::declarations::GateRegistry::default(),
             rules,

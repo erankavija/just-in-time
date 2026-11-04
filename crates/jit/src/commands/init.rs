@@ -257,9 +257,16 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
             Some(bytes) => {
                 let config =
                     String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
-                let parsed = crate::declarations::parse_configuration(config.as_bytes())
-                    .context("Failed to parse existing init configuration")?;
-                let project_name = parsed.project_name().cloned().unwrap_or(generated_name);
+                let parsed = crate::declarations::assemble_configuration(
+                    Some(config.as_bytes()),
+                    None,
+                    None,
+                )
+                .context("Failed to parse existing init configuration")?;
+                let project_name = parsed
+                    .project
+                    .and_then(|project| project.name)
+                    .unwrap_or(generated_name);
                 (config, project_name)
             }
             None => (
@@ -1014,9 +1021,9 @@ mod tests {
         // vocabulary and the named package's asset.
         assert!(repo.path().join("docs/workflow.txt").is_file());
         let published = fs::read(repo.path().join(".jit/config.toml")).unwrap();
-        let types = crate::declarations::parse_configuration(&published)
+        let types = crate::declarations::assemble_configuration(Some(&published), None, None)
             .unwrap()
-            .hierarchy
+            .type_hierarchy
             .expect("the published configuration declares a type hierarchy")
             .types;
         let missing = dependency
@@ -1214,11 +1221,12 @@ mod tests {
 
         let config_path = repo.path().join(".jit/config.toml");
         let mut config = fs::read_to_string(&config_path).unwrap();
-        let project_name = crate::declarations::parse_configuration(config.as_bytes())
-            .unwrap()
-            .project_name()
-            .cloned()
-            .unwrap();
+        let project_name =
+            crate::declarations::assemble_configuration(Some(config.as_bytes()), None, None)
+                .unwrap()
+                .project
+                .and_then(|project| project.name)
+                .unwrap();
         // `race` is a custom kind; the default package does not ship it.
         config.push_str(
             "\n[item_kinds.race]\nsection = \"race\"\nid-pattern = \"R-[0-9]+\"\n\
@@ -1227,10 +1235,10 @@ mod tests {
              [projection.race]\nkind = \"race\"\nmode = \"separate-file\"\n\
              target = \"RACE.generated.md\"\nstyle = \"id-anchor\"\n",
         );
-        // The package's own projections name the kinds its dependency declares,
-        // and this case composes the package alone, so the repository declares
-        // those kinds itself.
-        config.push('\n');
+        // The package's own projections and templates name the kinds and the
+        // container type its dependency declares, and this case composes the
+        // package alone, so the repository declares them itself.
+        config.push_str("\n[type_hierarchy]\ntypes = { epic = 2 }\n");
         config.push_str(&crate::test_utils::shipped_item_kind_tables(&[
             "invariant",
             "rule",

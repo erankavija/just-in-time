@@ -783,7 +783,7 @@ path = "recover"
 argv = ["recover", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "The fixture sets GIT_CEILING_DIRECTORIES to its own root, so git is never discoverable here and the git-dependent recovery phase is skipped rather than reached. Malformed config.toml fails the derived-state repair phase instead, which is the part of recovery that runs without git."
-expected_failure = "declaration validation pass: config.toml is invalid"
+expected_failure = "declaration validation pass: Failed to parse config.toml"
 expected_code = "recovery_failed"
 confirmation = "invoked"
 

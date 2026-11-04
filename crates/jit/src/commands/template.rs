@@ -223,7 +223,7 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                         &captured.issues,
                         &captured.derived.lease_targets,
                     ),
-                    captured.config.enforcement_mode(),
+                    captured.declarations.config().enforcement_mode(),
                 )
             };
             let warnings = super::refuse_foreign_leases_read(
@@ -249,7 +249,7 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 force,
                 &context,
             )?;
-            if captured.config.enforcement_mode() != lease_mode
+            if captured.declarations.config().enforcement_mode() != lease_mode
                 || existing_template_lease_targets(
                     &captured.issues,
                     &captured.derived.lease_targets,
@@ -324,7 +324,6 @@ struct DerivedTemplateApply {
 }
 
 struct CapturedTemplateApply {
-    config: crate::config::JitConfig,
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
     issues: Vec<Issue>,
     derived: DerivedTemplateApply,
@@ -338,13 +337,13 @@ fn derive_captured_template_apply(
     force: bool,
     context: &MutationContext,
 ) -> Result<CapturedTemplateApply> {
-    let config = template_config_from_image(image)?;
-    let template = request.resolve(&config)?;
-    let bindings = captured_anchor_bindings(request, &config, container_id, anchor_bindings);
+    let declarations = crate::repository_state::declarations_from_image(image)?;
+    let config = declarations.config();
+    let template = request.resolve(config)?;
+    let bindings = captured_anchor_bindings(request, config, container_id, anchor_bindings);
     let issues = parse_template_issues(image)?;
     let presets = parse_template_presets(image)?;
     let registry = parse_template_gate_registry(image)?;
-    let declarations = template_declarations_from_image(image, &config)?;
     let derived = derive_template_apply(
         &template,
         container_id,
@@ -354,12 +353,11 @@ fn derive_captured_template_apply(
         &issues,
         registry,
         &presets,
-        &config,
+        config,
         &declarations.rules,
         context,
     )?;
     Ok(CapturedTemplateApply {
-        config,
         declarations,
         issues,
         derived,
@@ -420,7 +418,7 @@ fn capture_template_image(
 }
 
 fn template_declaration_closure(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
-    let config = template_config_from_image(image)?;
+    let config = crate::repository_state::assemble_config(image)?;
     let rules = image
         .file_bytes(&VirtualPath::RULES)?
         .map(std::str::from_utf8)
@@ -434,7 +432,7 @@ fn template_operation_capture_paths(
     request: &TemplateRequest<'_>,
     container_id: &IssueId,
 ) -> Result<Vec<VirtualPath>> {
-    let config = template_config_from_image(image)?;
+    let config = crate::repository_state::assemble_config(image)?;
     let template = request.resolve(&config)?;
     let issues = parse_template_issues(image)?;
     let full_container_id = super::require_issue_in_capture(&issues, container_id)?;
@@ -541,70 +539,6 @@ fn template_document_parent_paths(paths: &[VirtualPath]) -> Result<Vec<VirtualPa
         }
     }
     Ok(parents)
-}
-
-fn template_config_from_image(image: &RepositoryImage) -> Result<crate::config::JitConfig> {
-    let config_path = VirtualPath::CONFIG;
-    let mut config = match image.file_bytes(&config_path)? {
-        Some(_) => crate::repository_state::assemble_config(image)?,
-        None => toml::from_str("")?,
-    };
-    let hierarchy_types = config
-        .type_hierarchy
-        .as_ref()
-        .map(|hierarchy| {
-            hierarchy
-                .types
-                .keys()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    config.templates = match image.file_bytes(&VirtualPath::TEMPLATES)? {
-        Some(bytes) => crate::templates::TemplateRegistry::from_toml_str(
-            std::str::from_utf8(bytes)?,
-            &hierarchy_types,
-        )?,
-        None => crate::templates::TemplateRegistry::empty(),
-    };
-    Ok(config)
-}
-
-fn template_declarations_from_image(
-    image: &RepositoryImage,
-    config: &crate::config::JitConfig,
-) -> Result<crate::repository_state::CapturedRepositoryDeclarations> {
-    if image.file_bytes(&VirtualPath::CONFIG)?.is_some() {
-        return Ok(crate::repository_state::declarations_from_image(image)?);
-    }
-    let namespaces = crate::config_manager::namespaces_from_config(config);
-    let rules = match image.file_bytes(&VirtualPath::RULES)? {
-        Some(bytes) => {
-            let content = std::str::from_utf8(bytes)?;
-            let schemas: Vec<_> = crate::declarations::rules::RuleSet::schema_requests(content)?
-                .into_iter()
-                .map(|request| {
-                    let path = VirtualPath::schema_reference(&request.reference)?;
-                    let bytes = image.file_bytes(&path)?.ok_or_else(|| {
-                        anyhow!("captured rule schema '{}' is absent", request.reference)
-                    })?;
-                    Ok((request.reference, bytes.to_vec()))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let parsed =
-                crate::declarations::rules::RuleSet::parse(content, Some(config), schemas)?;
-            crate::repository_state::reconcile_default_rules_with_config(parsed, &namespaces)?
-        }
-        None => crate::repository_state::default_ruleset(&namespaces),
-    };
-    Ok(
-        crate::repository_state::CapturedRepositoryDeclarations::from_parts(
-            crate::declarations::parse_configuration(b"")?,
-            config.clone(),
-            parse_template_gate_registry(image)?,
-            rules,
-        ),
-    )
 }
 
 fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<VirtualPath>> {
