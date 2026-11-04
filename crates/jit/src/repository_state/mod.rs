@@ -336,7 +336,7 @@ pub enum DeclarationParseError {
     #[error(transparent)]
     Template(#[from] crate::templates::TemplateConfigError),
     /// The gate registry could not be parsed.
-    #[error(transparent)]
+    #[error(".jit/gates.toml: {0}")]
     Gate(#[from] crate::declarations::GateDeclarationError),
     /// The rule set could not be parsed.
     #[error(transparent)]

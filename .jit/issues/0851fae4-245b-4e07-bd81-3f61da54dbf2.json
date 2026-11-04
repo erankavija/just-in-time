@@ -8,6 +8,7 @@
   ],
   "description": "Give the two storage backends one gate-run record reader with one set of clutter and corruption rules, so the per-issue layout changes one reader.\n\n## Background\n\nThe JSON and memory backends each implement `read_gate_runs` and `load_gate_run_result` with their own enumeration and clutter logic (`crates/jit/src/storage/json.rs`, `storage/memory.rs`). `storage/gate_runs.rs` is a test module, so the reader needs its own file. `read_repository_file_nofollow` (`storage/repository_state_store.rs`) takes a filesystem root, so the memory backend cannot sit on it, and no directory-listing primitive spans both backends; `read_path_bytes` resolves against the worktree root and goes through git2.\n\n`test_gate_run_readers_*` in `storage/issue_store_conformance.rs` already owns the clutter, symlink and corruption rules across both backends. Paired per-backend tests re-prove them: the per-backend `test_gate_run_readers_*` in `json.rs` and `memory.rs` and the helper `gate_run_parent_entry` in `memory.rs`. `test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps` in `json.rs` is file-backend behaviour and stays.\n\n## Success Criteria\n\n- [hard] REQ-01: `storage/gate_run_reader.rs` holds the one reader for listing and loading gate-run records, generic over a backend seam with two methods: list the child names of one directory, and read one regular file without following a symlink. The file backend implements the seam on its no-follow primitives and the memory backend over its map. Neither backend keeps its own enumeration, clutter or parse code for run records.\n- [hard] REQ-02: The `test_gate_run_readers_*` cases in `issue_store_conformance.rs` plant records through `VirtualPath::gate_run_record`, pass unchanged in what they assert, and gain any rule only a per-backend test covers.\n- [hard] REQ-03: The per-backend `test_gate_run_readers_*` tests and `gate_run_parent_entry` no longer exist, and `test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps` still passes.\n",
   "documents": [],
+  "done_at": "2026-11-04T02:42:33.388124257Z",
   "first_ready_at": "2026-11-04T01:44:00.275461088Z",
   "gates_required": [
     "cargo-ci",
@@ -15,9 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "b7a6831d-7ac7-4806-9838-14a84470bd99",
+      "run_id": "f2198c65-11cb-4a05-a386-67064b0e363e",
       "status": "passed",
-      "updated_at": "2026-11-04T02:24:22.931593429Z",
+      "updated_at": "2026-11-04T02:38:29.596884813Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d74514ce-130f-42d3-9be0-6232856d201f",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:42:32.915716321Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +41,7 @@
     "satisfies:f8a6b298/REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Both storage backends read gate-run records through one reader",
-  "updated_at": "2026-11-04T02:24:22.931593429Z"
+  "updated_at": "2026-11-04T02:42:33.388124257Z"
 }

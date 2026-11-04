@@ -7,6 +7,7 @@
 
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { JIT_BINARY } from "./jit-binary.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -29,7 +30,7 @@ export async function executeCommand(cmdPath, args, cmdDef, timeout = DEFAULT_TI
   const cliArgs = buildCliArgs(cmdPath, args, cmdDef, globalOptions);
   
   try {
-    const { stdout, stderr } = await execFileAsync('jit', cliArgs, {
+    const { stdout, stderr } = await execFileAsync(JIT_BINARY, cliArgs, {
       timeout,
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
     });

@@ -72,4 +72,11 @@ mod tests {
         assert_eq!(status, ExitCode::ValidationFailed);
         assert_eq!(status.code(), 4);
     }
+
+    #[test]
+    fn test_registered_output_schema_invariant_check_is_named_for_its_result_type() {
+        let registered = crate::dispatch::registered_output_schema("invariant_check").unwrap();
+
+        assert_eq!(registered.success, "InvariantCheckResult");
+    }
 }

@@ -871,7 +871,8 @@
     "5962427b": 1,
     "1539da29": 2,
     "abe555e9": 1,
-    "b23faa59": 1
+    "b23faa59": 2,
+    "e5d618ee": 1
   },
   "surfaced_pitfalls": [
     {
@@ -938,17 +939,143 @@
     },
     "epic_total": -239,
     "head_lines": 9111,
-    "head_rev": "b5bd434e8"
+    "head_rev": "b5bd434e8",
+    "head": 9075
   },
   "wave_notes": {
-    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host."
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line)."
   },
   "post_release_followups": [
-    "After 1eb949a5 lands: implement 26307dfd (D-36), then re-evaluate b23faa59 mcp-ci (fresh, inputs changed) and close it; delete land-one's PATH workaround (already removed).",
-    "Fan out wave 7 once b23faa59 code-review passes (do not wait for its mcp-ci).",
-    "Then implement 8c67b21a and delete the private dispatch.sh copy."
+    "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy."
   ],
   "issues": {
-    "b23faa59": {}
+    "b23faa59": {
+      "status": "done",
+      "note": "rework 2 passed code-review; cargo-ci rerun after an exit-75 load fault; mcp-ci fresh after 26307dfd"
+    },
+    "1eb949a5": {
+      "status": "done"
+    },
+    "26307dfd": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "steward-assigned standalone task; node/process-spawning tests rule out the Codex sandbox"
+    },
+    "10751360": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration"
+    },
+    "c9103fcf": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration"
+    },
+    "66790c84": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration"
+    },
+    "8c46fc85": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration"
+    },
+    "8f297e60": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration"
+    },
+    "f930acf2": {
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration"
+    },
+    "e5d618ee": {
+      "status": "rework",
+      "vendor": "Claude Sonnet",
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "lead review FAIL REQ-04: ambiguous-id 400 and gate-run lookup status changes lack tests"
+    },
+    "20fc3b92": {
+      "status": "in_progress",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration"
+    },
+    "153c9851": {
+      "status": "in_progress",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration"
+    },
+    "b25c2e54": {
+      "status": "in_progress",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration"
+    },
+    "3cf69ecf": {
+      "status": "in_progress",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration"
+    },
+    "1a4f2ebd": {
+      "status": "in_progress",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration"
+    },
+    "98cc2097": {
+      "status": "in_progress",
+      "vendor": "Claude Haiku",
+      "reason": "small single-group migration"
+    },
+    "0fe46027": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6.1-sol (high)",
+      "reason": "self-contained migration without sockets"
+    },
+    "1ac651c7": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6.1-sol (high)",
+      "reason": "self-contained migration without sockets"
+    },
+    "06ee9b67": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets"
+    },
+    "71f5296c": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets"
+    },
+    "cc4ea8a9": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6.1-sol (high)",
+      "reason": "self-contained migration without sockets"
+    },
+    "52110fb4": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets"
+    },
+    "182f4c03": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets"
+    },
+    "cd8e04cc": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6-astra (default)",
+      "reason": "self-contained migration without sockets"
+    },
+    "8e91126b": {
+      "status": "in_progress",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained migration without sockets"
+    },
+    "12c0f3fb": {
+      "status": "ready",
+      "vendor": null,
+      "reason": "form task (D-38); dispatch after the 05:30 settling window"
+    }
   }
 }

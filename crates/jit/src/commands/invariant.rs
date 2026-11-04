@@ -1,14 +1,4 @@
-//! Invariant enforcement-drift command (`jit invariant check`).
-//!
-//! `check` computes the enforcement-drift between the invariant registry and the
-//! declared rules/gates. It is a thin boundary: it pulls the effective ruleset and
-//! gate registry and delegates ALL drift logic to the pure engine
-//! ([`drift`](crate::validation::drift)). It owns no CLI parsing or output
-//! formatting (the layer boundary in AGENTS.md "Separation of Concerns").
-//!
-//! Projecting the registry into documentation is no longer an invariant-specific
-//! command: it is the generic [`project_render`](crate::commands::project) command
-//! (`jit project render`), driven by the `[projection.*]` config.
+//! Invariant enforcement drift over repository declarations.
 
 use super::*;
 use crate::validation::drift::DriftFinding;
@@ -18,6 +8,7 @@ pub enum FindingsKey {}
 
 impl CollectionKey for FindingsKey {
     const KEY: &'static str = "findings";
+    const SCHEMA_NAME: Option<&'static str> = Some("InvariantCheckResult");
 }
 
 /// Result of a `jit invariant check` enforcement-drift run: every
@@ -33,28 +24,33 @@ impl InvariantCheckResult {
 }
 
 impl<S: IssueStore> ItemOps<'_, S> {
-    /// Compute the enforcement-drift between the invariant registry and the
-    /// declared rules/gates, returning every drift finding.
-    ///
-    /// Delegates to
-    /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings),
-    /// the SAME tolerant drift computation the built-in `jit validate` pass
-    /// ([`enforcement_drift_findings`](crate::commands::ValidationOps::enforcement_drift_findings))
-    /// reports — the sole declared-but-unenforced direction — and exits non-zero
-    /// on ANY drift. A `.jit/rules.toml` (or gate registry) load failure is
-    /// tolerated, NOT propagated as an `Err`: it is resolved defensively to
-    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
-    /// so it surfaces as a declared-but-unenforced finding with
-    /// [`DriftFinding::unloadable`](crate::validation::drift::DriftFinding::unloadable)
-    /// set (REQ-01 "missing OR unloadable") rather than crashing the command.
+    /// Load declarations once without a writer session; unloadable rules remain drift.
     pub fn check_invariants(&self) -> Result<InvariantCheckResult> {
-        // Share the SINGLE tolerant drift computation with the built-in validate
-        // pass so both surfaces report identically, including the unloadable-source
-        // case (REQ-01 "missing OR unloadable"): a malformed `.jit/rules.toml`
-        // referenced by an `enforced-by` binding yields a declared-but-unenforced
-        // finding here too, not a raw parse error.
-        let findings: Vec<DriftFinding> = self.exec.validation().compute_drift_findings()?;
-        Ok(InvariantCheckResult::new(findings))
+        use crate::validation::drift::{enforcement_drift, SourceState};
+        use std::collections::BTreeSet;
+
+        let config = self.exec.cached_config()?;
+        let rules = self.exec.effective_rules().ok();
+        let rule_names: Option<BTreeSet<&str>> =
+            rules.map(|set| set.rules.iter().map(|rule| rule.name.as_str()).collect());
+        let rules_state = match &rule_names {
+            Some(names) => SourceState::Loaded(names),
+            None => SourceState::Unloadable,
+        };
+        let gates = self
+            .exec
+            .storage
+            .load_gate_registry()
+            .context("failed to load .jit/gates.toml")?
+            .gates
+            .into_keys()
+            .collect();
+
+        Ok(InvariantCheckResult::new(enforcement_drift(
+            &config.invariants.invariants,
+            rules_state,
+            &gates,
+        )))
     }
 }
 

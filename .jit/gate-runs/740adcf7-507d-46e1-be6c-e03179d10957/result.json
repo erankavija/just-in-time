@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "46a52f2c56a10085a5bbf844ddeff4169292653f",
+  "completed_at": "2026-11-04T02:42:46.349067181Z",
+  "duration_ms": 218506,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/invariant.rs",
+        "id": "F1",
+        "line": 31,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-22"
+        ],
+        "severity": "high",
+        "summary": "Invariant check uses a write-locking mutation session for a read-only capture, so it waits behind writers."
+      }
+    ],
+    "summary": "Invariant check now serializes behind repository writers, violating the read concurrency policy.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3acaa5a3-ff38-43f6-a252-5984b3cad2d9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "740adcf7-507d-46e1-be6c-e03179d10957",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:39:07.842766093Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5551 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a46c-ad11-72c3-9f67-88d7f2ce4675\n--------\nuser\n--- 5538 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8032c9f1b (`jit:3acaa5a3`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-20, @/charter/D-22 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-05 (.jit issue record); @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T02:37:22Z); code-review pending\nTruncation recovery: re-read storage mutation-session implementation in narrow ranges after a broad storage search truncated\n\n1. **[blocking][issue-impact]** `jit invariant check` now opens a mutation session at [invariant.rs:31](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/invariant.rs:31). That session acquires and retains the repository write lock during capture, so this read-only command waits behind writers without first attempting the required lock-free capture/admission path. This violates @/charter/D-22.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Invariant check now serializes behind repository writers, violating the read concurrency policy.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Invariant check uses a write-locking mutation session for a read-only capture, so it waits behind writers.\",\"file\":\"crates/jit/src/commands/invariant.rs\",\"line\":31,\"references\":[\"@/charter/D-22\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
