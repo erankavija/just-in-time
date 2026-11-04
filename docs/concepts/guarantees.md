@@ -59,8 +59,8 @@ JIT keeps the dependency graph transitively reduced. When `A→B→C` already ho
 
 ### Atomic Operations
 
-**Guarantee:** A mutation is published through one durable redo record over the
-files it writes. The record extends the event log, and it replaces each other
+**Guarantee:** A repository mutation is published through one durable redo record
+over the files it writes. The record extends the event log, and it replaces each other
 file by temp-file-and-rename.
 (`@/invariant/atomic-writes`, `@/invariant/derived-state-coherence`,
 `@/charter/D-17`)
@@ -114,6 +114,11 @@ state. The locks are released with their guards and work only among cooperating
 processes; they serialize competing writers rather than joining unrelated
 commands into one operation. Advisory work-lease coordination uses
 `.git/jit/locks/claims.lock` (`crates/jit/src/storage/lock.rs`).
+
+Leases use a separate publication boundary: renaming a staged lease file onto
+`.git/jit/leases/<issue-id>.json`, or unlinking that file, commits the lease
+change. The sequence counter and claim-history append follow it. An interrupted
+operation can lose history lines while retaining its committed lease change.
 
 **Example - Two agents claiming simultaneously:**
 
@@ -171,11 +176,9 @@ mutation is recorded or that it reconstructs complete repository history.
 
 **Event types:**
 
-Each event is tagged by a snake-case `type` field. The authoritative and
-evolving set of event variants is the `Event` enum in
-`crates/jit/src/domain/types.rs`, including the `issue_state_changed` variant
-used for lifecycle transitions. Consult that enum rather than relying on a
-hand-maintained list in prose.
+Each event is tagged by a snake-case `type` field, including
+`issue_state_changed` for lifecycle transitions. The generated
+[Event Log Tags](../reference/events.md) catalog defines the vocabulary.
 
 **Log format:**
 
@@ -192,6 +195,15 @@ Events are stored as newline-delimited JSON (JSONL):
 - **Append-only:** Events are appended to the log.
 - **State-transition evidence:** The state-change invariant is recorded as
   `issue_state_changed` events.
+
+Issue operations read only the log's length and final line, without parsing
+event records. An unknown tag or malformed middle line therefore does not block
+them. History readers report these errors with their line number and ignore an
+unterminated final line. Whole-repository `jit validate` and the
+`repository_validation` checker read the whole event log and every gate-run
+record for fidelity; per-issue validation does not. The
+[history-files reference](../reference/storage-format.md#history-files) lists
+the readers and paths. No file is derived from history.
 
 **Benefits:**
 
@@ -406,6 +418,10 @@ worktree of the repository.
 ├── issues/{id}.json          # Issue data
 ├── index.json                # Format version and deletion tombstones
 ├── gates.toml                # Gate registry
+├── gate-runs/
+│   ├── <issue-id>/<run-id>.json
+│   └── verdicts/<gate-key>/<inputs-digest>.json
+├── archive-evidence/<target-key>.json
 ├── tmp/                      # Scratch space; git-ignored
 │   └── redo.record           # A pending mutation's commit point
 └── events.jsonl              # Append-only event log
@@ -416,6 +432,12 @@ worktree of the repository.
 ├── claims.jsonl              # Claim history (append-only)
 └── locks/claims.lock         # Advisory lock serializing lease changes
 ```
+
+Latest gate views load the run named by the issue's gate state; verdict reuse
+loads the record for that gate and inputs. Archive operations read evidence by
+target. These reads address records directly rather than reconstructing state
+from history. The [storage-format reference](../reference/storage-format.md)
+defines their paths and publication boundaries.
 
 **Synchronization points:**
 
@@ -639,7 +661,7 @@ JIT is designed with isolation and fault tolerance:
   indefinite lease remains until a heartbeat, `jit claim release`,
   `jit claim force-evict`, or `jit recover` reclaims it. Either way the issue stays
   assigned until `jit issue release` or `jit issue unassign` clears its assignee
-- Malformed newline-terminated `events.jsonl` line → event *reads* fail fast with a parse error naming the line (an unterminated final line is an uncommitted append, which they ignore); issue operations and claims keep working
+- Malformed newline-terminated `events.jsonl` line or unknown event tag → history reads and whole-repository validation fail with an error naming the line; an unterminated final line is ignored. Issue operations and claims keep working
 
 **✓ No cascading failures:**
 
