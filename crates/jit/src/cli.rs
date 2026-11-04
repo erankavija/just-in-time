@@ -102,7 +102,7 @@ fn unknown_subcommand_hint(error: &clap::Error, args: &[String]) -> Option<&'sta
     let mut positional = args
         .iter()
         .skip(1)
-        .filter(|argument| !matches!(argument.as_str(), "-q" | "--quiet" | "--schema"));
+        .filter(|argument| !argument.starts_with('-'));
     let (group, verb) = (positional.next()?, positional.next()?);
     COMMAND_HINTS
         .iter()

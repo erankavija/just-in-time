@@ -15,6 +15,7 @@
       "path": "dev/active/0f8efc37-frontends-share-core/instantiation.json"
     }
   ],
+  "done_at": "2026-11-04T23:06:53.853956706Z",
   "first_ready_at": "2026-11-04T22:23:52.258524613Z",
   "gates_required": [
     "coverage-preview",
@@ -22,9 +23,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "run_id": "b442f1f7-20fd-4fcc-b640-b081fec8d79f",
-      "status": "failed",
-      "updated_at": "2026-11-04T22:31:31.826268201Z",
+      "run_id": "cbd82ec4-d697-462c-9054-78a7d54363f6",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:06:26.186362601Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -48,7 +49,7 @@
     "brackets:0f8efc37"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Break down the server and web shared mechanisms",
-  "updated_at": "2026-11-04T23:01:42.545677295Z"
+  "updated_at": "2026-11-04T23:06:53.853956706Z"
 }
