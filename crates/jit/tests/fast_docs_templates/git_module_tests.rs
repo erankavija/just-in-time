@@ -13,7 +13,7 @@ fn probe(dir: &Path) -> Option<ProbedCheckout> {
 }
 
 fn checkout(git: Git, root: &Path) -> GitCheckout {
-    GitCheckout::new(git, root.to_path_buf())
+    GitCheckout::for_test(git, root.to_path_buf())
 }
 
 #[cfg(unix)]
@@ -227,7 +227,7 @@ fn test_head_unstartable_program_returns_unavailable_error() {
 }
 
 fn dirty_paths(repository: &GitRepository) -> BTreeSet<PathBuf> {
-    GitCheckout::new(Git::default(), repository.root().to_path_buf())
+    GitCheckout::for_test(Git::default(), repository.root().to_path_buf())
         .dirty_paths()
         .unwrap()
         .into_iter()
@@ -325,7 +325,7 @@ fn test_dirty_paths_runs_one_git_process_in_the_checkout() {
     repository.write("README.md", "changed");
     let stand_in = GitStandIn::new();
 
-    GitCheckout::new(
+    GitCheckout::for_test(
         Git::with_program(stand_in.program()),
         repository.root().to_path_buf(),
     )

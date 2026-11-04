@@ -138,8 +138,15 @@ pub struct GitCheckout {
 }
 
 impl GitCheckout {
-    pub fn new(git: Git, worktree_root: PathBuf) -> Self {
+    /// Construct operations for a checkout already recognized by Git.
+    pub(super) fn new(git: Git, worktree_root: PathBuf) -> Self {
         Self { git, worktree_root }
+    }
+
+    /// Construct a checkout with an explicit executable for tests.
+    #[cfg(feature = "test-support")]
+    pub fn for_test(git: Git, worktree_root: PathBuf) -> Self {
+        Self::new(git, worktree_root)
     }
 
     // Temporary @/inv/convention-convergence exception: branch lookups converge
