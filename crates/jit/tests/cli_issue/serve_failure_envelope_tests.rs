@@ -34,3 +34,18 @@ fn test_serve_failures_emit_registered_error_envelope() {
         assert!(!output.status.success());
     }
 }
+
+#[test]
+fn test_serve_failure_prints_action_context_once_on_stderr() {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/server.pid.json"), "{").unwrap();
+    let output = cli.command(["serve", "--status"]).output().unwrap();
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("Error: checking server status: "),
+        "{stderr}"
+    );
+    assert_eq!(stderr.matches("checking server status").count(), 1);
+    assert_eq!(output.status.code(), Some(1));
+}

@@ -286,7 +286,9 @@ fn test_recover_repairs_derived_state_drift_without_git() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|warning| warning["kind"] == "claims_lease_recovery_skipped"),
+            .any(|warning| {
+                *warning == jit::storage::StorageWarning::ClaimsLeaseRecoverySkipped.to_string()
+            }),
         "recovery must expose the skip through its warning mechanism: {report}"
     );
 

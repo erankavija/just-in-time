@@ -142,7 +142,7 @@ impl ReportedFinding {
 /// evaluated. The command layer decides the process exit code from
 /// [`RuleReport::has_errors`] and renders [`RuleReport::findings`] in human or
 /// `--json` form.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct RuleReport {
     /// Every finding produced, local then graph, in evaluation order.
     pub findings: Vec<ReportedFinding>,
@@ -174,7 +174,7 @@ impl RuleReport {
 /// that excluded the issue, so `--explain` can show "the state predicate did not
 /// match". For a matched rule, `matched` is `true`, `skip_reason` is `None`, and
 /// `passed`/`messages` carry the PASS/FAIL result as before.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct RuleOutcome {
     /// Name of the rule.
     pub rule: String,
@@ -201,7 +201,7 @@ pub struct RuleOutcome {
 }
 
 /// The `--explain` report for one issue: every matching rule and its outcome.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct ExplainReport {
     /// Full id of the explained issue.
     pub issue_id: IssueId,

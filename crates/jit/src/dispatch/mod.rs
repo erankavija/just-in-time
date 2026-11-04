@@ -142,9 +142,26 @@ pub fn resolve_issue_filter<S: IssueStore>(
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
-    doc::output_schema,
+    apply::output_schema,
+    archive::output_schema,
+    claim::output_schema,
+    claim::recover::output_schema,
     config::output_schema,
+    dep::output_schema,
+    doc::output_schema,
+    events::output_schema,
+    graph::output_schema,
+    graph::rdeps::output_schema,
+    hooks::output_schema,
+    init::output_schema,
     invariant::output_schema,
+    item::output_schema,
+    label::output_schema,
+    project::output_schema,
+    search::output_schema,
+    serve::output_schema,
+    validate::output_schema,
+    version::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -330,10 +347,25 @@ macro_rules! command_group {
     };
 }
 
+pub mod apply;
+pub mod archive;
+pub mod claim;
 pub mod config;
+pub mod dep;
 pub mod doc;
+pub mod events;
+pub mod graph;
+pub mod hooks;
+pub mod init;
 pub mod invariant;
+pub mod item;
+pub mod label;
+pub mod project;
+pub mod search;
+pub mod serve;
 #[cfg(test)]
 mod test_forms;
 #[cfg(test)]
 mod test_group;
+pub mod validate;
+pub mod version;

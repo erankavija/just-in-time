@@ -3514,9 +3514,8 @@ of a whole-`[projection.*]` run — leaves every target byte-identical. All chan
 targets then publish through one redo record. JSON uses
 the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
 mode, style, kinds, count}`. Under `--json` the pre-write guards above surface the
-`VALIDATION_FAILED` envelope; any other command failure (for example, an
-unrecognized `--name`) returns the error envelope with code
-`PROJECT_COMMAND_FAILED`.
+`VALIDATION_FAILED` envelope; an unrecognized `--name` returns the
+`INVALID_ARGUMENT` error envelope and exits `2`.
 
 ### `jit invariant check`
 
@@ -3712,8 +3711,8 @@ An existing hook of the same name is left in place and reported as skipped. No
 hook checks leases; they are enforced when a mutation is written, so a hand edit
 of an issue record is not caught at commit.
 
-JSON returns `{hooks_dir, installed, skipped, message}`. A failure returns the
-error envelope with code `HOOKS_INSTALL_ERROR`.
+JSON returns `{hooks_dir, installed, skipped, message}`. Failures use the shared
+error classifier, which determines the envelope code and process exit status.
 
 Enforcement strictness is configuration, set in `.jit/config.toml`:
 
