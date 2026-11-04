@@ -944,8 +944,9 @@
     "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host."
   },
   "post_release_followups": [
-    "Land b23faa59, then 1eb949a5; fan out wave 7; implement 8c67b21a, then delete the private dispatch.sh copy.",
-    "26307dfd (mcp-ci builds the binary under evaluation) filed; once it lands, delete the PATH workaround from land-one.sh."
+    "After 1eb949a5 lands: implement 26307dfd (D-36), then re-evaluate b23faa59 mcp-ci (fresh, inputs changed) and close it; delete land-one's PATH workaround (already removed).",
+    "Fan out wave 7 once b23faa59 code-review passes (do not wait for its mcp-ci).",
+    "Then implement 8c67b21a and delete the private dispatch.sh copy."
   ],
   "issues": {
     "b23faa59": {}
