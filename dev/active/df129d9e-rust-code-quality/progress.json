@@ -962,7 +962,8 @@
     "3b696589": 1,
     "24a982b7": 1,
     "f87f9b00": 1,
-    "d58f80c9": 1
+    "d58f80c9": 1,
+    "01a88d32": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1410,10 +1411,11 @@
       "reason": "last handler move; empties the legacy schema table"
     },
     "01a88d32": {
-      "status": "dispatched",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after d58f80c9; worker checks criteria first",
-      "epic": "b697a3f7"
+      "epic": "b697a3f7",
+      "review": "lead R1 FAIL: deleted the fsync-before-write test leaving the property unowned (orthogonal-tests); rest PASS (DataRoot handle commit, -3)."
     }
   },
   "handoff": {
