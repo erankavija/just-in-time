@@ -1558,8 +1558,9 @@
       }
     },
     "75b46be9": {
-      "status": "ready",
-      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+      "status": "in_progress",
+      "note": "User approved30% floor; tested branch1daddafd1 awaits README reconciliation and gates",
+      "model": "gpt-6.1-sol"
     },
     "b22aabce": {
       "status": "ready",
@@ -1729,9 +1730,8 @@
     }
   },
   "handoff": {
-    "file": "handoff-11.md",
-    "from": "session c12148f1",
-    "to": "just-in-time-7c",
+    "file": "handoff-13.md",
+    "from": "Codex session13",
     "date": "2026-11-04"
   },
   "lead": "Codex execution lead (session 13)",
@@ -1824,7 +1824,7 @@
       "75b46be9": "gpt-6.1-sol high: measured compiler/debug behavior and budget calibration"
     },
     "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
-    "status": "first wave complete; split debug information next",
+    "status": "both scope decisions approved; resume split-debug landing",
     "measurements": {
       "f855d631": {
         "merge": "437c7ccfd",
@@ -1841,9 +1841,30 @@
           "acabe5453",
           "61cdc4ec4"
         ]
+      },
+      "75b46be9": {
+        "branch_commit": "1daddafd1",
+        "before_bytes": 1716674768,
+        "after_bytes": 1177006296,
+        "reduction_percent": 31.43685,
+        "budget_bytes": 1293942784,
+        "branch_tests": 5038,
+        "branch_doctests": 25,
+        "backtrace": "workspace source file/line preserved",
+        "criterion": "original40% unmet; proposed30% awaits approval"
       }
     },
     "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
-    "ownership_reconciliation": "Awaiting approval of proposed REQ-01/plan wording to match D-59"
+    "ownership_reconciliation": "Approved and recorded as epic D-05 and story D-01; plan reconciled",
+    "current_wave": 2,
+    "open_decisions": []
+  },
+  "session_14": {
+    "status": "resuming approved work",
+    "approvals": [
+      "75b46be9 floor30%",
+      "D-59 ownership wording"
+    ],
+    "timing": "remains deferred; preserve dynamic sharing"
   }
 }
