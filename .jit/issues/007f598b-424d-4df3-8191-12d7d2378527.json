@@ -9,11 +9,21 @@
   "description": "Update only `dev/architecture/repository-state-materialization.md` so its journal narrative describes decision and identity recovery without per-action progress state.\n\n## Background\n\nThe storage-format, profiles, and guarantees references already describe the decision and identity primitive correctly, so this task leaves them untouched. The architecture narrative is the one remaining documentation consumer that presents per-action progress as durable journal state.\n\n## Success Criteria\n\n- [hard] REQ-01: Revises `dev/architecture/repository-state-materialization.md` to describe the single-barrier protocol and its decision/identity recovery model.\n- [hard] REQ-02: Removes claims that per-action progress is durable journal state while retaining the terminal rollback marker and recoverability guarantees.\n- [hard] REQ-03: Leaves the storage-format, profiles, and guarantees references byte-unchanged.",
   "documents": [
     {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "3ff3b4cdd9535c53504c1be3f6fcda11f1bc524416b661871f6584605a4006a2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../docs/reference/storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        }
+      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Repository state materialization architecture",
-      "path": "dev/archive/4b7c06d0-test-suite-performance/architecture/repository-state-materialization.md"
+      "path": "dev/architecture/repository-state-materialization.md"
     }
   ],
   "done_at": "2026-08-12T00:27:32.182828238Z",
@@ -53,5 +63,5 @@
   "priority": "high",
   "state": "done",
   "title": "Cut over journal durability documentation",
-  "updated_at": "2026-08-22T11:56:49.854246582Z"
+  "updated_at": "2026-11-04T14:10:14.622865351Z"
 }

@@ -13,7 +13,7 @@
       "doc_type": "reference",
       "format": "markdown",
       "label": "Scenario-Eval Adjudication Method",
-      "path": "dev/archive/f2532a2d-jit-project-lead/eval/skill-eval-adjudication.md"
+      "path": "dev/eval/skill-eval-adjudication.md"
     }
   ],
   "done_at": "2026-07-02T20:46:17.590977690Z",
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Define scenario-eval adjudication method and verify jit-execution-lead evals",
-  "updated_at": "2026-07-27T10:05:09.242464464Z"
+  "updated_at": "2026-11-04T14:10:26.009682119Z"
 }

@@ -10,20 +10,6 @@
   "documents": [
     {
       "commit": null,
-      "doc_type": "implementation",
-      "format": "markdown",
-      "label": "Adapted trigger-eval runner (fixes self-hosted-skill shadowing confound)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/eval/skill-triggers/run_trigger_eval.py"
-    },
-    {
-      "commit": null,
-      "doc_type": "documentation",
-      "format": "markdown",
-      "label": "Trigger eval runner rationale and usage",
-      "path": "dev/archive/f2532a2d-jit-project-lead/eval/skill-triggers/README.md"
-    },
-    {
-      "commit": null,
       "doc_type": "reference",
       "label": "jit-execution-lead trigger eval queries",
       "path": ".agents/skills/jit-execution-lead/trigger_eval.json"
@@ -45,6 +31,20 @@
       "doc_type": "experiment",
       "label": "jit-planning-lead trigger eval results (11/17 pass, should-trigger 2/8, should-not-trigger 9/9 -- description undertriggers)",
       "path": ".agents/skills/jit-planning-lead/trigger_eval_results.json"
+    },
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "Adapted trigger-eval runner (fixes self-hosted-skill shadowing confound)",
+      "path": "dev/eval/skill-triggers/run_trigger_eval.py"
+    },
+    {
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": "Trigger eval runner rationale and usage",
+      "path": "dev/eval/skill-triggers/README.md"
     }
   ],
   "done_at": "2026-07-02T20:46:17.005832134Z",
@@ -70,5 +70,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Add activation trigger evals for both lead skills",
-  "updated_at": "2026-07-27T10:05:09.242464464Z"
+  "updated_at": "2026-11-04T14:10:25.978582453Z"
 }
