@@ -1,6 +1,6 @@
 //! Worktree inspection handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, Outcome};
 use crate::cli::WorktreeCommands;
 use crate::commands::worktree::{
     execute_worktree_info, execute_worktree_list, execute_worktree_store_divergence, WorktreeInfo,
@@ -8,16 +8,14 @@ use crate::commands::worktree::{
 use crate::output::{StoreComparison, WorktreeListResponse, WorktreeStoreDivergenceResponse};
 use crate::storage::JsonFileStorage;
 
-fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> anyhow::Result<Outcome<WorktreeInfo>> {
+fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeInfo> {
     let (info, warnings) =
         execute_worktree_info(&ctx.executor.storage().configured_worktree_paths()?)?;
     let message = format!("Worktree {} on branch {}", info.worktree_id, info.branch);
     Ok(Outcome::success_with(info, message).with_warnings(warnings))
 }
 
-fn list(
-    ctx: &CommandContext<'_, JsonFileStorage>,
-) -> anyhow::Result<Outcome<WorktreeListResponse>> {
+fn list(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeListResponse> {
     let (worktrees, warnings) =
         execute_worktree_list(&ctx.executor.storage().configured_worktree_paths()?)?;
     let message = format!("{} worktree(s)", worktrees.len());
@@ -29,7 +27,7 @@ fn list(
 
 fn store_divergence(
     ctx: &CommandContext<'_, JsonFileStorage>,
-) -> anyhow::Result<Outcome<WorktreeStoreDivergenceResponse>> {
+) -> HandlerResult<WorktreeStoreDivergenceResponse> {
     let report =
         execute_worktree_store_divergence(&ctx.executor.storage().configured_worktree_paths()?)?;
     let message = format!("{} divergence(s)", report.divergences.len());

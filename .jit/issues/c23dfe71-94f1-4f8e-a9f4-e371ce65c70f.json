@@ -17,11 +17,85 @@
       "path": "dev/archive/f2532a2d-jit-project-lead/active/c23dfe71-breakdown-spec.md"
     },
     {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "920e492391df0ecfd6c260bd91b787694ef6a2bc9ee50dd7bf4a711584a0f7de",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-execution-lead/evals/evals.json",
+          "resolved_path": ".agents/skills/jit-execution-lead/evals/evals.json"
+        },
+        {
+          "asset_type": "missing",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-planning-lead/evals/results.md",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/results.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "087379fec5dabcebb4fd619194b5a6e81d8255ed930498d3ab61b263cfa25adc",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "skill-eval-adjudication.md",
+          "resolved_path": "dev/eval/skill-eval-adjudication.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8ce9ec8fc1ea4f1b131149606f78d52a3a313a8f4a44f416566b96ed329c4f3b",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-execution-lead/trigger_eval_results.json",
+          "resolved_path": ".agents/skills/jit-execution-lead/trigger_eval_results.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "a2bb62c000ea47cf12d1e2a1a85cde04f6e30c02be7b098a1aebb98d3e388624",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../.agents/skills/jit-execution-lead/evals/results.md",
+          "resolved_path": ".agents/skills/jit-execution-lead/evals/results.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "c0ae38c61761a005e7546342aa82c04eec6b77c581271b1b8eee6300fc231229",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-planning-lead/trigger_eval_results.json",
+          "resolved_path": ".agents/skills/jit-planning-lead/trigger_eval_results.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8a99218ded94a2d418c6cdc80d9ddf49e35d13e8be9cde2aa3ebf73b9cc8fed9",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-planning-lead/evals/evals.json",
+          "resolved_path": ".agents/skills/jit-planning-lead/evals/evals.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "614ae364b339544bfa45b067fd2f2ac1affd421aaade05ac5defd46d8e1639e9",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-execution-lead/trigger_eval.json",
+          "resolved_path": ".agents/skills/jit-execution-lead/trigger_eval.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6274021a72cc216e169d5c73386e149179ca37698db472405ea10db61ac775a1",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../.agents/skills/jit-planning-lead/trigger_eval.json",
+          "resolved_path": ".agents/skills/jit-planning-lead/trigger_eval.json"
+        }
+      ],
       "commit": null,
       "doc_type": "reference",
       "format": "markdown",
       "label": "Lead-skills eval baseline (REQ-01..04 verification rollup)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/eval/lead-skills-eval-baseline.md"
+      "path": "dev/eval/lead-skills-eval-baseline.md"
     }
   ],
   "done_at": "2026-07-02T23:27:11.799144160Z",
@@ -55,5 +129,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Runnable eval verification for the lead skills",
-  "updated_at": "2026-10-01T19:32:38.310267334Z"
+  "updated_at": "2026-11-04T14:10:26.041565491Z"
 }

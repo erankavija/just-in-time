@@ -1,6 +1,6 @@
 //! `jit doc` handlers.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{AssetCommands, DocCommands};
 use crate::commands::{
     AssetListResult, DocumentAddResult, DocumentContentResult, DocumentDiffResult, DocumentHistory,
@@ -9,14 +9,14 @@ use crate::commands::{
 use crate::document::DocumentScope;
 use crate::domain::identity::IssueId;
 use crate::output::{ArtifactConformanceResponse, ArtifactDirectoryResponse, ErrorCode};
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::IssueStore;
 
 fn issue<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> anyhow::Result<IssueId> {
     resolve_issue(ctx.executor.storage(), id)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn add<S: IssueStore + RepositoryStateStore>(
+fn add<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
@@ -24,7 +24,7 @@ fn add<S: IssueStore + RepositoryStateStore>(
     label: Option<&str>,
     doc_type: Option<&str>,
     skip_scan: bool,
-) -> anyhow::Result<Outcome<DocumentAddResult>> {
+) -> HandlerResult<DocumentAddResult> {
     let (result, warnings) = ctx.executor.documents().add_document_reference(
         &issue(ctx, id)?,
         path,
@@ -38,10 +38,7 @@ fn add<S: IssueStore + RepositoryStateStore>(
     Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 
-fn list<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-    id: &str,
-) -> anyhow::Result<Outcome<DocumentListResult>> {
+fn list<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> HandlerResult<DocumentListResult> {
     let result = ctx
         .executor
         .documents()
@@ -50,11 +47,11 @@ fn list<S: IssueStore>(
     Ok(Outcome::success_with(result, message))
 }
 
-fn remove<S: IssueStore + RepositoryStateStore>(
+fn remove<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
-) -> anyhow::Result<Outcome<DocumentRemoveResult>> {
+) -> HandlerResult<DocumentRemoveResult> {
     let (result, warnings) = ctx
         .executor
         .documents()
@@ -71,7 +68,7 @@ fn show<S: IssueStore>(
     id: &str,
     path: &str,
     at: Option<&str>,
-) -> anyhow::Result<Outcome<DocumentContentResult>> {
+) -> HandlerResult<DocumentContentResult> {
     let result = ctx
         .executor
         .documents()
@@ -83,27 +80,29 @@ fn dir<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     area: &str,
-) -> anyhow::Result<Outcome<ArtifactDirectoryResponse>> {
+) -> HandlerResult<ArtifactDirectoryResponse> {
     let directory = ctx
         .executor
         .documents()
         .resolve_issue_artifact_directory(&issue(ctx, id)?, area)?;
-    Ok(Outcome::success(directory))
+    Ok(directory.into())
 }
 
 fn conformance<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<ArtifactConformanceResponse>> {
-    Ok(Outcome::success(
-        ctx.executor.documents().report_artifact_conformance()?,
-    ))
+) -> HandlerResult<ArtifactConformanceResponse> {
+    Ok(ctx
+        .executor
+        .documents()
+        .report_artifact_conformance()?
+        .into())
 }
 
 fn history<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
-) -> anyhow::Result<Outcome<DocumentHistory>> {
+) -> HandlerResult<DocumentHistory> {
     let result = ctx
         .executor
         .documents()
@@ -118,7 +117,7 @@ fn diff<S: IssueStore>(
     path: &str,
     from: &str,
     to: Option<&str>,
-) -> anyhow::Result<Outcome<DocumentDiffResult>> {
+) -> HandlerResult<DocumentDiffResult> {
     let result = ctx
         .executor
         .documents()
@@ -126,12 +125,12 @@ fn diff<S: IssueStore>(
     Ok(Outcome::success_with(result, "Document diff retrieved"))
 }
 
-fn assets_list<S: IssueStore + RepositoryStateStore>(
+fn assets_list<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
     rescan: bool,
-) -> anyhow::Result<Outcome<AssetListResult>> {
+) -> HandlerResult<AssetListResult> {
     let (result, warnings) =
         ctx.executor
             .documents()
@@ -141,10 +140,10 @@ fn assets_list<S: IssueStore + RepositoryStateStore>(
 }
 
 /// Broken links are a findings outcome; warnings alone succeed.
-fn check_links<S: IssueStore + RepositoryStateStore>(
+fn check_links<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     scope: &str,
-) -> anyhow::Result<Outcome<LinkCheckResult>> {
+) -> HandlerResult<LinkCheckResult> {
     let scope = DocumentScope::parse(scope, |id| issue(ctx, id))?;
     let result = ctx.executor.documents().check_document_links(&scope)?;
     let summary = &result.summary;
@@ -165,7 +164,7 @@ fn check_links<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: DocCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "doc_add" => DocCommands::Add { id, path, commit, label, doc_type, skip_scan }
             => add(&id, &path, commit.as_deref(), label.as_deref(), doc_type.as_deref(), skip_scan)

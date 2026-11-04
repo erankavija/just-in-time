@@ -1,6 +1,8 @@
 //! `jit claim` and `jit recover` handlers.
 
-use super::{resolve_issue, resolve_issue_filter, CommandContext, Outcome};
+use super::{
+    resolve_issue, resolve_issue_filter, CommandContext, HandlerResult, HandlerStore, Outcome,
+};
 use crate::cli::ClaimCommands;
 use crate::commands::RecoveryFailedError;
 use crate::domain::identity::IssueIdPrefix;
@@ -8,15 +10,14 @@ use crate::output::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
     ClaimRenewResponse, LeaseListResponse, RecoverResponse,
 };
-use crate::storage::{IssueStore, RepositoryStateStore};
 
-fn acquire<S: IssueStore + RepositoryStateStore>(
+fn acquire<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
     ttl: u64,
     agent_id: Option<String>,
     reason: Option<String>,
-) -> anyhow::Result<Outcome<ClaimAcquireResponse>> {
+) -> HandlerResult<ClaimAcquireResponse> {
     let full_id = resolve_issue(ctx.executor.storage(), &issue_id)?;
     let (lease_id, warnings) =
         ctx.executor
@@ -31,10 +32,10 @@ fn acquire<S: IssueStore + RepositoryStateStore>(
     Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
-fn release<S: IssueStore + RepositoryStateStore>(
+fn release<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
-) -> anyhow::Result<Outcome<ClaimReleaseResponse>> {
+) -> HandlerResult<ClaimReleaseResponse> {
     let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
     let (released, warnings) = ctx.executor.claims().release_by_issue(&id)?;
     let message = format!(
@@ -44,11 +45,11 @@ fn release<S: IssueStore + RepositoryStateStore>(
     Ok(Outcome::success_with(ClaimReleaseResponse { released }, message).with_warnings(&warnings))
 }
 
-fn renew<S: IssueStore + RepositoryStateStore>(
+fn renew<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
     extension: u64,
-) -> anyhow::Result<Outcome<ClaimRenewResponse>> {
+) -> HandlerResult<ClaimRenewResponse> {
     let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
     let (lease, warnings) = ctx.executor.claims().renew(&id, extension)?;
     let message = format!("Renewed lease {} by {extension} seconds", lease.lease_id);
@@ -56,10 +57,10 @@ fn renew<S: IssueStore + RepositoryStateStore>(
     Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
-fn heartbeat<S: IssueStore + RepositoryStateStore>(
+fn heartbeat<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
-) -> anyhow::Result<Outcome<ClaimHeartbeatResponse>> {
+) -> HandlerResult<ClaimHeartbeatResponse> {
     let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
     let (lease, warnings) = ctx.executor.claims().heartbeat(&id)?;
     let message = format!("Heartbeat sent for lease {}", lease.lease_id);
@@ -70,11 +71,11 @@ fn heartbeat<S: IssueStore + RepositoryStateStore>(
     Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
-fn status<S: IssueStore + RepositoryStateStore>(
+fn status<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue: Option<String>,
     agent: Option<String>,
-) -> anyhow::Result<Outcome<LeaseListResponse>> {
+) -> HandlerResult<LeaseListResponse> {
     let issue = issue
         .map(|id| resolve_issue_filter(ctx.executor.storage(), &id))
         .transpose()?;
@@ -89,9 +90,7 @@ fn status<S: IssueStore + RepositoryStateStore>(
     ))
 }
 
-fn list<S: IssueStore + RepositoryStateStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<LeaseListResponse>> {
+fn list<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<LeaseListResponse> {
     let leases = ctx.executor.claims().list()?;
     let message = format!("{} lease(s) found", leases.len());
     Ok(Outcome::success_with(
@@ -102,11 +101,11 @@ fn list<S: IssueStore + RepositoryStateStore>(
 
 /// Matches stored leases rather than issues, so a lease on a deleted issue
 /// stays evictable.
-fn force_evict<S: IssueStore + RepositoryStateStore>(
+fn force_evict<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
     reason: String,
-) -> anyhow::Result<Outcome<ClaimForceEvictResponse>> {
+) -> HandlerResult<ClaimForceEvictResponse> {
     let prefix = issue_id.parse::<IssueIdPrefix>()?;
     let (evicted, warnings) = ctx.executor.claims().force_evict(&prefix, &reason)?;
     let message = format!("Force-evicted lease {}", evicted.lease_id);
@@ -120,7 +119,7 @@ fn force_evict<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: ClaimCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "claim_acquire" => ClaimCommands::Acquire { issue_id, ttl, agent_id, reason }
             => acquire(issue_id, ttl, agent_id, reason) -> ClaimAcquireResponse,
@@ -142,9 +141,7 @@ pub mod recover {
     use super::*;
 
     /// Recovery failures keep the `recovery_failed` classification.
-    fn recover<S: IssueStore + RepositoryStateStore>(
-        ctx: &CommandContext<'_, S>,
-    ) -> anyhow::Result<Outcome<RecoverResponse>> {
+    fn recover<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<RecoverResponse> {
         let report = ctx
             .executor
             .claims()
@@ -166,7 +163,7 @@ pub mod recover {
 
     command_group! {
         command: (),
-        storage: [IssueStore + RepositoryStateStore],
+        storage: [HandlerStore],
         leaves: {
             "recover" => () => recover() -> RecoverResponse,
         }

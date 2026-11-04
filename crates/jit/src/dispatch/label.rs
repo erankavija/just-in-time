@@ -1,6 +1,6 @@
 //! `jit label` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, Outcome};
 use crate::cli::LabelCommands;
 use crate::config_manager::ConfigManager;
 use crate::output::{
@@ -8,9 +8,7 @@ use crate::output::{
 };
 use crate::storage::IssueStore;
 
-fn namespaces<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<NamespacesResponse>> {
+fn namespaces<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<NamespacesResponse> {
     let namespaces = ConfigManager::new(ctx.executor.storage().repository_layout()?)
         .get_namespaces()?
         .namespaces;
@@ -28,7 +26,7 @@ fn namespaces<S: IssueStore>(
 fn values<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     namespace: String,
-) -> anyhow::Result<Outcome<LabelValuesResponse>> {
+) -> HandlerResult<LabelValuesResponse> {
     let values = ctx.executor.issues().list_label_values(&namespace)?;
     let response = LabelValuesResponse::with_extras(values, LabelValuesScope { namespace });
     let message = format!("{} value(s)", response.count());

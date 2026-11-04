@@ -16,6 +16,7 @@
       "path": "dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md"
     }
   ],
+  "done_at": "2026-11-04T14:06:11.505713998Z",
   "first_ready_at": "2026-11-03T22:39:27.306285729Z",
   "gates_required": [
     "cargo-ci",
@@ -23,15 +24,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "8ed62ba2-d132-4c3c-9b15-220d8c5268a1",
+      "run_id": "a701cf9b-eb8b-42b5-a845-23e9248e020d",
       "status": "passed",
-      "updated_at": "2026-11-04T13:31:28.769916902Z",
+      "updated_at": "2026-11-04T14:00:59.908017822Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "2a14530e-209d-4de4-b433-0a5a58bff2a1",
-      "status": "failed",
-      "updated_at": "2026-11-04T13:36:40.567562964Z",
+      "run_id": "21e4572a-5b45-4927-b608-21e404bc7a0b",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:05:47.065052455Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,7 +45,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T13:50:12.447752120Z"
+  "updated_at": "2026-11-04T14:06:11.505713998Z"
 }

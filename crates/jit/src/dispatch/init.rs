@@ -1,6 +1,6 @@
 //! `jit init` handler.
 
-use super::Outcome;
+use super::{HandlerResult, Outcome};
 use crate::cli::InitArgs;
 use crate::commands::{
     open_repository, parse_profile_selectors, parse_profile_variable_assignments, OpenedRepository,
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 /// Initialization opens the repository itself, since it creates the data root
 /// the other commands require, then fills the scaffold through one mutation
 /// session; the machine-local worktree identity follows the publication.
-fn init(args: &InitArgs) -> anyhow::Result<Outcome<InitResponse>> {
+fn init(args: &InitArgs) -> HandlerResult<InitResponse> {
     let repository_root = env::current_dir()?;
     let OpenedRepository {
         retained_session: _session,

@@ -12,6 +12,10 @@ Three full `cargo-ci.sh --cargo nextest run --workspace --no-fail-fast` runs und
 
 All three are under their limits on a quiet host.
 
+### Serve test after the injected clock (authoritative for that test)
+
+The serve test changed after the quiet window (82745633d: the startup watch reads time through an injected clock, so the test waits no real time). It alone was re-measured: three nextest runs of `commands::serve::tests::test_start_server_bounds_a_child_that_neither_serves_nor_exits` under the exclusive lock, each started at a 1-minute load below 4 (3.36, 3.48, 3.48). Durations 0.029 s, 0.014 s and 0.015 s: median 0.015 s, worst 0.029 s against the 2 s unit limit. Raw junit, logs and loads are in [serve-clock/](serve-clock/). The document and lease figures above stand: their code is unchanged since the quiet window.
+
 ## Loaded host (first remeasurement)
 
 Method: the "Reproducing" section of `../README.md`, three full `cargo-ci.sh --cargo nextest run --workspace --no-fail-fast` runs under the exclusive lock (`flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock`), disk-backed `TMPDIR`, then `distribution.py`. Raw junit, run logs, load averages and distribution output are beside this note. `--no-fail-fast` lets a run finish when an unrelated test hits nextest's 20 s limit (see below).
