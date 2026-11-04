@@ -924,7 +924,7 @@ jit issue create --title <TITLE> [OPTIONS]
 | `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
-| `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. The reported findings are the same with or without it. |
+| `--force` | Create the issue despite blocking (`enforce = true`) rule failures; each bypassed failure is recorded as a `local_rule_bypassed` event, not reported in `findings`. Non-blocking findings are reported either way. |
 | `--json` | Emit the created issue as the `issue show` object, plus `findings` and a `message` field. |
 
 ```bash
@@ -944,10 +944,11 @@ of those).
 
 **Findings.** Creation reports the rule findings concerning the new issue: the
 non-blocking local-rule findings, then the graph-rule findings over the
-repository with the issue added. Findings never block creation. JSON carries
-them as `findings`; human output prints one `<severity> [<rule>] <message>` line
-per finding after the created id. A blocking rule failure bypassed by `--force`
-is recorded as an event rather than reported as a finding.
+repository with the issue added. Reported findings never block creation; a
+blocking rule failure refuses it unless `--force` bypasses that failure, which is
+then recorded as an event rather than reported. JSON carries the findings as
+`findings`; human output prints one `<severity> [<rule>] <message>` line per
+finding after the created id.
 
 Under `--quiet` the command prints only the new issue's id, which is what
 scripts capture.

@@ -633,12 +633,12 @@ Error: Issue not found: abc123
 
 **Scenario:** Document references external URL, but network is unavailable.
 
-**Impact:** Document operations fail, but core issue tracking unaffected.
+**Impact:** Link checking reports the URL unreachable, but core issue tracking unaffected.
 
 ```bash
 jit doc check-links --scope all
-Warning: External URL not validated: https://example.com/diagram.png
-  Referenced in: dev/design.md
+# reports an unreachable_url error for https://example.com/diagram.png
+# (referenced in dev/design.md) after the request timeout, and exits 4
 
 # Core functionality still works
 jit query available  # succeeds
