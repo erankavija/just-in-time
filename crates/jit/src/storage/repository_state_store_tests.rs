@@ -855,29 +855,27 @@ fn sessions_over(files: &[(VirtualPath, &[u8])]) -> (TempDir, [WrittenSession; 2
 #[test]
 fn test_conformance_extend_reads_only_what_the_image_lacks_on_both_backends() {
     let (kept, added) = (VirtualPath::INDEX, VirtualPath::CONFIG);
+    let upgraded = VirtualPath::data("upgrade.txt").unwrap();
     let log = vec![b'x'; EVENT_LOG_TAIL_WINDOW as usize + 1];
     let (_worktree, sessions) = sessions_over(&[
         (kept.clone(), b"first"),
         (added.clone(), b"added"),
-        (VirtualPath::EVENTS, &log),
+        (upgraded.clone(), &log),
     ]);
     for (mut session, write) in sessions {
         let mut spec = CaptureSpec::new([kept.clone()], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec.discover_tail(upgraded.clone()).unwrap();
         let image = session.capture(spec).unwrap();
         write(&kept, b"second");
         let mut spec = image.capture_spec().clone();
-        spec.discover_paths([added.clone(), VirtualPath::EVENTS])
+        spec.discover_paths([added.clone(), upgraded.clone()])
             .unwrap();
 
         let grown = session.extend(image, spec).unwrap();
 
         assert_eq!(grown.file_bytes(&kept).unwrap(), Some(&b"first"[..]));
         assert_eq!(grown.file_bytes(&added).unwrap(), Some(&b"added"[..]));
-        assert_eq!(
-            grown.file_bytes(&VirtualPath::EVENTS).unwrap(),
-            Some(&log[..])
-        );
+        assert_eq!(grown.file_bytes(&upgraded).unwrap(), Some(&log[..]));
     }
 }
 
@@ -1506,16 +1504,13 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
         .unwrap()
     };
     let spec = || {
-        CaptureSpec::new(
-            [
-                VirtualPath::GATE_RUNS,
-                run_dir.clone(),
-                run_file.clone(),
-                events.clone(),
-            ],
+        let mut spec = CaptureSpec::new(
+            [VirtualPath::GATE_RUNS, run_dir.clone(), run_file.clone()],
             budget(),
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(events.clone()).unwrap();
+        spec
     };
 
     std::fs::create_dir_all(data.join("gate-runs")).unwrap();
@@ -1936,11 +1931,18 @@ impl WriteSetFixture {
 
     /// The image a mutation reading `paths` captured.
     fn capture(&self, paths: impl IntoIterator<Item = VirtualPath>) -> RepositoryImage {
+        let (tails, whole): (Vec<_>, Vec<_>) = paths
+            .into_iter()
+            .partition(|path| *path == VirtualPath::EVENTS);
+        let mut spec = CaptureSpec::new(whole, budget()).unwrap();
+        for path in tails {
+            spec.discover_tail(path).unwrap();
+        }
         capture_capability_image(
             &self.layout,
             &self.roots,
             &self.storage,
-            CaptureSpec::new(paths, budget()).unwrap(),
+            spec,
             CapturedAnswers::default(),
         )
         .unwrap()

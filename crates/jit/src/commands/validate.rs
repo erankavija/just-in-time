@@ -408,13 +408,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .listings
                     .iter()
                     .all(|listing| read.listings().contains(listing));
-            // The base already reads the log in the mode this capture needs.
-            spec.discover_paths(
-                closure
-                    .paths
-                    .into_iter()
-                    .filter(|path| *path != VirtualPath::EVENTS),
-            )?;
+            spec.discover_paths(closure.paths)?;
             spec.discover_listings(closure.listings)?;
             if !closure_read {
                 return Ok(());

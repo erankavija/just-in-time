@@ -875,10 +875,14 @@
     "e5d618ee": 2,
     "153c9851": 1,
     "98cc2097": 2,
-    "20fc3b92": 1,
+    "20fc3b92": 2,
     "10751360": 1,
     "8a14e8e9": 2,
-    "9529b9ac": 1
+    "9529b9ac": 1,
+    "06ee9b67": 1,
+    "71f5296c": 1,
+    "66790c84": 1,
+    "d952d057": 2
   },
   "surfaced_pitfalls": [
     {
@@ -960,7 +964,7 @@
     "note": "12c0f3fb added +233 (forms); handler moves must pay back"
   },
   "wave_notes": {
-    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line)."
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework."
   },
   "post_release_followups": [
     "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy."
@@ -1076,7 +1080,8 @@
       "status": "codex_done_unreviewed",
       "vendor": "Codex gpt-6.1-sol (high)",
       "reason": "self-contained migration without sockets",
-      "note": "lead-preserve ac9220229"
+      "note": "lead-preserve ac9220229",
+      "review": "lead R1 FAIL (7c), Tier 2.5 only: main.rs:536 rustdoc links [`resolve_gate_key`], which moved to jit::dispatch. Criteria otherwise met on reading. Rework with the main merge after the batch lands."
     },
     "06ee9b67": {
       "status": "in_batch",
@@ -1110,13 +1115,15 @@
       "status": "codex_partial",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
-      "note": "lead-preserve e1bff4aae; +68 lines to reconcile"
+      "note": "lead-preserve e1bff4aae; +68 lines to reconcile",
+      "review": "lead (7c): partial; migrate group no longer exists on main (842b0ac6 archived), so scope is snapshot export alone per its Notes. Completion dispatch after the batch lands; reconcile the +68 lines."
     },
     "cd8e04cc": {
       "status": "codex_done_unreviewed",
       "vendor": "Codex gpt-6-astra (default)",
       "reason": "self-contained migration without sockets",
-      "note": "lead-preserve 2cb30f0ac"
+      "note": "lead-preserve 2cb30f0ac",
+      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge)."
     },
     "8e91126b": {
       "status": "in_batch",
@@ -1144,6 +1151,17 @@
       "vendor": "Claude Sonnet",
       "reason": "ENOSPC classification (D-47)",
       "note": "follow-up landed 1e2d11ebf; code-review F1 (round 2): same-test assertion plus ENOSPC elsewhere in block exits 75; rework 2 of 2: ENOSPC must be in the panic message"
+    },
+    "d952d057": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "script change with self-test; steward priority",
+      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker."
+    },
+    "b51291e4": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained script change without sockets; alternation"
     }
   },
   "handoff": {
@@ -1151,5 +1169,6 @@
     "from": "session c12148f1",
     "to": "just-in-time-7c",
     "date": "2026-11-04"
-  }
+  },
+  "lead": "just-in-time-7c (session 12)"
 }

@@ -25,7 +25,7 @@
     "satisfies:9876a23a/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Capture specs validate only added entries",
-  "updated_at": "2026-11-03T23:04:27.566512559Z"
+  "updated_at": "2026-11-04T07:08:56.322220378Z"
 }
