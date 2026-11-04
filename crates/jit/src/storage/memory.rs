@@ -500,7 +500,7 @@ impl InMemoryStorage {
     /// Install `record` as the residue this backend applies forward, changing no
     /// state entry.
     ///
-    /// The in-memory commit point, mirroring [`RedoRecord::commit`]: an
+    /// The in-memory commit point, mirroring [`commit_redo_record`](super::commit_redo_record): an
     /// installed record is refused rather than replaced, because what occupies
     /// the slot is a mutation no application consumed.
     ///

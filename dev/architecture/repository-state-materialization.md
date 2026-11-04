@@ -358,8 +358,10 @@ none is an ancestor of another, the event append's implicit target included —
 checked identically by `RedoRecord::new` and `RedoRecord::parse`, so only a
 directory no other operation lies beneath is carried as a make-directory.
 
-`RedoRecord::commit` writes the record in place under the scratch directory,
-syncs it and the directory, and refuses an occupied record path. The synced write
+`commit_redo_record` (`storage/redo_apply.rs`) writes the record in place under
+the scratch directory of the data-root handle it is given, syncs it and the
+directory, and refuses an occupied record path; the session commits through the
+handle it verified, so a root rebound by path never receives the record. The synced write
 is the mutation's commit point: before it the repository is unchanged; after it
 the record is the mutation.
 

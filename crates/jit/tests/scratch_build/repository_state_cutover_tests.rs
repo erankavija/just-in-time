@@ -471,7 +471,7 @@ const DATA_ROOT_CREATOR: &str = "stage_new_data_root";
 /// definition it owns, with the reason it may.
 const REPOSITORY_STATE_PUBLISHERS: [(&str, &str); 3] = [
     (
-        "pub struct RedoRecord {",
+        "pub fn commit_redo_record(",
         "the record is a mutation's commit point, written and synced in the data root's \
          scratch directory before any live file changes",
     ),

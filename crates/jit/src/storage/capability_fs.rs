@@ -24,7 +24,57 @@ pub enum CapabilityFsError {
 /// session boundary that verified their identity.
 pub struct CapabilityRoots {
     worktree: Dir,
-    data: Option<Dir>,
+    data: Option<DataRoot>,
+}
+
+/// An open no-follow handle on a data root, or on the stage that becomes one.
+///
+/// Holding it pins the directory it opened: a record committed through it
+/// lands there however the path is rebound afterwards.
+pub struct DataRoot {
+    directory: Dir,
+    #[cfg(test)]
+    refuse_sync: bool,
+}
+
+impl DataRoot {
+    /// Open the directory at the absolute `path` without following links.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `path` is relative, is absent, or resolves
+    /// through a link.
+    pub fn open(path: &Path) -> Result<Self, CapabilityFsError> {
+        open_absolute_dir_nofollow(path).map(Self::from_dir)
+    }
+
+    pub(in crate::storage) fn from_dir(directory: Dir) -> Self {
+        Self {
+            directory,
+            #[cfg(test)]
+            refuse_sync: false,
+        }
+    }
+
+    pub(in crate::storage) fn dir(&self) -> &Dir {
+        &self.directory
+    }
+
+    /// Fsync the root, so entries created in it are durable.
+    pub(in crate::storage) fn sync(&self) -> std::io::Result<()> {
+        #[cfg(test)]
+        if self.refuse_sync {
+            return Err(std::io::Error::other("injected root fsync failure"));
+        }
+        sync_capability_directory(&self.directory)
+    }
+
+    /// Test seam: a handle whose root fsync fails.
+    #[cfg(test)]
+    pub(in crate::storage) fn refusing_sync(mut self) -> Self {
+        self.refuse_sync = true;
+        self
+    }
 }
 
 impl CapabilityRoots {
@@ -53,7 +103,7 @@ impl CapabilityRoots {
             Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {
                 let data = open_child_dir_nofollow(&data_parent, &data_leaf)?;
                 ensure_capability_identity(&data, layout.data_identity(), layout.data_root())?;
-                Some(data)
+                Some(DataRoot::from_dir(data))
             }
             Ok(_) => {
                 return Err(CapabilityFsError::UnsafeTarget(
@@ -80,10 +130,14 @@ impl CapabilityRoots {
         Ok((Self { worktree, data }, data_parent, data_leaf))
     }
 
+    pub(in crate::storage) fn data_root(&self) -> Option<&DataRoot> {
+        self.data.as_ref()
+    }
+
     pub(in crate::storage) fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
         match class {
             RepositoryRootClass::Worktree => Some(&self.worktree),
-            RepositoryRootClass::Data => self.data.as_ref(),
+            RepositoryRootClass::Data => self.data.as_ref().map(DataRoot::dir),
         }
     }
 }

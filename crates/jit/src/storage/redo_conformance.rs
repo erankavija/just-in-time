@@ -8,7 +8,7 @@
 //! only what that backend adds (`@/inv/orthogonal-tests`).
 
 use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
-use crate::storage::capability_fs::CapabilityRoots;
+use crate::storage::capability_fs::{CapabilityRoots, DataRoot};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     arbitrary_record, data_root, directory_vocabulary_paths, path_vocabulary, record_relative_path,
@@ -16,8 +16,8 @@ use crate::storage::redo_apply::test_fixtures::{
     RecordedPoints, SnapshotEntry, CAPTURED_LOG,
 };
 use crate::storage::{
-    EventAppend, InMemoryStorage, MemoryRedoApplier, NoRedoInterruptions, PutFile, RedoApplier,
-    RedoApplyError, RedoInterruptionInjector, RedoPoint, RedoRecord,
+    commit_redo_record, EventAppend, InMemoryStorage, MemoryRedoApplier, NoRedoInterruptions,
+    PutFile, RedoApplier, RedoApplyError, RedoInterruptionInjector, RedoPoint, RedoRecord,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -93,7 +93,7 @@ impl RecordBackend for FileBackend {
     }
 
     fn commit(&self, record: &RedoRecord) {
-        record.commit(&data_root(&self.worktree)).unwrap();
+        commit_redo_record(&DataRoot::open(&data_root(&self.worktree)).unwrap(), record).unwrap();
     }
 
     fn apply(

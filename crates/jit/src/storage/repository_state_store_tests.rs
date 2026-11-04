@@ -6,6 +6,7 @@ use crate::repository_state::{
 };
 #[cfg(windows)]
 use crate::storage::capability_fs::capability_metadata_identity;
+use crate::storage::capability_fs::DataRoot;
 use crate::storage::capability_fs::{
     open_regular_file_nofollow, CapabilityFsError, CapabilityRoots,
 };
@@ -2425,7 +2426,7 @@ impl SessionRecordBackend for FileSessionBackend {
     }
 
     fn commit(&self, record: &RedoRecord) {
-        record.commit(&redo_root(&self.worktree)).unwrap();
+        commit_redo_record(&DataRoot::open(&redo_root(&self.worktree)).unwrap(), record).unwrap();
     }
 
     fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {

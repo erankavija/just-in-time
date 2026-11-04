@@ -357,13 +357,13 @@ fn test_gate_evaluate_json_failure_includes_lease_warnings() {
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(json["error"]["code"], "GATE_FAILED");
-    let warnings = json["error"]["details"]["warnings"].as_array().unwrap();
+    let warnings = json["warnings"].as_array().unwrap();
     assert!(
         warnings.iter().any(|warning| warning
             .as_str()
             .unwrap()
             .contains("is leased by agent:holder")),
-        "expected lease warning in JSON details: {json}"
+        "expected lease warning beside the error: {json}"
     );
 }
 

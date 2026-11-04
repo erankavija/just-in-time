@@ -2017,7 +2017,6 @@ jit gate evaluate abc123 tests --json
 #   "key": "tests",
 #   "status": "passed",
 #   "verdict": "pass",
-#   "warnings": [],
 #   "message": "Passed gate 'tests' for issue abc123"
 # }
 
@@ -2056,7 +2055,8 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
-  per gate (`key`, `status`, `verdict`, `warnings`). On the first
+  per gate (`key`, `status`, `verdict`); each gate's warnings join the
+  envelope's `warnings`, prefixed with `(<gate>): `. On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
   `error.details.key` naming the offending gate, and `error.details.verdict`
   `fail` or `error`).
@@ -2069,8 +2069,8 @@ jit gate evaluate-all abc123 --json
 #   "status": "passed",
 #   "verdict": "pass",
 #   "gates": [
-#     { "key": "tests",  "status": "passed", "verdict": "pass", "warnings": [] },
-#     { "key": "clippy", "status": "passed", "verdict": "pass", "warnings": [] }
+#     { "key": "tests",  "status": "passed", "verdict": "pass" },
+#     { "key": "clippy", "status": "passed", "verdict": "pass" }
 #   ],
 #   "message": "Passed 2 required gate(s) for issue abc123"
 # }
@@ -2100,14 +2100,20 @@ is reusable.
 
 Issues are evaluated in argument order. Evaluation is serialised per issue,
 and the command continues after a checker failure, runner error, lookup error,
-or manual-gate attestation error. Exit `0` means every issue passed; otherwise
+or manual-gate attestation error. Under strict lease enforcement, another
+agent's lease on any requested issue refuses the whole batch before any
+evaluation. Exit `0` means every issue passed; otherwise
 the command returns the first failing issue's code from the [`jit gate
 evaluate`](#jit-gate-evaluate) taxonomy.
 
-With `--json`, the response uses the list envelope `{"count": N,
-"results": [...]}`. Each result contains `issue_id`, `key`, `status`,
-`verdict` when a verdict was produced, `warnings`, and `error` when that issue
-did not pass.
+The report is the list envelope `{"count": N, "results": [...]}`. Each result
+contains `issue_id`, `key`, `status`, `verdict` when a verdict was produced,
+and `error`, the classified error object, when that issue did not pass. Each
+issue's warnings join the envelope's `warnings`, prefixed with `(<issue>): `.
+When every issue passed, `--json` prints the report as the success response.
+Otherwise it prints the failure envelope with the first failing issue's code
+and the report under `error.details`; in human mode the per-issue lines go to
+stdout and a one-line summary to stderr.
 
 ### `jit gate fail`
 
