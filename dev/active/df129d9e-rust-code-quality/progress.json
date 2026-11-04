@@ -1151,7 +1151,7 @@
       "reason": "resume after 8f297e60 on main; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "review_note": "8f297e60 (2a758ab62) made an unreadable --values-file an InvalidArgumentError: profile apply's plain form now exits 2 (was 3); its --json form still exits 1 via profile_json_error until this issue migrates the arm. On review: both forms should exit 2, with a profile apply row and dual-form binding.",
       "note": "lead-preserve b7827c17a; waits for 8f297e60 on main",
-      "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT."
+      "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT. Lead merged main (additive; unused imports dropped)."
     },
     "52110fb4": {
       "status": "done",
@@ -1172,7 +1172,7 @@
       "vendor": "Claude Sonnet",
       "reason": "rework 1: exit-code row bindings, split render line; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve 2cb30f0ac",
-      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge). Rework 1 at e69f46779: lead PASS; rows narrowed to worktree info/list with one binding each; WorktreesKey moved into collection_keys!. Whole-tree run left to branch CI (worker's locked run starved behind gate runs). Lead merge eed453f70 (both sides deleted an arm). Landed; code-review R1 (0989acfc) failed: store-divergence omitted from changed exit-code rows (REQ-04). Rework 2 of 2 to Claude Sonnet."
+      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge). Rework 1 at e69f46779: lead PASS; rows narrowed to worktree info/list with one binding each; WorktreesKey moved into collection_keys!. Whole-tree run left to branch CI (worker's locked run starved behind gate runs). Lead merge eed453f70 (both sides deleted an arm). Landed; code-review R1 (0989acfc) failed: store-divergence omitted from changed exit-code rows (REQ-04). Rework 2 of 2 to Claude Sonnet. Rework 2 at 8d81d1e27: lead PASS; store-divergence row 5 with binding; 3/10 shown unreachable (evidence in worker report)."
     },
     "8e91126b": {
       "status": "done",
