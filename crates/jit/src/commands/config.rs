@@ -290,7 +290,16 @@ impl<S: IssueStore> ConfigOps<'_, S> {
             let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
             let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed())?;
             let proposed = apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
-            let validation = crate::validation::repository::validate_repository(&proposed)?;
+            let validation = crate::validation::report(
+                &crate::validation::CapturedValidation::from_image(&proposed),
+                &crate::validation::ReportInputs {
+                    now: chrono::Utc::now(),
+                    history: None,
+                },
+            );
+            if let Some(error) = validation.structural_failure {
+                return Err(error);
+            }
             if validation.rule_report.has_errors() {
                 anyhow::bail!(
                     "config set would leave {} validation error finding(s)",

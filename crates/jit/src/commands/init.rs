@@ -161,8 +161,16 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                     .map_err(crate::repository_state::RepositoryStateError::from)?;
                 let proposed =
                     apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
-                let validation = crate::validation::repository::validate_repository(&proposed)
-                    .map_err(init_validation_error)?;
+                let validation = crate::validation::report(
+                    &crate::validation::CapturedValidation::from_image(&proposed),
+                    &crate::validation::ReportInputs {
+                        now: chrono::Utc::now(),
+                        history: None,
+                    },
+                );
+                if let Some(error) = validation.structural_failure {
+                    return Err(init_validation_error(error));
+                }
                 if validation.rule_report.has_errors() {
                     anyhow::bail!(
                         "repository initialization produced {} validation error finding(s)",
@@ -374,10 +382,7 @@ fn init_response_paths(
 /// Preserve the startup-facing unsupported-format error while deriving it from the
 /// same closed proposed image that init validates. Other structural failures keep
 /// their original validation context.
-fn init_validation_error(
-    failure: crate::validation::repository::RepositoryValidationFailure,
-) -> anyhow::Error {
-    let error = failure.into_error();
+fn init_validation_error(error: anyhow::Error) -> anyhow::Error {
     let unsupported = error.chain().find_map(|cause| {
         cause
             .downcast_ref::<crate::repository_state::RepositoryIndexError>()
@@ -594,6 +599,8 @@ mod tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
     }
 
@@ -674,6 +681,8 @@ mod tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
     }
 
@@ -718,6 +727,8 @@ mod tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
     }
 
@@ -949,6 +960,8 @@ mod tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
     }
 
@@ -1027,6 +1040,8 @@ mod tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
         drop(retained);
     }
@@ -1104,6 +1119,8 @@ mod tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
     }
 
@@ -1376,6 +1393,8 @@ assert = { require-section = { heading = \"Goals\" } }\n";
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
         assert_eq!(

@@ -25,6 +25,7 @@ use crate::repository_state::{
 use crate::validation::engine::{Finding, SchemaEngine};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
+use chrono::{DateTime, Utc};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// One named stage in whole-repository validation.
@@ -48,100 +49,73 @@ pub enum RepositoryValidationPass {
     Projections,
 }
 
-/// Validation outcome, including semantic findings and stages reached.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RepositoryValidationReport {
+/// A captured image paired with the issue records the loader parsed from it.
+#[derive(Debug)]
+pub struct CapturedValidation<'a> {
+    image: &'a RepositoryImage,
+    /// `None` when the loader refused the image.
+    records: Option<Vec<Issue>>,
+}
+
+impl<'a> CapturedValidation<'a> {
+    /// Parse `image`'s issue records through the records loader.
+    pub fn from_image(image: &'a RepositoryImage) -> Self {
+        Self {
+            image,
+            records: load_records(image).ok(),
+        }
+    }
+}
+
+/// Everything a report reads besides its captured validation.
+#[derive(Debug)]
+pub struct ReportInputs {
+    /// The instant `gate-recency` rules judge recorded gate results against.
+    pub now: DateTime<Utc>,
+    /// Verdicts read from repository history; only whole-repository validation
+    /// supplies them.
+    pub history: Option<HistoryVerdicts>,
+}
+
+/// Verdicts whose evidence lies outside the captured image. Each `Err` holds
+/// why the repository fails it.
+#[derive(Debug)]
+pub struct HistoryVerdicts {
+    /// Whether stored records reproduce what the writer would publish.
+    pub record_fidelity: std::result::Result<(), String>,
+    /// Whether every issue's document references resolve.
+    pub document_references: std::result::Result<(), String>,
+}
+
+/// The whole-repository validation report.
+#[derive(Debug)]
+pub struct ValidationReport {
     /// Stages reached in deterministic pipeline order.
     pub passes: Vec<RepositoryValidationPass>,
-    /// Number of issue records validated.
-    pub issue_count: usize,
-    /// Declarative and built-in semantic findings produced from the same view.
+    /// The first structural failure; every finding collected before it is kept.
+    pub structural_failure: Option<anyhow::Error>,
+    /// Whether the report judged the history verdicts.
+    pub has_history: bool,
+    /// Declarative and built-in findings, in wire form.
     pub rule_report: RuleReport,
 }
 
-/// Validation read the repository and found it wrong: a verdict on its content,
-/// where every other structural failure means it could not load or read what it
-/// needed.
+impl ValidationReport {
+    /// Whether the structural failure judges the repository wrong, where any
+    /// other structural failure means validation could not read what it needed.
+    pub fn is_judged_invalid(&self) -> bool {
+        self.structural_failure
+            .as_ref()
+            .is_some_and(|error| error.downcast_ref::<RepositoryJudgedInvalid>().is_some())
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
-pub(crate) struct RepositoryJudgedInvalid(pub(crate) String);
+struct RepositoryJudgedInvalid(String);
 
 fn judged_invalid(error: anyhow::Error) -> anyhow::Error {
     RepositoryJudgedInvalid(format!("{error:#}")).into()
-}
-
-/// A structural repository-validation failure with all semantic findings that
-/// could still be collected from the already captured [`RepositoryImage`].
-///
-/// Callers that render validation output should inspect [`Self::report`] before
-/// propagating [`Self::into_error`]. This keeps a structural failure authoritative
-/// without discarding rule findings or rerunning rules through another data source.
-#[derive(Debug)]
-pub struct RepositoryValidationFailure {
-    error: anyhow::Error,
-    report: RepositoryValidationReport,
-}
-
-impl RepositoryValidationFailure {
-    fn new(error: anyhow::Error, report: RepositoryValidationReport) -> Self {
-        Self { error, report }
-    }
-
-    pub(crate) fn declaration(error: anyhow::Error) -> Self {
-        Self::new(
-            error.context("declaration validation pass"),
-            RepositoryValidationReport {
-                passes: Vec::new(),
-                issue_count: 0,
-                rule_report: RuleReport::default(),
-            },
-        )
-    }
-
-    pub(crate) fn materialization(error: anyhow::Error) -> Self {
-        Self::new(
-            error.context("derived-materialization validation pass"),
-            RepositoryValidationReport {
-                passes: Vec::new(),
-                issue_count: 0,
-                rule_report: RuleReport::default(),
-            },
-        )
-    }
-
-    /// Whether validation judged the repository wrong rather than being unable to judge.
-    pub fn is_judged_invalid(&self) -> bool {
-        self.error
-            .downcast_ref::<RepositoryJudgedInvalid>()
-            .is_some()
-    }
-
-    /// Partial validation report collected from the exact supplied view.
-    pub fn report(&self) -> &RepositoryValidationReport {
-        &self.report
-    }
-
-    /// Consume the failure into its structural error and partial report.
-    pub fn into_parts(self) -> (anyhow::Error, RepositoryValidationReport) {
-        (self.error, self.report)
-    }
-
-    /// Consume the failure into its authoritative structural error.
-    pub fn into_error(self) -> anyhow::Error {
-        self.error
-    }
-}
-
-impl std::fmt::Display for RepositoryValidationFailure {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "{:#}", self.error)
-    }
-}
-
-impl std::error::Error for RepositoryValidationFailure {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(self.error.as_ref())
-    }
 }
 
 /// Read a repo-relative path's bytes from the captured image.
@@ -155,24 +129,27 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
-/// Validate declarations, records, rules, and materializations in `image`.
-///
-/// Mutations use this pipeline without auditing unrelated document references;
-/// full validation supplies that pass's separately captured verdict through
-/// [`validate_repository_with_materializations`].
-///
-/// The image is the single closed evidence source: a
-/// live capture validates the working tree, and an overlay image
-/// ([`apply_overlay`](crate::repository_state::apply_overlay)) validates a proposed
-/// final state. Every pass reads only image-projected content — no live filesystem
-/// or Git I/O — so a path outside the captured closure fails typed rather than
-/// reading through.
-pub fn validate_repository(
-    image: &RepositoryImage,
-) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-    let declarations = crate::repository_state::validation_declarations_from_image(image)
-        .map_err(|error| RepositoryValidationFailure::declaration(error.into()))?;
-    let expected = declarations
+/// Validate declarations, records, rules, and materializations in the captured
+/// image, which is the only evidence source: a live capture validates the
+/// working tree, an overlay image
+/// ([`apply_overlay`](crate::repository_state::apply_overlay)) a proposed final
+/// state.
+pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> ValidationReport {
+    let image = captured.image;
+    let mut report = ValidationReport {
+        passes: Vec::new(),
+        structural_failure: None,
+        has_history: inputs.history.is_some(),
+        rule_report: RuleReport::default(),
+    };
+    let declarations = match crate::repository_state::validation_declarations_from_image(image) {
+        Ok(declarations) => declarations,
+        Err(error) => {
+            report.structural_failure = Some(anyhow!(error).context("declaration validation pass"));
+            return report;
+        }
+    };
+    let expected = match declarations
         .rules_loaded()
         .then(|| {
             crate::repository_state::derive_materialization(
@@ -183,52 +160,29 @@ pub fn validate_repository(
             )
         })
         .transpose()
-        .map_err(|error| {
-            RepositoryValidationFailure::new(
-                error.into(),
-                RepositoryValidationReport {
-                    passes: Vec::new(),
-                    issue_count: 0,
-                    rule_report: RuleReport::default(),
-                },
-            )
-        })?;
-    validate_repository_with_materializations(
-        image,
-        &declarations,
-        expected.as_ref(),
-        Ok(()),
-        Ok(()),
-    )
-}
-
-pub(crate) fn validate_repository_with_materializations(
-    image: &RepositoryImage,
-    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
-    expected: Option<&crate::repository_state::MaterializationPlan>,
-    document_references: Result<()>,
-    record_fidelity: Result<()>,
-) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+    {
+        Ok(expected) => expected,
+        Err(error) => {
+            report.structural_failure =
+                Some(anyhow!(error).context("derived-materialization validation pass"));
+            return report;
+        }
+    };
     let read = move |path: &str| image_read(image, path);
     let read: &ReadBytes<'_> = &read;
-    let mut passes = Vec::new();
-    let config = declarations.config().clone();
+    let passes = &mut report.passes;
+    let config = declarations.config();
     if let Err(error) = config.validate_item_kinds() {
-        return Err(RepositoryValidationFailure::new(
-            anyhow!(error).context("effective-config validation pass"),
-            RepositoryValidationReport {
-                passes,
-                issue_count: 0,
-                rule_report: RuleReport::default(),
-            },
-        ));
+        report.structural_failure =
+            Some(anyhow!(error).context("effective-config validation pass"));
+        return report;
     }
     passes.push(RepositoryValidationPass::EffectiveConfig);
 
-    let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let rules = declarations.rules().clone();
+    let namespaces = crate::config_manager::namespaces_from_config(config);
+    let rules = declarations.rules();
     let rules_loaded = declarations.rules_loaded();
-    let mut findings = Vec::new();
+    let findings = &mut report.rule_report.findings;
     if rules_loaded {
         passes.push(RepositoryValidationPass::RulesAndSchemas);
     } else if let Some(error) = declarations.rules_load_error() {
@@ -245,54 +199,61 @@ pub(crate) fn validate_repository_with_materializations(
     }
 
     let mut structural_error = None;
-    let gates = declarations.gates().clone();
+    let gates = declarations.gates();
     passes.push(RepositoryValidationPass::Gates);
 
-    let issues = match load_records(read, image).context("records validation pass") {
-        Ok(issues) => {
+    let issues = match &captured.records {
+        Some(issues) => {
             passes.push(RepositoryValidationPass::Records);
-            Some(issues)
+            Some(issues.as_slice())
         }
-        Err(error) => {
-            if structural_error.is_none() {
-                structural_error = Some(error);
-            }
+        None => {
+            // The loader's error is not `Clone`; rerunning it on the image the
+            // records came from yields an owned, typed copy.
+            let error = load_records(image)
+                .err()
+                .unwrap_or_else(|| anyhow!("issue records did not load"));
+            structural_error = Some(error.context("records validation pass"));
             None
         }
     };
 
-    if structural_error.is_none() {
-        structural_error = record_fidelity
-            .context("record-fidelity validation pass")
-            .err();
+    let history = inputs.history.as_ref();
+    if let Some(Err(message)) = history.map(|history| &history.record_fidelity) {
+        structural_error.get_or_insert(
+            anyhow::Error::from(RepositoryJudgedInvalid(message.clone()))
+                .context("record-fidelity validation pass"),
+        );
     }
 
-    if let Some(issues) = &issues {
-        let integrity_error = validate_integrity(issues, &gates, document_references)
+    if let Some(issues) = issues {
+        let document_references = history
+            .and_then(|history| history.document_references.as_ref().err())
+            .map(String::as_str);
+        match validate_integrity(issues, gates, document_references)
             .map_err(judged_invalid)
             .context("repository-integrity validation pass")
-            .err();
-        if let Some(error) = integrity_error {
-            if structural_error.is_none() {
-                structural_error = Some(error);
+        {
+            Err(error) => {
+                structural_error.get_or_insert(error);
             }
-        } else if structural_error.is_none() {
-            passes.push(RepositoryValidationPass::RepositoryIntegrity);
+            Ok(()) if structural_error.is_none() => {
+                passes.push(RepositoryValidationPass::RepositoryIntegrity);
+            }
+            Ok(()) => {}
         }
     }
 
     let mut namespace_and_hierarchy_complete = rules_loaded;
     if rules_loaded {
-        if let Some(issues) = &issues {
-            match collect_rule_findings(read, issues, &rules, &namespaces, &config)
+        if let Some(issues) = issues {
+            match collect_rule_findings(read, issues, rules, &namespaces, config, inputs.now)
                 .context("namespace-and-hierarchy validation pass")
             {
                 Ok(rule_findings) => findings.extend(rule_findings),
                 Err(error) => {
                     namespace_and_hierarchy_complete = false;
-                    if structural_error.is_none() {
-                        structural_error = Some(error);
-                    }
+                    structural_error.get_or_insert(error);
                 }
             }
         } else {
@@ -300,16 +261,16 @@ pub(crate) fn validate_repository_with_materializations(
         }
     }
     findings.extend(collect_enforcement_drift_findings(
-        &config,
-        rules_loaded.then_some(&rules),
-        &gates,
+        config,
+        rules_loaded.then_some(rules),
+        gates,
     ));
-    findings.extend(collect_review_placeholder_findings(&gates));
+    findings.extend(collect_review_placeholder_findings(gates));
     if namespace_and_hierarchy_complete {
         passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
     }
 
-    if let Some(issues) = &issues {
+    if let Some(issues) = issues {
         let credit_namespaces = if rules_loaded {
             crate::validation::graph::coverage_credit_namespaces(&rules.rules)
         } else {
@@ -319,7 +280,7 @@ pub(crate) fn validate_repository_with_materializations(
             .item_kinds()
             .map_err(anyhow::Error::from)
             .and_then(|kinds| {
-                collect_item_link_findings(read, issues, &config, kinds, &credit_namespaces)
+                collect_item_link_findings(read, issues, config, kinds, &credit_namespaces)
             })
             .context("item-links validation pass")
         {
@@ -328,35 +289,24 @@ pub(crate) fn validate_repository_with_materializations(
                 passes.push(RepositoryValidationPass::ItemLinks);
             }
             Err(error) => {
-                if structural_error.is_none() {
-                    structural_error = Some(error);
-                }
+                structural_error.get_or_insert(error);
             }
         }
     }
 
-    if let Some(expected) = expected {
+    if let Some(expected) = &expected {
         match validate_materializations(image, expected)
             .context("derived-materialization validation pass")
         {
             Ok(()) => passes.push(RepositoryValidationPass::Projections),
             Err(error) => {
-                if structural_error.is_none() {
-                    structural_error = Some(error);
-                }
+                structural_error.get_or_insert(error);
             }
         }
     }
 
-    let report = RepositoryValidationReport {
-        passes,
-        issue_count: issues.as_ref().map_or(0, Vec::len),
-        rule_report: RuleReport { findings },
-    };
-    match structural_error {
-        Some(error) => Err(RepositoryValidationFailure::new(error, report)),
-        None => Ok(report),
-    }
+    report.structural_failure = structural_error;
+    report
 }
 
 /// A repository byte source keyed by repo-relative path.
@@ -374,10 +324,10 @@ fn read_text(read: &ReadBytes<'_>, path: &str) -> Result<Option<String>> {
         .transpose()
 }
 
-fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Vec<Issue>> {
+fn load_records(image: &RepositoryImage) -> Result<Vec<Issue>> {
     let index_path = VirtualPath::INDEX.repository_relative();
     RepositoryIndex::parse(
-        &read(&index_path)?
+        &image_read(image, &index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
     .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))?;
@@ -399,7 +349,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Vec<Iss
 fn validate_integrity(
     issues: &[Issue],
     gates: &GateRegistry,
-    document_references: Result<()>,
+    document_references: Option<&str>,
 ) -> Result<()> {
     let ids: HashSet<&IssueId> = issues.iter().map(|issue| &issue.id).collect();
     for issue in issues {
@@ -423,7 +373,9 @@ fn validate_integrity(
         }
     }
 
-    document_references?;
+    if let Some(reason) = document_references {
+        return Err(anyhow!("{reason}"));
+    }
     let refs: Vec<&Issue> = issues.iter().collect();
     let graph = DependencyGraph::new(&refs);
     graph.validate_dag()?;
@@ -515,6 +467,7 @@ fn collect_rule_findings(
     rules: &RuleSet,
     namespaces: &crate::domain::LabelNamespaces,
     config: &JitConfig,
+    now: DateTime<Utc>,
 ) -> Result<Vec<ReportedFinding>> {
     let repo_format = config.content_format();
     let engine = SchemaEngine::new();
@@ -545,7 +498,7 @@ fn collect_rule_findings(
         issues,
         &hierarchy,
         repo_format,
-        chrono::Utc::now(),
+        now,
         &plan_content,
     );
     reported.extend(
@@ -805,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_repository_preserves_invalid_hierarchy_error() {
+    fn test_report_preserves_invalid_hierarchy_error() {
         let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
@@ -827,12 +780,10 @@ mod tests {
         )
         .unwrap();
 
-        let failure = executor
-            .validation()
-            .validate_repository_report()
-            .unwrap()
-            .unwrap_err();
-        let (error, _report) = failure.into_parts();
+        let error = validate_live(&executor)
+            .unwrap_err()
+            .structural_failure
+            .unwrap();
 
         assert_eq!(
             error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
@@ -866,15 +817,15 @@ mod tests {
     /// Capture and validate the live fixture repository.
     fn validate_live(
         executor: &crate::commands::CommandExecutor<JsonFileStorage>,
-    ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-        executor.validation().validate_repository_report().unwrap()
+    ) -> std::result::Result<ValidationReport, ValidationReport> {
+        split(executor.validation().validate_repository_report().unwrap())
     }
 
     /// Capture and validate the fixture overlaid with proposed final bytes/absence.
     fn validate_overlaid<P: Into<PathBuf>>(
         executor: &crate::commands::CommandExecutor<JsonFileStorage>,
         changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
-    ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+    ) -> std::result::Result<ValidationReport, ValidationReport> {
         let overrides = crate::commands::overrides_from_repo_changes(
             &executor.require_layout().unwrap(),
             changes
@@ -883,7 +834,7 @@ mod tests {
         )
         .unwrap();
         let image = executor.capture_validation_image_with(&overrides).unwrap();
-        validate_repository(&image)
+        split(overlay_report(&image))
     }
 
     /// Validate a semantic proposal together with the exact coupled derived-state
@@ -891,7 +842,7 @@ mod tests {
     fn validate_materialized_overlaid<P: Into<PathBuf>>(
         executor: &crate::commands::CommandExecutor<JsonFileStorage>,
         changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
-    ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
+    ) -> std::result::Result<ValidationReport, ValidationReport> {
         let layout = executor.require_layout().unwrap();
         let mut overrides = crate::commands::overrides_from_repo_changes(
             &layout,
@@ -911,7 +862,31 @@ mod tests {
         .unwrap();
         overrides.extend(crate::commands::validation_overlay(plan.image(), plan.delta()).unwrap());
         let image = executor.capture_validation_image_with(&overrides).unwrap();
-        validate_repository(&image)
+        split(overlay_report(&image))
+    }
+
+    /// The report over an overlay image, which supplies no history.
+    fn overlay_report(image: &RepositoryImage) -> ValidationReport {
+        report(
+            &CapturedValidation::from_image(image),
+            &ReportInputs {
+                now: Utc::now(),
+                history: None,
+            },
+        )
+    }
+
+    /// `Err` when `report` carries a structural failure.
+    fn split(report: ValidationReport) -> std::result::Result<ValidationReport, ValidationReport> {
+        match report.structural_failure {
+            Some(_) => Err(report),
+            None => Ok(report),
+        }
+    }
+
+    /// A report's structural failure with its causes.
+    fn failure(report: &ValidationReport) -> String {
+        format!("{:#}", report.structural_failure.as_ref().unwrap())
     }
 
     /// A string-valued overlay change (create/replace with UTF-8 text).
@@ -937,7 +912,8 @@ mod tests {
         );
         let plain = validate_live(&executor).unwrap();
         let planned = validate_overlaid::<&str>(&executor, []).unwrap();
-        assert_eq!(plain, planned);
+        assert_eq!(plain.passes, planned.passes);
+        assert_eq!(plain.rule_report, planned.rule_report);
         assert_eq!(plain.passes.len(), 8);
     }
 
@@ -982,6 +958,41 @@ mod tests {
     }
 
     #[test]
+    fn test_report_judges_gate_recency_at_the_injected_instant() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        seed_attested_gate_run(&mut executor);
+        let rules = String::from_utf8(
+            read_fixture(&executor, &VirtualPath::RULES.repository_relative()).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            data_path(&executor, &VirtualPath::RULES),
+            format!(
+                "{rules}\n[[rules]]\nname = \"recency\"\nseverity = \"error\"\n\
+                 assert = {{ gate-recency = {{ max-age-days = 7 }} }}\n"
+            ),
+        )
+        .unwrap();
+        let image = executor
+            .capture_validation_image_with(&std::collections::BTreeMap::new())
+            .unwrap();
+        let captured = CapturedValidation::from_image(&image);
+        let is_stale_at = |now| {
+            report(&captured, &ReportInputs { now, history: None })
+                .rule_report
+                .findings
+                .iter()
+                .any(|finding| finding.rule == "recency")
+        };
+
+        assert!(!is_stale_at(Utc::now()));
+        assert!(is_stale_at(Utc::now() + chrono::Duration::days(8)));
+    }
+
+    #[test]
     fn test_validate_live_accepts_every_record_the_writers_published() {
         let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
@@ -1018,7 +1029,7 @@ mod tests {
         )
         .unwrap();
 
-        let error = validate_live(&executor).unwrap_err().to_string();
+        let error = failure(&validate_live(&executor).unwrap_err());
 
         assert!(
             error.contains("record-fidelity") && error.contains(run_id.as_str()),
@@ -1104,14 +1115,12 @@ mod tests {
         let declarations =
             crate::repository_state::validation_declarations_from_image(&image).unwrap();
         let expected = declarations.config().validate_item_kinds().unwrap_err();
-        let failure =
-            validate_repository_with_materializations(&image, &declarations, None, Ok(()), Ok(()))
-                .unwrap_err();
+        let report = overlay_report(&image);
         assert_eq!(
-            failure.to_string(),
+            failure(&report),
             format!("effective-config validation pass: {expected}")
         );
-        assert!(failure.report().passes.is_empty());
+        assert!(report.passes.is_empty());
     }
 
     #[test]
@@ -1292,7 +1301,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_repository_passes_records_over_an_unparseable_event_log() {
+    fn test_report_passes_records_over_an_unparseable_event_log() {
         let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
@@ -1332,7 +1341,7 @@ mod tests {
             .unwrap();
         std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl\n").unwrap();
 
-        let error = validate_live(&executor).unwrap_err().to_string();
+        let error = failure(&validate_live(&executor).unwrap_err());
 
         assert!(
             error.contains("record-fidelity")
@@ -1368,9 +1377,8 @@ mod tests {
         )];
         issue.gates_required = vec!["planned".parse().unwrap()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
-        let error = format!(
-            "{:#}",
-            validate_overlaid(
+        let error = failure(
+            &validate_overlaid(
                 &executor,
                 [
                     (issue_path(&id).repository_relative(), Some(bad)),
@@ -1479,7 +1487,7 @@ mod tests {
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";
         let live = validate_live(&executor).unwrap();
         assert!(!live.rule_report.has_errors());
-        let failure = validate_materialized_overlaid(
+        let partial = validate_materialized_overlaid(
             &executor,
             [
                 (
@@ -1493,12 +1501,9 @@ mod tests {
             ],
         )
         .unwrap_err();
-        assert!(failure.to_string().contains("does not exist"), "{failure}");
-        assert_eq!(failure.report().rule_report.error_count(), 1);
-        assert_eq!(
-            failure.report().rule_report.findings[0].rule,
-            "task-needs-req"
-        );
+        assert!(failure(&partial).contains("does not exist"), "{partial:?}");
+        assert_eq!(partial.rule_report.error_count(), 1);
+        assert_eq!(partial.rule_report.findings[0].rule, "task-needs-req");
     }
 
     #[test]
@@ -1628,16 +1633,17 @@ mod tests {
             crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
-        let error = validate_overlaid(
-            &executor,
-            [
-                put(VirtualPath::CONFIG.repository_relative(), &config),
-                put(VirtualPath::INVARIANTS.repository_relative(), invariants),
-                put("INVARIANTS.md", "stale planned projection\n"),
-            ],
-        )
-        .unwrap_err()
-        .to_string();
+        let error = failure(
+            &validate_overlaid(
+                &executor,
+                [
+                    put(VirtualPath::CONFIG.repository_relative(), &config),
+                    put(VirtualPath::INVARIANTS.repository_relative(), invariants),
+                    put("INVARIANTS.md", "stale planned projection\n"),
+                ],
+            )
+            .unwrap_err(),
+        );
         assert!(
             error.contains("derived-materialization validation pass"),
             "{error}"
