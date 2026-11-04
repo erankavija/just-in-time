@@ -1336,12 +1336,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     } = jit::commands::open_repository(jit::commands::RepositoryInvocation {
         current_dir: current_dir.clone(),
         data_dir_override: env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
-        is_init: matches!(&command, Commands::Init { .. }),
+        is_init: matches!(&command, Commands::Init(_)),
         opens_mutation_session: command.requires_recovery_dispatch(),
         coordinates_claims_first: command.coordinates_claims_first(),
         is_validation_exempt: matches!(
             &command,
-            Commands::Init { .. } | Commands::Profile(ProfileCommands::Show { .. })
+            Commands::Init(_) | Commands::Profile(ProfileCommands::Show { .. })
         ),
         is_recover: matches!(&command, Commands::Recover),
         write_override: invocation_write_override,
@@ -1368,22 +1368,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     };
 
     match command {
-        Commands::Init {
-            profile,
-            values_file,
-            set,
-        } => {
-            return init::dispatch(
-                init::Invocation {
-                    profile: &profile,
-                    values_file: values_file.as_deref(),
-                    set: &set,
-                    repository_root: &current_dir,
-                },
-                &ctx,
-                &mut io::stdout(),
-                &mut io::stderr(),
-            );
+        Commands::Init(args) => {
+            return init::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Profile(profile_cmd) => match profile_cmd {
             ProfileCommands::Show { profile } => {

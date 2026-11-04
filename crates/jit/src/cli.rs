@@ -81,6 +81,27 @@ impl IssueFilterArgs {
     }
 }
 
+/// Arguments of `jit init`.
+#[derive(Args)]
+pub struct InitArgs {
+    /// Select a worktree package directory by its path.
+    /// Repeatable; occurrence order is preserved.
+    #[arg(
+        long,
+        value_name = "SELECTOR",
+        action = ArgAction::Append
+    )]
+    pub profile: Vec<String>,
+
+    /// Optional TOML file containing the `[variables]` value map.
+    #[arg(long, value_name = "PATH")]
+    pub values_file: Option<std::path::PathBuf>,
+
+    /// Set one declared profile variable; repeatable and last-wins.
+    #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+    pub set: Vec<String>,
+}
+
 /// Arguments of `jit apply`.
 #[derive(Args)]
 pub struct ApplyArgs {
@@ -105,24 +126,7 @@ pub struct ApplyArgs {
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
     /// staged complete and published without replacing an occupied destination
-    Init {
-        /// Select a worktree package directory by its path.
-        /// Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-    },
+    Init(InitArgs),
 
     /// Inspect and apply repository profiles
     #[command(subcommand)]
@@ -2660,7 +2664,7 @@ impl Commands {
     /// the generated-command guard required by the universal recovery boundary.
     pub fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Init { .. } | Self::Apply(_) | Self::Recover { .. } => true,
+            Self::Init(_) | Self::Apply(_) | Self::Recover { .. } => true,
             Self::Profile(command) => command.requires_recovery_dispatch(),
             Self::Issue(command) => command.requires_recovery_dispatch(),
             Self::Dep(command) => command.requires_recovery_dispatch(),
@@ -2719,7 +2723,7 @@ impl Commands {
             Self::Invariant(command) => command.coordinates_claims_first(),
             Self::Project(command) => command.coordinates_claims_first(),
             Self::Recover => true,
-            Self::Init { .. }
+            Self::Init(_)
             | Self::List { .. }
             | Self::Apply(_)
             | Self::Rdeps { .. }
@@ -3350,11 +3354,11 @@ mod recovery_dispatch_tests {
 
     #[test]
     fn test_representative_writer_and_reader_classification() {
-        assert!(Commands::Init {
+        assert!(Commands::Init(InitArgs {
             profile: Vec::new(),
             values_file: None,
             set: Vec::new(),
-        }
+        })
         .requires_recovery_dispatch());
         assert!(Commands::Validate {
             id: None,

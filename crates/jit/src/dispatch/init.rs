@@ -1,37 +1,30 @@
 //! `jit init` handler.
 
 use super::{CommandContext, Outcome};
+use crate::cli::InitArgs;
 use crate::commands::{
     parse_profile_selectors, parse_profile_variable_assignments, ProfileVariableOptions,
 };
 use crate::output::{InitResponse, OutputContext};
 use crate::storage::{IssueStore, RepositoryStateStore};
-use std::path::Path;
-
-/// The parsed arguments of `jit init` from the directory it runs in.
-pub struct Invocation<'a> {
-    pub profile: &'a [String],
-    pub values_file: Option<&'a Path>,
-    pub set: &'a [String],
-    pub repository_root: &'a Path,
-}
+use std::env;
 
 /// Initialization fills the scaffold through one mutation session; the
 /// machine-local worktree identity follows the publication.
 fn init<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
-    invocation: &Invocation<'_>,
+    args: &InitArgs,
 ) -> anyhow::Result<Outcome<InitResponse>> {
     let profiles = ctx.executor.profiles();
     let selection = profiles.select_profiles(
-        &parse_profile_selectors(invocation.profile)?,
+        &parse_profile_selectors(&args.profile)?,
         &ProfileVariableOptions {
-            values_file: invocation.values_file.map(Path::to_path_buf),
-            assignments: parse_profile_variable_assignments(invocation.set)?,
+            values_file: args.values_file.clone(),
+            assignments: parse_profile_variable_assignments(&args.set)?,
         },
     )?;
-    let init_result =
-        profiles.initialize_fresh_repository(invocation.repository_root, Some(&selection))?;
+    let repository_root = env::current_dir()?;
+    let init_result = profiles.initialize_fresh_repository(&repository_root, Some(&selection))?;
     let (identity, warnings) =
         profiles.initialize_worktree_identity(ctx.executor.require_worktree_paths()?)?;
     let output = OutputContext::new(ctx.mode.quiet, ctx.mode.json);
@@ -39,7 +32,7 @@ fn init<S: IssueStore + RepositoryStateStore>(
         .iter()
         .try_for_each(|warning| output.print_warning(warning))?;
     let response = InitResponse {
-        repository_root: invocation.repository_root.display().to_string(),
+        repository_root: repository_root.display().to_string(),
         data_dir: ctx.executor.storage().root().display().to_string(),
         repository_id: identity.map(|identity| identity.worktree_id.to_string()),
         gitattributes_status: init_result.gitattributes,
@@ -53,10 +46,10 @@ fn init<S: IssueStore + RepositoryStateStore>(
 }
 
 command_group! {
-    command: Invocation<'_>,
+    command: InitArgs,
     storage: [IssueStore + RepositoryStateStore],
     leaves: {
-        "init" => invocation => init(&invocation) -> InitResponse,
+        "init" => args => init(&args) -> InitResponse,
     }
 }
 
