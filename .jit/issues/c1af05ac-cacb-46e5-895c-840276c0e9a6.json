@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3e584dc9-4785-436b-83bb-9fa4235c2494",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:45:37.501645099Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cbef1a48-7fbc-495b-bfe0-7b7ede351050",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:50:12.563053832Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c1af05ac-cacb-46e5-895c-840276c0e9a6",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Report pass tests cover the executor-pass cases",
-  "updated_at": "2026-11-04T05:19:16.429137900Z"
+  "updated_at": "2026-11-04T05:50:12.563053832Z"
 }

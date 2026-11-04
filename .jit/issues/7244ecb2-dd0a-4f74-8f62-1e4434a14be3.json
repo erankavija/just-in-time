@@ -7,6 +7,7 @@
   ],
   "description": "Prove at the lease sequence that an interruption at any step leaves the lease file at its prior or its next value and never needs the claims log to recover, and make recovery remove the stage file an interruption leaves.\n\n## Background\n\nEvery lease change in `crates/jit/src/storage/claim_coordinator.rs` runs under one held lease lock through one `apply` step: evict an expired lease, apply a pure change, publish the lease file by synced temp file and rename (or unlink) with a directory sync, bump `claims.seq`, append the operation's history lines to `claims.jsonl` in one write. The rename or unlink is the commit point. An acquire over an expired lease writes two history lines, the eviction and the acquire. No lease-level interruption seam exists: `MutationInterruptionInjector` (`storage/mutation_interruption.rs`) and `RedoInterruptionInjector` (`storage/redo_apply.rs`) cover repository sessions and redo records only.\n\nAn operation interrupted after writing its temp file leaves it in `.git/jit/leases/`. Readers skip it, but the claims family's recover operation runs `cleanup_orphaned_temp_files` (`storage/temp_cleanup.rs`) over the data root only, so it accumulates.\n\n## Success Criteria\n\n- [hard] REQ-01: A test-only interruption seam, shaped like `RedoInterruptionInjector`, can stop `apply` after each step.\n- [hard] REQ-02: One matrix test interrupts acquire, renew, heartbeat, release and force-evict at every step and shows that the lease file then holds the prior or the next lease, that the next operation succeeds, and that the history log lacks at most the interrupted operation's history lines.\n- [hard] REQ-03: A retried acquire after an interruption past the commit point finds its own lease and writes no duplicate.\n- [hard] REQ-04: `jit recover` removes stale stage files under `.git/jit/leases/` with the same age threshold as its data-root temp cleanup and never removes a lease record, and a test shows both.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T06:21:53.538114991Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "satisfies:f8a6b298/REQ-07"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "An interrupted lease operation leaves the prior or the next lease",
-  "updated_at": "2026-11-02T23:39:48.884799557Z"
+  "updated_at": "2026-11-04T06:21:53.538114991Z"
 }
