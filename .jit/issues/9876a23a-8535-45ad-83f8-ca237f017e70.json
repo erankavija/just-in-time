@@ -98,7 +98,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-04T06:39:26.901680294Z"
+  "updated_at": "2026-11-04T13:06:33.357047301Z"
 }
