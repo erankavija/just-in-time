@@ -1,8 +1,7 @@
 //! `jit apply` handler.
 
-use super::{CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, Outcome};
 use crate::cli::ApplyArgs;
-use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::output::TemplateApplyResponse;
 use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::anyhow;
@@ -16,9 +15,7 @@ fn apply<S: IssueStore + RepositoryStateStore>(
     force: bool,
 ) -> anyhow::Result<Outcome<TemplateApplyResponse>> {
     let templates = ctx.executor.templates();
-    let resolve = |requested: &str| -> anyhow::Result<IssueId> {
-        templates.resolve_issue(&requested.parse::<IssueIdPrefix>()?)
-    };
+    let resolve = |requested: &str| resolve_issue(ctx.executor.storage(), requested);
     let bindings = anchors
         .iter()
         .map(|pair| {
@@ -35,9 +32,6 @@ fn apply<S: IssueStore + RepositoryStateStore>(
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
     let container = resolve(container)?;
     let (result, warnings) = templates.apply_template(template, &container, &bindings, force)?;
-    warnings
-        .iter()
-        .for_each(|warning| eprintln!("Warning: {warning}"));
     let response = TemplateApplyResponse {
         template: result.template,
         container,
@@ -45,10 +39,9 @@ fn apply<S: IssueStore + RepositoryStateStore>(
         created_node_ids_by_role: result.created_node_ids_by_role,
         anchor_dependency_snapshots: result.anchor_dependency_snapshots,
         created_issues: result.created_issues,
-        quiet: ctx.mode.quiet,
     };
-    let message = Some(response.message());
-    Ok(Outcome::Success { response, message })
+    let message = response.message();
+    Ok(Outcome::success_with(response, message).with_warnings(warnings))
 }
 
 command_group! {

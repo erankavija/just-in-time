@@ -1339,10 +1339,6 @@ pub struct InitResponse {
     /// Applied profile results when initialization included a profile, one per
     /// package of its dependency closure.
     pub profile: Option<crate::profile::ProfileComposedApplyResult>,
-    /// Whether `--quiet` suppresses the human rendering.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub quiet: bool,
 }
 
 /// Response for `status` command
@@ -1438,10 +1434,6 @@ pub struct TemplateApplyResponse {
     pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
     pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
-    /// Whether `--quiet` reduces the human rendering to the created ids.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub quiet: bool,
 }
 
 impl TemplateApplyResponse {
