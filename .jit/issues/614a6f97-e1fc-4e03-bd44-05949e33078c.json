@@ -26,7 +26,7 @@
     "satisfies:f8a6b298/REQ-05"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Renew, heartbeat and force-evict address a lease by issue",
-  "updated_at": "2026-11-04T01:32:26.809002345Z"
+  "updated_at": "2026-11-04T01:37:22.418527723Z"
 }
