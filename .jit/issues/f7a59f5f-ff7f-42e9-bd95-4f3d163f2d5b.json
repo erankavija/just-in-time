@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T12:43:03.724721976Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -27,5 +28,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Sessions share the captured image and recognise it by token",
-  "updated_at": "2026-10-24T21:29:30.384790162Z"
+  "updated_at": "2026-11-04T12:43:03.724721976Z"
 }
