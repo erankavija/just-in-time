@@ -23472,3 +23472,5 @@
 {"assignee":"agent:worker","id":"fa932ebd-508c-4a00-8df1-76b3bb228471","issue_id":"0851fae4-245b-4e07-bd81-3f61da54dbf2","timestamp":"2026-11-04T02:11:18.645660781Z","type":"issue_claimed"}
 {"from":"ready","id":"eb29b180-7da2-46c3-bf03-967afbdd491e","issue_id":"5e1ba005-b066-4473-9a23-d414a17038c7","timestamp":"2026-11-04T02:11:18.833120692Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"f910a9ed-5796-4b61-96a0-f274abef6e05","issue_id":"5e1ba005-b066-4473-9a23-d414a17038c7","timestamp":"2026-11-04T02:11:18.833120692Z","type":"issue_claimed"}
+{"id":"94ea541e-b2b8-4e9b-b942-4f183debc75c","issue_id":"26307dfd-9eac-4f43-90dd-183ad38d1814","priority":"normal","timestamp":"2026-11-04T02:11:28.470668322Z","title":"mcp-ci tests the jit built from the commit under evaluation","type":"issue_created"}
+{"fields":["dependencies"],"id":"a0ab44b0-7f07-4301-a227-050f47c07814","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-04T02:11:34.123552209Z","type":"issue_updated","updated_by":"dependency-add"}
