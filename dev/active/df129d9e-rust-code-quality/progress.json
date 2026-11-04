@@ -1558,8 +1558,9 @@
       }
     },
     "75b46be9": {
-      "status": "ready",
-      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+      "status": "in_progress",
+      "note": "Before/after executable-byte measurement, existing should-panic backtrace reproduction",
+      "model": "gpt-6.1-sol"
     },
     "b22aabce": {
       "status": "ready",
@@ -1824,7 +1825,7 @@
       "75b46be9": "gpt-6.1-sol high: measured compiler/debug behavior and budget calibration"
     },
     "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
-    "status": "first wave complete; split debug information next",
+    "status": "split debug information implementation",
     "measurements": {
       "f855d631": {
         "merge": "437c7ccfd",
@@ -1844,6 +1845,7 @@
       }
     },
     "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
-    "ownership_reconciliation": "Awaiting approval of proposed REQ-01/plan wording to match D-59"
+    "ownership_reconciliation": "Awaiting approval of proposed REQ-01/plan wording to match D-59",
+    "current_wave": 2
   }
 }
