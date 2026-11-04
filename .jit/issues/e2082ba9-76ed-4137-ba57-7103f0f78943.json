@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e01b62c3-c36e-4185-afd5-328c98b2cd98",
+      "run_id": "04611a35-4e3f-4c05-8044-c081e9820a08",
       "status": "failed",
-      "updated_at": "2026-11-04T04:17:02.073745357Z",
+      "updated_at": "2026-11-04T04:28:42.632142928Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -36,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Item links resolve sugar addresses whose self-id several kinds admit",
-  "updated_at": "2026-11-04T04:17:02.073745357Z"
+  "updated_at": "2026-11-04T04:28:42.632142928Z"
 }
