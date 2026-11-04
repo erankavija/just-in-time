@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "da5e6320-fa43-4c10-87f8-e7657407f61b",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:31:37.280124590Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "12c0f3fb-fde6-4504-aac0-773b435f0a83",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Handler contract covers every arm shape",
-  "updated_at": "2026-11-04T03:18:56.985641294Z"
+  "updated_at": "2026-11-04T03:31:37.280124590Z"
 }
