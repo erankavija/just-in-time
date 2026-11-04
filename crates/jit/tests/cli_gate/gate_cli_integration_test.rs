@@ -270,6 +270,34 @@ fn lease_to_another_agent(temp: &JitCli, issue_id: &str) {
 }
 
 #[test]
+fn test_gate_update_json_success_suppresses_human_lease_warnings() {
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
+    enable_warn_leases(&temp);
+    lease_to_another_agent(&temp, &issue_id);
+
+    let output = temp
+        .command_with_env(
+            [
+                "gate",
+                "update",
+                "test-gate",
+                "--title",
+                "Updated",
+                "--json",
+            ],
+            [("JIT_AGENT_ID", "agent:editor")],
+        )
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(output.stderr.is_empty(), "{output:?}");
+    let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(response["title"], "Updated");
+}
+
+#[test]
 fn test_gate_evaluate_json_failure_includes_lease_warnings() {
     let temp = JitCli::initialised().unwrap();
     let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");

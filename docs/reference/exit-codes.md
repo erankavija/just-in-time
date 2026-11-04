@@ -36,6 +36,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
 | `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |
+| `gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create` | `1` | A registry or preset file could not be parsed, or an untyped command failure occurred. Other typed failures use the universal codes. |  |
 | `gate define` | `6` | The gate key is already registered. |  |
 | `issue delete` | `2` | Deletion was refused for missing operator confirmation (JIT_ALLOW_DELETION=1 not set in the process environment). |  |
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
@@ -51,7 +52,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. |  |
 | `doc check-links` | `1` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
-| `gate preset apply` | `3` | A preset target was not found, so the application failed. |  |
+| `gate preset apply` | `3` | One or more preset targets failed; the findings report retains successful targets and per-target errors. | yes |
 | `serve, serve --stop, serve --status` | `1` | The daemon PID state could not be parsed (exits 0 on success). |  |
 | `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |
 | `serve --fg` | `child` | Foreground mode passes through the inline dev-server child's own exit code (1 when the child produced none). | yes |

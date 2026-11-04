@@ -53,6 +53,7 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
         .expect("preset application should run");
 
     assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
     let response: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("failure must emit JSON");
     let error = response["error"]
@@ -106,8 +107,12 @@ fn test_gate_preset_apply_plain_partial_batch_fails_with_error_summary() {
         .expect("preset application should run");
 
     assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("Errors (1)"));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Errors (1)"));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Issue not found"));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("Failed to apply preset '{PRESET}' to 1 issue(s)\n")
+    );
 }
 
 #[test]

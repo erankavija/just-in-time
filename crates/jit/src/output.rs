@@ -15,6 +15,7 @@ use thiserror::Error;
 
 mod emit;
 pub mod failure;
+pub mod gate;
 mod invariant;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
@@ -1382,10 +1383,16 @@ collection_keys! {
     ArtifactsKey = "artifacts";
     NamespacesKey = "namespaces";
     WorktreesKey = "worktrees";
-    PresetsKey = "presets";
     EventsKey = "events";
     ValuesKey = "values";
     LeasesKey = "leases";
+}
+
+pub enum PresetsKey {}
+
+impl CollectionKey for PresetsKey {
+    const KEY: &'static str = "presets";
+    const SCHEMA_NAME: Option<&'static str> = Some("GatePresetListResponse");
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)

@@ -526,6 +526,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::errors::InvalidArgumentError>()
         .is_some()
         || error
+            .downcast_ref::<crate::domain::identity::InvalidGateKeyError>()
+            .is_some()
+        || error
             .downcast_ref::<crate::domain::AssigneeParseError>()
             .is_some()
         || error
@@ -883,6 +886,14 @@ mod exit_code_projection_tests {
                     ["aaaa1111".to_string(), "aaaa2222".to_string()],
                 )
                 .into(),
+                2,
+                "*",
+            ),
+            (
+                "Bad_Key"
+                    .parse::<crate::domain::identity::GateKey>()
+                    .unwrap_err()
+                    .into(),
                 2,
                 "*",
             ),
