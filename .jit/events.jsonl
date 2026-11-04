@@ -23771,3 +23771,6 @@
 {"gate_key":"code-review","id":"2f40c82e-a237-495c-b1eb-b9a806e84bb2","issue_id":"c9103fcf-aa0c-4642-8531-5360f5fdd58d","timestamp":"2026-11-04T06:49:56.312157027Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"0cd097fb-9258-4e9e-be38-8776cfb6ca81","issue_id":"c9103fcf-aa0c-4642-8531-5360f5fdd58d","timestamp":"2026-11-04T06:50:05.122363541Z","to":"done","type":"issue_state_changed"}
 {"id":"380e632e-cc15-4e9b-867e-4dac4d731728","issue_id":"c9103fcf-aa0c-4642-8531-5360f5fdd58d","timestamp":"2026-11-04T06:50:05.122363541Z","type":"issue_completed"}
+{"id":"eb1da50a-415e-4795-a265-32aff05fc6dc","issue_id":"d952d057-f781-455b-9982-05678fd7e0e1","priority":"high","timestamp":"2026-11-04T06:50:09.301621477Z","title":"CI runs own and remove their temporary directory","type":"issue_created"}
+{"id":"7b780eba-61e9-4d2e-8b40-c3ca5796313e","issue_id":"b51291e4-8f88-44fe-92e6-90790e235ca3","priority":"high","timestamp":"2026-11-04T06:50:09.550452947Z","title":"Worker worktrees own and remove their temporary directory","type":"issue_created"}
+{"fields":["dependencies"],"id":"531fa4c4-9db0-4feb-bd00-d6338ca4cf72","issue_id":"fb2dc5c3-1f32-418f-896b-41df16f57997","timestamp":"2026-11-04T06:50:10.163053450Z","type":"issue_updated","updated_by":"dependency-add"}
