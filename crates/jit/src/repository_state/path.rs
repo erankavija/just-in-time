@@ -11,9 +11,6 @@ use std::path::{Component, Path, PathBuf};
 /// it so version control never carries a commit point a checkout never made.
 pub const RECORD_SCRATCH_DIR: &str = "tmp";
 
-/// The file holding one gate run's record inside its directory.
-pub const GATE_RUN_RECORD_FILE: &str = "result.json";
-
 /// The worktree's bootstrap lock file, which serializes every session sharing
 /// one worktree over the init publisher's sibling stage.
 pub const BOOTSTRAP_LOCK_FILE: &str = ".jit-bootstrap.lock";
@@ -211,7 +208,7 @@ pub use self::identity::VirtualPath;
 /// What the module hands its parent is [`from_parts`](VirtualPath::from_parts),
 /// the record constructors, and the two field accessors. `from_parts` returns a
 /// `Result`; [`issue_record`](VirtualPath::issue_record),
-/// [`gate_run_directory`](VirtualPath::gate_run_directory), and
+/// [`gate_run_issue_directory`](VirtualPath::gate_run_issue_directory), and
 /// [`gate_run_record`](VirtualPath::gate_run_record) are the infallible derived
 /// paths, whose canonical UUID components make their descendants safe by
 /// construction. [`archive_evidence_record`](VirtualPath::archive_evidence_record)
@@ -224,9 +221,7 @@ pub use self::identity::VirtualPath;
 /// const-construction primitive, and the declaration list that emits every const
 /// together with its inventory.
 mod identity {
-    use super::{
-        RepositoryLayoutError, RepositoryRootClass, RootRelativePath, GATE_RUN_RECORD_FILE,
-    };
+    use super::{RepositoryLayoutError, RepositoryRootClass, RootRelativePath};
     use crate::domain::artifact_plan::{normalize_artifact_path, PlanTarget};
     use crate::domain::identity::{GateKey, GateRunId, IssueId};
     use crate::domain::repository_inputs::InputsDigest;
@@ -259,21 +254,21 @@ mod identity {
             }
         }
 
-        /// Construct the data-root directory path of one gate run.
-        pub fn gate_run_directory(id: &GateRunId) -> Self {
+        /// Construct the data-root directory holding one issue's gate runs.
+        pub fn gate_run_issue_directory(issue: &IssueId) -> Self {
             Self {
                 root: RepositoryRootClass::Data,
-                relative: Self::GATE_RUNS.relative().join(id.as_str()),
+                relative: Self::GATE_RUNS.relative().join(issue.as_str()),
             }
         }
 
-        /// Construct the data-root path of one gate run's record.
-        pub fn gate_run_record(id: &GateRunId) -> Self {
+        /// Construct the data-root path of the record of `issue`'s run `run`.
+        pub fn gate_run_record(issue: &IssueId, run: &GateRunId) -> Self {
             Self {
                 root: RepositoryRootClass::Data,
-                relative: Self::gate_run_directory(id)
+                relative: Self::gate_run_issue_directory(issue)
                     .relative
-                    .join(GATE_RUN_RECORD_FILE),
+                    .join(&[run.as_str(), ".json"].concat()),
             }
         }
 
@@ -995,21 +990,24 @@ mod tests {
     }
 
     #[test]
-    fn test_virtual_path_gate_run_record_nests_the_record_in_the_runs_directory() {
-        let id = crate::test_utils::gate_run_id(1);
-        let path = VirtualPath::gate_run_record(&id);
-        let directory = VirtualPath::gate_run_directory(&id);
+    fn test_virtual_path_gate_run_record_names_the_run_under_its_issue_directory() {
+        let issue = crate::test_utils::issue_id(7);
+        let run = crate::test_utils::gate_run_id(1);
+        let path = VirtualPath::gate_run_record(&issue, &run);
 
         assert_eq!(path.root_class(), RepositoryRootClass::Data);
         assert_eq!(
-            path.relative().as_path().parent(),
-            Some(directory.relative().as_path())
+            path.relative().as_str(),
+            format!("gate-runs/{issue}/{run}.json")
         );
         assert_eq!(
-            directory.relative().as_path().parent(),
-            Some(VirtualPath::GATE_RUNS.relative().as_path())
+            path.relative().as_path().parent(),
+            Some(
+                VirtualPath::gate_run_issue_directory(&issue)
+                    .relative()
+                    .as_path()
+            )
         );
-        assert_eq!(directory.file_name(), Some(id.as_str()));
         assert_eq!(
             VirtualPath::data(path.relative().as_path()).unwrap(),
             path,

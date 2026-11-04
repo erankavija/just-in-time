@@ -171,38 +171,40 @@
       "issues": [
         {
           "short_id": "612ee9d4",
-          "status": "rework 1 + merge c4a8c14d6; pipeline queued after 2b5f452c",
+          "status": "rework 1 + merge c4a8c14d6 reviewed; landing pending",
           "worker": "claude opus",
           "worker_reason": "report-selection contract"
         },
         {
           "short_id": "2b5f452c",
-          "status": "landed 6d4a8b704; code-review F1 (--fix repair planning re-decodes); rework 3 of 3 (final before escalation)",
+          "status": "rework 3 240ff34d0 accepted by steward (D-01); landing + held code-review pending",
           "worker": "claude opus",
           "worker_reason": "fidelity on parsed records (REQ-10)"
         },
         {
           "short_id": "3acaa5a3",
-          "status": "landed 7b2cfcdef, 1077419b1; rework 2: rules() reloads config.toml (code-review F1)",
+          "status": "rework 2 a91e3b5cb reviewed; landing pending",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "drift through report function"
         },
         {
           "short_id": "c1af05ac",
-          "status": "WIP a961a0d8f; blocked on new bug e2082ba9 (sugar address parity)",
+          "status": "report tests pass after e2082ba9 (merge 4d48054e6); landing pending",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "test relocation"
         },
         {
           "short_id": "e2082ba9",
-          "status": "reviewed; pipeline running",
+          "status": "landed b67342fec; code-review passed; cargo-ci gate error (load) - rerun pending",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "bug found by c1af05ac; regression from 001a9c46"
         }
       ]
     }
   ],
-  "held": {},
+  "held": {
+    "wave7_landing_chain": "paused: main has a failing server test (1630015d x e5d618ee conflict); restart scratchpad land-pipeline.zsh chain 3acaa5a3, 2b5f452c, 612ee9d4, c1af05ac, then e2082ba9 cargo-ci gate, when just-in-time-88 reports the fix"
+  },
   "line_target": {
     "goal": "net production-line reduction",
     "baseline_rev": "120402067",
@@ -357,7 +359,8 @@
     "Plan and manifest edits in main's checkout block other leads' land.sh; edit in scratch, then copy and commit in one command.",
     "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review.",
     "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief).",
-    "dispatch-worker-worktree.sh refuses whenever main's checkout has any tracked change, including other leads' tracker files: commit a tracker sync immediately before dispatching, and check the [ok] line before writing briefs (03c59566, wave 7)."
+    "dispatch-worker-worktree.sh refuses whenever main's checkout has any tracked change, including other leads' tracker files: commit a tracker sync immediately before dispatching, and check the [ok] line before writing briefs (03c59566, wave 7).",
+    "Pipelines wait at most 30 min for load<4, then run CI (user ruling); exit 75 suite-budget faults are known environment faults until 88's f487aeef. Never launch a pipeline with & inside a foreground Bash call; use run_in_background."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
