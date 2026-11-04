@@ -1304,37 +1304,8 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         Ok(findings)
     }
 
-    /// Built-in validate pass: report enforcement drift between the invariant
-    /// registry and the declared rules/gates (REQ-01/REQ-02).
-    ///
-    /// This runs as part of every validate path — NOT behind an opt-in
-    /// `.jit/rules.toml` rule — mirroring
-    /// [`dangling_link_findings`](Self::dangling_link_findings). It is gated only
-    /// on the presence of declared invariants: when `.jit/invariants.toml` is
-    /// absent or empty the pass returns no findings (graceful degradation), so a
-    /// repository that declares no invariants — including the live repo — is
-    /// totally unaffected and `jit validate` surfaces nothing new.
-    ///
-    /// When invariants ARE declared, drift is reported as unattributed
-    /// [`GraphFinding`]s (drift pertains to the project's declarations, not a
-    /// single issue) via
-    /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings),
-    /// the SAME tolerant drift computation shared with
-    /// [`check_invariants`](crate::commands::ItemOps::check_invariants). The
-    /// sole direction is **declared-but-unenforced** — an invariant whose
-    /// `enforced-by` names a missing/unloadable rule or gate — emitted at
-    /// [`Severity::Error`](crate::declarations::rules::Severity::Error), so it FAILS
-    /// `jit validate` (the broken binding is a real defect). An unclaimed rule or
-    /// gate is NOT drift (the enforced-but-undeclared direction was removed in
-    /// REQ-05).
-    ///
-    /// The rule name on every finding is [`BuiltInPass::EnforcementDrift`]. A `rules.toml`
-    /// (or gate registry) load failure is tolerated, NOT propagated as an `Err`:
-    /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings)
-    /// resolves it defensively to
-    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
-    /// so it surfaces as a declared-but-unenforced finding rather than aborting
-    /// validation.
+    /// Report unresolved invariant enforcement bindings as unattributed errors.
+    /// An unloadable rule set remains reportable; gate load errors propagate.
     pub fn enforcement_drift_findings(
         &self,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
@@ -1358,23 +1329,8 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         Ok(findings)
     }
 
-    /// Compute the enforcement-drift findings, tolerating an unloadable rule set /
-    /// gate registry (REQ-01 "missing OR unloadable").
-    ///
-    /// This is the SINGLE drift computation shared by the built-in validate pass
-    /// ([`enforcement_drift_findings`](Self::enforcement_drift_findings), which
-    /// assigns per-direction severity) and the
-    /// [`check_invariants`](crate::commands::ItemOps::check_invariants)
-    /// command (which serializes the raw findings), so both surfaces report
-    /// IDENTICALLY. Returns an empty list when no invariants are declared (the
-    /// pass is dormant — a repo without `.jit/invariants.toml` is unaffected).
-    ///
-    /// Each enforcement SOURCE is loaded defensively: a parse/load failure is NOT
-    /// propagated (it would crash the run) but treated as
-    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
-    /// so a binding into it surfaces as a declared-but-unenforced finding flagged
-    /// `unloadable` instead of an error. Only `cached_config` (the invariant
-    /// registry itself) can still error.
+    /// Compute drift with tolerant rule loading and strict gate loading.
+    /// Returns no findings when no invariants are declared.
     pub fn compute_drift_findings(&self) -> Result<Vec<crate::validation::drift::DriftFinding>> {
         use crate::validation::drift::{enforcement_drift, SourceState};
         use std::collections::BTreeSet;
@@ -1386,14 +1342,14 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             return Ok(Vec::new());
         }
 
-        // Defensive (tolerant) loads: a failure -> unloadable, not an error.
         let rule_names_owned = self.loadable_rule_names();
-        let gate_set: Option<BTreeSet<GateKey>> = self
+        let gate_set: BTreeSet<GateKey> = self
             .exec
             .storage
-            .load_gate_registry()
-            .ok()
-            .map(|registry| registry.gates.into_keys().collect());
+            .load_gate_registry()?
+            .gates
+            .into_keys()
+            .collect();
 
         let rule_set: Option<BTreeSet<&str>> = rule_names_owned
             .as_ref()
@@ -1403,12 +1359,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             Some(set) => SourceState::Loaded(set),
             None => SourceState::Unloadable,
         };
-        let gates_state = match &gate_set {
-            Some(set) => SourceState::Loaded(set),
-            None => SourceState::Unloadable,
-        };
-
-        Ok(enforcement_drift(invariants, rules_state, gates_state))
+        Ok(enforcement_drift(invariants, rules_state, &gate_set))
     }
 
     /// Defensively resolve the names of every LOADABLE rule, returning `None` when

@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "b7a6831d-7ac7-4806-9838-14a84470bd99",
+      "run_id": "f2198c65-11cb-4a05-a386-67064b0e363e",
       "status": "passed",
-      "updated_at": "2026-11-04T02:24:22.931593429Z",
+      "updated_at": "2026-11-04T02:38:29.596884813Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d508c5bb-c3b7-4f3e-95c7-a69a360822f5",
+      "status": "failed",
+      "updated_at": "2026-11-04T02:29:25.629749734Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Both storage backends read gate-run records through one reader",
-  "updated_at": "2026-11-04T02:24:22.931593429Z"
+  "updated_at": "2026-11-04T02:38:29.596884813Z"
 }

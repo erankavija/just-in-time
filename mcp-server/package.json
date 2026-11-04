@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node index.js",
-    "test": "node test-unit.js && node test-integration.js"
+    "test": "node run-tests.js",
+    "test:suites": "node test-unit.js && node test-integration.js"
   },
   "keywords": ["mcp", "jit", "issue-tracker", "ai"],
   "author": "erankavija",

@@ -13,9 +13,10 @@ import { CURATION, curationCoverage, generateTools, generateDefaultTools, parseT
 import { validateArguments, createValidator } from './lib/validator.js';
 import { buildCliArgs, getTimeoutForCommand } from './lib/cli-executor.js';
 import { ConcurrencyLimiter } from './lib/concurrency.js';
+import { JIT_BINARY } from './lib/jit-binary.js';
 
 // Load the real schema from the CLI (single source of truth)
-const realSchema = JSON.parse(execFileSync('jit', ['--schema'], { maxBuffer: 10 * 1024 * 1024 }).toString());
+const realSchema = JSON.parse(execFileSync(JIT_BINARY, ['--schema'], { maxBuffer: 10 * 1024 * 1024 }).toString());
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
