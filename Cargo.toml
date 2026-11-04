@@ -27,7 +27,8 @@ incremental = true
 
 [profile.test]
 debug = "line-tables-only"
-incremental = true
+# Test builds are frequent and short-lived; avoid accumulating incremental state on disk.
+incremental = false
 
 # Dependencies are compiled once and then run by every test process, so their
 # unoptimized code is pure repeated cost: the suite's own CPU profile is spread
