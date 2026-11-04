@@ -57,7 +57,7 @@ fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() 
             ],
             [
                 ("JIT_DATA_DIR", linked_store.to_str().unwrap()),
-                crate::ALLOW_LINKED_WRITES,
+                super::ALLOW_LINKED_WRITES,
             ],
         )
         .output()
@@ -122,7 +122,7 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
                 agent_id,
                 "--json",
             ],
-            [selected_store, crate::ALLOW_LINKED_WRITES],
+            [selected_store, super::ALLOW_LINKED_WRITES],
         )
         .output()
         .unwrap();
@@ -152,7 +152,7 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
             ],
             [
                 selected_store,
-                crate::ALLOW_LINKED_WRITES,
+                super::ALLOW_LINKED_WRITES,
                 ("JIT_AGENT_ID", agent_id),
             ],
         )

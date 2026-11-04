@@ -6,7 +6,7 @@ use jit::test_utils::profiled_repository_fixture;
 #[test]
 fn test_fix_unknown_type_with_suggestion() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     // A typo in the type label: should be "task".
     let issue_id = cli
@@ -44,7 +44,7 @@ fn test_fix_unknown_type_with_suggestion() {
 #[test]
 fn test_fix_unknown_type_no_suggestion() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     cli.create_issue([
         "--title",
@@ -85,7 +85,7 @@ fn test_fix_and_validate_agree_on_a_malformed_label_until_it_is_removed() {
 #[test]
 fn test_fix_multiple_issues() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     let id1 = cli
         .create_issue(["--title", "Issue 1", "--label", "type:taks"])
@@ -105,7 +105,7 @@ fn test_fix_multiple_issues() {
 #[test]
 fn test_dry_run_doesnt_modify() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     let issue_id = cli
         .create_issue(["--title", "Test", "--label", "type:taks"])
@@ -130,7 +130,7 @@ fn test_dry_run_doesnt_modify() {
 #[test]
 fn test_fix_json_output() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     cli.create_issue(["--title", "Test", "--label", "type:taks"])
         .unwrap();
@@ -144,7 +144,7 @@ fn test_fix_json_output() {
 #[test]
 fn test_dry_run_requires_fix_flag() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
 
     let output = cli.command(["validate", "--dry-run"]).output().unwrap();
@@ -156,7 +156,7 @@ fn test_dry_run_requires_fix_flag() {
 #[test]
 fn test_fix_with_valid_repository() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     cli.create_issue(["--title", "Valid issue", "--label", "type:task"])
         .unwrap();

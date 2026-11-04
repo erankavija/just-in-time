@@ -8,7 +8,7 @@
 //!
 //! Every view supports `--json`, and argument errors are machine-readable.
 
-use crate::{create_issue_requiring, define_auto_gate, run_gate_forced};
+use super::{create_issue_requiring, define_auto_gate, run_gate_forced};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;

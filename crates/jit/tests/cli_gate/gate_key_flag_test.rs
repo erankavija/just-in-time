@@ -6,7 +6,7 @@
 //!   3. Supplying BOTH positional and --gate errors with an actionable message.
 //!   4. Supplying NEITHER errors with an actionable message.
 
-use crate::{add_auto_gate_issue, add_manual_gate_issue};
+use super::{add_auto_gate_issue, add_manual_gate_issue};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;

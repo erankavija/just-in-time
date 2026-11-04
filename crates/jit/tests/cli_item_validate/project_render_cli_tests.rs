@@ -34,7 +34,7 @@ fn append_projection(cli: &JitCli, table: &str) {
 #[test]
 fn test_project_render_region_mode_byte_preserves_surroundings() {
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        jit::test_utils::profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     std::fs::write(cli.root().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
 
@@ -88,7 +88,7 @@ fn test_project_render_region_mode_byte_preserves_surroundings() {
 #[test]
 fn test_project_render_named_selects_single_projection() {
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        jit::test_utils::profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     std::fs::write(cli.root().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
     append_projection(
@@ -132,7 +132,7 @@ fn test_project_render_projection_error_reports_classified_code_on_both_paths() 
     // A region-mode target missing its begin marker fails with a typed
     // ManagedDocumentError, classified as VALIDATION_FAILED in both modes.
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        jit::test_utils::profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     std::fs::write(cli.root().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
     std::fs::write(
@@ -168,7 +168,7 @@ fn test_project_render_projection_error_reports_classified_code_on_both_paths() 
 #[test]
 fn test_project_render_unknown_name_uses_invalid_argument_on_both_paths() {
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        jit::test_utils::profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     let json = cli
         .command(["project", "render", "--name", "does-not-exist", "--json"])
@@ -263,7 +263,7 @@ fn appended_and_changed(cli: &JitCli, args: &[&str]) -> (Vec<Value>, Vec<String>
 #[test]
 fn test_config_set_and_project_render_each_append_one_files_published_event() {
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        jit::test_utils::profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     let render = ["project", "render"];
     let config_set = ["config", "set", "project.name", "renamed-project"];

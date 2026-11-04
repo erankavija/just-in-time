@@ -11,7 +11,7 @@ fn test_default_repo_item_list_kind_decision_returns_decisions() {
     // --kind decision` returns decision items parsed from an issue's `## Decisions`
     // section — exercised through the actual binary.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["decision"]))
             .unwrap()
             .0,
     );
@@ -47,7 +47,7 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
     // `<short-id>/<self-id>` sugar INPUT, and reports the canonical uniform
     // kind-segmented qualified id.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["decision"]))
             .unwrap()
             .0,
     );
@@ -82,7 +82,7 @@ fn test_default_repo_markdown_is_sole_source_for_decisions() {
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no decision store file is written under `.jit/`.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["decision"]))
             .unwrap()
             .0,
     );
