@@ -221,7 +221,7 @@ impl GitCheckout {
     /// the name being unset, or reports non-UTF-8 output.
     pub fn user_name(&self) -> Result<Option<String>, GitError> {
         const ARGS: [&str; 2] = ["config", "user.name"];
-        let output = self.git.run(&self.worktree_root, &ARGS)?;
+        let output = self.git.run(&self.worktree_root, ARGS)?;
         if !output.status.success() {
             if output.status.code() == Some(1) {
                 return Ok(None);
