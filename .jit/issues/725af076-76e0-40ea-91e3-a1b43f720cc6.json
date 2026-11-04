@@ -11,12 +11,26 @@
   ],
   "description": "Make every test image capture the event log through the end-of-log probe, make the capture layer refuse a whole read of the log, and delete the code that handles one.\n\n## Background\n\n`CaptureSpec::discover_paths` (`crates/jit/src/repository_state/image.rs`), and `CaptureSpec::new` through it, accept `VirtualPath::EVENTS` as a whole path; only `discover_tail` reads its bounded end. By the time this lands, production captures use `discover_tail`, and whole-repository record fidelity reads the log through `RepositoryMutationSession::read_history_log`, outside `CaptureSpec`.\n\nTest images still request it whole: the shared test image builder `jit::test_harness`, through which cf49da17 makes the repository-state and document test modules build their images; `commands/document.rs`; `captured_issue_spec` and `captured_gate_issue_spec` in `commands/mod.rs`; `commands/gate.rs`; and `storage/repository_state_store_tests.rs`. One test there requests the log as a tail and then whole, and asserts that `extend` upgrades the entry to its bytes; it must move to another path, since it owns upgrade behaviour rather than anything about the log.\n\nThe refusal leaves these arms dead: the whole arm of `captured_log_end` (`repository_state/mutation.rs`), its counterpart in `storage/repository_state_store.rs`, `repository_state/overlay.rs`, the `EVENTS` entry in `validate_capture_closure` (`repository_state/materialize.rs`) with the filter that drops it in `commands/validate.rs`, and the \"already requested whole\" branch of `discover_tail`.\n\n## Success Criteria\n\n- [hard] REQ-01: The shared test image builder and every listed test spec capture the event log through `discover_tail`, and no test module builds an image of its own that requests the log whole. Their assertions are unchanged, except the tail-to-whole upgrade test, which proves the same upgrade on another path.\n- [hard] REQ-02: `CaptureSpec::new` and `discover_paths` return a capture error for `VirtualPath::EVENTS`, and one unit test owns the refusal. `read_history_log` is untouched.\n- [hard] REQ-03: The listed whole-log arms no longer exist: a captured event-log entry is always a tail, and code that reads its length or final line handles only that form.\n",
   "documents": [],
+  "done_at": "2026-11-04T07:08:56.220171334Z",
   "first_ready_at": "2026-11-02T23:39:54.615056832Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "46f102dd-1596-45f0-9037-47a8bfd9e085",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:05:09.988946227Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a84a73df-4794-4c34-a51c-820068519fdb",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:08:55.745054359Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "725af076-76e0-40ea-91e3-a1b43f720cc6",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "component:testing"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Captures refuse a whole read of the event log",
-  "updated_at": "2026-11-04T05:16:50.367853471Z"
+  "updated_at": "2026-11-04T07:08:56.220171334Z"
 }

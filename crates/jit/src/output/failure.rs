@@ -79,6 +79,18 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             ],
         };
     }
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return derive_guidance(&failed.cause);
+    }
+    if let Some(exited) = error.downcast_ref::<crate::commands::serve::ForegroundServerExited>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "port": exited.port,
+                "exit_code": exited.status.code(),
+            })),
+            suggestions: Vec::new(),
+        };
+    }
     if let Some(not_required) = error.downcast_ref::<GateNotRequiredError>() {
         let (issue, key) = (&not_required.issue_id, &not_required.gate_key);
         return Guidance {
@@ -214,11 +226,23 @@ pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
 /// The registered code of a failure. Human message text is deliberately absent
 /// from this cascade, and its order is semantic.
 fn classify_code(error: &anyhow::Error) -> ErrorCode {
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return classify_code(&failed.cause);
+    }
     // A rejected `jit dep add` batch (jit:c8518f2a) wraps every rejected edge's
     // own typed error; classify by the batch's dominant edge rather than this
     // wrapper itself, so a mixed batch still maps to the right exit code.
     if let Some(batch) = error.downcast_ref::<crate::errors::DependencyBatchRejectedError>() {
         return dependency_batch_error_code(batch);
+    }
+    // `jit recover` failing to apply the leftover redo record or run its
+    // repairs is `recovery_failed`, unless it was contention.
+    if let Some(failure) = error.downcast_ref::<crate::commands::RecoveryFailedError>() {
+        return if crate::storage::is_lock_timeout(&failure.0) {
+            ErrorCode::LockTimeout
+        } else {
+            ErrorCode::RecoveryFailed
+        };
     }
     // A lock wait that expired is contention, not the command's own failure:
     // the command changed nothing and may be retried.
@@ -236,6 +260,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     }
     // Targeting a gate the issue does not require is an argument/lookup error,
     // classified before the run path, never reported as a runner error.
+    if error.is::<crate::commands::serve::ForegroundServerExited>() {
+        return ErrorCode::ServerExited;
+    }
     if error
         .downcast_ref::<crate::commands::GateNotRequiredError>()
         .is_some()
@@ -625,6 +652,12 @@ fn dependency_batch_error_code(batch: &crate::errors::DependencyBatchRejectedErr
         .iter()
         .map(|(_, error)| classify_code(error))
         .find(|code| code.exit_code() != ExitCode::ValidationFailed)
+        .or_else(|| {
+            batch
+                .rejected()
+                .first()
+                .map(|(_, error)| classify_code(error))
+        })
         .unwrap_or(ErrorCode::ValidationFailed)
 }
 
@@ -638,29 +671,6 @@ pub fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> JsonError {
         code
     };
     JsonError::new(code, error.to_string())
-}
-
-/// Build the JSON error envelope for a failed claim/lease command.
-///
-/// A specific typed class always wins over the command fallback. This keeps
-/// permission, external-I/O, no-Git, parsing, and lookup failures aligned with
-/// the human path, which uses [`classify`]. Only a genuinely unclassified
-/// failure retains the command-specific registered code.
-pub fn claim_json_error(error: &anyhow::Error, fallback_code: ErrorCode) -> JsonError {
-    let classified = classify_code(error);
-    let code = if classified == ErrorCode::GenericError {
-        fallback_code
-    } else {
-        classified
-    };
-    JsonError::new(code, error.to_string())
-}
-
-/// Preserve a `validate --fix` failure's complete cause chain and its exact
-/// typed classification. The envelope's registered code owns the process
-/// status; callers must not retain a parallel exit-code projection.
-pub fn validate_fix_json_error(error: &anyhow::Error) -> JsonError {
-    JsonError::new(classify_code(error), format!("{error:#}"))
 }
 
 /// Build the JSON error envelope for a failed profile command: the code the
@@ -793,7 +803,7 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::{claim_json_error, classify, validate_fix_json_error};
+    use super::classify;
     use crate::declarations::GateStage;
     use crate::domain::{GateRunResult, GateRunStatus};
     use crate::output::ErrorCode;
@@ -836,15 +846,6 @@ mod exit_code_projection_tests {
             warnings: Vec::new(),
         }
         .into()
-    }
-
-    #[test]
-    fn test_claim_json_error_keeps_registered_fallback_for_unclassified_failure() {
-        let error = anyhow::anyhow!("claim-specific failure without a typed cause");
-        let json = claim_json_error(&error, ErrorCode::ClaimRenewError);
-
-        assert_eq!(json.error.code, ErrorCode::ClaimRenewError);
-        assert_eq!(json.exit_code(), ErrorCode::ClaimRenewError.exit_code());
     }
 
     /// Representative typed errors, each paired with the exit code the classifier
@@ -1065,49 +1066,6 @@ mod exit_code_projection_tests {
     }
 
     #[test]
-    fn test_validate_fix_json_error_uses_typed_code_as_status_authority() {
-        use std::io::{Error as IoError, ErrorKind};
-
-        let cases = [
-            (
-                crate::errors::ValidationFailedError::new("invalid repository").into(),
-                ErrorCode::ValidationFailed,
-            ),
-            (
-                crate::errors::InvalidArgumentError::new("bad repair option").into(),
-                ErrorCode::InvalidArgument,
-            ),
-            (
-                crate::errors::AlreadyExistsError::new("occupied repair target").into(),
-                ErrorCode::AlreadyExists,
-            ),
-            (
-                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
-                ErrorCode::PermissionDenied,
-            ),
-            (
-                crate::storage::RepositoryFormatUnsupportedError::new(9999, 1).into(),
-                ErrorCode::RepositoryFormatUnsupported,
-            ),
-            (
-                anyhow::anyhow!("untyped repair failure"),
-                ErrorCode::GenericError,
-            ),
-            (
-                IoError::new(ErrorKind::BrokenPipe, "closed repair output").into(),
-                ErrorCode::IoError,
-            ),
-        ];
-
-        for (error, expected_code) in cases {
-            let envelope = validate_fix_json_error(&error);
-            assert_eq!(envelope.error.code, expected_code);
-            assert_eq!(envelope.exit_code(), expected_code.exit_code());
-            assert_eq!(envelope.exit_code(), classify(&error).exit_code());
-        }
-    }
-
-    #[test]
     fn test_invalid_label_pattern_keeps_specific_registered_code() {
         let error = anyhow::Error::new(crate::errors::InvalidLabelPatternError::new(
             "bad label pattern",
@@ -1133,7 +1091,7 @@ mod exit_code_projection_tests {
                 schema
                     .command_exit_codes
                     .iter()
-                    .any(|c| c.command == row && c.code == Some(actual)),
+                    .any(|c| c.command == row && c.code == actual),
                 "classifier emits code {actual} for `{error}`, but the \
                  command_exit_codes projection has no `{row}` row documenting it"
             );
@@ -1425,6 +1383,22 @@ mod lock_timeout_classification_tests {
     fn test_classify_reports_wrapped_session_lock_timeout() {
         assert_eq!(
             classify(&session_lock_timeout()).error.code,
+            ErrorCode::LockTimeout
+        );
+    }
+
+    #[test]
+    fn test_classify_recovery_failed_error_is_recovery_failed_unless_contention() {
+        use crate::commands::RecoveryFailedError;
+        let failed = RecoveryFailedError(anyhow::anyhow!("redo record"));
+        let contended = RecoveryFailedError(session_lock_timeout());
+
+        assert_eq!(
+            classify(&failed.into()).error.code,
+            ErrorCode::RecoveryFailed
+        );
+        assert_eq!(
+            classify(&contended.into()).error.code,
             ErrorCode::LockTimeout
         );
     }
@@ -1789,6 +1763,7 @@ mod derived_guidance_tests {
         let classified = classify(&error);
         let dedicated = dependency_batch_json_error(batch_error);
 
+        assert_eq!(classified.error.code, dedicated.error.code);
         assert_eq!(classified.exit_code(), dedicated.exit_code());
         assert_eq!(classified.error.details, dedicated.error.details);
         assert_eq!(classified.error.suggestions, dedicated.error.suggestions);

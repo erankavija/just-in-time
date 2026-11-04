@@ -203,8 +203,7 @@ pub struct ExitCodeDoc {
 /// general; this maps the codes back to the command families and conditions
 /// that produce them. `exception` flags a row where the code's meaning here
 /// departs from the global entry — a completed run signalling findings with a
-/// non-zero code, or a pass-through of a subprocess's own code — rather than the
-/// ordinary error classification.
+/// non-zero code — rather than the ordinary error classification.
 ///
 /// The classification rows derive from the typed-error classifier
 /// ([`classify`](crate::output::failure::classify)); the exception rows derive
@@ -218,15 +217,13 @@ pub struct CommandExitCode {
     /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
     /// every command.
     pub command: String,
-    /// Exit code emitted, when the command chooses a fixed code (always a member
-    /// of the global taxonomy in [`CommandSchema::exit_codes`]). `None` marks a
-    /// pass-through, where the command exits with a subprocess's own code rather
-    /// than a jit-assigned one (e.g. `serve`).
-    pub code: Option<i32>,
+    /// Exit code emitted (always a member of the global taxonomy in
+    /// [`CommandSchema::exit_codes`]).
+    pub code: i32,
     /// Condition that produces the code.
     pub condition: String,
     /// True when the code's meaning here departs from the global taxonomy entry
-    /// for `code` (a completed-run findings signal, or a pass-through).
+    /// for `code` (a completed-run findings signal).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exception: bool,
 }
@@ -548,15 +545,6 @@ impl CommandSchema {
         }
 
         let (schema, type_name) = match cmd_path {
-            // Repository initialization.
-            "init" => (Some(schema_to_value::<InitResponse>()), "InitResponse"),
-
-            // Version command
-            "version" => (
-                Some(schema_to_value::<crate::build_info::VersionInfo>()),
-                "VersionInfo",
-            ),
-
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
@@ -723,79 +711,6 @@ impl CommandSchema {
                 (Some(union), "BlockedListResponse")
             }
 
-            // `jit apply` echoes each created node's raw stored record under
-            // `created_issues`, so their gate lists are carried under
-            // gates_required / gates_status.
-            "apply" => (
-                Some(schema_to_value::<TemplateApplyResponse>()),
-                "TemplateApplyResponse",
-            ),
-
-            // Graph commands
-            "graph_deps" => (
-                Some(schema_to_value::<GraphDepsTreeResponse>()),
-                "GraphDepsTreeResponse",
-            ),
-            "graph_rdeps" => (
-                Some(schema_to_value::<GraphDownstreamResponse>()),
-                "GraphDownstreamResponse",
-            ),
-            "graph_roots" => (
-                Some(schema_to_value::<GraphRootsResponse>()),
-                "GraphRootsResponse",
-            ),
-            "graph_tree" => (
-                Some(schema_to_value::<GraphTreeResponse>()),
-                "GraphTreeResponse",
-            ),
-            // `graph export --format json` emits two shapes: the default lean
-            // summary nodes (no gate fields) and, under `--full`, complete stored
-            // issue records (gate list under `gates_required` / `gates_status`)
-            // with the resolved hierarchy flattened on. Declaring both via `oneOf`
-            // makes the gate-free summary distinguishable from the full record.
-            "graph_export" => {
-                use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<GraphExportSummaryResponse>(),
-                        schema_to_value::<GraphExportFullResponse>(),
-                    ],
-                    "description": "Default shape: lean summary nodes (id, short_id, \
-                        title, state, priority, labels) with no gate fields. With \
-                        --full: complete stored issue records, whose gate list is \
-                        carried under gates_required / gates_status, plus the \
-                        resolved-hierarchy fields (parent, children, cluster, rank)."
-                });
-                (Some(union), "GraphExportSummaryResponse")
-            }
-
-            // `doc dir` resolves one value, so it declares the flat named object
-            // rather than a list envelope.
-            "doc_dir" => (
-                Some(schema_to_value::<ArtifactDirectoryResponse>()),
-                "ArtifactDirectoryResponse",
-            ),
-            "doc_conformance" => (
-                Some(schema_to_value::<ArtifactConformanceResponse>()),
-                "ArtifactConformanceResponse",
-            ),
-            "label_namespaces" => (
-                Some(schema_to_value::<NamespacesResponse>()),
-                "NamespacesResponse",
-            ),
-            "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
-            "events_tail" | "events_query" => (
-                Some(schema_to_value::<EventListResponse>()),
-                "EventListResponse",
-            ),
-            "label_values" => (
-                Some(schema_to_value::<LabelValuesResponse>()),
-                "LabelValuesResponse",
-            ),
-            "claim_status" | "claim_list" => (
-                Some(schema_to_value::<LeaseListResponse>()),
-                "LeaseListResponse",
-            ),
             "worktree_list" => (
                 Some(schema_to_value::<WorktreeListResponse>()),
                 "WorktreeListResponse",
@@ -804,41 +719,6 @@ impl CommandSchema {
                 Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
                 "WorktreeStoreDivergenceResponse",
             ),
-            "doc_list" => (
-                Some(schema_to_value::<crate::commands::DocumentListResult>()),
-                "DocumentListResult",
-            ),
-            "doc_assets_list" => (
-                Some(schema_to_value::<crate::commands::AssetListResult>()),
-                "AssetListResult",
-            ),
-            "item_list" | "item_search" => (
-                Some(schema_to_value::<crate::commands::ItemListResult>()),
-                "ItemListResult",
-            ),
-            "project_render" => (
-                Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
-                "ProjectRenderResult",
-            ),
-            "archive_candidates" => (
-                Some(schema_to_value::<
-                    crate::domain::artifact_plan::ArchiveCandidates,
-                >()),
-                "ArchiveCandidates",
-            ),
-            // Without `--execute` the command previews the plan it would run.
-            "archive_document" | "archive_container" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<crate::domain::artifact_plan::ArtifactPlan>(),
-                        schema_to_value::<crate::domain::artifact_execution::ArchiveExecutionResult>(),
-                    ],
-                    "description": "Default: the ArtifactPlan preview. With --execute: \
-                        the ArchiveExecutionResult of the run."
-                });
-                (Some(union), "ArtifactPlan")
-            }
-
             // Default: no specific schema
             _ => (None, "CommandResponse"),
         };
@@ -965,7 +845,7 @@ impl CommandSchema {
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
         let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
             command: command.to_string(),
-            code: Some(code),
+            code,
             condition: condition.to_string(),
             exception,
         };
@@ -1009,6 +889,20 @@ impl CommandSchema {
                  retried.",
                 false,
             ),
+            // `search` leaf: ripgrep missing or failing exits 1; a spawn or
+            // path I/O failure exits 10, on both --json and human paths.
+            row(
+                "search",
+                1,
+                "ripgrep is not installed (RIPGREP_NOT_FOUND) or ran and failed (SEARCH_FAILED).",
+                false,
+            ),
+            row(
+                "search",
+                10,
+                "ripgrep could not be spawned or the search root could not be resolved (I/O failure).",
+                false,
+            ),
             // Command-family classification (standard taxonomy meaning).
             row(
                 "any command that writes an issue",
@@ -1020,8 +914,9 @@ impl CommandSchema {
             row(
                 "dep add",
                 4,
-                "The edge would create a cycle, or a redundant \
-                 (transitively-implied) edge was rejected.",
+                "The edge would create a cycle (CYCLE_DETECTED), or a redundant \
+                 (transitively-implied) edge was rejected (VALIDATION_FAILED), \
+                 in human and JSON output alike.",
                 false,
             ),
             row(
@@ -1032,6 +927,7 @@ impl CommandSchema {
                  created.",
                 false,
             ),
+            row("init", 2, "The `--values-file` path cannot be read.", false),
             row(
                 "issue update, issue claim, issue claim-next",
                 4,
@@ -1078,6 +974,30 @@ impl CommandSchema {
                  require git for worktree identity).",
                 false,
             ),
+            row(
+                "hooks install",
+                2,
+                "The invocation is outside a git repository.",
+                false,
+            ),
+            row(
+                "hooks install",
+                3,
+                "A repository path needed to install hooks was not found.",
+                false,
+            ),
+            row(
+                "hooks install",
+                5,
+                "Filesystem permissions denied hook installation.",
+                false,
+            ),
+            row(
+                "hooks install",
+                10,
+                "A filesystem or subprocess operation needed to install hooks failed.",
+                false,
+            ),
             // Gate evaluation: the code carries the checker's verdict.
             row(
                 "gate evaluate, gate evaluate-all, gate evaluate-many",
@@ -1096,26 +1016,20 @@ impl CommandSchema {
             row(
                 "validate",
                 4,
-                "Repository-integrity, scope, or drift validation found \
-                 error-severity findings.",
-                true,
-            ),
-            row(
-                "validate",
-                1,
-                "Rule evaluation reported error-severity findings.",
+                "Repository, scope, issue, selected-rule, or explanation \
+                 validation reported error-severity findings.",
                 true,
             ),
             row(
                 "validate --branch-drift",
-                1,
+                4,
                 "Branch-drift validation failed: the check reported drift from \
                  the upstream branch or could not run.",
                 true,
             ),
             row(
                 "validate --leases",
-                1,
+                4,
                 "Lease validation found one or more invalid leases, or the lease \
                  check could not run.",
                 true,
@@ -1134,6 +1048,13 @@ impl CommandSchema {
                 true,
             ),
             row(
+                "item list, item search, item show, item resolve",
+                2,
+                "The repository configuration failed to load, or an item address \
+                 was not a qualified id.",
+                false,
+            ),
+            row(
                 "config validate",
                 4,
                 "The repo or environment-variable configuration failed to \
@@ -1142,7 +1063,7 @@ impl CommandSchema {
             ),
             row(
                 "doc check-links",
-                1,
+                4,
                 "One or more documents have broken links. Documents with only \
                  risky-link warnings exit `0`: warnings are reported, never fatal.",
                 true,
@@ -1153,6 +1074,12 @@ impl CommandSchema {
                 "One or more preset targets failed; the findings report retains \
                  successful targets and per-target errors.",
                 true,
+            ),
+            row(
+                "project render",
+                2,
+                "The requested projection name is not declared in repository configuration.",
+                false,
             ),
             // `serve` default (daemon), `--stop`, and `--status` route failures
             // through the shared classifier. Malformed PID state is the
@@ -1174,15 +1101,13 @@ impl CommandSchema {
                 "A downstream reader closed the pipe while jit was still writing.",
                 true,
             ),
-            // `serve --fg` passes the inline server child's own code through.
-            CommandExitCode {
-                command: "serve --fg".to_string(),
-                code: None,
-                condition: "Foreground mode passes through the inline dev-server \
-                            child's own exit code (1 when the child produced none)."
-                    .to_string(),
-                exception: true,
-            },
+            row(
+                "serve --fg",
+                1,
+                "The foreground server exited with a failure status (`SERVER_EXITED`; \
+                 the child's status is in `error.details`).",
+                false,
+            ),
         ]
     }
 }
@@ -1220,7 +1145,7 @@ pub fn render_exit_code_reference() -> String {
          that produces it: the shared classifier (`classify` in \
          `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
          command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals and the `serve --fg` pass-through).\n\n",
+         directly (the findings signals).\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");
@@ -1235,23 +1160,18 @@ pub fn render_exit_code_reference() -> String {
         "Most commands draw only from the global taxonomy above. The rows below \
          identify the codes a specific command family emits. An **exception** is \
          a code a completed run emits to signal findings, or a code whose meaning \
-         departs from the global entry (for example, `doc check-links` exits `1` \
-         for broken links, not a generic error). A `child` code marks a pass-through, \
-         where the command exits with a subprocess's own code. `*` marks a code \
+         departs from the global entry (for example, `doc check-links` exits `4` \
+         for broken links, not a generic error). `*` marks a code \
          every command can reach: `0` on successful completion, and the failure \
          codes through the shared classifier.\n\n",
     );
     out.push_str("| Command | Code | Condition | Exception |\n");
     out.push_str("|---------|------|-----------|-----------|\n");
     for entry in CommandSchema::generate_command_exit_codes() {
-        let code = match entry.code {
-            Some(c) => format!("`{c}`"),
-            None => "`child`".to_string(),
-        };
         out.push_str(&format!(
-            "| `{}` | {} | {} | {} |\n",
+            "| `{}` | `{}` | {} | {} |\n",
             entry.command,
-            code,
+            entry.code,
             entry.condition,
             if entry.exception { "yes" } else { "" }
         ));
@@ -1784,8 +1704,8 @@ mod tests {
 
     #[test]
     fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("init").unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("init").unwrap();
+        let resolved = CommandSchema::resolve_output_schema("status").unwrap();
+        let legacy = CommandSchema::get_output_schema_for_command("status").unwrap();
         assert_eq!(resolved.success, legacy.success);
         assert_eq!(resolved.success_schema, legacy.success_schema);
     }
@@ -1904,6 +1824,7 @@ mod tests {
         for command in [
             "*",
             "gate evaluate, gate evaluate-all, gate evaluate-many",
+            "hooks install",
             "validate",
         ] {
             assert!(
@@ -1920,26 +1841,18 @@ mod tests {
     fn test_command_exit_codes_within_global_taxonomy() {
         // Every projected fixed code must be a defined member of the global
         // taxonomy, so the per-command surface can never introduce a code the
-        // taxonomy does not explain. Pass-through rows (`code: None`, e.g.
-        // `serve`) carry no jit-assigned code and are exempt.
+        // taxonomy does not explain.
         let taxonomy: std::collections::HashSet<i32> = CommandSchema::generate_exit_codes()
             .iter()
             .map(|d| d.code)
             .collect();
         for entry in CommandSchema::generate_command_exit_codes() {
-            if let Some(code) = entry.code {
-                assert!(
-                    taxonomy.contains(&code),
-                    "command `{}` documents code {code}, which is absent from the global taxonomy",
-                    entry.command,
-                );
-            } else {
-                assert!(
-                    entry.exception,
-                    "pass-through row for `{}` (code: None) must be an exception",
-                    entry.command,
-                );
-            }
+            assert!(
+                taxonomy.contains(&entry.code),
+                "command `{}` documents code {}, which is absent from the global taxonomy",
+                entry.command,
+                entry.code,
+            );
         }
     }
 

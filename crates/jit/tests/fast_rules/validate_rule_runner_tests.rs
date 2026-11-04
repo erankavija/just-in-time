@@ -1,21 +1,36 @@
-//! In-process tests for the `jit validate` rule runner: per-issue + whole-repo
-//! local/graph rule evaluation, `--explain` outcomes, and error-severity
-//! exit-code threading (issue b8ba1b10).
+//! Harness tests for the `jit validate <id>` and `--explain` views: the
+//! selection and explanation of the report one validation capture computes.
 //!
-//! The pure local/graph engines are unit-tested in their own modules; these are
-//! wiring tests over `ValidationOps::run_rules` / `explain_rules` proving the
-//! production orchestration loads the ruleset, scopes correctly, and reports
-//! findings with the right severity.
-//!
-//! NOTE: post-a0f0f342 the effective rule set ALSO includes the built-in default
-//! rules derived from the scaffolded `config.toml` (label format, namespace
-//! registry, etc.). These tests therefore filter to the USER rule under test
-//! rather than asserting on the total finding/outcome count, which now legitimately
-//! includes default-rule activity.
+//! The effective rule set also holds the built-in default rules derived from the
+//! scaffolded `config.toml`, so these tests filter to the user rule under test.
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
+use jit::commands::CommandExecutor;
+use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::Issue;
 use jit::storage::InMemoryStorage;
+use jit::validation::report::{BuiltInPass, Selection};
+use jit::validation::{ExplainReport, RuleReport};
+
+/// The report `jit validate <id>` renders.
+fn issue_view(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> RuleReport {
+    executor
+        .validation()
+        .selection_report()
+        .unwrap()
+        .select(&Selection::Issue(IssueIdPrefix::from(id)))
+        .unwrap()
+}
+
+/// The report `jit validate <id> --explain` renders.
+fn explain_view(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> ExplainReport {
+    executor
+        .validation()
+        .selection_report()
+        .unwrap()
+        .explain(&IssueIdPrefix::from(id))
+        .unwrap()
+}
 
 /// A local rule: every `type:epic` must carry a `req:*` label. Error severity.
 const EPIC_NEEDS_REQ: &str = r#"
@@ -58,7 +73,7 @@ fn test_per_issue_local_rule_fails() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().run_rules(Some(&id)).unwrap();
+    let report = issue_view(&executor, &id);
 
     assert!(report.has_errors(), "missing req:* label is an error");
     assert_eq!(report.error_count(), 1);
@@ -83,7 +98,7 @@ fn test_per_issue_local_rule_passes() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().run_rules(Some(&id)).unwrap();
+    let report = issue_view(&executor, &id);
 
     // The user rule is satisfied: no `epic-needs-req` finding. (Default rules may
     // independently flag the scaffolded-config namespaces; out of scope here.)
@@ -91,94 +106,6 @@ fn test_per_issue_local_rule_passes() {
         !report.findings.iter().any(|f| f.rule == "epic-needs-req"),
         "satisfied user rule must not appear: {report:?}"
     );
-}
-
-#[test]
-fn test_whole_repo_collects_local_findings_for_all_issues() {
-    let storage = InMemoryStorage::new();
-    // Two bad epics; both must surface.
-    jit::test_harness::seed_memory_issue(&storage, &epic(false));
-    jit::test_harness::seed_memory_issue(&storage, &epic(false));
-
-    let executor = memory_executor_declaring(
-        storage,
-        MemoryDeclarations {
-            rules: Some(EPIC_NEEDS_REQ),
-            ..MemoryDeclarations::default()
-        },
-    );
-    let report = executor.validation().run_rules(None).unwrap();
-
-    assert_eq!(report.error_count(), 2, "both epics fail: {report:?}");
-    assert!(report.has_errors());
-}
-
-#[test]
-fn test_per_issue_surfaces_relevant_graph_finding() {
-    // A graph rule: every type:task must depend on a type:story.
-    let rules = r#"
-[[rules]]
-name = "task-needs-story-dep"
-when = { type = "task" }
-severity = "error"
-assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
-"#;
-    let storage = InMemoryStorage::new();
-    let mut story = crate::fixture_issue("a story".to_string(), String::new());
-    story.labels = vec!["type:story".to_string()];
-    let mut task = crate::fixture_issue("a task".to_string(), String::new());
-    task.labels = vec!["type:task".to_string()]; // no story dependency -> violation
-    let task_id = task.id.clone();
-    jit::test_harness::seed_memory_issue(&storage, &story);
-    jit::test_harness::seed_memory_issue(&storage, &task);
-
-    let executor = memory_executor_declaring(
-        storage,
-        MemoryDeclarations {
-            rules: Some(rules),
-            ..MemoryDeclarations::default()
-        },
-    );
-    let report = executor.validation().run_rules(Some(&task_id)).unwrap();
-
-    assert!(report.has_errors(), "graph rule fires for the task");
-    assert!(report
-        .findings
-        .iter()
-        .any(|f| f.rule == "task-needs-story-dep"));
-}
-
-#[test]
-fn test_explain_lists_matched_rules_and_outcomes() {
-    let storage = InMemoryStorage::new();
-    let bad = epic(false);
-    let id = bad.id.clone();
-    jit::test_harness::seed_memory_issue(&storage, &bad);
-
-    let executor = memory_executor_declaring(
-        storage,
-        MemoryDeclarations {
-            rules: Some(EPIC_NEEDS_REQ),
-            ..MemoryDeclarations::default()
-        },
-    );
-    let report = executor.validation().explain_rules(&id).unwrap();
-
-    assert_eq!(report.issue_id, id);
-    // The effective set also contains always-on default rules (e.g. label-format);
-    // assert on the USER rule's outcome by name.
-    let outcome = report
-        .outcomes
-        .iter()
-        .find(|o| o.rule == "epic-needs-req")
-        .expect("epic-needs-req outcome present");
-    assert_eq!(outcome.scope, jit::declarations::rules::RuleScope::Local);
-    assert_eq!(outcome.severity, jit::declarations::rules::Severity::Error);
-    assert_eq!(outcome.selector, "type=epic");
-    assert!(!outcome.passed, "rule failed for this issue");
-    assert!(!outcome.messages.is_empty());
-    assert!(report.has_failures());
-    assert!(report.has_errors());
 }
 
 #[test]
@@ -195,7 +122,7 @@ fn test_explain_passing_rule_marks_pass() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().explain_rules(&id).unwrap();
+    let report = explain_view(&executor, &id);
 
     // The USER rule passes for a compliant epic; assert on it by name (default
     // rules derived from the scaffolded config are evaluated alongside it).
@@ -224,7 +151,7 @@ fn test_explain_non_matching_rule_is_reported_as_skipped() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().explain_rules(&id).unwrap();
+    let report = explain_view(&executor, &id);
 
     // The epic-selected USER rule does not match a task, but is now STILL listed
     // as a skipped outcome carrying the reason its selector excluded the issue.
@@ -272,7 +199,7 @@ assert = { require-section = { heading = "Plan" } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().explain_rules(&id).unwrap();
+    let report = explain_view(&executor, &id);
 
     let outcome = report
         .outcomes
@@ -315,7 +242,7 @@ assert = { require-section = { heading = "Summary" } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().explain_rules(&id).unwrap();
+    let report = explain_view(&executor, &id);
 
     let outcome = report
         .outcomes
@@ -362,9 +289,87 @@ assert = { require-label = { label = "req:*", min = 1 } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.validation().run_rules(Some(&id)).unwrap();
+    let report = issue_view(&executor, &id);
 
     assert!(!report.has_errors(), "warn never fails validate");
     assert_eq!(report.error_count(), 0);
     assert_eq!(report.findings.len(), 1, "but is still reported");
+}
+
+/// A coverage rule whose firing epic carries no `brackets:` pointer fails with
+/// a config error naming that epic.
+const POINTER_RULE: &str = r#"
+[[rules]]
+name = "epic-pointer"
+when = { type = "epic" }
+severity = "error"
+assert = { label-coverage = { container-from-label = "brackets" } }
+"#;
+
+#[test]
+fn test_validate_issue_omits_a_pointer_error_fired_by_another_issue() {
+    let storage = InMemoryStorage::new();
+    let (other, selected) = (epic(true), epic(true));
+    jit::test_harness::seed_memory_issue(&storage, &other);
+    jit::test_harness::seed_memory_issue(&storage, &selected);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(POINTER_RULE),
+            ..MemoryDeclarations::default()
+        },
+    );
+
+    let report = issue_view(&executor, &selected.id);
+
+    let pointer: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.rule == "epic-pointer")
+        .collect();
+    assert!(
+        pointer
+            .iter()
+            .any(|f| f.message.contains(&selected.short_id())),
+        "{report:?}"
+    );
+    assert!(
+        pointer
+            .iter()
+            .all(|f| !f.message.contains(&other.short_id())),
+        "{report:?}"
+    );
+}
+
+#[test]
+fn test_validate_issue_with_unloadable_rules_reports_rules_file_without_drift() {
+    let storage = InMemoryStorage::new();
+    let issue = epic(true);
+    jit::test_harness::seed_memory_issue(&storage, &issue);
+    let config = jit::test_utils::shipped_item_kind_tables(&["invariant"]);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(&config),
+            rules: Some("not toml = ["),
+            invariants: Some(
+                "[[invariants]]\nid = \"bound\"\nstatement = \"s\"\n\
+                 kind = \"enforced\"\nenforced-by = \"@/rule/bad-rule\"\n",
+            ),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
+
+    let report = issue_view(&executor, &issue.id);
+
+    let rules: Vec<_> = report.findings.iter().map(|f| f.rule.as_str()).collect();
+    assert!(
+        rules.contains(&BuiltInPass::RulesFile.as_str()),
+        "{rules:?}"
+    );
+    assert!(
+        !rules.contains(&BuiltInPass::EnforcementDrift.as_str()),
+        "{rules:?}"
+    );
 }

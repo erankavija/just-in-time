@@ -460,162 +460,6 @@ fn omit_current_gate_projection(issue: &mut IssueShowResponse, gate_key: &GateKe
     issue.gates.retain(|gate| &gate.key != gate_key);
 }
 
-fn repository_rule_report(
-    image: &crate::repository_state::RepositoryImage,
-) -> crate::validation::report::RuleReport {
-    crate::validation::report(
-        &crate::validation::CapturedValidation::from_image(image),
-        &crate::validation::ReportInputs {
-            now: chrono::Utc::now(),
-            history: None,
-        },
-    )
-    .rule_report
-}
-
-fn captured_issue_rule_report(
-    image: &crate::repository_state::RepositoryImage,
-    issue_id: &IssueId,
-) -> Result<crate::validation::report::RuleReport> {
-    use crate::validation::report::{ReportedFinding, RuleReport};
-
-    let issues = super::captured_active_issues(image)?;
-    let issue = issues
-        .iter()
-        .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
-    let declarations = crate::repository_state::declarations_from_image(image)?;
-    let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config.content_format();
-    let local = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
-        .map_err(|error| anyhow!("Local rule evaluation failed: {error}"))?;
-    let mut findings = local
-        .findings()
-        .iter()
-        .map(|finding| ReportedFinding::new(Some(issue.id.clone()), finding))
-        .collect::<Vec<_>>();
-    let applicable = declarations
-        .rules
-        .matching_rules(issue)
-        .into_iter()
-        .map(|rule| rule.name.as_str())
-        .collect::<std::collections::HashSet<_>>();
-    let graph_rules = declarations
-        .rules
-        .rules
-        .iter()
-        .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
-        .collect::<Vec<_>>();
-    let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-    let plan_content = super::validate::plan_content_with_issues(image, &issues, &issues)?;
-    findings.extend(
-        crate::validation::graph::evaluate_graph(
-            &graph_rules,
-            &issues,
-            &hierarchy,
-            repo_format,
-            chrono::Utc::now(),
-            &plan_content,
-        )
-        .into_iter()
-        .filter(|finding| {
-            finding.issue_id.as_ref() == Some(issue_id)
-                || (finding.is_config_error() && applicable.contains(finding.finding.rule.as_str()))
-        })
-        .map(|finding| ReportedFinding::new(Some(issue.id.clone()), &finding.finding)),
-    );
-    findings.extend(
-        repository_rule_report(image)
-            .findings
-            .into_iter()
-            .filter(|finding| {
-                finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
-                    && finding.issue_id.as_ref() == Some(issue_id)
-            }),
-    );
-    Ok(RuleReport { findings })
-}
-
-fn captured_scope_rule_report(
-    image: &crate::repository_state::RepositoryImage,
-    container_id: &IssueId,
-) -> Result<crate::validation::report::RuleReport> {
-    use crate::declarations::rules::{RuleScope, Severity};
-    use crate::validation::report::{ReportedFinding, RuleReport};
-
-    let all = super::captured_active_issues(image)?;
-    let config = crate::repository_state::assemble_config(image)?;
-    let declarations = crate::repository_state::declarations_from_image(image)?;
-    let container_type = all
-        .iter()
-        .find(|issue| &issue.id == container_id)
-        .and_then(|issue| label_utils::type_label_value(&issue.labels));
-    let breakdown_type = container_type
-        .and_then(|kind| config.templates.template_for_container(kind))
-        .and_then(|template| template.breakdown_type(&config.templates.roles));
-    let scope_ids = crate::domain::queries::bracket_scope_ids(container_id, &all, breakdown_type);
-    let slice = all
-        .iter()
-        .filter(|issue| scope_ids.contains(&issue.id))
-        .cloned()
-        .collect::<Vec<_>>();
-    let repo_format = config.content_format();
-    let mut findings = Vec::new();
-    for issue in &slice {
-        let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
-            .map_err(|error| anyhow!("Local rule evaluation failed: {error}"))?;
-        findings.extend(
-            evaluation
-                .findings()
-                .iter()
-                .map(|finding| ReportedFinding::new(Some(issue.id.clone()), finding)),
-        );
-    }
-    let graph_rules = declarations
-        .rules
-        .rules
-        .iter()
-        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-        .filter(|rule| !rule.assert.is_repo_wide_at_transition())
-        .filter(|rule| slice.iter().any(|issue| rule.when.matches(issue)))
-        .collect::<Vec<_>>();
-    if !graph_rules.is_empty() {
-        let namespaces = crate::config_manager::namespaces_from_config(&config);
-        let hierarchy =
-            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-        let plan_content = super::validate::plan_content_with_issues(image, &all, &slice)?;
-        findings.extend(
-            crate::validation::graph::evaluate_graph_scoped(
-                &graph_rules,
-                &slice,
-                &all,
-                &hierarchy,
-                repo_format,
-                chrono::Utc::now(),
-                &plan_content,
-            )
-            .iter()
-            .map(|finding| ReportedFinding::new(finding.issue_id.clone(), &finding.finding)),
-        );
-    }
-    findings.extend(
-        repository_rule_report(image)
-            .findings
-            .into_iter()
-            .filter(|finding| {
-                (finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
-                    && finding
-                        .issue_id
-                        .as_ref()
-                        .is_some_and(|id| scope_ids.contains(id)))
-                    || finding.rule
-                        == crate::validation::report::BuiltInPass::EnforcementDrift.as_str()
-            }),
-    );
-    Ok(RuleReport { findings })
-}
-
 /// Convert validation findings into the gate-run finding contract.
 fn gate_findings_from_rule_report(
     report: &crate::validation::report::RuleReport,
@@ -643,62 +487,67 @@ fn gate_findings_from_rule_report(
         .collect()
 }
 
-/// Convert one whole-repository validation result into the built-in gate finding
-/// contract.
+/// The gate findings `selection` admits from `report`, and whether they fail the
+/// gate.
 ///
-/// A repository validation judged wrong is a verdict, reported beside the rule
-/// findings. Failing to load or read what it needed, an unloadable rules declaration
-/// included, is a fault the checker cannot judge through, so it returns `Err`.
-fn gate_findings_from_report(
-    report: crate::validation::ValidationReport,
+/// A structural failure judging the repository wrong is a verdict, reported beside
+/// the findings. A selection error, an unloadable rule set, and any other
+/// structural failure are faults the checker cannot judge through, so they return
+/// `Err`.
+fn selected_gate_findings(
+    report: &crate::validation::ValidationReport,
+    selection: &crate::validation::report::Selection,
 ) -> Result<(Vec<GateFinding>, bool)> {
-    let judged_invalid = report.is_judged_invalid();
-    let rules_loaded = report
-        .passes
-        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas);
-    let (failure, rule_report) = report.into_parts();
-    if let Some(error) = failure {
-        if !judged_invalid {
-            return Err(error);
+    use crate::validation::report::{BuiltInPass, StructuralFailure};
+
+    let selected = match report.select(selection) {
+        Ok(selected) => selected,
+        Err(error) => {
+            let StructuralFailure { failure, findings } = error.downcast()?;
+            if !report.is_judged_invalid() {
+                anyhow::bail!("{failure:#}");
+            }
+            let mut gate_findings = gate_findings_from_rule_report(&findings);
+            gate_findings.push(GateFinding::builtin(
+                "repository-invalid",
+                FindingSeverity::High,
+                FindingDisposition::Blocking,
+                FindingOrigin::PreExisting,
+                format!("{failure:#}"),
+            ));
+            return Ok((gate_findings, true));
         }
-        let mut findings = gate_findings_from_rule_report(&rule_report);
-        findings.push(GateFinding::builtin(
-            "repository-invalid",
-            FindingSeverity::High,
-            FindingDisposition::Blocking,
-            FindingOrigin::PreExisting,
-            format!("{error:#}"),
-        ));
-        return Ok((findings, true));
-    }
-    if !rules_loaded {
-        let causes = rule_report
-            .findings
-            .iter()
-            .filter(|finding| finding.is_error())
-            .map(|finding| finding.message.as_str())
-            .collect::<Vec<_>>()
-            .join("; ");
-        anyhow::bail!("rules declaration did not load: {causes}");
+    };
+    let rules_file = selected
+        .findings
+        .iter()
+        .filter(|finding| finding.rule == BuiltInPass::RulesFile.as_str())
+        .map(|finding| finding.message.as_str())
+        .collect::<Vec<_>>();
+    if !rules_file.is_empty() {
+        anyhow::bail!("rules declaration did not load: {}", rules_file.join("; "));
     }
     Ok((
-        gate_findings_from_rule_report(&rule_report),
-        rule_report.has_errors(),
+        gate_findings_from_rule_report(&selected),
+        selected.has_errors(),
     ))
 }
 
-/// Validate the scope named by the issue's single `<namespace>:<target-id>` label.
-///
-/// The value is unresolved input: a full id or unique prefix, as templates write
-/// short ids. A missing, repeated, malformed, unknown, or ambiguous target is a
-/// configuration fault.
-fn label_target_report(
-    image: &crate::repository_state::RepositoryImage,
+/// The target named by the gated issue's single `<namespace>:<target-id>` label:
+/// a full id or unique prefix, as templates write short ids. A missing, repeated,
+/// or malformed target is a configuration fault.
+fn label_target(
+    captured: &crate::validation::CapturedValidation<'_>,
     issue_id: &IssueId,
     label_namespace: &str,
-) -> Result<crate::validation::report::RuleReport> {
-    let issues = super::captured_active_issues(image)?;
-    let issue = issues
+) -> Result<IssueIdPrefix> {
+    if label_namespace.is_empty() {
+        anyhow::bail!("label_namespace is empty");
+    }
+    let issue = captured
+        .issues
+        .as_deref()
+        .map_err(|error| anyhow!("{error:#}"))?
         .iter()
         .find(|issue| &issue.id == issue_id)
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
@@ -708,21 +557,15 @@ fn label_target_report(
         .iter()
         .filter_map(|label| label.strip_prefix(&prefix))
         .collect();
-    if label_namespace.is_empty() {
-        anyhow::bail!("label_namespace is empty");
-    }
     let [target] = targets[..] else {
         anyhow::bail!(
             "expected exactly one '{label_namespace}:<target-id>' label on issue {issue_id}, found {}",
             targets.len()
         );
     };
-    let target = target
+    target
         .parse::<IssueIdPrefix>()
-        .map_err(anyhow::Error::from)
-        .and_then(|prefix| crate::storage::resolve_issue_id_among(&prefix, &issues))
-        .with_context(|| format!("label '{label_namespace}:{target}' on issue {issue_id}"))?;
-    captured_scope_rule_report(image, &target)
+        .with_context(|| format!("label '{label_namespace}:{target}' on issue {issue_id}"))
 }
 
 /// The `error` run of a built-in checker that could not judge the repository,
@@ -1065,7 +908,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     event: Box::new(event),
                 },
             ];
-            let plan = finalize(&layout, &final_image, &mutation, &intents)?;
+            let plan = finalize(&layout, &final_image, &mutation, &intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -1127,6 +970,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::declarations::GateChecker;
+        use crate::validation::{report::Selection, CapturedValidation, ReportInputs};
 
         let GateRunSubject {
             run_id,
@@ -1147,21 +991,36 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         // An `Err` is a fault: the checker could not judge the repository.
         // An `Ok` carries a verdict on the content.
+        let select_over_image = |captured: &CapturedValidation<'_>, selection: Selection| {
+            let inputs = ReportInputs {
+                now: chrono::Utc::now(),
+                history: None,
+            };
+            selected_gate_findings(&crate::validation::report(captured, &inputs), &selection)
+        };
         let judged: Result<(Vec<GateFinding>, bool)> = match checker {
             GateChecker::RepositoryValidation => self
                 .validation()
                 .validate_repository_report()
-                .and_then(gate_findings_from_report),
-            GateChecker::IssueValidation => captured_issue_rule_report(repository_image, issue_id)
-                .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
-            GateChecker::RuleValidation { rule } => {
-                super::validate::rule_validation_outcome(repository_image, issue_id, rule)
-                    .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
-                    .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
-            }
+                .and_then(|report| selected_gate_findings(&report, &Selection::Whole)),
+            GateChecker::IssueValidation => select_over_image(
+                &CapturedValidation::from_image(repository_image),
+                Selection::Issue(issue_id.into()),
+            ),
+            GateChecker::RuleValidation { rule } => select_over_image(
+                &CapturedValidation::from_image(repository_image),
+                Selection::Rule {
+                    issue: issue_id.into(),
+                    rule: rule.clone(),
+                },
+            ),
             GateChecker::LabelTargetValidation { label_namespace } => {
-                label_target_report(repository_image, issue_id, label_namespace)
-                    .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
+                let captured = CapturedValidation::from_image(repository_image);
+                label_target(&captured, issue_id, label_namespace).and_then(|target| {
+                    select_over_image(&captured, Selection::Scope(target.clone())).with_context(
+                        || format!("label '{label_namespace}:{target}' on issue {issue_id}"),
+                    )
+                })
             }
             GateChecker::ReviewPlaceholder => Ok((
                 vec![GateFinding::builtin(
@@ -1745,26 +1604,6 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         std::fs::write(rules_path, rule_validation_test_rules()).unwrap();
     }
 
-    fn seed_unrelated_manual_gate(executor: &CommandExecutor<InMemoryStorage>) {
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            "unrelated-pending".parse().unwrap(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: "unrelated-pending".parse().unwrap(),
-                title: "Unrelated pending gate".to_string(),
-                description: "A deliberately unpassed unrelated gate".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Manual,
-                checker: None,
-                priority: 100,
-                reserved: HashMap::new(),
-                inputs: None,
-            },
-        );
-        seed_gate_registry(&executor.storage, &registry);
-    }
-
     fn prior_run(
         run_id: &GateRunId,
         gate_key: &GateKey,
@@ -2226,7 +2065,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_captured_issue_rule_report_preserves_invalid_hierarchy_error() {
+    fn test_issue_validation_records_a_failed_rule_pass_as_an_error_run() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
@@ -2243,12 +2082,25 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .capture_validation_image_with(&std::collections::BTreeMap::new())
             .unwrap();
 
-        let error = super::captured_issue_rule_report(&image, &issue_id)
-            .expect_err("invalid hierarchy must fail gate rule evaluation");
+        let run = executor
+            .execute_builtin_checker_with_repository_view(
+                GateRunSubject {
+                    run_id: &crate::test_utils::gate_run_id(1),
+                    gate_key: &"not-a-reserved-repository-key".parse().unwrap(),
+                    issue_id: &issue_id,
+                    stage: GateStage::Postcheck,
+                },
+                &GateChecker::IssueValidation,
+                &image,
+            )
+            .unwrap();
 
         assert_eq!(
-            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
-            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+            run.status,
+            GateRunStatus::Error,
+            "{} {}",
+            run.stdout,
+            run.stderr
         );
     }
 
@@ -3272,39 +3124,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_ne!(before, after);
     }
 
-    #[test]
-    fn test_check_gate_file_repository_ignores_legacy_cached_rules() {
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config = format!(
-            "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            taxonomy.config_fragment()
-        );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
-        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
-        let cached = executor.validation().run_rules(None).unwrap();
-        assert!(!cached
-            .findings
-            .iter()
-            .any(|finding| finding.rule == "planned-task-needs-summary"));
-        std::fs::write(repo.path().join(".jit/rules.toml"), late_rule).unwrap();
-
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"not-a-reserved-repository-key".parse().unwrap())
-            .unwrap();
-
-        assert_eq!(result.command, "builtin:repository_validation");
-        assert_eq!(result.status, GateRunStatus::Failed);
-        assert_eq!(result.exit_code, Some(4));
-        assert!(result
-            .findings
-            .unwrap()
-            .findings
-            .iter()
-            .any(|finding| finding.summary.contains("planned-task-needs-summary")));
-    }
-
     type RepositoryChange = fn(&std::path::Path, &IssueId);
 
     fn leave_unchanged(_: &std::path::Path, _: &IssueId) {}
@@ -3370,7 +3189,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let validate = executor
             .validation()
             .validate_repository_report()
-            .map(|report| report.structural_failure.is_none() && !report.rule_report.has_errors())
+            .map(|report| report.structural_failure.is_none() && !report.rule_report().has_errors())
             .unwrap();
         let run = executor
             .execute_builtin_checker_with_repository_view(
@@ -3489,106 +3308,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_repository_validation_warns_for_sorted_placeholder_gate_keys() {
-        let executor = setup();
-        add_builtin_gate(
-            &executor,
-            &"z-review".parse().unwrap(),
-            GateChecker::ReviewPlaceholder,
-            vec!["type:task".to_string()],
-        );
-        add_builtin_gate(
-            &executor,
-            &"a-review".parse().unwrap(),
-            GateChecker::ReviewPlaceholder,
-            vec!["type:task".to_string()],
-        );
-
-        let findings = executor.validation().review_placeholder_findings().unwrap();
-
-        assert_eq!(findings.len(), 1);
-        assert_eq!(
-            findings[0].rule,
-            crate::validation::report::BuiltInPass::ReviewPlaceholder.as_str()
-        );
-        assert_eq!(
-            findings[0].severity,
-            crate::declarations::rules::Severity::Warn
-        );
-        assert!(findings[0].message.contains("a-review, z-review"));
-    }
-
-    #[test]
-    fn test_label_target_validation_records_missing_configured_pointer_as_error_run() {
-        let executor = setup();
-        let issue_id = add_builtin_gate(
-            &executor,
-            &"arbitrary-coverage-key".parse().unwrap(),
-            GateChecker::LabelTargetValidation {
-                label_namespace: "parent-pointer".to_string(),
-            },
-            vec!["type:task".to_string()],
-        );
-
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
-            .unwrap();
-
-        assert_eq!(result.status, GateRunStatus::Error);
-        assert_eq!(
-            result.exit_code,
-            Some(crate::gate_execution::CHECKER_TEMPFAIL_EXIT)
-        );
-        assert!(result.stderr.contains("parent-pointer:<target-id>"));
-    }
-
-    #[test]
-    fn test_label_target_validation_records_empty_namespace_as_error_run() {
-        let executor = setup();
-        let issue_id = add_builtin_gate(
-            &executor,
-            &"arbitrary-coverage-key".parse().unwrap(),
-            GateChecker::LabelTargetValidation {
-                label_namespace: String::new(),
-            },
-            vec!["type:task".to_string()],
-        );
-
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
-            .unwrap();
-
-        assert_eq!(result.status, GateRunStatus::Error);
-    }
-
-    #[test]
-    fn test_label_target_validation_records_unresolvable_target_as_error_run() {
-        let executor = setup();
-        let issue_id = add_builtin_gate(
-            &executor,
-            &"arbitrary-coverage-key".parse().unwrap(),
-            GateChecker::LabelTargetValidation {
-                label_namespace: "coverage-target".to_string(),
-            },
-            vec![
-                "type:task".to_string(),
-                "coverage-target:no-such-issue".to_string(),
-            ],
-        );
-
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
-            .unwrap();
-
-        assert_eq!(result.status, GateRunStatus::Error);
-        assert!(result.stderr.contains("coverage-target:no-such-issue"));
-    }
-
-    #[test]
-    fn test_label_target_validation_records_ambiguous_target_as_error_run_naming_label() {
+    fn test_label_target_validation_records_each_target_label_fault_as_error_run() {
         let executor = setup();
         for id in [
             crate::test_utils::issue_id(0xdead_beef),
@@ -3599,61 +3319,66 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             target.id = id;
             seed_issue(executor.storage(), target);
         }
-        let issue_id = add_builtin_gate(
-            &executor,
-            &"arbitrary-coverage-key".parse().unwrap(),
-            GateChecker::LabelTargetValidation {
-                label_namespace: "coverage-target".to_string(),
-            },
-            vec![
-                "type:task".to_string(),
-                "coverage-target:deadbeef".to_string(),
-            ],
-        );
+        let cases: [(&str, &[&str], &[&str]); 5] = [
+            (
+                "coverage-target",
+                &[],
+                &["coverage-target:<target-id>", "found 0"],
+            ),
+            (
+                "coverage-target",
+                &["coverage-target:aaaa", "coverage-target:bbbb"],
+                &["coverage-target:<target-id>", "found 2"],
+            ),
+            ("", &[], &["label_namespace is empty"]),
+            (
+                "coverage-target",
+                &["coverage-target:no-such-issue"],
+                &["coverage-target:no-such-issue"],
+            ),
+            (
+                "coverage-target",
+                &["coverage-target:deadbeef"],
+                &["coverage-target:deadbeef", "ambiguous"],
+            ),
+        ];
 
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
-            .unwrap();
+        for (index, (label_namespace, targets, named)) in cases.into_iter().enumerate() {
+            let gate_key: GateKey = format!("coverage-{index}").parse().unwrap();
+            let labels = std::iter::once("type:task")
+                .chain(targets.iter().copied())
+                .map(str::to_string)
+                .collect();
+            let issue_id = add_builtin_gate(
+                &executor,
+                &gate_key,
+                GateChecker::LabelTargetValidation {
+                    label_namespace: label_namespace.to_string(),
+                },
+                labels,
+            );
 
-        assert_eq!(result.status, GateRunStatus::Error);
-        assert!(result.stderr.contains("coverage-target:deadbeef"));
-        assert!(result.stderr.to_lowercase().contains("ambiguous"));
+            let result = executor.gates().check_gate(&issue_id, &gate_key).unwrap();
+
+            assert_eq!(result.status, GateRunStatus::Error, "case {index}");
+            assert_eq!(
+                result.exit_code,
+                Some(crate::gate_execution::CHECKER_TEMPFAIL_EXIT),
+                "case {index}"
+            );
+            let stderr = result.stderr.to_lowercase();
+            for fragment in named {
+                assert!(stderr.contains(fragment), "case {index}: {}", result.stderr);
+            }
+        }
     }
 
+    /// REQ-02: over one image, each built-in validation checker reports the
+    /// findings `jit validate` reports for its selection.
     #[test]
-    fn test_label_target_validation_passes_for_short_id_target() {
-        let executor = setup();
-        let mut target =
-            crate::test_utils::fixture_issue("Container".to_string(), "Container".to_string());
-        target.labels = vec!["type:task".to_string()];
-        let target_id = target.id.clone();
-        seed_issue(executor.storage(), target);
+    fn test_execute_builtin_checker_reports_the_findings_of_its_validate_selection() {
+        use crate::validation::report::{Selection, StructuralFailure};
 
-        let issue_id = add_builtin_gate(
-            &executor,
-            &"arbitrary-coverage-key".parse().unwrap(),
-            GateChecker::LabelTargetValidation {
-                label_namespace: "coverage-target".to_string(),
-            },
-            vec![
-                "type:task".to_string(),
-                format!("coverage-target:{}", target_id.short_id()),
-            ],
-        );
-
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
-            .unwrap();
-
-        assert_eq!(result.status, GateRunStatus::Passed);
-        assert_eq!(result.command, "builtin:label_target_validation");
-        assert_eq!(result.findings.unwrap().verdict, "pass");
-    }
-
-    #[test]
-    fn test_rule_validation_checker_ignores_unrelated_validation_failures() {
         let executor = setup();
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
@@ -3669,148 +3394,122 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_rule_validation_rules(&executor);
 
         let mut container = crate::test_utils::fixture_issue(
-            "Selected container".to_string(),
-            "## Success Criteria\n\n- [hard] REQ-01: selected work\n".to_string(),
+            "Container".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: covered\n- [hard] REQ-02: uncovered\n"
+                .to_string(),
         );
         container.labels = vec!["type:epic".to_string()];
-        let container_short = container.short_id();
-
+        let container_id = container.id.clone();
         let mut child =
-            crate::test_utils::fixture_issue("Selected implementation".to_string(), String::new());
+            crate::test_utils::fixture_issue("Implementation".to_string(), String::new());
         child.labels = vec![
             "type:task".to_string(),
-            format!("satisfies:{container_short}/REQ-01"),
+            format!("satisfies:{}/REQ-01", container.short_id()),
+            "satisfies:@/requirement/missing".to_string(),
         ];
+        child.state = State::Ready;
+        let child_id = child.id.clone();
         container.dependencies = vec![child.id.clone()];
         seed_issue(&executor.storage, child);
         seed_issue(&executor.storage, container);
 
-        let selected_id = add_builtin_gate(
-            &executor,
-            &"coverage-preview".parse().unwrap(),
-            GateChecker::RuleValidation {
-                rule: "coverage-preview".to_string(),
-            },
-            vec![
-                "type:breakdown".to_string(),
-                format!("brackets:{container_short}"),
-            ],
-        );
-
-        let mut local_failure = crate::test_utils::fixture_issue(
-            "Unrelated local failure".to_string(),
-            "See @/missing/item".to_string(),
-        );
-        local_failure.labels = vec![
-            "type:task".to_string(),
-            "satisfies:@/requirement/missing".to_string(),
+        let breakdown_labels = vec![
+            "type:breakdown".to_string(),
+            format!("brackets:{}", container_id.short_id()),
         ];
-        local_failure.dependencies = vec![crate::test_utils::issue_id(
-            0x4c965feb95709e34e4c8581004d64f1d,
-        )];
-        local_failure.gates_required = vec!["unrelated-pending".parse().unwrap()];
-        seed_issue(&executor.storage, local_failure);
-
-        let mut unrelated_graph = crate::test_utils::fixture_issue(
-            "Unrelated graph failure".to_string(),
+        let gated = |key: &str, checker: GateChecker, labels: &[String]| {
+            add_builtin_gate(&executor, &key.parse().unwrap(), checker, labels.to_vec())
+        };
+        let rule = GateChecker::RuleValidation {
+            rule: "coverage-preview".to_string(),
+        };
+        let label_target = GateChecker::LabelTargetValidation {
+            label_namespace: "brackets".to_string(),
+        };
+        let rule_gated = gated("rule-gate", rule.clone(), &breakdown_labels);
+        let scope_gated = gated("scope-gate", label_target.clone(), &breakdown_labels);
+        let repository_gated = gated(
+            "repository-gate",
+            GateChecker::RepositoryValidation,
+            &["type:task".to_string()],
+        );
+        let mut unrelated = crate::test_utils::fixture_issue(
+            "Unrelated".to_string(),
             "## Success Criteria\n\n- [hard] REQ-99: uncovered\n".to_string(),
         );
-        unrelated_graph.labels = vec!["type:epic".to_string()];
-        seed_issue(&executor.storage, unrelated_graph);
-        seed_unrelated_manual_gate(&executor);
+        unrelated.labels = vec!["type:epic".to_string()];
+        unrelated.dependencies = vec![rule_gated.clone(), scope_gated.clone(), repository_gated];
+        seed_issue(&executor.storage, unrelated);
+        let image = executor
+            .capture_validation_image_with(&std::collections::BTreeMap::new())
+            .unwrap();
+        let validate = executor.validation().selection_report().unwrap();
+        let whole = executor.validation().validate_repository_report().unwrap();
+        let cases = [
+            (
+                GateChecker::IssueValidation,
+                child_id.clone(),
+                validate.select(&Selection::Issue((&child_id).into())),
+            ),
+            (
+                rule,
+                rule_gated.clone(),
+                validate.select(&Selection::Rule {
+                    issue: (&rule_gated).into(),
+                    rule: "coverage-preview".to_string(),
+                }),
+            ),
+            (
+                label_target,
+                scope_gated,
+                validate.select(&Selection::Scope((&container_id).into())),
+            ),
+            (
+                GateChecker::RepositoryValidation,
+                child_id,
+                whole.select(&Selection::Whole),
+            ),
+        ];
 
-        let broad_report = executor
-            .validation()
-            .run_rules(None)
-            .expect("the representative unrelated failures should be observable");
-        for rule in [
-            "unrelated-local-failure",
-            "unrelated-graph-failure",
-            "unrelated-label-reference",
-            crate::validation::report::BuiltInPass::DanglingItemLink.as_str(),
-        ] {
+        for (checker, gated, selected) in cases {
+            let (selected, failure) = match selected {
+                Ok(selected) => (selected, None),
+                Err(error) => {
+                    let StructuralFailure { failure, findings } = error.downcast().unwrap();
+                    (findings, Some(format!("{failure:#}")))
+                }
+            };
+            let expected = selected
+                .findings
+                .iter()
+                .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+                .chain(failure)
+                .collect::<Vec<_>>();
+            let run = executor
+                .execute_builtin_checker_with_repository_view(
+                    GateRunSubject {
+                        run_id: &crate::test_utils::gate_run_id(1),
+                        gate_key: &"parity".parse().unwrap(),
+                        issue_id: &gated,
+                        stage: GateStage::Postcheck,
+                    },
+                    &checker,
+                    &image,
+                )
+                .unwrap();
+            let reported = run
+                .findings
+                .unwrap()
+                .findings
+                .into_iter()
+                .map(|finding| finding.summary)
+                .collect::<Vec<_>>();
             assert!(
-                broad_report
-                    .findings
-                    .iter()
-                    .any(|finding| finding.rule == rule),
-                "broad validation fixture must contain {rule}: {:?}",
-                broad_report.findings
+                !expected.is_empty(),
+                "{checker:?}: the image holds findings"
             );
+            assert_eq!(reported, expected, "{checker:?}");
         }
-
-        let result = executor
-            .gates()
-            .check_gate(&selected_id, &"coverage-preview".parse().unwrap())
-            .expect("captured native rule validation should run");
-
-        assert_eq!(result.command, "builtin:rule_validation");
-        assert_eq!(result.status, GateRunStatus::Passed);
-        assert_eq!(result.exit_code, Some(0));
-        assert_eq!(result.findings.unwrap().verdict, "pass");
-    }
-
-    #[test]
-    fn test_rule_validation_checker_reports_missing_and_ambiguous_targets() {
-        let missing_executor = setup();
-        seed_rule_validation_rules(&missing_executor);
-        let missing_id = add_builtin_gate(
-            &missing_executor,
-            &"coverage-preview".parse().unwrap(),
-            GateChecker::RuleValidation {
-                rule: "coverage-preview".to_string(),
-            },
-            vec![
-                "type:breakdown".to_string(),
-                "brackets:missing-target".to_string(),
-            ],
-        );
-        let missing = missing_executor
-            .gates()
-            .check_gate(&missing_id, &"coverage-preview".parse().unwrap())
-            .expect("missing target should be a native validation failure");
-        assert_eq!(missing.status, GateRunStatus::Failed);
-        assert!(missing
-            .findings
-            .unwrap()
-            .findings
-            .iter()
-            .any(|finding| finding.summary.contains("names no known issue")));
-
-        let ambiguous_executor = setup();
-        seed_rule_validation_rules(&ambiguous_executor);
-        for id in [
-            crate::test_utils::issue_id(0xdead_beef),
-            crate::test_utils::issue_id(0x1_deadbeef),
-        ] {
-            let mut target =
-                crate::test_utils::fixture_issue(format!("Ambiguous target {id}"), String::new());
-            target.id = id;
-            target.labels = vec!["type:epic".to_string()];
-            seed_issue(&ambiguous_executor.storage, target);
-        }
-        let ambiguous_id = add_builtin_gate(
-            &ambiguous_executor,
-            &"coverage-preview".parse().unwrap(),
-            GateChecker::RuleValidation {
-                rule: "coverage-preview".to_string(),
-            },
-            vec![
-                "type:breakdown".to_string(),
-                "brackets:deadbeef".to_string(),
-            ],
-        );
-        let ambiguous = ambiguous_executor
-            .gates()
-            .check_gate(&ambiguous_id, &"coverage-preview".parse().unwrap())
-            .expect("ambiguous target should be a native validation failure");
-        assert_eq!(ambiguous.status, GateRunStatus::Failed);
-        assert!(ambiguous
-            .findings
-            .unwrap()
-            .findings
-            .iter()
-            .any(|finding| finding.summary.contains("ambiguous")));
     }
 
     #[test]
@@ -3845,12 +3544,25 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let record = repo
+            .path()
+            .join(VirtualPath::issue_record(&issue_id).repository_relative());
+        let mut raw: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+        raw["labels"]
+            .as_array_mut()
+            .unwrap()
+            .push(format!("target:{issue_id}").into());
+        std::fs::write(&record, serde_json::to_vec_pretty(&raw).unwrap()).unwrap();
         std::fs::write(repo.path().join(".jit/rules.toml"), "[[rules\nnot toml").unwrap();
         for checker in [
             GateChecker::IssueValidation,
             GateChecker::RepositoryValidation,
             GateChecker::RuleValidation {
                 rule: "any".to_string(),
+            },
+            GateChecker::LabelTargetValidation {
+                label_namespace: "target".to_string(),
             },
         ] {
             let image = executor
@@ -3870,6 +3582,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .unwrap();
 
             assert_eq!(result.status, GateRunStatus::Error, "{checker:?}");
+            assert!(
+                result.stderr.contains("rules declaration did not load"),
+                "{checker:?}: {}",
+                result.stderr
+            );
         }
     }
 

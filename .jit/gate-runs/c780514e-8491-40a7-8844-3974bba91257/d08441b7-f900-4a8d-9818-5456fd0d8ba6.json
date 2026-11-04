@@ -1,0 +1,26 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "./scripts/profile-test-suite.sh --self-test",
+  "commit": null,
+  "completed_at": "2026-11-01T11:24:13.831147657Z",
+  "duration_ms": 0,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "profile-suite-selftest",
+  "inputs_digest": "bbeb2b3a7e3091dc1e7a61ca1bbb941ef0f3d6532f6e32216c71bec5291ee40e",
+  "issue_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_issue": "d6635a93-822d-4f64-b171-f4485dde4a10",
+    "source_run": "ecc4ded5-a5d5-4466-8470-15795674bfe5"
+  },
+  "run_id": "d08441b7-f900-4a8d-9818-5456fd0d8ba6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T11:24:13.831147657Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

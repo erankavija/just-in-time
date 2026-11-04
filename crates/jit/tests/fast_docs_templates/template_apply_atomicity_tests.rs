@@ -472,7 +472,6 @@ fn repository_image<S: IssueStore + RepositoryStateStore>(store: &S) -> Reposito
             .unwrap();
     let mut paths = vec![
         VirtualPath::data("index.json").unwrap(),
-        VirtualPath::data("events.jsonl").unwrap(),
         VirtualPath::data("gates.toml").unwrap(),
         VirtualPath::data("issues").unwrap(),
     ];
@@ -484,6 +483,7 @@ fn repository_image<S: IssueStore + RepositoryStateStore>(store: &S) -> Reposito
             .map(|issue| VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap()),
     );
     let mut spec = CaptureSpec::new(paths, SNAPSHOT_BUDGET).unwrap();
+    spec.discover_tail(VirtualPath::EVENTS).unwrap();
     spec.discover_listing(VirtualPath::data("issues").unwrap())
         .unwrap();
     let mut session = store.open_mutation_session(layout).unwrap();

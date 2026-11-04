@@ -347,7 +347,7 @@ pub fn evaluate_graph(
 }
 
 /// Evaluate graph rules over a **partial** issue slice while resolving container
-/// pointers against the **complete** repository issue set (`--scope`, ef0065ad).
+/// pointers against the **complete** repository issue set (the scope gate checker, ef0065ad).
 ///
 /// The `evaluation` slice decides which issues fire each rule and which issues
 /// the coverage walk considers as candidates (a bracket subtree). The
@@ -735,7 +735,7 @@ fn config_error(rule: &Rule, subject: &IssueId, message: impl Into<String>) -> G
 ///
 /// `resolution_index` is the issue set a `container-from-label` pointer resolves
 /// against; it is the complete repository issue set even when `issues` is a partial
-/// `--scope` slice (ef0065ad). A pointer that resolves to a container OUTSIDE the
+/// scope slice (ef0065ad). A pointer that resolves to a container OUTSIDE the
 /// evaluation slice names a different bracket scope, so that firing issue's
 /// coverage is skipped (no finding) rather than evaluated against the partial map.
 /// For whole-repo evaluation the two sets are identical, so every resolved

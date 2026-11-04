@@ -1,0 +1,133 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/4a00b2b0-agent-validation",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 9935,
+            "sha256": "a6af8d1a116a55ab032ed3f30b95177400ceb8c6b57e937165dbd343b723ead9"
+          },
+          "source": "dev/active/agent-validation-design.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 10851,
+            "sha256": "223b1b3b5eac0d26a161389680c0f5bbae55c5881a1afdc4d845248d484abf72"
+          },
+          "source": "dev/studies/ai-tool-worktree-compatibility.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 3101,
+            "sha256": "cd6c65f558b6d7a1329107cbfc42093ce36a007c2067057415085c446d85b0c2"
+          },
+          "source": "dev/studies/worktree-merge-analysis.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9935,
+            "sha256": "a6af8d1a116a55ab032ed3f30b95177400ceb8c6b57e937165dbd343b723ead9"
+          },
+          "destination": "dev/archive/4a00b2b0-agent-validation/dev/active/agent-validation-design.md",
+          "source": "dev/active/agent-validation-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10851,
+            "sha256": "223b1b3b5eac0d26a161389680c0f5bbae55c5881a1afdc4d845248d484abf72"
+          },
+          "destination": "dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md",
+          "source": "dev/studies/ai-tool-worktree-compatibility.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3101,
+            "sha256": "cd6c65f558b6d7a1329107cbfc42093ce36a007c2067057415085c446d85b0c2"
+          },
+          "destination": "dev/archive/4a00b2b0-agent-validation/dev/studies/worktree-merge-analysis.md",
+          "source": "dev/studies/worktree-merge-analysis.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "5932a8de2f10f84ea173e00d04100bd921c8a65aead8d77f884d56ffc5bf2415"
+          },
+          "destination": "dev/archive/4a00b2b0-agent-validation/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/agent-validation-design.md",
+          "issue": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+          "to_path": "dev/archive/4a00b2b0-agent-validation/dev/active/agent-validation-design.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/studies/worktree-merge-analysis.md",
+          "issue": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+          "to_path": "dev/archive/4a00b2b0-agent-validation/dev/studies/worktree-merge-analysis.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/studies/ai-tool-worktree-compatibility.md",
+          "issue": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+          "to_path": "dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md"
+        }
+      ],
+      "target": {
+        "id": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/4a00b2b0-agent-validation",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 547,
+            "sha256": "3202f1229af03ece01329a1ee1cc29660b9a3e55f35f689570bbf1cc8f79c8e4"
+          },
+          "source": "dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 547,
+            "sha256": "3202f1229af03ece01329a1ee1cc29660b9a3e55f35f689570bbf1cc8f79c8e4"
+          },
+          "destination": "dev/archive/4a00b2b0-agent-validation/dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md",
+          "source": "dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 3,
+          "from_path": "dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md",
+          "issue": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+          "to_path": "dev/archive/4a00b2b0-agent-validation/dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md"
+        }
+      ],
+      "target": {
+        "id": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+    "kind": "container"
+  }
+}

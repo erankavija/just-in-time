@@ -206,7 +206,9 @@ wire_vocabulary! {
     /// on write. `Graph` rules need cross-issue context and run in `jit validate`,
     /// gate checkers, and at state transitions (where an enforcing failure
     /// blocks the transition); they never run on plain field writes.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+    )]
     pub enum RuleScope {
         /// Per-issue, runs on write.
         Local = "local",

@@ -1,0 +1,53 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/a4e3cfb0",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 9055,
+            "sha256": "7a000386a15e1a410c3b4dd9edb54e241ab29f8e69602b1c6897d3b7262b9b4f"
+          },
+          "source": "dev/studies/documentation-tooling-evaluation.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9055,
+            "sha256": "7a000386a15e1a410c3b4dd9edb54e241ab29f8e69602b1c6897d3b7262b9b4f"
+          },
+          "destination": "dev/archive/a4e3cfb0/dev/studies/documentation-tooling-evaluation.md",
+          "source": "dev/studies/documentation-tooling-evaluation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "10c8e32c46ac2df540b2118fd2c84406593c05b0dc3c9ae4deca4f0cf3aa437d"
+          },
+          "destination": "dev/archive/a4e3cfb0/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/studies/documentation-tooling-evaluation.md",
+          "issue": "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+          "to_path": "dev/archive/a4e3cfb0/dev/studies/documentation-tooling-evaluation.md"
+        }
+      ],
+      "target": {
+        "id": "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "a4e3cfb0-626e-4a73-8be4-364dd0597833",
+    "kind": "container"
+  }
+}

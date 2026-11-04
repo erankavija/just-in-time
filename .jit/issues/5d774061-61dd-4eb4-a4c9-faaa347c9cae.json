@@ -6,7 +6,6 @@
     "03c59566-093f-4a7c-a3a6-65098a4b28de",
     "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
     "208edf4c-ce57-4f8b-996f-9df2d53ca3a7",
-    "2c8c13b2-1079-4400-b0b9-deb107ea34b4",
     "2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a",
     "ea843d26-492a-44cc-8c10-15f19b8c8ce3"
   ],
@@ -29,5 +28,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Measure validation views on this repository",
-  "updated_at": "2026-11-03T23:04:06.630677545Z"
+  "updated_at": "2026-11-04T06:52:53.907643232Z"
 }
