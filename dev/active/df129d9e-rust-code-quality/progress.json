@@ -935,7 +935,8 @@
     "cd8e04cc": 2,
     "cc4ea8a9": 2,
     "1a4f2ebd": 2,
-    "4a01ccba": 1
+    "4a01ccba": 1,
+    "10fdad38": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1279,13 +1280,15 @@
       "review": "lead PASS at 2cad00a53: edge codes via classify_code (generic -> DependencyError), render_checker table, with_warnings takes Display; -60 lines"
     },
     "10fdad38": {
-      "status": "dispatched",
-      "note": "resumed after quiet window"
+      "status": "rework",
+      "note": "resumed after quiet window",
+      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex."
     },
     "3b696589": {
       "status": "dispatched",
       "vendor": "Claude Opus",
-      "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement"
+      "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement",
+      "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)"
     },
     "f7a59f5f": {
       "status": "dispatched",
