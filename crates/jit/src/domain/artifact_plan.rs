@@ -126,6 +126,20 @@ pub enum ArtifactVersion {
 pub struct CanonicalCommitOid(String);
 
 impl CanonicalCommitOid {
+    /// Parse a full lowercase Git commit OID in SHA-1 or SHA-256 format.
+    pub fn parse(oid: impl Into<String>) -> Result<Self, PlanError> {
+        let oid = oid.into();
+        if matches!(oid.len(), 40 | 64)
+            && oid
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            Ok(Self(oid))
+        } else {
+            Err(PlanError::NonCanonicalCommitOid(oid))
+        }
+    }
+
     /// The canonical full OID string.
     pub fn as_str(&self) -> &str {
         &self.0
@@ -141,16 +155,7 @@ impl ArtifactVersion {
     /// storage boundary; only its canonical result crosses into the plan
     /// domain.
     pub fn pinned(oid: impl Into<String>) -> Result<Self, PlanError> {
-        let oid = oid.into();
-        if matches!(oid.len(), 40 | 64)
-            && oid
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            Ok(Self::Pinned(CanonicalCommitOid(oid)))
-        } else {
-            Err(PlanError::NonCanonicalCommitOid(oid))
-        }
+        CanonicalCommitOid::parse(oid).map(Self::Pinned)
     }
 
     /// Return the exact string used in JSON and ordering.

@@ -28,7 +28,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Pinned revision reads move into the git module behind a bridge",
-  "updated_at": "2026-11-01T14:05:18.333052352Z"
+  "updated_at": "2026-11-04T22:47:34.207484624Z"
 }

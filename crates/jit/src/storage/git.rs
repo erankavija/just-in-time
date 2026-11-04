@@ -8,6 +8,8 @@ use std::process::{Command, Output};
 use std::sync::Arc;
 use thiserror::Error;
 
+use crate::domain::artifact_plan::CanonicalCommitOid;
+
 /// Errors from running git.
 #[derive(Debug, Clone, Error)]
 pub enum GitError {
@@ -140,6 +142,43 @@ impl GitCheckout {
         Self { git, worktree_root }
     }
 
+    // Temporary @/inv/convention-convergence exception: branch lookups converge
+    // here when 732f7afb, 9de4c09c, f6eaba42, 3f8da8c4 and c140921c land.
+    /// Read the checked-out commit and branch with one git process.
+    ///
+    /// An unborn branch has no head. Detached checkouts have a commit and no
+    /// branch name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GitError::Unavailable`] if git cannot start or
+    /// [`GitError::UnexpectedOutput`] if successful output is not a canonical
+    /// commit and branch pair.
+    pub fn head(&self) -> Result<Option<Head>, GitError> {
+        const ARGS: [&str; 4] = ["rev-parse", "HEAD", "--abbrev-ref", "HEAD"];
+        let output = self.git.run(&self.worktree_root, &ARGS)?;
+        if !output.status.success() {
+            return Ok(None);
+        }
+
+        let unexpected = || GitError::UnexpectedOutput {
+            command: ARGS.join(" "),
+            output: String::from_utf8_lossy(&output.stdout).into_owned(),
+        };
+        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
+        let (commit, branch) = match stdout.lines().collect::<Vec<_>>().as_slice() {
+            [commit, branch] => (*commit, *branch),
+            _ => return Err(unexpected()),
+        };
+        let commit = CanonicalCommitOid::parse(commit).map_err(|_| unexpected())?;
+        let branch = match branch {
+            "HEAD" => None,
+            "" => return Err(unexpected()),
+            branch => Some(branch.to_owned()),
+        };
+        Ok(Some(Head { commit, branch }))
+    }
+
     /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.
     pub fn worktree_root(&self) -> &Path {
         &self.worktree_root
@@ -184,6 +223,30 @@ impl GitCheckout {
             }
         }
         Ok(paths)
+    }
+}
+
+/// Commit and branch identity for a checkout with a commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Head {
+    commit: CanonicalCommitOid,
+    branch: Option<String>,
+}
+
+impl Head {
+    /// The full canonical commit OID.
+    pub fn commit(&self) -> &CanonicalCommitOid {
+        &self.commit
+    }
+
+    /// The branch name, or `None` when `HEAD` is detached.
+    pub fn branch(&self) -> Option<&str> {
+        self.branch.as_deref()
+    }
+
+    /// The branch name, or `HEAD` when the checkout is detached.
+    pub fn branch_label(&self) -> &str {
+        self.branch().unwrap_or("HEAD")
     }
 }
 
