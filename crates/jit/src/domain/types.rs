@@ -11,7 +11,6 @@ use crate::domain::vocabulary::wire_vocabulary;
 // nothing from this crate and performs no I/O, so naming its root-relative path
 // identity here keeps the domain layer pure while leaving one canonical type
 // for a normalized repository-root-relative path.
-use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -443,15 +442,17 @@ struct IssueWire {
     archived_from: Option<State>,
 }
 
-impl TryFrom<IssueWire> for Issue {
-    type Error = String;
+/// An archived issue record that does not say which state it was archived from.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("missing field `archived_from` on archived issue {0}")]
+pub struct MissingArchivedFrom(pub IssueId);
 
-    fn try_from(wire: IssueWire) -> std::result::Result<Self, Self::Error> {
+impl TryFrom<IssueWire> for Issue {
+    type Error = MissingArchivedFrom;
+
+    fn try_from(wire: IssueWire) -> Result<Self, Self::Error> {
         if wire.state == State::Archived && wire.archived_from.is_none() {
-            return Err(format!(
-                "missing field `archived_from` on archived issue {}",
-                wire.id
-            ));
+            return Err(MissingArchivedFrom(wire.id));
         }
         Ok(Self {
             id: wire.id,
@@ -1849,6 +1850,13 @@ mod tests {
                 .unwrap();
         assert_eq!(decoded.archived_from, Some(State::Done));
         assert!(serde_json::from_value::<Issue>(issue_record(State::Done, None)).is_ok());
+    }
+
+    #[test]
+    fn test_issue_from_wire_rejects_archived_record_with_typed_error() {
+        let wire: IssueWire = serde_json::from_value(issue_record(State::Archived, None)).unwrap();
+        let id = wire.id.clone();
+        assert_eq!(Issue::try_from(wire), Err(MissingArchivedFrom(id)));
     }
 
     #[test]
