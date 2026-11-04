@@ -36,7 +36,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "59337a21-0010-404a-975f-cc37d43d1f31",
+      "status": "passed",
+      "updated_at": "2026-11-04T16:39:49.826268793Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5687e281-d504-4b85-ab4f-c84e603c37e2",
   "labels": [
     "type:task",
@@ -50,7 +57,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Reduce main.rs to parse, bootstrap, dispatch, render and exit",
-  "updated_at": "2026-11-04T16:17:21.232050846Z"
+  "updated_at": "2026-11-04T16:43:24.410569374Z"
 }

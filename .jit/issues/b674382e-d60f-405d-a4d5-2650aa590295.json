@@ -29,7 +29,7 @@
     "satisfies:b697a3f7/REQ-02"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Validate fix derives readiness through the shared helper",
-  "updated_at": "2026-11-04T16:24:28.181685154Z"
+  "updated_at": "2026-11-04T16:43:24.628225448Z"
 }
