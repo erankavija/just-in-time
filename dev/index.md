@@ -143,7 +143,7 @@ binary it ships, so the packaged tree is the one the released commit declares.
 - [core-system-design.md](architecture/core-system-design.md) — start here for the system overview
 - [web-ui-architecture.md](architecture/web-ui-architecture.md) — web UI design
 - [graph-filtering-architecture.md](architecture/graph-filtering-architecture.md) — graph query design
-- [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) — CLI and MCP integration
+- [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) — historical CLI and MCP integration strategy, superseded by @/charter/D-23
 
 ### Vision
 - [9db27a3a-charter.md](vision/9db27a3a-charter.md) — the v1.0 charter and its decision log
@@ -167,8 +167,8 @@ binary it ships, so the packaged tree is the one the released commit declares.
 
 **Agent surfaces:** [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md)
 is the ten-minute introduction;
-[docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference)
-covers the MCP tool surface for agents.
+[docs/reference/cli-commands.md](../docs/reference/cli-commands.md)
+describes CLI commands; `--json` and `--schema` support agents.
 
 **Review policy ownership:** Treat applicable `AGENTS.md` files as canonical
 engineering prose and configured addressable-item sources as canonical for

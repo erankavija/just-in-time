@@ -383,7 +383,6 @@ fn test_reflected_executable_arm_paths_from_keeps_leaves_and_parents_with_own_fl
     ) -> jit::schema::Command {
         jit::schema::Command {
             description: String::new(),
-            hidden: false,
             aliases: Vec::new(),
             subcommands,
             args: Vec::new(),

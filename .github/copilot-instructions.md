@@ -114,7 +114,6 @@ let state = if issue.has_blocking_dependencies() {
 - **/crates/jit-server**: HTTP server wrapper around jit CLI, used with the web UI
 - **dev/**: Development documents, design notes and plans
 - **docs/**: User documentation and guides
-- **mcp-server/**: MCP server for agentic use of jit
 - **scripts/**: Utility scripts for setup, testing, deployment
 - **web/**: Web UI for visualizing (and managing) issues
 

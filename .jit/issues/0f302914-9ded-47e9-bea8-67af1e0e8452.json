@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "32607213-7402-4c17-9889-7a6286e1959e",
+    "487f45a9-bd42-47f8-8dd1-6487ad287793"
+  ],
+  "description": "One server helper and its route-wide migration establish the runtime isolation property.\n\n## Background\n\nThe server already maps classified errors through `reject`; keep classification there while moving synchronous executor work off async workers.\n\n## Success Criteria\n\n- [hard] REQ-01: Every executor-reaching handler uses one server-owned blocking execution helper, mapping errors through the existing reject and classifier; multiple calls within a request share one offloaded closure.\n- [hard] REQ-02: Tests cover offload and error mapping.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T22:24:54.946576604Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "0f302914-9ded-47e9-bea8-67af1e0e8452",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-server",
+    "satisfies:0f8efc37/REQ-07",
+    "satisfies:c8e79465/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Offload executor work in server handlers",
+  "updated_at": "2026-11-04T22:25:10.546109706Z"
+}

@@ -66,7 +66,6 @@ workflows:
         - test-rust-features
         - profile-adoption
         - msrv
-        - test-mcp-server
         - test-web-ui
     jobs:
       # The contract check itself: deleting or renaming this job is a finding,
@@ -102,7 +101,7 @@ workflows:
       secrets:
         allowed: []
     callers:
-      # The three audit boundaries, named one by one. Each has to exist here
+      # The two audit boundaries, named one by one. Each has to exist here
       # and to run unconditionally, and every job a caller runs of its own has
       # to reach the call through `needs`. Together that makes each boundary a
       # predecessor of everything a caller does — artifact production and
@@ -110,7 +109,6 @@ workflows:
       # (@/charter/D-11).
       require_needs:
         - cargo-audit
-        - npm-audit-mcp-server
         - npm-audit-web
 
   docker.yml:
@@ -171,7 +169,7 @@ workflows:
       secrets:
         allowed: []
     callers:
-      # What a caller inherits by calling this workflow: both shipped artifacts
+      # What a caller inherits by calling this workflow: the shipped artifact
       # and the smoke test over the extracted archive. Each job named below has
       # to exist here and to run unconditionally, and every job a caller runs of
       # its own has to wait for the call — which is what keeps publication
@@ -179,7 +177,6 @@ workflows:
       require_needs:
         - build-web-ui
         - build-native
-        - package-mcp-server
         - smoke
     jobs:
       # The web bundle is compiled into jit-server, so it is a predecessor of

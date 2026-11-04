@@ -52,8 +52,6 @@ exclude = [
   ".jit/server.pid.json",
   "badges",
   "coverage.json",
-  "mcp-server/jit-schema.json",
-  "mcp-server/node_modules",
   "target",
   "web/dist",
   "web/node_modules",
@@ -92,46 +90,11 @@ exclude = [
   ".jit/server.pid.json",
   "badges",
   "coverage.json",
-  "mcp-server/jit-schema.json",
-  "mcp-server/node_modules",
   "target",
   "web/dist",
   "web/node_modules",
   "web/test-output.log",
 ]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "clippy"
-title = "Clippy Lints Pass"
-description = "Zero clippy warnings allowed"
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "cargo clippy --lib -- -D warnings"
-timeout_seconds = 120
-pass_context = false
-
-[gates.checker.env]
-
-# Inputs: the compilation inputs of the jit library — the workspace manifests
-# and sources, plus the profile package and hook files production code embeds.
-# No exclusions: none of these roots carries generated material, and the build
-# directory is not among them.
-[gates.inputs]
-roots = [
-  "Cargo.lock",
-  "Cargo.toml",
-  "crates",
-  "profiles",
-  "scripts/hooks",
-]
-exclude = []
 
 [gates.reserved]
 
@@ -247,42 +210,11 @@ exclude = [
   ".jit/server.pid.json",
   "badges",
   "coverage.json",
-  "mcp-server/jit-schema.json",
-  "mcp-server/node_modules",
   "target",
   "web/dist",
   "web/node_modules",
   "web/test-output.log",
 ]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "fmt"
-title = "Code Formatted"
-description = "Code must be formatted with cargo fmt"
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "cargo fmt -- --check"
-timeout_seconds = 30
-pass_context = false
-
-[gates.checker.env]
-
-# Inputs: the Rust sources the formatter reads, and the manifest it resolves the
-# workspace targets through. No exclusions: neither root carries generated
-# material.
-[gates.inputs]
-roots = [
-  "Cargo.toml",
-  "crates",
-]
-exclude = []
 
 [gates.reserved]
 
@@ -328,50 +260,9 @@ pass_context = false
 
 [[gates]]
 version = 1
-key = "mcp-ci"
-title = "MCP CI (mcp-server test suite)"
-description = "MCP server workspace checks: the mcp-server unit and integration suites both pass against the jit built from the tree under evaluation (debug profile; the jit on PATH is ignored), the integration suite over a fixture repository it creates. Covers the workspace that npm-ci (web) and cargo-ci (Rust crates) leave unexercised."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "cd mcp-server && npm test"
-timeout_seconds = 1800
-pass_context = false
-
-[gates.checker.env]
-
-# Inputs: the bridge workspace, plus every input of the jit binary the suites
-# run. `npm test` builds that binary from this tree (`cargo build -p jit --bin
-# jit`) and passes it to both suites as JIT_BIN, so the jit on PATH is never
-# used. The build reads the workspace manifests and lockfile, `crates`, and the
-# `scripts/hooks` sources it embeds; `profiles` is read by the Rust tests, and
-# the repository declares no toolchain pin, `.cargo/config.toml` or other build
-# input. The installed dependency tree is excluded by declaration rather than digested: it is 27 MB
-# that would be walked on every evaluation, and mcp-server/package-lock.json —
-# tracked, and inside the digest — is what moves when those versions change.
-[gates.inputs]
-roots = [
-  "Cargo.lock",
-  "Cargo.toml",
-  "crates",
-  "mcp-server",
-  "profiles",
-  "scripts/hooks",
-]
-exclude = [
-  "mcp-server/node_modules",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
 key = "npm-ci"
 title = "NPM CI (test + lint + build)"
-description = "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci. Scoped to web/ — does not exercise mcp-server/; see mcp-ci for that workspace."
+description = "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci. Scoped to web/."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -474,65 +365,6 @@ mode = "manual"
 priority = 100
 
 [gates.reserved]
-
-[[gates]]
-version = 1
-key = "tdd-reminder"
-title = "TDD Reminder"
-description = "Write tests first"
-stage = "precheck"
-mode = "manual"
-priority = 100
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "tests"
-title = "All Tests Pass"
-description = "Full test suite must pass"
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "cargo test --lib"
-timeout_seconds = 300
-pass_context = false
-
-[gates.checker.env]
-
-# Inputs: the tree-wide footprint. `cargo test --lib` reaches the same
-# repository-walking suites cargo-ci does (profile live sources, documentation
-# projections, the repository's own registries), so it reads the same tree and
-# excludes the same generated trees.
-[gates.inputs]
-roots = ["."]
-exclude = [
-  ".agents/cache-pool",
-  ".agents/worktrees",
-  ".claude",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  "badges",
-  "coverage.json",
-  "mcp-server/jit-schema.json",
-  "mcp-server/node_modules",
-  "target",
-  "web/dist",
-  "web/node_modules",
-  "web/test-output.log",
-]
-
-[gates.reserved]
-
-
-# Script self-test gates registered at planning for epic c780514e (steward
-# ruling D-05). Each runs one repository script's own self-test over that script
-# and what it exercises; any non-zero exit fails the gate, including exit 2 for a
-# missing tool. A checker whose self-test still has a skip branch also fails
-# when the run prints a `SKIP:` line.
 
 [[gates]]
 version = 1
@@ -640,8 +472,6 @@ exclude = [
   ".jit/server.pid.json",
   "badges",
   "coverage.json",
-  "mcp-server/jit-schema.json",
-  "mcp-server/node_modules",
   "target",
   "web/dist",
   "web/node_modules",
@@ -891,8 +721,6 @@ exclude = [
   ".jit/server.pid.json",
   "badges",
   "coverage.json",
-  "mcp-server/jit-schema.json",
-  "mcp-server/node_modules",
   "target",
   "web/dist",
   "web/node_modules",

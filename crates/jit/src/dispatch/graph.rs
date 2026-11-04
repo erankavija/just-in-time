@@ -27,7 +27,7 @@ fn deps<S: IssueStore>(
     id: String,
     depth: u32,
 ) -> HandlerResult<GraphDepsTreeResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &id)?;
+    let id = resolve_issue(ctx.executor, &id)?;
     let tree = ctx.executor.graph().build_dependency_tree(&id, depth)?;
     let summary = compute_dependency_summary(&tree);
     let message = count_message(summary.total, "", " dependencies");
@@ -49,7 +49,7 @@ fn rdeps<S: IssueStore>(
     id: String,
     depth: u32,
 ) -> HandlerResult<GraphDownstreamResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &id)?;
+    let id = resolve_issue(ctx.executor, &id)?;
     let issues = ctx.executor.graph().show_rdeps_with_depth(&id, depth)?;
     let message = count_message(issues.len(), "", " dependents");
     let dependents: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
@@ -74,7 +74,7 @@ fn tree<S: IssueStore>(
     root: Option<String>,
 ) -> HandlerResult<GraphTreeResponse> {
     let root = root
-        .map(|root| resolve_issue(ctx.executor.storage(), &root))
+        .map(|root| resolve_issue(ctx.executor, &root))
         .transpose()?;
     let response = ctx.executor.graph().resolve_hierarchy_tree(root.as_ref())?;
     let message = count_message(response.count(), "", " nodes");
@@ -107,7 +107,7 @@ fn export<S: HandlerStore>(
         return Err(InvalidArgumentError::new("--full is only valid with --format json").into());
     }
     let scope = scope
-        .map(|scope| resolve_issue(ctx.executor.storage(), &scope))
+        .map(|scope| resolve_issue(ctx.executor, &scope))
         .transpose()?;
 
     // `batch` runs a distinct projection; boundary edges are reported as warnings

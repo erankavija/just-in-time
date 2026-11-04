@@ -220,14 +220,19 @@ pub fn dispatch(
 }
 
 /// Parse and resolve one user-supplied issue-id argument: the CLI's single
-/// prefix boundary, applied before any executor call.
+/// prefix boundary, resolved by the issue command family.
 ///
 /// # Errors
 ///
 /// [`InvalidIdPrefixError`](crate::domain::identity::InvalidIdPrefixError)
 /// before any read, then the resolver's not-found or ambiguous-id error.
-pub fn resolve_issue<S: IssueStore>(storage: &S, requested: &str) -> anyhow::Result<IssueId> {
-    storage.resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
+pub fn resolve_issue<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    requested: &str,
+) -> anyhow::Result<IssueId> {
+    executor
+        .issues()
+        .resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
 }
 
 /// Parse an issue-id filter into the prefix that matches stored ids: the
@@ -239,11 +244,11 @@ pub fn resolve_issue<S: IssueStore>(storage: &S, requested: &str) -> anyhow::Res
 /// [`InvalidIdPrefixError`](crate::domain::identity::InvalidIdPrefixError)
 /// before any read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
 pub fn resolve_issue_filter<S: IssueStore>(
-    storage: &S,
+    executor: &CommandExecutor<S>,
     requested: &str,
 ) -> anyhow::Result<IssueIdPrefix> {
     let prefix = requested.parse::<IssueIdPrefix>()?;
-    match storage.resolve_issue_id(&prefix) {
+    match executor.issues().resolve_issue_id(&prefix) {
         Ok(id) => Ok(IssueIdPrefix::from(&id)),
         Err(error) if error.is::<IssueNotFoundError>() => Ok(prefix),
         Err(error) => Err(error),

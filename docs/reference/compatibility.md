@@ -17,7 +17,6 @@ product version:
 - native `jit` CLI
 - `jit-server` Rust server and API
 - built web UI
-- `@erankavija/jit-mcp-server` MCP server
 
 The release tag adds a `v` prefix to the product version. Component manifests
 and their committed lock metadata use the product version without that prefix.

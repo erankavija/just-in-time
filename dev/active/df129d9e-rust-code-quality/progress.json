@@ -971,7 +971,8 @@
     "635f23c7": 1,
     "578ed10d": 1,
     "5f12265a": 1,
-    "f35c86de": 1
+    "f35c86de": 1,
+    "487f45a9": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1510,9 +1511,22 @@
       "note": "merged fad481d3e; code-review F1 stale archive execution field in cli-commands.md:417; lead fixed"
     },
     "fb38bf1f": {
-      "status": "in_progress",
+      "status": "done",
       "note": "bf5bfe3c3 landed; merged cargo-ci5039+25pass; independent review running",
-      "production_delta": 37
+      "production_delta": 37,
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and independent code-review passed; MCP-only gate retired by user-authorized D-23 reconciliation",
+        "criteria": {
+          "REQ-01": "zero crate::output under commands; results owned inward and rendering remains output",
+          "REQ-02": "recursive structural guard red then green, reports each offending file",
+          "REQ-03": "5039tests25doctests and registered contracts unchanged"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "moved type references updated; no output re-export compatibility aliases",
+        "deferred_items": "no linked design documents; MCP retirement owns removed surface",
+        "holistic": "existing DTOs moved; divergence projection unified; production delta+37"
+      }
     },
     "578ed10d": {
       "status": "done",
@@ -1652,7 +1666,16 @@
     "487f45a9": {
       "status": "in_progress",
       "note": "b0c51b0e7 core landed; main Rust gate passed; independent review running; obsolete MCP scope/gate removed by authorized retirement",
-      "production_delta": -17
+      "production_delta": -1,
+      "review": {
+        "verdict": "FAIL",
+        "gates": "cargo-ci passed5040+25; code-reviewR1F1 Git requirement prose omits hooks",
+        "prior_findings": "R1F1 repair committedb72bd9aaa; D24 committed2ec33f8c5 explicitly supersedes D4 exclusivity",
+        "criteria": "core criteria met; docs rework awaiting main landing+review",
+        "deferred_items": "no linked design docs",
+        "stale_narrative": "rework covers guarantees,profiles,manualAGENTS; historicalD4 preserved underD24",
+        "required_changes": "land documented rework and rerun authoritative gates"
+      }
     },
     "5962427b": {
       "status": "done"
@@ -1910,7 +1933,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "split-debug done; suite consolidation active",
+    "status": "Awaiting steward priority retirement landing; all prepared branches retained; no bypassed gates",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1919,10 +1942,10 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "fb38bf1f review",
       "487f45a9 review",
       "f35c86de rework1",
-      "0eca332a implementation"
+      "0eca332a implementation",
+      "0546fc82 read-only documentation audit"
     ],
     "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
@@ -1935,6 +1958,26 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Inherited+171; fb38+37;487-17; build tasks0; running epic net+191 before remaining repairs/deletions"
+    "production_net": "Corrected default-mode ledger: inherited+171,fb38+37,487\u22121,build0 = current+207. Prepared f35\u22123 and0eca\u221241 would yield+163; this session core net\u22128, plus8server lines removed.",
+    "prepared_branches": {
+      "f35c86de": {
+        "commit": "c5b146e02",
+        "tests": 5041,
+        "doctests": 25,
+        "production_delta": -3
+      },
+      "0eca332a": {
+        "commit": "6b563b365",
+        "tests": 5038,
+        "doctests": 25,
+        "production_delta": -41,
+        "server_lines_removed": 8
+      },
+      "487f45a9_rework": {
+        "commit": "b72bd9aaa",
+        "scope": "current Git requirement docs consistent withD24; targeted links pass"
+      }
+    },
+    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags."
   }
 }

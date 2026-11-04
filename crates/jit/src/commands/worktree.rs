@@ -1,7 +1,6 @@
-//! Worktree command implementations.
-//!
-//! Provides CLI interface for worktree information and operations.
+//! Worktree inspection and execution.
 
+use super::CommandExecutor;
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
@@ -45,34 +44,100 @@ pub struct WorktreeListEntry {
     pub active_claims: usize,
 }
 
-/// Run `program` holding the repository write lock, answering its exit status.
-/// Opens no mutation session, because a session would apply the leftover redo
-/// record this refuses.
-///
-/// # Errors
-///
-/// Returns a lock timeout when the bounded wait expires, and an error for a
-/// pending record or when `program` cannot start.
-pub fn execute_worktree_exec<S: IssueStore>(
-    storage: &S,
-    layout: &RepositoryLayout,
-    program: &str,
-    args: &[String],
-) -> Result<ExitStatus> {
-    let _guard = storage.acquire_repo_write_lock()?;
-    let record = layout
-        .data_root()
-        .join(RECORD_SCRATCH_DIR)
-        .join(RECORD_FILE_NAME);
-    ensure!(
-        !record.exists(),
-        "Refusing to run over a leftover redo record at {}: run `jit recover` first",
-        record.display()
-    );
-    Command::new(program)
-        .args(args)
-        .status()
-        .map_err(|error| anyhow!("Failed to run {program}: {error}"))
+pub struct WorktreeOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
+impl<S: IssueStore> CommandExecutor<S> {
+    pub fn worktrees(&self) -> WorktreeOps<'_, S> {
+        WorktreeOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> WorktreeOps<'_, S> {
+    /// Run a child under the repository write lock, refusing a leftover redo record.
+    pub fn exec(&self, program: &str, args: &[String]) -> Result<ExitStatus> {
+        let layout = self.exec.repository_layout()?;
+        let _guard = self.exec.storage.acquire_repo_write_lock()?;
+        let record = layout
+            .data_root()
+            .join(RECORD_SCRATCH_DIR)
+            .join(RECORD_FILE_NAME);
+        ensure!(
+            !record.exists(),
+            "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+            record.display()
+        );
+        Command::new(program)
+            .args(args)
+            .status()
+            .map_err(|error| anyhow!("Failed to run {program}: {error}"))
+    }
+
+    /// Current checkout identity, branch and paths, with relocation warnings.
+    pub fn info(&self) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        let branch = get_current_branch(&paths.worktree_root)?;
+
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+
+        Ok((
+            WorktreeInfo {
+                worktree_id: identity.worktree_id,
+                branch: identity.branch,
+                root_path: paths.worktree_root.to_string_lossy().to_string(),
+                is_main_worktree: !paths.is_worktree(),
+                common_dir: paths.common_dir.to_string_lossy().to_string(),
+            },
+            warnings,
+        ))
+    }
+
+    /// Worktrees and active claim counts, with identity warnings.
+    pub fn list(&self) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        execute_worktree_list_at(paths, &crate::storage::clock::SystemClock)
+    }
+
+    /// Compare exact checkout stores without aggregation or writes; a checkout
+    /// without a primary counterpart reports no divergences.
+    pub fn store_divergence(&self) -> Result<StoreDivergenceReport> {
+        let paths = self.exec.require_worktree_paths()?;
+        let checkout_store = paths.local_jit.to_string_lossy().into_owned();
+
+        let Some(reference_root) = paths.primary_data_root()? else {
+            return Ok(StoreDivergenceReport {
+                checkout_store,
+                reference_store: None,
+                divergences: Vec::new(),
+            });
+        };
+
+        let local_layout =
+            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+        let primary_worktree = paths
+            .primary_worktree_root()?
+            .ok_or_else(|| anyhow::anyhow!("primary worktree root is unavailable"))?;
+        let reference_layout =
+            crate::storage::discover_repository_layout(primary_worktree, &reference_root)?;
+        let local = read_exact_store(&local_layout)?;
+        let reference = read_exact_store(&reference_layout)?;
+
+        Ok(StoreDivergenceReport {
+            checkout_store,
+            reference_store: Some(reference_root.to_string_lossy().into_owned()),
+            divergences: compare_stores(
+                StoreRecords {
+                    issues: &local.issues,
+                    events: &local.events,
+                },
+                StoreRecords {
+                    issues: &reference.issues,
+                    events: &reference.events,
+                },
+            ),
+        })
+    }
 }
 
 /// Get current git branch name.
@@ -163,75 +228,7 @@ fn count_claims_for_worktree(leases: &[Lease], worktree_id: &WorktreeId) -> usiz
         .count()
 }
 
-/// Execute `jit worktree info` command.
-///
-/// Displays current worktree context including ID, branch, paths, and whether
-/// this is the main worktree or a secondary one.
-///
-/// # Returns
-///
-/// The worktree info paired with any non-fatal [`StorageWarning`]s observed
-/// while loading the worktree identity (e.g. a relocation), for the caller's
-/// output layer to render. This function never writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected checkout's branch cannot be resolved or the
-/// identity cannot be loaded or created.
-pub fn execute_worktree_info(paths: &WorktreePaths) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
-    // Get current branch
-    let branch = get_current_branch(&paths.worktree_root)?;
-
-    // Load or generate worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
-
-    // Determine if this is the main worktree
-    let is_main = !paths.is_worktree();
-
-    Ok((
-        WorktreeInfo {
-            worktree_id: identity.worktree_id,
-            branch: identity.branch,
-            root_path: paths.worktree_root.to_string_lossy().to_string(),
-            is_main_worktree: is_main,
-            common_dir: paths.common_dir.to_string_lossy().to_string(),
-        },
-        warnings,
-    ))
-}
-
-/// Execute `jit worktree list` command.
-///
-/// Lists all git worktrees with their JIT status including worktree ID, branch,
-/// path, and count of active claims.
-///
-/// # Returns
-///
-/// The worktree entries paired with any non-fatal [`StorageWarning`]s observed
-/// while loading each worktree's identity (e.g. a relocation), for the caller's
-/// output layer to render. This function never writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if `git worktree list` fails, the primary checkout cannot
-/// be resolved, or a listed checkout's identity cannot be read.
-pub fn execute_worktree_list(
-    paths: &WorktreePaths,
-) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
-    // Production time source: the real system clock.
-    execute_worktree_list_at(paths, &crate::storage::clock::SystemClock)
-}
-
-/// Core of [`execute_worktree_list`] with the control-plane paths and time
-/// source injected.
-///
-/// This holds the real command logic (running `git worktree list`, loading the
-/// leases, resolving each worktree's identity, and counting active
-/// claims); the public wrapper supplies the invocation's authoritative `paths`
-/// and a [`SystemClock`](crate::storage::clock::SystemClock). `now` for every
-/// per-worktree expiry check is read once from `clock`, so a test can drive
-/// expiry deterministically by advancing an injected clock while exercising this
-/// exact path.
+/// List against one captured time so every worktree uses the same lease expiry cutoff.
 fn execute_worktree_list_at(
     paths: &WorktreePaths,
     clock: &dyn crate::storage::clock::Clock,
@@ -332,60 +329,6 @@ pub struct StoreDivergenceReport {
     pub reference_store: Option<String>,
     /// Every record the two stores disagree about, empty when they agree.
     pub divergences: Vec<StoreDivergence>,
-}
-
-/// Execute `jit worktree store-divergence`.
-///
-/// Compares the records physically held by the selected checkout's store against
-/// those held by its primary checkout's store, naming every issue record and
-/// event record the two disagree about. The comparison is read-only: both stores
-/// are read exactly as they sit, without the aggregation, history, or
-/// primary-checkout fallback an ordinary issue read applies, and neither store is
-/// written.
-///
-/// A checkout with no primary counterpart to compare against — the primary
-/// checkout itself, and a store outside version control (`@/charter/D-4`) —
-/// reports no divergences rather than failing.
-///
-/// # Errors
-///
-/// Returns an error when the primary checkout cannot be resolved from `paths`, or
-/// when either store holds a record that cannot be read or parsed.
-pub fn execute_worktree_store_divergence(paths: &WorktreePaths) -> Result<StoreDivergenceReport> {
-    let checkout_store = paths.local_jit.to_string_lossy().into_owned();
-
-    let Some(reference_root) = paths.primary_data_root()? else {
-        return Ok(StoreDivergenceReport {
-            checkout_store,
-            reference_store: None,
-            divergences: Vec::new(),
-        });
-    };
-
-    let local_layout =
-        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-    let primary_worktree = paths
-        .primary_worktree_root()?
-        .ok_or_else(|| anyhow::anyhow!("primary worktree root is unavailable"))?;
-    let reference_layout =
-        crate::storage::discover_repository_layout(primary_worktree, &reference_root)?;
-    let local = read_exact_store(&local_layout)?;
-    let reference = read_exact_store(&reference_layout)?;
-
-    Ok(StoreDivergenceReport {
-        checkout_store,
-        reference_store: Some(reference_root.to_string_lossy().into_owned()),
-        divergences: compare_stores(
-            StoreRecords {
-                issues: &local.issues,
-                events: &local.events,
-            },
-            StoreRecords {
-                issues: &reference.issues,
-                events: &reference.events,
-            },
-        ),
-    })
 }
 
 /// Whether the branch checked out at `repository` has moved off `origin/main`:
@@ -657,6 +600,13 @@ mod tests {
     }
 
     mod store_divergence {
+        fn executor(
+            paths: &super::WorktreePaths,
+        ) -> super::CommandExecutor<crate::storage::JsonFileStorage> {
+            super::CommandExecutor::new(crate::storage::JsonFileStorage::new(&paths.local_jit))
+                .with_worktree_paths(paths.clone())
+        }
+
         use super::*;
         use crate::domain::store_divergence::{DivergenceClass, DivergentRecord};
         use crate::domain::{Event, Issue};
@@ -816,8 +766,10 @@ mod tests {
             let (local_only, reference_only, conflicting) =
                 seed_divergent_stores(&paths, &reference_root);
 
-            let report =
-                execute_worktree_store_divergence(&paths).expect("compare the two checkout stores");
+            let report = executor(&paths)
+                .worktrees()
+                .store_divergence()
+                .expect("compare the two checkout stores");
 
             let reported = findings(&report);
             assert!(
@@ -864,8 +816,10 @@ mod tests {
                 stored_bytes(&paths.local_jit),
                 stored_bytes(&reference_root),
             );
-            let report =
-                execute_worktree_store_divergence(&paths).expect("compare the two checkout stores");
+            let report = executor(&paths)
+                .worktrees()
+                .store_divergence()
+                .expect("compare the two checkout stores");
             assert!(
                 !report.divergences.is_empty(),
                 "the read-only property is asserted over a comparison that found something"
@@ -908,8 +862,10 @@ mod tests {
                 seed_events(store, &events);
             }
 
-            let report =
-                execute_worktree_store_divergence(&paths).expect("compare the two checkout stores");
+            let report = executor(&paths)
+                .worktrees()
+                .store_divergence()
+                .expect("compare the two checkout stores");
 
             assert_eq!(
                 findings(&report),
@@ -937,8 +893,10 @@ mod tests {
                 ),
             );
 
-            let report =
-                execute_worktree_store_divergence(&paths).expect("inspect the primary checkout");
+            let report = executor(&paths)
+                .worktrees()
+                .store_divergence()
+                .expect("inspect the primary checkout");
 
             assert_eq!(
                 findings(&report),
@@ -973,7 +931,9 @@ mod tests {
                 "the fixture models a store outside version control"
             );
 
-            let report = execute_worktree_store_divergence(&paths)
+            let report = executor(&paths)
+                .worktrees()
+                .store_divergence()
                 .expect("a store outside version control succeeds rather than erroring");
 
             assert_eq!(

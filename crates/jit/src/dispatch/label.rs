@@ -2,16 +2,13 @@
 
 use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::LabelCommands;
-use crate::config_manager::ConfigManager;
 use crate::output::{
     LabelValuesResponse, LabelValuesScope, NamespacesHumanDetails, NamespacesResponse,
 };
 use crate::storage::IssueStore;
 
 fn namespaces<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<NamespacesResponse> {
-    let namespaces = ConfigManager::new(ctx.executor.storage().repository_layout()?)
-        .get_namespaces()?
-        .namespaces;
+    let namespaces = ctx.executor.config().get_namespaces()?.namespaces;
     let (names, details): (Vec<_>, Vec<_>) = namespaces.into_iter().unzip();
     let response = NamespacesResponse::with_extras(
         names,

@@ -1418,6 +1418,7 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
+            crate::test_harness::seed_memory_gate_keys(storage, &["tests".parse().unwrap()]);
             let mut gated = create_test_issue(
                 &crate::test_utils::issue_id(0xaaaa_1111),
                 State::Ready,
@@ -2052,6 +2053,7 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
+            crate::test_harness::seed_memory_gate_keys(storage, &["tests".parse().unwrap()]);
             let mut issue = create_test_issue(
                 &crate::test_utils::issue_id(0xaaaa_1111),
                 State::Done,

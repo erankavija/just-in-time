@@ -41,15 +41,6 @@ else
 fi
 
 echo
-echo "🌐 Checking MCP server..."
-if [ -f "mcp-server/package.json" ]; then
-    echo "  ✅ MCP server package.json found"
-else
-    echo "  ❌ MCP server package.json missing"
-    exit 1
-fi
-
-echo
 echo "⚛️  Checking Web UI..."
 if [ -f "web/package.json" ]; then
     echo "  ✅ Web UI package.json found"

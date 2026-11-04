@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "32607213-7402-4c17-9889-7a6286e1959e"
+  ],
+  "description": "One fallible binding API cutover includes its mechanically migrated implementations and inventoried callers.\n\n## Background\n\n`IssueStore::configure_repository_layout` and `CommandExecutor::with_layout` currently bind without returning mismatch errors. The investigation inventories implementations and callers.\n\n## Success Criteria\n\n- [hard] REQ-01: Layout binding returns an error before side effects when roots differ, preserving same-root refresh and recovery ordering; callers propagate errors and tests cover mismatch and same-root binding.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T22:24:54.946576604Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-core",
+    "satisfies:0f8efc37/REQ-02",
+    "satisfies:a236e81e/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Reject incompatible repository layout bindings",
+  "updated_at": "2026-11-04T22:25:07.291094312Z"
+}

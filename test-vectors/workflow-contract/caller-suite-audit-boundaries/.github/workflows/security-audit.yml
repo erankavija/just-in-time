@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: cargo audit -D warnings
-  npm-audit-mcp-server:
+  npm-audit-extra:
     runs-on: ubuntu-latest
     steps:
       - run: npm audit --omit=dev --audit-level=info

@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "4d8791fb-01c9-4d12-a54b-2990baa22ace"
+  ],
+  "description": "One search hook replaces the local scorer and guards stale responses.\n\n## Success Criteria\n\n- [hard] REQ-01: Browser uses server issue and linked-document matches, preserves navigation, and ignores stale in-flight results after query or version changes; the App passes its SSE version to the hook and routes issue matches to issue details and document matches to the viewer. Actual asynchronous hook tests cover out-of-order completion; obsolete scorer-only tests are removed or replaced.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "gates_required": [
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b067c2db-5664-48ed-a960-3c0abe7a21a1",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-web",
+    "satisfies:0f8efc37/REQ-08",
+    "satisfies:3a61ff16/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Use server search results in browser",
+  "updated_at": "2026-11-04T22:24:54.946576604Z"
+}

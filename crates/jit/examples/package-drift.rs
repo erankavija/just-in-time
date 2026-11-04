@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 /// The gates whose footprint is the whole tree.
-const TREE_WIDE_GATES: [&str; 4] = ["cargo-ci", "cargo-ci-features", "tests", "docs-mechanical"];
+const TREE_WIDE_GATES: [&str; 3] = ["cargo-ci", "cargo-ci-features", "docs-mechanical"];
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -91,7 +91,6 @@ fn gate_input_findings(root: &Path) -> Vec<String> {
         ("cargo-ci", ".config/nextest.toml"),
         ("npm-ci", "web/package-lock.json"),
         ("npm-ci", "web/src/App.tsx"),
-        ("mcp-ci", "mcp-server/package-lock.json"),
     ]
     .into_iter()
     .chain(TREE_WIDE_GATES.map(|key| (key, ".agents/skills/jit-manage/SKILL.md")))
@@ -100,7 +99,6 @@ fn gate_input_findings(root: &Path) -> Vec<String> {
     let uncovered = [
         ("npm-ci", "web/node_modules/react/index.js"),
         ("npm-ci", "web/dist/index.html"),
-        ("mcp-ci", "mcp-server/node_modules/express/index.js"),
     ]
     .into_iter()
     .filter(|(key, path)| !holds(key, &|declared| !declared.covers(path)))

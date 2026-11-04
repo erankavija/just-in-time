@@ -246,7 +246,7 @@ fn test_schema_issue_create_details() {
 }
 
 /// The `--content-format` flag must surface in the auto-generated `--schema`
-/// for BOTH `issue create` and `issue update` so the MCP server (which derives
+/// for BOTH `issue create` and `issue update` so consumers (which derive
 /// its tools from this schema, DR §9.3) exposes the new authorable surface.
 #[test]
 fn test_schema_issue_create_and_update_expose_content_format() {

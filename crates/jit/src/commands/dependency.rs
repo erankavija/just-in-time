@@ -1,7 +1,7 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::identity::IssueId;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::IssueNotFoundError;
@@ -63,6 +63,75 @@ pub struct DependenciesRemoveResult {
 }
 
 impl<S: IssueStore> GraphOps<'_, S> {
+    /// Resolve a requested batch, aggregating resolution failures before graph validation.
+    pub fn add_requested_dependencies(
+        &self,
+        from_id: &IssueId,
+        requested: &[String],
+        policy: RedundancyPolicy,
+    ) -> Result<DependenciesAddResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let resolve = |id: &str| self.exec.issues().resolve_issue_id(&id.parse()?);
+        let (resolved, rejected): (Vec<_>, Vec<_>) = requested
+            .iter()
+            .map(|id| (id, resolve(id)))
+            .partition(|(_, result)| result.is_ok());
+        if rejected.is_empty() {
+            let resolved = resolved
+                .into_iter()
+                .map(|(_, result)| result)
+                .collect::<Result<Vec<_>>>()?;
+            self.add_dependencies_with_policy(from_id, &resolved, policy)
+        } else {
+            Err(crate::errors::DependencyBatchRejectedError::new(
+                from_id.clone(),
+                rejected
+                    .into_iter()
+                    .filter_map(|(id, result)| result.err().map(|error| (id.clone(), error)))
+                    .collect(),
+            )
+            .into())
+        }
+    }
+
+    /// Resolve targets against stored edges, including deleted issues. Repeated
+    /// targets match only edges no earlier target named; unmatched text is retained.
+    pub fn remove_requested_dependencies(
+        &self,
+        from_id: &IssueId,
+        requested: &[String],
+    ) -> Result<(DependenciesRemoveResult, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let prefixes = requested
+            .iter()
+            .map(|id| id.parse::<IssueIdPrefix>())
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let stored = self.exec.storage.load_issue(from_id)?.dependencies;
+        let (matched, unmatched) = prefixes.into_iter().try_fold(
+            (Vec::new(), Vec::new()),
+            |(mut matched, mut unmatched): (Vec<IssueId>, Vec<String>), prefix| {
+                let remaining = stored
+                    .iter()
+                    .filter(|id| !matched.contains(id))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                match crate::storage::resolve_dependency_id(&prefix, &remaining) {
+                    Ok(id) => matched.push(id),
+                    Err(error) if error.is::<crate::storage::IssueNotFoundError>() => {
+                        unmatched.push(prefix.as_str().to_string())
+                    }
+                    Err(error) => return Err(error),
+                }
+                Ok((matched, unmatched))
+            },
+        )?;
+        Ok((self.remove_dependencies(from_id, &matched)?, unmatched))
+    }
+
     /// Remove a dependency from an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.

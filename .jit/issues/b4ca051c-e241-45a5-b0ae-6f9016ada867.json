@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-04T22:30:43.113718802Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Correct the pages that describe issue visibility as a three-tier fallback through git `HEAD`.\n\n## Background\n\nIssue reads come from the checkout's own data root and, in a linked checkout, the primary checkout's data root. Four pages still describe a git `HEAD` tier:\n\n- `docs/tutorials/parallel-work-worktrees.md:107` lists three tiers.\n- `docs/how-to/multi-agent-coordination.md:202` draws them in a mermaid chart.\n- `docs/how-to/troubleshooting.md:423` names `HEAD` as a cause, and `:436` suggests `git show HEAD:.jit/index.json`.\n- `docs/reference/worktree-validate.md:172` names version-control history as a read source.\n\n## Success Criteria\n\n- [hard] REQ-01: The four pages state that issue reads come from the checkout's own data root and, in a linked checkout, the primary checkout's, and none names git `HEAD` or version-control history as a read source.\n- [hard] REQ-02: The troubleshooting remedies for a secondary worktree check those two sources and no longer suggest `git show HEAD:.jit/index.json`.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T22:37:51.534762795Z",
   "first_ready_at": "2026-11-01T15:24:29.781632298Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "c128a7ff-ad54-4bd0-a4bd-7d56ff90ba41",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:35:55.962774568Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "3d5356e9-9c0e-4d3f-a17c-385c8effef1a",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:34:16.649401763Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b4ca051c-e241-45a5-b0ae-6f9016ada867",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "satisfies:f4d9502a/REQ-06"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Issue visibility pages describe two read sources",
-  "updated_at": "2026-11-01T15:24:29.781632298Z"
+  "updated_at": "2026-11-04T22:37:51.534762795Z"
 }
