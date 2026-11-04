@@ -539,16 +539,21 @@
       "agent": "/root/head_lookup"
     }
   ],
-  "dispatch_policy": "Alternate implementation dispatches between Claude sub-agents and Codex workers (user instruction relayed by just-in-time-05); tier within each family by difficulty. Codex workers cannot commit; the lead reviews and commits.",
-  "session_end": {
-    "date": "2026-10-24",
-    "reason": "user wind-down",
-    "main_red": "cli_gate test_issue_show_errors_on_corrupt_gate_run since df129d9e 46a747fc2; just-in-time-db fixing"
-  },
-  "resumed_at": "2026-11-04",
+  "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
+  "resumed_at": "2026-11-05",
   "resume_notes": [
     "Live JIT supersedes October handoff. All formerly listed external dependencies are terminal; overlap holds with df129d9e remain coordination constraints, not new DAG edges.",
     "Steward directs storage/git primitives first; independent documentation deferred from old wave 2. Serialize git.rs edits.",
-    "4ba18af4 old implementation refreshed against main c76f9ea33; worker resolving two merge conflicts. No source merge before peer coordination."
+    "4ba18af4 old implementation refreshed against main c76f9ea33; worker resolving two merge conflicts. No source merge before peer coordination.",
+    "Direct user authorization received: I authorize your work. Earlier approval blocker resolved; head worker resumed without source edits during the hold.",
+    "c5062e21 shared-bootstrap startup contract correction committed as e63c8b273 and 47da420ad; refresh affected planning approval before its implementation.",
+    "Main source landings and full gates remain serialized with df129d9e and steward retirement work."
+  ],
+  "planning_reviews_pending": [
+    {
+      "issue": "28ccf9a9",
+      "reason": "Approved c5062e21 shared-bootstrap contract correction changes plan-fixed startup contract.",
+      "before_implementation": "c5062e21"
+    }
   ]
 }
