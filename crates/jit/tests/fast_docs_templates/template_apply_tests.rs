@@ -1507,6 +1507,101 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
     }
 }
 
+/// The demotion the wired edge demands lands in the same mutation as the edge:
+/// the container's `Ready → Backlog` event and its dependency-add event carry
+/// one timestamp.
+#[test]
+fn test_apply_template_publishes_the_dependent_demotion_with_its_edge() {
+    let h = TestHarness::new();
+    let epic = create_epic(&h, "Same session epic");
+
+    h.executor
+        .templates()
+        .apply_template_with(&plan_template(), &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let events = h.storage.read_events().unwrap();
+    let timestamp_of = |matches: &dyn Fn(&jit::domain::EventBody) -> bool| {
+        events
+            .iter()
+            .find(|event| matches(event.body()))
+            .map(|event| serde_json::to_value(event).unwrap()["timestamp"].clone())
+            .expect("the apply records the event")
+    };
+    let demoted = timestamp_of(&|body| {
+        matches!(body, jit::domain::EventBody::IssueStateChanged { issue_id, to, .. }
+            if *issue_id == epic && *to == jit::domain::State::Backlog)
+    });
+    let wired = timestamp_of(&|body| {
+        matches!(body, jit::domain::EventBody::IssueUpdated { issue_id, updated_by, .. }
+            if *issue_id == epic && updated_by == "dependency-add")
+    });
+    assert_eq!(demoted, wired);
+}
+
+/// Removing a template edge promotes its dependent through graph rules: a rule
+/// refusing the container's `Ready` keeps it in `Backlog`, records the refusal,
+/// and reports it after the apply commits.
+#[test]
+fn test_apply_template_edge_removal_promotion_refused_by_graph_rule_stays_backlog() {
+    let h = TestHarness::new();
+    let template = TemplateRegistry::from_toml_str(
+        r#"
+[[template]]
+name        = "move"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#,
+        &HIERARCHY,
+    )
+    .unwrap()
+    .get("move")
+    .unwrap()
+    .clone();
+    let epic = create_epic(&h, "Refused epic");
+    let upstream = h.create_issue("Upstream");
+    add_reducing_edge(&h.executor, &epic, &upstream).unwrap();
+    h.storage.add_data_file(
+        "rules.toml",
+        r#"
+[[rules]]
+name = "ready-epic-needs-breakdown"
+when = { type = "epic", state = "ready" }
+severity = "error"
+enforce = true
+assert = { dependency-shape = { target = { type = "breakdown" }, mode = "must" } }
+"#,
+    );
+
+    let error = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .expect_err("the graph rule refuses the container's promotion");
+
+    assert!(error.is::<jit::errors::TransitionBlockedError>(), "{error}");
+    let container = h.get_issue(&epic);
+    assert!(container.dependencies.is_empty());
+    assert_eq!(container.state, jit::domain::State::Backlog);
+    assert!(h
+        .storage
+        .read_events()
+        .unwrap()
+        .iter()
+        .any(|event| matches!(
+            event.body(),
+            jit::domain::EventBody::TransitionBlocked { issue_id, .. } if *issue_id == epic
+        )));
+}
+
 #[test]
 fn test_apply_template_returns_created_issues_by_role() {
     let h = TestHarness::new();

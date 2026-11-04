@@ -72,7 +72,7 @@ mod tests {
 
         let printed: serde_json::Value = serde_json::from_slice(&out).unwrap();
         let hooks_dir = temp.path().join("hooks").display().to_string();
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert_eq!(printed["hooks_dir"], hooks_dir);
         assert_eq!(printed["installed"], serde_json::json!(["pre-commit"]));
         assert_eq!(printed["skipped"], serde_json::json!([]));
@@ -98,7 +98,7 @@ mod tests {
 
         let status = dispatch(HooksCommands::Install, &ctx, &mut out, &mut Vec::new()).unwrap();
 
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert_eq!(
             String::from_utf8(out).unwrap(),
             format!(
@@ -116,7 +116,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert_eq!(
             String::from_utf8(skipped_out).unwrap(),
             format!(

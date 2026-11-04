@@ -169,8 +169,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 unreachable!("removals use the captured removal coordinator");
             };
             let source_id = super::require_issue_in_capture(&issues, issue_id)?;
+            let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
             let derived =
-                derive_batch_dependency_add(&issues, &source_id, dependency_ids, *policy)?;
+                derive_batch_dependency_add(&issues, &source_id, dependency_ids, *policy, &graph)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
@@ -251,15 +252,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 None
             };
-            let derived = derive_dependency_removal(
-                &issues,
-                &resolved_request,
-                warning,
-                super::CapturedTransitionEvidence {
-                    issues: &issues,
-                    graph: &graph,
-                },
-            )?;
+            let derived = derive_dependency_removal(&issues, &resolved_request, warning, &graph)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
@@ -321,7 +314,7 @@ fn derive_dependency_removal(
     issues: &[Issue],
     request: &CapturedDependencyMutation,
     warning: Option<String>,
-    evidence: super::CapturedTransitionEvidence<'_>,
+    graph: &super::CapturedGraphEvidence<'_>,
 ) -> Result<DerivedDependencyMutation> {
     let (source_id, removed, outcome) = match request {
         CapturedDependencyMutation::RemoveSingle {
@@ -378,61 +371,26 @@ fn derive_dependency_removal(
         .iter_mut()
         .find(|candidate| candidate.id == source_id)
         .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))? = issue.clone();
-    let ready_ids = crate::domain::queries::issues_becoming_ready(&candidate);
-    let mut intents = vec![MutationIntent::RecordEvent {
-        phase: 1,
-        event: Box::new(EventBody::draft_issue_updated(
-            source_id.clone(),
-            "dependency-remove".to_string(),
-            vec!["dependencies".to_string()],
-        )),
-    }];
-    if ready_ids.contains(&source_id) {
-        match super::derive_state_transition(issue.clone(), State::Ready, false, evidence)? {
-            super::DerivedStateTransition::Applied {
-                issue: transitioned,
-                events,
-                ..
-            } => {
-                issue = *transitioned;
-                intents.extend(events.into_iter().map(|(phase, event)| {
-                    MutationIntent::RecordEvent {
-                        phase: phase.saturating_add(1),
-                        event: Box::new(event),
-                    }
-                }));
-            }
-            super::DerivedStateTransition::GraphBlocked { error, events } => {
-                intents.extend(events.into_iter().map(|(phase, event)| {
-                    MutationIntent::RecordEvent {
-                        phase: phase.saturating_add(1),
-                        event: Box::new(event),
-                    }
-                }));
-                intents.insert(
-                    0,
-                    MutationIntent::UpdateIssue {
-                        issue: Box::new(issue),
-                    },
-                );
-                return Ok(DerivedDependencyMutation {
-                    outcome,
-                    intents,
-                    error_after_apply: Some(error),
-                });
-            }
-        }
-    }
-    intents.insert(
-        0,
-        MutationIntent::UpdateIssue {
+    let readiness = super::derive_readiness_intents(issues, &candidate, graph)?;
+    let intents = (!readiness.corrects(&source_id))
+        .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
-        },
-    );
+        })
+        .into_iter()
+        .chain(std::iter::once(MutationIntent::RecordEvent {
+            phase: 1,
+            event: Box::new(EventBody::draft_issue_updated(
+                source_id,
+                "dependency-remove".to_string(),
+                vec!["dependencies".to_string()],
+            )),
+        }))
+        .chain(readiness.intents)
+        .collect();
     Ok(DerivedDependencyMutation {
         outcome,
         intents,
-        error_after_apply: None,
+        error_after_apply: readiness.error_after_apply,
     })
 }
 
@@ -441,6 +399,7 @@ fn derive_batch_dependency_add(
     full_issue_id: &IssueId,
     dependency_ids: &[IssueId],
     policy: RedundancyPolicy,
+    graph: &super::CapturedGraphEvidence<'_>,
 ) -> Result<DerivedDependencyMutation> {
     let full_issue_id = full_issue_id.clone();
     let from_deps = dependency_set(captured_issue(issues, &full_issue_id)?);
@@ -573,24 +532,50 @@ fn derive_batch_dependency_add(
         .filter(|(_, _, full_id)| added_ids.contains(full_id))
         .map(|(_, text, _)| text.clone())
         .collect();
-    let intents = if reduced_from == from_deps {
-        Vec::new()
-    } else {
-        derive_reduced_graph_intents(
-            issues,
-            &acyclic_candidate,
-            Some((&full_issue_id, &reduced_from)),
-        )?
-    };
+    let outcome = CapturedDependencyOutcome::Batch(DependenciesAddResult {
+        added,
+        already_exist,
+        skipped,
+        warnings: Vec::new(),
+    });
+    if reduced_from == from_deps {
+        return Ok(DerivedDependencyMutation {
+            outcome,
+            intents: Vec::new(),
+            error_after_apply: None,
+        });
+    }
+    let reduced = derive_reduced_graph_intents(
+        issues,
+        &acyclic_candidate,
+        Some((&full_issue_id, &reduced_from)),
+    )?;
+    let projected = issues
+        .iter()
+        .map(|issue| {
+            reduced
+                .iter()
+                .find_map(|intent| match intent {
+                    MutationIntent::UpdateIssue { issue: updated } if updated.id == issue.id => {
+                        Some((**updated).clone())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| issue.clone())
+        })
+        .collect::<Vec<_>>();
+    let readiness = super::derive_readiness_intents(issues, &projected, graph)?;
+    let mut intents = reduced
+        .into_iter()
+        .filter(|intent| {
+            !matches!(intent, MutationIntent::UpdateIssue { issue } if readiness.corrects(&issue.id))
+        })
+        .collect::<Vec<_>>();
+    intents.extend(readiness.intents);
     Ok(DerivedDependencyMutation {
-        outcome: CapturedDependencyOutcome::Batch(DependenciesAddResult {
-            added,
-            already_exist,
-            skipped,
-            warnings: Vec::new(),
-        }),
+        outcome,
         intents,
-        error_after_apply: None,
+        error_after_apply: readiness.error_after_apply,
     })
 }
 
@@ -626,10 +611,6 @@ pub(super) fn derive_reduced_graph_intents(
     source: Option<(&IssueId, &HashSet<IssueId>)>,
 ) -> Result<Vec<MutationIntent>> {
     let graph = dependency_graph(candidate);
-    // Dependency states are what readiness reads, and this derivation changes no
-    // issue's state, so the original view resolves every dependency the reduced
-    // sets can name.
-    let resolved = crate::domain::queries::build_issue_map(original);
     let mut updates = Vec::new();
     let mut events = Vec::new();
 
@@ -659,44 +640,30 @@ pub(super) fn derive_reduced_graph_intents(
         issue.dependencies.sort();
         let issue_id = issue.id.clone();
 
-        if source.is_some_and(|(source_id, _)| source_id == &issue_id) {
-            // Readiness derives from the final dependency set through the shared
-            // domain helper, the same one the graph-template apply path consults,
-            // so the two cannot drift (`@/invariant/derived-state-coherence`). An
-            // edge addition owns only the demotion direction; promotion belongs to
-            // the removal path below and to dependency completion.
-            let demoted =
-                issue.derive_readiness_correction(&resolved) == Some(ReadinessCorrection::Demote);
-            if demoted {
-                issue.state = State::Backlog;
-                events.push(MutationIntent::RecordEvent {
-                    phase: 1,
-                    event: Box::new(EventBody::draft_issue_state_changed(
-                        issue_id.clone(),
-                        State::Ready,
-                        State::Backlog,
-                    )),
-                });
-            }
-            events.push(MutationIntent::RecordEvent {
-                phase: 2,
-                event: Box::new(EventBody::draft_issue_updated(
+        let (phase, event) = if source.is_some_and(|(source_id, _)| source_id == &issue_id) {
+            (
+                2,
+                EventBody::draft_issue_updated(
                     issue_id,
                     "dependency-add".to_string(),
                     vec!["dependencies".to_string()],
-                )),
-            });
+                ),
+            )
         } else {
-            events.push(MutationIntent::RecordEvent {
-                phase: 3,
-                event: Box::new(EventBody::draft_dependency_reduced(
+            (
+                3,
+                EventBody::draft_dependency_reduced(
                     issue_id,
                     original_deps.len(),
                     reduced.len(),
                     removed,
-                )),
-            });
-        }
+                ),
+            )
+        };
+        events.push(MutationIntent::RecordEvent {
+            phase,
+            event: Box::new(event),
+        });
         updates.push(MutationIntent::UpdateIssue {
             issue: Box::new(issue),
         });

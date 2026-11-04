@@ -1,4 +1,4 @@
-//! Gate definitions, presets and status; execution remains in the CLI.
+//! Gate definitions, presets, status and evaluation.
 
 use super::{
     resolve_gate_key, resolve_gate_key_for, resolve_issue, CommandContext, HandlerResult,
@@ -10,15 +10,18 @@ use crate::declarations::{GateChecker, GateMode, GateStage};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::{GateRunResult, GateRunStatus, GateStatus};
 use crate::errors::InvalidArgumentError;
+use crate::output::failure::classify;
 use crate::output::gate::{
-    ForIssue, GateAddResponse, GateDefinitionResponse, GateMutationResponse, GateNeverRun,
+    ForIssue, GateAddResponse, GateDefinitionResponse, GateEvaluateAllResponse,
+    GateEvaluateResponse, GateFailResponse, GateMutationResponse, GateNeverRun,
     GatePresetApplyResponse, GatePresetCreateResponse, GatePresetError, GatePresetShowResponse,
     GatePresetSuccess, GateStatusOutput,
 };
 use crate::output::{
-    ErrorCode, GateCheckAllResponse, GateCheckSummary, GateDefinition, GateFindingsResponse,
-    GateFlatReportResponse, GateListResponse, GatePresetListResponse, GateRunHistoryResponse,
-    GateRunSummary, GateStatusEntry,
+    BatchTarget, ErrorCode, GateCheckAllResponse, GateCheckSummary, GateDefinition,
+    GateEvaluateManyResponse, GateEvaluateManyResult, GateFindingsResponse, GateFlatReportResponse,
+    GateListResponse, GatePresetListResponse, GateRunHistoryResponse, GateRunSummary,
+    GateStatusEntry,
 };
 use crate::storage::IssueStore;
 use std::collections::HashMap;
@@ -528,6 +531,135 @@ fn status_all<S: IssueStore>(
     })
 }
 
+fn evaluate<S: HandlerStore>(
+    ctx: &CommandContext<'_, S>,
+    id: String,
+    gate_key: Option<String>,
+    gate_flag: Option<String>,
+    by: Option<String>,
+    force: bool,
+) -> HandlerResult<GateEvaluateResponse> {
+    let key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate")?;
+    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let outcome = ctx.executor.gates().pass_gate(&full_id, &key, by, force)?;
+    Ok(Outcome::from(GateEvaluateResponse::new(id, key)).with_warnings(outcome.warnings))
+}
+
+fn evaluate_all<S: HandlerStore>(
+    ctx: &CommandContext<'_, S>,
+    id: String,
+    by: Option<String>,
+    force: bool,
+) -> HandlerResult<GateEvaluateAllResponse> {
+    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let results = ctx
+        .executor
+        .gates()
+        .pass_all_gates(&full_id, by, force)?
+        .results;
+    let warnings = results
+        .iter()
+        .flat_map(|entry| {
+            let key = &entry.gate_key;
+            entry
+                .warnings
+                .iter()
+                .map(move |warning| format!("({key}): {warning}"))
+        })
+        .collect::<Vec<_>>();
+    let keys = results.into_iter().map(|entry| entry.gate_key).collect();
+    Ok(Outcome::from(GateEvaluateAllResponse::new(id, keys)).with_warnings(warnings))
+}
+
+/// Each requested issue in argument order, an unresolved id failing its own
+/// entry; any failure makes the batch findings under the first failure's code.
+/// Another agent's lease on any issue refuses the whole batch.
+fn evaluate_many<S: HandlerStore>(
+    ctx: &CommandContext<'_, S>,
+    gate_key: String,
+    ids: Vec<String>,
+    by: Option<String>,
+    force: bool,
+) -> HandlerResult<GateEvaluateManyResponse> {
+    let key: GateKey = gate_key.parse()?;
+    let resolved: Vec<(String, anyhow::Result<IssueId>)> = ids
+        .into_iter()
+        .map(|requested| {
+            let id = resolve_issue(ctx.executor.storage(), &requested);
+            (requested, id)
+        })
+        .collect();
+    let full_ids: Vec<IssueId> = resolved
+        .iter()
+        .filter_map(|(_, id)| id.as_ref().ok().cloned())
+        .collect();
+    // A foreign lease is an authorization failure, not a per-issue error.
+    full_ids
+        .iter()
+        .try_for_each(|id| ctx.executor.refuse_foreign_lease(id).map(drop))?;
+    let mut evaluated = ctx
+        .executor
+        .gates()
+        .pass_gate_many(&full_ids, &key, by, force)
+        .results
+        .into_iter();
+    let mut warnings = Vec::new();
+    let mut first_failure = None;
+    let mut results = Vec::with_capacity(resolved.len());
+    for (requested, id) in resolved {
+        let (target, result) = match id {
+            Ok(_) => match evaluated.next() {
+                Some(entry) => (BatchTarget::Resolved(entry.issue_id), entry.result),
+                None => continue,
+            },
+            Err(error) => (BatchTarget::Unresolved(requested), Err(error)),
+        };
+        let (entry_warnings, entry) = match result {
+            Ok(outcome) => (
+                outcome.warnings,
+                GateEvaluateManyResult::passed(target, key.clone()),
+            ),
+            Err(error) => {
+                let failure = classify(&error);
+                first_failure.get_or_insert(failure.error.code);
+                let entry = GateEvaluateManyResult::failed(target, key.clone(), &failure)?;
+                (failure.warnings, entry)
+            }
+        };
+        let subject = entry.target.as_str();
+        warnings.extend(
+            entry_warnings
+                .into_iter()
+                .map(|warning| format!("({subject}): {warning}")),
+        );
+        results.push(entry);
+    }
+    let failed = results.iter().filter(|entry| entry.error.is_some()).count();
+    let message = format!(
+        "Evaluated gate '{key}' for {} issue(s): {} passed, {failed} failed",
+        results.len(),
+        results.len() - failed
+    );
+    let response = GateEvaluateManyResponse::new(results);
+    let outcome = match first_failure {
+        None => Outcome::success_with(response, message),
+        Some(code) => Outcome::findings(code, message, response),
+    };
+    Ok(outcome.with_warnings(warnings))
+}
+
+fn fail<S: HandlerStore>(
+    ctx: &CommandContext<'_, S>,
+    id: String,
+    gate_key: String,
+    by: Option<String>,
+) -> HandlerResult<GateFailResponse> {
+    let key = gate_key.parse()?;
+    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let warnings = ctx.executor.gates().fail_gate(&full_id, &key, by)?;
+    Ok(Outcome::from(GateFailResponse::new(id, key)).with_warnings(warnings))
+}
+
 command_group! {
     command: GateCommands,
     storage: [HandlerStore],
@@ -546,9 +678,11 @@ command_group! {
             as union [GateRunSummary, GateRunHistoryResponse, GateFlatReportResponse, GateFindingsResponse, GateNeverRun]
             "Default shape: the gate's latest run. With --all or --limit: the count-wrapped run history. With --stdout, --stderr or --tail: the stored report text. With --findings: the structured findings and verdict. GateNeverRun when the selected gate has not run.",
         "gate_status-all" => GateCommands::StatusAll { id, full } => status_all(id, full) -> ForIssue<GateCheckAllResponse>,
+        "gate_evaluate" => GateCommands::Evaluate { id, gate_key, gate_flag, by, force } => evaluate(id, gate_key, gate_flag, by, force) -> GateEvaluateResponse,
+        "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force) -> GateEvaluateAllResponse,
+        "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force) -> GateEvaluateManyResponse,
+        "gate_fail" => GateCommands::Fail { id, gate_key, by } => fail(id, gate_key, by) -> GateFailResponse,
     },
-    unmigrated: GateCommands::Evaluate { .. } | GateCommands::EvaluateAll { .. } |
-        GateCommands::EvaluateMany { .. } | GateCommands::Fail { .. }
 }
 
 #[cfg(test)]
@@ -558,7 +692,7 @@ mod tests {
     use crate::commands::CommandExecutor;
     use crate::declarations::{GateDefinition as Declared, GateMode, GateStage};
     use crate::output::failure::classify;
-    use crate::output::{ExitCode, OutputMode};
+    use crate::output::{ExitCode, OutputMode, RunStatus};
     use crate::schema::OutputSchema;
     use crate::storage::InMemoryStorage;
 
@@ -593,7 +727,7 @@ mod tests {
     fn run(
         executor: &CommandExecutor<InMemoryStorage>,
         command: GateCommands,
-    ) -> anyhow::Result<(ExitCode, serde_json::Value)> {
+    ) -> anyhow::Result<(RunStatus, serde_json::Value)> {
         let ctx = CommandContext {
             executor,
             mode: OutputMode {
@@ -602,10 +736,7 @@ mod tests {
             },
         };
         let mut out = Vec::new();
-        let status = match dispatch(command, &ctx, &mut out, &mut Vec::new())? {
-            crate::dispatch::Dispatched::Handled(status) => status,
-            crate::dispatch::Dispatched::Unhandled(_) => panic!("status leaves are handled"),
-        };
+        let status = dispatch(command, &ctx, &mut out, &mut Vec::new())?;
         Ok((status, serde_json::from_slice(&out).unwrap()))
     }
 
@@ -640,12 +771,46 @@ mod tests {
     }
 
     #[test]
+    fn test_dispatch_evaluate_many_with_failing_entries_fails_with_the_first_failures_code_and_results(
+    ) {
+        let (executor, id) = requiring_manual_gate();
+        let missing = crate::test_utils::issue_id(0x99).to_string();
+        let ids = ["!", id.as_str(), missing.as_str()]
+            .map(str::to_owned)
+            .to_vec();
+
+        let (status, printed) = run(
+            &executor,
+            GateCommands::EvaluateMany {
+                gate_key: "tests".to_owned(),
+                ids,
+                by: Some("human:reviewer".to_owned()),
+                force: false,
+            },
+        )
+        .unwrap();
+
+        let first = ErrorCode::InvalidIdPrefix;
+        assert_eq!(printed["error"]["code"], first.as_str());
+        assert_eq!(status, first.exit_code().into());
+        let results = printed["error"]["details"]["results"].as_array().unwrap();
+        let statuses: Vec<_> = results.iter().map(|entry| &entry["status"]).collect();
+        assert_eq!(statuses, ["failed", "passed", "failed"]);
+        assert_eq!(results[0]["error"]["code"], first.as_str());
+        assert_eq!(results[1]["issue_id"], id);
+        assert_eq!(
+            results[2]["error"]["code"],
+            ErrorCode::IssueNotFound.as_str()
+        );
+    }
+
+    #[test]
     fn test_dispatch_status_of_a_gate_never_run_prints_a_typed_object_with_the_explanation() {
         let (executor, id) = requiring_manual_gate();
 
         let (status, printed) = run(&executor, status_args(&id, Some("tests"))).unwrap();
 
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert_eq!(printed["key"], "tests");
         assert_eq!(printed["issue_id"], id);
         assert!(printed["message"]
@@ -703,6 +868,16 @@ mod tests {
                 "gate_preset_create",
                 OutputSchema::of::<GatePresetCreateResponse>(),
             ),
+            ("gate_evaluate", OutputSchema::of::<GateEvaluateResponse>()),
+            (
+                "gate_evaluate-all",
+                OutputSchema::of::<GateEvaluateAllResponse>(),
+            ),
+            (
+                "gate_evaluate-many",
+                OutputSchema::of::<GateEvaluateManyResponse>(),
+            ),
+            ("gate_fail", OutputSchema::of::<GateFailResponse>()),
         ] {
             let actual = crate::dispatch::registered_output_schema(path).unwrap();
             assert_eq!(actual.success, expected.success, "{path}");

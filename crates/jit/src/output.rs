@@ -10,7 +10,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Display;
-use std::io::{self, Write};
 use thiserror::Error;
 
 mod apply;
@@ -46,7 +45,8 @@ pub use claim::{
     ClaimRenewResponse, LeaseListResponse, LeasesKey, RecoverResponse,
 };
 pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
-pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub(crate) use emit::status_after;
+pub use emit::{emit_failure, emit_outcome, HumanRender, Report, Response};
 pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 pub use issue::{
     BatchCreateResponse, BlockedListing, IssueBatchCreateOutput, IssueDeleteResponse,
@@ -380,13 +380,6 @@ pub struct RenderedFindings {
     pub stderr: String,
 }
 
-impl RenderedFindings {
-    pub fn print(&self) {
-        print!("{}", self.stdout);
-        eprint!("{}", self.stderr);
-    }
-}
-
 /// One `{severity} [{rule}] {message}` line per finding, then the summary.
 /// Warnings-only findings get no pass line; `summary: None` renders the lines alone
 /// for commands that frame the block themselves.
@@ -652,91 +645,20 @@ pub struct OutputMode {
     pub quiet: bool,
 }
 
-/// Context for controlling output verbosity
-pub struct OutputContext {
-    quiet: bool,
-    json: bool,
-}
-
-impl OutputContext {
-    /// Create a new output context
-    pub fn new(quiet: bool, json: bool) -> Self {
-        Self { quiet, json }
-    }
-
-    /// Print essential output (always shown unless --json)
-    pub fn print_data(&self, msg: impl Display) -> io::Result<()> {
-        if !self.json {
-            writeln_safe(&format!("{}", msg))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Print informational message (suppressed by --quiet or --json)
-    pub fn print_info(&self, msg: impl Display) -> io::Result<()> {
-        if !self.quiet && !self.json {
-            writeln_safe(&format!("{}", msg))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Print success message (suppressed by --quiet or --json)
-    pub fn print_success(&self, msg: impl Display) -> io::Result<()> {
-        if !self.quiet && !self.json {
-            writeln_safe(&format!("{}", msg))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Print warning (suppressed by --quiet or --json)
-    pub fn print_warning(&self, msg: impl Display) -> io::Result<()> {
-        if !self.quiet && !self.json {
-            writeln_safe_stderr(&format!("Warning: {}", msg))
-        } else {
-            Ok(())
-        }
-    }
-}
-
-/// Safe println that handles broken pipes gracefully
-fn writeln_safe(msg: &str) -> io::Result<()> {
-    match writeln!(io::stdout(), "{}", msg) {
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
-            // Quiet exit on broken pipe (expected when piping to head, etc.)
-            std::process::exit(ExitCode::BrokenPipe.code());
-        }
-        Err(e) => Err(e),
-    }
-}
-
-/// Safe eprintln that handles broken pipes gracefully
-fn writeln_safe_stderr(msg: &str) -> io::Result<()> {
-    match writeln!(io::stderr(), "{}", msg) {
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
-            // Quiet exit on broken pipe
-            std::process::exit(ExitCode::BrokenPipe.code());
-        }
-        Err(e) => Err(e),
-    }
-}
-
-/// True when `message` is the panic text std's `print!`/`println!`/`eprint!`/
-/// `eprintln!` machinery raises when a stream write fails
-/// (`library/std/src/io/stdio.rs`: `panic!("failed printing to {label}: {e}")`,
-/// where `label` is `"stdout"` or `"stderr"`), and the underlying failure is
-/// specifically a closed pipe. Detected by message text because a panic
-/// payload is an opaque `dyn Any`, not a typed [`io::Error`] — this matches
-/// std's exact, long-stable wording rather than approximating the general
-/// panic path. Used by `main`'s top-level panic hook to suppress the panic
-/// banner for the hundreds of raw `println!`/`print!` call sites that cannot
-/// individually check an `io::Result` (jit:6f881a85).
-pub fn is_broken_pipe_write_panic(message: &str) -> bool {
-    message.starts_with("failed printing to std") && message.contains("Broken pipe")
+/// True when a panic `payload` is the one std's `print!`/`println!`/`eprint!`/
+/// `eprintln!` machinery raises when a stream write fails on a closed pipe
+/// (`library/std/src/io/stdio.rs`: `panic!("failed printing to {label}: {e}")`).
+/// A payload is an opaque `dyn Any` holding a `String` or `&str`, so detection
+/// matches std's long-stable wording. `main`'s panic hook uses it to turn the
+/// remaining raw print sites' broken-pipe panic into [`ExitCode::BrokenPipe`].
+pub fn is_broken_pipe_write_panic(payload: &dyn std::any::Any) -> bool {
+    payload
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| payload.downcast_ref::<&str>().copied())
+        .is_some_and(|message| {
+            message.starts_with("failed printing to std") && message.contains("Broken pipe")
+        })
 }
 
 // ============================================================================
@@ -917,8 +839,8 @@ pub enum ExitCode {
     /// A downstream reader closed the pipe while jit was writing (141)
     ///
     /// `128 + SIGPIPE (13) = 141`: the exit status a shell reports for a
-    /// process terminated by SIGPIPE, adopted here as a direct
-    /// `std::process::exit` code rather than by altering this process's own
+    /// process terminated by SIGPIPE, returned as a status rather than by
+    /// altering this process's own
     /// signal disposition (resetting SIGPIPE disposition needs an unsafe
     /// FFI call, and this crate forbids unsafe code).
     BrokenPipe = 141,
@@ -939,7 +861,7 @@ impl ExitCode {
         ExitCode::BrokenPipe,
     ];
 
-    /// Convert exit code to i32 for `std::process::exit`
+    /// The process exit status.
     pub fn code(self) -> i32 {
         self as i32
     }
@@ -963,6 +885,30 @@ impl ExitCode {
             ExitCode::BrokenPipe => {
                 "Downstream reader closed the pipe while jit was writing (128 + SIGPIPE)"
             }
+        }
+    }
+}
+
+/// The status a run exits with: a taxonomy code, or a status another program
+/// decided (the `worktree exec` child, or clap rejecting the command line).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunStatus {
+    Code(ExitCode),
+    Passthrough(i32),
+}
+
+impl From<ExitCode> for RunStatus {
+    fn from(code: ExitCode) -> Self {
+        Self::Code(code)
+    }
+}
+
+impl RunStatus {
+    /// The process exit status.
+    pub fn code(self) -> i32 {
+        match self {
+            Self::Code(code) => code.code(),
+            Self::Passthrough(status) => status,
         }
     }
 }
@@ -1463,6 +1409,8 @@ collection_keys! {
     /// Collection key of [`GateCheckAllResponse`].
     GateReadinessKey = "gates" as "GateCheckAllResponse";
     ResultsKey = "results";
+    /// Collection key of [`GateEvaluateManyResponse`].
+    GateEvaluationsKey = "results" as "GateEvaluateManyResponse";
     /// Collection key of [`ArtifactConformanceResponse`].
     ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
     /// Collection key of [`NamespacesResponse`].
@@ -2739,24 +2687,56 @@ pub struct GateEvaluateManyResult {
     pub target: BatchTarget,
     /// Gate key evaluated for this issue.
     pub key: GateKey,
-    /// [`GateStatus::Passed`] token when a verdict was recorded as passing,
-    /// otherwise the [`GateStatus::Failed`] token.
-    pub status: String,
+    /// `passed` when the gate passed, otherwise `failed`.
+    pub status: GateStatus,
     /// `pass` or `fail`/`error` when a checker produced a verdict. Pre-verdict
     /// lookup and argument errors leave this absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verdict: Option<String>,
-    /// Advisory warnings from the gate evaluation.
-    pub warnings: Vec<String>,
-    /// The single-issue gate error envelope's `error` object, when evaluation failed.
+    /// The classified `error` object of the entry's failure.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
 }
 
-/// JSON payload of `jit gate evaluate-many --json`.
+impl GateEvaluateManyResult {
+    pub fn passed(target: BatchTarget, key: GateKey) -> Self {
+        Self {
+            target,
+            key,
+            status: GateStatus::Passed,
+            verdict: Some("pass".to_owned()),
+            error: None,
+        }
+    }
+
+    /// A failed entry carrying `failure`, the classified envelope of its error.
+    pub fn failed(
+        target: BatchTarget,
+        key: GateKey,
+        failure: &JsonError,
+    ) -> serde_json::Result<Self> {
+        let verdict = failure
+            .error
+            .details
+            .as_ref()
+            .and_then(|details| details.get("verdict"))
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        Ok(Self {
+            target,
+            key,
+            status: GateStatus::Failed,
+            verdict,
+            error: Some(serde_json::to_value(&failure.error)?),
+        })
+    }
+}
+
+/// Report of `jit gate evaluate-many`: the success payload, or `error.details`
+/// when an entry failed.
 ///
 /// `results` holds one entry per requested issue, in argument order.
-pub type GateEvaluateManyResponse = ListEnvelope<ResultsKey, GateEvaluateManyResult>;
+pub type GateEvaluateManyResponse = ListEnvelope<GateEvaluationsKey, GateEvaluateManyResult>;
 
 /// JSON payload of `jit gate status --all` / `--limit` (the history view).
 ///
@@ -3054,6 +3034,11 @@ impl HumanRender for LabelValuesResponse {
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
     ListEnvelope<WorktreesKey, crate::commands::worktree::WorktreeListEntry>;
+
+/// `worktree exec` writes no response: its child owns stdout and stderr, and
+/// the child's exit status is the run's.
+#[derive(Debug, Serialize, JsonSchema)]
+pub enum WorktreeExecResponse {}
 
 /// Response for `worktree store-divergence`: every record the two stores
 /// disagree about, beside the stores that were compared.
@@ -3383,24 +3368,25 @@ mod tests {
     }
 
     #[test]
-    fn test_is_broken_pipe_write_panic_matches_stdout_and_stderr_messages() {
+    fn test_is_broken_pipe_write_panic_matches_stdout_and_stderr_payloads_of_either_shape() {
         assert!(is_broken_pipe_write_panic(
-            "failed printing to stdout: Broken pipe (os error 32)"
+            &"failed printing to stdout: Broken pipe (os error 32)"
         ));
         assert!(is_broken_pipe_write_panic(
-            "failed printing to stderr: Broken pipe (os error 32)"
+            &"failed printing to stderr: Broken pipe (os error 32)".to_owned()
         ));
     }
 
     #[test]
     fn test_is_broken_pipe_write_panic_rejects_unrelated_panics() {
-        assert!(!is_broken_pipe_write_panic("index out of bounds"));
+        assert!(!is_broken_pipe_write_panic(&"index out of bounds"));
         assert!(!is_broken_pipe_write_panic(
-            "failed printing to stdout: Permission denied (os error 13)"
+            &"failed printing to stdout: Permission denied (os error 13)"
         ));
         assert!(!is_broken_pipe_write_panic(
-            "some other message mentions Broken pipe in passing"
+            &"some other message mentions Broken pipe in passing"
         ));
+        assert!(!is_broken_pipe_write_panic(&32_i32));
     }
 
     #[test]

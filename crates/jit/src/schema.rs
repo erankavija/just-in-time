@@ -207,7 +207,7 @@ pub struct ExitCodeDoc {
 ///
 /// The classification rows derive from the typed-error classifier
 /// ([`classify`](crate::output::failure::classify)); the exception rows derive
-/// from the direct-exit sites in the CLI dispatch. The classifier's unit tests
+/// from the findings envelopes handlers return. The classifier's unit tests
 /// verify the classification rows against it, and
 /// [`CommandExitCode::code`] is verified against the global taxonomy in
 /// `schema.rs` tests, so this projection cannot silently drift from runtime
@@ -534,29 +534,12 @@ impl CommandSchema {
     }
 
     /// Legacy output schema table for leaves not yet registered with a
-    /// handler group (e.g., "issue_create").
-    pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
-        use crate::output::*;
-
-        // Helper to convert schemars schema to serde_json Value
-        fn schema_to_value<T: JsonSchema>() -> Value {
-            serde_json::to_value(schema_for!(T)).unwrap_or(json!({}))
-        }
-
-        let (schema, type_name) = match cmd_path {
-            // Gate commands
-            "gate_evaluate-many" => (
-                Some(schema_to_value::<GateEvaluateManyResponse>()),
-                "GateEvaluateManyResponse",
-            ),
-
-            // Default: no specific schema
-            _ => (None, "CommandResponse"),
-        };
-
+    /// handler group; it has no rows left, so every such leaf takes the
+    /// untyped `CommandResponse`.
+    pub(crate) fn get_output_schema_for_command(_cmd_path: &str) -> Option<OutputSchema> {
         Some(OutputSchema {
-            success_schema: schema,
-            success: type_name.to_string(),
+            success_schema: None,
+            success: "CommandResponse".to_string(),
             error: "ErrorResponse".to_string(),
         })
     }
@@ -670,8 +653,8 @@ impl CommandSchema {
     /// specific to a command family, and exceptions — codes a completed run
     /// emits to signal findings, or codes whose meaning departs from the global
     /// taxonomy. Classification rows mirror the typed-error classifier
-    /// (`output::failure::classify`); exception rows mirror
-    /// the direct process-exit sites in the CLI dispatch. Both are verified by
+    /// (`output::failure::classify`); exception rows mirror the findings
+    /// envelopes handlers return. Both are verified by
     /// test rather than hand-copied (@/inv/single-source-prose).
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
         let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
@@ -977,9 +960,8 @@ impl CommandSchema {
                 false,
             ),
             // Every command reaches this if its stdout write outlives the
-            // downstream reader (`| head`, etc.): a direct process::exit site
-            // (main's panic hook + catch_unwind), not the typed-error
-            // classifier.
+            // downstream reader (`| head`, etc.): the renderers return it, not
+            // the typed-error classifier.
             row(
                 "*",
                 141,
@@ -1029,8 +1011,8 @@ pub fn render_exit_code_reference() -> String {
          `jit --schema`. Each emitted mapping is bound by a test to the runtime \
          that produces it: the shared classifier (`classify` in \
          `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
-         command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals).\n\n",
+         findings envelope a completed run reports (the findings signals). Every \
+         run exits through one exit site with its envelope's code.\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");
@@ -1587,14 +1569,6 @@ mod tests {
         assert!(mismatched.is_empty(), "mismatched: {mismatched:?}");
     }
 
-    #[test]
-    fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("gate_evaluate-many").unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("gate_evaluate-many").unwrap();
-        assert_eq!(resolved.success, legacy.success);
-        assert_eq!(resolved.success_schema, legacy.success_schema);
-    }
-
     /// Regression (jit:c505031a): `gate status-all`'s output schema lookup
     /// key must match its canonical clap subcommand path (`gate_status-all`),
     /// not a retired alias spelling (`gate_check-all`). The lookup key is
@@ -1618,26 +1592,6 @@ mod tests {
         assert!(
             output.success_schema.is_some(),
             "gate status-all success_schema should be present"
-        );
-    }
-
-    #[test]
-    fn test_schema_gate_evaluate_many_has_output_schema() {
-        let schema = CommandSchema::generate();
-        let evaluate_many = schema
-            .commands
-            .get("gate")
-            .and_then(|command| command.subcommands.as_ref())
-            .and_then(|commands| commands.get("evaluate-many"))
-            .expect("gate evaluate-many subcommand");
-        let output = evaluate_many
-            .output
-            .as_ref()
-            .expect("gate evaluate-many should have an output schema");
-        assert_eq!(output.success, "GateEvaluateManyResponse");
-        assert!(
-            output.success_schema.is_some(),
-            "gate evaluate-many success_schema should be present"
         );
     }
 

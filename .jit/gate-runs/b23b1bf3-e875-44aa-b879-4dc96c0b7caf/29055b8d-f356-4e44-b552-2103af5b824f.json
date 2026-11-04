@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "93e9844b7ac5d1b4cc0545b35db091e42c33702d",
+  "completed_at": "2026-11-04T16:15:56.528003894Z",
+  "duration_ms": 297357,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are satisfied by the attributable current implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "29055b8d-f356-4e44-b552-2103af5b824f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T16:10:59.170410996Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8133e165 (claim), b13b9077 (refactor), 644e7b0f (merge), all reachable from HEAD\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18; @/issue/df129d9e/decision/D-03, D-04; @/invariant/architecture-dependency-direction, semantic-types, orthogonal-tests, essential-code-prose, single-source-prose\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T16:08:59Z); mcp-ci passed (exit 0, 2026-11-04T16:10:42Z); code-review pending\nTruncation recovery: narrowed the truncated merge diff to affected current handlers, output, schema, docs, and focused tests\n\n1. No findings identified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are satisfied by the attributable current implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

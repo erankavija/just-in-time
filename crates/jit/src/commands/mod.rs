@@ -1336,6 +1336,109 @@ fn derive_state_transition(
     })
 }
 
+/// The readiness changes a graph edit publishes in its own plan.
+struct DerivedReadiness {
+    /// Each corrected record, then its events.
+    intents: Vec<crate::repository_state::MutationIntent>,
+    /// The first promotion a graph rule refused, reported after apply.
+    error_after_apply: Option<crate::errors::TransitionBlockedError>,
+}
+
+impl DerivedReadiness {
+    /// Whether `id`'s corrected record is among the intents, so the caller
+    /// publishes no record of its own for it.
+    fn corrects(&self, id: &IssueId) -> bool {
+        self.intents.iter().any(|intent| {
+            matches!(intent, crate::repository_state::MutationIntent::UpdateIssue { issue } if &issue.id == id)
+        })
+    }
+}
+
+/// Map the readiness corrections the edit from `base` to `projected` demands
+/// ([`ReadinessScope::Affected`](crate::domain::queries::ReadinessScope)) to
+/// mutation intents. A promotion passes graph rules through
+/// [`derive_state_transition`]; a refused one records its `transition_blocked`
+/// events and keeps the record. A demotion applies directly.
+fn derive_readiness_intents(
+    base: &[Issue],
+    projected: &[Issue],
+    graph: &CapturedGraphEvidence<'_>,
+) -> Result<DerivedReadiness> {
+    use crate::domain::queries::{derive_readiness_corrections, ReadinessScope};
+    use crate::repository_state::MutationIntent;
+
+    let mut issues = projected.to_vec();
+    let mut events = Vec::new();
+    let mut updates = Vec::new();
+    let mut error_after_apply = None;
+    for (id, correction) in derive_readiness_corrections(base, projected, ReadinessScope::Affected)
+    {
+        let position = issues
+            .iter()
+            .position(|issue| issue.id == id)
+            .ok_or_else(|| anyhow!("corrected issue {id} is not projected"))?;
+        let issue = issues[position].clone();
+        let corrected = match correction {
+            ReadinessCorrection::Promote => {
+                match derive_state_transition(
+                    issue,
+                    State::Ready,
+                    false,
+                    CapturedTransitionEvidence {
+                        issues: &issues,
+                        graph,
+                    },
+                )? {
+                    DerivedStateTransition::Applied {
+                        issue,
+                        events: transition,
+                        ..
+                    } => {
+                        events.extend(transition);
+                        Some(*issue)
+                    }
+                    DerivedStateTransition::GraphBlocked {
+                        error,
+                        events: blocked,
+                    } => {
+                        events.extend(blocked);
+                        error_after_apply = error_after_apply.or(Some(error));
+                        None
+                    }
+                }
+            }
+            ReadinessCorrection::Demote => {
+                events.push((
+                    2,
+                    EventBody::draft_issue_state_changed(id, issue.state, State::Backlog),
+                ));
+                Some(Issue {
+                    state: State::Backlog,
+                    ..issue
+                })
+            }
+        };
+        if let Some(corrected) = corrected {
+            issues[position] = corrected.clone();
+            updates.push(MutationIntent::UpdateIssue {
+                issue: Box::new(corrected),
+            });
+        }
+    }
+    updates.extend(
+        events
+            .into_iter()
+            .map(|(phase, event)| MutationIntent::RecordEvent {
+                phase,
+                event: Box::new(event),
+            }),
+    );
+    Ok(DerivedReadiness {
+        intents: updates,
+        error_after_apply,
+    })
+}
+
 fn derive_field_update(
     original: Issue,
     request: &CapturedFieldUpdate,
@@ -1591,7 +1694,7 @@ fn derive_field_update(
         )
     }));
     let (promotions, blocked) = if request.rejection && entered_terminal {
-        let graph = evidence
+        let projected = evidence
             .issues
             .iter()
             .map(|candidate| {
@@ -1602,27 +1705,8 @@ fn derive_field_update(
                 }
             })
             .collect::<Vec<_>>();
-        crate::domain::queries::issues_becoming_ready(&graph)
-            .iter()
-            .try_fold((Vec::new(), None), |(mut intents, blocked), id| {
-                let dependent = graph
-                    .iter()
-                    .find(|candidate| &candidate.id == id)
-                    .cloned()
-                    .ok_or_else(|| anyhow!("captured dependent {id} disappeared"))?;
-                let (promoted, events, error) = issue::derive_ready_promotion(
-                    dependent,
-                    CapturedTransitionEvidence {
-                        issues: &graph,
-                        ..evidence
-                    },
-                )?;
-                intents.push(MutationIntent::UpdateIssue {
-                    issue: Box::new(promoted),
-                });
-                intents.extend(events);
-                Ok::<_, anyhow::Error>((intents, blocked.or(error)))
-            })?
+        let readiness = derive_readiness_intents(evidence.issues, &projected, evidence.graph)?;
+        (readiness.intents, readiness.error_after_apply)
     } else {
         (Vec::new(), None)
     };
