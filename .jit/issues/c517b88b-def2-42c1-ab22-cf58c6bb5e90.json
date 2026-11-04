@@ -16,7 +16,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "29eab864-1db0-4528-9119-0be5941a8214",
+      "status": "passed",
+      "updated_at": "2026-11-04T16:48:46.115894716Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0b44f9f2-9cfd-404b-bfd6-5bc2a84881c1",
+      "status": "failed",
+      "updated_at": "2026-11-04T16:53:58.960706519Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c517b88b-def2-42c1-ab22-cf58c6bb5e90",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Every redo record appends an event, enforced by plan construction and storage",
-  "updated_at": "2026-11-04T16:43:24.520743439Z"
+  "updated_at": "2026-11-04T16:53:58.960706519Z"
 }

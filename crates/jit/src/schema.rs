@@ -416,7 +416,7 @@ impl CommandSchema {
             subcommands,
             args,
             flags,
-            output: Self::resolve_output_schema(cmd_path).map(OutputSchema::with_warnings),
+            output: Self::get_output_schema_for_command(cmd_path).map(OutputSchema::with_warnings),
         }
     }
 
@@ -526,22 +526,9 @@ impl CommandSchema {
         }
     }
 
-    /// The output schema of the leaf at `cmd_path`: the handler registry's
-    /// entry when a group registers it, else the legacy table's.
-    pub(crate) fn resolve_output_schema(cmd_path: &str) -> Option<OutputSchema> {
+    /// The registered response schema of the executable command at `cmd_path`.
+    pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
         crate::dispatch::registered_output_schema(cmd_path)
-            .or_else(|| Self::get_output_schema_for_command(cmd_path))
-    }
-
-    /// Legacy output schema table for leaves not yet registered with a
-    /// handler group; it has no rows left, so every such leaf takes the
-    /// untyped `CommandResponse`.
-    pub(crate) fn get_output_schema_for_command(_cmd_path: &str) -> Option<OutputSchema> {
-        Some(OutputSchema {
-            success_schema: None,
-            success: "CommandResponse".to_string(),
-            error: "ErrorResponse".to_string(),
-        })
     }
 
     fn generate_types() -> HashMap<String, Value> {
@@ -1057,6 +1044,57 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_get_output_schema_for_command_uses_only_registered_responses() {
+        assert_eq!(
+            CommandSchema::get_output_schema_for_command("graph_rdeps")
+                .unwrap()
+                .success,
+            "GraphDownstreamResponse"
+        );
+        for path in ["unregistered_command", "graph", "graph_downstream"] {
+            assert!(
+                CommandSchema::get_output_schema_for_command(path).is_none(),
+                "{path} has no registered response"
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_registers_every_visible_executable_clap_path() {
+        fn walk(clap: &clap::Command, command: &Command, path: &str) {
+            if !clap.is_subcommand_required_set() {
+                let registered = crate::dispatch::registered_output_schema(path)
+                    .unwrap_or_else(|| panic!("{path} has no registered response"));
+                let output = command
+                    .output
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{path} has no generated response"));
+                assert_ne!(output.success, "CommandResponse", "{path}");
+                assert_eq!(output.success, registered.success, "{path}");
+                assert!(output.success_schema.is_some(), "{path}");
+            }
+            for child in clap
+                .get_subcommands()
+                .filter(|child| !child.is_hide_set() && child.get_name() != "help")
+            {
+                let name = child.get_name();
+                let child_path = format!("{path}_{name}");
+                let child_command = &command.subcommands.as_ref().unwrap()[name];
+                walk(child, child_command, &child_path);
+            }
+        }
+
+        let schema = CommandSchema::generate();
+        for command in crate::cli::Cli::command()
+            .get_subcommands()
+            .filter(|command| !command.is_hide_set() && command.get_name() != "help")
+        {
+            let name = command.get_name();
+            walk(command, &schema.commands[name], name);
+        }
+    }
+
+    #[test]
     fn test_hidden_field_set_for_known_commands() {
         let schema = CommandSchema::generate();
 
@@ -1526,7 +1564,7 @@ mod tests {
                     .output
                     .as_ref()
                     .and_then(|output| output.success_schema.clone());
-                let mut raw = CommandSchema::resolve_output_schema(&path)
+                let mut raw = CommandSchema::get_output_schema_for_command(&path)
                     .and_then(|output| output.success_schema);
                 if raw
                     .as_ref()

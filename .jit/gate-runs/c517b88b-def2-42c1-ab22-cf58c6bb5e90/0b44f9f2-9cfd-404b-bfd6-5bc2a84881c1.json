@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "951866a987ab304ecf2fef8085fa5ef532968fde",
+  "completed_at": "2026-11-04T16:53:58.958713077Z",
+  "duration_ms": 301628,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/mutation.rs",
+        "id": "F1",
+        "line": 1314,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Generic files_published event allocation advances rather than resets the operation context on retry."
+      }
+    ],
+    "summary": "Generic files_published events do not reset their reused mutation context across retries.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c517b88b-def2-42c1-ab22-cf58c6bb5e90",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0b44f9f2-9cfd-404b-bfd6-5bc2a84881c1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T16:48:57.329724127Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7865 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a776-b68f-7dc2-9d6b-58ec81734acb\n--------\nuser\n--- 7852 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `5c5d4fe2d` (`jit:c517b88b`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-17` (dev/vision/9db27a3a-charter.md); `@/charter/D-22` (dev/vision/9db27a3a-charter.md); `@/invariant/event-log` (.jit/invariants.toml); `@/issue/b697a3f7/requirement/REQ-23` (issue description)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: reread bounded retry-driver, publication, command, export, and package-tree ranges after one truncated search\n\n1. **F1 — blocking, issue-impact (medium):** `publication_of` allocates the generic event directly without resetting the reused `MutationContext`. Contexts intentionally survive session retries, but a retry therefore consumes the next ID instead of rebuilding the same deterministic publication candidate. Call `context.begin()` before composing the generic `files_published` event and add a same-context retry/replan test. [crates/jit/src/repository_state/mutation.rs:1314](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mutation.rs:1314)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Generic files_published events do not reset their reused mutation context across retries.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Generic files_published event allocation advances rather than resets the operation context on retry.\",\"file\":\"crates/jit/src/repository_state/mutation.rs\",\"line\":1314,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
