@@ -12,6 +12,22 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt::Write;
 
+/// Collection key of [`IssueListResponse`].
+pub enum ListedIssuesKey {}
+
+impl CollectionKey for ListedIssuesKey {
+    const KEY: &'static str = "issues";
+    const SCHEMA_NAME: Option<&'static str> = Some("IssueListResponse");
+}
+
+/// Collection key of [`IssueSearchResponse`].
+pub enum SearchedIssuesKey {}
+
+impl CollectionKey for SearchedIssuesKey {
+    const KEY: &'static str = "issues";
+    const SCHEMA_NAME: Option<&'static str> = Some("IssueSearchResponse");
+}
+
 /// Collection key of [`IssueChildrenResponse`].
 pub enum ChildrenKey {}
 

@@ -21,7 +21,7 @@ mod issue;
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 pub use issue::{
     ChildrenKey, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
-    IssueStatusOutput,
+    IssueStatusOutput, ListedIssuesKey, SearchedIssuesKey,
 };
 
 use crate::declarations::{GateMode, GateStage};
@@ -1434,7 +1434,7 @@ collection_keys! {
 
 /// Generic response for issue list queries (available, all, ready, etc.)
 /// Uses MinimalIssue for efficiency - contains only id, title, state, priority
-pub type IssueListResponse = ListEnvelope<IssuesKey, MinimalIssue>;
+pub type IssueListResponse = ListEnvelope<ListedIssuesKey, MinimalIssue>;
 
 /// Full-record response for `jit query … --full --json`.
 ///
@@ -1451,7 +1451,7 @@ pub type IssueListFullResponse = ListEnvelope<IssuesKey, Issue>;
 ///
 /// The [`IssueListResponse`] shape plus the echoed `query`: lean
 /// [`MinimalIssue`] entries with no gate fields.
-pub type IssueSearchResponse = ListEnvelope<IssuesKey, MinimalIssue, IssueSearchQuery>;
+pub type IssueSearchResponse = ListEnvelope<SearchedIssuesKey, MinimalIssue, IssueSearchQuery>;
 
 /// Full-record response for `jit issue search … --full --json`.
 ///

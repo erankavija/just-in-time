@@ -63,3 +63,27 @@ fn test_issue_show_missing_item_reports_item_not_found() {
     assert_eq!(envelope["error"]["code"], "ITEM_NOT_FOUND");
     assert_eq!(json_exit, human_exit);
 }
+
+#[test]
+fn test_issue_show_multi_id_load_failure_carries_the_failed_to_load_context() {
+    let repository = JitCli::initialised().unwrap();
+    let good = repository.create_issue(["--title", "Good"]).unwrap();
+    let broken = repository.create_issue(["--title", "Broken"]).unwrap();
+    fs::write(
+        repository.root().join(format!(".jit/issues/{broken}.json")),
+        b"{",
+    )
+    .unwrap();
+
+    let output = repository
+        .command(["issue", "show", &good, &broken])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("Failed to load issue {broken}")),
+        "{stderr}"
+    );
+}

@@ -14,13 +14,18 @@ use crate::output::{
 };
 use crate::schema::OutputSchema;
 use crate::storage::IssueStore;
+use anyhow::Context as _;
 
 fn show_response<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     requested: &str,
 ) -> anyhow::Result<IssueShowResponse> {
     let issues = ctx.executor.issues();
-    issues.show_response(issues.show_issue(&resolve_issue(ctx.executor.storage(), requested)?)?)
+    let id = resolve_issue(ctx.executor.storage(), requested)?;
+    let issue = issues
+        .show_issue(&id)
+        .with_context(|| format!("Failed to load issue {id}"))?;
+    issues.show_response(issue)
 }
 
 fn show<S: IssueStore>(
