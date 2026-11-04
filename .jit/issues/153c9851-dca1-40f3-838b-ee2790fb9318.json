@@ -10,6 +10,7 @@
   ],
   "description": "The config arms assemble the effective configuration and validate it inline. This moves the config group to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ConfigCommands::Show` builds the whole effective-config tree with `json!`, `Get` and `Set` build bodies inline, and `Validate` carries its checking logic and a local `struct ValidationResult` in the arm, rendering through `render_validation_json` and calling `std::process::exit` on errors. One config arm substitutes `INVALID_ARGUMENT` for its failures, and `ShowHierarchy` renders inline. Every config leaf falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `config show|get|set|validate|show-hierarchy` to a handler in `crates/jit/src/dispatch/config.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: The config check lives in `crates/jit/src/commands/config.rs` and returns a report; `config validate` with errors returns a findings outcome with `VALIDATION_FAILED`, printed in human mode through the shared validation-report renderer.\n- [hard] REQ-03: Each leaf returns its registered output-owned response type, and the schema names that type for each leaf.\n- [hard] REQ-04: The handler returns failures as errors with no substituted code or `std::process::exit`, and a test states any exit code that changes as a result.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n842b0ac6 removes inert keys from `config show`; migrate whatever the arm holds when this starts.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T05:21:00.684833692Z",
   "first_ready_at": "2026-11-03T23:08:01.083088838Z",
   "gates_required": [
     "cargo-ci",
@@ -21,6 +22,12 @@
       "run_id": "27c981d4-3762-45a2-a976-f73b791c64c3",
       "status": "passed",
       "updated_at": "2026-11-04T05:10:58.585049407Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1511e043-2df1-42d2-a2db-c5ecfc778295",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:21:00.349879611Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -45,7 +52,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Config commands move to library handlers",
-  "updated_at": "2026-11-04T05:11:17.367762493Z"
+  "updated_at": "2026-11-04T05:21:00.684833692Z"
 }

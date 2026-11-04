@@ -1026,7 +1026,7 @@
       "note": "lead review: top-level rdeps left in legacy table (REQ-01/02); batch boundary-edge human text changed (REQ-06); +162 lines"
     },
     "153c9851": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
