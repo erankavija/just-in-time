@@ -107,7 +107,12 @@ fn test_doc_check_links_checks_and_tracks_a_derived_document() {
     write_file(cli.root(), &design, "# design\n");
 
     let scope = format!("issue:{}", issue.short_id());
-    let report = json_output(&cli, &["doc", "check-links", "--scope", &scope]);
+    // A broken link makes the command fail, carrying the report as `error.details`.
+    let envelope = json_output(&cli, &["doc", "check-links", "--scope", &scope]);
+    let report = envelope
+        .pointer("/error/details")
+        .cloned()
+        .unwrap_or(envelope);
     let findings = |kind: &str| -> Vec<Value> {
         report[kind]
             .as_array()
@@ -122,7 +127,7 @@ fn test_doc_check_links_checks_and_tracks_a_derived_document() {
         "the derived document's links are checked: {report}"
     );
     assert!(
-        findings("warnings")
+        findings("link_warnings")
             .iter()
             .all(|warning| warning["link"] != "design.md"),
         "a link to a derived document targets a tracked document: {report}"

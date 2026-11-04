@@ -773,16 +773,6 @@ impl CommandSchema {
                 Some(schema_to_value::<GateListResponse>()),
                 "GateListResponse",
             ),
-            // `doc dir` resolves one value, so it declares the flat named object
-            // rather than a list envelope.
-            "doc_dir" => (
-                Some(schema_to_value::<ArtifactDirectoryResponse>()),
-                "ArtifactDirectoryResponse",
-            ),
-            "doc_conformance" => (
-                Some(schema_to_value::<ArtifactConformanceResponse>()),
-                "ArtifactConformanceResponse",
-            ),
             "label_namespaces" => (
                 Some(schema_to_value::<NamespacesResponse>()),
                 "NamespacesResponse",
@@ -811,14 +801,6 @@ impl CommandSchema {
             "worktree_store-divergence" => (
                 Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
                 "WorktreeStoreDivergenceResponse",
-            ),
-            "doc_list" => (
-                Some(schema_to_value::<crate::commands::DocumentListResult>()),
-                "DocumentListResult",
-            ),
-            "doc_assets_list" => (
-                Some(schema_to_value::<crate::commands::AssetListResult>()),
-                "AssetListResult",
             ),
             "item_list" | "item_search" => (
                 Some(schema_to_value::<crate::commands::ItemListResult>()),
@@ -1143,7 +1125,7 @@ impl CommandSchema {
             ),
             row(
                 "doc check-links",
-                1,
+                4,
                 "One or more documents have broken links. Documents with only \
                  risky-link warnings exit `0`: warnings are reported, never fatal.",
                 true,
@@ -1235,7 +1217,7 @@ pub fn render_exit_code_reference() -> String {
         "Most commands draw only from the global taxonomy above. The rows below \
          identify the codes a specific command family emits. An **exception** is \
          a code a completed run emits to signal findings, or a code whose meaning \
-         departs from the global entry (for example, `doc check-links` exits `1` \
+         departs from the global entry (for example, `doc check-links` exits `4` \
          for broken links, not a generic error). A `child` code marks a pass-through, \
          where the command exits with a subprocess's own code. `*` marks a code \
          every command can reach: `0` on successful completion, and the failure \

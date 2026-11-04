@@ -751,7 +751,7 @@ row_bindings! {
     test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", Some(4), true) => invoke_gate_status_all;
     test_command_exit_codes_invariant_check_emits_4: ("invariant check", Some(4), true) => invoke_invariant_check;
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", Some(4), false) => invoke_config_validate;
-    test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", Some(1), true) => invoke_doc_check_links;
+    test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", Some(4), true) => invoke_doc_check_links;
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", Some(3), false) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", Some(1), false) => invoke_serve_daemon_error;
     #[cfg(unix)]
