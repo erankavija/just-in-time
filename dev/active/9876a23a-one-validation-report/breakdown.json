@@ -892,8 +892,7 @@
       "code-review"
     ],
     "depends_on": [
-      "report-selection",
-      "capture-hands-records"
+      "issue-views-over-selection"
     ],
     "planning": {
       "outcome": "jit validate <id> --rule <rule> captures once and selects the rule's findings for the issue from the one report.",
@@ -943,8 +942,7 @@
       "code-review"
     ],
     "depends_on": [
-      "report-selection",
-      "capture-hands-records"
+      "issue-views-over-selection"
     ],
     "planning": {
       "outcome": "jit validate --scope evaluates rules over the whole repository and restricts the report to the container's bracket scope.",
@@ -1145,7 +1143,6 @@
       "code-review"
     ],
     "depends_on": [
-      "issue-views-over-selection",
       "scope-view-over-selection",
       "invariant-drift-over-declarations",
       "gate-checkers-over-selection",
@@ -1243,7 +1240,6 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "issue-views-over-selection",
       "scope-view-over-selection",
       "invariant-drift-over-declarations",
       "gate-checkers-over-selection"
@@ -1641,7 +1637,6 @@
       "code-review"
     ],
     "depends_on": [
-      "issue-views-over-selection",
       "scope-view-over-selection",
       "capture-spec-incremental",
       "create-output-reports-findings",
