@@ -36,6 +36,47 @@
       "format": "markdown",
       "label": "Planning handoff",
       "path": "dev/active/df129d9e-rust-code-quality/handoff.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "6c50b30d6dc97ff4bdc5dfdaf450a3380b86fd3089b4880ba05b0dc7e52b0224",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-12.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/handoff-12.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "317eb482803a8da93b590c78dc78ffb03464669e58e15d18a50fe668142c9761",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/handoff.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "31f5585ee896f9b12ed4107117c64bc584b1f9f9f2dc60e46b6e683fea7975ae",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "progress.json",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ed44ff428a7736645d194e223131bd88346d77b1dd53cbfd7e6229ff8fd5b4da",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "plan.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/plan.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Session 13 handoff",
+      "path": "dev/active/df129d9e-rust-code-quality/handoff-13.md"
     }
   ],
   "first_ready_at": "2026-07-27T20:07:37.084018691Z",
@@ -57,5 +98,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-11-04T15:21:09.705218647Z"
+  "updated_at": "2026-11-04T21:00:11.829454824Z"
 }
