@@ -1078,7 +1078,7 @@ mod tests {
         };
         std::fs::write(&file, serde_json::to_vec(&record).unwrap()).unwrap();
 
-        let error = validate_live(&executor).unwrap_err().to_string();
+        let error = failure(&validate_live(&executor).unwrap_err());
 
         assert!(
             error.contains("record-fidelity") && error.contains(&path.repository_relative()),
