@@ -14,8 +14,7 @@ Outgoing lead: just-in-time-7c (`agent:df129d9e-lead`), which took over from jus
   - Stories: c06daf50, f35c86de, fe3ad1b0, 46fe7593, fb2dc5c3. They close when their tasks do.
   - Tasks still to run: 487f45a9, 0eca332a, fb38bf1f, 0546fc82, f9977efd, f487aeef (held), fba8d478 (after f487aeef), and a08c4b38 (completion report, last).
 - b697a3f7 issues executed by this lead (they count on b697a3f7's own ledger, plan D-54):
-  - Done: f56bad8d, f7a59f5f, 4575a03d, 1ade3e6f, ceaaf0ab, 5d09e74b, d58f80c9, 01a88d32, c517b88b, 945f9181, b674382e, eaca3f52.
-  - 635f23c7 and 578ed10d: see the final status section at the end.
+  - Done: f56bad8d, f7a59f5f, 4575a03d, 1ade3e6f, ceaaf0ab, 5d09e74b, d58f80c9, 01a88d32, c517b88b, 945f9181, b674382e, eaca3f52, 635f23c7, 578ed10d.
   - Track A remainder, all backlog: c2b3cefa → d2acb105 → fe9147fa → 693a2fdd. c2b3cefa is sequenced against gate writes.
   - Track B is finished apart from the archive tail (65aafaba, c0775a83, 4e2bed35, e73ad8bc, 30334066, 19404174), which is blocked on epic f4d9502a (git-cli-module). That epic has no lead.
 - Active claims: none. Every lease was released at handoff. Re-acquire with `jit claim acquire <id> --ttl 86400`. Acquiring also assigns an unassigned issue, then run `jit issue update <id> --state in_progress` so the tracker shows dispatched work; 6a checks this.
@@ -24,12 +23,11 @@ Outgoing lead: just-in-time-7c (`agent:df129d9e-lead`), which took over from jus
 
 ### Ledgers
 
-- **df129d9e, REQ-10 (whole-crate net production lines against baseline dc2ea8706, ceiling +375, plan D-54):** **+188** over 98 first-parent merges; the crate is at 73,644 at b93170ced.
+- **df129d9e, REQ-10 (whole-crate net production lines against baseline dc2ea8706, ceiling +375, plan D-54):** **+171** over 101 first-parent merges; the crate is at 73,631 on main after 6acd7a05's merge f004e7cd3.
   - Per-merge deltas since 2026-11-04 are in `progress.json` → `line_target.whole_crate_ledger.since_2026_11_04`.
-  - This session: f82a2e4a −60, 10fdad38 −221, 9be5b0de −23, 8fbf8c43 −31, 24a982b7 +27, f87f9b00 −114, 3f816619 −105, b23b1bf3 −53, 5687e281 −175, da30b92a −8, ae3f4f8b −13, 0bc448fb +31, 8b3cce62 −106 (first merge).
+  - This session: f82a2e4a −60, 10fdad38 −221, 9be5b0de −23, 8fbf8c43 −31, 24a982b7 +27, f87f9b00 −114, 3f816619 −105, b23b1bf3 −53, 5687e281 −175, da30b92a −8, ae3f4f8b −13, 0bc448fb +31, 8b3cce62 −106 then −21 (rework), 6acd7a05 +4 then 0 (rework 2).
   - Measure a merge as `python3 scripts/production-lines.py <merge>^1` against `<merge>`; the TOTAL line is the figure.
-  - 6acd7a05 (expected about +12) and 8b3cce62's rework (expected about −21) are recorded in the final status section.
-- **b697a3f7 (own ledger):** 945f9181 +4, c517b88b +129 then +1 (rework), b674382e +21, eaca3f52 +248, 635f23c7 −99, 578ed10d +79. Recorded in `whole_crate_ledger.b697a3f7_merges`. Earlier b697a3f7 merges are in [ledger-2026-11-05.txt](ledger-2026-11-05.txt).
+- **b697a3f7 (own ledger):** 945f9181 +4, c517b88b +129 then +1 (rework), b674382e +21, eaca3f52 +248, 635f23c7 −99 then 0 (rework), 578ed10d +79 then +4 (rework). Recorded in `whole_crate_ledger.b697a3f7_merges`. Earlier b697a3f7 merges are in [ledger-2026-11-05.txt](ledger-2026-11-05.txt).
 
 ## What just happened
 
@@ -177,4 +175,8 @@ Context: on 2026-11-04 /mnt/nvme had 189 GB free. 21 done worktrees held hundred
 
 ## Final status at handoff
 
-(Filled in at handoff commit time; this section supersedes any earlier line about these issues.)
+- Every issue dispatched this session is landed, gated and closed: 8b3cce62 (rework 1), 6acd7a05 (rework 2, a lead doc fix), 635f23c7 (rework 1) and 578ed10d (rework 1). No worker is running.
+- Worktrees: every df129d9e and b697a3f7 worktree is reclaimed, with incremental dirs deleted first. Only `agent-4ba18af4` remains; it is another lead's ready issue and was left alone.
+- Branches `worktree-agent-<id>` are kept by the reclaim script. Every one is merged into main.
+- Leases: none held. Hold file: none. `jit validate` passes.
+- At the user's request the steward clears main's `target/`, the cache pool and `/mnt/nvme/jit/tmp` after this handoff. The first build next session is cold.
