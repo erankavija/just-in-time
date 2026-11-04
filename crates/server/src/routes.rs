@@ -17,12 +17,79 @@ use jit::declarations::GateDefinition;
 use jit::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use jit::domain::{Issue, Priority, State as IssueState};
 use jit::graph::hierarchy::NodeHierarchy;
-use jit::output::GateRunSummary;
+use jit::output::failure::classify;
+use jit::output::{ErrorCode, GateRunSummary};
 use jit::search::{SearchOptions, SearchResult};
-use jit::storage::{IssueStore, PathReadError};
+use jit::storage::IssueStore;
 
 use crate::sse;
 use crate::watcher::ChangeTracker;
+
+/// The HTTP status a failure of class `code` is reported with.
+fn status_of(code: ErrorCode) -> StatusCode {
+    match code {
+        ErrorCode::IssueNotFound
+        | ErrorCode::GateNotFound
+        | ErrorCode::RepositoryNotFound
+        | ErrorCode::DocumentNotFound
+        | ErrorCode::ItemNotFound => StatusCode::NOT_FOUND,
+        ErrorCode::InvalidArgument
+        | ErrorCode::InvalidLabelPattern
+        | ErrorCode::InvalidState
+        | ErrorCode::AmbiguousId
+        | ErrorCode::InvalidIdPrefix
+        | ErrorCode::DeletionNotConfirmed => StatusCode::BAD_REQUEST,
+        ErrorCode::CycleDetected
+        | ErrorCode::AlreadyExists
+        | ErrorCode::Blocked
+        | ErrorCode::ProfileConflict
+        | ErrorCode::ProfileUncommittedTargets
+        | ErrorCode::LinkedCheckoutWriteRefused => StatusCode::CONFLICT,
+        ErrorCode::ValidationFailed | ErrorCode::GateFailed => StatusCode::UNPROCESSABLE_ENTITY,
+        ErrorCode::PermissionDenied => StatusCode::FORBIDDEN,
+        ErrorCode::LockTimeout => StatusCode::SERVICE_UNAVAILABLE,
+        ErrorCode::IoError
+        | ErrorCode::ParseError
+        | ErrorCode::ClaimRequiresGit
+        | ErrorCode::RepositoryFormatUnsupported
+        | ErrorCode::DependencyError
+        | ErrorCode::GateError
+        | ErrorCode::GateCheckError
+        | ErrorCode::PresetError
+        | ErrorCode::ItemCommandFailed
+        | ErrorCode::InvariantCommandFailed
+        | ErrorCode::ProjectCommandFailed
+        | ErrorCode::ProfileError
+        | ErrorCode::SearchFailed
+        | ErrorCode::RipgrepNotFound
+        | ErrorCode::WorktreeInfoError
+        | ErrorCode::WorktreeListError
+        | ErrorCode::WorktreeStoreDivergenceError
+        | ErrorCode::HooksInstallError
+        | ErrorCode::GenericError
+        | ErrorCode::RecoveryFailed
+        | ErrorCode::ClaimAcquireError
+        | ErrorCode::ClaimReleaseError
+        | ErrorCode::ClaimRenewError
+        | ErrorCode::ClaimHeartbeatError
+        | ErrorCode::ClaimStatusError
+        | ErrorCode::ClaimListError
+        | ErrorCode::ClaimForceEvictError => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+/// The status of `error`, projected from the library's classification.
+fn status_of_failure(error: &anyhow::Error) -> StatusCode {
+    status_of(classify(error).error.code)
+}
+
+/// Log `error` and report it with the status its classification maps to.
+fn reject(error: impl Into<anyhow::Error>) -> StatusCode {
+    let error = error.into();
+    let status = status_of_failure(&error);
+    tracing::warn!(%status, "request failed: {error:#}");
+    status
+}
 
 /// Shared application state
 #[derive(Clone)]
@@ -145,26 +212,15 @@ async fn list_issues<S: IssueStore>(
         .list_issues(None, None, None)
         .and_then(|issues| state.executor.documents().with_reported_documents(issues))
         .map(|issues| Json(issues.into_iter().map(IssueResponse::from).collect()))
-        .map_err(|e| {
-            tracing::error!("Failed to list issues: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
+        .map_err(reject)
 }
 
 fn resolve_issue_path_id<S: IssueStore>(
     executor: &CommandExecutor<S>,
     requested: &str,
 ) -> Result<IssueId, StatusCode> {
-    let prefix = requested
-        .parse::<IssueIdPrefix>()
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    executor
-        .storage()
-        .resolve_issue_id(&prefix)
-        .map_err(|error| {
-            tracing::debug!("Failed to resolve issue id {}: {:?}", requested, error);
-            StatusCode::NOT_FOUND
-        })
+    let prefix = requested.parse::<IssueIdPrefix>().map_err(reject)?;
+    executor.storage().resolve_issue_id(&prefix).map_err(reject)
 }
 
 /// Get single issue by ID, its `documents` explicit and derived.
@@ -173,18 +229,12 @@ async fn get_issue<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<IssueResponse>, StatusCode> {
     let id = resolve_issue_path_id(&state.executor, &id)?;
-    let mut issue = state.executor.issues().show_issue(&id).map_err(|e| {
-        tracing::error!("Failed to get issue {}: {:?}", id, e);
-        StatusCode::NOT_FOUND
-    })?;
+    let mut issue = state.executor.issues().show_issue(&id).map_err(reject)?;
     issue.documents = state
         .executor
         .documents()
         .issue_documents(&issue)
-        .map_err(|e| {
-            tracing::error!("Failed to list documents of issue {}: {:?}", id, e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
     Ok(Json(IssueResponse::from(issue)))
 }
 
@@ -254,10 +304,7 @@ async fn get_graph<S: IssueStore>(
         .executor
         .issues()
         .list_issues(None, None, None)
-        .map_err(|e| {
-            tracing::error!("Failed to list issues for graph: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     // Build node lookup for blocked state calculation
     let issue_map: std::collections::HashMap<IssueId, &Issue> =
@@ -266,10 +313,7 @@ async fn get_graph<S: IssueStore>(
     // Resolve the hierarchy with the core resolver, over the repo's type levels.
     let issue_refs: Vec<&Issue> = issues.iter().collect();
     let config =
-        jit::config_manager::get_hierarchy_config(state.executor.storage()).map_err(|e| {
-            tracing::error!("Failed to load hierarchy configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        jit::config_manager::get_hierarchy_config(state.executor.storage()).map_err(reject)?;
     let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
     // Create nodes
@@ -322,10 +366,7 @@ pub struct StatusResponse {
 async fn get_status<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = state.executor.validation().get_status().map_err(|e| {
-        tracing::error!("Failed to get status: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let summary = state.executor.validation().get_status().map_err(reject)?;
 
     Ok(Json(StatusResponse {
         backlog: summary.backlog,
@@ -378,15 +419,9 @@ async fn search_issues<S: IssueStore>(
         .executor
         .documents()
         .get_issue_document_paths()
-        .map_err(|e| {
-            tracing::error!("Failed to get issue documents: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
-    let layout = state.executor.repository_layout().map_err(|error| {
-        tracing::error!("Search has no repository layout: {:?}", error);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let layout = state.executor.repository_layout().map_err(reject)?;
     // An empty glob list would search every worktree file, so documents are searched only when linked.
     let mut results = if document_paths.is_empty() {
         Vec::new()
@@ -398,10 +433,7 @@ async fn search_issues<S: IssueStore>(
             file_patterns: document_paths,
             ..Default::default()
         };
-        jit::search::search(layout.worktree_root(), &params.q, options).map_err(|e| {
-            tracing::error!("Search failed: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?
+        jit::search::search(layout.worktree_root(), &params.q, options).map_err(reject)?
     };
     if results.len() < params.limit {
         let remaining = params.limit - results.len();
@@ -412,11 +444,8 @@ async fn search_issues<S: IssueStore>(
             file_patterns: vec!["issues/*.json".to_string()],
             ..Default::default()
         };
-        let mut data_results = jit::search::search(layout.data_root(), &params.q, data_options)
-            .map_err(|e| {
-                tracing::error!("Data-root search failed: {:?}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        let mut data_results =
+            jit::search::search(layout.data_root(), &params.q, data_options).map_err(reject)?;
         results.append(&mut data_results);
     }
 
@@ -437,17 +466,6 @@ struct DocumentByPathQuery {
     commit: Option<String>,
 }
 
-/// Map a typed `PathReadError` to an HTTP status code.
-fn path_read_error_status(e: &PathReadError) -> StatusCode {
-    match e {
-        PathReadError::NotFound(_) | PathReadError::CommitNotFound(_) => StatusCode::NOT_FOUND,
-        PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_) => {
-            StatusCode::BAD_REQUEST
-        }
-        PathReadError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
-}
-
 /// Get document content by path (without requiring issue ID)
 ///
 /// This endpoint allows accessing documents directly by their filesystem path,
@@ -464,10 +482,7 @@ async fn get_document_by_path<S: IssueStore>(
         .executor
         .documents()
         .read_path_bytes(&query.path, query.commit.as_deref())
-        .map_err(|e| {
-            tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
     // Convert bytes to String for the JSON response (lossy for binary files).
     let content = String::from_utf8_lossy(&bytes).into_owned();
     Ok(Json(DocumentContentResponse {
@@ -699,10 +714,7 @@ async fn get_document_content<S: IssueStore>(
         .executor
         .documents()
         .read_document_content(&id, &path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read document content: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     Ok(Json(DocumentContentResponse {
         path: path.clone(),
@@ -731,10 +743,7 @@ async fn get_document_raw<S: IssueStore>(
         .executor
         .documents()
         .read_document_bytes(&id, &path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read raw document bytes: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let content_type = infer_content_type(&path);
 
@@ -774,7 +783,7 @@ async fn get_document_raw<S: IssueStore>(
 /// escapes) is enforced by `JsonFileStorage::read_path_bytes`, which is
 /// invariant-owning for this concern.  Invalid paths and out-of-repo escapes
 /// surface as `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`,
-/// both mapped to HTTP 400 by `path_read_error_status`.
+/// both classified as invalid arguments.
 async fn get_document_raw_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
@@ -785,10 +794,7 @@ async fn get_document_raw_by_path<S: IssueStore>(
         .executor
         .documents()
         .read_path_bytes(&query.path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read path {}: {:?}", query.path, e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
     let content_type = infer_content_type(&query.path);
 
     // Inject <base href> into HTML responses.  The storage layer rejects
@@ -828,7 +834,7 @@ async fn get_document_raw_by_path<S: IssueStore>(
 /// Security: repo-root containment (rejecting empty/absolute/`..` paths and
 /// symlink escapes) is enforced by `JsonFileStorage::read_path_bytes`.  The
 /// resulting `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`
-/// variants map to HTTP 400 via `path_read_error_status`.
+/// variants classify as invalid arguments.
 async fn get_raw_wildcard<S: IssueStore>(
     Path(path): Path<String>,
     Query(query): Query<DocumentContentQuery>,
@@ -840,10 +846,7 @@ async fn get_raw_wildcard<S: IssueStore>(
         .executor
         .documents()
         .read_path_bytes(&path, at_commit)
-        .map_err(|e| {
-            tracing::error!("Failed to read raw path {}: {:?}", path, e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let content_type = infer_content_type(&path);
 
@@ -896,10 +899,7 @@ async fn get_document_history<S: IssueStore>(
         .executor
         .documents()
         .get_document_history(&id, &path)
-        .map_err(|e| {
-            tracing::error!("Failed to get document history: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let commits_response = commits
         .into_iter()
@@ -946,10 +946,7 @@ async fn get_document_diff<S: IssueStore>(
         .executor
         .documents()
         .get_document_diff(&id, &path, &query.from, to)
-        .map_err(|e| {
-            tracing::error!("Failed to get document diff: {:?}", e);
-            path_read_error_status(&e)
-        })?;
+        .map_err(reject)?;
 
     let to_ref = to.unwrap_or("HEAD");
 
@@ -965,10 +962,12 @@ async fn get_document_diff<S: IssueStore>(
 async fn list_gates<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
-    state.executor.gates().list_gates().map(Json).map_err(|e| {
-        tracing::error!("Failed to list gates: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+    state
+        .executor
+        .gates()
+        .list_gates()
+        .map(Json)
+        .map_err(reject)
 }
 
 /// Get a single gate definition by key
@@ -981,10 +980,7 @@ async fn get_gate_definition<S: IssueStore>(
         .gates()
         .show_gate_definition(&key)
         .map(Json)
-        .map_err(|e| {
-            tracing::error!("Failed to get gate definition {}: {:?}", key, e);
-            StatusCode::NOT_FOUND
-        })
+        .map_err(reject)
 }
 
 /// Query parameters for gate runs
@@ -1004,32 +1000,23 @@ async fn list_gate_runs<S: IssueStore>(
         .executor
         .gates()
         .list_gate_runs(&id, params.gate_key.as_ref())
-        .map_err(|e| {
-            tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
-            StatusCode::NOT_FOUND
-        })?;
+        .map_err(reject)?;
 
     Ok(Json(runs.iter().map(GateRunSummary::lean).collect()))
 }
 
 /// Get a single gate run result with full stdout/stderr
 async fn get_gate_run<S: IssueStore>(
-    Path((id, run_id)): Path<(String, String)>,
+    Path((id, run_id)): Path<(String, GateRunId)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
     let id = resolve_issue_path_id(&state.executor, &id)?;
-    let run_id = run_id
-        .parse::<GateRunId>()
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .executor
         .gates()
         .get_gate_run_result(&id, &run_id)
         .map(|r| Json(GateRunSummary::full(&r)))
-        .map_err(|e| {
-            tracing::error!("Failed to get gate run {}: {:?}", run_id, e);
-            StatusCode::NOT_FOUND
-        })
+        .map_err(reject)
 }
 
 /// Response for strategic types
@@ -1046,10 +1033,7 @@ async fn get_strategic_types<S: IssueStore>(
         .executor
         .config_manager
         .get_namespaces()
-        .map_err(|e| {
-            tracing::error!("Failed to load configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
@@ -1072,10 +1056,7 @@ async fn get_hierarchy<S: IssueStore>(
         .executor
         .config_manager
         .get_namespaces()
-        .map_err(|e| {
-            tracing::error!("Failed to load configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
@@ -1085,10 +1066,7 @@ async fn get_hierarchy<S: IssueStore>(
         .executor
         .config_manager
         .get_hierarchy_icons()
-        .map_err(|e| {
-            tracing::error!("Failed to load hierarchy icons: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     Ok(Json(HierarchyResponse {
         types,
@@ -1117,10 +1095,7 @@ async fn get_namespaces<S: IssueStore>(
         .executor
         .config_manager
         .get_namespaces()
-        .map_err(|e| {
-            tracing::error!("Failed to load configuration: {:?}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+        .map_err(reject)?;
 
     let namespaces = label_namespaces
         .namespaces
@@ -1163,7 +1138,7 @@ mod tests {
     use axum_test::TestServer;
     use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::domain::Priority;
-    use jit::storage::{InMemoryStorage, JsonFileStorage};
+    use jit::storage::{InMemoryStorage, JsonFileStorage, PathReadError};
     use jit::test_utils::setup_test_repo_with_config;
 
     use crate::watcher::ChangeTracker;
@@ -1185,6 +1160,62 @@ mod tests {
             shutdown: CancellationToken::new(),
         };
         TestServer::new(create_routes(state)).unwrap()
+    }
+
+    /// The status the server reports for `error`, derived from its classification.
+    fn status_of_error(error: impl Into<anyhow::Error>) -> StatusCode {
+        status_of(classify(&error.into()).error.code)
+    }
+
+    #[test]
+    fn test_status_of_maps_each_error_class_to_its_http_status() {
+        let expected = [
+            (ErrorCode::IssueNotFound, StatusCode::NOT_FOUND),
+            (ErrorCode::DocumentNotFound, StatusCode::NOT_FOUND),
+            (ErrorCode::InvalidArgument, StatusCode::BAD_REQUEST),
+            (ErrorCode::AmbiguousId, StatusCode::BAD_REQUEST),
+            (ErrorCode::CycleDetected, StatusCode::CONFLICT),
+            (
+                ErrorCode::ValidationFailed,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (ErrorCode::PermissionDenied, StatusCode::FORBIDDEN),
+            (ErrorCode::LockTimeout, StatusCode::SERVICE_UNAVAILABLE),
+            (ErrorCode::IoError, StatusCode::INTERNAL_SERVER_ERROR),
+            (ErrorCode::ParseError, StatusCode::INTERNAL_SERVER_ERROR),
+        ];
+        for (code, status) in expected {
+            assert_eq!(status_of(code), status, "{code:?}");
+        }
+        assert!(ErrorCode::ALL
+            .into_iter()
+            .map(status_of)
+            .all(|status| status.is_client_error() || status.is_server_error()));
+    }
+
+    #[test]
+    fn test_status_of_failure_reports_path_read_errors_by_what_they_describe() {
+        let status = |error: PathReadError| status_of_failure(&error.into());
+        assert_eq!(
+            status(PathReadError::NotFound("a".into())),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status(PathReadError::CommitNotFound("abc1234".into())),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status(PathReadError::InvalidPath("../x".into())),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(PathReadError::OutsideRepoRoot("link".into())),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(PathReadError::Other(anyhow::anyhow!("disk fault"))),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[tokio::test]
@@ -1222,15 +1253,50 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_issue_not_found() {
-        let server = test_app(memory_executor_declaring(
+        let executor = memory_executor_declaring(
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&taxonomy_config()),
                 ..MemoryDeclarations::default()
             },
-        ));
-        let response = server.get("/issues/nonexistent").await;
-        response.assert_status(StatusCode::NOT_FOUND);
+        );
+        let missing = executor
+            .storage()
+            .resolve_issue_id(&"nonexistent".parse().unwrap())
+            .unwrap_err();
+        let expected = status_of_error(missing);
+        let response = test_app(executor).get("/issues/nonexistent").await;
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::NOT_FOUND);
+    }
+
+    /// A stored issue that cannot be read is a server fault, not a missing issue.
+    #[tokio::test]
+    async fn test_get_issue_reports_an_unreadable_issue_as_a_server_error() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "Broken".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        std::fs::write(temp.path().join(format!(".jit/issues/{id}.json")), "{").unwrap();
+        let expected = status_of_error(executor.issues().show_issue(&id).unwrap_err());
+
+        let response = test_app(executor).get(&format!("/issues/{id}")).await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     #[tokio::test]
@@ -1971,7 +2037,10 @@ unique = false
         ));
         let response = server.get("/documents?path=nonexistent.md").await;
         // Should return 404 for file that doesn't exist
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     #[tokio::test]
@@ -2196,7 +2265,10 @@ unique = false
         let _path = HTML_DOC;
         let url = format!("/issues/{}/documents/nonexistent.html/raw", id);
         let response = server.get(&url).await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     #[tokio::test]
@@ -2326,7 +2398,10 @@ unique = false
             .get("/documents/raw")
             .add_query_param("path", "no_such_file.html")
             .await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     #[tokio::test]
@@ -2374,34 +2449,6 @@ unique = false
         assert_eq!(data.version, 2);
     }
 
-    // ── path_read_error_status unit tests ─────────────────────────────────────
-
-    /// Verify that `PathReadError::NotFound` → 404 and `Other` → 500.
-    ///
-    /// These are the two invariants the route handlers rely on; having them as
-    /// unit tests ensures a copy-change in the dispatch function is caught
-    /// immediately rather than only at the integration level.
-    #[test]
-    fn test_path_read_error_status_not_found_returns_404() {
-        let err = PathReadError::NotFound("docs/spec.md".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::NOT_FOUND);
-    }
-
-    #[test]
-    fn test_path_read_error_status_commit_not_found_returns_404() {
-        let err = PathReadError::CommitNotFound("abc1234".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::NOT_FOUND);
-    }
-
-    #[test]
-    fn test_path_read_error_status_other_returns_500() {
-        let err = PathReadError::Other(anyhow::Error::msg("I/O error: permission denied"));
-        assert_eq!(
-            path_read_error_status(&err),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-    }
-
     /// Verify that the `get_document_by_path` endpoint returns 404 for a
     /// missing file (relying on typed dispatch, not string-matching).
     #[tokio::test]
@@ -2418,7 +2465,10 @@ unique = false
             .get("/documents")
             .add_query_param("path", "does_not_exist.md")
             .await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     /// Verify that the `get_document_raw_by_path` endpoint returns 404 for a
@@ -2437,7 +2487,10 @@ unique = false
             .get("/documents/raw")
             .add_query_param("path", "does_not_exist.bin")
             .await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     /// A directory is not an ordinary document file and is rejected as an
@@ -2468,7 +2521,10 @@ unique = false
             .get("/documents")
             .add_query_param("path", dir_rel)
             .await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
@@ -2498,7 +2554,10 @@ unique = false
             .get("/documents/raw")
             .add_query_param("path", dir_rel)
             .await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
@@ -2553,7 +2612,10 @@ unique = false
         let encoded = percent_encode_segment(doc_rel);
         let url = format!("/issues/{}/documents/{}/content", id, encoded);
         let response = server.get(&url).await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
@@ -2859,7 +2921,10 @@ unique = false
 
         let url = format!("/issues/{}/documents/{}/raw", id, doc_rel);
         let response = server.get(&url).await;
-        assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::InvalidPath(String::new()))
+        );
         assert_eq!(response.text(), "");
     }
 
@@ -3027,26 +3092,6 @@ unique = false
         );
     }
 
-    // ── PathReadError → InvalidPath / OutsideRepoRoot mapping ─────────────────
-
-    /// `PathReadError::InvalidPath` must map to HTTP 400.  The storage layer
-    /// raises this for empty paths, absolute paths, and `..` traversal
-    /// attempts, and route handlers must surface those as client errors.
-    #[test]
-    fn test_path_read_error_status_invalid_path_returns_400() {
-        let err = PathReadError::InvalidPath("../etc/passwd".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::BAD_REQUEST);
-    }
-
-    /// `PathReadError::OutsideRepoRoot` must map to HTTP 400.  The storage
-    /// layer raises this when canonicalization shows the path escapes the
-    /// repo root (e.g. via a symlink).
-    #[test]
-    fn test_path_read_error_status_outside_repo_root_returns_400() {
-        let err = PathReadError::OutsideRepoRoot("docs/secret.txt".to_string());
-        assert_eq!(path_read_error_status(&err), StatusCode::BAD_REQUEST);
-    }
-
     // ── GET /raw/*path integration tests ─────────────────────────────────────
 
     fn seed_worktree_file(worktree: &std::path::Path, rel_path: &str, content: &[u8]) {
@@ -3172,7 +3217,10 @@ unique = false
             },
         ));
         let response = server.get("/raw/definitely/does/not/exist.svg").await;
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.status_code(),
+            status_of_error(PathReadError::NotFound(String::new()))
+        );
     }
 
     /// Commit-pinned HTML also gets base-tag injection (same as working-tree reads).
@@ -3329,7 +3377,7 @@ unique = false
         let response = server.get("/raw/docs/secret.txt").await;
         assert_eq!(
             response.status_code(),
-            StatusCode::BAD_REQUEST,
+            status_of_error(PathReadError::InvalidPath(String::new())),
             "symlink escaping repo root must be rejected with 400"
         );
     }
@@ -3396,7 +3444,7 @@ unique = false
         let response = server.get(&url).await;
         assert_eq!(
             response.status_code(),
-            StatusCode::BAD_REQUEST,
+            status_of_error(PathReadError::InvalidPath(String::new())),
             "symlink escaping repo root must be rejected on issue-scoped raw endpoint"
         );
     }
@@ -3439,7 +3487,7 @@ unique = false
             .await;
         assert_eq!(
             response.status_code(),
-            StatusCode::BAD_REQUEST,
+            status_of_error(PathReadError::InvalidPath(String::new())),
             "symlink escaping repo root must be rejected on path-only raw endpoint"
         );
     }
