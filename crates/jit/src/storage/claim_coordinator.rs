@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use super::lock::FileLocker;
 use super::worktree_paths::WorktreePaths;
-use crate::domain::identity::{IssueId, LeaseId, WorktreeId};
+use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId, WorktreeId};
 use crate::domain::Assignee;
 use crate::errors;
 
@@ -221,10 +221,19 @@ fn read_lease_record(shared_jit: &Path, issue_id: &IssueId) -> Result<Option<Lea
     Ok(Some(lease))
 }
 
-/// Every lease record, ordered by issue. Names other than a lease record's,
-/// such as an interrupted operation's stage file, are skipped, and so is a
-/// record removed while the directory is read.
+/// Every lease record, ordered by issue. A record removed while the directory
+/// is read is skipped.
 fn read_lease_records(shared_jit: &Path) -> Result<Vec<Lease>> {
+    lease_record_issues(shared_jit)?
+        .iter()
+        .filter_map(|issue_id| read_lease_record(shared_jit, issue_id).transpose())
+        .collect()
+}
+
+/// The issues named by lease record file names, sorted, without reading any
+/// record. Names other than a lease record's, such as an interrupted
+/// operation's stage file, are skipped.
+fn lease_record_issues(shared_jit: &Path) -> Result<Vec<IssueId>> {
     let dir = WorktreePaths::leases_dir(shared_jit);
     let entries = match fs::read_dir(&dir) {
         Ok(entries) => entries,
@@ -240,10 +249,7 @@ fn read_lease_records(shared_jit: &Path) -> Result<Vec<Lease>> {
         .collect::<std::io::Result<Vec<_>>>()
         .with_context(|| format!("Failed to list lease records in {}", dir.display()))?;
     issues.sort();
-    issues
-        .iter()
-        .filter_map(|issue_id| read_lease_record(shared_jit, issue_id).transpose())
-        .collect()
+    Ok(issues)
 }
 
 /// Claim coordinator for atomic lease operations
@@ -302,13 +308,23 @@ impl LeaseLock {
         read_lease_records(&self.coordinator.paths.shared_jit)
     }
 
-    /// `lease-id-scan-bridge`: find a lease by id until renew, heartbeat and
-    /// force-evict are addressed by issue.
-    fn find_by_lease_id(&self, lease_id: &LeaseId) -> Result<Lease> {
-        self.list()?
-            .into_iter()
-            .find(|lease| &lease.lease_id == lease_id)
-            .ok_or_else(|| lease_not_found(lease_id))
+    /// The issue among the stored lease records that `prefix` names, read
+    /// from record names only, so a lease whose issue was deleted resolves.
+    ///
+    /// # Errors
+    ///
+    /// [`LeaseNotFoundError`](errors::LeaseNotFoundError) when no record
+    /// matches, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError) when
+    /// several do.
+    fn resolve_leased_issue(&self, prefix: &IssueIdPrefix) -> Result<IssueId> {
+        let issues = lease_record_issues(&self.coordinator.paths.shared_jit)?;
+        crate::storage::resolve_unique_issue_id(prefix, issues.iter(), |id| Some(id.to_string()))
+            .map_err(
+                |error| match error.is::<crate::storage::IssueNotFoundError>() {
+                    true => no_active_lease(prefix),
+                    false => error,
+                },
+            )
     }
 
     /// Change the issue's lease through `op(current, now)`.
@@ -462,8 +478,9 @@ fn resolve_change(
     }
 }
 
-fn lease_not_found(lease_id: &LeaseId) -> anyhow::Error {
-    crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str())).into()
+/// The lease-not-found failure naming `issue`.
+pub(crate) fn no_active_lease(issue: impl std::fmt::Display) -> anyhow::Error {
+    errors::LeaseNotFoundError::new(&errors::no_active_lease(issue)).into()
 }
 
 /// The lease check a repository mutation reads through a [`LeaseLock`] held
@@ -684,32 +701,40 @@ impl ClaimCoordinator {
         Ok((lease, synced))
     }
 
-    /// Refresh `last_beat` on the caller's lease without changing its expiry.
+    /// Refresh `last_beat` on the caller's lease on `issue_id` without
+    /// changing its expiry.
     ///
     /// # Errors
     ///
-    /// The lease does not exist (or has expired), or another agent owns it.
-    pub fn heartbeat(&self, lease_id: &LeaseId) -> Result<Lease> {
-        let mut lock = self.lock()?;
-        let listed = lock.find_by_lease_id(lease_id)?;
-        lock.apply(&listed.issue_id, |current, now| {
-            if listed.agent_id != self.agent_id {
-                bail!(
-                    "Cannot heartbeat lease {} owned by {} (you are {})",
-                    lease_id,
-                    listed.agent_id,
-                    self.agent_id
-                );
-            }
-            let current = current
-                .filter(|lease| &lease.lease_id == lease_id)
-                .ok_or_else(|| lease_not_found(lease_id))?;
-            Ok(LeaseChange::Put(Lease {
-                last_beat: now,
-                ..current.clone()
-            }))
-        })?
-        .ok_or_else(|| lease_not_found(lease_id))
+    /// The issue has no unexpired lease, or another agent owns it. An expired
+    /// lease's eviction is persisted before the error.
+    pub fn heartbeat(&self, issue_id: &IssueId) -> Result<Lease> {
+        self.change_own_lease(issue_id, |current, now| Lease {
+            last_beat: now,
+            ..current.clone()
+        })
+    }
+
+    /// Put `change(current, now)` as the issue's lease when the caller owns it.
+    fn change_own_lease(
+        &self,
+        issue_id: &IssueId,
+        change: impl FnOnce(&Lease, DateTime<Utc>) -> Lease,
+    ) -> Result<Lease> {
+        self.lock()?
+            .apply(issue_id, |current, now| match current {
+                None => Err(no_active_lease(issue_id)),
+                Some(current) if current.agent_id != self.agent_id => bail!(
+                    "{}",
+                    errors::not_owner(
+                        &format!("the lease on issue {issue_id}"),
+                        &current.agent_id.to_string(),
+                        &self.agent_id.to_string()
+                    )
+                ),
+                Some(current) => Ok(LeaseChange::Put(change(current, now))),
+            })?
+            .ok_or_else(|| no_active_lease(issue_id))
     }
 
     /// Append `lines` to the claims log in one write.
@@ -843,66 +868,46 @@ impl ClaimCoordinator {
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
 
-    /// Renew the caller's lease: a finite lease expires `extension_secs` from
-    /// now, an indefinite one gets a heartbeat.
+    /// Renew the caller's lease on `issue_id`: a finite lease expires
+    /// `extension_secs` from now, an indefinite one gets a heartbeat.
     ///
     /// # Errors
     ///
-    /// The lease is owned by another agent, or does not exist or has expired.
-    /// An expired lease's eviction is persisted before either error.
-    pub fn renew_lease(&self, lease_id: &LeaseId, extension_secs: u64) -> Result<Lease> {
-        let mut lock = self.lock()?;
-        let listed = lock.find_by_lease_id(lease_id)?;
-        lock.apply(&listed.issue_id, |current, now| {
-            if listed.agent_id != self.agent_id {
-                bail!(
-                    "{}",
-                    errors::not_owner(
-                        &format!("lease {}", lease_id),
-                        &listed.agent_id.to_string(),
-                        &self.agent_id.to_string()
-                    )
-                );
-            }
-            let current = current
-                .filter(|lease| &lease.lease_id == lease_id)
-                .ok_or_else(|| lease_not_found(lease_id))?;
-            // A finite lease gains a new expiry; an indefinite one a heartbeat.
-            let (expires_at, last_beat) = if current.ttl_secs > 0 {
-                (
-                    Some(now + Duration::seconds(extension_secs as i64)),
-                    current.last_beat,
-                )
-            } else {
-                (None, now)
-            };
-            Ok(LeaseChange::Put(Lease {
-                expires_at,
-                last_beat,
+    /// The issue has no unexpired lease, or another agent owns it. An expired
+    /// lease's eviction is persisted before the error.
+    pub fn renew_lease(&self, issue_id: &IssueId, extension_secs: u64) -> Result<Lease> {
+        self.change_own_lease(issue_id, |current, now| match current.ttl_secs {
+            0 => Lease {
+                last_beat: now,
                 ..current.clone()
-            }))
-        })?
-        .ok_or_else(|| lease_not_found(lease_id))
+            },
+            _ => Lease {
+                expires_at: Some(now + Duration::seconds(extension_secs as i64)),
+                ..current.clone()
+            },
+        })
     }
 
-    /// Remove a lease whoever owns it (admin operation). A lease that has
-    /// already expired is evicted as expired.
+    /// Remove, whoever owns it, the lease on the issue among the stored lease
+    /// records that `issue` names (admin operation), and return it. The issue
+    /// store is not consulted, so a lease on a deleted issue stays evictable.
     ///
     /// # Errors
     ///
-    /// - Lease not found
-    pub fn force_evict_lease(&self, lease_id: &LeaseId, reason: &str) -> Result<()> {
+    /// No lease record matches `issue`, several do, or the matched lease has
+    /// expired; an expired lease's eviction is persisted before the error.
+    pub fn force_evict_lease(&self, issue: &IssueIdPrefix, reason: &str) -> Result<Lease> {
         let mut lock = self.lock()?;
-        let listed = lock.find_by_lease_id(lease_id)?;
-        lock.apply(&listed.issue_id, |current, _| {
-            Ok(match current {
-                Some(lease) if &lease.lease_id == lease_id => {
-                    LeaseChange::Remove(reason.to_string())
-                }
-                _ => LeaseChange::Keep,
-            })
-        })
-        .map(drop)
+        let issue_id = lock.resolve_leased_issue(issue)?;
+        let mut evicted = None;
+        lock.apply(&issue_id, |current, _| {
+            evicted = current.cloned();
+            match current {
+                Some(_) => Ok(LeaseChange::Remove(reason.to_string())),
+                None => Err(no_active_lease(&issue_id)),
+            }
+        })?;
+        evicted.ok_or_else(|| no_active_lease(&issue_id))
     }
 }
 
@@ -1669,7 +1674,7 @@ mod tests {
         let (kept, ()) = acquire(&coordinator, &crate::test_utils::issue_id(21), 600, limits);
         let (evicted, ()) = acquire(&coordinator, &crate::test_utils::issue_id(22), 600, limits);
         coordinator
-            .force_evict_lease(&evicted.lease_id, "test")
+            .force_evict_lease(&IssueIdPrefix::from(&evicted.issue_id), "test")
             .unwrap();
 
         let records = fs::read_dir(WorktreePaths::leases_dir(shared_jit))
@@ -1792,37 +1797,11 @@ mod tests {
         clock.set(base + Duration::seconds(2));
 
         for _ in 0..2 {
-            let error = coordinator.renew_lease(&expired.lease_id, 600).unwrap_err();
+            let error = coordinator.renew_lease(&expired.issue_id, 600).unwrap_err();
             assert!(error.to_string().contains("not found"), "{error}");
         }
 
         assert_evicted_once(&temp_dir, &coordinator, &expired);
-    }
-
-    #[test]
-    fn test_renew_lease_failing_as_not_owned_keeps_the_eviction_of_the_expired_lease() {
-        use crate::storage::clock::FixedClock;
-
-        let temp_dir = TempDir::new().unwrap();
-        let base = Utc::now();
-        let clock = Arc::new(FixedClock::new(base));
-        let owner = coordinator_for(&temp_dir, "agent:owner", clock.clone());
-        let (expired, ()) = acquire(
-            &owner,
-            &crate::test_utils::issue_id(24),
-            1,
-            ClaimAcquireLimits::new(1, 1),
-        );
-        clock.set(base + Duration::seconds(2));
-        let stranger = coordinator_for(&temp_dir, "agent:stranger", clock);
-
-        let error = stranger.renew_lease(&expired.lease_id, 600).unwrap_err();
-
-        assert!(
-            error.to_string().contains("owned by agent:owner"),
-            "{error}"
-        );
-        assert_evicted_once(&temp_dir, &owner, &expired);
     }
 
     #[test]
@@ -1981,7 +1960,7 @@ mod tests {
         thread::sleep(StdDuration::from_millis(100));
 
         // Renew the lease
-        let renewed = coordinator.renew_lease(&lease.lease_id, 600).unwrap();
+        let renewed = coordinator.renew_lease(&lease.issue_id, 600).unwrap();
 
         // Expiry should be extended
         assert!(renewed.expires_at.unwrap() > original_expiry);
@@ -2010,7 +1989,7 @@ mod tests {
         thread::sleep(StdDuration::from_millis(100));
 
         // Renew (heartbeat) the lease
-        let renewed = coordinator.renew_lease(&lease.lease_id, 0).unwrap();
+        let renewed = coordinator.renew_lease(&lease.issue_id, 0).unwrap();
 
         // Heartbeat should be updated
         assert!(renewed.last_beat > original_heartbeat);
@@ -2019,49 +1998,44 @@ mod tests {
     }
 
     #[test]
-    fn test_renew_nonexistent_lease() {
+    fn test_renew_lease_of_an_issue_without_a_lease_fails_as_not_found_naming_the_issue() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
+        let issue_id = crate::test_utils::issue_id(7);
 
-        let result = coordinator.renew_lease(
-            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
-            600,
-        );
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found"));
+        let error = coordinator.renew_lease(&issue_id, 600).unwrap_err();
+
+        assert!(error.is::<errors::LeaseNotFoundError>(), "{error}");
+        assert!(error.to_string().contains(issue_id.as_str()), "{error}");
     }
 
     #[test]
-    fn test_renew_lease_not_owned() {
+    fn test_renew_lease_and_heartbeat_by_another_agent_fail_as_not_owned_and_keep_the_lease() {
+        use crate::storage::clock::FixedClock;
+
         let temp_dir = TempDir::new().unwrap();
-        let coordinator1 = setup_coordinator(&temp_dir);
-
-        // Agent 1 acquires lease
-        let (lease, ()) = coordinator1
-            .acquire_claim_synchronized(
-                &crate::test_utils::issue_id(28),
-                600,
-                Some("test lease"),
-                ClaimAcquireLimits::new(100, 100),
-                |_| Ok(()),
-            )
-            .unwrap();
-
-        // Create coordinator for different agent
-        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
-        let coordinator2 = ClaimCoordinator::new(
-            paths,
-            FileLocker::new(StdDuration::from_secs(
-                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-            )),
-            "wt:other".parse().unwrap(),
-            "agent:other".parse().unwrap(),
+        let clock = Arc::new(FixedClock::new(Utc::now()));
+        let owner = coordinator_for(&temp_dir, "agent:owner", clock.clone());
+        let (lease, ()) = acquire(
+            &owner,
+            &crate::test_utils::issue_id(28),
+            600,
+            ClaimAcquireLimits::new(100, 100),
         );
+        let stranger = coordinator_for(&temp_dir, "agent:stranger", clock);
 
-        // Agent 2 tries to renew - should fail
-        let result = coordinator2.renew_lease(&lease.lease_id, 600);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("owned by"));
+        let errors = [
+            stranger.renew_lease(&lease.issue_id, 600).unwrap_err(),
+            stranger.heartbeat(&lease.issue_id).unwrap_err(),
+        ];
+
+        errors.iter().for_each(|error| {
+            assert!(
+                error.to_string().contains("owned by agent:owner"),
+                "{error}"
+            )
+        });
+        assert_eq!(read_leases(&owner.paths).unwrap(), vec![lease]);
     }
 
     #[test]
@@ -2092,9 +2066,10 @@ mod tests {
         );
 
         // Admin force evicts (no ownership check)
-        admin_coordinator
-            .force_evict_lease(&lease.lease_id, "stale after crash")
+        let evicted = admin_coordinator
+            .force_evict_lease(&IssueIdPrefix::from(&lease.issue_id), "stale after crash")
             .unwrap();
+        assert_eq!(evicted, lease);
 
         // Verify lease is gone
         assert!(read_leases(&coordinator1.paths).unwrap().is_empty());
@@ -2112,16 +2087,45 @@ mod tests {
     }
 
     #[test]
-    fn test_force_evict_nonexistent_lease() {
+    fn test_force_evict_lease_of_a_prefix_without_a_lease_record_fails_as_not_found_naming_it() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
+        let prefix: IssueIdPrefix = "deadbeef".parse().unwrap();
 
-        let result = coordinator.force_evict_lease(
-            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
-            "test",
+        let error = coordinator.force_evict_lease(&prefix, "test").unwrap_err();
+
+        assert!(error.is::<errors::LeaseNotFoundError>(), "{error}");
+        assert!(error.to_string().contains("Issue deadbeef "), "{error}");
+    }
+
+    #[test]
+    fn test_force_evict_lease_resolves_its_prefix_among_lease_record_names() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let [kept, evicted] = [0xabcd_0001, 0xabcd_0002].map(|seed| {
+            acquire(
+                &coordinator,
+                &crate::test_utils::issue_id(seed),
+                600,
+                ClaimAcquireLimits::new(100, 100),
+            )
+            .0
+        });
+        let prefix = |text: &str| text.parse::<IssueIdPrefix>().unwrap();
+
+        let ambiguous = coordinator
+            .force_evict_lease(&prefix("abcd"), "test")
+            .unwrap_err();
+        let removed = coordinator
+            .force_evict_lease(&prefix(&evicted.issue_id.as_str()[..8]), "test")
+            .unwrap();
+
+        assert!(
+            ambiguous.is::<crate::storage::AmbiguousIdError>(),
+            "{ambiguous}"
         );
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found"));
+        assert_eq!(removed, evicted);
+        assert_eq!(read_leases(&coordinator.paths).unwrap(), vec![kept]);
     }
 
     #[test]
@@ -2139,9 +2143,9 @@ mod tests {
                 |_| Ok(()),
             )
             .unwrap();
-        coordinator.renew_lease(&lease.lease_id, 600).unwrap();
+        coordinator.renew_lease(&lease.issue_id, 600).unwrap();
         coordinator
-            .force_evict_lease(&lease.lease_id, "test release")
+            .force_evict_lease(&IssueIdPrefix::from(&lease.issue_id), "test release")
             .unwrap();
 
         // Check audit log
@@ -2268,7 +2272,7 @@ mod tests {
         std::thread::sleep(StdDuration::from_millis(50));
 
         // Send heartbeat
-        let updated = coordinator.heartbeat(&lease.lease_id).unwrap();
+        let updated = coordinator.heartbeat(&lease.issue_id).unwrap();
 
         // last_beat should be updated
         assert!(
@@ -2297,7 +2301,7 @@ mod tests {
             )
             .unwrap();
 
-        coordinator.heartbeat(&lease.lease_id).unwrap();
+        coordinator.heartbeat(&lease.issue_id).unwrap();
 
         // Check audit log contains heartbeat operation
         let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
