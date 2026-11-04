@@ -1299,7 +1299,7 @@
       "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite"
     },
     "f7a59f5f": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 storage-only, medium",
       "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
