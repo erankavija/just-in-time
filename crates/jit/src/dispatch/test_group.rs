@@ -200,10 +200,9 @@ fn test_registered_group_dispatches_and_resolves_its_leaf_schemas_through_regist
         assert_eq!(registered.success, name, "{path}");
         assert_eq!(registered.success_schema, Some(schema), "{path}");
 
-        let resolved = CommandSchema::resolve_output_schema(path).unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command(path).unwrap();
+        let resolved = CommandSchema::get_output_schema_for_command(path).unwrap();
         assert_eq!(resolved.success, name, "{path}");
-        assert_ne!(resolved.success, legacy.success, "{path}");
+        assert_eq!(resolved.success_schema, registered.success_schema, "{path}");
     }
 }
 
