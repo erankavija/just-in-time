@@ -170,8 +170,11 @@ const READ_ONLY: &[(&str, &str)] = &[
 /// reads (`crates/server/src/routes.rs` routes `get` alone).
 const SERVER: &str = "serve";
 
+/// A proof of an exempt path, run over a copy of the seeded repository.
+type ExemptProof = fn(&Repo);
+
 /// Writes that reach a leased issue by design, each with its reason and proof.
-const EXEMPT_PATHS: &[(&str, &str, fn())] = &[
+const EXEMPT_PATHS: &[(&str, &str, ExemptProof)] = &[
     (
         "issue release",
         "documented timeout recovery; a required reason, and its event names who released",
@@ -440,8 +443,8 @@ fn assert_ok(output: &Output) {
     );
 }
 
-fn release_records_the_acting_identity_and_reason() {
-    let repo = Repo::new();
+fn release_records_the_acting_identity_and_reason(seeded: &Repo) {
+    let repo = seeded.duplicate();
     repo.owner(&["issue", "assign", &repo.x, OWNER]);
 
     assert_ok(&repo.other(&["issue", "release", &repo.x, "lease lapsed"]));
@@ -457,16 +460,16 @@ fn release_records_the_acting_identity_and_reason() {
     assert_eq!(released["reason"], "lease lapsed");
 }
 
-fn claim_of_an_unleased_issue_writes() {
-    let repo = Repo::new();
+fn claim_of_an_unleased_issue_writes(seeded: &Repo) {
+    let repo = seeded.duplicate();
 
     assert_ok(&repo.other(&["issue", "claim", &repo.y, OTHER]));
 
     assert_eq!(repo.record(&repo.y)["assignee"], OTHER);
 }
 
-fn close_promotes_a_leased_dependent() {
-    let repo = Repo::new();
+fn close_promotes_a_leased_dependent(seeded: &Repo) {
+    let repo = seeded.duplicate();
     assert_eq!(repo.record(&repo.x)["state"], "backlog");
     assert_ok(&repo.other(&["claim", "acquire", &repo.z, "--ttl", "600"]));
 
@@ -475,8 +478,8 @@ fn close_promotes_a_leased_dependent() {
     assert_ne!(repo.record(&repo.x)["state"], "backlog");
 }
 
-fn delete_rewrites_a_leased_dependent() {
-    let repo = Repo::new();
+fn delete_rewrites_a_leased_dependent(seeded: &Repo) {
+    let repo = seeded.duplicate();
     assert_ok(&repo.other(&["claim", "acquire", &repo.z, "--ttl", "600"]));
 
     assert_ok(&repo.other(&["issue", "delete", &repo.z]));
@@ -484,8 +487,8 @@ fn delete_rewrites_a_leased_dependent() {
     assert_eq!(repo.record(&repo.x)["dependencies"], serde_json::json!([]));
 }
 
-fn fix_repairs_readiness_of_a_leased_issue() {
-    let repo = Repo::new();
+fn fix_repairs_readiness_of_a_leased_issue(seeded: &Repo) {
+    let repo = seeded.duplicate();
     let mut record = repo.record(&repo.x);
     record["state"] = "ready".into();
     repo.write_record(&repo.x, &record);
@@ -495,8 +498,8 @@ fn fix_repairs_readiness_of_a_leased_issue() {
     assert_eq!(repo.record(&repo.x)["state"], "backlog");
 }
 
-fn fix_reduces_a_leased_issue() {
-    let repo = Repo::new();
+fn fix_reduces_a_leased_issue(seeded: &Repo) {
+    let repo = seeded.duplicate();
     repo.owner(&["dep", "add", &repo.z, &repo.y]);
     let mut record = repo.record(&repo.x);
     record["dependencies"]
@@ -513,8 +516,8 @@ fn fix_reduces_a_leased_issue() {
     );
 }
 
-fn archive_relinks_terminal_records_only() {
-    let repo = Repo::new();
+fn archive_relinks_terminal_records_only(seeded: &Repo) {
+    let repo = seeded.duplicate();
     repo.owner(&["claim", "acquire", &repo.z, "--ttl", "600"]);
     repo.owner(&["doc", "add", &repo.z, "docs/a.md"]);
     repo.owner(&["issue", "update", &repo.z, "--state", "done"]);
@@ -530,8 +533,8 @@ fn archive_relinks_terminal_records_only() {
     assert_eq!(repo.raw_record(&repo.x), active_sharer);
 }
 
-fn recover_replays_a_committed_mutation() {
-    let repo = Repo::new();
+fn recover_replays_a_committed_mutation(seeded: &Repo) {
+    let repo = seeded.duplicate();
     let mut record = repo.record(&repo.x);
     record["priority"] = "high".into();
     let id: IssueId = repo.x.parse().unwrap();
@@ -589,38 +592,43 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuse
     assert_eq!(classified, actual, "classify every CLI leaf");
 
     let seeded = Repo::new();
-    for (leaf, argv) in REFUSES {
-        let repo = seeded.duplicate();
-        let argv = repo.expand(argv);
-        let argv = argv.iter().map(String::as_str).collect::<Vec<_>>();
-        let before = repo.snapshot();
+    std::thread::scope(|scope| {
+        for (leaf, argv) in REFUSES {
+            let seeded = &seeded;
+            scope.spawn(move || {
+                let repo = seeded.duplicate();
+                let argv = repo.expand(argv);
+                let argv = argv.iter().map(String::as_str).collect::<Vec<_>>();
+                let before = repo.snapshot();
 
-        let refused = repo.other(&argv);
-        let anonymous = repo.anonymous(&argv);
+                let refused = repo.other(&argv);
+                let anonymous = repo.anonymous(&argv);
 
-        assert!(
-            !refused.status.success(),
-            "{leaf} must refuse another agent"
-        );
-        assert!(
-            stderr(&refused).contains(OWNER),
-            "{leaf} refused another agent for another reason: {}",
-            stderr(&refused)
-        );
-        assert!(
-            !anonymous.status.success(),
-            "{leaf} must refuse no identity"
-        );
-        assert!(
-            stderr(&anonymous).contains("JIT_AGENT_ID"),
-            "{leaf} refused no identity for another reason: {}",
-            stderr(&anonymous)
-        );
-        assert_eq!(repo.snapshot(), before, "{leaf} changed something");
+                assert!(
+                    !refused.status.success(),
+                    "{leaf} must refuse another agent"
+                );
+                assert!(
+                    stderr(&refused).contains(OWNER),
+                    "{leaf} refused another agent for another reason: {}",
+                    stderr(&refused)
+                );
+                assert!(
+                    !anonymous.status.success(),
+                    "{leaf} must refuse no identity"
+                );
+                assert!(
+                    stderr(&anonymous).contains("JIT_AGENT_ID"),
+                    "{leaf} refused no identity for another reason: {}",
+                    stderr(&anonymous)
+                );
+                assert_eq!(repo.snapshot(), before, "{leaf} changed something");
 
-        repo.release_leases();
-        assert_ok(&repo.other(&argv));
-    }
+                repo.release_leases();
+                assert_ok(&repo.other(&argv));
+            });
+        }
+    });
 }
 
 #[test]
@@ -661,9 +669,10 @@ fn test_mutating_leaves_classified_as_no_record_leave_every_issue_record_alone()
 
 #[test]
 fn test_strict_lease_exempt_paths_write_for_their_stated_reason() {
+    let seeded = Repo::new();
     for (name, reason, proof) in EXEMPT_PATHS {
         assert!(reason.len() >= 20, "{name} needs a reason");
-        proof();
+        proof(&seeded);
     }
 }
 

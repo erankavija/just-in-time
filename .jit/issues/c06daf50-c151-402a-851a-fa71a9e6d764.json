@@ -3,28 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "06ee9b67-07c3-48ad-a938-179a83d12564",
-    "0fe46027-8a33-4dce-bc6f-76162d067fee",
-    "153c9851-dca1-40f3-838b-ee2790fb9318",
-    "182f4c03-2c8b-431c-9c1e-a208c234a525",
-    "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
-    "20fc3b92-6ce6-48e1-9d51-9bd77956236e",
-    "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
-    "3cf69ecf-5ec1-4cb1-855f-100aa76f7520",
-    "3f816619-6163-46d4-8549-f988a3de65db",
-    "52110fb4-8fe5-4090-9f7e-5da7081953ac",
-    "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
-    "71f5296c-7de3-498b-b088-75a2f052014c",
-    "8c46fc85-284a-4491-aa5c-57a5b22f96db",
-    "8e91126b-c17b-4274-bccb-13385e40c318",
-    "8f297e60-a74e-4efa-bdcc-54659f9959a4",
-    "98cc2097-026d-4744-aeaa-82532910328e",
-    "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
-    "b25c2e54-2614-4d87-b967-0f2cb25c37f9",
-    "c9103fcf-aa0c-4642-8531-5360f5fdd58d",
-    "cc4ea8a9-6f24-4dc2-ad6a-fccbe7d79be4",
-    "cd8e04cc-1f52-40a5-935a-b2b77a67240e",
-    "f930acf2-0f03-4ca0-8ad8-97ddcc85f368"
+    "ae3f4f8b-4f95-402f-8b05-3be296bff3e9"
   ],
   "description": "Moves command dispatch out of the 6,400-line `run()` in `crates/jit/src/main.rs` into library-side handlers that return typed, output-owned responses and failures as values, on top of one global `--json` flag and one shared issue-filter argument group.\n\n## Background\n\n`run()` matches over the 29 `Commands` variants and builds success payloads, chooses error codes, prints and calls `std::process::exit` inside the arms. `cli.rs` declares 108 per-command `json` fields, `main.rs` scans raw argv for `--json` twice, 13 hidden verb stubs shadow the parser-level hint path, issue filters are parsed at about 14 sites, and 74 of 120 schema leaves fall back to `CommandResponse`. Several arms reach `storage`, `jit::search`, the claims free functions and the serve process helpers directly instead of the executor or `commands/`.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `--json` is one global flag carried as `OutputMode`; no subcommand declares a `json` field, no code reads raw argv for it, and the MCP bridge still requests machine output.\n- [hard] REQ-02: No hidden verb-hint stub remains; a wrong verb prints its hint and clap's diagnostic on stderr and exits 2, with or without `--json`.\n- [hard] REQ-03: Every issue-filtering command takes its filters from one flattened `IssueFilterArgs` group parsed once at the CLI boundary.\n- [hard] REQ-04: Every command group dispatches from `run()` to a handler in `crates/jit/src/dispatch/`, and every visible schema leaf names the typed, output-owned response its handler returns.\n- [hard] REQ-05: Handlers return failures and findings as values: no handler chooses an error code, prints an error envelope or calls `std::process::exit`, and each deliberate exit-code, envelope or schema change has a test stating the new contract.\n- [hard] REQ-06: The migrated handlers make no storage, `jit::search`, claims free-function or serve process call; they go through the executor or `commands/`.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
@@ -46,5 +25,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Library-side command dispatch for crates/jit",
-  "updated_at": "2026-11-04T03:38:40.593638791Z"
+  "updated_at": "2026-11-04T12:28:20.020435282Z"
 }

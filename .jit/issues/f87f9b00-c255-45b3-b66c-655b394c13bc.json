@@ -4,6 +4,7 @@
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "1ac651c7-665b-40a5-b214-9abbc14e0534",
+    "8fbf8c43-88a7-4671-8402-865a872075ff",
     "9fa12e75-2632-4e68-8d67-b80caf78770d",
     "a24b11aa-7a20-45ff-a72e-6d0a6c0354cc"
   ],
@@ -32,7 +33,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Gate status commands move to library handlers",
-  "updated_at": "2026-11-04T11:59:35.235940428Z"
+  "updated_at": "2026-11-04T12:28:18.488005023Z"
 }

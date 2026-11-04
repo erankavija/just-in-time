@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T12:29:03.083371947Z",
+  "context": {},
+  "created_at": "2026-11-04T12:28:15.714145628Z",
+  "dependencies": [],
+  "description": "The output layer drops one unused constructor and four places where the same text is rendered twice, so each rendering has one implementation.\n\n## Background\n\nA read-only survey of `crates/jit/src/output.rs`, `output/` and `dispatch/` (2026-11-04) found code that nothing calls and renderers written twice. `JsonError::gate_not_found` has no caller, because the classifier builds the gate-not-found envelope directly. `resolve_gate_key` states its two usage lines in both error arms. The graph and issue outputs each wrap the shared issue-list renderer in their own near-identical helper. The dependency add and remove renderers repeat the same count header and labelled bullet section. The issue listing and issue search results each keep an intermediate `render` method beside their `HumanRender` impls.\n\n## Success Criteria\n\n- [hard] REQ-01: `JsonError::gate_not_found` no longer exists, and no import it alone needed remains.\n- [hard] REQ-02: `resolve_gate_key` states its usage text once.\n- [hard] REQ-03: The graph and issue outputs render issue lists through one shared helper, and the dependency add and remove renderers share one section helper. Their human output is byte-identical to before.\n- [hard] REQ-04: The issue listing and search results render through their `HumanRender` impls without separate intermediate `render` methods.\n- [hard] REQ-05: The change removes at least 25 production lines from `crates/jit/src` (default mode of `scripts/production-lines.py`), and no command's JSON payload, human output or exit code changes.\n\n## Notes\n\nPart of the epic's net-reduction work (plan D-51). Existing tests pin the rendered text; no test is weakened.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T12:28:15.714145628Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9be5b0de-c2e4-45aa-8b3e-577291301af6",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Output renderers have one implementation each",
+  "updated_at": "2026-11-04T12:29:03.083371947Z"
+}

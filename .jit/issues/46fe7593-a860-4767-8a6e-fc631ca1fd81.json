@@ -5,6 +5,8 @@
   "dependencies": [
     "0546fc82-435f-4d02-9af2-0dc22e301d60",
     "6acd7a05-b199-43f8-b619-554b536dc420",
+    "9be5b0de-c2e4-45aa-8b3e-577291301af6",
+    "f82a2e4a-61b1-4f31-8360-ac55c4e5d579",
     "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09"
   ],
   "description": "The CLI's machine and human output are produced by shared types and renderers in the output module, the generated schema derives from them, and the contract is stated once in the reference docs.\n\n## Background\n\n`crates/jit/src/output.rs` declares 33 hand-written `count` structs, eight of which (`ReadyQueryResponse` … `ClosedQueryResponse`) are dead, while `ProfileCollection<T>` in `profile/application.rs` is already a generic envelope with a fixed key. `CommandSchema::generate()` in `crates/jit/src/schema.rs` types output through the hand table in `get_output_schema_for_command`, which falls back to `CommandResponse` for 74 of 120 leaves and lists clap-hidden stubs and the hidden `validate --divergence` flag as ordinary surface. Human rendering of the issue list, the validation report, gate run status and archive execution is copied across dispatch arms in several diverging forms. The list envelope is stated only in `README.md` and `docs/concepts/design-philosophy.md`, and `docs/reference/cli-commands.md` documents behaviour this epic changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Every list payload is an instantiation of one generic `ListEnvelope` type in the output module, no hand-written `count` struct remains, and each command keeps the `{\"count\": N, \"<collection>\": [...]}` wire shape.\n- [hard] REQ-02: The generated schema omits everything clap marks hidden and names a registered, typed success response for every visible executable command, with no hand-kept path-to-type table.\n- [hard] REQ-03: The issue list, validation report, gate run status and archive execution views each have one renderer in the output module that every printing command calls.\n- [hard] REQ-04: `docs/reference/cli-commands.md` states the list envelope, the global `--json`, the one-rendering-per-invocation stream rule, the findings envelope and the wrong-verb hint behaviour once, and other pages cite it.\n- [hard] REQ-05: Each deliberate change to human output, schema names or schema content has a test stating the new contract, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
@@ -26,5 +28,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "One stated output and schema contract for the CLI",
-  "updated_at": "2026-11-04T09:40:58.912390592Z"
+  "updated_at": "2026-11-04T12:32:06.403754798Z"
 }
