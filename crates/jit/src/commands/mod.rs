@@ -732,26 +732,7 @@ fn captured_precheck_plan(
                 .collect::<Vec<_>>(),
         );
         if consumes_history {
-            let run_ids = crate::repository_state::captured_gate_run_ids(image)
-                .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
-            for path in run_ids
-                .iter()
-                .map(crate::repository_state::VirtualPath::gate_run_record)
-            {
-                match image.entry(&path)? {
-                    crate::repository_state::RepositoryEntry::File { content, .. } => {
-                        let run: crate::domain::GateRunResult =
-                            serde_json::from_slice(content.bytes()).with_context(|| {
-                                format!("failed to parse captured gate run at {path:?}")
-                            })?;
-                        if run.issue_id == issue.id {
-                            paths.insert(path);
-                        }
-                    }
-                    crate::repository_state::RepositoryEntry::Absent => {}
-                    _ => anyhow::bail!("captured gate run at {path:?} is not a regular file"),
-                }
-            }
+            paths.extend(named_gate_run_records(issue).map(|(_, _, path)| path));
         }
     }
     let mut prompts = HashMap::new();
@@ -2206,6 +2187,27 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
     )
 }
 
+/// Each required gate of `issue` paired with the record path of the run its
+/// state names, the only runs a history-consuming checker reads.
+fn named_gate_run_records(
+    issue: &Issue,
+) -> impl Iterator<
+    Item = (
+        &GateKey,
+        &crate::domain::identity::GateRunId,
+        crate::repository_state::VirtualPath,
+    ),
+> {
+    issue.gates_required.iter().filter_map(|key| {
+        let run_id = issue.gates_status.get(key)?.run_id.as_ref()?;
+        Some((
+            key,
+            run_id,
+            crate::repository_state::VirtualPath::gate_run_record(run_id),
+        ))
+    })
+}
+
 /// Add the gate-run root and its complete listing to `spec`, then each run
 /// directory the image lists, then the result leaf of each the image holds as
 /// a directory. Direct occupants not named by a run id are evidence only through
@@ -2529,14 +2531,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Publish `draft`, whose id `context` derived, as a new issue, with its
-    /// advisory local-rule findings and the graph-rule findings attributed to it.
+    /// advisory local-rule findings, then the graph-rule findings attributed to
+    /// it, and the count of local-rule findings.
     fn publish_issue_creation(
         &self,
         context: &crate::repository_state::MutationContext,
         draft: Issue,
         explicit_type: bool,
         force: bool,
-    ) -> Result<(Issue, Vec<crate::validation::ReportedFinding>)>
+    ) -> Result<(Issue, Vec<crate::validation::ReportedFinding>, usize)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2621,7 +2624,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 })
                 .collect();
             let plan = finalize(&layout, &image, context, &intents)?;
-            Ok(SessionStep::Apply(plan, (created, findings)))
+            Ok(SessionStep::Apply(
+                plan,
+                (created, findings, validation.warnings.len()),
+            ))
         })
     }
 
@@ -4367,12 +4373,18 @@ assert = {}
     }
 
     #[test]
-    fn test_precheck_evidence_detects_run_history_mutation() {
+    fn test_precheck_evidence_detects_named_run_mutation() {
         let storage = crate::storage::InMemoryStorage::new();
         let issue_id = seed_precheck_evidence(&storage);
+        let run = prior_precheck_run(&issue_id);
+        let mut issue = storage.load_issue(&issue_id).unwrap();
+        issue.gates_status.insert(
+            run.gate_key.clone(),
+            crate::commands::gate_check::gate_state_from_run(&run),
+        );
+        crate::commands::test_helpers::seed_issue(&storage, issue);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
-        let run = prior_precheck_run(&issue_id);
         storage.add_data_file(
             crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
                 .relative()

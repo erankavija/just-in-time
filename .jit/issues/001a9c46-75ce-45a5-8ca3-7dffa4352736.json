@@ -9,6 +9,7 @@
   ],
   "description": "Make item-link validation resolve every qualified link against one address index value, and resolve the configured item kinds once per set of captured declarations.\n\n## Background\n\n- `collect_item_link_findings` (`crates/jit/src/validation/repository.rs:697-843`) builds a set of canonical addresses from issue-embedded items and project sources (`:713-749`), then resolves each issue-scoped address by scanning every issue with a prefix (`:800-814`).\n- Item kinds are resolved by `resolve_item_kinds` in that pass (`:703`) and again for every rendered projection inside the same validation (`crates/jit/src/repository_state/projection_render.rs:67`, reached from `repository_state/materialize.rs:319`).\n- Captured declarations are parsed once into `CapturedRepositoryDeclarations` (`crates/jit/src/repository_state/mod.rs:435-490`).\n- Item kinds hold their id pattern as an `IdPattern`, kind scope is the domain `KindScope`, and item-address issue segments are `IssueIdPrefix` values.\n\n## Success Criteria\n\n- [hard] REQ-01: A domain address-index type holds the canonical addresses of every issue-embedded and project item and resolves an issue-scoped address's prefix in one lookup; repository validation builds it once per validation and resolves every link label against it.\n- [hard] REQ-02: `CapturedRepositoryDeclarations` resolves the configured item kinds once, and item-link validation and projection rendering read them from there; neither calls `resolve_item_kinds`.\n- [hard] REQ-03: Unit tests over the address index show a resolved project address, a resolved issue-scoped address given by short prefix, an alias-form address resolving like its canonical form, an ambiguous issue scope and a dangling address; the existing item-link tests pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged. An invalid item-kind declaration still fails the effective-configuration pass with the same error.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T00:23:23.102052673Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "satisfies:9876a23a/REQ-07"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Item links resolve against one address index with item kinds resolved once",
-  "updated_at": "2026-10-21T20:31:36.534879837Z"
+  "updated_at": "2026-11-04T00:23:23.102052673Z"
 }
