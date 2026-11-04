@@ -965,13 +965,9 @@ struct FailingMutationSession {
     inner: Box<dyn jit::storage::RepositoryMutationSession>,
 }
 
-impl jit::storage::RepositoryMutationSession for FailingMutationSession {
+impl jit::storage::RepositoryReadSession for FailingMutationSession {
     fn layout(&self) -> &jit::repository_state::RepositoryLayout {
         self.inner.layout()
-    }
-
-    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
-        self.inner.recovery_report()
     }
 
     fn capture(
@@ -989,6 +985,12 @@ impl jit::storage::RepositoryMutationSession for FailingMutationSession {
     ) -> Result<jit::repository_state::RepositoryImage, jit::storage::RepositoryStateStoreError>
     {
         self.inner.extend(image, spec)
+    }
+}
+
+impl jit::storage::RepositoryMutationSession for FailingMutationSession {
+    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
     }
 
     fn apply(
@@ -1018,6 +1020,14 @@ impl jit::storage::RepositoryStateStore for FailingMutationStorage {
         Ok(Box::new(FailingMutationSession {
             inner: self.inner.open_mutation_session(layout)?,
         }))
+    }
+
+    fn open_read_session(
+        &self,
+        layout: jit::repository_state::RepositoryLayout,
+    ) -> Result<Box<dyn jit::storage::OptimisticReadSession>, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.open_read_session(layout)
     }
 }
 

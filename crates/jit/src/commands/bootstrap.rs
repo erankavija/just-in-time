@@ -5,7 +5,7 @@
 use super::{CommandExecutor, DispatchMutationAnnotation};
 use crate::config_manager::ConfigManager;
 use crate::domain::LinkedCheckoutWriteStance;
-use crate::errors::LinkedCheckoutWriteRefusedError;
+use crate::errors::{LinkedCheckoutWriteRefusedError, RecoveryFailedError};
 use crate::repository_state::{MutationContextAnnotation, RepositoryLayout};
 use crate::storage::discovery::{discover_jit_dir, discover_recovery_jit_dir};
 use crate::storage::repository_state_store::is_leftover_record_failure;
@@ -37,12 +37,6 @@ pub struct RepositoryInvocation {
     pub is_recover: bool,
     pub write_override: Option<LinkedCheckoutWriteStance>,
 }
-
-/// `jit recover` failed applying the leftover redo record while opening its
-/// session; the source is the session-open failure.
-#[derive(Debug, thiserror::Error)]
-#[error(transparent)]
-pub struct RecoveryFailedError(pub anyhow::Error);
 
 /// A repository opened for dispatch.
 ///
