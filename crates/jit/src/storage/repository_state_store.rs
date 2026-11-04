@@ -20,9 +20,10 @@ use crate::storage::capability_fs::{
 use crate::storage::init_publish;
 use crate::storage::memory::{append_events, MemoryRepositoryState};
 use crate::storage::{
-    EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, MemoryRedoApplier,
-    MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier, RedoApplyError, RedoRecord,
-    RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
+    commit_redo_record, EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage,
+    MemoryRedoApplier, MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier,
+    RedoApplyError, RedoRecord, RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME,
+    RECORD_SCRATCH_DIR,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
@@ -603,9 +604,10 @@ impl JsonMutationSession {
     ) -> Result<(), RepositoryStateStoreError> {
         let record = redo_record_for(image, delta.actions().iter())?;
         ensure_write_set_unchanged(&self.roots, image, &record)?;
-        record
-            .commit(self.layout.data_root())
-            .map_err(RepositoryStateStoreError::Publication)?;
+        let root = self.roots.data_root().ok_or_else(|| {
+            RepositoryStateStoreError::UnsafeTarget(self.layout.data_root().display().to_string())
+        })?;
+        commit_redo_record(root, &record).map_err(RepositoryStateStoreError::Publication)?;
         RedoApplier::new(SessionRedoInterruptions::new(interruptions))
             .apply(&self.roots, &record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
@@ -638,7 +640,7 @@ impl JsonMutationSession {
         let redo = |outcome: Result<(), RedoApplyError>| {
             outcome.map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
         };
-        init_publish::stage_new_data_root(
+        let stage = init_publish::stage_new_data_root(
             &self.data_parent,
             &self.data_leaf,
             of_class(RepositoryRootClass::Data),
@@ -648,9 +650,7 @@ impl JsonMutationSession {
             // Durable inside the stage, so publishing the root and committing
             // its worktree targets are one act: the rename carries the record
             // into the root, and an interruption between them leaves it there.
-            record
-                .commit(&init_publish::stage_path(self.layout.data_root()))
-                .map_err(RepositoryStateStoreError::Publication)?;
+            commit_redo_record(&stage, &record).map_err(RepositoryStateStoreError::Publication)?;
         }
         interruptions.check(&MutationPoint::BeforeRootPublication)?;
         init_publish::publish_staged_data_root(

@@ -24,7 +24,33 @@ pub enum CapabilityFsError {
 /// session boundary that verified their identity.
 pub struct CapabilityRoots {
     worktree: Dir,
-    data: Option<Dir>,
+    data: Option<DataRoot>,
+}
+
+/// An open no-follow handle on a data root, or on the stage that becomes one.
+///
+/// Holding it pins the directory it opened: a record committed through it
+/// lands there however the path is rebound afterwards.
+pub struct DataRoot(Dir);
+
+impl DataRoot {
+    /// Open the directory at the absolute `path` without following links.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `path` is relative, is absent, or resolves
+    /// through a link.
+    pub fn open(path: &Path) -> Result<Self, CapabilityFsError> {
+        open_absolute_dir_nofollow(path).map(Self)
+    }
+
+    pub(in crate::storage) fn from_dir(directory: Dir) -> Self {
+        Self(directory)
+    }
+
+    pub(in crate::storage) fn dir(&self) -> &Dir {
+        &self.0
+    }
 }
 
 impl CapabilityRoots {
@@ -53,7 +79,7 @@ impl CapabilityRoots {
             Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {
                 let data = open_child_dir_nofollow(&data_parent, &data_leaf)?;
                 ensure_capability_identity(&data, layout.data_identity(), layout.data_root())?;
-                Some(data)
+                Some(DataRoot::from_dir(data))
             }
             Ok(_) => {
                 return Err(CapabilityFsError::UnsafeTarget(
@@ -80,10 +106,14 @@ impl CapabilityRoots {
         Ok((Self { worktree, data }, data_parent, data_leaf))
     }
 
+    pub(in crate::storage) fn data_root(&self) -> Option<&DataRoot> {
+        self.data.as_ref()
+    }
+
     pub(in crate::storage) fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
         match class {
             RepositoryRootClass::Worktree => Some(&self.worktree),
-            RepositoryRootClass::Data => self.data.as_ref(),
+            RepositoryRootClass::Data => self.data.as_ref().map(DataRoot::dir),
         }
     }
 }

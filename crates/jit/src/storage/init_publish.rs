@@ -10,31 +10,33 @@
 
 use crate::repository_state::RepositoryAction;
 use crate::storage::atomic_write::{rename_noreplace_cap, sync_capability_directory};
-use crate::storage::capability_fs::{open_child_dir_nofollow, open_or_create_capability_parent};
+use crate::storage::capability_fs::{
+    open_child_dir_nofollow, open_or_create_capability_parent, DataRoot,
+};
 use crate::storage::redo_apply::write_staged_file;
 use crate::storage::repository_state_store::RepositoryStateStoreError;
 use cap_std::fs::Dir;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// The stage directory a publication of the root at `data_root` writes into.
-///
-/// One deterministic sibling, so the next publication reclaims the orphan an
-/// interrupted one left; the session's bootstrap lock is what keeps two
-/// publications from sharing it.
-pub(in crate::storage) fn stage_path(data_root: &Path) -> PathBuf {
+#[cfg(test)]
+pub(in crate::storage) fn stage_path(data_root: &Path) -> std::path::PathBuf {
     let leaf = data_root.file_name().unwrap_or_default().to_string_lossy();
     data_root.with_file_name(stage_name(&leaf))
 }
 
-/// [`stage_path`] for a caller holding the data root as a parent capability
-/// and the leaf it publishes at.
+/// The stage a publication of the root at `data_leaf` writes into.
+///
+/// One deterministic sibling, so the next publication reclaims the orphan an
+/// interrupted one left; the session's bootstrap lock is what keeps two
+/// publications from sharing it.
 fn stage_name(data_leaf: &str) -> String {
     format!("{data_leaf}.stage")
 }
 
-/// Write the new root into a fresh stage beside the data root and return once
-/// its scaffold is durable.
+/// Write the new root into a fresh stage beside the data root and return its
+/// handle once its scaffold is durable.
 ///
 /// Every action is a data-root action creating the root or something under it;
 /// the stage is the root itself, so an action on the root's own path needs no
@@ -50,7 +52,7 @@ pub(in crate::storage) fn stage_new_data_root<'a>(
     data_parent: &Dir,
     data_leaf: &str,
     actions: impl Iterator<Item = &'a RepositoryAction>,
-) -> Result<(), RepositoryStateStoreError> {
+) -> Result<DataRoot, RepositoryStateStoreError> {
     let stage = stage_name(data_leaf);
     remove_stage(data_parent, &stage)?;
     data_parent.create_dir(&stage)?;
@@ -82,7 +84,8 @@ pub(in crate::storage) fn stage_new_data_root<'a>(
             ),
         }
     })?;
-    sync_tree(&root)
+    sync_tree(&root)?;
+    Ok(DataRoot::from_dir(root))
 }
 
 /// Publish the stage as the data root at `data_root`.

@@ -83,7 +83,7 @@ fn test_recover_help_describes_purpose() {
 
 #[test]
 fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
-    use jit::storage::{PutFile, RedoRecord};
+    use jit::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
 
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
@@ -91,7 +91,7 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
     let published = cli.root().join("applied-by-recovery.md");
-    RedoRecord::new(
+    let record = RedoRecord::new(
         Vec::new(),
         vec![PutFile {
             path: jit::repository_state::VirtualPath::worktree("applied-by-recovery.md").unwrap(),
@@ -101,9 +101,8 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
         Vec::new(),
         None,
     )
-    .unwrap()
-    .commit(&cli.root().join(".jit"))
     .unwrap();
+    commit_redo_record(&DataRoot::open(&cli.root().join(".jit")).unwrap(), &record).unwrap();
 
     let output = cli
         .command(["recover", "--json"])

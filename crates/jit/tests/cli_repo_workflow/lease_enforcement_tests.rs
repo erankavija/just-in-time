@@ -8,7 +8,7 @@ use jit::domain::identity::IssueId;
 use jit::repository_state::{FileMode, VirtualPath};
 use jit::storage::claim_coordinator::Lease;
 use jit::storage::worktree_paths::WorktreePaths;
-use jit::storage::{PutFile, RedoRecord};
+use jit::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
 use jit::test_cli::JitCli;
 use jit::test_lease_store::{history_path, lease_path, plant_lease};
 use jit::test_utils::copy_tree_exact;
@@ -538,7 +538,7 @@ fn recover_replays_a_committed_mutation(seeded: &Repo) {
     let mut record = repo.record(&repo.x);
     record["priority"] = "high".into();
     let id: IssueId = repo.x.parse().unwrap();
-    RedoRecord::new(
+    let committed = RedoRecord::new(
         Vec::new(),
         vec![PutFile {
             path: VirtualPath::issue_record(&id),
@@ -548,8 +548,11 @@ fn recover_replays_a_committed_mutation(seeded: &Repo) {
         Vec::new(),
         None,
     )
-    .unwrap()
-    .commit(&repo.cli.root().join(".jit"))
+    .unwrap();
+    commit_redo_record(
+        &DataRoot::open(&repo.cli.root().join(".jit")).unwrap(),
+        &committed,
+    )
     .unwrap();
 
     assert_ok(&repo.other(&["recover"]));
