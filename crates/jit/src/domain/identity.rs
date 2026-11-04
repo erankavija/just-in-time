@@ -341,6 +341,10 @@ impl IssueIdPrefix {
         &self.requested
     }
 
+    pub(crate) fn normalised(&self) -> &str {
+        &self.normalised
+    }
+
     /// Whether this prefix names `id`.
     pub fn matches(&self, id: &IssueId) -> bool {
         id.as_str()
