@@ -12,8 +12,7 @@ fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> anyhow::Result<Outcome<Wor
     let (info, warnings) =
         execute_worktree_info(&ctx.executor.storage().configured_worktree_paths()?)?;
     let message = format!("Worktree {} on branch {}", info.worktree_id, info.branch);
-    Ok(Outcome::success_with(info, message)
-        .with_warnings(warnings.into_iter().map(|warning| warning.to_string())))
+    Ok(Outcome::success_with(info, message).with_warnings(warnings))
 }
 
 fn list(
@@ -24,7 +23,7 @@ fn list(
     let message = format!("{} worktree(s)", worktrees.len());
     Ok(
         Outcome::success_with(WorktreeListResponse::new(worktrees), message)
-            .with_warnings(warnings.into_iter().map(|warning| warning.to_string())),
+            .with_warnings(warnings),
     )
 }
 
