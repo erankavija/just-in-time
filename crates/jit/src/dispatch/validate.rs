@@ -221,18 +221,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
     Ok(if validation_failed {
         Outcome::findings(ErrorCode::ValidationFailed, message, response)
     } else {
-        let mut warnings = Vec::new();
-        if response.warning_count > 0 {
-            warnings.push(format!("{} warning finding(s)", response.warning_count));
-        }
-        if response.divergence_count > 0 {
-            warnings.push(format!(
-                "{} membership label(s) not backed by the DAG (run `jit query divergence` for details)",
-                response.divergence_count
-            ));
-        }
         Outcome::success_with(ValidateResponse::Repository(response), message)
-            .with_warnings(warnings)
     })
 }
 

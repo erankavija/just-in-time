@@ -243,6 +243,18 @@ impl RepositoryValidationResponse {
             }
         }
         rendered.push_str(&render_validation_findings(&self.rule_findings, None).stdout);
+        if self.warning_count > 0 {
+            let _ = writeln!(rendered, "\nWarnings: {}", self.warning_count);
+        }
+        // Advisory only: does not affect the exit status.
+        if self.divergence_count > 0 {
+            let _ = writeln!(
+                rendered,
+                "warning: {} membership label(s) not backed by the DAG \
+                 (run `jit query divergence` for details)",
+                self.divergence_count
+            );
+        }
         rendered
     }
 }
