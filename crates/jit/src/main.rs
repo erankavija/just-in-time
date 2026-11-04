@@ -18,11 +18,11 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, GateCommands,
-    GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
+    GraphCommands, IssueCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, config, events, init, invariant, resolve_issue, resolve_issue_filter, version,
+    apply, config, events, init, invariant, item, resolve_issue, resolve_issue_filter, version,
     CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
@@ -820,97 +820,15 @@ fn build_issue_show_response<S: IssueStore>(
 
 /// Render a single resolved addressable item as a JSON envelope or a short block.
 ///
-/// Shared by `jit item show/resolve` and the `jit issue show <issue>/<self-id>`
-/// qualified-id path so both render an addressed item identically.
+/// Used by the `jit issue show <issue>/<self-id>` qualified-id path; the human
+/// block is the item response's own rendering.
 fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bool) -> Result<()> {
-    let output_ctx = OutputContext::new(quiet, json);
+    use jit::output::HumanRender;
     if json {
         let output = JsonOutput::success(result);
         println!("{}", output.to_json_string()?);
     } else {
-        output_ctx.print_data(format!("Qualified id: {}", result.item.qualified_id))?;
-        output_ctx.print_data(format!("Kind:         {}", result.item.kind))?;
-        output_ctx.print_data(format!("Self id:      {}", result.item.self_id))?;
-        match (&result.issue_full_id, &result.issue_title) {
-            (Some(full_id), Some(title)) => {
-                output_ctx.print_data(format!("Issue:        {full_id} | {title}"))?;
-            }
-            // A project-scoped item (`@/<kind>/<self-id>`) has no owning issue.
-            _ => {
-                output_ctx.print_data("Scope:        @ (project)".to_string())?;
-            }
-        }
-        output_ctx.print_data(format!("Text:         {}", result.item.text))?;
-    }
-    Ok(())
-}
-
-/// Dispatch the `jit item` subcommands.
-///
-/// A thin delegation over the [`CommandExecutor`] item methods: it selects the
-/// list/search/show executor call, then renders the result as JSON or as
-/// human-readable lines.
-fn run_item<S: IssueStore>(
-    executor: &CommandExecutor<S>,
-    command: ItemCommands,
-    mode: OutputMode,
-) -> Result<()> {
-    // When --json is set, a failure is rendered as a JSON object and the process
-    // exits with the error's code, rather than the top-level plain `Error: ...`.
-    let result = run_item_inner(executor, command, mode);
-    if let Err(e) = result {
-        handle_json_error!(
-            mode.json,
-            e,
-            command_json_error(&e, jit::output::ErrorCode::ItemCommandFailed)
-        );
-    }
-    Ok(())
-}
-
-/// Inner dispatch for `jit item`; errors are converted to JSON by
-/// [`run_item`] when `--json` is set.
-fn run_item_inner<S: IssueStore>(
-    executor: &CommandExecutor<S>,
-    command: ItemCommands,
-    mode: OutputMode,
-) -> Result<()> {
-    let OutputMode { json, quiet } = mode;
-    use jit::commands::ItemListResult;
-
-    // Render an item list either as a JSON envelope or one line per item.
-    fn print_list(result: &ItemListResult, json: bool, quiet: bool) -> Result<()> {
-        let output_ctx = OutputContext::new(quiet, json);
-        if json {
-            let msg = format!("Found {} item(s)", result.count());
-            let output = JsonOutput::success(result).with_message(msg);
-            println!("{}", output.to_json_string()?);
-        } else if result.items.is_empty() {
-            let _ = output_ctx.print_info("No addressable items found");
-        } else {
-            for item in &result.items {
-                output_ctx.print_data(format!(
-                    "{}  [{}]  {}",
-                    item.qualified_id, item.kind, item.text
-                ))?;
-            }
-        }
-        Ok(())
-    }
-
-    match command {
-        ItemCommands::List { kind } => {
-            let result = executor.items().list_items(kind.as_deref())?;
-            print_list(&result, json, quiet)?;
-        }
-        ItemCommands::Search { query, kind } => {
-            let result = executor.items().search_items(&query, kind.as_deref())?;
-            print_list(&result, json, quiet)?;
-        }
-        ItemCommands::Show { qualified_id } | ItemCommands::Resolve { qualified_id } => {
-            let result = executor.items().show_item(&qualified_id)?;
-            print_item_show(&result, json, quiet)?;
-        }
+        print!("{}", result.render_human(OutputMode { json, quiet }));
     }
     Ok(())
 }
@@ -5114,8 +5032,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Item(item_cmd) => {
-            run_item(&executor, item_cmd, mode)?;
+        Commands::Item(command) => {
+            return item::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Invariant(command) => {
             return invariant::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());

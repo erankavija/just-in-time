@@ -517,6 +517,29 @@ fn invoke_config_validate(json: bool) -> Vec<Output> {
     vec![output_in_form(&cli, &["config", "validate"], json)]
 }
 
+/// `jit item` over an unreadable config (list, search) and over a value that is
+/// not a qualified id (show, resolve).
+fn invoke_item_failures(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/config.toml"), "not = valid = toml").unwrap();
+    let mut outputs = vec![
+        output_in_form(&cli, &["item", "list"], json),
+        output_in_form(&cli, &["item", "search", "survey"], json),
+    ];
+    fs::write(cli.root().join(".jit/config.toml"), "").unwrap();
+    outputs.push(output_in_form(
+        &cli,
+        &["item", "show", "not-a-qualified-address"],
+        json,
+    ));
+    outputs.push(output_in_form(
+        &cli,
+        &["item", "resolve", "not-a-qualified-address"],
+        json,
+    ));
+    outputs
+}
+
 /// `jit doc check-links` on a broken link.
 fn invoke_doc_check_links(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
@@ -760,6 +783,7 @@ row_bindings! {
     test_command_exit_codes_validate_leases_emits_1: ("validate --leases", Some(1), true) => invoke_validate_leases;
     test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", Some(4), true) => invoke_gate_status_all;
     test_command_exit_codes_invariant_check_emits_4: ("invariant check", Some(4), true) => invoke_invariant_check;
+    test_command_exit_codes_item_failures_emit_2: ("item list, item search, item show, item resolve", Some(2), false) => invoke_item_failures;
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", Some(4), false) => invoke_config_validate;
     test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", Some(1), true) => invoke_doc_check_links;
     test_command_exit_codes_init_missing_values_file_emits_2: ("init", Some(2), false) => invoke_init_missing_values_file;

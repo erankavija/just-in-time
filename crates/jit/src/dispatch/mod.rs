@@ -131,6 +131,7 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     events::output_schema,
     init::output_schema,
     invariant::output_schema,
+    item::output_schema,
     version::output_schema,
     #[cfg(test)]
     test_group::output_schema,
@@ -322,6 +323,7 @@ pub mod config;
 pub mod events;
 pub mod init;
 pub mod invariant;
+pub mod item;
 #[cfg(test)]
 mod test_forms;
 #[cfg(test)]

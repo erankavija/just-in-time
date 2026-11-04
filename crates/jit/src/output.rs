@@ -20,6 +20,7 @@ mod events;
 pub mod failure;
 mod init;
 mod invariant;
+mod item;
 mod version;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};

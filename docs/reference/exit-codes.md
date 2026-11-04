@@ -50,6 +50,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `validate --leases` | `1` | Lease validation found one or more invalid leases, or the lease check could not run. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
+| `item list, item search, item show, item resolve` | `2` | The repository configuration failed to load, or an item address was not a qualified id. |  |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. |  |
 | `doc check-links` | `1` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
 | `gate preset apply` | `3` | A preset target was not found, so the application failed. |  |
