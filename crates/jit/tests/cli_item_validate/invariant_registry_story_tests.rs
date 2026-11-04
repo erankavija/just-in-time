@@ -187,7 +187,7 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
     // REQ-03: the real binary, given a `.jit/invariants.toml`, returns each
     // invariant addressed as `@/<kind>/<self-id>` under `--kind invariant`.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     seed_invariants(&cli);
 
@@ -244,7 +244,7 @@ fn req03_item_show_at_qualified_id_resolves_invariant() {
     // REQ-03 (show path): `jit item show @/invariant/sample-invariant` also resolves the invariant
     // from the registry rather than the issue store.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     seed_invariants(&cli);
 
@@ -390,7 +390,7 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
     // An invariant-tagged line inside an issue description (which would be indexed by
     // a markdown-first kind) must NOT appear as an invariant.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     seed_invariants(&cli);
 
@@ -448,7 +448,7 @@ fn req05_item_list_without_kind_filter_does_not_mix_invariants_with_requirements
     // from the registry and requirements appear only from issue markdown.  The
     // registry does not bleed across kind boundaries.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     seed_invariants(&cli);
 

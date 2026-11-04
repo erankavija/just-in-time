@@ -1,0 +1,43 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T21:59:02.643703922Z",
+  "dependencies": [
+    "110a4a2f-54fa-4f1a-b055-174b95276675"
+  ],
+  "description": "Instantiate the reviewed server/web manifest for 0f8efc37 with exact issue and edge fidelity.\n\n## Success Criteria\n\n- [hard] REQ-01: The stored issue graph exactly matches the approved manifest, bracket wiring and external dependencies.\n- [hard] REQ-02: Every active container criterion has coverage and every terminal is one focused implementation/review assignment.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-11-04T21:59:02.643703922Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-11-04T21:59:02.643703922Z",
+      "updated_by": null
+    }
+  },
+  "id": "32607213-7402-4c17-9889-7a6286e1959e",
+  "labels": [
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "component:server",
+    "component:web",
+    "component:core",
+    "component:storage",
+    "per:@/charter/D-18",
+    "per:@/charter/D-20",
+    "type:breakdown",
+    "brackets:0f8efc37"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Break down the server and web shared mechanisms",
+  "updated_at": "2026-11-04T21:59:45.821232800Z"
+}

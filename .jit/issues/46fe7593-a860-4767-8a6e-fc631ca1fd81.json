@@ -13,8 +13,7 @@
   "documents": [],
   "gates_required": [
     "cargo-ci",
-    "code-review",
-    "mcp-ci"
+    "code-review"
   ],
   "gates_status": {},
   "id": "46fe7593-a860-4767-8a6e-fc631ca1fd81",
@@ -28,5 +27,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "One stated output and schema contract for the CLI",
-  "updated_at": "2026-11-04T12:32:06.403754798Z"
+  "updated_at": "2026-11-04T22:02:09.489420047Z"
 }

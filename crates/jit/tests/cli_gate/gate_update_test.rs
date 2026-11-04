@@ -225,7 +225,7 @@ fn test_gate_update_no_fields_errors_json() {
 fn test_gate_update_leaves_per_issue_status_unchanged() {
     let temp = JitCli::initialised().unwrap();
     // A manual gate so the issue carries a per-issue status entry.
-    let issue_id = crate::add_manual_gate_issue(&temp, "review");
+    let issue_id = super::add_manual_gate_issue(&temp, "review");
 
     // Establish a concrete per-issue status (Passed) so the comparison is
     // meaningful rather than an empty-map equality.

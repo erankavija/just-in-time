@@ -40,8 +40,8 @@ set -euo pipefail
 # they are enforced against plus a stated headroom rule, and it lives in
 # dev/benchmarks/rust-build-budgets/README.md, not in this file. Changing a
 # value here without re-deriving it there leaves a limit nothing measured.
-readonly MAX_INTEGRATION_TARGETS=12
-readonly MAX_EXECUTABLE_BYTES=$((1234 * 1024 * 1024)) # MiB; derivation in README
+readonly MAX_INTEGRATION_TARGETS=3
+readonly MAX_EXECUTABLE_BYTES=$((706 * 1024 * 1024)) # MiB; derivation in README
 readonly MAX_TEST_SUITE_SECONDS=30
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

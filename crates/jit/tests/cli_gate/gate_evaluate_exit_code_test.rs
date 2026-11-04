@@ -8,7 +8,7 @@
 //!   gate not required   -> no verdict
 //!   manual gate, no --by -> no verdict (jit:1d59070d REQ-03)
 
-use crate::add_auto_gate_issue;
+use super::add_auto_gate_issue;
 use jit::test_cli::JitCli;
 
 #[test]

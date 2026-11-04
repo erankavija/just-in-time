@@ -970,7 +970,8 @@
     "8b3cce62": 1,
     "635f23c7": 1,
     "578ed10d": 1,
-    "5f12265a": 1
+    "5f12265a": 1,
+    "f35c86de": 1
   },
   "surfaced_pitfalls": [
     {
@@ -996,7 +997,7 @@
     {
       "id": "mcp-ci-format-cutover",
       "summary": "Since format 4 landed (55438f664), a HEAD-built jit cannot read this repository's format-3 tracker, so the mcp-ci PATH workaround fails (REPOSITORY_FORMAT_UNSUPPORTED). Because the digest excludes the binary, the failed verdict is then reused for the installed binary. b23faa59's mcp-ci is held pending the steward's ruling on --force; the workaround has been removed from land-one.sh. Tracked by 26307dfd.",
-      "status": "open"
+      "status": "resolved by26307dfd (done); mcp-ci builds evaluated workspace binary"
     },
     {
       "id": "codex-read-only-git",
@@ -1006,7 +1007,7 @@
     {
       "id": "pool-runner-timeouts",
       "summary": "cargo-pool-run waits for a jobserver token inside nextest's per-test timer, so millisecond tests TIMEOUT at 20 s under parallel load. Not content failures; land-one retries TIMEOUT-only failures. f487aeef must not tighten limits until settled (D-43).",
-      "status": "with the user via steward"
+      "status": "User keeps dynamic sharing and defers timing enforcement; no host edits"
     },
     "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence.",
     "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
@@ -1510,7 +1511,8 @@
     },
     "fb38bf1f": {
       "status": "in_progress",
-      "note": "rescoped by plan D-59 to commands-import-no-output (REQ-01..03)"
+      "note": "bf5bfe3c3 landed; merged cargo-ci5039+25pass; independent review running",
+      "production_delta": 37
     },
     "578ed10d": {
       "status": "done",
@@ -1578,9 +1580,24 @@
       }
     },
     "b22aabce": {
-      "status": "in_progress",
+      "status": "done",
       "note": "two-suite consolidation with exact inventory preservation",
-      "model": "gpt-6.1-sol high"
+      "model": "gpt-6.1-sol high",
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and independent code-review passed",
+        "criteria": {
+          "REQ-01": "two jit suites; three workspace targets",
+          "REQ-02": "exact normalized inventory5038;1684 renamed3354 unchanged",
+          "REQ-03": "3-target706MiB budgets;1177002600\u2192673455960B",
+          "REQ-04": "normal libtest1180CLI+504contracts passes together; no test logic changes",
+          "REQ-05": "guide and CI commands updated"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "live focused commands updated; earlier measurements labeled historical",
+        "deferred_items": "no linked design docs; README complete",
+        "holistic": "zero production delta; modules retain fixture paths"
+      }
     },
     "0546fc82": {
       "status": "backlog"
@@ -1718,7 +1735,20 @@
       "status": "done"
     },
     "f35c86de": {
-      "status": "ready"
+      "status": "in_progress",
+      "review": {
+        "verdict": "FAIL",
+        "gates": "cargo-ci passed; code-review F1 blocking",
+        "criteria": {
+          "REQ-01": "surface structural test passes",
+          "REQ-02": "UNMET: direct storage calls remain in dispatch",
+          "REQ-03": "existing5038tests25doctests pass"
+        },
+        "prior_findings": "first review; F1 open",
+        "stale_narrative": "historical planning references retained as history",
+        "deferred_items": "no linked design documents",
+        "holistic": "repair dispatch storage bypasses at existing command owners; preserve criteria"
+      }
     },
     "f487aeef": {
       "status": "ready"
@@ -1809,7 +1839,7 @@
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
     "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
-  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a.",
+  "coordination": "Steward01a1a886-d199-7093-b096-7acbab6adb48; f4d9502a lead01a1a88a-3bda-7302-8fdf-0662e2095cc1;0f8efc37 planning lead01a1a88d-d433-7032-b70a-eb7c4c59d62f. One epic per execution lead; coordinate main landing reservations.",
   "incidents": [
     {
       "date": "2026-11-04",
@@ -1889,6 +1919,17 @@
       "fb38bf1f",
       "487f45a9"
     ],
-    "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git."
+    "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git.",
+    "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
+    "b22aabce": {
+      "status": "done",
+      "tests": 5038,
+      "doctests": 25,
+      "before_bytes": 1177002600,
+      "after_bytes": 673455960,
+      "integration_targets": 3,
+      "production_delta": 0
+    },
+    "production_net": "Inherited+171; fb38+37;487pending-17; build tasks0"
   }
 }

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c76f9ea3369dc61258a4bc3d5710a59f58f75704",
+  "completed_at": "2026-11-04T21:53:21.791145118Z",
+  "duration_ms": 251641,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/dep.rs",
+        "id": "F1",
+        "line": 17,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f35c86de/requirement/REQ-02",
+          "@/invariant/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "CLI dispatch still accesses IssueStore/JsonFileStorage directly, leaving REQ-02 unmet."
+      }
+    ],
+    "summary": "The story has no attributable implementation patch and CLI dispatch still calls storage directly, leaving REQ-02 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f35c86de-e4fa-4ce9-bf48-ee1378115355",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "17e23f60-7859-43cf-9ed6-5cc869272053",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T21:49:10.150123075Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5578 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a889-9122-73d0-b681-f286524ba67f\n--------\nuser\n--- 5565 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c76f9ea33 (`chore(jit:f35c86de)`; issue-claim metadata only)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f35c86de/requirement/REQ-01, REQ-02, REQ-03 (.jit/issues/f35c86de-e4fa-4ce9-bf48-ee1378115355.json, markdown-first); @/invariant/architecture-dependency-direction (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T21:48:31Z); code-review pending\nTruncation recovery: re-read bounded command, dispatch, plan, and investigation sections after broad searches truncated\n\n1. [blocking][issue-impact] REQ-02 remains unmet: CLI dispatch directly accesses storage through `ctx.executor.storage()`. For example, dependency handlers resolve IDs and load issue records directly in [dep.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/dep.rs:17); archive and worktree handlers also bind `JsonFileStorage` directly ([archive.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/archive.rs:11), [worktree.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/worktree.rs:12)). This bypasses the intended commands/facade boundary and violates the hard storage-free CLI criterion. References: @/issue/f35c86de/requirement/REQ-02, @/invariant/architecture-dependency-direction.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The story has no attributable implementation patch and CLI dispatch still calls storage directly, leaving REQ-02 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CLI dispatch still accesses IssueStore/JsonFileStorage directly, leaving REQ-02 unmet.\",\"file\":\"crates/jit/src/dispatch/dep.rs\",\"line\":17,\"references\":[\"@/issue/f35c86de/requirement/REQ-02\",\"@/invariant/architecture-dependency-direction\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

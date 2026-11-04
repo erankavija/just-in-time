@@ -25,7 +25,7 @@ fn test_story_item_list_decision_and_risk_coexist() {
     // decision` returns ONLY the decision items; `jit item list --kind risk`
     // returns ONLY the risk items — no kind bleeds into the other's index.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["decision", "risk"]))
             .unwrap()
             .0,
     );
@@ -89,7 +89,7 @@ fn test_story_markdown_sole_source_both_kinds() {
     //       both ids;
     //   (c) editing the description and NOTHING else changes BOTH indexes.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["decision", "risk"]))
             .unwrap()
             .0,
     );

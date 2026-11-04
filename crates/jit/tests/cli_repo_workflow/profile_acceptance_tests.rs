@@ -240,8 +240,8 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
 
     // Both worktrees carry the same staged packages, so the trees compared at
     // the end differ only in how the profile got there.
-    let fresh_location = crate::repository_package_at(fresh.root(), "jit-dogfood");
-    let existing_location = crate::repository_package_at(existing.root(), "jit-dogfood");
+    let fresh_location = super::repository_package_at(fresh.root(), "jit-dogfood");
+    let existing_location = super::repository_package_at(existing.root(), "jit-dogfood");
     let fresh_selector = fresh_location.to_string();
     assert_eq!(fresh_location, existing_location);
     let fresh_init = success_json(&fresh, &["init", "--profile", &fresh_selector, "--json"]);
@@ -253,7 +253,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     success_json(&existing, &["init", "--json"]);
     // A preview is derived over one package, so the self-contained one is what
     // a repository declaring nothing can be shown. It writes nothing.
-    let existing_default_location = crate::repository_package_at(existing.root(), "jit-default");
+    let existing_default_location = super::repository_package_at(existing.root(), "jit-default");
     let existing_default_selector = existing_default_location.to_string();
     let preview = success_json(
         &existing,
@@ -484,7 +484,7 @@ fn test_profile_application_contributes_workflow_invariants_to_scaffolded_regist
     let repo = JitCli::uninitialised().unwrap();
 
     success_json(&repo, &["init", "--json"]);
-    let dogfood_location = crate::repository_package_at(repo.root(), "jit-dogfood");
+    let dogfood_location = super::repository_package_at(repo.root(), "jit-dogfood");
     let dogfood_selector = dogfood_location.to_string();
     let applied = success_json(
         &repo,
@@ -517,7 +517,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let repo = JitCli::uninitialised().unwrap();
     let checker_path = checker_path_without_jq();
     let path = Some(checker_path.value.as_path());
-    let dogfood_location = crate::repository_package_at(repo.root(), "jit-dogfood");
+    let dogfood_location = super::repository_package_at(repo.root(), "jit-dogfood");
     let dogfood_selector = dogfood_location.to_string();
     success_json_with_path(
         &repo,
@@ -900,7 +900,7 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
 #[test]
 fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
     let source = JitCli::uninitialised().unwrap();
-    let dogfood = crate::repository_package_at(source.root(), "jit-dogfood");
+    let dogfood = super::repository_package_at(source.root(), "jit-dogfood");
     let holding =
         super::profile_cli_tests::jit(&source, &["init", "--profile", &dogfood, "--json"]);
     assert!(holding.status.success(), "{holding:?}");
@@ -911,7 +911,7 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
     for id in ["jit-default", "jit-dogfood"] {
         let archive = exchange.path().join(format!("{id}.tar"));
         let archive = archive.to_str().unwrap();
-        let package = crate::repository_package_at(source.root(), id);
+        let package = super::repository_package_at(source.root(), id);
         let packed = super::profile_cli_tests::jit(
             &source,
             &[

@@ -174,21 +174,20 @@ use jit::test_harness::TestHarness;
 worked example: it creates, updates, claims and releases an issue through `h.executor`, and
 asserts the stored result.
 
-Run the whole suite with `cargo test --test fast_issue`, or one module with
-`cargo test --test fast_issue test_no_coordinator`.
+Run the whole suite with `cargo test --test contracts`, or one module with
+`cargo test --test contracts fast_issue::test_no_coordinator`.
 
 ## 3. Integration Tests
 
-Integration tests are grouped into cohesive **suites**. Each suite is one directory under
-`crates/jit/tests/<suite>/` whose `main.rs` declares its test files as modules, so Cargo
-links and runs one executable per suite instead of one per file. Suites divide by execution
-model and subsystem:
+Integration tests are grouped into cohesive **suites**. The two entry points,
+`crates/jit/tests/cli.rs` and `contracts.rs`, declare subsystem directories as modules.
+Each directory's `mod.rs` declares its test files, so Cargo links one executable per suite.
+The former targets remain modules grouped by execution model:
 
 | Suite | Execution model | Covers |
 | --- | --- | --- |
-| `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
-| `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
-| `scratch_build` | policy checks | manifest/source policy checks |
+| `contracts` | in-process (`CommandExecutor`) and policy checks | `fast_issue`, `fast_rules`, `fast_docs_templates`, `scratch_build` |
+| `cli` | CLI subprocess | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
 its measured suite and its `excluded-tests` step, on warm Cargo artifacts,
@@ -225,7 +224,7 @@ self-test costs seconds and never rebuilds this workspace.
 
 Shared in-process helpers live in the `jit` library's `test-support` surface (for example
 `crates/jit/src/test_harness.rs`), so they never surface as their own test targets. Add a new integration case to the file that
-matches its subsystem, or add a module file plus a `mod` line in the suite's `main.rs`.
+matches its subsystem, or add a module file plus a `mod` line in its subsystem's `mod.rs`.
 
 New and migrated CLI tests spawn `jit` through `jit::test_cli::JitCli`, the one shared
 subprocess fixture. It owns a temporary repository (`uninitialised()`, `initialised()` by
@@ -275,8 +274,8 @@ the same way: one `server_integration` suite whose `main.rs` declares the module
 both the in-process API cases and the real-process shutdown cases that spawn the compiled
 `jit-server` binary through `env!("CARGO_BIN_EXE_jit-server")`.
 
-Run a whole suite with `cargo test --test cli_repo_workflow`, or filter to one module or case
-with `cargo test --test cli_repo_workflow integration_test`.
+Run a whole suite with `cargo test --test cli`, or filter to one module or case
+with `cargo test --test cli cli_repo_workflow::integration_test`.
 
 ## 4. Build Footprint Budget
 
@@ -615,11 +614,11 @@ cargo test
 cargo test --lib
 
 # Harness tests, one module
-cargo test --test fast_issue test_no_coordinator
+cargo test --test contracts fast_issue::test_no_coordinator
 
 # One integration suite, or one module within it
-cargo test --test cli_repo_workflow
-cargo test --test cli_query_graph query_tests
+cargo test --test cli
+cargo test --test cli cli_query_graph::query_tests
 
 # Doc examples
 cargo test --doc

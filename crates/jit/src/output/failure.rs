@@ -1844,4 +1844,45 @@ mod malformed_identity_classification_tests {
             ErrorCode::InvalidArgument
         );
     }
+    #[test]
+    fn test_with_read_session_reports_an_unappliable_leftover_record_as_recovery_failed() {
+        use crate::commands::with_read_session;
+        use crate::storage::repository_state_store::test_fixtures::{
+            leftover_record, leftover_target, InterruptAtMoment, MemorySessionBackend,
+            SessionRecordBackend,
+        };
+        use crate::storage::{MutationPoint, RedoPoint};
+
+        let backend = MemorySessionBackend::seeded();
+        backend.commit(&leftover_record());
+        let interrupted = backend
+            .0
+            .with_mutation_interruption_view(InterruptAtMoment::new(MutationPoint::Redo(
+                RedoPoint::BeforeApply,
+            )));
+
+        let error = with_read_session(&interrupted, &backend.layout(), "blocked", |session| {
+            let image = session.capture(crate::repository_state::CaptureSpec::new(
+                [leftover_target()],
+                crate::repository_state::CaptureBudget {
+                    max_listings: 0,
+                    max_bytes: 1024 * 1024,
+                    max_depth: 8,
+                },
+            )?)?;
+            Ok(Some(
+                image.file_bytes(&leftover_target())?.map(<[u8]>::to_vec),
+            ))
+        })
+        .unwrap_err();
+
+        assert!(error
+            .downcast_ref::<crate::errors::RecoveryFailedError>()
+            .is_some());
+        assert!(error.to_string().contains("jit recover"), "{error}");
+        assert_eq!(
+            crate::output::failure::classify(&error).error.code,
+            crate::output::ErrorCode::RecoveryFailed
+        );
+    }
 }

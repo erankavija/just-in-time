@@ -5,7 +5,7 @@
   "dependencies": [
     "07663984-071b-4aa1-963a-e6ec2791f8d8"
   ],
-  "description": "Make `jit-server` detect the layout of the checkout holding `--data-dir` once at startup and hand that value to its storage and executor, so it stops classifying the process working directory and its handles stop detecting again.\n\n## Background\n\n- Server startup calls `WorktreePaths::detect()` (`crates/server/src/main.rs:67`), which detects from the process working directory (`crates/jit/src/storage/worktree_paths.rs:28-30`), keeps only its worktree root, and builds the repository layout from it (`crates/server/src/main.rs:70`). Storage comes from `prepare_server_storage` (`crates/server/src/lib.rs:65-81`) and the executor from `CommandExecutor::new(storage).with_layout(..)` (`crates/server/src/main.rs:76`); neither receives the detected paths.\n- Each handle then detects again on first use through its lazy fallback: `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) and `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2240-2256`). A server can therefore run three detections, the first against the wrong directory when it is started outside its repository.\n- The CLI already detects once from the selected data root (`crates/jit/src/main.rs:1903`) and passes the value to storage (`crates/jit/src/main.rs:1926`) and the executor (`crates/jit/src/main.rs:1968`).\n- `detect()` has no other production caller.\n\n## Success Criteria\n\n- [hard] REQ-01: A server-library function derives the startup layout once through `WorktreePaths::detect_for_data_root`, with the `--data-dir` directory as the selected root and the process directory as the non-git fallback root. Startup configures its storage handle and executor with that value.\n- [hard] REQ-02: A test starts the derivation from a directory outside the repository with the data directory inside a git checkout and asserts that the worktree root is that checkout's root and that the paths classify it as a git checkout. Against today's derivation, which detects the process directory, both assertions fail.\n\n## Notes\n\n- Behaviour change: a server started outside its repository classifies the checkout holding its data directory, not the directory it was started from.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit-server` consume the shared repository bootstrap so the checkout selected by `--data-dir` supplies one layout and worktree classification to storage and the executor.\n\n## Background\n\nThe CLI already opens repositories through `commands/bootstrap::open_repository`. That constructor resolves the selected data root, detects worktree paths once, configures storage and executor, and controls startup recovery before validation. Server startup still calls `WorktreePaths::detect()` from its process directory and builds a separate layout and storage path.\n\n## Success Criteria\n\n- [hard] REQ-01: Server startup consumes `commands/bootstrap::open_repository` for storage, executor, layout and worktree paths. It passes the selected `--data-dir` and the process directory as the non-Git fallback, performs no server-owned layout/worktree discovery, preserves recovery before validation, and releases startup serialization before serving requests.\n- [hard] REQ-02: A test starts the derivation from a directory outside the repository with the data directory inside a Git checkout and asserts that the worktree root is that checkout's root and that the paths classify it as a Git checkout. The non-Git case preserves the explicit process-directory fallback.\n\n## Notes\n\nThe Git epic owns this combined startup migration, including the server/web epic's shared-bootstrap requirement. The steward reconciled the formerly competing discovery contracts on 2026-11-04; no second server constructor or discovery path is introduced.\n",
   "documents": [],
   "first_ready_at": "2026-11-01T14:05:43.239550705Z",
   "gates_required": [
@@ -22,10 +22,11 @@
     "component:server",
     "per:@/charter/D-21",
     "satisfies:f4d9502a/REQ-03",
-    "satisfies:f4d9502a/REQ-04"
+    "satisfies:f4d9502a/REQ-04",
+    "satisfies:0f8efc37/REQ-01"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Server detects its layout once from the selected data root",
-  "updated_at": "2026-11-01T14:05:43.239550705Z"
+  "updated_at": "2026-11-04T22:01:13.854689356Z"
 }

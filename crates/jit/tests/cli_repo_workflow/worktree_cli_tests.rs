@@ -97,7 +97,7 @@ fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() 
             ["init", "--json"],
             [("JIT_DATA_DIR", worktree_path.join(".jit").to_str().unwrap())]
                 .into_iter()
-                .chain([crate::ALLOW_LINKED_WRITES]),
+                .chain([super::ALLOW_LINKED_WRITES]),
         )
         .output()
         .unwrap();
@@ -575,7 +575,7 @@ fn test_init_in_new_worktree_generates_unique_id() {
 
     // Run jit init in the worktree
     linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .assert()
         .success();
 
@@ -610,7 +610,7 @@ fn test_init_is_idempotent_in_worktree() {
 
     // Run jit init first time
     linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .assert()
         .success();
 
@@ -621,7 +621,7 @@ fn test_init_is_idempotent_in_worktree() {
 
     // Run jit init second time
     linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .assert()
         .success();
 
@@ -649,7 +649,7 @@ fn test_worktree_list_shows_distinct_ids() {
 
     [&linked, &second].iter().for_each(|checkout| {
         checkout
-            .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+            .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
             .assert()
             .success();
     });
@@ -684,7 +684,7 @@ fn test_worktree_list_shows_distinct_ids() {
 fn test_git_worktree_move_preserves_id() {
     let (cli, linked) = JitCli::linked_checkouts().unwrap();
     linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .assert()
         .success();
     let id_before = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"].clone();
@@ -729,7 +729,7 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
                 "--title",
                 "Held by the linked checkout alone",
             ],
-            [crate::ALLOW_LINKED_WRITES],
+            [super::ALLOW_LINKED_WRITES],
         )
         .assert()
         .success();

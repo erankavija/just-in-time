@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T21:48:04.094611037Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -13,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ad91af03-43ed-4558-8d76-bfa05627ac54",
+      "status": "passed",
+      "updated_at": "2026-11-04T21:48:48.554505744Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "17e23f60-7859-43cf-9ed6-5cc869272053",
+      "status": "failed",
+      "updated_at": "2026-11-04T21:53:21.793055369Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f35c86de-e4fa-4ce9-bf48-ee1378115355",
   "labels": [
     "type:story",
@@ -24,7 +38,7 @@
     "story:executor-surface"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Narrow executor surface and storage-free CLI entry",
-  "updated_at": "2026-11-04T18:21:04.534321938Z"
+  "updated_at": "2026-11-04T21:53:21.793055369Z"
 }

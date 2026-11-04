@@ -262,8 +262,8 @@ async fn get_issue<S: IssueStore>(
 ///
 /// List envelope: `count` is the number of entries in `nodes`, the primary
 /// collection. `edges` is a secondary collection, counted by its own length.
-/// This matches [`jit::output::GraphTreeResponse`], where `count` likewise
-/// counts `nodes`, and [`jit::output::IssueChildrenResponse`], where `count`
+/// This matches [`jit::commands::GraphTreeResponse`], where `count` likewise
+/// counts `nodes`, and [`jit::commands::IssueChildrenResponse`], where `count`
 /// counts the primary `issues` collection and leaves the secondary `dangling`
 /// list uncounted.
 #[derive(Debug, Serialize, Deserialize)]

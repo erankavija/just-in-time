@@ -1,9 +1,3 @@
-//! `fast_rules` integration-test suite. Aggregates former per-file
-//! integration targets as modules under one Cargo test target so Cargo links
-//! and runs them as a single executable (jit:8d4f7084).
-
-use jit::test_utils::fixture_issue;
-
 mod config_loading_tests;
 mod default_rules_registry_derivation_tests;
 mod effective_rules_tests;
