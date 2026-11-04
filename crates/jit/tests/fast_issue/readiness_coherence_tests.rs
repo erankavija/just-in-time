@@ -150,11 +150,7 @@ fn test_validate_fix_demotes_a_ready_issue_that_carries_an_unmet_dependency() {
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
-    let (fixes, _messages) = h
-        .executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    let (fixes, _messages, _, _) = h.executor.validation().validate_with_fix(false).unwrap();
 
     assert_eq!(fixes, 1, "exactly the one incoherent issue is repaired");
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
@@ -178,10 +174,7 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
     let events_before = h.storage.read_events().unwrap().len();
 
-    h.executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    h.executor.validation().validate_with_fix(false).unwrap();
 
     let events = h.storage.read_events().unwrap();
     assert!(events.len() > events_before);
@@ -209,11 +202,7 @@ fn test_validate_fix_dry_run_reports_the_incoherent_issue_without_repairing_it()
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
-    let (fixes, messages) = h
-        .executor
-        .validation()
-        .validate_with_fix(true, true)
-        .unwrap();
+    let (fixes, messages, _, _) = h.executor.validation().validate_with_fix(true).unwrap();
 
     assert_eq!(fixes, 1);
     assert!(
@@ -332,10 +321,7 @@ fn test_validate_reports_and_fix_promotes_a_backlog_dependent_whose_blockers_are
     assert!(rendered.contains(&h.get_issue(&dependent).short_id()));
     assert!(rendered.contains("jit validate --fix"));
 
-    h.executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    h.executor.validation().validate_with_fix(false).unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
     assert!(h.executor.validation().validate_silent().is_ok());

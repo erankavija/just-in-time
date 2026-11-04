@@ -2995,6 +2995,7 @@ fn test_redo_record_for_finalized_gate_run_precedes_issue_naming_it() {
                 draft: Box::new(run),
             },
         ],
+        None,
     )
     .unwrap();
     let record = redo_record_for(&image, plan.delta().actions().iter()).unwrap();

@@ -737,6 +737,13 @@
       "id": "09ca911e-r1",
       "vendor": "lead",
       "reason": "doc-review 11855055 F1 F2: drop two internal reader claims in reference.rs prose, regenerate"
+    },
+    {
+      "id": "f0a5b90a",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "multi-page operator docs derived from current lease code"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
