@@ -440,7 +440,8 @@
     "2117739f": 1,
     "2f563673": 1,
     "0851fae4": 1,
-    "944edb32": 2
+    "944edb32": 2,
+    "09ca911e": 1
   },
   "surfaced_pitfalls": [
     {
@@ -731,6 +732,11 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "test-only, fully specified criteria"
+    },
+    {
+      "id": "09ca911e-r1",
+      "vendor": "lead",
+      "reason": "doc-review 11855055 F1 F2: drop two internal reader claims in reference.rs prose, regenerate"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
