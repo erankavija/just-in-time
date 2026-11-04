@@ -581,6 +581,33 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "recovery onto LeaseLock; concurrency-critical; on 944edb32 path"
+    },
+    {
+      "id": "0bd2c797",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path gate captures"
+    },
+    {
+      "id": "93b7f1dd",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "critical path verdict provenance contract"
+    },
+    {
+      "id": "97f5f2b7",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "well-specified removal"
+    },
+    {
+      "id": "db9bcf12",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "archive evidence record writes"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

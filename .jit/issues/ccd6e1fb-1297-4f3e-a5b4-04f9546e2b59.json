@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-03T23:56:59.451522072Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -27,5 +27,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Local rules compile each schema once per report",
-  "updated_at": "2026-11-03T23:56:59.451522072Z"
+  "updated_at": "2026-11-04T00:03:01.751947176Z"
 }
