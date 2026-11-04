@@ -1486,6 +1486,25 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
+    fn validation_image<S: IssueStore + crate::storage::RepositoryStateStore>(
+        executor: &CommandExecutor<S>,
+    ) -> crate::repository_state::RepositoryImage {
+        crate::commands::with_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            "checker fixture capture",
+            |session| {
+                Ok(match executor.validation().capture_validation(session)? {
+                    Some(captured) => {
+                        crate::commands::SessionStep::Done(captured.image.into_owned())
+                    }
+                    None => crate::commands::SessionStep::Retry,
+                })
+            },
+        )
+        .unwrap()
+    }
+
     struct FailNthPublication {
         remaining: Mutex<usize>,
     }
@@ -2078,18 +2097,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             crate::test_taxonomy::invalid_hierarchy_config_fragment()
         );
         std::fs::write(executor.storage().root().join("config.toml"), &config).unwrap();
-        let image = crate::commands::with_mutation_session(
-            executor.storage(),
-            &executor.require_layout().unwrap(),
-            "checker fixture capture",
-            |session| {
-                Ok(match executor.validation().capture_validation(session)? {
-                    Some(captured) => crate::commands::SessionStep::Done(captured.image),
-                    None => crate::commands::SessionStep::Retry,
-                })
-            },
-        )
-        .unwrap();
+        let image = validation_image(&executor);
 
         let run = executor
             .execute_builtin_checker_with_repository_view(
@@ -3191,18 +3199,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let image = crate::commands::with_mutation_session(
-            executor.storage(),
-            &executor.require_layout().unwrap(),
-            "checker fixture capture",
-            |session| {
-                Ok(match executor.validation().capture_validation(session)? {
-                    Some(captured) => crate::commands::SessionStep::Done(captured.image),
-                    None => crate::commands::SessionStep::Retry,
-                })
-            },
-        )
-        .unwrap();
+        let image = validation_image(&executor);
         change(repo.path(), &issue_id);
         let validate = executor
             .validation()
@@ -3458,18 +3455,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         unrelated.labels = vec!["type:epic".to_string()];
         unrelated.dependencies = vec![rule_gated.clone(), scope_gated.clone(), repository_gated];
         seed_issue(&executor.storage, unrelated);
-        let image = crate::commands::with_mutation_session(
-            executor.storage(),
-            &executor.require_layout().unwrap(),
-            "checker fixture capture",
-            |session| {
-                Ok(match executor.validation().capture_validation(session)? {
-                    Some(captured) => crate::commands::SessionStep::Done(captured.image),
-                    None => crate::commands::SessionStep::Retry,
-                })
-            },
-        )
-        .unwrap();
+        let image = validation_image(&executor);
         let validate = crate::validation::report(
             &crate::validation::CapturedValidation::from_image(&image),
             &crate::validation::ReportInputs {
@@ -3602,18 +3588,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 label_namespace: "target".to_string(),
             },
         ] {
-            let image = crate::commands::with_mutation_session(
-                executor.storage(),
-                &executor.require_layout().unwrap(),
-                "checker fixture capture",
-                |session| {
-                    Ok(match executor.validation().capture_validation(session)? {
-                        Some(captured) => crate::commands::SessionStep::Done(captured.image),
-                        None => crate::commands::SessionStep::Retry,
-                    })
-                },
-            )
-            .unwrap();
+            let image = validation_image(&executor);
             let result = executor
                 .execute_builtin_checker_with_repository_view(
                     GateRunSubject {

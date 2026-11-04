@@ -2518,6 +2518,27 @@ depends_on = ["planning"]
         split(executor.validation().validate_repository_report().unwrap())
     }
 
+    fn capture_overlaid_image(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        overrides: &std::collections::BTreeMap<VirtualPath, Option<Vec<u8>>>,
+        finish: impl Fn(&RepositoryImage) -> anyhow::Result<RepositoryImage>,
+    ) -> RepositoryImage {
+        with_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            "overlay fixture capture",
+            |session| {
+                let Some(base) = executor.capture_proposed_base(session, overrides, &[], None)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let proposed = crate::repository_state::apply_overlay(&base, overrides.clone())?;
+                Ok(SessionStep::Done(finish(&proposed)?))
+            },
+        )
+        .unwrap()
+    }
+
     /// Capture and validate the fixture overlaid with proposed final bytes/absence.
     fn validate_overlaid<P: Into<PathBuf>>(
         executor: &crate::commands::CommandExecutor<JsonFileStorage>,
@@ -2533,22 +2554,7 @@ depends_on = ["planning"]
         if overrides.is_empty() {
             return split(executor.validation().selection_report().unwrap());
         }
-        let image = with_mutation_session(
-            executor.storage(),
-            &executor.require_layout().unwrap(),
-            "overlay fixture capture",
-            |session| {
-                let Some(base) = executor.capture_proposed_base(session, &overrides, &[], None)?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
-                Ok(SessionStep::Done(crate::repository_state::apply_overlay(
-                    &base,
-                    overrides.clone(),
-                )?))
-            },
-        )
-        .unwrap();
+        let image = capture_overlaid_image(executor, &overrides, |proposed| Ok(proposed.clone()));
         split(crate::validation::report(
             &crate::validation::CapturedValidation::from_image(&image),
             &crate::validation::ReportInputs {
@@ -2572,30 +2578,19 @@ depends_on = ["planning"]
                 .map(|(path, value)| (path.into(), value)),
         )
         .unwrap();
-        let image = with_mutation_session(
-            executor.storage(),
-            &layout,
-            "materialized overlay fixture capture",
-            |session| {
-                let Some(base) = executor.capture_proposed_base(session, &overrides, &[], None)?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
-                let proposed = crate::repository_state::apply_overlay(&base, overrides.clone())?;
-                let declarations = crate::repository_state::declarations_from_image(&proposed)?;
-                let plan = crate::repository_state::derive_materialization(
-                    &proposed,
-                    crate::repository_state::MaterializationRequest::RepairDerivedState {
-                        declarations: declarations.borrowed(),
-                    },
-                )?;
-                Ok(SessionStep::Done(crate::repository_state::apply_overlay(
-                    &proposed,
-                    crate::repository_state::action_overrides(plan.delta().actions()),
-                )?))
-            },
-        )
-        .unwrap();
+        let image = capture_overlaid_image(executor, &overrides, |proposed| {
+            let declarations = crate::repository_state::declarations_from_image(proposed)?;
+            let plan = crate::repository_state::derive_materialization(
+                proposed,
+                crate::repository_state::MaterializationRequest::RepairDerivedState {
+                    declarations: declarations.borrowed(),
+                },
+            )?;
+            Ok(crate::repository_state::apply_overlay(
+                proposed,
+                crate::repository_state::action_overrides(plan.delta().actions()),
+            )?)
+        });
         split(crate::validation::report(
             &crate::validation::CapturedValidation::from_image(&image),
             &crate::validation::ReportInputs {
