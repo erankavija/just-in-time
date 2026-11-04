@@ -19,7 +19,6 @@ use crate::output::{
     IssueStatusResponse, IssueUpdateOutput, IssueUpdateResponse,
 };
 use crate::query_engine::QueryFilter;
-use crate::schema::OutputSchema;
 use crate::storage::IssueStore;
 use anyhow::Context as _;
 
@@ -608,29 +607,37 @@ command_group! {
             "Single id: a bare IssueStatusResponse. Multiple ids: the {count, issues} envelope of IssueStatusResponse objects in argument order.",
         "issue_children" => IssueCommands::Children { id } => children(id) -> IssueChildrenResponse,
         "issue_progress" => IssueCommands::Progress { id } => progress(id) -> ContainerProgressResponse,
-        "issue_create" => IssueCommands::Create { positional_title, title, description, description_file, priority, issue_type, gate, label, content_format, force } => create(positional_title.or(title).unwrap_or_default(), description, description_file, priority, issue_type, gate, label, content_format, force) -> IssueCreateResponse,
+        "issue_create" => IssueCommands::Create { positional_title, title, description, description_file, priority, issue_type, gate, label, content_format, force } => create(positional_title.or(title).unwrap_or_default(), description, description_file, priority, issue_type, gate, label, content_format, force)
+            raises [ValidationFailed] -> IssueCreateResponse,
         "issue_batch-create" => IssueCommands::BatchCreate { from_json, dry_run } => batch_create(from_json, dry_run) -> IssueBatchCreateOutput
             as union [BatchCreateResponse, BatchDryRunOutcome]
             "Default shape: the ids map from each entry's symbolic key to its created issue's full id. With --dry-run: the validation result; nothing is created.",
-        "issue_update" => IssueCommands::Update { id, filter, title, description, description_file, append_description, append_description_file, priority, state, issue_type, label, remove_label, add_gate, remove_gate, assignee, unassign, content_format, force } => update(id, filter, title, description, description_file, append_description, append_description_file, priority, state, issue_type, label, remove_label, add_gate, remove_gate, assignee, unassign, content_format, force) -> IssueUpdateOutput
+        "issue_update" => IssueCommands::Update { id, filter, title, description, description_file, append_description, append_description_file, priority, state, issue_type, label, remove_label, add_gate, remove_gate, assignee, unassign, content_format, force } => update(id, filter, title, description, description_file, append_description, append_description_file, priority, state, issue_type, label, remove_label, add_gate, remove_gate, assignee, unassign, content_format, force)
+            raises [Blocked, ValidationFailed] -> IssueUpdateOutput
             as union [IssueUpdateResponse, crate::commands::BulkUpdateResult]
             "With an issue id: the updated issue's lean confirmation. With --filter: the batch result (matched, modified, skipped and failed ids with a summary).",
-        "issue_delete" => IssueCommands::Delete { id } => delete(id) -> IssueDeleteResponse,
+        "issue_delete" => IssueCommands::Delete { id } => delete(id)
+            raises [DeletionNotConfirmed] -> IssueDeleteResponse,
         "issue_assign" => IssueCommands::Assign { id, assignee } => assign(id, assignee) -> IssueLifecycleResponse,
-        "issue_claim" => IssueCommands::Claim { id, assignee, assign_only } => claim(id, assignee, assign_only) -> IssueLifecycleResponse,
+        "issue_claim" => IssueCommands::Claim { id, assignee, assign_only } => claim(id, assignee, assign_only)
+            raises [Blocked, ValidationFailed] -> IssueLifecycleResponse,
         "issue_unassign" => IssueCommands::Unassign { id } => unassign(id) -> IssueLifecycleResponse,
         "issue_reject" => IssueCommands::Reject { id, reason } => reject(id, reason) -> IssueLifecycleResponse,
         "issue_release" => IssueCommands::Release { id, reason } => release(id, reason) -> IssueLifecycleResponse,
-        "issue_claim-next" => IssueCommands::ClaimNext { assignee, filter } => claim_next(assignee, filter) -> IssueLifecycleResponse,
+        "issue_claim-next" => IssueCommands::ClaimNext { assignee, filter } => claim_next(assignee, filter)
+            raises [Blocked, ValidationFailed] -> IssueLifecycleResponse,
     }
 }
 
-/// The top-level `list` alias shares `issue list`'s response.
-pub fn alias_output_schema(cmd_path: &str) -> Option<OutputSchema> {
-    (cmd_path == "list")
-        .then(|| output_schema("issue_list"))
-        .flatten()
-}
+/// The top-level `list` alias shares `issue list`'s response and codes.
+pub const ALIAS_GROUP: super::RegisteredGroup = super::RegisteredGroup {
+    output_schema: |cmd_path| {
+        (cmd_path == "list")
+            .then(|| output_schema("issue_list"))
+            .flatten()
+    },
+    leaves: &[],
+};
 
 #[cfg(test)]
 mod tests {

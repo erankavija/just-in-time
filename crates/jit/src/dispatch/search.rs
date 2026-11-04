@@ -46,6 +46,7 @@ command_group! {
     command: SearchArgs,
     storage: [IssueStore],
     leaves: {
-        "search" => args => search(args) -> SearchResponse,
+        "search" => args => search(args)
+            raises [RipgrepNotFound, SearchFailed] -> SearchResponse,
     }
 }

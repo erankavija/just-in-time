@@ -77,7 +77,8 @@ command_group! {
     command: DepCommands,
     storage: [HandlerStore],
     leaves: {
-        "dep_add" => DepCommands::Add { from_id, to_ids, reduce } => add(from_id, to_ids, reduce) -> DependencyAddResponse,
+        "dep_add" => DepCommands::Add { from_id, to_ids, reduce } => add(from_id, to_ids, reduce)
+            raises [CycleDetected, ValidationFailed] -> DependencyAddResponse,
         "dep_rm" => DepCommands::Rm { from_id, to_ids } => rm(from_id, to_ids) -> DependencyRemoveResponse,
     }
 }

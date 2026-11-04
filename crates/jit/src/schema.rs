@@ -199,19 +199,8 @@ pub struct ExitCodeDoc {
 
 /// Exit code a command family emits under a named condition.
 ///
-/// The global taxonomy in [`ExitCodeDoc`] states what each code means in
-/// general; this maps the codes back to the command families and conditions
-/// that produce them. `exception` flags a row where the code's meaning here
-/// departs from the global entry — a completed run signalling findings with a
-/// non-zero code — rather than the ordinary error classification.
-///
-/// The classification rows derive from the typed-error classifier
-/// ([`classify`](crate::output::failure::classify)); the exception rows derive
-/// from the findings envelopes handlers return. The classifier's unit tests
-/// verify the classification rows against it, and
-/// [`CommandExitCode::code`] is verified against the global taxonomy in
-/// `schema.rs` tests, so this projection cannot silently drift from runtime
-/// behavior (@/inv/single-source-prose).
+/// The `*` rows hold for every command; the others derive from the codes each
+/// leaf declares in its `command_group!` registration.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommandExitCode {
     /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
@@ -222,8 +211,7 @@ pub struct CommandExitCode {
     pub code: i32,
     /// Condition that produces the code.
     pub condition: String,
-    /// True when the code's meaning here departs from the global taxonomy entry
-    /// for `code` (a completed-run findings signal).
+    /// True for a declared findings code and for the broken-pipe status.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exception: bool,
 }
@@ -634,336 +622,124 @@ impl CommandSchema {
             .collect()
     }
 
-    /// Project the per-command-family exit-code mappings.
-    ///
-    /// The rows are grouped as: universal codes every command can emit, codes
-    /// specific to a command family, and exceptions — codes a completed run
-    /// emits to signal findings, or codes whose meaning departs from the global
-    /// taxonomy. Classification rows mirror the typed-error classifier
-    /// (`output::failure::classify`); exception rows mirror the findings
-    /// envelopes handlers return. Both are verified by
-    /// test rather than hand-copied (@/inv/single-source-prose).
+    /// Project the per-command exit-code mappings: the universal `*` rows,
+    /// then the rows [`declared_exit_codes`] derives from every registered leaf.
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
-        let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
-            command: command.to_string(),
-            code,
+        let universal = |code: ExitCode, condition: &str, exception: bool| CommandExitCode {
+            command: "*".to_string(),
+            code: code.code(),
             condition: condition.to_string(),
             exception,
         };
-        vec![
-            row(
-                "worktree info, worktree list",
-                3,
-                "A required filesystem path was not found.",
+        let declared = declared_exit_codes(
+            crate::dispatch::REGISTERED_GROUPS
+                .iter()
+                .flat_map(|group| group.leaves),
+        );
+        [
+            universal(ExitCode::Success, "Command completed successfully.", false),
+            universal(
+                ExitCode::GenericError,
+                "No typed classifier matched the failure (generic error), or input data \
+                 could not be parsed.",
                 false,
             ),
-            row(
-                "worktree info, worktree list",
-                5,
-                "A filesystem operation was denied.",
-                false,
-            ),
-            row(
-                "worktree info, worktree list",
-                10,
-                "An I/O failure prevented worktree inspection.",
-                false,
-            ),
-            row(
-                "worktree store-divergence",
-                5,
-                "A filesystem operation reading the primary checkout's store was denied.",
-                false,
-            ),
-            // Universal: any command reaches these — `0` on successful completion,
-            // the failure codes through the shared classifier.
-            row("*", 0, "Command completed successfully.", false),
-            row(
-                "*",
-                1,
-                "No typed classifier matched the failure (generic error).",
-                false,
-            ),
-            row(
-                "*",
-                2,
+            universal(
+                ExitCode::InvalidArgument,
                 "Invalid arguments or usage error, including an unresolvable, \
                  ambiguous, or too-short id prefix.",
                 false,
             ),
-            row(
-                "*",
-                3,
+            universal(
+                ExitCode::NotFound,
                 "A referenced issue, gate, gate-run, preset, lease, repository, \
                  or file path was not found.",
                 false,
             ),
-            row("*", 5, "A filesystem operation was denied.", false),
-            row(
-                "profile apply",
-                2,
-                "The --values-file path could not be read.",
+            universal(
+                ExitCode::PermissionDenied,
+                "A filesystem operation was denied.",
                 false,
             ),
-            row(
-                "profile apply",
-                4,
-                "Repository-state derivation refused conflicting profile targets.",
-                false,
-            ),
-            row(
-                "profile diff",
-                4,
-                "The difference report found targets or final validation that prevent publication.",
-                true,
-            ),
-            row(
-                "profile pack",
-                6,
-                "The archive output path already exists.",
-                false,
-            ),
-            row(
-                "profile add",
-                4,
-                "The package destination already exists.",
-                false,
-            ),
-            row(
-                "*",
-                10,
+            universal(
+                ExitCode::ExternalError,
                 "The repository's on-disk format is not the one this binary accepts, or a \
                  filesystem/subprocess I/O operation failed.",
                 false,
             ),
-            row(
-                "*",
-                11,
+            universal(
+                ExitCode::LockTimeout,
                 "A lock wait expired while another jit process held the lock \
                  (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be \
                  retried.",
                 false,
             ),
-            // `search` leaf: ripgrep missing or failing exits 1; a spawn or
-            // path I/O failure exits 10, on both --json and human paths.
-            row(
-                "search",
-                1,
-                "ripgrep is not installed (RIPGREP_NOT_FOUND) or ran and failed (SEARCH_FAILED).",
-                false,
-            ),
-            row(
-                "search",
-                10,
-                "ripgrep could not be spawned or the search root could not be resolved (I/O failure).",
-                false,
-            ),
-            // Command-family classification (standard taxonomy meaning).
-            row(
-                "any command that writes an issue",
-                4,
-                "An enforcing validation rule rejected the write (the shared \
-                 write-validation path blocks on rule findings).",
-                false,
-            ),
-            row(
-                "dep add",
-                4,
-                "The edge would create a cycle (CYCLE_DETECTED), or a redundant \
-                 (transitively-implied) edge was rejected (VALIDATION_FAILED), \
-                 in human and JSON output alike.",
-                false,
-            ),
-            row(
-                "apply",
-                4,
-                "The template delta would close a dependency cycle through \
-                 existing issues; the apply is rejected before any node is \
-                 created.",
-                false,
-            ),
-            row("init", 2, "The `--values-file` path cannot be read.", false),
-            row(
-                "issue update, issue claim, issue claim-next",
-                4,
-                "A state transition is blocked by unmet dependencies or unpassed \
-                 gates.",
-                false,
-            ),
-            row(
-                "gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create",
-                1,
-                "A registry or preset file could not be parsed, or an untyped \
-                 command failure occurred. Other typed failures use the universal codes.",
-                false,
-            ),
-            row(
-                "gate define",
-                6,
-                "The gate key is already registered.",
-                false,
-            ),
-            row(
-                "issue delete",
-                2,
-                "Deletion was refused for missing operator confirmation \
-                 (JIT_ALLOW_DELETION=1 not set in the process environment).",
-                false,
-            ),
-            row(
-                "issue batch-create",
-                2,
-                "The batch file failed pre-validation; no issues were created.",
-                false,
-            ),
-            row(
-                "snapshot export",
-                6,
-                "The snapshot output path already exists.",
-                false,
-            ),
-            row(
-                "claim",
-                10,
-                "A lease subcommand was run outside a git repository (leases \
-                 require git for worktree identity).",
-                false,
-            ),
-            row(
-                "hooks install",
-                2,
-                "The invocation is outside a git repository.",
-                false,
-            ),
-            row(
-                "hooks install",
-                3,
-                "A repository path needed to install hooks was not found.",
-                false,
-            ),
-            row(
-                "hooks install",
-                5,
-                "Filesystem permissions denied hook installation.",
-                false,
-            ),
-            row(
-                "hooks install",
-                10,
-                "A filesystem or subprocess operation needed to install hooks failed.",
-                false,
-            ),
-            // Gate evaluation: the code carries the checker's verdict.
-            row(
-                "gate evaluate, gate evaluate-all, gate evaluate-many",
-                4,
-                "A checker ran and its verdict was fail.",
-                true,
-            ),
-            row(
-                "gate evaluate, gate evaluate-all, gate evaluate-many",
-                10,
-                "A checker could not run to a verdict (timeout, crash, command \
-                 not found, or exit status 75).",
-                true,
-            ),
-            // Findings signalled by a completed run via a non-zero exit code.
-            row(
-                "validate",
-                4,
-                "Repository, scope, issue, selected-rule, or explanation \
-                 validation reported error-severity findings.",
-                true,
-            ),
-            row(
-                "validate --branch-drift",
-                4,
-                "Branch-drift validation failed: the check reported drift from \
-                 the upstream branch or could not run.",
-                true,
-            ),
-            row(
-                "validate --leases",
-                4,
-                "Lease validation found one or more invalid leases, or the lease \
-                 check could not run.",
-                true,
-            ),
-            row(
-                "gate status-all",
-                4,
-                "One or more required gates have not passed.",
-                true,
-            ),
-            row(
-                "invariant check",
-                4,
-                "Enforcement drift was found (declared enforcement not backed by \
-                 an enforcing rule).",
-                true,
-            ),
-            row(
-                "item list, item search, item show, item resolve",
-                2,
-                "The repository configuration failed to load, or an item address \
-                 was not a qualified id.",
-                false,
-            ),
-            row(
-                "config validate",
-                4,
-                "The repo or environment-variable configuration failed to \
-                 load or carried an invalid value.",
-                false,
-            ),
-            row(
-                "doc check-links",
-                4,
-                "One or more documents have broken links. Documents with only \
-                 risky-link warnings exit `0`: warnings are reported, never fatal.",
-                true,
-            ),
-            row(
-                "gate preset apply",
-                3,
-                "One or more preset targets failed; the findings report retains \
-                 successful targets and per-target errors.",
-                true,
-            ),
-            row(
-                "project render",
-                2,
-                "The requested projection name is not declared in repository configuration.",
-                false,
-            ),
-            // `serve` default (daemon), `--stop`, and `--status` route failures
-            // through the shared classifier. Malformed PID state is the
-            // representative parser failure bound here; other typed failures
-            // use the applicable universal row above.
-            row(
-                "serve, serve --stop, serve --status",
-                1,
-                "The daemon PID state could not be parsed (exits 0 on success).",
-                false,
-            ),
-            // Every command reaches this if its stdout write outlives the
-            // downstream reader (`| head`, etc.): the renderers return it, not
-            // the typed-error classifier.
-            row(
-                "*",
-                141,
+            // The renderers return this when stdout outlives its reader
+            // (`| head`), not the typed-error classifier.
+            universal(
+                ExitCode::BrokenPipe,
                 "A downstream reader closed the pipe while jit was still writing.",
                 true,
             ),
-            row(
-                "serve --fg",
-                1,
-                "The foreground server exited with a failure status (`SERVER_EXITED`; \
-                 the child's status is in `error.details`).",
-                false,
-            ),
         ]
+        .into_iter()
+        .chain(declared)
+        .collect()
     }
+}
+
+/// The exit-code rows `leaves` declare: per leaf, one row per exit code, its
+/// condition joining the declared codes' descriptions (or the findings
+/// condition, flagged `exception`); leaves with equal rows share one.
+fn declared_exit_codes<'a>(
+    leaves: impl IntoIterator<Item = &'a crate::dispatch::LeafCodes>,
+) -> Vec<CommandExitCode> {
+    fn merge(
+        mut rows: Vec<CommandExitCode>,
+        row: CommandExitCode,
+        same: fn(&CommandExitCode, &CommandExitCode) -> bool,
+        combine: fn(&mut CommandExitCode, CommandExitCode),
+    ) -> Vec<CommandExitCode> {
+        match rows.iter_mut().find(|existing| same(existing, &row)) {
+            Some(existing) => combine(existing, row),
+            None => rows.push(row),
+        }
+        rows
+    }
+    leaves
+        .into_iter()
+        .flat_map(|leaf| {
+            let command = leaf.path.replace('_', " ");
+            leaf.raises
+                .iter()
+                .map(|code| (*code, code.description(), false))
+                .chain(
+                    leaf.findings
+                        .map(|(code, condition)| (code, condition, true)),
+                )
+                .map(move |(code, condition, exception)| CommandExitCode {
+                    command: command.clone(),
+                    code: code.exit_code().code(),
+                    condition: condition.to_string(),
+                    exception,
+                })
+                .fold(Vec::new(), |rows, row| {
+                    merge(
+                        rows,
+                        row,
+                        |a, b| a.code == b.code && a.exception == b.exception,
+                        |a, b| a.condition = format!("{} {}", a.condition, b.condition),
+                    )
+                })
+        })
+        .fold(Vec::new(), |rows, row| {
+            merge(
+                rows,
+                row,
+                |a, b| a.code == b.code && a.exception == b.exception && a.condition == b.condition,
+                |a, b| a.command = format!("{}, {}", a.command, b.command),
+            )
+        })
 }
 
 #[cfg(any(test, feature = "test-support"))]
@@ -1012,12 +788,12 @@ pub fn render_exit_code_reference() -> String {
     out.push_str("## Command-specific mappings\n\n");
     out.push_str(
         "Most commands draw only from the global taxonomy above. The rows below \
-         identify the codes a specific command family emits. An **exception** is \
-         a code a completed run emits to signal findings, or a code whose meaning \
-         departs from the global entry (for example, `doc check-links` exits `4` \
-         for broken links, not a generic error). `*` marks a code \
-         every command can reach: `0` on successful completion, and the failure \
-         codes through the shared classifier.\n\n",
+         identify the codes a specific command family emits, derived from the \
+         codes each command's handler registration declares. An **exception** is \
+         a code a completed run emits to signal findings (for example, \
+         `doc check-links` exits `4` for broken links), or the broken-pipe status. \
+         `*` marks a code every command can reach: `0` on successful completion, \
+         and the failure codes through the shared classifier.\n\n",
     );
     out.push_str("| Command | Code | Condition | Exception |\n");
     out.push_str("|---------|------|-----------|-----------|\n");
@@ -1042,6 +818,7 @@ pub fn render_exit_code_reference() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::ErrorCode;
 
     #[test]
     fn test_get_output_schema_for_command_uses_only_registered_responses() {
@@ -1689,48 +1466,86 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_command_exit_codes_present_in_schema() {
-        let schema = CommandSchema::generate();
-        assert!(
-            !schema.command_exit_codes.is_empty(),
-            "command_exit_codes projection must be populated"
-        );
-        // A few representative families must surface so the projection stays
-        // discoverable.
-        for command in [
-            "*",
-            "gate evaluate, gate evaluate-all, gate evaluate-many",
-            "hooks install",
-            "validate",
-        ] {
-            assert!(
-                schema
-                    .command_exit_codes
-                    .iter()
-                    .any(|c| c.command == command),
-                "command_exit_codes must document `{command}`"
-            );
+    fn leaf(
+        path: &'static str,
+        raises: &'static [ErrorCode],
+        findings: Option<(ErrorCode, &'static str)>,
+    ) -> crate::dispatch::LeafCodes {
+        crate::dispatch::LeafCodes {
+            path,
+            raises,
+            findings,
         }
     }
 
     #[test]
-    fn test_command_exit_codes_within_global_taxonomy() {
-        // Every projected fixed code must be a defined member of the global
-        // taxonomy, so the per-command surface can never introduce a code the
-        // taxonomy does not explain.
-        let taxonomy: std::collections::HashSet<i32> = CommandSchema::generate_exit_codes()
-            .iter()
-            .map(|d| d.code)
-            .collect();
-        for entry in CommandSchema::generate_command_exit_codes() {
-            assert!(
-                taxonomy.contains(&entry.code),
-                "command `{}` documents code {}, which is absent from the global taxonomy",
-                entry.command,
-                entry.code,
-            );
+    fn test_declared_exit_codes_merge_one_leafs_codes_sharing_an_exit_status() {
+        let rows = declared_exit_codes(&[leaf(
+            "dep_add",
+            &[ErrorCode::CycleDetected, ErrorCode::ValidationFailed],
+            None,
+        )]);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].command, "dep add");
+        assert_eq!(rows[0].code, ErrorCode::CycleDetected.exit_code().code());
+        for code in [ErrorCode::CycleDetected, ErrorCode::ValidationFailed] {
+            assert!(rows[0].condition.contains(code.description()), "{code:?}");
         }
+    }
+
+    #[test]
+    fn test_declared_exit_codes_join_leaves_with_equal_rows() {
+        let rows = declared_exit_codes(&[
+            leaf("a_one", &[ErrorCode::AlreadyExists], None),
+            leaf("b", &[ErrorCode::Blocked], None),
+            leaf("a_two", &[ErrorCode::AlreadyExists], None),
+        ]);
+
+        let commands: Vec<_> = rows.iter().map(|row| row.command.as_str()).collect();
+        assert_eq!(commands, ["a one, a two", "b"]);
+    }
+
+    #[test]
+    fn test_declared_exit_codes_flag_exactly_the_findings_rows_as_exceptions() {
+        let condition = "the check found drift";
+        let rows = declared_exit_codes(&[leaf(
+            "check",
+            &[ErrorCode::ValidationFailed],
+            Some((ErrorCode::ValidationFailed, condition)),
+        )]);
+
+        let flagged: Vec<_> = rows
+            .iter()
+            .map(|row| (row.condition.as_str(), row.exception))
+            .collect();
+        assert_eq!(
+            flagged,
+            [
+                (ErrorCode::ValidationFailed.description(), false),
+                (condition, true)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_generate_command_exit_codes_hand_writes_only_universal_rows() {
+        let declared = declared_exit_codes(
+            crate::dispatch::REGISTERED_GROUPS
+                .iter()
+                .flat_map(|group| group.leaves),
+        );
+        let rows = CommandSchema::generate_command_exit_codes();
+        let (universal, derived) = rows.split_at(rows.len() - declared.len());
+
+        assert!(universal.iter().all(|row| row.command == "*"));
+        assert_eq!(
+            serde_json::to_value(derived).unwrap(),
+            serde_json::to_value(&declared).unwrap()
+        );
+        let exceptions: Vec<_> = universal.iter().filter(|row| row.exception).collect();
+        assert_eq!(exceptions.len(), 1);
+        assert_eq!(exceptions[0].code, ExitCode::BrokenPipe.code());
     }
 
     /// The committed reference page is a projection: it must equal the rendered

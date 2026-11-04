@@ -1054,6 +1054,28 @@ impl ErrorCode {
         }
     }
 
+    /// Whether any command can reach this code through the shared classifier,
+    /// so the universal `*` exit-code rows describe it and no leaf declares it.
+    pub const fn is_universal(self) -> bool {
+        matches!(
+            self,
+            ErrorCode::GenericError
+                | ErrorCode::ParseError
+                | ErrorCode::InvalidArgument
+                | ErrorCode::AmbiguousId
+                | ErrorCode::InvalidIdPrefix
+                | ErrorCode::IssueNotFound
+                | ErrorCode::GateNotFound
+                | ErrorCode::PresetError
+                | ErrorCode::RepositoryNotFound
+                | ErrorCode::DocumentNotFound
+                | ErrorCode::PermissionDenied
+                | ErrorCode::IoError
+                | ErrorCode::RepositoryFormatUnsupported
+                | ErrorCode::LockTimeout
+        )
+    }
+
     /// Return a concise description of the failure this member names.
     ///
     /// The match is exhaustive so adding a member requires describing it.

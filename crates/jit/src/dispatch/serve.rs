@@ -124,6 +124,7 @@ command_group! {
     command: ServeArgs,
     storage: [IssueStore],
     leaves: {
-        "serve" => args => serve(args) -> ServeResponse,
+        "serve" => args => serve(args)
+            raises [ServerExited] -> ServeResponse,
     }
 }

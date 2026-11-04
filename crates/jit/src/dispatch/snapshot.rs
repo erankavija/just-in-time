@@ -41,7 +41,8 @@ command_group! {
     command: SnapshotCommands,
     storage: [HandlerStore],
     leaves: {
-        "snapshot_export" => SnapshotCommands::Export(args) => export(args) -> SnapshotExportResponse,
+        "snapshot_export" => SnapshotCommands::Export(args) => export(args)
+            raises [AlreadyExists] -> SnapshotExportResponse,
     }
 }
 
