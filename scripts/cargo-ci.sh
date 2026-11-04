@@ -31,9 +31,9 @@ set -euo pipefail
 # digest reuse, so such a failure is rerun rather than carried to another
 # issue as a verdict. A step is environment-sensitive only when it is
 #   - any step whose output reports ENOSPC ("No space left on device" or
-#     os error 28), except a `test` step that also has a FAIL or ABORT result
-#     for a test whose own output does not report ENOSPC; ENOSPC makes the run
-#     exit 75 whatever the load baseline,
+#     os error 28) and no other failure: no test failing without ENOSPC in its
+#     own output, no compiler error, rustfmt diff or budget violation beyond
+#     the ENOSPC line. ENOSPC makes the run exit 75 whatever the load baseline,
 #   - `test` with at least one nextest TIMEOUT result and no FAIL or ABORT
 #     result, or
 #   - `budget` whose only violation is the suite-duration budget.
@@ -80,10 +80,14 @@ reports_enospc() {
   [ -f "$1" ] && grep -qE 'No space left on device|os error 28' "$1"
 }
 
-# nextest FAIL or ABORT results whose own output does not report ENOSPC. A
-# result's output runs from its status line to the next status line.
-count_non_enospc_test_failures() {
+# Failure markers in a step's output that ENOSPC does not account for. A failed
+# test (nextest FAIL or ABORT, doctest FAILED) counts unless its own output block
+# reports ENOSPC; outside test blocks a rustc `error` line (except the
+# per-crate summary lines), a rustfmt `Diff in` line, or a budget violation
+# counts unless the line itself reports ENOSPC.
+count_non_enospc_failures() {
   awk '
+    function enospc(line) { return line ~ /No space left on device|os error 28/ }
     /^[[:space:]]*(TRY [0-9]+ )?[A-Z]+ \[/ {
       cur = ""
       if ($0 ~ /^[[:space:]]*(FAIL|ABORT) \[/) {
@@ -93,17 +97,22 @@ count_non_enospc_test_failures() {
       }
       next
     }
-    /No space left on device|os error 28/ { if (cur != "") enospc[cur] = 1 }
-    END { for (name in failed) if (!(name in enospc)) n++; print n + 0 }
+    /^---- .* stdout ----$/ { cur = $0; sub(/^---- /, "", cur); sub(/ stdout ----$/, "", cur); next }
+    /^test .* \.\.\. FAILED$/ { name = $0; sub(/^test /, "", name); sub(/ \.\.\. FAILED$/, "", name); failed[name] = 1; next }
+    /^(failures:|test result:)/ { cur = ""; next }
+    enospc($0) { if (cur != "") hit[cur] = 1; next }
+    cur != "" { next }
+    /^error(\[[A-Za-z0-9]+\])?:/ && !/could not compile|aborting due to|previous error/ { n++; next }
+    /^Diff in / || /^  - / { n++ }
+    END { for (name in failed) if (!(name in hit)) n++; print n + 0 }
   ' "$1"
 }
 
-# The step failed because the disk was full: its output reports ENOSPC and no
-# test failed for another reason.
+# The step failed because the disk was full: its output reports ENOSPC and
+# carries no other failure marker.
 step_failed_by_enospc() {
   local out="$WORK/$1.out"
-  reports_enospc "$out" || return 1
-  [ "$1" != test ] || [ "$(count_non_enospc_test_failures "$out")" -eq 0 ]
+  reports_enospc "$out" && [ "$(count_non_enospc_failures "$out")" -eq 0 ]
 }
 
 # nextest reported a TIMEOUT and nothing that is a verdict on the test itself.

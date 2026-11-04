@@ -1020,6 +1020,12 @@ test_classifier_enospc_exit_paths() {
   expect_enospc_classification "ENOSPC test failure on a loaded host" 75 "$LOADED_LOAD1" "$ENOSPC_FAIL_BLOCK" "" test
   expect_enospc_classification "ENOSPC test failure with unknown load" 75 "" "$ENOSPC_FAIL_BLOCK" "" test
   expect_enospc_classification "ENOSPC budget failure on a quiet host" 75 "$QUIET_LOAD1" "" "write failed: No space left on device" budget
+  expect_enospc_classification "ENOSPC clippy-style error alone" 75 "$QUIET_LOAD1" "" "error: failed to write: No space left on device (os error 28)
+error: could not compile \`x\` due to 1 previous error" budget
+  expect_enospc_classification "ENOSPC beside a compiler error in a non-test step" 1 "$QUIET_LOAD1" "" "error: failed to write: No space left on device (os error 28)
+error[E0308]: mismatched types" budget
+  expect_enospc_classification "ENOSPC beside a footprint violation in a non-test step" 1 "$QUIET_LOAD1" "" "write failed: No space left on device
+$FOOTPRINT_VIOLATION" budget
   expect_enospc_classification "ENOSPC failure beside a genuine test FAIL" 1 "$LOADED_LOAD1" "$beside_fail" "" test
   expect_enospc_classification "ENOSPC failure beside a genuine FAIL on a quiet host" 1 "$QUIET_LOAD1" "$beside_fail" "" test
   expect_enospc_classification "ENOSPC test step beside a footprint budget failure" 1 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK" "$FOOTPRINT_VIOLATION" test budget
