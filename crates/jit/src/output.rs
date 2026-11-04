@@ -4,6 +4,11 @@
 //! and error cases, ensuring machine-readable output that works well with
 //! AI agents and automation tools.
 
+use crate::commands::{
+    ArtifactConformanceResponse, ArtifactDirectoryResponse, ContainerProgressResponse,
+    DivergenceResponse, DivergenceView, GateStatusEntry, GraphDepsTreeResponse, GraphRootsResponse,
+    GraphTreeResponse, IssueChildrenResponse, IssueShowResponse, IssueStatusResponse, StateRollup,
+};
 use crate::domain::identity::GateKey;
 use crate::domain::Assignee;
 use schemars::JsonSchema;
@@ -47,7 +52,6 @@ pub use claim::{
 pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub(crate) use emit::status_after;
 pub use emit::{emit_failure, emit_outcome, HumanRender, Report, Response};
-pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 pub use issue::{
     BatchCreateResponse, BlockedListing, IssueBatchCreateOutput, IssueDeleteResponse,
     IssueLifecycleResponse, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
@@ -59,13 +63,13 @@ pub use serve::{ServeResponse, WebUiSource};
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::IssueId;
-use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::list_envelope::{collection_keys, CollectionKey, ListEnvelope};
 use crate::domain::queries::BlockingReason;
 use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{
-    GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
-    Priority, State,
+    GateRunResult, GateRunStatus, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue, Priority,
+    State,
 };
 use crate::errors::{TransitionBlockedError, TransitionBlocker};
 
@@ -949,8 +953,8 @@ wire_vocabulary! {
         PermissionDenied = "PERMISSION_DENIED",
         /// Input data could not be parsed.
         ParseError = "PARSE_ERROR",
-        /// A claim or lease command requires a Git repository.
-        ClaimRequiresGit = "CLAIM_REQUIRES_GIT",
+        /// The command requires a Git repository.
+        RequiresGit = "REQUIRES_GIT",
         /// An ID prefix matched more than one candidate.
         AmbiguousId = "AMBIGUOUS_ID",
         /// An ID prefix was shorter than the accepted minimum.
@@ -1035,7 +1039,7 @@ impl ErrorCode {
             | ErrorCode::LinkedCheckoutWriteRefused => ExitCode::InvalidArgument,
             ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
             ErrorCode::IoError
-            | ErrorCode::ClaimRequiresGit
+            | ErrorCode::RequiresGit
             | ErrorCode::RepositoryFormatUnsupported => ExitCode::ExternalError,
             ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
             ErrorCode::LockTimeout => ExitCode::LockTimeout,
@@ -1076,7 +1080,7 @@ impl ErrorCode {
                 "The operation was denied by filesystem or operating-system permissions."
             }
             ErrorCode::ParseError => "Input data could not be parsed.",
-            ErrorCode::ClaimRequiresGit => "The claim or lease operation requires Git.",
+            ErrorCode::RequiresGit => "The command requires Git.",
             ErrorCode::AmbiguousId => "The ID prefix matches more than one candidate.",
             ErrorCode::InvalidIdPrefix => "The ID prefix is shorter than the accepted minimum.",
             ErrorCode::RepositoryNotFound => "No JIT repository exists at the resolved path.",
@@ -1369,28 +1373,9 @@ pub struct IssueSearchQuery {
     pub query: Option<String>,
 }
 
-/// Declares the [`CollectionKey`] marker for each list-envelope collection key.
-macro_rules! collection_keys {
-    ($($(#[$meta:meta])* $marker:ident = $key:literal $(as $schema:literal)?;)+) => {$(
-        $(#[$meta])*
-        pub enum $marker {}
-
-        impl CollectionKey for $marker {
-            const KEY: &'static str = $key;
-            $(const SCHEMA_NAME: Option<&'static str> = Some($schema);)?
-        }
-    )+};
-}
-
 collection_keys! {
     /// Collection key of [`GraphDownstreamResponse`].
     DependentsKey = "dependents" as "GraphDownstreamResponse";
-    /// Collection key of [`GraphRootsResponse`].
-    RootsKey = "roots" as "GraphRootsResponse";
-    /// Collection key of [`GraphDepsTreeResponse`].
-    GraphDepsNodesKey = "nodes" as "GraphDepsTreeResponse";
-    /// Collection key of [`GraphTreeResponse`].
-    GraphTreeNodesKey = "nodes" as "GraphTreeResponse";
     IssuesKey = "issues";
     /// Collection key of [`IssueListResponse`].
     ListedIssuesKey = "issues" as "IssueListResponse";
@@ -1398,21 +1383,13 @@ collection_keys! {
     BlockedIssuesKey = "issues" as "BlockedListResponse";
     /// Collection key of [`IssueSearchResponse`].
     SearchedIssuesKey = "issues" as "IssueSearchResponse";
-    /// Collection key of [`IssueChildrenResponse`].
-    ChildrenKey = "issues" as "IssueChildrenResponse";
     DivergencesKey = "divergences";
-    /// Collection key of [`DivergenceResponse`].
-    MembershipDivergencesKey = "divergences" as "DivergenceResponse";
-    /// Collection key of [`StateRollup`].
-    ByStateKey = "by_state" as "StateRollup";
     GatesKey = "gates";
     /// Collection key of [`GateCheckAllResponse`].
     GateReadinessKey = "gates" as "GateCheckAllResponse";
     ResultsKey = "results";
     /// Collection key of [`GateEvaluateManyResponse`].
     GateEvaluationsKey = "results" as "GateEvaluateManyResponse";
-    /// Collection key of [`ArtifactConformanceResponse`].
-    ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
     /// Collection key of [`NamespacesResponse`].
     NamespacesKey = "namespaces" as "NamespacesResponse";
     /// Collection key of [`LabelValuesResponse`].
@@ -1555,200 +1532,6 @@ pub struct IssueScope {
     pub issue_id: IssueId,
 }
 
-/// Tree node for hierarchical dependency display
-#[derive(Debug, Serialize, JsonSchema, Clone)]
-pub struct DependencyTreeNode {
-    /// Issue ID
-    pub id: IssueId,
-    /// Short ID (first 8 chars)
-    pub short_id: String,
-    /// Issue title
-    pub title: String,
-    /// Current state
-    pub state: State,
-    /// Priority
-    pub priority: Priority,
-    /// Depth level in tree (1 = immediate child, 2 = grandchild, etc.)
-    pub level: u32,
-    /// Whether this node appears multiple times in the tree (shared dependency)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shared: Option<bool>,
-    /// Pre-archive origin state, present exactly for an `Archived` node.
-    /// Carried so dependency consumers can compute effective
-    /// terminality (`jit:45a140ae`): an `archived` node with a terminal origin
-    /// still satisfies its dependents.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub archived_from: Option<State>,
-    /// Child dependencies
-    pub children: Vec<DependencyTreeNode>,
-}
-
-impl DependencyTreeNode {
-    /// Create from MinimalIssue
-    pub fn from_minimal(issue: &MinimalIssue, level: u32) -> Self {
-        Self {
-            short_id: issue.short_id(),
-            id: issue.id.clone(),
-            title: issue.title.clone(),
-            state: issue.state,
-            priority: issue.priority,
-            level,
-            shared: None,
-            archived_from: issue.archived_from,
-            children: Vec::new(),
-        }
-    }
-}
-
-/// Response for `graph deps` with tree structure.
-///
-/// `count` is the number of top-level entries in `nodes` (the immediate
-/// dependency nodes; each may carry nested `children`). This differs from
-/// `summary.total`, which counts every unique dependency across the whole tree.
-pub type GraphDepsTreeResponse =
-    ListEnvelope<GraphDepsNodesKey, DependencyTreeNode, DependencyTreeScope>;
-
-/// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DependencyTreeScope {
-    pub issue_id: IssueId,
-    /// Depth of traversal (1 = immediate, 0 = unlimited)
-    pub depth: u32,
-    /// Summary statistics
-    pub summary: DependencySummary,
-}
-
-/// Summary statistics for dependencies
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DependencySummary {
-    /// Total number of unique dependencies
-    pub total: usize,
-    /// Count by state (keys are canonical snake_case state names)
-    pub by_state: std::collections::HashMap<State, usize>,
-}
-
-/// Response for `graph roots` command
-pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
-
-/// One node's resolved hierarchy facts, as rendered by `graph tree`.
-///
-/// The `type` key is the value of the node's `type:` label (absent when it has
-/// none). The `parent`, `children`, `cluster`, and `rank` keys are flattened
-/// from [`NodeHierarchy`](crate::graph::hierarchy::NodeHierarchy), the
-/// DAG-authoritative resolution produced by
-/// [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
-///
-/// # Examples
-///
-/// ```
-/// use jit::graph::hierarchy::NodeHierarchy;
-/// use jit::output::HierarchyNodeView;
-///
-/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
-/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
-/// let view = HierarchyNodeView {
-///     id: epic_id.clone(),
-///     short_id: epic_id.short_id().to_string(),
-///     title: "Auth epic".into(),
-///     type_name: Some("epic".into()),
-///     hierarchy: NodeHierarchy {
-///         parent: None,
-///         children: vec![task_id.clone()],
-///         cluster: Some(epic_id.clone()),
-///         rank: 1,
-///     },
-/// };
-/// let json = serde_json::to_value(&view).unwrap();
-/// // `type_name` serializes under the `type` key.
-/// assert_eq!(json["type"], "epic");
-/// // The resolution fields sit flat on the node.
-/// assert_eq!(json["children"][0], task_id.as_str());
-/// assert_eq!(json["cluster"], epic_id.as_str());
-/// assert_eq!(json["rank"], 1);
-/// ```
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct HierarchyNodeView {
-    /// Full issue id.
-    pub id: IssueId,
-    /// Short id (first 8 chars).
-    pub short_id: String,
-    /// Issue title.
-    pub title: String,
-    /// The node's `type:` label value, if any.
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub type_name: Option<String>,
-    /// DAG-resolved parent, children, cluster, and rank, flattened onto the node.
-    #[serde(flatten)]
-    pub hierarchy: crate::graph::hierarchy::NodeHierarchy,
-}
-
-/// Response for `graph tree` command.
-///
-/// `count` is the number of entries in `nodes`. `root` echoes the optional root
-/// id the view was scoped to (`null` for the whole repository). Each node
-/// carries its DAG-resolved parent, children, cluster, and rank.
-///
-/// # Examples
-///
-/// ```
-/// use jit::graph::hierarchy::NodeHierarchy;
-/// use jit::output::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
-///
-/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
-/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
-/// let response = GraphTreeResponse::with_extras(
-///     vec![HierarchyNodeView {
-///         id: task_id.clone(),
-///         short_id: task_id.short_id().to_string(),
-///         title: "A task".into(),
-///         type_name: Some("task".into()),
-///         hierarchy: NodeHierarchy {
-///             parent: Some(epic_id.clone()),
-///             children: vec![],
-///             cluster: Some(epic_id.clone()),
-///             rank: 0,
-///         },
-///     }],
-///     TreeRoot { root: None },
-/// );
-/// let json = serde_json::to_value(&response).unwrap();
-/// assert_eq!(json["count"], 1);
-/// assert_eq!(json["root"], serde_json::Value::Null);
-/// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
-/// ```
-pub type GraphTreeResponse = ListEnvelope<GraphTreeNodesKey, HierarchyNodeView, TreeRoot>;
-
-/// The scope of a [`GraphTreeResponse`]. `nodes` are ordered by ascending short id.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct TreeRoot {
-    /// The root id the tree was scoped to, or `null` for the whole repository.
-    pub root: Option<IssueId>,
-}
-
-/// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DivergenceView {
-    /// Full id of the issue carrying the unsupported membership label.
-    pub id: IssueId,
-    /// Short id (first 8 chars).
-    pub short_id: String,
-    /// Issue title.
-    pub title: String,
-    /// The full `namespace:value` membership label.
-    pub label: String,
-    /// The label namespace.
-    pub namespace: String,
-    /// The label value.
-    pub value: String,
-}
-
-/// Response for `query divergence` command.
-///
-/// Each entry in `divergences` is a membership label whose claim the dependency
-/// DAG does not back (the issue carries the label but is not in the closure of
-/// the container that owns it), ordered by `(issue_id, label)`.
-pub type DivergenceResponse = ListEnvelope<MembershipDivergencesKey, DivergenceView>;
-
 impl HumanRender for DivergenceResponse {
     fn render_human(&self, mode: OutputMode) -> String {
         let rows = self
@@ -1775,530 +1558,12 @@ impl HumanRender for DivergenceResponse {
 // Issue Show Response
 // ============================================================================
 
-/// Per-gate view emitted in `issue show --json`.
-///
-/// One entry per gate in the issue's `gates_required`. `status` reflects the
-/// gate's [`GateState`] (or `pending` when none exists). `last_run_at` and
-/// `exit_code` come from the gate's latest [`GateRunResult`] and are both
-/// `null` when no run has been recorded; a manual gate's attestation is a run
-/// whose `exit_code` is `null`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GateView {
-    /// Gate key.
-    pub key: GateKey,
-    /// Gate status.
-    pub status: crate::domain::GateStatus,
-    /// Timestamp of the gate's latest run, or `null` when never run.
-    pub last_run_at: Option<String>,
-    /// Exit code of the gate's latest run, or `null` when never run.
-    pub exit_code: Option<i32>,
-}
-
-impl GateView {
-    /// Build the per-gate view for a single required gate.
-    ///
-    /// `latest` is the run named by `state`, loaded by the latest-run accessor.
-    fn build(
-        key: &GateKey,
-        state: Option<&crate::domain::GateState>,
-        latest: Option<&GateRunResult>,
-    ) -> Self {
-        let status = state
-            .map(|s| s.status)
-            .unwrap_or(crate::domain::GateStatus::Pending);
-
-        GateView {
-            key: key.clone(),
-            status,
-            last_run_at: latest.map(|r| r.started_at.to_rfc3339()),
-            exit_code: latest.and_then(|r| r.exit_code),
-        }
-    }
-}
-
-/// A single unmet dependency, as projected into `issue show --json` and the
-/// compact `issue status` view.
-///
-/// A dependency is *unmet* when it is not effectively terminal (`Done`,
-/// `Rejected`, or `Archived` retired from one of those —
-/// [`Issue::is_effectively_terminal`]) — the exact same readiness test as
-/// [`Issue::is_blocked`] and
-/// [`query_ready`](crate::domain::queries::query_ready): an effectively terminal
-/// dependency unblocks its dependents, so it is never listed here. The shape is a subset of
-/// the enriched `dependencies` entries (`id`, `short_id`, `title`, `state`),
-/// carrying only what an orchestrator needs to see what is still blocking work.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct UnmetDependency {
-    pub id: IssueId,
-    /// Short ID (first 8 chars of the full UUID), for human-readable references.
-    pub short_id: String,
-    pub title: String,
-    pub state: State,
-}
-
-impl From<&MinimalIssue> for UnmetDependency {
-    fn from(dep: &MinimalIssue) -> Self {
-        Self {
-            id: dep.id.clone(),
-            short_id: dep.short_id(),
-            title: dep.title.clone(),
-            state: dep.state,
-        }
-    }
-}
-
 /// Response for `issue create`: the created issue's view and its findings.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueCreateResponse {
     #[serde(flatten)]
     pub issue: IssueShowResponse,
     pub findings: Vec<crate::validation::ReportedFinding>,
-}
-
-/// Response for `issue show` command with enriched dependencies
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueShowResponse {
-    pub id: IssueId,
-    /// Short ID (first 8 chars of the full UUID), for human-readable references.
-    pub short_id: String,
-    pub title: String,
-    pub description: String,
-    pub state: State,
-    pub priority: Priority,
-    pub assignee: Option<String>,
-    /// Enriched dependency list with full metadata
-    pub dependencies: Vec<MinimalIssue>,
-    /// Dependency ids from the issue's stored `dependencies` array that did
-    /// NOT resolve to an existing issue (e.g. a stale reference left by raw
-    /// storage mutation or legacy data predating the delete-cascade fix in
-    /// `IssueOps::delete_issue`, jit:f847df3f). Deleting an issue
-    /// through the CLI strips its own id from every dependent's
-    /// `dependencies`, so this is empty in a repository touched only through
-    /// the CLI; when non-empty, it means a dangling id exists and — unlike
-    /// `dependencies`, which silently omits ids it cannot resolve — is not
-    /// hidden.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling_dependency_ids: Vec<IssueId>,
-    /// The subset of `dependencies` that are not yet met (not effectively terminal),
-    /// consistent with readiness — see [`UnmetDependency`]. Always an array,
-    /// empty when every dependency is effectively terminal (`Done`, `Rejected`,
-    /// or `Archived` from one of those) or there are none.
-    pub unmet_dependencies: Vec<UnmetDependency>,
-    /// Per-gate view, one entry per required gate, enriched from each gate's
-    /// latest run.
-    pub gates: Vec<GateView>,
-    pub context: std::collections::HashMap<String, String>,
-    pub documents: Vec<crate::domain::DocumentReference>,
-    pub labels: Vec<String>,
-    /// Per-issue content format override; absent means the repo default applies.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content_format: Option<crate::domain::ContentFormat>,
-    pub created_at: String,
-    pub updated_at: String,
-    /// When the issue FIRST entered `ready` (RFC 3339); absent when unset.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub first_ready_at: Option<String>,
-    /// When the issue was FIRST claimed/assigned (RFC 3339); absent when unset.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub claimed_at: Option<String>,
-    /// When the issue FIRST reached `done` (RFC 3339); absent when unset.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub done_at: Option<String>,
-}
-
-impl IssueShowResponse {
-    /// Create from Issue with enriched dependencies and the issue's gate runs.
-    ///
-    /// `gate_runs` contains one latest run per gate, supplied by
-    /// [`GateOps::get_last_gate_runs_for_issue`](crate::commands::GateOps::get_last_gate_runs_for_issue).
-    /// Pass an empty slice when no gate state names a run.
-    ///
-    /// `enriched_deps` normally holds one [`MinimalIssue`] per entry in
-    /// `issue.dependencies`, but an id that no longer resolves to a stored
-    /// issue is left out of it by
-    /// [`get_dependencies_enriched`](crate::commands::IssueOps::get_dependencies_enriched).
-    /// This constructor recovers any such id by diffing `enriched_deps`
-    /// against `issue.dependencies` and reports it via
-    /// `dangling_dependency_ids` instead of dropping it silently
-    /// (jit:f847df3f).
-    pub fn from_issue(
-        issue: crate::domain::Issue,
-        enriched_deps: Vec<MinimalIssue>,
-        gate_runs: &[GateRunResult],
-    ) -> Self {
-        let latest_runs: std::collections::HashMap<_, _> =
-            gate_runs.iter().map(|run| (&run.gate_key, run)).collect();
-        let gates = issue
-            .gates_required
-            .iter()
-            .map(|key| {
-                GateView::build(
-                    key,
-                    issue.gates_status.get(key),
-                    latest_runs.get(key).copied(),
-                )
-            })
-            .collect();
-
-        // See the doc comment above: recover ids `enriched_deps` couldn't
-        // resolve so they surface instead of vanishing from the response.
-        let resolved_ids: std::collections::HashSet<&IssueId> =
-            enriched_deps.iter().map(|dep| &dep.id).collect();
-        let dangling_dependency_ids: Vec<IssueId> = issue
-            .dependencies
-            .iter()
-            .filter(|dep_id| !resolved_ids.contains(dep_id))
-            .cloned()
-            .collect();
-
-        // Unmet by the one predicate `Issue::is_blocked` and the transition
-        // blockers apply. Dangling ids are reported separately above rather than
-        // projected here.
-        let unmet_dependencies: Vec<UnmetDependency> = enriched_deps
-            .iter()
-            .filter(|dep| !crate::domain::is_dependency_met(dep.state, dep.archived_from))
-            .map(UnmetDependency::from)
-            .collect();
-
-        Self {
-            short_id: issue.short_id(),
-            id: issue.id,
-            title: issue.title,
-            description: issue.description,
-            state: issue.state,
-            priority: issue.priority,
-            assignee: issue
-                .assignee
-                .as_ref()
-                .map(crate::domain::Assignee::to_string),
-            dependencies: enriched_deps,
-            dangling_dependency_ids,
-            unmet_dependencies,
-            gates,
-            context: issue.context,
-            documents: issue.documents,
-            labels: issue.labels,
-            content_format: issue.content_format,
-            created_at: issue.created_at.to_rfc3339(),
-            updated_at: issue.updated_at.to_rfc3339(),
-            first_ready_at: issue.first_ready_at.map(|t| t.to_rfc3339()),
-            claimed_at: issue.claimed_at.map(|t| t.to_rfc3339()),
-            done_at: issue.done_at.map(|t| t.to_rfc3339()),
-        }
-    }
-}
-
-/// Compact orchestration status for one issue: where it stands in one glance.
-///
-/// This is the small shape behind `jit issue status` (text one-liner and
-/// `--json` object). It projects an [`IssueShowResponse`] down to the fields an
-/// agent reconstructs by hand when it only needs "state, per-gate status, and
-/// what is still blocking": `state`, a `{key, status}` entry per required gate
-/// (b1586c0d convention), and the `short_id`s of the [unmet
-/// dependencies](UnmetDependency). It carries no run history, description, or
-/// enriched dependency metadata.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::identity::GateKey;
-/// use jit::domain::{GateStatus, Issue, State};
-/// use jit::output::{IssueShowResponse, IssueStatusResponse};
-///
-/// let id = jit::test_utils::issue_id(1);
-/// let mut issue = Issue::draft(id, "Build parser".into(), "Body".into());
-/// issue.state = State::Ready;
-/// let gate: GateKey = "tests".parse().unwrap();
-/// issue.gates_required = vec![gate.clone()];
-/// let show = IssueShowResponse::from_issue(issue, vec![], &[]);
-///
-/// let status = IssueStatusResponse::from_show(&show);
-/// assert_eq!(status.state, State::Ready);
-/// assert_eq!(status.gates.len(), 1);
-/// assert_eq!(status.gates[0].key, gate);
-/// assert_eq!(status.gates[0].status, GateStatus::Pending);
-/// assert!(status.unmet_dependencies.is_empty());
-///
-/// // The one-line render is stable and greppable; empty sections read `none`.
-/// let line = status.to_line();
-/// assert!(line.contains("[ready]"));
-/// assert!(line.contains("gates: tests=pending"));
-/// assert!(line.contains("unmet: none"));
-/// assert!(line.ends_with("title: Build parser"));
-/// ```
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueStatusResponse {
-    /// Short ID (first 8 chars of the full UUID).
-    pub short_id: String,
-    pub state: State,
-    /// One entry per required gate, `{key, status}` only.
-    pub gates: Vec<GateStatusEntry>,
-    /// Short ids of the dependencies that are not yet met (not effectively terminal),
-    /// consistent with readiness. Empty when nothing is blocking.
-    pub unmet_dependencies: Vec<String>,
-    pub title: String,
-}
-
-impl IssueStatusResponse {
-    /// Project a full [`IssueShowResponse`] down to the compact status shape.
-    pub fn from_show(show: &IssueShowResponse) -> Self {
-        Self {
-            short_id: show.short_id.clone(),
-            state: show.state,
-            gates: show
-                .gates
-                .iter()
-                .map(|g| GateStatusEntry {
-                    key: g.key.clone(),
-                    status: g.status,
-                })
-                .collect(),
-            unmet_dependencies: show
-                .unmet_dependencies
-                .iter()
-                .map(|d| d.short_id.clone())
-                .collect(),
-            title: show.title.clone(),
-        }
-    }
-
-    /// Render the stable, greppable one-line text form:
-    ///
-    /// ```text
-    /// <short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>
-    /// ```
-    ///
-    /// The `gates:` and `unmet:` sections each render `none` when empty, so the
-    /// field order and separators are fixed regardless of content. `state` and
-    /// each gate `status` use their canonical snake_case names.
-    pub fn to_line(&self) -> String {
-        let gates = if self.gates.is_empty() {
-            "none".to_string()
-        } else {
-            self.gates
-                .iter()
-                .map(|g| format!("{}={}", g.key, g.status.as_str()))
-                .collect::<Vec<_>>()
-                .join(",")
-        };
-        let unmet = if self.unmet_dependencies.is_empty() {
-            "none".to_string()
-        } else {
-            self.unmet_dependencies.join(",")
-        };
-        format!(
-            "{} [{}] gates: {} unmet: {} title: {}",
-            self.short_id,
-            self.state.as_str(),
-            gates,
-            unmet,
-            self.title
-        )
-    }
-}
-
-/// One `(state, count)` bucket in a [`StateRollup`].
-///
-/// Every [`State`] variant is represented, so `count` is `0` for a state with
-/// no issues rather than the entry being omitted (see [`StateRollup`]).
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct StateCount {
-    /// The lifecycle state this bucket counts.
-    pub state: State,
-    /// Number of issues in that state (`0` when the state is unpopulated).
-    pub count: usize,
-}
-
-/// Counts-by-state aggregation with a terminal-state rollup over a set of
-/// issues, shared by `jit issue progress` (over a container's direct children)
-/// and `jit query count --by state` (over a label bucket or the whole repo).
-///
-/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::ALL`]
-/// order, zero-count states included, so the shape is stable and complete
-/// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
-/// `count` is `by_state.len()` (one entry per state).
-///
-/// Effective-terminal semantics ([`Issue::effective_terminal_state`],
-/// `Done`/`Rejected`): the two terminal tallies are reported separately because
-/// a rejected issue is terminal but not delivered. `Archived` is
-/// terminality-preserving, so an issue archived from `Done` counts toward `done`
-/// and one archived from `Rejected` toward `rejected`; an `Archived` issue with a
-/// non-terminal origin is not effectively terminal and counts as `open`. `open` is every issue that is not effectively terminal
-/// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
-/// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
-pub type StateRollup = ListEnvelope<ByStateKey, StateCount, RollupTotals>;
-
-impl HumanRender for StateRollup {
-    fn render_human(&self, _: OutputMode) -> String {
-        self.to_lines()
-            .into_iter()
-            .map(|line| format!("{line}\n"))
-            .collect()
-    }
-}
-
-/// Delivery tallies of a [`StateRollup`] beside its `by_state` buckets.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct RollupTotals {
-    /// Total issues aggregated.
-    pub total: usize,
-    /// Issues in `Done`.
-    pub done: usize,
-    /// Issues in `Rejected` (terminal but not delivered).
-    pub rejected: usize,
-    /// Non-terminal issues (`total − done − rejected`).
-    pub open: usize,
-    /// `round(100 * done / total)`, or `0` when `total` is `0`.
-    pub percent: u32,
-}
-
-impl ListEnvelope<ByStateKey, StateCount, RollupTotals> {
-    /// Aggregate a slice of issues into the counts-by-state rollup.
-    ///
-    /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
-    /// (every variant, zero-count states kept); the [`RollupTotals`] follow the
-    /// effective-terminal semantics documented on the type, folding an
-    /// `Archived` issue into its pre-archive terminal origin
-    /// ([`Issue::effective_terminal_state`]).
-    pub fn from_issues(issues: &[Issue]) -> Self {
-        let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
-            .into_iter()
-            .map(|(state, count)| StateCount { state, count })
-            .collect();
-
-        let total = issues.len();
-        // Delivery accounting folds by effective terminal state: an issue archived
-        // from Done counts as delivered, one archived from Rejected as rejected,
-        // so a fully-delivered-then-archived container still reports 100%.
-        let done = issues
-            .iter()
-            .filter(|i| i.effective_terminal_state() == Some(State::Done))
-            .count();
-        let rejected = issues
-            .iter()
-            .filter(|i| i.effective_terminal_state() == Some(State::Rejected))
-            .count();
-        let open = total - done - rejected;
-        let percent = if total == 0 {
-            0
-        } else {
-            ((done as f64 / total as f64) * 100.0).round() as u32
-        };
-
-        Self::with_extras(
-            by_state,
-            RollupTotals {
-                total,
-                done,
-                rejected,
-                open,
-                percent,
-            },
-        )
-    }
-
-    /// Render the two-line greppable text form:
-    ///
-    /// ```text
-    /// by state: backlog=0 ready=1 in_progress=1 gated=0 done=2 rejected=1 archived=0
-    /// done 2/5 (40%)  open 1  rejected 1
-    /// ```
-    ///
-    /// The `by state:` line lists every state as `<state>=<count>` in canonical
-    /// order (states enumerated from the domain, not hardcoded), so its columns
-    /// are fixed regardless of which states are populated.
-    pub fn to_lines(&self) -> Vec<String> {
-        let by_state = self
-            .items
-            .iter()
-            .map(|c| format!("{}={}", c.state.as_str(), c.count))
-            .collect::<Vec<_>>()
-            .join(" ");
-        vec![
-            format!("by state: {by_state}"),
-            format!(
-                "done {}/{} ({}%)  open {}  rejected {}",
-                self.extras.done,
-                self.extras.total,
-                self.extras.percent,
-                self.extras.open,
-                self.extras.rejected
-            ),
-        ]
-    }
-}
-
-/// Compact container header — `{short_id, title, state}` — carried at the top of
-/// `jit issue children` and `jit issue progress` JSON so a consumer sees which
-/// container the child listing or rollup is for without a second lookup.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ContainerHeader {
-    /// Short ID (first 8 chars of the full UUID).
-    pub short_id: String,
-    /// The container's title.
-    pub title: String,
-    /// The container's own lifecycle state.
-    pub state: State,
-}
-
-impl From<&Issue> for ContainerHeader {
-    fn from(issue: &Issue) -> Self {
-        Self {
-            short_id: issue.short_id(),
-            title: issue.title.clone(),
-            state: issue.state,
-        }
-    }
-}
-
-/// Response for `jit issue children`: a container header plus one compact
-/// [`IssueStatusResponse`] per resolvable direct child (its immediate
-/// dependencies, depth 1), and the ids of any child edges that no longer
-/// resolve.
-///
-/// `issues` and `count` form the standard `{count, issues}` list envelope, with
-/// `container` added on top. `dangling` follows
-/// the [`IssueShowResponse::dangling_dependency_ids`] precedent: a dependency id
-/// that points at no stored issue is surfaced here rather than silently dropped,
-/// and is omitted from the JSON when empty. Children are ordered by ascending
-/// short id (stored dependency order is set-derived and not meaningful).
-///
-/// `issues` holds one compact status projection per resolvable direct child,
-/// ascending short id.
-pub type IssueChildrenResponse = ListEnvelope<ChildrenKey, IssueStatusResponse, ChildrenScope>;
-
-/// Fields of [`IssueChildrenResponse`] beside its `issues`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ChildrenScope {
-    /// `{short_id, title, state}` of the queried container.
-    pub container: ContainerHeader,
-    /// Dependency ids that resolve to no stored issue (dangling edges), omitted
-    /// when empty. `count`/`issues` cover resolvable children only.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling: Vec<IssueId>,
-}
-
-/// Response for `jit issue progress`: a container header, the counts-by-state
-/// [`StateRollup`] over its resolvable direct children, and any dangling child
-/// edges.
-///
-/// The [`StateRollup`] fields are flattened to the top level, so the JSON is the `StateRollup`
-/// shape plus `container` (and `dangling` when non-empty). `total` and every
-/// count are over **resolvable** children only; a dependency id resolving to no
-/// stored issue is surfaced in `dangling` (the [`IssueShowResponse`] precedent)
-/// rather than counted or dropped.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ContainerProgressResponse {
-    /// `{short_id, title, state}` of the queried container.
-    pub container: ContainerHeader,
-    /// The counts-by-state rollup over resolvable direct children, flattened to
-    /// the top level.
-    #[serde(flatten)]
-    pub rollup: StateRollup,
-    /// Dependency ids that resolve to no stored issue (dangling edges), omitted
-    /// when empty. The rollup counts resolvable children only.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling: Vec<IssueId>,
 }
 
 /// Render a single top-level field of a serialized issue value as plain text.
@@ -2612,33 +1877,6 @@ impl GateRunSummary {
     }
 }
 
-/// Per-required-gate readiness entry in a [`GateCheckAllResponse`].
-///
-/// Reports one required gate's authoritative per-issue [`GateStatus`] so a
-/// `--json` consumer can distinguish a gate that
-/// ran and failed from one that has never run/attested, both of which map to
-/// the single nonzero exit code of `gate status-all`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GateStatusEntry {
-    pub key: GateKey,
-    pub status: GateStatus,
-}
-
-impl GateStatusEntry {
-    /// Build the `{key, status}` entry for one required gate: its recorded
-    /// [`GateState`] status, or `pending` when no run or attestation exists.
-    ///
-    /// Centralizes the pending-default so the compact `gates` projection shared
-    /// by `issue status` and `issue show --summary` matches the status the full
-    /// [`GateView`] reports for the same gate.
-    pub fn for_required(key: &GateKey, state: Option<&GateState>) -> Self {
-        Self {
-            key: key.clone(),
-            status: state.map(|s| s.status).unwrap_or(GateStatus::Pending),
-        }
-    }
-}
-
 /// JSON payload of `jit gate status-all --json`.
 ///
 /// `results` contains one [`GateRunSummary`] per recorded AUTOMATED run;
@@ -2854,101 +2092,6 @@ impl From<crate::declarations::GateDefinition> for GateDefinition {
 // Document Response Types
 // ============================================================================
 
-/// Response for `doc dir` command.
-///
-/// One resolved value rather than a collection, so the shape is a flat named
-/// object: the issue whose directory this is, the area the caller named, and
-/// the repository-relative directory
-/// ([`resolve_artifact_directory`](crate::domain::artifact_directory::resolve_artifact_directory)
-/// derives the name inside the area). `area` echoes the caller's spelling
-/// rather than a normalized one, so a response is readable against the request
-/// that produced it, while `directory` is normalized.
-///
-/// The directory is a name: it is reported whether or not anything has been
-/// written there, and producing this response creates nothing.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ArtifactDirectoryResponse {
-    /// Full identifier of the issue the directory belongs to.
-    pub issue_id: IssueId,
-    /// Short identifier the directory name is built from.
-    pub short_id: String,
-    /// Issue-scoped area the caller named.
-    pub area: String,
-    /// Repository-relative directory the issue owns in that area.
-    pub directory: String,
-}
-
-/// Response for `doc conformance`, the advisory artifact-location report.
-///
-/// `count` is the length of `artifacts`, which are ordered by area and then by
-/// path. `areas` states the registry that was walked, which is exactly
-/// [`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas),
-/// so a machine caller reads the scanned set instead of assuming one.
-///
-/// The report is advice (`@/issue/8e071e18/decision/D-7`): an entry states
-/// where an artifact sits and where its owner's directory is, and blocks
-/// nothing.
-pub type ArtifactConformanceResponse =
-    ListEnvelope<ArtifactsKey, ArtifactConformanceEntry, ConformanceScope>;
-
-/// Fields of [`ArtifactConformanceResponse`] beside its `artifacts`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ConformanceScope {
-    /// Declared issue-scoped areas the report walked.
-    pub areas: Vec<String>,
-}
-
-/// One artifact `doc conformance` names.
-///
-/// `status` is `nonconforming` when the owning issue is known and the artifact
-/// sits outside the directory that issue owns, and `unattributed` when the
-/// report's inputs settle no single owner. `issue_id` and
-/// `canonical_directory` are carried by a `nonconforming` entry and absent from
-/// an `unattributed` one, which claims no owner and no destination.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ArtifactConformanceEntry {
-    /// Repository-relative path of the artifact, which is a directory when a
-    /// whole directory sits outside its owner's.
-    pub path: String,
-    /// Declared issue-scoped area the artifact was found under.
-    pub area: String,
-    /// Short identifier the artifact's own name opens with, empty when the name
-    /// carries none and a document reference resolved the owner instead.
-    pub short_id: String,
-    /// `nonconforming` or `unattributed`.
-    pub status: String,
-    /// Full identifier of the owning issue, for a `nonconforming` entry.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub issue_id: Option<IssueId>,
-    /// Repository-relative directory the owner owns in that area, for a
-    /// `nonconforming` entry.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub canonical_directory: Option<String>,
-}
-
-impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactConformanceEntry {
-    fn from(artifact: crate::domain::artifact_conformance::ReportedArtifact) -> Self {
-        use crate::domain::artifact_conformance::ArtifactDisposition;
-
-        let status = artifact.disposition.as_str().to_string();
-        let (issue_id, canonical_directory) = match artifact.disposition {
-            ArtifactDisposition::Nonconforming {
-                issue_id,
-                canonical_directory,
-            } => (Some(issue_id), Some(canonical_directory)),
-            ArtifactDisposition::Unattributed => (None, None),
-        };
-        Self {
-            path: artifact.path,
-            area: artifact.area,
-            short_id: artifact.short_id,
-            status,
-            issue_id,
-            canonical_directory,
-        }
-    }
-}
-
 // ============================================================================
 // Label Response Types
 // ============================================================================
@@ -3056,6 +2199,51 @@ pub struct StoreComparison {
 
 #[cfg(test)]
 mod tests {
+    use crate::commands::DependencyTreeNode;
+    /// REQ-05: the machine-readable status of a reused verdict is
+    /// distinguishable from a derived one and names the run behind it.
+    #[test]
+    fn test_gate_run_summary_distinguishes_a_reused_verdict_from_a_derived_one() {
+        use crate::commands::test_helpers::gate_reuse::ReuseFixture;
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let reused = fixture.evaluate(&fixture.issue("Test", "Test"));
+
+        let rendered = |run: &GateRunResult| {
+            serde_json::to_value(crate::output::GateRunSummary::lean(run))
+                .expect("the summary serializes")
+        };
+        let executed_json = rendered(&executed);
+        let reused_json = rendered(&reused);
+
+        assert_ne!(
+            executed_json["origin"], reused_json["origin"],
+            "the two derivations must not read identically"
+        );
+        assert!(
+            reused_json["origin"]
+                .to_string()
+                .contains(executed.run_id.as_str()),
+            "the reused summary must name the run it was taken from: {reused_json}"
+        );
+        assert_eq!(
+            executed_json["inputs_digest"], reused_json["inputs_digest"],
+            "both summaries describe the same declared input content"
+        );
+    }
+
     use super::*;
     use schemars::schema_for;
     use serde_json::json;
@@ -3828,7 +3016,7 @@ mod tests {
             (ErrorCode::IoError, ExitCode::ExternalError),
             (ErrorCode::PermissionDenied, ExitCode::PermissionDenied),
             (ErrorCode::ParseError, ExitCode::GenericError),
-            (ErrorCode::ClaimRequiresGit, ExitCode::ExternalError),
+            (ErrorCode::RequiresGit, ExitCode::ExternalError),
             (ErrorCode::AmbiguousId, ExitCode::InvalidArgument),
             (ErrorCode::InvalidIdPrefix, ExitCode::InvalidArgument),
             (ErrorCode::RepositoryNotFound, ExitCode::NotFound),
@@ -4232,5 +3420,82 @@ mod tests {
         assert_envelope_value(&value, "leases", 1);
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());
+    }
+}
+
+impl IssueStatusResponse {
+    /// Render the stable, greppable one-line text form:
+    ///
+    /// ```text
+    /// <short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>
+    /// ```
+    ///
+    /// The `gates:` and `unmet:` sections each render `none` when empty, so the
+    /// field order and separators are fixed regardless of content. `state` and
+    /// each gate `status` use their canonical snake_case names.
+    pub fn to_line(&self) -> String {
+        let gates = if self.gates.is_empty() {
+            "none".to_string()
+        } else {
+            self.gates
+                .iter()
+                .map(|g| format!("{}={}", g.key, g.status.as_str()))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let unmet = if self.unmet_dependencies.is_empty() {
+            "none".to_string()
+        } else {
+            self.unmet_dependencies.join(",")
+        };
+        format!(
+            "{} [{}] gates: {} unmet: {} title: {}",
+            self.short_id,
+            self.state.as_str(),
+            gates,
+            unmet,
+            self.title
+        )
+    }
+}
+
+impl HumanRender for StateRollup {
+    fn render_human(&self, _: OutputMode) -> String {
+        self.to_lines()
+            .into_iter()
+            .map(|line| format!("{line}\n"))
+            .collect()
+    }
+}
+
+impl StateRollup {
+    /// Render the two-line greppable text form:
+    ///
+    /// ```text
+    /// by state: backlog=0 ready=1 in_progress=1 gated=0 done=2 rejected=1 archived=0
+    /// done 2/5 (40%)  open 1  rejected 1
+    /// ```
+    ///
+    /// The `by state:` line lists every state as `<state>=<count>` in canonical
+    /// order (states enumerated from the domain, not hardcoded), so its columns
+    /// are fixed regardless of which states are populated.
+    pub fn to_lines(&self) -> Vec<String> {
+        let by_state = self
+            .items
+            .iter()
+            .map(|c| format!("{}={}", c.state.as_str(), c.count))
+            .collect::<Vec<_>>()
+            .join(" ");
+        vec![
+            format!("by state: {by_state}"),
+            format!(
+                "done {}/{} ({}%)  open {}  rejected {}",
+                self.extras.done,
+                self.extras.total,
+                self.extras.percent,
+                self.extras.open,
+                self.extras.rejected
+            ),
+        ]
     }
 }

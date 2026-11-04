@@ -308,7 +308,7 @@ jobs:
       - name: Exercise offline profile adoption
         # Quoted: the `:: ` in the test-path filter would otherwise end the
         # plain scalar and make the whole workflow unparseable YAML.
-        run: 'cargo test --locked -p jit --test cli_repo_workflow profile_acceptance_tests:: -- --nocapture'
+        run: 'cargo test --locked -p jit --test cli cli_repo_workflow::profile_acceptance_tests:: -- --nocapture'
 
   coverage:
     name: Coverage Badges

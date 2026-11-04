@@ -59,7 +59,7 @@ impl ActionableError {
     /// Renders the error text verbatim, with no "Error: " prefix: the single
     /// prefix is added exactly once, by the top-level CLI printer
     /// (`main::main`), so wrapping this in another error type (as
-    /// [`ClaimRequiresGitError`] and [`LeaseNotFoundError`] do) never produces
+    /// [`RequiresGitError`] and [`LeaseNotFoundError`] do) never produces
     /// a doubled "Error: Error: " line.
     pub fn to_error_message(&self) -> String {
         let mut msg = format!("{}\n", self.error);
@@ -417,14 +417,7 @@ impl LeaseNotFoundError {
     }
 }
 
-/// Which git precondition is unmet for a claim or lease command.
-///
-/// A worktree identity needs a resolvable `HEAD`, which fails for two
-/// distinct reasons that call for different fixes: there may be no git
-/// repository at all (fix: `git init`), or there may be a git repository with
-/// zero commits so far, in which `HEAD` doesn't resolve to a branch yet (fix:
-/// an initial commit, not `git init` again). [`ClaimRequiresGitError::new`]
-/// takes one of these so its remediation hint matches the actual gap.
+/// The missing Git precondition, determining the appropriate remediation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GitRequirementGap {
     /// The current directory is not inside a git repository at all.
@@ -434,26 +427,17 @@ pub enum GitRequirementGap {
     NoCommits,
 }
 
-/// Error returned when a claim or lease command is run outside a git repository.
-///
-/// Claims and leases require git for worktree identity and branch tracking.
-/// This typed wrapper is downcastable in `output::failure::classify` (→
-/// `ExitCode::ExternalError`) so the CLI reports exit code 10 rather than the
-/// generic error exit code.
+/// A command requires a usable Git repository (external dependency failure, exit 10).
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
-pub struct ClaimRequiresGitError {
+pub struct RequiresGitError {
     message: String,
 }
 
-impl ClaimRequiresGitError {
-    /// Build a [`ClaimRequiresGitError`] for the given [`GitRequirementGap`],
-    /// with a remediation hint tailored to that specific gap (REQ-04): a
-    /// missing repository hints `git init`; a repository with no commits
-    /// hints making an initial commit instead.
+impl RequiresGitError {
+    /// Tailor remediation to a missing repository or an unborn branch.
     pub fn new(gap: GitRequirementGap) -> Self {
-        let base = ActionableError::new("Claims and leases require a git repository")
-            .with_cause("Claim tracking records the git worktree identity and current branch");
+        let base = ActionableError::new("This command requires a git repository");
         let actionable = match gap {
             GitRequirementGap::NoRepository => base
                 .with_cause("Current directory is not inside a git repository")

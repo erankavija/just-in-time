@@ -18,7 +18,7 @@ fn test_issue_show_reads_committed_issue_from_linked_checkout_store() {
     primary.commit("Add issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -36,7 +36,7 @@ fn test_issue_show_reads_from_main_worktree_uncommitted() {
         .create_issue(["--title", "Uncommitted Issue"])
         .unwrap();
     assert!(linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -55,14 +55,14 @@ fn test_query_all_shows_issues_from_all_sources() {
     // Issue B stays uncommitted in the primary checkout.
     let id_b = primary.create_issue(["--title", "Issue B"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
     let created_c = linked
         .command_with_env(
             ["issue", "create", "--title", "Issue C", "--json"],
-            [crate::ALLOW_LINKED_WRITES],
+            [super::ALLOW_LINKED_WRITES],
         )
         .output()
         .unwrap();
@@ -104,7 +104,7 @@ fn test_graph_show_works_across_worktrees() {
     primary.commit("Add issues with dependency").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -132,7 +132,7 @@ fn test_partial_id_resolution_across_worktrees() {
     primary.commit("Add issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -151,7 +151,7 @@ fn test_local_overrides_main() {
     primary.commit("Add original issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
+        .command_with_env(["init"], [super::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -166,7 +166,7 @@ fn test_local_overrides_main() {
                 "--title",
                 "Modified in Secondary",
             ],
-            [crate::ALLOW_LINKED_WRITES],
+            [super::ALLOW_LINKED_WRITES],
         )
         .status()
         .unwrap()
@@ -196,7 +196,7 @@ fn test_issue_creates_on_two_branches_merge_without_an_index_conflict() {
     let created = linked
         .command_with_env(
             ["issue", "create", "-t", "Linked", "--json"],
-            [crate::ALLOW_LINKED_WRITES],
+            [super::ALLOW_LINKED_WRITES],
         )
         .output()
         .unwrap();

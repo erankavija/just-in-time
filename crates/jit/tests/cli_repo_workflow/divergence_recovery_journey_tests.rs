@@ -17,7 +17,7 @@
 //! The sequence below is the documented one step for step; each such step names
 //! the page step it executes.
 
-use crate::linked_checkout_write_policy_tests::durable_events;
+use super::linked_checkout_write_policy_tests::durable_events;
 use jit::domain::store_divergence::DivergenceClass;
 use jit::test_cli::{created_issue_id, JitCli};
 use serde_json::Value;

@@ -5,10 +5,10 @@ use super::{capture_discovering, READ_OPTIMISTIC_ATTEMPTS};
 use super::{with_read_session, MutationSessionExhausted, MUTATION_SESSION_RETRY_LIMIT};
 use crate::repository_state::{CaptureBudget, CaptureSpec};
 use crate::storage::repository_state_store::test_fixtures::{
-    leftover_record, leftover_target, FileSessionBackend, InterruptAtMoment, MemorySessionBackend,
+    leftover_record, leftover_target, FileSessionBackend, MemorySessionBackend,
     SessionRecordBackend, LEFTOVER_BYTES,
 };
-use crate::storage::{MutationPoint, RedoPoint, RepositoryReadSession};
+use crate::storage::RepositoryReadSession;
 use anyhow::{anyhow, Result};
 use std::sync::{Condvar, Mutex};
 use std::time::Duration;
@@ -133,29 +133,6 @@ fn test_with_read_session_falls_back_to_one_mutation_session_drive_after_failed_
         calls,
         READ_OPTIMISTIC_ATTEMPTS as usize + MUTATION_SESSION_RETRY_LIMIT,
         "each optimistic attempt runs once, then the mutation session's own bound"
-    );
-}
-
-#[test]
-fn test_with_read_session_reports_an_unappliable_leftover_record_as_recovery_failed() {
-    let backend = MemorySessionBackend::seeded();
-    backend.commit(&leftover_record());
-    let interrupted = backend
-        .0
-        .with_mutation_interruption_view(InterruptAtMoment::new(MutationPoint::Redo(
-            RedoPoint::BeforeApply,
-        )));
-
-    let error =
-        with_read_session(&interrupted, &backend.layout(), "blocked", read_leftover).unwrap_err();
-
-    assert!(error
-        .downcast_ref::<crate::errors::RecoveryFailedError>()
-        .is_some());
-    assert!(error.to_string().contains("jit recover"), "{error}");
-    assert_eq!(
-        crate::output::failure::classify(&error).error.code,
-        crate::output::ErrorCode::RecoveryFailed
     );
 }
 

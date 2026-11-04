@@ -42,6 +42,8 @@ one that adds it (D-18).
 - D-20: One computation per capability; previews, scoped views, and checkers are views over it
 - D-21: Reach git only through the git CLI, from one storage-owned module
 - D-22: Reads never wait on writers; a lock-free capture is admitted only when no commit crossed it
+- D-23: Retire the bundled MCP server and its support surfaces; the CLI remains the machine interface
+- D-24: Git-hook installation requires a Git checkout; core tracker operations remain Git-optional
 
 ## Decision Details
 
@@ -85,7 +87,7 @@ one that adds it (D-18).
 
 - **Chosen:** Core commands run without git; only the claim and lease commands
   (`jit claim acquire/release/renew/heartbeat/status/list`) require a git
-  repository and fail with a typed `ClaimRequiresGitError` (exit 10) outside one.
+  repository and fail with a typed `RequiresGitError` (exit 10) outside one.
 - **Rejected:** Requiring git for every command — a uniform but heavier
   dependency.
 - **Reasoning:** The tracker must run in non-git contexts, but multi-agent
@@ -429,3 +431,37 @@ one that adds it (D-18).
   event log that D-17 already maintains, so concurrency adds one check rather
   than a lock mode (D-18).
 - **Date:** 2026-10-24
+
+### D-23: Retire the bundled MCP server completely
+
+- **Chosen:** Remove the MCP server package and its exclusive code, dependencies,
+  tests, configuration, documentation, CI jobs, security audits and release
+  artifacts. The CLI retains its JSON and schema contracts; the server/API and
+  web UI remain supported. Active plans, criteria and gate bindings reflect the
+  retirement. Historical decisions and completed-work evidence remain history.
+  This supersedes D-9's MCP support commitment and the MCP-specific portions of
+  D-10, D-11 and D-16.
+- **Rejected:** Continuing to maintain and publish the adapter without a concrete
+  adopter need, or retaining compatibility stubs and dormant release paths.
+  Both preserve a second surface that must track the CLI without adding tracker
+  capabilities.
+- **Reasoning:** The adapter executes the CLI; its distinct capability is access
+  from MCP-only clients. The owner explicitly chose complete retirement.
+  Removing that maintenance burden follows D-18. A future demonstrated need can
+  justify a new thin adapter over the CLI contract; git preserves the old code.
+- **Date:** 2026-11-05
+
+### D-24: State the Git-hook installation prerequisite explicitly
+
+- **Chosen:** Core tracker operations remain usable without Git. In addition to
+  the claim and lease requirements in D-4, Git-hook installation requires a Git
+  checkout and reports the same typed Git-requirement error outside one. This
+  supersedes D-4's claim that only claim and lease commands require Git; it does
+  not add a Git prerequisite to other commands or change their behavior.
+- **Rejected:** Keeping an exclusive exception list that contradicts hook
+  installation, or making hook installation pretend to succeed without a Git
+  checkout.
+- **Reasoning:** Installing a Git hook is inherently a Git operation. Documenting
+  its existing prerequisite aligns the charter, user guarantees and common error
+  contract without weakening the Git-optional core.
+- **Date:** 2026-11-05

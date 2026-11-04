@@ -17,13 +17,26 @@
   ],
   "description": "No module under `crates/jit/src/commands/` imports from the output layer: commands return command or domain values, and the output layer builds responses from them.\n\n## Background\n\n`@/inv/architecture-dependency-direction` points dependencies inward. The output layer depending on result types that `commands/` defines is that direction; `commands/` importing `crate::output` is the reverse. At this task's filing, `commands/` modules query, graph, validate, issue, document, gate_check and worktree named `crate::output` types, mostly to build responses (`GraphTreeResponse`, `DivergenceResponse`, `StateRollup`, `IssueShowResponse`, `ArtifactDirectoryResponse` and others) or to use `ExitCode`.\n\n## Success Criteria\n\n- [hard] REQ-01: No module under `crates/jit/src/commands/` names any `crate::output` path; commands return command or domain values and the output layer builds responses from them.\n- [hard] REQ-02: A structural test scans `commands/` for `crate::output` and fails naming each offending file.\n- [hard] REQ-03: JSON payloads, schema names, human output and exit codes of every affected leaf are unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: Rescoped by steward ruling (just-in-time-6a, 2026-11-04), correcting the earlier output-ownership ruling. Under `@/inv/architecture-dependency-direction` the output layer depending on command-defined result types is the correct direction, so relocating registered success types into `output/` is not required; at an estimated +280 production lines it is churn without simplification. The former REQ-01 to REQ-03 (relocation, deletion of command-layer response shapes and its registration guard) are dropped, not deferred. The remaining scope is the former REQ-05 and its structural test (now REQ-01 and REQ-02) and the unchanged-output criterion (now REQ-03). Plan D-59.\n\n## Notes\n\nThe estimate that prompted the rescope (about +120 to +500 lines, central +280) came from a read-only survey of registered success types defined outside `output/`. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T22:13:13.579236906Z",
   "first_ready_at": "2026-11-04T09:40:58.219593245Z",
   "gates_required": [
     "cargo-ci",
-    "code-review",
-    "mcp-ci"
+    "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9be5aafe-d638-4d4c-b43f-9b778a9c7c36",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:05:17.612097945Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "09b2c505-bd2b-4d65-9c24-5dba550f9ff4",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:11:16.562734433Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09",
   "labels": [
     "epic:rust-code-quality",
@@ -33,7 +46,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Commands import nothing from the output layer",
-  "updated_at": "2026-11-04T21:46:31.204948913Z"
+  "updated_at": "2026-11-04T22:13:13.579236906Z"
 }

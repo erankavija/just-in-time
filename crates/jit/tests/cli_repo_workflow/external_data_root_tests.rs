@@ -178,7 +178,7 @@ fn test_recover_and_claims_outside_every_checkout_over_external_store_report_the
     let failure: Value = serde_json::from_slice(&listed.stdout).unwrap();
     assert_eq!(
         failure["error"]["code"].as_str(),
-        Some(ErrorCode::ClaimRequiresGit.as_str())
+        Some(ErrorCode::RequiresGit.as_str())
     );
 }
 

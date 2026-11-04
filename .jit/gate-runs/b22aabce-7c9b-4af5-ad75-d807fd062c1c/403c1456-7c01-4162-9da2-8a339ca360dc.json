@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7620257ab42dbc2397a5c5064916f09b7b57e99b",
+  "completed_at": "2026-11-04T22:04:27.535039361Z",
+  "duration_ms": 265944,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The two-suite integration-test consolidation satisfies the scoped requirements with no attributable defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b22aabce-7c9b-4af5-ad75-d807fd062c1c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "403c1456-7c01-4162-9da2-8a339ca360dc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:00:01.590305740Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `5719c72bf` (`jit:b22aabce`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/bounded-rust-build-footprint`, `@/invariant/orthogonal-tests`, `@/invariant/no-ignored-tests` (`.jit/invariants.toml`); `@/gate/cargo-ci` (`.jit/gates.toml`); `@/issue/b22aabce/requirement/REQ-01`, `REQ-02`, `REQ-03`, `REQ-04`, `REQ-05` (issue description)\nGate evidence: `cargo-ci` passed (exit 0, 2026-11-04T21:59:14Z)\nTruncation recovery: partitioned patch reads by affected paths; verified all test-patch changes are module relocation/path updates; inspected current targets, policy tests, workflow, budget, and focused-test docs. Cargo metadata completed unpooled after its cache lease write was refused by the read-only filesystem.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The two-suite integration-test consolidation satisfies the scoped requirements with no attributable defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

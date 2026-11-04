@@ -115,7 +115,7 @@ fn test_config_writes_and_validate_fix_restore_defaults_in_custom_only_file() {
 #[test]
 fn test_validate_id_passes_for_compliant_issue() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -129,7 +129,7 @@ fn test_validate_id_passes_for_compliant_issue() {
 #[test]
 fn test_validate_id_json_success_keeps_the_rule_report() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -146,7 +146,7 @@ fn test_validate_id_json_success_keeps_the_rule_report() {
 #[test]
 fn test_validate_id_fails_and_exits_nonzero() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(EPIC).unwrap();
@@ -159,7 +159,7 @@ fn test_validate_id_fails_and_exits_nonzero() {
 #[test]
 fn test_validate_id_json_reports_findings_and_exits_nonzero() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(EPIC).unwrap();
@@ -178,7 +178,7 @@ fn test_validate_id_json_reports_findings_and_exits_nonzero() {
 #[test]
 fn test_validate_explain_lists_outcomes() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(EPIC).unwrap();
@@ -197,7 +197,7 @@ fn test_validate_explain_lists_outcomes() {
 #[test]
 fn test_validate_explain_json_structure() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -239,7 +239,7 @@ fn test_validate_explain_renders_skipped_rule_with_state_reason() {
     // so the rule is rendered as a [SKIP] line naming the issue state and the wanted
     // token.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, DONE_NEEDS_SUMMARY);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -255,7 +255,7 @@ fn test_validate_explain_renders_skipped_rule_with_state_reason() {
 #[test]
 fn test_validate_explain_json_includes_matched_and_skip_reason() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, DONE_NEEDS_SUMMARY);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -284,7 +284,7 @@ fn test_validate_explain_json_includes_matched_and_skip_reason() {
 fn test_validate_explain_json_matched_rule_has_no_skip_reason() {
     // A matched rule keeps `matched = true` and omits `skip_reason` from JSON.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -311,7 +311,7 @@ fn test_validate_explain_json_matched_rule_has_no_skip_reason() {
 #[test]
 fn test_validate_explain_requires_id() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     cli.command(["validate", "--explain"])
@@ -326,7 +326,7 @@ fn test_gate_checker_via_jit_issue_id_env_var() {
     // when the issue is compliant. This proves the JIT_ISSUE_ID wiring end to end
     // (no `{issue}` placeholder is used).
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let checker = format!(
@@ -376,7 +376,7 @@ fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
     // The same gate must FAIL when the issue violates an error-severity rule,
     // because `jit validate "$JIT_ISSUE_ID"` exits non-zero.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let checker = format!(
@@ -466,7 +466,7 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
     // including the graph finding, and exit non-zero — not bail via the generic
     // error path that drops the structured report.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, COVERAGE_GRAPH_RULE);
     let _id = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
@@ -491,7 +491,7 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
 #[test]
 fn test_validate_retains_rule_findings_with_integrity_failure() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(EPIC).unwrap();
@@ -531,7 +531,7 @@ fn test_validate_retains_rule_findings_with_integrity_failure() {
 fn test_validate_id_with_fix_is_rejected() {
     // Finding #2: `--fix` is repo-wide and must not be silently scoped to an id.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -565,7 +565,7 @@ type = "review_placeholder"
 #[test]
 fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     configure_review_placeholder(&cli);
 
@@ -592,7 +592,7 @@ fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
 #[test]
 fn test_validate_scope_with_only_warnings_prints_findings_without_pass_line_and_succeeds() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_WARNS_WITHOUT_COMPONENT);
     let container = cli.create_issue(EPIC).unwrap();
@@ -618,7 +618,7 @@ fn test_validate_scope_with_only_warnings_prints_findings_without_pass_line_and_
 fn test_validate_id_with_branch_drift_is_rejected() {
     // Finding #2: `--branch-drift` is repo-wide and incompatible with a positional id.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -634,7 +634,7 @@ fn test_validate_id_with_branch_drift_is_rejected() {
 fn test_validate_id_with_leases_is_rejected() {
     // Finding #2: `--leases` is repo-wide and incompatible with a positional id.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(COMPLIANT_EPIC).unwrap();
@@ -649,7 +649,7 @@ fn test_validate_id_with_leases_is_rejected() {
 #[test]
 fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, SELECTED_COVERAGE_GRAPH_RULE);
     let selected = cli.create_issue(EPIC_WITH_CRITERION).unwrap();
@@ -713,7 +713,7 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
 #[test]
 fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(
         &cli,
@@ -758,7 +758,7 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
 #[test]
 fn test_validate_rule_cli_reports_missing_selected_container() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+        profiled_repository_fixture(super::DEFAULT_PACKAGE, "packages").unwrap(),
     );
     append_rules(&cli, SELECTED_BREAKDOWN_COVERAGE_RULE);
     let breakdown = cli

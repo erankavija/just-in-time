@@ -510,7 +510,7 @@ and completion report.
   reconciliation warning in status/list output. Lock-order APIs and tests reject
   any path that acquires the coordinator after
   bootstrap/data-root-publication/repository/events. Non-Git claim calls retain
-  `ClaimRequiresGitError`; no saga makes Git mandatory for unrelated core commands.
+  the then claim-specific Git requirement error; no saga makes Git mandatory for unrelated core commands.
 
 ### Claim v2 migration and credential closure
 

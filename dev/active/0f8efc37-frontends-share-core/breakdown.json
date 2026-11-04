@@ -1,0 +1,635 @@
+[
+  {
+    "key": "layout-binding",
+    "title": "Reject incompatible repository layout bindings",
+    "description": "One fallible binding API cutover includes its mechanically migrated implementations and inventoried callers.\n\n## Background\n\n`IssueStore::configure_repository_layout` and `CommandExecutor::with_layout` currently bind without returning mismatch errors. The investigation inventories implementations and callers.\n\n## Success Criteria\n\n- [hard] REQ-01: Layout binding returns an error before side effects when roots differ, preserving same-root refresh and recovery ordering; callers propagate errors and tests cover mismatch and same-root binding.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-core",
+      "satisfies:0f8efc37/REQ-02",
+      "satisfies:{core-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Reject incompatible repository layout bindings.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "storage",
+        "test_boundary": "Storage binding conformance",
+        "worker_sized_reason": "One fallible binding API cutover includes its mechanically migrated implementations and inventoried callers.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/mod.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/storage/repository_state_store.rs",
+            "crates/jit/src/commands/bootstrap.rs"
+          ],
+          "uncertainty": "Migrate every configure_repository_layout and with_layout implementation and caller, including the full inventory in investigation.md; existing tests must cover mismatch, same-root refresh and recovery."
+        }
+      }
+    }
+  },
+  {
+    "key": "watch-paths",
+    "title": "Centralize watcher path selection",
+    "description": "The storage predicate and its watcher consumer form one small behavior cutover.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned predicate derives watched paths from storage constants, includes config.toml, and emits configuration changes; watcher tests cover included and unrelated paths.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-03",
+      "satisfies:0f8efc37/REQ-04",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Centralize watcher path selection.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-03",
+        "REQ-04"
+      ],
+      "terminal": {
+        "consumer_family": "server",
+        "test_boundary": "Storage watcher predicate",
+        "worker_sized_reason": "The storage predicate and its watcher consumer form one small behavior cutover.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/watcher.rs",
+            "crates/jit/src/repository_state/path.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "config-refresh",
+    "title": "Reload browser hierarchy on configuration events",
+    "description": "One event-triggered hierarchy reload and its browser test form one behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: A configuration change reloads hierarchy from the fresh configuration path; browser tests cover changed hierarchy after an event.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-web",
+      "satisfies:0f8efc37/REQ-04",
+      "satisfies:{web-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "npm-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "watch-paths"
+    ],
+    "planning": {
+      "outcome": "Reload browser hierarchy on configuration events.",
+      "contract_refs": [
+        "browser-summary"
+      ],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "terminal": {
+        "consumer_family": "web",
+        "test_boundary": "GraphView event-driven hierarchy refresh",
+        "worker_sized_reason": "One event-triggered hierarchy reload and its browser test form one behavior.",
+        "footprint": {
+          "touches": [
+            "web/src/components/Graph/GraphView.tsx",
+            "web/src/hooks/useEventStream.ts",
+            "web/src/components/Graph/__tests__/GraphView.test.tsx"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "shared-capture",
+    "title": "Share version-scoped issue capture and projections",
+    "description": "Share one issue snapshot across graph and base issue projections for each tracker version, while retaining live derived-document visibility.\n\n## Background\n\nThe list and graph handlers each load all issues today. The list also calls `DocumentOps::with_reported_documents`, which discovers artifact paths outside the watched data directory; caching that complete response would hide artifact changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Concurrent list and graph requests share one captured issue snapshot and cached base projections per version; failed attempts remain retryable and stale completion cannot replace a newer generation.\n- [hard] REQ-02: The list applies fresh derived-document discovery over captured issue records without another issue listing, so adding, deleting or renaming an artifact after cache warm updates its reported documents at the same tracker version.\n- [hard] REQ-03: Configuration invalidation rebuilds projections with current declarations. Deterministic tests cover concurrent admission, version crossings, failure/retry and live artifact changes; tracker versions remain invalidation hints, not transaction revisions.\n\n## Notes\n\nUse the shared executor helper and existing lock-free repository read behavior; do not hold a writer lock across async work.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-06",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "executor-offload"
+    ],
+    "planning": {
+      "outcome": "Share version-scoped issue capture and projections.",
+      "contract_refs": [
+        "executor-helper",
+        "capture-version"
+      ],
+      "source_refs": [
+        "REQ-06"
+      ],
+      "terminal": {
+        "consumer_family": "server",
+        "test_boundary": "Server route refresh-cache behavior",
+        "worker_sized_reason": "One server cache covers both projections and their concurrent admission behavior.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs",
+            "crates/server/src/watcher.rs",
+            "crates/server/src/main.rs",
+            "crates/server/tests/server_integration/document_api_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "executor-offload",
+    "title": "Offload executor work in server handlers",
+    "description": "One server helper and its route-wide migration establish the runtime isolation property.\n\n## Background\n\nThe server already maps classified errors through `reject`; keep classification there while moving synchronous executor work off async workers.\n\n## Success Criteria\n\n- [hard] REQ-01: Every executor-reaching handler uses one server-owned blocking execution helper, mapping errors through the existing reject and classifier; multiple calls within a request share one offloaded closure.\n- [hard] REQ-02: Tests cover offload and error mapping.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-07",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Offload executor work in server handlers.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-07"
+      ],
+      "terminal": {
+        "consumer_family": "server",
+        "test_boundary": "Server executor offload error mapping",
+        "worker_sized_reason": "One server helper and its route-wide migration establish the runtime isolation property.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs"
+          ]
+        },
+        "warning_overrides": {
+          "chain-link": "This completes runtime isolation by migrating every executor-reaching route to the helper, rather than delivering scaffolding alone."
+        }
+      },
+      "produces_contracts": [
+        "executor-helper"
+      ]
+    }
+  },
+  {
+    "key": "semantic-search",
+    "title": "Unify issue and linked-document search",
+    "description": "Unify semantic issue and linked-document search for HTTP and the browser while preserving raw repository search as a distinct CLI capability.\n\n## Background\n\n`QueryOps::search_issues_with_filters` owns issue search today. HTTP currently uses ripgrep on serialized issue records; top-level `jit search` intentionally searches raw repository files and history.\n\n## Success Criteria\n\n- [hard] REQ-01: The existing issue-search computation serves both `jit issue search` and HTTP semantic issue matches over ID, title and description; default issue search retains case-insensitive whole-query substring, ID prefix and filters.\n- [hard] REQ-02: HTTP regex and case options apply to semantic issue fields and linked-document content, while ripgrep never reads serialized issue records for this HTTP search; an empty linked-document path list does not broaden the search.\n- [hard] REQ-03: Top-level `jit search` retains its raw-file and history corpus and existing regex, glob, case, context and limit behavior; shared ripgrep machinery is reused. Documentation distinguishes the raw search capability from semantic issue and document search.\n- [hard] REQ-04: Focused tests cover semantic matches, HTTP options, linked-document empty paths and preservation of raw history search.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-08",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "executor-offload"
+    ],
+    "planning": {
+      "outcome": "Unify issue and linked-document search.",
+      "contract_refs": [
+        "executor-helper",
+        "search-options"
+      ],
+      "source_refs": [
+        "REQ-08"
+      ],
+      "terminal": {
+        "consumer_family": "core-server",
+        "test_boundary": "Core semantic search behavior",
+        "worker_sized_reason": "One existing issue-search computation and the HTTP adapter converge while preserving raw CLI search.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/search.rs",
+            "crates/server/src/routes.rs",
+            "crates/jit/tests/cli_query_graph/search_tests.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "browser-search",
+    "title": "Use server search results in browser",
+    "description": "One search hook replaces the local scorer and guards stale responses.\n\n## Success Criteria\n\n- [hard] REQ-01: Browser uses server issue and linked-document matches, preserves navigation, and ignores stale in-flight results after query or version changes; the App passes its SSE version to the hook and routes issue matches to issue details and document matches to the viewer. Actual asynchronous hook tests cover out-of-order completion; obsolete scorer-only tests are removed or replaced.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-web",
+      "satisfies:0f8efc37/REQ-08",
+      "satisfies:{web-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "npm-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "semantic-search"
+    ],
+    "planning": {
+      "outcome": "Use server search results in browser.",
+      "contract_refs": [
+        "search-options"
+      ],
+      "source_refs": [
+        "REQ-08"
+      ],
+      "terminal": {
+        "consumer_family": "web",
+        "test_boundary": "Search hook out-of-order responses",
+        "worker_sized_reason": "One browser search cutover migrates the hook, its App caller and navigation, deletes the scorer, and replaces scorer tests with the asynchronous consumer property.",
+        "footprint": {
+          "touches": [
+            "web/src/components/Search/useSearch.ts",
+            "web/src/utils/clientSearch.ts",
+            "web/src/components/Search/useSearch.test.ts",
+            "web/src/App.tsx",
+            "web/src/utils/clientSearch.test.ts"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "documents",
+    "title": "Converge document operation adapters",
+    "description": "One command method family and its CLI and HTTP adapters converge after the external Git primitives land.\n\n## Background\n\n`DocumentOps` currently has parallel content, history and diff methods; the Git owner supplies version selection and Git primitives.\n\n## Success Criteria\n\n- [hard] REQ-01: CLI and HTTP consume one core content, history and diff method family, removing obsolete parallel methods.\n- [hard] REQ-02: Preserve binary bytes, linked-document validation, working-tree edits for unpinned documents and supported HTTP diff; tests compare selected-version bytes and exercise diff.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-09",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "executor-offload"
+    ],
+    "planning": {
+      "outcome": "Converge document operation adapters.",
+      "contract_refs": [
+        "executor-helper"
+      ],
+      "source_refs": [
+        "REQ-09"
+      ],
+      "terminal": {
+        "consumer_family": "core-server",
+        "test_boundary": "Document command version behavior",
+        "worker_sized_reason": "One command method family and its CLI and HTTP adapters converge after the external Git primitives land.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/src/dispatch/doc.rs",
+            "crates/server/src/routes.rs",
+            "crates/server/tests/server_integration/document_api_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/document_history_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "api-pruning",
+    "title": "Remove explicitly unused API routes and client methods",
+    "description": "One bounded HTTP and web client removal includes matching result type reuse.\n\n## Success Criteria\n\n- [hard] REQ-01: Remove /status, /config/strategic-types, /changes and /gates/:key and the currently unused `getStatus`, `getGateDefinition` and `getDocumentDiff` web methods; preserve /issues, /health and HTTP document diff. Keep `listIssues` while App still calls it; its removal belongs to the graph-summary cutover.\n- [hard] REQ-02: Reuse matching core response types and cover route presence and removal.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-10",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "npm-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "executor-offload"
+    ],
+    "planning": {
+      "outcome": "Remove explicitly unused API routes and client methods.",
+      "contract_refs": [
+        "executor-helper"
+      ],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "core-server-web",
+        "test_boundary": "Server routing contract",
+        "worker_sized_reason": "One bounded HTTP and web client removal includes matching result type reuse.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs",
+            "web/src/api/client.ts",
+            "web/src/api/client.test.ts",
+            "crates/server/tests/server_integration/document_api_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "server-modules",
+    "title": "Compile server modules through the library",
+    "description": "The binary imports its existing library modules and drops unused manifest dependencies.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary imports library modules without redeclaring them; unused server dependencies are removed and existing server tests compile and run once.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-11",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Compile server modules through the library.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-11"
+      ],
+      "terminal": {
+        "consumer_family": "server",
+        "test_boundary": "Server build target topology",
+        "worker_sized_reason": "The binary imports its existing library modules and drops unused manifest dependencies.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/main.rs",
+            "crates/server/Cargo.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "raw-responses",
+    "title": "Unify raw document response construction",
+    "description": "One server response builder owns MIME and percent codec consolidation.\n\n## Success Criteria\n\n- [hard] REQ-01: Raw documents use one response builder, mime_guess and one percent codec while preserving HTML base injection, CSP and traversal rejection; tests cover binary MIME, HTML and invalid paths.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-server",
+      "satisfies:0f8efc37/REQ-12",
+      "satisfies:{server-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "executor-offload"
+    ],
+    "planning": {
+      "outcome": "Unify raw document response construction.",
+      "contract_refs": [
+        "executor-helper"
+      ],
+      "source_refs": [
+        "REQ-12"
+      ],
+      "terminal": {
+        "consumer_family": "server",
+        "test_boundary": "Server raw document response",
+        "worker_sized_reason": "One server response builder owns MIME and percent codec consolidation.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs",
+            "crates/server/src/embedded.rs",
+            "crates/server/Cargo.toml",
+            "crates/server/tests/server_integration/document_api_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "graph-summary",
+    "title": "Use unfiltered graph summaries for browser metadata",
+    "description": "The browser replaces the issue-list metadata source with unfiltered graph summaries.\n\n## Success Criteria\n\n- [hard] REQ-01: Change events no longer request /issues; full unfiltered graph summaries provide labels and dependency titles even when graph filters hide nodes. Remove `listIssues` and its test with the final App caller, after the search scorer has been replaced.\n- [hard] REQ-02: Tests cover filtered dependencies and refresh.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-web",
+      "satisfies:0f8efc37/REQ-05",
+      "satisfies:{web-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "npm-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "browser-search"
+    ],
+    "planning": {
+      "outcome": "Use unfiltered graph summaries for browser metadata.",
+      "contract_refs": [
+        "browser-summary"
+      ],
+      "source_refs": [
+        "REQ-05"
+      ],
+      "terminal": {
+        "consumer_family": "web",
+        "test_boundary": "Browser graph metadata refresh",
+        "worker_sized_reason": "The browser replaces the issue-list metadata source with unfiltered graph summaries.",
+        "footprint": {
+          "touches": [
+            "web/src/App.tsx",
+            "web/src/components/Graph/GraphView.tsx",
+            "web/src/components/Issue/IssueDetail.tsx",
+            "web/src/components/Graph/__tests__/GraphView.test.tsx",
+            "web/src/api/client.ts",
+            "web/src/api/client.test.ts"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "layout-indexes",
+    "title": "Index graph layout and refresh passes",
+    "description": "Two existing graph bulk passes replace repeated lookups with pass-local indexes.\n\n## Success Criteria\n\n- [hard] REQ-01: Build node and cluster indexes once per bulk pass so GraphView and clusterAwareLayout avoid per-node array searches; tests preserve layout and refresh behavior without adding container selection policy.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "story:frontend-web",
+      "satisfies:0f8efc37/REQ-15",
+      "satisfies:{web-story.short_id}/REQ-01"
+    ],
+    "gates": [
+      "npm-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Index graph layout and refresh passes.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-15"
+      ],
+      "terminal": {
+        "consumer_family": "web",
+        "test_boundary": "Cluster-aware graph layout",
+        "worker_sized_reason": "Two existing graph bulk passes replace repeated lookups with pass-local indexes.",
+        "footprint": {
+          "touches": [
+            "web/src/components/Graph/GraphView.tsx",
+            "web/src/utils/clusterAwareLayout.ts",
+            "web/src/utils/clusterAwareLayout.test.ts",
+            "web/src/components/Graph/__tests__/GraphView.layoutCache.test.tsx"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "core-story",
+    "title": "Repository foundations",
+    "description": "Repository layout binding enforces the storage root while server startup uses the shared repository constructor.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage binding rejects a mismatched root and server startup consumes the shared constructor.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0",
+      "satisfies:0f8efc37/REQ-01"
+    ],
+    "gates": [
+      "repo-validate",
+      "code-review"
+    ],
+    "depends_on": [
+      "layout-binding"
+    ],
+    "planning": {
+      "outcome": "Repository foundations.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-02",
+        "REQ-01"
+      ]
+    }
+  },
+  {
+    "key": "server-story",
+    "title": "Server convergence",
+    "description": "Server endpoints reuse core execution and document operations, while refresh work is shared across clients.\n\n## Success Criteria\n\n- [hard] REQ-01: Supported server routes use shared core operations and preserve their HTTP contracts.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0"
+    ],
+    "gates": [
+      "repo-validate",
+      "code-review"
+    ],
+    "depends_on": [
+      "watch-paths",
+      "shared-capture",
+      "semantic-search",
+      "documents",
+      "api-pruning",
+      "server-modules",
+      "raw-responses"
+    ],
+    "planning": {
+      "outcome": "Server convergence.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-06"
+      ]
+    }
+  },
+  {
+    "key": "web-story",
+    "title": "Browser convergence",
+    "description": "Browser refresh, search and graph layout consume shared server results efficiently.\n\n## Success Criteria\n\n- [hard] REQ-01: The browser exposes shared search results, graph metadata and live configured hierarchy across refreshes; indexed bulk passes preserve layout semantics.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:frontends-share-core",
+      "milestone:v1.0"
+    ],
+    "gates": [
+      "repo-validate",
+      "code-review"
+    ],
+    "depends_on": [
+      "config-refresh",
+      "graph-summary",
+      "layout-indexes"
+    ],
+    "planning": {
+      "outcome": "Browser convergence.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-05"
+      ]
+    }
+  }
+]

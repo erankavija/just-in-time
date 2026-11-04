@@ -11,7 +11,7 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
     // --kind risk` returns risk items parsed from an issue's `## Risks` section
     // — exercised through the actual binary.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["risk"]))
             .unwrap()
             .0,
     );
@@ -46,7 +46,7 @@ fn test_default_repo_markdown_is_sole_source_for_risks() {
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no risk store file is written under `.jit/`.
     let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"]))
+        setup_test_repo_with_config(&super::config_with_shipped_kinds(&["risk"]))
             .unwrap()
             .0,
     );

@@ -2,7 +2,7 @@
 //!
 //! Tests the `--add-gate` and `--remove-gate` flags for `jit issue update`
 
-use crate::create_titled_issue;
+use super::create_titled_issue;
 use jit::test_cli::JitCli;
 
 fn define_titled_gate(temp: &JitCli, key: &str, title: &str) {

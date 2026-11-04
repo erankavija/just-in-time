@@ -160,7 +160,7 @@ pub(super) fn json(output: &Output) -> Value {
 fn test_profile_show_works_without_repository() {
     let repo = JitCli::uninitialised().unwrap();
 
-    let location = crate::repository_package_at(repo.root(), "jit-dogfood");
+    let location = super::repository_package_at(repo.root(), "jit-dogfood");
     let show = jit(
         &repo,
         &["profile", "show", "--profile", &location, "--json"],
@@ -923,7 +923,7 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
             "profile",
             "show",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1013,7 +1013,7 @@ fn test_profiled_init_publishes_a_valid_repo() {
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1058,7 +1058,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-default"),
+            &super::repository_package_at(repo.root(), "jit-default"),
         ]
     )
     .status
@@ -1071,7 +1071,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--dry-run",
             "--json",
         ],
@@ -1097,7 +1097,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1111,7 +1111,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1131,7 +1131,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1155,7 +1155,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--dry-run",
             "--json",
         ],
@@ -1178,7 +1178,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1203,7 +1203,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1235,7 +1235,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1256,7 +1256,7 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.root(), "jit-dogfood"),
+            &super::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1573,7 +1573,7 @@ fn test_profile_pack_packs_every_shipped_package_from_a_repository_holding_it() 
     for id in jit::test_utils::published_package_ids() {
         let exchange = TempDir::new().unwrap();
         let repo = JitCli::uninitialised().unwrap();
-        let package = crate::repository_package_at(repo.root(), &id);
+        let package = super::repository_package_at(repo.root(), &id);
         let initialized = jit(&repo, &["init", "--profile", &package, "--json"]);
         assert!(initialized.status.success(), "{initialized:?}");
         let archive = exchange.path().join(format!("{id}.tar"));

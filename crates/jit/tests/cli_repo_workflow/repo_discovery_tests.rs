@@ -74,7 +74,7 @@ fn test_nested_profile_init_keeps_data_and_assets_in_child() {
 
     let child = parent.root().join("child");
     fs::create_dir(&child).unwrap();
-    let location = crate::repository_package_at(&child, "jit-dogfood");
+    let location = super::repository_package_at(&child, "jit-dogfood");
     let child_init = parent
         .command(["init", "--profile", &location, "--json"])
         .current_dir(&child)
@@ -107,7 +107,7 @@ fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
     fs::create_dir(&child).unwrap();
     let external = TempDir::new().unwrap();
     let data_root = external.path().join("jit-data");
-    let location = crate::repository_package_at(&child, "jit-dogfood");
+    let location = super::repository_package_at(&child, "jit-dogfood");
 
     let output = parent
         .command_with_env(
@@ -141,7 +141,7 @@ fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
     // root override resolves to, not in the child the command runs from.
     let location = repo
         .root()
-        .join(crate::repository_package_at(repo.root(), "jit-dogfood"));
+        .join(super::repository_package_at(repo.root(), "jit-dogfood"));
 
     let output = repo
         .command_with_env(

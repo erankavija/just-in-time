@@ -1,9 +1,3 @@
-//! `fast_issue` integration-test suite. Aggregates former per-file
-//! integration targets as modules under one Cargo test target so Cargo links
-//! and runs them as a single executable (jit:8d4f7084).
-
-use jit::test_utils::fixture_issue;
-
 mod archived_semantics_tests;
 mod bulk_operations_tests;
 mod dep_add_atomic_tests;

@@ -8,7 +8,7 @@
 //! against is whatever `jit doc dir` resolves in the same repository, so no
 //! expectation here restates the naming rule.
 
-use crate::doc_show_tests::{declared_area, membership_type_and_namespace, undeclared_area};
+use super::doc_show_tests::{declared_area, membership_type_and_namespace, undeclared_area};
 use jit::domain::State;
 use jit::test_cli::{created_issue_id, JitCli};
 use jit::test_utils::setup_test_repo_with_config;

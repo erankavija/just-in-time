@@ -285,7 +285,7 @@ A malformed invocation (`jit query count --by bogus --json`, `jit hooks install 
 
 ### `claim` (7 arms) — all via `claim_json_error`
 
-`claim acquire` main.rs:7308 (7348-7350) · `claim release` :7357 (7393-7395) · `claim renew` :7402 (7435-7437) · `claim heartbeat` :7444 (7468-7470) · `claim status` :7477 (7556-7558) · `claim list` :7565 (7629-7631) · `claim force-evict` :7638 (7668-7670). All ENVELOPE. Codes observed: `CLAIM_ACQUIRE_ERROR`, `CLAIM_RELEASE_ERROR`, `CLAIM_REQUIRES_GIT`.
+`claim acquire` main.rs:7308 (7348-7350) · `claim release` :7357 (7393-7395) · `claim renew` :7402 (7435-7437) · `claim heartbeat` :7444 (7468-7470) · `claim status` :7477 (7556-7558) · `claim list` :7565 (7629-7631) · `claim force-evict` :7638 (7668-7670). All ENVELOPE. Codes observed: `CLAIM_ACQUIRE_ERROR`, `CLAIM_RELEASE_ERROR`, the then claim-specific Git requirement code.
 
 ### `query` (7 arms) — all `none`
 
@@ -391,5 +391,5 @@ The sweep of `dev/` and `docs/` found little; nothing supersedes this report.
 
 - **Current test-executable bytes vs the 2 GiB budget** — not measured; requires a full `cargo test --workspace --no-run`.
 - **`recover`'s failure envelope in practice** — I could not force `executor.recover_transactions()` to fail, so the stderr/compact/`recovery_failed` behavior at `main.rs:6989-6991` is established from source only, not by invocation.
-- **The claim-namespace fallback codes** — the scratch repo had no commits, so five `claim` arms short-circuited on `CLAIM_REQUIRES_GIT` (exit 10, agreeing on both paths). Their `CLAIM_*_ERROR` fallbacks are structurally in the same exit-1-vs-typed-class bucket as `claim acquire`/`claim release` (which I did measure disagreeing), but that was not confirmed by invocation for `renew`, `heartbeat`, `status`, `list`, `force-evict`.
+- **The claim-namespace fallback codes** — the scratch repo had no commits, so five `claim` arms short-circuited on the then claim-specific Git requirement code (exit 10, agreeing on both paths). Their `CLAIM_*_ERROR` fallbacks are structurally in the same exit-1-vs-typed-class bucket as `claim acquire`/`claim release` (which I did measure disagreeing), but that was not confirmed by invocation for `renew`, `heartbeat`, `status`, `list`, `force-evict`.
 - **Whether any arm can print partial success to stdout before failing** — I found none among the 61 arms I drove to failure, and the human-output helpers are all `json`-guarded, but I could not exhaustively drive multi-step arms (`gate evaluate-all` with a mid-list checker failure, `project render` with one failing projection, `validate --fix` with a mid-run write failure) into a partial-output state.

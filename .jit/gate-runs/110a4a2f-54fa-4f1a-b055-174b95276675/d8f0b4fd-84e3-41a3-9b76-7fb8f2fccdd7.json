@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f79fcab4273db086a9dd457bb19696363084ea74",
+  "completed_at": "2026-11-04T22:16:52.552903427Z",
+  "duration_ms": 232533,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/0f8efc37-frontends-share-core/plan.md",
+        "id": "F1",
+        "line": 107,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/110a4a2f/REQ-01",
+          "@/issue/0f8efc37/REQ-01",
+          "@/issue/0f8efc37/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "External prerequisite edges declared for core-story, documents, and executor-offload cannot be represented or instantiated by this manifest."
+      }
+    ],
+    "summary": "The authoritative manifest omits the external prerequisite edges required by its own settled ownership plan.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "110a4a2f-54fa-4f1a-b055-174b95276675",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8f0b4fd-84e3-41a3-9b76-7fb8f2fccdd7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:13:00.019249989Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5547 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a89f-62a1-7b30-a58b-7adc9d37327d\n--------\nuser\n--- 5534 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact (high):** The manifest does not encode the external prerequisite edges that the plan explicitly requires re-homing. The plan assigns `c5062e21` to `core-story`, `933ff852` and `f35c86de` to `documents`, and `487f45a9` to `executor-offload` ([plan.md](dev/active/0f8efc37-frontends-share-core/plan.md:107)), but those entries only have internal dependencies ([breakdown.json](dev/active/0f8efc37-frontends-share-core/breakdown.json:185), [breakdown.json](dev/active/0f8efc37-frontends-share-core/breakdown.json:315), [breakdown.json](dev/active/0f8efc37-frontends-share-core/breakdown.json:565)). `c5062e21` is still ready and owns the server bootstrap migration required by REQ-01; the other owners are backlog or in progress. Moreover, `batch-create` accepts dependencies only on keys defined in the same manifest, so the declared external IDs cannot be represented as written ([batch_create.rs](crates/jit/src/commands/batch_create.rs:92)). The instantiated graph can therefore schedule dependent work before its declared producers and allow `core-story` to close without the server-bootstrap change. Add native, validated external-dependency support to the authoritative manifest/batch contract and encode the stated edges, or revise the settled ownership decision and coverage together; then regenerate and revalidate. References: @/issue/110a4a2f/REQ-01, @/issue/0f8efc37/REQ-01, @/issue/0f8efc37/REQ-09.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The authoritative manifest omits the external prerequisite edges required by its own settled ownership plan.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"External prerequisite edges declared for core-story, documents, and executor-offload cannot be represented or instantiated by this manifest.\",\"file\":\"dev/active/0f8efc37-frontends-share-core/plan.md\",\"line\":107,\"references\":[\"@/issue/110a4a2f/REQ-01\",\"@/issue/0f8efc37/REQ-01\",\"@/issue/0f8efc37/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,0 +1,25 @@
+{
+  "assignee": "agent:retire-mcp",
+  "claimed_at": "2026-11-04T21:59:23.509795829Z",
+  "context": {},
+  "created_at": "2026-11-04T21:59:12.266540359Z",
+  "dependencies": [],
+  "description": "Remove the MCP server and its integrations, consolidate repository quality gates, and preserve historical gate evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: The MCP server, its exclusive Rust metadata and tests, and its build, security, release, and profile integrations are absent.\n- [hard] REQ-02: Active documentation and release plans describe the remaining product surfaces without MCP server instructions.\n- [hard] REQ-03: CLI JSON and schema contracts and other product capabilities remain available and verified.\n- [hard] REQ-04: Historical issue records, evidence, and charter decisions remain intact.\n- [hard] REQ-05: Repository-local tests, fmt, clippy, and tdd-reminder gates and live bindings are absent; cargo-ci retains formatting, lint, and test coverage.\n- [hard] REQ-06: Historical gate runs remain readable after the gate definition and issue binding are removed, independent of issue state; reopening with undefined required gates is rejected.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T21:59:12.266540359Z",
+  "gates_required": [
+    "cargo-ci",
+    "docs-mechanical",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "4d844e61-f310-4395-b938-81247a964c81",
+  "labels": [
+    "milestone:v1.0",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Retire the MCP server and consolidate quality gates",
+  "updated_at": "2026-11-04T22:10:26.180995754Z"
+}

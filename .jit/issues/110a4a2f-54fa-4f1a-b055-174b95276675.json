@@ -1,0 +1,58 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T21:59:02.643703922Z",
+  "dependencies": [
+    "2195c98f-95a9-45d0-8582-d93c1d1fec45"
+  ],
+  "description": "Plan server/web convergence against the hard criteria of 0f8efc37 using current code and a worker-sized authoritative manifest.\n\n## Success Criteria\n\n- [hard] REQ-01: The linked plan and breakdown manifest cover every active container criterion, preserve shared producers and define an executable dependency graph.\n- [hard] REQ-02: Current-code investigation and adversarial review justify the contracts and worker-sized leaves.\n\n## Notes\n\nExternal producer prerequisites recorded in the plan are part of the final stored graph. The established breakdown protocol publishes internal batch edges first and external edges afterward, before its completion checkpoint releases work. The plan's external-edge publication decision cites that protocol; a native batch schema extension is outside this work.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "investigation",
+      "label": "Investigation",
+      "path": "dev/active/0f8efc37-frontends-share-core/investigation.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "label": "Plan",
+      "path": "dev/active/0f8efc37-frontends-share-core/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "manifest",
+      "label": "Authoritative breakdown",
+      "path": "dev/active/0f8efc37-frontends-share-core/breakdown.json"
+    }
+  ],
+  "done_at": "2026-11-04T22:23:52.126835610Z",
+  "first_ready_at": "2026-11-04T21:59:02.643703922Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "run_id": "7c888b70-8279-4385-88f3-55a1938d13e5",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:23:01.277979505Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "110a4a2f-54fa-4f1a-b055-174b95276675",
+  "labels": [
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "component:server",
+    "component:web",
+    "component:core",
+    "component:storage",
+    "per:@/charter/D-18",
+    "per:@/charter/D-20",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Plan the server and web shared mechanisms",
+  "updated_at": "2026-11-04T22:23:52.126835610Z"
+}

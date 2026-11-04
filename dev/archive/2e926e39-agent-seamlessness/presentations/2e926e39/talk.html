@@ -186,7 +186,7 @@ jit validate --scope epic-123     # a container's bracket subtree (gate checker)
 <pre><code class="language-bash" data-trim>$ jit claim acquire abc123        # run outside a git repository
 Error: Claims and leases require a git repository    # typed error, exit 10</code></pre>
   <ul>
-    <li>REQ-17 — a typed <code>ClaimRequiresGitError</code> (exit 10) instead of a confusing low-level failure</li>
+    <li>REQ-17 — a typed claim-specific Git requirement error (exit 10) instead of a confusing low-level failure</li>
     <li>REQ-14 — <code>issue create --json</code> now carries the same <code>gates[]</code> / <code>short_id</code> contract as <code>issue show</code></li>
   </ul>
 </section>
