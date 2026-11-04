@@ -69,13 +69,6 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::HooksInstallError
         | ErrorCode::GenericError
         | ErrorCode::RecoveryFailed
-        | ErrorCode::ClaimAcquireError
-        | ErrorCode::ClaimReleaseError
-        | ErrorCode::ClaimRenewError
-        | ErrorCode::ClaimHeartbeatError
-        | ErrorCode::ClaimStatusError
-        | ErrorCode::ClaimListError
-        | ErrorCode::ClaimForceEvictError
         | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }

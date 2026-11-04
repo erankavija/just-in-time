@@ -751,10 +751,6 @@ impl CommandSchema {
                 Some(schema_to_value::<LabelValuesResponse>()),
                 "LabelValuesResponse",
             ),
-            "claim_status" | "claim_list" => (
-                Some(schema_to_value::<LeaseListResponse>()),
-                "LeaseListResponse",
-            ),
             "worktree_list" => (
                 Some(schema_to_value::<WorktreeListResponse>()),
                 "WorktreeListResponse",

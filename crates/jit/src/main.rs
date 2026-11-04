@@ -17,18 +17,18 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, GateCommands,
-    GraphCommands, IssueCommands, ProfileCommands, ProjectCommands,
+    ArchiveCommands, Cli, Commands, DepCommands, DocCommands, GateCommands, GraphCommands,
+    IssueCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, config, events, init, invariant, item, resolve_issue, resolve_issue_filter, serve,
-    version, CommandContext,
+    apply, claim, config, events, init, invariant, item, resolve_issue, serve, version,
+    CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
-    claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
+    classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
 use jit::output::{
     plain_issue_rows, print_issue_list, ErrorCode, ExitCode, IssueColumn, JsonError, JsonOutput,
@@ -39,20 +39,6 @@ use std::env;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
-
-/// Report a `jit recover` failure as `recovery_failed` and exit.
-fn exit_recovery_failed(error: &anyhow::Error, json: bool) -> ! {
-    if json {
-        let output = command_json_error(error, ErrorCode::RecoveryFailed);
-        match output.to_json_string() {
-            Ok(rendered) => println!("{rendered}"),
-            Err(render) => eprintln!("Error: {render}"),
-        }
-        std::process::exit(output.exit_code().code());
-    }
-    eprintln!("Recovery failed: {error}");
-    std::process::exit(1);
-}
 
 /// Render a validation result under the machine-readable contract.
 ///
@@ -1220,7 +1206,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         data_root: _,
         worktree_paths,
         layout: executor_layout,
-        recovered_records: redo_records_applied,
+        recovered_records: _,
         // Spans the rest of dispatch, so every production mutation context
         // carries a permitted linked-checkout override (jit:f52567ed).
         write_override_annotation: _linked_checkout_write_override,
@@ -1233,13 +1219,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         is_validation_exempt: matches!(&command, Commands::Profile(ProfileCommands::Show { .. })),
         is_recover: matches!(&command, Commands::Recover),
         write_override: invocation_write_override,
-    })
-    .map_err(
-        |error| match error.downcast::<jit::commands::RecoveryFailedError>() {
-            Ok(failure) => exit_recovery_failed(&failure.0, json),
-            Err(error) => error,
-        },
-    )?;
+    })?;
     let storage = executor.storage().clone();
     let ctx = CommandContext {
         executor: &executor,
@@ -5671,56 +5651,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             }
         }
         Commands::Recover => {
-            use jit::output::{JsonOutput, OutputContext};
-            use serde_json::json;
-
-            match executor.claims().recover() {
-                Ok(report) => {
-                    if json {
-                        let msg = format!(
-                            "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
-                            report.stale_locks_cleaned,
-                            report.expired_leases_evicted,
-                            report.stale_leases_reclaimed
-                        );
-                        let output = JsonOutput::success(json!({
-                            "success": true,
-                            "redo_records_applied": redo_records_applied,
-                            "stale_locks_cleaned": report.stale_locks_cleaned,
-                            "expired_leases_evicted": report.expired_leases_evicted,
-                            "stale_leases_reclaimed": report.stale_leases_reclaimed,
-                            "temp_files_removed": report.temp_files_removed,
-                            "derived_state_repaired": report.derived_state_repaired,
-                            "claims_lease_recovery": report.claims_lease_recovery,
-                            "warnings": report.warnings,
-                        }))
-                        .with_message(msg);
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Recovery complete:");
-                        println!("  • Redo records applied: {redo_records_applied}");
-                        println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
-                        println!(
-                            "  • Expired leases evicted: {}",
-                            report.expired_leases_evicted
-                        );
-                        println!(
-                            "  • Stale leases reclaimed: {}",
-                            report.stale_leases_reclaimed
-                        );
-                        println!("  • Temp files removed: {}", report.temp_files_removed);
-                        println!(
-                            "  • Derived-state targets repaired: {}",
-                            report.derived_state_repaired
-                        );
-                        let output_ctx = OutputContext::new(quiet, json);
-                        for warning in &report.warnings {
-                            output_ctx.print_warning(warning)?;
-                        }
-                    }
-                }
-                Err(e) => exit_recovery_failed(&e, json),
-            }
+            return claim::recover::dispatch((), &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Serve(args) => {
             // Release this process's startup mutation session before the
@@ -5732,269 +5663,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             }
             return serve::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
-        Commands::Claim(claim_cmd) => match claim_cmd {
-            ClaimCommands::Acquire {
-                issue_id,
-                ttl,
-                agent_id,
-                reason,
-            } => {
-                use jit::output::{JsonOutput, OutputContext};
-
-                match resolve_issue(&storage, &issue_id).and_then(|full_id| {
-                    executor
-                        .claims()
-                        .acquire(&full_id, ttl, agent_id.as_deref(), reason.as_deref())
-                }) {
-                    Ok((lease_id, warnings)) => {
-                        if json {
-                            let response = serde_json::json!({
-                                "lease_id": lease_id,
-                                "issue_id": issue_id,
-                                "ttl_secs": ttl,
-                                "warnings": warnings,
-                                "message": format!("Acquired lease {} on issue {}", lease_id, issue_id),
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Acquired lease: {}", lease_id);
-                            println!("  Issue: {}", issue_id);
-                            println!("  TTL: {} seconds", ttl);
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimAcquireError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            ClaimCommands::Release { issue_id } => {
-                use jit::output::{JsonOutput, OutputContext};
-
-                match resolve_issue(&storage, &issue_id)
-                    .and_then(|full_id| executor.claims().release_by_issue(&full_id))
-                {
-                    Ok((released, warnings)) => {
-                        if json {
-                            let response = serde_json::json!({
-                                "lease_id": released.lease_id,
-                                "issue_id": released.issue_id,
-                                "previous_owner": released.previous_owner,
-                                "actor": released.actor,
-                                "warnings": warnings,
-                                "message": format!(
-                                    "Released lease {} on issue {} (was held by {}) by {}",
-                                    released.lease_id,
-                                    released.issue_id,
-                                    released.previous_owner,
-                                    released.actor
-                                ),
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Released lease: {}", released.lease_id);
-                            println!("  Issue: {}", released.issue_id);
-                            println!("  Previous owner: {}", released.previous_owner);
-                            println!("  Released by: {}", released.actor);
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimReleaseError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            ClaimCommands::Renew {
-                lease_id,
-                extension,
-            } => {
-                use jit::output::{JsonOutput, OutputContext};
-
-                match executor.claims().renew(&lease_id, extension) {
-                    Ok((renewed_lease, warnings)) => {
-                        if json {
-                            let response = serde_json::json!({
-                                "lease": renewed_lease,
-                                "warnings": warnings,
-                                "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Renewed lease: {}", lease_id);
-                            println!("  Issue: {}", renewed_lease.issue_id);
-                            println!("  Extended by: {} seconds", extension);
-                            if let Some(expires_at) = renewed_lease.expires_at {
-                                println!("  New expiry: {}", expires_at.to_rfc3339());
-                            }
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimRenewError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            ClaimCommands::Heartbeat { lease_id } => {
-                use jit::output::{JsonOutput, OutputContext};
-
-                match executor.claims().heartbeat(&lease_id) {
-                    Ok(warnings) => {
-                        if json {
-                            let response = serde_json::json!({
-                                "lease_id": lease_id,
-                                "warnings": warnings,
-                                "message": format!("Heartbeat sent for lease {}", lease_id),
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Heartbeat sent: {}", lease_id);
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimHeartbeatError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            ClaimCommands::Status { issue, agent } => {
-                use jit::output::{JsonOutput, LeaseListResponse};
-
-                match issue
-                    .map(|id| resolve_issue_filter(&storage, &id))
-                    .transpose()
-                    .and_then(|issue| executor.claims().status(issue.as_ref(), agent.as_deref()))
-                {
-                    Ok(leases) => {
-                        if json {
-                            let msg = format!("{} active lease(s)", leases.len());
-                            let response = LeaseListResponse::new(leases);
-                            let output = JsonOutput::success(response).with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else if leases.is_empty() {
-                            println!("No active leases found.");
-                        } else {
-                            println!("Active leases ({}):\n", leases.len());
-                            for lease in &leases {
-                                print_lease(lease);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimStatusError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            ClaimCommands::List => {
-                use jit::output::{JsonOutput, LeaseListResponse};
-
-                match executor.claims().list() {
-                    Ok(leases) => {
-                        if json {
-                            let msg = format!("{} lease(s) found", leases.len());
-                            let response = LeaseListResponse::new(leases);
-                            let output = JsonOutput::success(response).with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else if leases.is_empty() {
-                            println!("No active leases.");
-                        } else {
-                            println!("All active leases ({}):\n", leases.len());
-                            for lease in &leases {
-                                print_lease(lease);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimListError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            ClaimCommands::ForceEvict { lease_id, reason } => {
-                use jit::output::{JsonOutput, OutputContext};
-
-                match executor.claims().force_evict(&lease_id, &reason) {
-                    Ok(warnings) => {
-                        if json {
-                            let response = serde_json::json!({
-                                "lease_id": lease_id,
-                                "reason": reason,
-                                "warnings": warnings,
-                                "message": format!("Force-evicted lease {}", lease_id),
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Force-evicted lease: {}", lease_id);
-                            println!("  Reason: {}", reason);
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error = claim_json_error(&e, ErrorCode::ClaimForceEvictError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-        },
+        Commands::Claim(command) => {
+            return claim::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Worktree(worktree_cmd) => match worktree_cmd {
             jit::cli::WorktreeCommands::Info => {
                 use jit::commands::worktree::execute_worktree_info;
@@ -6232,50 +5903,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     }
 
     Ok(ExitCode::Success)
-}
-
-/// Render one lease for plain-text `claim status` and `claim list`.
-fn print_lease(listed: &jit::commands::claim::ListedLease) {
-    let lease = &listed.lease;
-    let now = chrono::Utc::now();
-    println!("Lease: {}", lease.lease_id);
-    println!("  Issue:    {}", lease.issue_id);
-    println!("  Agent:    {}", lease.agent_id);
-    println!("  Worktree: {}", lease.worktree_id);
-    if let Some(branch) = &lease.branch {
-        println!("  Branch:   {}", branch);
-    }
-    println!("  Acquired: {}", lease.acquired_at);
-
-    if lease.ttl_secs > 0 {
-        if let Some(expires_at) = lease.expires_at {
-            let remaining = expires_at.signed_duration_since(now);
-            println!(
-                "  Expires:  {} ({} seconds remaining)",
-                expires_at,
-                remaining.num_seconds().max(0)
-            );
-        }
-    } else {
-        let since_beat = now.signed_duration_since(lease.last_beat);
-        println!("  TTL:      indefinite");
-        println!(
-            "  Last beat: {} ({} seconds ago)",
-            lease.last_beat,
-            since_beat.num_seconds()
-        );
-        if listed.stale {
-            println!(
-                "  STALE: Lease marked stale (no heartbeat for {} minutes)",
-                since_beat.num_minutes()
-            );
-            println!(
-                "     Use 'jit claim heartbeat {}' to refresh",
-                lease.lease_id
-            );
-        }
-    }
-    println!();
 }
 
 #[cfg(test)]
