@@ -971,7 +971,8 @@
     "635f23c7": 1,
     "578ed10d": 1,
     "5f12265a": 1,
-    "f35c86de": 1
+    "f35c86de": 1,
+    "487f45a9": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1665,7 +1666,16 @@
     "487f45a9": {
       "status": "in_progress",
       "note": "b0c51b0e7 core landed; main Rust gate passed; independent review running; obsolete MCP scope/gate removed by authorized retirement",
-      "production_delta": -17
+      "production_delta": -1,
+      "review": {
+        "verdict": "FAIL",
+        "gates": "cargo-ci passed5040+25; code-reviewR1F1 Git requirement prose omits hooks",
+        "prior_findings": "R1F1 repair committedb72bd9aaa; D24 committed2ec33f8c5 explicitly supersedes D4 exclusivity",
+        "criteria": "core criteria met; docs rework awaiting main landing+review",
+        "deferred_items": "no linked design docs",
+        "stale_narrative": "rework covers guarantees,profiles,manualAGENTS; historicalD4 preserved underD24",
+        "required_changes": "land documented rework and rerun authoritative gates"
+      }
     },
     "5962427b": {
       "status": "done"
@@ -1923,7 +1933,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "split-debug done; suite consolidation active",
+    "status": "Awaiting steward priority retirement landing; all prepared branches retained; no bypassed gates",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1948,6 +1958,26 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Inherited+171; fb38+37;487-17; build tasks0; running epic net+191 before remaining repairs/deletions"
+    "production_net": "Corrected default-mode ledger: inherited+171,fb38+37,487\u22121,build0 = current+207. Prepared f35\u22123 and0eca\u221241 would yield+163; this session core net\u22128, plus8server lines removed.",
+    "prepared_branches": {
+      "f35c86de": {
+        "commit": "c5b146e02",
+        "tests": 5041,
+        "doctests": 25,
+        "production_delta": -3
+      },
+      "0eca332a": {
+        "commit": "6b563b365",
+        "tests": 5038,
+        "doctests": 25,
+        "production_delta": -41,
+        "server_lines_removed": 8
+      },
+      "487f45a9_rework": {
+        "commit": "b72bd9aaa",
+        "scope": "current Git requirement docs consistent withD24; targeted links pass"
+      }
+    },
+    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags."
   }
 }

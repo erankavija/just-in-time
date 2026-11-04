@@ -366,57 +366,6 @@ jobs:
           git commit -m "Update coverage badges [skip ci]"
           git push --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" badges
 
-  test-mcp-server:
-    name: Test MCP Server
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      
-      - name: Free Disk Space
-        run: |
-          # Free up disk space on GitHub Actions runners
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          df -h
-      
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
-        with:
-          toolchain: stable
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '20'
-          # Note: cache disabled for act compatibility
-          # Real GitHub Actions will still benefit from npm's own cache
-      
-      - name: Install dependencies
-        working-directory: mcp-server
-        run: npm ci
-      
-      - name: Install ripgrep (for search tests)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ripgrep
-      
-      - name: Configure git default branch
-        run: git config --global init.defaultBranch main
-      
-      - name: Build Rust CLI (needed for MCP tests)
-        run: cargo build --release --bin jit
-      
-      - name: Run MCP tests
-        working-directory: mcp-server
-        run: |
-          export PATH="${GITHUB_WORKSPACE}/target/release:$PATH"
-          npm test
-
   test-web-ui:
     name: Test Web UI
     runs-on: ubuntu-latest

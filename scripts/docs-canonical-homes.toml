@@ -26,7 +26,7 @@
 # Markdown scanned for duplicate statements, beside the homes themselves: the
 # adopter documentation root plus the entry-point and component pages a reader
 # arrives through, which is where a copied adopter workflow otherwise hides.
-scan_roots = ["docs", "README.md", "mcp-server/README.md", "contrib/README.md", "AGENTS.md"]
+scan_roots = ["docs", "README.md", "contrib/README.md", "AGENTS.md"]
 
 # Pages that must link every home, so a canonical page cannot fall out of the
 # documentation's own navigation.
@@ -118,20 +118,6 @@ home = "docs/how-to/deployment.md#building-the-web-ui"
     [[fact.binding.exempt]]
     path = "AGENTS.md"
     reason = "one step of the contributor validation sequence for the web workspace, not the adopter instruction for producing the bundle jit-server embeds"
-
-[[fact]]
-id = "mcp-server-package"
-home = "docs/how-to/mcp-integration.md#install-the-released-tarball"
-
-  [[fact.binding]]
-  # The packaging step whose output name the guide derives the asset name from.
-  doc = "npm pack"
-  sources = [".github/workflows/release-artifacts.yml"]
-
-  [[fact.binding]]
-  # The executable the package installs, as the client configuration names it.
-  doc = "\"jit-mcp-server\""
-  sources = ["mcp-server/package.json"]
 
 [[fact]]
 id = "release-publication"

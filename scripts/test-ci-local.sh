@@ -41,12 +41,11 @@ echo ""
 echo "Choose a test to run:"
 echo "  1) Dry run - Show what would execute (fast)"
 echo "  2) Test Rust components only"
-echo "  3) Test MCP Server only"
-echo "  4) Test Web UI only"
-echo "  5) Run all CI jobs (slow, ~10-15 min)"
-echo "  6) Exit"
+echo "  3) Test Web UI only"
+echo "  4) Run all CI jobs (slow, ~10-15 min)"
+echo "  5) Exit"
 echo ""
-read -p "Enter choice [1-6]: " choice
+read -p "Enter choice [1-5]: " choice
 
 case $choice in
     1)
@@ -59,20 +58,16 @@ case $choice in
         act -j test-rust
         ;;
     3)
-        echo "Testing MCP Server..."
-        act -j test-mcp-server
-        ;;
-    4)
         echo "Testing Web UI..."
         act -j test-web-ui
         ;;
-    5)
+    4)
         echo "Running all CI jobs..."
         echo "This will take 10-15 minutes. Press Ctrl+C to cancel."
         sleep 3
         act -W .github/workflows/ci.yml
         ;;
-    6)
+    5)
         echo "Exiting..."
         exit 0
         ;;

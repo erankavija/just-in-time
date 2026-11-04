@@ -71,8 +71,7 @@ registry constructs are `npm`, `yarn`, `pnpm` and `cargo publish`, `docker`,
 `podman` and `buildah push`, `skopeo copy`, a `docker buildx build --push`, and
 the `docker/build-push-action`, `redhat-actions/push-to-registry` and
 `JS-DevTools/npm-publish` actions. Packaging is not publication: `npm pack`
-writes a tarball into the workspace and reaches no registry, which is how the
-MCP server ships as a release asset.
+writes a tarball into the workspace and reaches no registry.
 
 ### Per-workflow declarations
 

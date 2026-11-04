@@ -38,7 +38,6 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work
 - [Deployment](how-to/deployment.md) - Serving the API and web UI natively or from the container image
-- [MCP Integration](how-to/mcp-integration.md) - Installing the published MCP server and starting it from a client
 - [Troubleshooting](how-to/troubleshooting.md) - Common issues and solutions
 
 ### 📖 [Reference](reference/) - Information-Oriented

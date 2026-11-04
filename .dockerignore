@@ -47,7 +47,6 @@ dev/
 
 # Unused product surfaces and image fixtures
 docker-compose.yml
-mcp-server/
 test-vectors/
 
 # Lock files (we copy these explicitly)

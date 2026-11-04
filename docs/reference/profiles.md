@@ -359,8 +359,7 @@ commit point [Publication and recovery](#publication-and-recovery) describes;
 no member of that selection is published separately. For an existing repository,
 `jit profile apply` uses the same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
-`jit --schema`; the same command family is exposed through the generated MCP
-tools.
+`jit --schema`.
 
 ## The `jit-dogfood` package
 

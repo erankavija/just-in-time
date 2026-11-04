@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "1d2235b1-7a07-4428-842b-db338fd133c0"
+  ],
+  "description": "One event-triggered hierarchy reload and its browser test form one behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: A configuration change reloads hierarchy from the fresh configuration path; browser tests cover changed hierarchy after an event.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "gates_required": [
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-web",
+    "satisfies:0f8efc37/REQ-04",
+    "satisfies:3a61ff16/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Reload browser hierarchy on configuration events",
+  "updated_at": "2026-11-04T22:24:54.946576604Z"
+}

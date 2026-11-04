@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "32607213-7402-4c17-9889-7a6286e1959e"
+  ],
+  "description": "The binary imports its existing library modules and drops unused manifest dependencies.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary imports library modules without redeclaring them; unused server dependencies are removed and existing server tests compile and run once.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T22:24:54.946576604Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "abf68973-3771-47cb-89d0-708290cb00ac",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-server",
+    "satisfies:0f8efc37/REQ-11",
+    "satisfies:c8e79465/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Compile server modules through the library",
+  "updated_at": "2026-11-04T22:25:08.352808650Z"
+}

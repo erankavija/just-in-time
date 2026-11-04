@@ -22,7 +22,7 @@ fn query<S: IssueStore>(
     limit: usize,
 ) -> HandlerResult<EventListResponse> {
     let issue = issue_id
-        .map(|id| resolve_issue_filter(ctx.executor.storage(), &id))
+        .map(|id| resolve_issue_filter(ctx.executor, &id))
         .transpose()?;
     let events = ctx
         .executor

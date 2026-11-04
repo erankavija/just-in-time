@@ -19,7 +19,7 @@ fn acquire<S: HandlerStore>(
     agent_id: Option<String>,
     reason: Option<String>,
 ) -> HandlerResult<ClaimAcquireResponse> {
-    let full_id = resolve_issue(ctx.executor.storage(), &issue_id)?;
+    let full_id = resolve_issue(ctx.executor, &issue_id)?;
     let (lease_id, warnings) =
         ctx.executor
             .claims()
@@ -37,7 +37,7 @@ fn release<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
 ) -> HandlerResult<ClaimReleaseResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
+    let id = resolve_issue(ctx.executor, &issue_id)?;
     let (released, warnings) = ctx.executor.claims().release_by_issue(&id)?;
     let message = format!(
         "Released lease {} on issue {} (was held by {}) by {}",
@@ -51,7 +51,7 @@ fn renew<S: HandlerStore>(
     issue_id: String,
     extension: u64,
 ) -> HandlerResult<ClaimRenewResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
+    let id = resolve_issue(ctx.executor, &issue_id)?;
     let (lease, warnings) = ctx.executor.claims().renew(&id, extension)?;
     let message = format!("Renewed lease {} by {extension} seconds", lease.lease_id);
     let response = ClaimRenewResponse { lease, extension };
@@ -62,7 +62,7 @@ fn heartbeat<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
 ) -> HandlerResult<ClaimHeartbeatResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
+    let id = resolve_issue(ctx.executor, &issue_id)?;
     let (lease, warnings) = ctx.executor.claims().heartbeat(&id)?;
     let message = format!("Heartbeat sent for lease {}", lease.lease_id);
     let response = ClaimHeartbeatResponse {
@@ -78,7 +78,7 @@ fn status<S: HandlerStore>(
     agent: Option<String>,
 ) -> HandlerResult<LeaseListResponse> {
     let issue = issue
-        .map(|id| resolve_issue_filter(ctx.executor.storage(), &id))
+        .map(|id| resolve_issue_filter(ctx.executor, &id))
         .transpose()?;
     let leases = ctx
         .executor
