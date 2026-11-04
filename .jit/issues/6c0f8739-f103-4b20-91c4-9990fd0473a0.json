@@ -7,6 +7,7 @@
   ],
   "description": "Find a reusable verdict by reading the one verdict record for its gate and digest, so reuse never scans recorded runs, and delete the run-list selections that nothing calls afterwards.\n\n## Background\n\n`IssueStore::find_reusable_gate_run(gate_key, digest)` (`crates/jit/src/storage/mod.rs`) scans every recorded run and selects one with `domain::latest_gate_run` (`storage/json.rs`, `storage/memory.rs`). `check_gate_with` (`commands/gate_check.rs`) calls it on `self.storage`, between its inputs session and its record session, because `declared_inputs_digest` runs after the inputs session. Both integration-test `IssueStore` wrappers forward the method, and `storage/issue_store_conformance.rs` has a case for it.\n\nEach reusable run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming its issue and run. `GateState::projected_run` (`domain/types.rs`) is a second selection over a run list; its last callers leave with the latest-run accessor and the named-run captures, and because it is `pub` no dead-code warning fires.\n\n## Success Criteria\n\n- [hard] REQ-01: After computing the digest, `check_gate_with` reads the verdict record for `(gate, digest)` and the run it names through a capture of exactly those paths. It reads no other run and no other verdict record, and a run that no verdict record names is never a reuse source.\n- [hard] REQ-02: `IssueStore::find_reusable_gate_run`, its implementations, both test wrappers' forwards and its conformance case no longer exist.\n- [hard] REQ-03: A test proves that reuse succeeds while every other run record and every other verdict record is unparseable.\n- [hard] REQ-04: `domain::latest_gate_run`, `GateState::projected_run` and their tests no longer exist, and no selection of a latest run over a list of runs remains in `domain/types.rs`.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T01:18:45.945928996Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +28,7 @@
     "satisfies:f8a6b298/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Gate reuse reads one verdict record",
-  "updated_at": "2026-11-02T23:39:52.211045005Z"
+  "updated_at": "2026-11-04T01:18:45.945928996Z"
 }

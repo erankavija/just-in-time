@@ -23440,3 +23440,10 @@
 {"from":"ready","id":"b0b3cc66-0362-4463-bc56-5e35d90ea5a6","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T01:11:24.955063391Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"da095ea0-9380-4a84-94e6-369cb46f4594","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T01:11:24.955063391Z","type":"issue_claimed"}
 {"gate_key":"code-review","id":"4728ec58-1373-4ccc-9c4b-53e70b4c8b0f","issue_id":"2f563673-82ee-4579-913a-e9d55c9881f1","timestamp":"2026-11-04T01:11:25.868993593Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"c6d58726-2cb8-4bc6-b71d-fd6606f9b04d","issue_id":"b33ed7eb-f699-49a1-a998-5ef6b839d394","timestamp":"2026-11-04T01:14:49.476623644Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"25dd5c13-deab-4657-aae7-12abebe22c8d","issue_id":"b33ed7eb-f699-49a1-a998-5ef6b839d394","timestamp":"2026-11-04T01:18:45.327870498Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"914f840c-0699-4b14-9145-500ef8ac932c","issue_id":"b33ed7eb-f699-49a1-a998-5ef6b839d394","timestamp":"2026-11-04T01:18:45.773133359Z","to":"done","type":"issue_state_changed"}
+{"id":"debec525-3a60-4222-9b03-a23a8d34a062","issue_id":"b33ed7eb-f699-49a1-a998-5ef6b839d394","timestamp":"2026-11-04T01:18:45.773133359Z","type":"issue_completed"}
+{"from":"backlog","id":"0bc8e6a2-3ee2-4b30-b56c-08e73d51f634","issue_id":"09ca911e-0518-4545-b516-b13cdbfd6834","timestamp":"2026-11-04T01:18:45.868809302Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"3e69fbfa-7da1-482b-91fd-f88889996755","issue_id":"6c0f8739-f103-4b20-91c4-9990fd0473a0","timestamp":"2026-11-04T01:18:45.945928996Z","to":"ready","type":"issue_state_changed"}
+{"fields":["description"],"id":"9a244d29-6b33-4966-9f0e-c3baf7cb4625","issue_id":"97f5f2b7-5c95-441f-ae03-d8feeedc8420","timestamp":"2026-11-04T01:18:46.419050816Z","type":"issue_updated","updated_by":"issue-update"}
