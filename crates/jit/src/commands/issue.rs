@@ -3461,28 +3461,49 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
     }
 
-    #[test]
-    fn test_reject_issue_promotes_dependent_whose_last_blocker_it_removes() {
-        for reason in [None, Some("obsolete")] {
-            let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
-            let blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
-            let blocker_id = blocker.id.clone();
-            crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
+    /// Reject a blocker with `reason`, optionally blocking a `Backlog`
+    /// dependent; returns the session opens the rejection took and the
+    /// dependent's state.
+    fn reject_blocker(reason: Option<&str>, with_dependent: bool) -> (usize, Option<State>) {
+        let counter = crate::commands::test_helpers::SessionOpenCounter::new();
+        let executor = crate::commands::test_helpers::memory_executor(
+            InMemoryStorage::new().with_mutation_interruption_view(counter.clone()),
+        );
+        let blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+        let blocker_id = blocker.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
+        let dependent_id = with_dependent.then(|| {
             let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
             dependent.state = State::Backlog;
             dependent.dependencies.push(blocker_id.clone());
-            let dependent_id = dependent.id.clone();
+            let id = dependent.id.clone();
             crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
+            id
+        });
+        let opened = counter.count();
 
-            executor
-                .issues()
-                .reject_issue(&IssueIdPrefix::from(&blocker_id), reason)
-                .unwrap();
+        executor
+            .issues()
+            .reject_issue(&IssueIdPrefix::from(&blocker_id), reason)
+            .unwrap();
 
+        (
+            counter.count() - opened,
+            dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
+        )
+    }
+
+    #[test]
+    fn test_reject_issue_promotes_dependent_whose_last_blocker_it_removes_in_the_same_publication()
+    {
+        for reason in [None, Some("obsolete")] {
+            let (baseline, _) = reject_blocker(reason, false);
+            let (sessions, dependent) = reject_blocker(reason, true);
+
+            assert_eq!(dependent, Some(State::Ready), "reason: {reason:?}");
             assert_eq!(
-                executor.storage.load_issue(&dependent_id).unwrap().state,
-                State::Ready,
-                "reason: {reason:?}"
+                sessions, baseline,
+                "the dependent's promotion must add no session to the rejection (reason: {reason:?})"
             );
         }
     }
