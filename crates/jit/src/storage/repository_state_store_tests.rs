@@ -2566,6 +2566,51 @@ fn test_recovery_dispatch_report_counts_applied_records_on_both_backends() {
 /// REQ-05. The first open creates the session's own advisory lock files, so
 /// the snapshot the refusal is measured against excludes nothing.
 #[test]
+fn test_open_mutation_session_failed_recovery_leaves_storage_unbound() {
+    let worktree = TempDir::new().unwrap();
+    let other = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let scratch = data.join(RECORD_SCRATCH_DIR);
+    std::fs::create_dir_all(&scratch).unwrap();
+    std::fs::write(scratch.join(RECORD_FILE_NAME), b"invalid record").unwrap();
+    let storage = JsonFileStorage::new(&data);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    assert!(storage.open_mutation_session(layout).is_err());
+    assert!(storage.repository_layout().is_err());
+    let alternate = discover_repository_layout(other.path(), &data).unwrap();
+    storage.configure_repository_layout(&alternate).unwrap();
+}
+
+#[test]
+fn test_open_mutation_session_refuses_foreign_binding_during_recovery() {
+    let worktree = TempDir::new().unwrap();
+    let other = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let foreign = discover_repository_layout(other.path(), &data).unwrap();
+    let slot = Arc::new(Mutex::new(None::<JsonFileStorage>));
+    let source = Arc::clone(&slot);
+    let same = layout.clone();
+    let storage = JsonFileStorage::with_mutation_interruptions(
+        &data,
+        HookAtMoment::new(MutationPoint::SessionOpen, move || {
+            let storage = source.lock().unwrap().clone().unwrap();
+            let competing = storage.clone();
+            assert!(
+                std::thread::spawn(move || competing.configure_repository_layout(&foreign))
+                    .join()
+                    .unwrap()
+                    .is_err()
+            );
+            storage.configure_repository_layout(&same).unwrap();
+        }),
+    );
+    *slot.lock().unwrap() = Some(storage.clone());
+    storage.open_mutation_session(layout).unwrap();
+    slot.lock().unwrap().take();
+}
+
+#[test]
 fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
     let backend = FileSessionBackend::seeded();
     drop(backend.open().unwrap());

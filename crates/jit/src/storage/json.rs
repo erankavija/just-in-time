@@ -934,6 +934,7 @@ impl IssueStore for JsonFileStorage {
             .repository_layout
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.active_mutation_layout().check_binding(layout)?;
         match configured.as_ref() {
             None => *configured = Some(layout.clone()),
             Some(current)
