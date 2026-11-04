@@ -1009,6 +1009,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         Ok(crate::commands::AssetListResult::with_extras(
             assets,
             crate::commands::AssetListScope {
+                worktree_root: self.exec.require_layout()?.worktree_root().to_path_buf(),
                 issue_id: full_id,
                 document_path: path.to_string(),
                 summary: crate::commands::AssetSummary {
