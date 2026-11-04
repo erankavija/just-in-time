@@ -3,13 +3,11 @@
 use super::{CommandContext, HandlerResult, Outcome};
 use crate::{cli::HooksCommands, output::hooks::HooksInstallResponse, storage::IssueStore};
 
-const NOT_GIT_REPOSITORY: &str = "Not in a git repository (no .git directory found)";
-
 fn install<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<HooksInstallResponse> {
     let paths = ctx.executor.require_worktree_paths()?;
     anyhow::ensure!(
         paths.is_git_repository(),
-        crate::errors::InvalidArgumentError::new(NOT_GIT_REPOSITORY)
+        crate::errors::RequiresGitError::new(crate::errors::GitRequirementGap::NoRepository)
     );
 
     let result = crate::commands::hooks::install_hooks(&paths.common_dir)?;
@@ -26,7 +24,7 @@ fn install<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<HooksIns
 }
 
 command_group! { command: HooksCommands, storage: [IssueStore], leaves: {
-    "hooks_install" => HooksCommands::Install => install() -> HooksInstallResponse,
+    "hooks_install" => HooksCommands::Install => install() raises [RequiresGit] -> HooksInstallResponse,
 } }
 
 #[cfg(test)]
@@ -145,8 +143,8 @@ mod tests {
             .unwrap_err();
             let classified = classify(&error);
 
-            assert_eq!(classified.error.code, ErrorCode::InvalidArgument);
-            assert_eq!(classified.exit_code(), ExitCode::InvalidArgument);
+            assert_eq!(classified.error.code, ErrorCode::RequiresGit);
+            assert_eq!(classified.exit_code(), ExitCode::ExternalError);
         });
     }
 

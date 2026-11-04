@@ -413,13 +413,11 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     {
         return ErrorCode::InvalidArgument;
     }
-    // Claim/lease commands require git; running them outside a git repository is
-    // an external-dependency failure (exit 10).
     if error
-        .downcast_ref::<crate::errors::ClaimRequiresGitError>()
+        .downcast_ref::<crate::errors::RequiresGitError>()
         .is_some()
     {
-        return ErrorCode::ClaimRequiresGit;
+        return ErrorCode::RequiresGit;
     }
 
     // A repository whose on-disk format this binary does not accept is an
@@ -899,7 +897,7 @@ mod exit_code_projection_tests {
                 2,
             ),
             (
-                crate::errors::ClaimRequiresGitError::new(
+                crate::errors::RequiresGitError::new(
                     crate::errors::GitRequirementGap::NoRepository,
                 )
                 .into(),

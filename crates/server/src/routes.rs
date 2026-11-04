@@ -51,7 +51,7 @@ fn status_of(code: ErrorCode) -> StatusCode {
         ErrorCode::LockTimeout => StatusCode::SERVICE_UNAVAILABLE,
         ErrorCode::IoError
         | ErrorCode::ParseError
-        | ErrorCode::ClaimRequiresGit
+        | ErrorCode::RequiresGit
         | ErrorCode::RepositoryFormatUnsupported
         | ErrorCode::DependencyError
         | ErrorCode::GateError

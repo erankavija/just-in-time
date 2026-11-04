@@ -86,7 +86,7 @@ one that adds it (D-18).
 
 - **Chosen:** Core commands run without git; only the claim and lease commands
   (`jit claim acquire/release/renew/heartbeat/status/list`) require a git
-  repository and fail with a typed `ClaimRequiresGitError` (exit 10) outside one.
+  repository and fail with a typed `RequiresGitError` (exit 10) outside one.
 - **Rejected:** Requiring git for every command — a uniform but heavier
   dependency.
 - **Reasoning:** The tracker must run in non-git contexts, but multi-agent

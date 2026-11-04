@@ -29,15 +29,15 @@ Code read at HEAD `4d7b416e5`. Line numbers in the epic background predate sever
 | REQ-08 | Lease validation lists worktrees at most once | open | C8. |
 | REQ-09 | Gate commit and branch evidence go through the module | open | C7. |
 | REQ-11 | Module exposes only production-called operations | partly done | 842b0ac6 `trim-git-revision-access` (**52732879, done**) removed `changed_paths_between`, `changed_worktree_paths`, `inspect_pinned_target`, `parse_changed_paths`, `parse_pinned_tree_entry` and `ChangedPathsFailed`, and made `GitRevisionError: Clone` (`git_revision.rs:24-32`, `Arc<io::Error>`). Remaining non-production surface: `WorktreePaths::detect()` (prod caller: server only), `WorktreePaths::is_main_worktree` (test-only; only call `commands/worktree.rs:1004`, inside `#[cfg(test)]` at `:479`), the public `git_repository` field duplicated by `is_git_repository()`, and `GitRevisionResolver::with_git_program` (production caller is crate-internal only). |
-| REQ-12 | Core commands work outside git and without a git executable; claims and leases give the typed error | partially valid | Core commands: confirmed working with an empty `PATH` (`issue create`, `query available` succeed). **Claims without a git executable are wrong**: `claim list --json` with no git on `PATH` → `REPOSITORY_NOT_FOUND`, exit 3. The spawn error is `.context(...)` at `claim.rs:50` and is never mapped to `ClaimRequiresGitError`. Outside a repo with git present → `CLAIM_REQUIRES_GIT`, exit 10 (correct). |
+| REQ-12 | Core commands work outside git and without a git executable; claims and leases give the typed error | partially valid | Core commands: confirmed working with an empty `PATH` (`issue create`, `query available` succeed). **Claims without a git executable are wrong**: `claim list --json` with no git on `PATH` → `REPOSITORY_NOT_FOUND`, exit 3. The spawn error is `.context(...)` at `claim.rs:50` and is never mapped to the then claim-specific Git requirement error. Outside a repo with git present → the then claim-specific Git requirement code, exit 10 (correct). |
 
 Totals for this scope: already-done 0 (REQ-11 is partly done), valid-and-open 12 (C1-C6, C8, C9, REQ-02, -03, -04, -05, -08, -09, -12 partially), invalid-as-stated 2 (C7, C10).
 
 ### 2. Prior-art sweep
 
 - **Charter D-21** (`dev/vision/9db27a3a-charter.md:398-410`): every git access goes through one storage-owned module that runs the CLI. Layout facts are "detected once per invocation and passed down". The rejected options are "libgit2 everywhere" and "a module hiding both backends". Reasoning: "One spawn per needed fact".
-- **Charter D-4** (`:83-95`): only `jit claim acquire/release/renew/heartbeat/status/list` require git, failing with `ClaimRequiresGitError`, exit 10.
-- `docs/concepts/guarantees.md:221,233-250` documents the NoCommits case ("`git init` alone is not enough") and lists `force-evict` as git-requiring. `docs/reference/claim.md:98-104` ("resolvable HEAD"). `docs/reference/error-codes.md:26` (`CLAIM_REQUIRES_GIT` → 10). `docs/reference/worktree-validate.md:338` (`--branch-drift` "requires git"). `docs/how-to/troubleshooting.md:345,396-437` (`origin/main` message, `git rev-parse --git-common-dir`).
+- **Charter D-4** (`:83-95`): only `jit claim acquire/release/renew/heartbeat/status/list` require git, failing with the then claim-specific Git requirement error, exit 10.
+- `docs/concepts/guarantees.md:221,233-250` documents the NoCommits case ("`git init` alone is not enough") and lists `force-evict` as git-requiring. `docs/reference/claim.md:98-104` ("resolvable HEAD"). `docs/reference/error-codes.md:26` (the then claim-specific Git requirement code → 10). `docs/reference/worktree-validate.md:338` (`--branch-drift` "requires git"). `docs/how-to/troubleshooting.md:345,396-437` (`origin/main` message, `git rev-parse --git-common-dir`).
 - No doc, config reference or `dev/` study describes a git-executable setting. `dev/architecture/*.md` say nothing about git access.
 - Audit: `findings-tables.md` rows 9, 21 and 24 recommend "one `rev-parse` call returning three lines", "one `rev-parse`" for evidence, and "list worktrees once". `jit-audit-report.md:77` originally proposed a *git2-backed* module; D-21 superseded that.
 - Related in-flight epics: f368ce3d (domain-agnostic engine) REQ-10/11/12 owns *whether* the main-history guard and `--branch-drift` run and *which* base branch they use (the f4d9502a notes defer this). 0f8efc37 REQ-01 has the server obtain layout from the core constructor. a807e699 (df129d9e) moves the CLI prelude, including `detect_for_data_root` and `configure_worktree_paths`, into a library function.
@@ -115,7 +115,7 @@ There is no mechanism today (C10). Delivering it means one `Git { program }` val
 
 | Site | Command | Detached HEAD | Unborn branch | Failure |
 |---|---|---|---|---|
-| claim.rs:45 | `rev-parse --abbrev-ref HEAD` | `"HEAD"` | spawns again to classify → `ClaimRequiresGitError(NoCommits)` | spawn error → untyped (exit 3) |
+| claim.rs:45 | `rev-parse --abbrev-ref HEAD` | `"HEAD"` | spawns again to classify → the then claim-specific Git requirement error (`NoCommits`) | spawn error → untyped (exit 3) |
 | worktree.rs:46 | same, `current_dir` | `"HEAD"` | generic bail | generic |
 | claim_coordinator.rs:979 | same | `"HEAD"` | `git_command_failed` → callers `.ok()` → `None` (`:483,616,778`) | — |
 | mod.rs:3308 | `branch --show-current` | `""` | unborn name (e.g. `trunk`) | `"main"` fallback |
@@ -138,7 +138,7 @@ Every module operation runs `git -C <worktree_root>`. This also removes the proc
 
 #### 4.6 No-git operation
 
-Startup already degrades: `worktree_paths.rs:64-70` turns a spawn error into "not a repo". Claims need the typed error on **both** "not a repo" and "git unavailable". Today the second gives exit 3 (§1, REQ-12). Mapping a missing layout handle to `ClaimRequiresGitError(NoRepository)` at one place fixes both.
+Startup already degrades: `worktree_paths.rs:64-70` turns a spawn error into "not a repo". Claims need the typed error on **both** "not a repo" and "git unavailable". Today the second gives exit 3 (§1, REQ-12). Mapping a missing layout handle to the then claim-specific Git requirement error (`NoRepository`) at one place fixes both.
 
 #### 4.7 Cost
 
@@ -189,7 +189,7 @@ Delete or make private: `WorktreePaths::detect`, `detect_from`, `is_main_worktre
 
 - `@/inv/architecture-dependency-direction`: holds with option 5.1 A. `validation/repository.rs:542` calls up into `commands::validate_claims_index_at` today; f8a6b298 98184c64 deletes that call.
 - `@/inv/convention-convergence`: two porcelain parsers (`worktree.rs:64`, `validate.rs:2697-2703`), two divergence computations (`worktree.rs:388`, `validate.rs:2421`), six branch lookups and two layout detectors (`worktree_paths.rs`, `hooks.rs:82`) converge onto module operations.
-- `@/charter/D-4`: claims without a git executable currently break the typed contract (§1, REQ-12). Fix it at the one `paths.git()` → `ClaimRequiresGitError` mapping.
+- `@/charter/D-4`: claims without a git executable currently break the typed contract (§1, REQ-12). Fix it at the one `paths.git()` → the then claim-specific Git requirement error mapping.
 - `@/inv/semantic-types`: branch names stay `String` in `Lease.branch`, `WorktreeIdentity.branch` and `GateRunResult.branch`. 2195c98f adds no `BranchName` or commit-OID type. `ArtifactVersion` (`domain/artifact_plan.rs:103`) is the existing canonical commit type.
 - `@/inv/orthogonal-tests`: the module behaviour matrix (outside repo, git missing, unborn, detached, linked) belongs in one module suite, mostly migrated from `worktree_paths.rs:250-336`, `gate_execution.rs:720` and `git_revision_tests.rs`. Consumers prove only that they route through the module, e.g. a counting stand-in shows `validate --leases` lists once, and a cwd-elsewhere plus `JIT_DATA_DIR` run proves the selected worktree is used.
 - `@/inv/pid-safety` and `atomic-writes`: unaffected.
@@ -201,7 +201,7 @@ Each step leaves the workspace building, with clippy clean and tests green.
 1. **git-module-probe**: create `storage/git.rs` with `Git`, `GitCheckout`, `probe` (one process) and `head`. `WorktreePaths` carries `Option<GitCheckout>`. Rewire `main.rs:1987` and server `main.rs:67` (probe the data dir; this deletes `detect()`). Delete the lazy fallbacks (`json.rs:557-575`, `mod.rs:2200-2216`) and fix `claim.rs:724`. Move the module behaviour suite here.
    - Files: `storage/{git.rs,worktree_paths.rs,json.rs,mod.rs}`, `main.rs`, `commands/mod.rs`, `commands/claim.rs`, `crates/server/src/main.rs`, test_utils and struct-literal sites (§3.2).
    - Needs 2195c98f done (epic edge). No specific key.
-2. **one-branch-lookup**: route `claim.rs:45`, `worktree.rs:46`, `mod.rs:3308`, `gate_execution.rs:551-581` and the coordinator through `head()`. Delete `is_inside_git_work_tree`. Map a missing checkout or git to `ClaimRequiresGitError` (REQ-12 fix plus the no-git-executable CLI test).
+2. **one-branch-lookup**: route `claim.rs:45`, `worktree.rs:46`, `mod.rs:3308`, `gate_execution.rs:551-581` and the coordinator through `head()`. Delete `is_inside_git_work_tree`. Map a missing checkout or git to the then claim-specific Git requirement error (REQ-12 fix plus the no-git-executable CLI test).
    - Coordinator part: touches the code rewritten by f8a6b298 **dd53527f** (lease-ops-through-lock) and **2f563673** (lease-per-issue-records). Recommended edge: this step → after 2f563673 (ours waits). Alternatively split the coordinator edit into its own late step.
    - Snapshot `snapshot.rs:25` waits for the REQ-10 snapshot step (other part).
    - Same-file 2195c98f keys that land first: **a50e9be9** agent-identity-assignee, **6e8b9f31** system-actor-constants, **8cfbf19d** lease-worktree-ids.

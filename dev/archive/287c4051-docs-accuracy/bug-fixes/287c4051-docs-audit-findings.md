@@ -24,7 +24,7 @@ epic; the findings here are the ones the epic's child issues carry.
 ### docs/concepts/guarantees.md (task 313a7f3a)
 
 - "What works without git" lists agent claiming/coordination; `jit claim` leases require
-  git and fail with `ClaimRequiresGitError` (exit 10, `commands/claim.rs:32-51`). The
+  git and fail with the then claim-specific Git requirement error (exit 10, `commands/claim.rs:32-51`). The
   doc's own multi-agent example runs `jit claim acquire`. Assignment (`jit issue claim`)
   is the part that works without git.
 
