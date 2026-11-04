@@ -11,10 +11,10 @@
 //! The profile's asset/region/registry claims arrive as a
 //! [`ProfileApplicationInput`]; this module alone derives and compares their final
 //! bytes.
-//! Finalization derives the coupled default-rule/schema closure and composes the
-//! aggregate profile lifecycle line appended at the captured `events.jsonl` committed
-//! length (id, timestamp, and position are never command-owned). Every byte flows through
-//! `session.apply` here.
+//! Finalization derives the coupled default-rule/schema closure and positions the
+//! aggregate profile lifecycle append at the captured `events.jsonl` committed
+//! length (id, timestamp, and position are never command-owned). Every byte flows
+//! through `session.apply` here.
 
 use std::collections::BTreeMap;
 
@@ -360,9 +360,9 @@ impl InitializationScaffold {
                 owner: RepositoryActionOwner::RepositoryInit,
             });
         }
-        // The audit log is not a neutral scaffold file: the finalizer composes it
-        // (an empty log for a plain init, an aggregate lifecycle append for a profiled
-        // one) at the captured committed length. See `derive_initialization`.
+        // The audit log is not a neutral scaffold file: the finalizer positions an
+        // aggregate lifecycle append for a profiled init at its captured committed
+        // length. A plain init creates an absent log empty. See `derive_initialization`.
         Ok(files)
     }
 
@@ -383,8 +383,9 @@ impl InitializationScaffold {
             .into_iter()
             .map(|file| file.path)
             .collect();
-        // The finalizer appends to `events.jsonl`; a command captures it
-        // through the base's tail probe and drops it from its whole-file paths.
+        // The finalizer positions its append at `events.jsonl`'s committed length;
+        // the tail probe captures enough to derive that offset without reading the
+        // whole log.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
             paths.extend(profile.claims.target_paths());
