@@ -88,9 +88,9 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "1530f9eb-1af9-4e0f-a47c-4debe7a146b0",
-      "status": "failed",
-      "updated_at": "2026-11-04T13:12:23.479198191Z",
+      "run_id": "1fbdaea6-ae31-409d-b75f-88243fa28594",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:27:39.831994427Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -114,5 +114,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-04T13:24:31.711683622Z"
+  "updated_at": "2026-11-04T13:27:39.831994427Z"
 }

@@ -24269,3 +24269,5 @@
 {"from":"in_progress","id":"e698edd1-1f38-4ab2-9a74-33eac180fd3b","issue_id":"4b66bc6b-03a9-4fa4-90e9-dfec9ea78c13","timestamp":"2026-11-04T13:24:31.597094993Z","to":"done","type":"issue_state_changed"}
 {"id":"c89393c2-419d-494d-8ac1-1392696bfa02","issue_id":"4b66bc6b-03a9-4fa4-90e9-dfec9ea78c13","timestamp":"2026-11-04T13:24:31.597094993Z","type":"issue_completed"}
 {"from":"backlog","id":"8a33f459-4078-44b2-9111-57e7d3b4dfa2","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:24:31.711683622Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"code-review","id":"f0e7fc65-85a4-4c51-bb7b-2f5f0b24c094","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","timestamp":"2026-11-04T13:25:31.220787657Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"a210968e-954b-411f-aae7-ab1f085dc724","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:27:39.831994427Z","type":"gate_passed","updated_by":"auto:executor"}

@@ -17,6 +17,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T13:21:20.443289534Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8f278006-0fe6-418e-8e37-716e8822f208",
+      "status": "failed",
+      "updated_at": "2026-11-04T13:25:31.220787657Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "3b696589-81fa-4a01-a576-460c1e34a7dd",
@@ -30,5 +36,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Graceful-shutdown tests observe the server through explicit signals",
-  "updated_at": "2026-11-04T13:21:20.443289534Z"
+  "updated_at": "2026-11-04T13:25:31.220787657Z"
 }
