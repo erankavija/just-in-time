@@ -944,7 +944,8 @@
     "1a4f2ebd": 2,
     "4a01ccba": 2,
     "10fdad38": 1,
-    "9be5b0de": 2
+    "9be5b0de": 2,
+    "3b696589": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1299,11 +1300,11 @@
       "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate)."
     },
     "3b696589": {
-      "status": "landing",
+      "status": "rework",
       "vendor": "Claude Opus",
       "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement",
       "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)",
-      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite"
+      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite Landed; code-review 8f278006: F1 unjoined stderr collector race, F2 no committed 20+20 evidence. Rework 1 to same worker."
     },
     "f7a59f5f": {
       "status": "done",
