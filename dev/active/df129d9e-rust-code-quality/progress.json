@@ -925,7 +925,7 @@
       "kind": "criterion-vs-invariant",
       "issue": "10fdad38",
       "summary": "shared test helper vs REQ-03 direct calls",
-      "status": "open"
+      "status": "resolved: D-01; done"
     }
   ],
   "rework_counts": {
@@ -1058,7 +1058,8 @@
       "crate_main": 74130,
       "file": "ledger-2026-11-04.txt",
       "since_2026_11_04": {
-        "f82a2e4a": -60
+        "f82a2e4a": -60,
+        "10fdad38": -221
       },
       "epic_net_running": 951
     },
@@ -1310,9 +1311,9 @@
       "review": "lead PASS at 2cad00a53: edge codes via classify_code (generic -> DependencyError), render_checker table, with_warnings takes Display; -60 lines"
     },
     "10fdad38": {
-      "status": "escalated",
+      "status": "done",
       "note": "resumed after quiet window",
-      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate). Landed; code-review 148117fc: add_reducing_edge recreates wrapper vs REQ-03 (helper came from lead's rework-1 review). Escalated."
+      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate). Landed; code-review 148117fc: add_reducing_edge recreates wrapper vs REQ-03 (helper came from lead's rework-1 review). Escalated. REQ-03 amended + D-01; code-review rerun passed; closed."
     },
     "3b696589": {
       "status": "landing",
