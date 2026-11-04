@@ -1,5 +1,6 @@
 //! Effective rules combine authored rules with registry-derived defaults without writes.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_utils::{declaration_dir, file_executor};
 
 const REGISTRY_CONFIG: &str = r#"

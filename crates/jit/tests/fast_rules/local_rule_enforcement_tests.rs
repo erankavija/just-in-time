@@ -11,6 +11,7 @@
 //! - the batch path (`apply_bulk_update`) is also enforced.
 
 use jit::commands::bulk_update::UpdateOperations;
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{
     memory_executor_declaring, memory_executor_wrapping, MemoryDeclarations,
 };

@@ -4,6 +4,7 @@
 //! parity for the new positional + flag.
 
 use assert_cmd::prelude::*;
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_cli::JitCli;
 use jit::test_utils::profiled_repository_fixture;
 use predicates::prelude::*;
