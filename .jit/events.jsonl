@@ -23405,3 +23405,4 @@
 {"from":"in_progress","id":"36048131-b2b7-446e-99d6-80cacde64285","issue_id":"5d5a1794-c98e-41d9-8329-344d1ae8b316","timestamp":"2026-11-04T00:47:12.431536868Z","to":"done","type":"issue_state_changed"}
 {"id":"3351d49c-655f-4ba7-bc60-ff293dbc9afa","issue_id":"5d5a1794-c98e-41d9-8329-344d1ae8b316","timestamp":"2026-11-04T00:47:12.431536868Z","type":"issue_completed"}
 {"from":"backlog","id":"479375af-51b6-4225-a822-63d4d82180a6","issue_id":"03c59566-093f-4a7c-a3a6-65098a4b28de","timestamp":"2026-11-04T00:47:12.555874306Z","to":"ready","type":"issue_state_changed"}
+{"fields":["description"],"id":"908bb271-4fe1-4ecf-9bde-8d1c75c7946b","issue_id":"03c59566-093f-4a7c-a3a6-65098a4b28de","timestamp":"2026-11-04T00:48:53.629257647Z","type":"issue_updated","updated_by":"issue-update"}
