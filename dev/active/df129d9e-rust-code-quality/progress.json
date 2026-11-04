@@ -1291,10 +1291,11 @@
       "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex."
     },
     "3b696589": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Opus",
       "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement",
-      "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)"
+      "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)",
+      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite"
     },
     "f7a59f5f": {
       "status": "landing",
