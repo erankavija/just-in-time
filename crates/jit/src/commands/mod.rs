@@ -1926,6 +1926,19 @@ pub struct CommitInfo {
     pub message: String,
 }
 
+/// Status summary for all issues
+#[derive(Debug)]
+pub struct StatusSummary {
+    pub backlog: usize,
+    pub ready: usize,
+    pub in_progress: usize,
+    pub gated: usize,
+    pub done: usize,
+    pub rejected: usize,
+    pub blocked: usize,
+    pub total: usize,
+}
+
 /// Collection key of [`DocumentListResult`].
 pub enum DocumentsKey {}
 
