@@ -223,7 +223,8 @@ fn test_validate_leases_json_output_on_failure() {
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json.as_object().map(|object| object.len()), Some(1));
-    assert_eq!(json["error"]["code"], "GENERIC_ERROR");
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(output.status.code(), Some(4));
     assert!(output.stderr.is_empty(), "JSON failure stays stream-pure");
     let details = &json["error"]["details"];
     assert_eq!(details["valid"], false, "Validation should report invalid");

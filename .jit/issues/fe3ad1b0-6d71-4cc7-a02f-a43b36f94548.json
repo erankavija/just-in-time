@@ -4,6 +4,7 @@
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "0eca332a-76ac-4ae8-951b-043f1d5c3dd7",
+    "487f45a9-bd42-47f8-8dd1-6487ad287793",
     "5687e281-d504-4b85-ab4f-c84e603c37e2",
     "e5d618ee-a23a-4857-baa9-e0d5188b8614"
   ],
@@ -26,5 +27,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "One library error boundary for the CLI and the server",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T07:35:59.431863778Z"
 }

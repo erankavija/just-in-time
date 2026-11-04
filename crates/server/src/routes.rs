@@ -59,23 +59,15 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::PresetError
         | ErrorCode::ItemCommandFailed
         | ErrorCode::InvariantCommandFailed
-        | ErrorCode::ProjectCommandFailed
         | ErrorCode::ProfileError
         | ErrorCode::SearchFailed
         | ErrorCode::RipgrepNotFound
         | ErrorCode::WorktreeInfoError
         | ErrorCode::WorktreeListError
         | ErrorCode::WorktreeStoreDivergenceError
-        | ErrorCode::HooksInstallError
         | ErrorCode::GenericError
         | ErrorCode::RecoveryFailed
-        | ErrorCode::ClaimAcquireError
-        | ErrorCode::ClaimReleaseError
-        | ErrorCode::ClaimRenewError
-        | ErrorCode::ClaimHeartbeatError
-        | ErrorCode::ClaimStatusError
-        | ErrorCode::ClaimListError
-        | ErrorCode::ClaimForceEvictError => StatusCode::INTERNAL_SERVER_ERROR,
+        | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 

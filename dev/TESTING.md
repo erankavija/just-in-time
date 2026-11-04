@@ -69,7 +69,7 @@ counterexample across generated inputs.
 | `crates/jit/src/graph/mod.rs` | Unlimited traversal equals the transitive dependency set; cycle detection reports none for DAGs |
 | `crates/jit/src/graph/hierarchy.rs` | Resolution invariants hold on arbitrary DAGs; resolution is order-invariant |
 | `crates/jit/src/domain/type_taxonomy.rs` | Type-name extraction normalizes consistently; invalid labels are rejected |
-| `crates/jit/src/storage/claim_coordinator_proptests.rs` | Index rebuild is idempotent and lossless; lease counts stay consistent; sequence numbers increase monotonically; concurrent claims stay exclusive |
+| `crates/jit/src/storage/claim_coordinator_proptests.rs` | Lease counts stay consistent; sequence numbers increase monotonically; concurrent claims stay exclusive; staleness and recovery agree |
 | `crates/jit/tests/fast_docs_templates/template_apply_tests.rs` | Template application yields an acyclic, transitively reduced graph; force-refresh is idempotent over nodes and edges |
 | `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` | Stored readiness agrees with the graph-derived blocked predicate after any sequence of dependency additions and removals |
 | `crates/jit/tests/fast_issue/short_hash_tests.rs` | Any unique prefix resolves to its issue; shared prefixes are reported as ambiguous |
@@ -81,6 +81,29 @@ suite module that owns the property). Commit them: they are regression tests.
 
 Write a property test when you can name an invariant that must hold for all inputs. Write an
 example test when you care about one specific input.
+
+### Claim Coordination Coverage
+
+`crates/jit/src/storage/claim_coordinator_proptests.rs` owns these properties:
+
+- `test_lease_count_invariant` and `test_sequence_numbers_monotonic` check stored
+  lease counts and audit sequence order.
+- `test_concurrent_claims_exclusive` and `test_concurrent_different_issues_succeed`
+  check that competing agents get one lease per issue and can claim distinct issues.
+- `test_staleness_consistent_with_threshold`,
+  `test_evict_lapsed_reclaims_an_indefinite_lease_iff_it_is_stale`, and
+  `test_finite_leases_never_stale` check heartbeat staleness and reclamation.
+
+Coordinator tests in `crates/jit/src/storage/claim_coordinator.rs` cover per-issue
+storage (`test_lease_lock_apply_stores_each_lease_as_its_issue_record_only`),
+history-independent reads
+(`test_lease_lock_loads_lists_and_applies_without_the_claims_index_or_log_history`),
+and expiry and reclamation
+(`test_evict_lapsed_logs_one_record_per_lease_and_counts_each_cause_apart`).
+`crates/jit/src/storage/claim_coordinator_interruption_tests.rs` owns the failure
+matrix in `test_lease_lock_apply_interrupted_at_any_step_leaves_the_prior_or_the_next_lease`.
+Listing behavior is covered in `crates/jit/src/commands/claim.rs` by
+`test_list_and_status_omit_expired_and_mark_stale_leases_without_a_lock_or_a_write`.
 
 ## 2. Harness Tests
 
@@ -322,10 +345,12 @@ harness that produces both.
   instead of the workspace, at no cost to a cold run. What it costs is disk, which the reclaim
   path in the worktree dispatch protocol prunes. The measurements are under "Provenance" in
   [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
-- **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
-  `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
-  run that must bypass the cache. Opting an existing target directory into a wrapper changes
-  Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
+- **Shared compiler cache** — when `sccache` is on `PATH` and no wrapper is set,
+  `scripts/cargo-ci.sh` selects it as `RUSTC_WRAPPER`. Every wrapper the run uses, selected or
+  explicit, runs through `scripts/caller-tmpdir-wrapper.sh`, which restores the caller's `TMPDIR`
+  so a daemon it starts outlives the run's temporary directory. Set `CARGO_CI_NO_SCCACHE=1` for a
+  diagnostic run that must bypass the cache. Opting an existing target directory into a wrapper
+  changes Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
 - **Host-wide serialization** — gate and benchmark builds default to the shared
   `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`, allowing Cargo-heavy work in adjacent repositories
   to queue instead of competing for CPU and causing timeout-sensitive tests to become noisy.
@@ -424,9 +449,10 @@ must wait out a real connect-without-accept before it can conclude no one answer
 ### Property-based tests over real production code paths
 
 proptest's default is 256 generated cases per property. `crates/jit/src/storage/claim_coordinator_proptests.rs`
-runs its concurrency and rebuild properties against a real on-disk store, with real file
-locks and real threads per case. It sets `with_fsync(false)`: these properties verify index
-and rebuild invariants rather than crash durability, so the cost is the file and lock work
+runs its coordination properties against a real on-disk store, with real file
+locks and, for concurrency cases, real threads. It sets `with_fsync(false)`:
+these properties verify lease counts, sequence order, exclusivity, and reclamation
+rather than crash durability, so the cost is the file and lock work
 itself. It bounds filesystem work with fewer generated cases while leaving pure-logic
 properties at the default case count. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
 and `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` run each case through a
@@ -445,7 +471,6 @@ files' own configuration comments for the exact rationale.
 | `readiness_coherence_tests::prop_stored_readiness_agrees_with_the_blocked_predicate_after_dependency_edits` | 1,732 |
 | `storage::claim_coordinator::proptests::test_sequence_numbers_monotonic` | 1,247 |
 | `storage::claim_coordinator::proptests::test_lease_count_invariant` | 571 |
-| `storage::claim_coordinator::proptests::test_no_data_loss_in_rebuild` | 524 |
 
 ### CLI subprocess publishing durable state
 
@@ -520,7 +545,6 @@ and is measured — twice.
 | Test | Warm (ms) |
 | --- | ---: |
 | `commands::init::tests::test_concurrent_fresh_profile_init_publishes_one_coherent_repository` | 1,213 |
-| `storage::claim_coordinator::tests::test_rebuild_index_filters_expired_leases` | 1,111 |
 | `template_apply_atomicity_tests::test_concurrent_writer_observes_failed_apply_preimage_then_publishes` | 610 |
 | `watcher::tests::test_start_watching_ignores_events_jsonl` (library target) | 513 |
 | `watcher::tests::test_start_watching_ignores_events_jsonl` (binary target) | 512 |
@@ -647,7 +671,7 @@ cargo fmt --all -- --check
 2. **Start at the cheapest layer.** Unit test the function, harness test the workflow, and
    add an integration test only when the CLI surface itself is the thing under test.
 3. **Reach for a property test when you can state an invariant.** DAG operations, id
-   resolution, and idempotent rebuilds are the recurring candidates.
+   resolution, and lease exclusivity are recurring candidates.
 4. **Assert specifically.** Compare against expected values rather than checking that a
    collection is non-empty.
 

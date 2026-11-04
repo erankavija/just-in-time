@@ -1,0 +1,89 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/93f3e4df-rejection-state",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 5414,
+            "sha256": "f9048d80bae189e466555427c509b8aca69b2584d813d7aa74ee7133227282cf"
+          },
+          "source": "dev/active/rejection-state-design.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5414,
+            "sha256": "f9048d80bae189e466555427c509b8aca69b2584d813d7aa74ee7133227282cf"
+          },
+          "destination": "dev/archive/93f3e4df-rejection-state/dev/active/rejection-state-design.md",
+          "source": "dev/active/rejection-state-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "01aa7693e66f1bee43551f0f57d8503842a97838b2fe44b895e31a29e516b056"
+          },
+          "destination": "dev/archive/93f3e4df-rejection-state/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/rejection-state-design.md",
+          "issue": "93f3e4df-990c-4993-b8dc-66a8827acba7",
+          "to_path": "dev/archive/93f3e4df-rejection-state/dev/active/rejection-state-design.md"
+        }
+      ],
+      "target": {
+        "id": "93f3e4df-990c-4993-b8dc-66a8827acba7",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/93f3e4df-rejection-state",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 555,
+            "sha256": "2d2e132bbbcf2aaba50982fe98fdab86f6bed91e487fdb124790887f2bb8b2cb"
+          },
+          "source": "dev/active/93f3e4df-990c-4993-b8dc-66a8827acba7-plan.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 555,
+            "sha256": "2d2e132bbbcf2aaba50982fe98fdab86f6bed91e487fdb124790887f2bb8b2cb"
+          },
+          "destination": "dev/archive/93f3e4df-rejection-state/dev/active/93f3e4df-990c-4993-b8dc-66a8827acba7-plan.md",
+          "source": "dev/active/93f3e4df-990c-4993-b8dc-66a8827acba7-plan.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 1,
+          "from_path": "dev/active/93f3e4df-990c-4993-b8dc-66a8827acba7-plan.md",
+          "issue": "93f3e4df-990c-4993-b8dc-66a8827acba7",
+          "to_path": "dev/archive/93f3e4df-rejection-state/dev/active/93f3e4df-990c-4993-b8dc-66a8827acba7-plan.md"
+        }
+      ],
+      "target": {
+        "id": "93f3e4df-990c-4993-b8dc-66a8827acba7",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "93f3e4df-990c-4993-b8dc-66a8827acba7",
+    "kind": "container"
+  }
+}

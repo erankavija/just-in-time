@@ -20,9 +20,6 @@ enum CapturedDependencyMutation {
         dependency_ids: Vec<IssueId>,
         policy: RedundancyPolicy,
     },
-    ReduceAll {
-        dry_run: bool,
-    },
     RemoveSingle {
         issue_id: IssueId,
         dependency_id: IssueId,
@@ -39,10 +36,6 @@ enum CapturedDependencyOutcome {
         warning: Option<String>,
     },
     Batch(DependenciesAddResult),
-    Reduced {
-        count: usize,
-        messages: Vec<String>,
-    },
     RemovedSingle {
         warning: Option<String>,
     },
@@ -222,19 +215,6 @@ impl<S: IssueStore> GraphOps<'_, S> {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Repair every transitive-reduction violation from one captured graph.
-    pub(super) fn reduce_all_dependencies(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::ReduceAll {
-            dry_run,
-        })? {
-            CapturedDependencyOutcome::Reduced { count, messages } => Ok((count, messages)),
-            _ => unreachable!("reduction repair returns a reduction outcome"),
-        }
-    }
-
     /// Capture the complete active issue graph and publish one dependency mutation.
     ///
     /// The issues listing is the sole discovery authority. The second phase captures every
@@ -277,7 +257,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 | CapturedDependencyMutation::Batch { issue_id, .. } => {
                     Some(super::require_issue_in_capture(&issues, issue_id)?)
                 }
-                CapturedDependencyMutation::ReduceAll { .. } => None,
                 _ => unreachable!("removals use the captured removal coordinator"),
             };
             let lease_warnings = if enforce_lease {
@@ -313,9 +292,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     dependency_ids: dependency_ids.clone(),
                     policy: *policy,
                 },
-                CapturedDependencyMutation::ReduceAll { dry_run } => {
-                    CapturedDependencyMutation::ReduceAll { dry_run: *dry_run }
-                }
                 _ => unreachable!("removals use the captured removal coordinator"),
             };
             let warning = lease_warnings.into_iter().next();
@@ -326,7 +302,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -415,7 +391,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -482,9 +458,6 @@ fn derive_dependency_mutation(
             dependency_ids,
             policy,
         } => derive_batch_dependency_add(issues, issue_id, dependency_ids, *policy),
-        CapturedDependencyMutation::ReduceAll { dry_run } => {
-            derive_dependency_repair(issues, *dry_run)
-        }
         CapturedDependencyMutation::RemoveSingle { .. }
         | CapturedDependencyMutation::RemoveBatch { .. } => {
             unreachable!("removals use their captured derivation")
@@ -831,48 +804,6 @@ fn derive_batch_dependency_add(
     })
 }
 
-fn derive_dependency_repair(issues: &[Issue], dry_run: bool) -> Result<DerivedDependencyMutation> {
-    let graph = dependency_graph(issues);
-    let reductions = issues
-        .iter()
-        .filter_map(|issue| {
-            let reduced = graph.compute_transitive_reduction(&issue.id);
-            let removed = issue.dependencies.len().saturating_sub(reduced.len());
-            (removed > 0).then_some((issue, reduced, removed))
-        })
-        .collect::<Vec<_>>();
-    let count = reductions.iter().map(|(_, _, count)| count).sum();
-    let messages = if dry_run {
-        Vec::new()
-    } else {
-        reductions
-            .iter()
-            .map(|(issue, _, fixed)| {
-                format!(
-                    "Fixed {} redundant {} in issue {}",
-                    fixed,
-                    if *fixed == 1 {
-                        "dependency"
-                    } else {
-                        "dependencies"
-                    },
-                    issue.id.short_id()
-                )
-            })
-            .collect()
-    };
-    let intents = if dry_run || reductions.is_empty() {
-        Vec::new()
-    } else {
-        derive_reduced_graph_intents(issues, issues, None)?
-    };
-    Ok(DerivedDependencyMutation {
-        outcome: CapturedDependencyOutcome::Reduced { count, messages },
-        intents,
-        error_after_apply: None,
-    })
-}
-
 fn candidate_issues<'a>(
     issues: &[Issue],
     source_id: &IssueId,
@@ -899,7 +830,7 @@ fn dependency_set(issue: &Issue) -> HashSet<IssueId> {
     issue.dependencies.iter().cloned().collect()
 }
 
-fn derive_reduced_graph_intents(
+pub(super) fn derive_reduced_graph_intents(
     original: &[Issue],
     candidate: &[Issue],
     source: Option<(&IssueId, &HashSet<IssueId>)>,

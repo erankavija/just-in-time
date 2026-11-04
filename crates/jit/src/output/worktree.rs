@@ -3,7 +3,15 @@ use crate::commands::worktree::WorktreeInfo;
 
 impl HumanRender for WorktreeInfo {
     fn render_human(&self, _: OutputMode) -> String {
-        format!("Worktree Information:\n  ID:         {}\n  Branch:     {}\n  Root:       {}\n  Type:       {}\n  Common dir: {}\n", self.worktree_id, self.branch, self.root_path, if self.is_main_worktree { "main worktree" } else { "secondary worktree" }, self.common_dir)
+        let kind = if self.is_main_worktree {
+            "main worktree"
+        } else {
+            "secondary worktree"
+        };
+        format!(
+            "Worktree Information:\n  ID:         {}\n  Branch:     {}\n  Root:       {}\n  Type:       {kind}\n  Common dir: {}\n",
+            self.worktree_id, self.branch, self.root_path, self.common_dir
+        )
     }
 }
 

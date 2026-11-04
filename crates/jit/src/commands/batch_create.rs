@@ -362,7 +362,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     drafts,
                     dependencies,
                 }];
-                let plan = finalize(&layout, &image, &context, &intents)?;
+                let plan = finalize(&layout, &image, &context, &intents, None)?;
                 Ok(SessionStep::Apply(
                     plan,
                     BatchCreateOutcome {
@@ -1064,7 +1064,11 @@ mod tests {
         assert!(task
             .labels
             .contains(&format!("satisfies:{}/REQ-01", map["story"].short_id())));
-        let report = exec.validation().run_rules(None).unwrap();
+        let report = exec
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .rule_report();
         assert!(
             !report.findings.iter().any(|f| f.rule == "story-coverage"),
             "{:?}",

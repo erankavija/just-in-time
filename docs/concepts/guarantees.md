@@ -537,31 +537,36 @@ jit claim list
 Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
   Issue:    abc123
   Agent:    agent:worker-1
-  Expires:  <timestamp in the past> (0 seconds remaining)
+  TTL:      indefinite
+  Last beat: <timestamp before the stale threshold>
+  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
+
+Listings omit expired finite leases and mark stale indefinite ones.
 
 **Recovery:**
 
 ```bash
-# An expired lease is evicted during a later lease acquisition, so another agent
-# can acquire a new lease. The issue assignee is stored separately: a Ready issue
-# with any assignee is still excluded from `jit query available`.
-jit claim acquire abc123 --agent-id agent:worker-2
+# Evict expired leases and reclaim stale indefinite ones
+jit recover
+
+# Or evict one issue's lease immediately
+jit claim force-evict abc123 --reason "agent crashed"
 
 # Clear the current assignee before looking for unassigned ready work.
 jit issue release abc123 "return to the available pool"
 # Or: jit issue unassign abc123
 jit query available
-
-# Manual eviction if needed
-jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "agent crashed"
 ```
 
-**Prevention:** Use heartbeats to renew leases:
+**Prevention:** Renew finite leases before expiry; heartbeat indefinite leases:
 
 ```bash
 # Renew lease before expiry
-jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 600
+jit claim renew abc123 --extension 600
+
+# Refresh an indefinite lease
+jit claim heartbeat abc123
 ```
 
 ### Missing File Handling
@@ -631,10 +636,10 @@ JIT is designed with isolation and fault tolerance:
   still work; leases, document history/diff, and commit-specific document reads
   are unavailable
 - Expired finite lease → evicted during a later lease acquisition; a stale
-  indefinite lease is not auto-evicted and remains until a heartbeat,
-  `jit claim release`, or `jit claim force-evict`. Either way the issue stays
+  indefinite lease remains until a heartbeat, `jit claim release`,
+  `jit claim force-evict`, or `jit recover` reclaims it. Either way the issue stays
   assigned until `jit issue release` or `jit issue unassign` clears its assignee
-- Malformed newline-terminated `events.jsonl` line → event *reads* fail fast with a parse error naming the line (an unterminated final line is an uncommitted append, which they ignore); issue operations, which read only the log's length and final line, keep working, while a claim, which parses the log to reflect it, fails with a malformed-record error
+- Malformed newline-terminated `events.jsonl` line → event *reads* fail fast with a parse error naming the line (an unterminated final line is an uncommitted append, which they ignore); issue operations and claims keep working
 
 **✓ No cascading failures:**
 

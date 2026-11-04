@@ -210,7 +210,7 @@ flowchart LR
     subgraph Secondary["Secondary worktree"]
         SI[".jit/issues/ (reads from main)"]
     end
-    CP[".git/jit/<br/>leases/<br/>claims.jsonl"]
+    CP[".git/jit/<br/>leases/{issue-id}.json<br/>claims.jsonl"]
     MI -->|shared| CP
     SI -->|shared| CP
 ```
@@ -242,7 +242,7 @@ If an agent crashes or the lease expires:
 jit claim list
 
 # Force evict if needed (admin operation)
-jit claim force-evict <lease-id> --reason "agent crashed"
+jit claim force-evict <issue-id> --reason "agent crashed"
 ```
 
 ### Scenario: Need More Time
@@ -250,7 +250,7 @@ jit claim force-evict <lease-id> --reason "agent crashed"
 Renew your lease before it expires:
 
 ```bash
-jit claim renew <lease-id> --extension 600
+jit claim renew <issue-id> --extension 600
 ```
 
 ### Scenario: Check Dependencies

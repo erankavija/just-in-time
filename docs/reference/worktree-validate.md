@@ -364,6 +364,8 @@ preserve authored or unmanaged bytes. An ambiguous target is reported without
 writes. Coordination state — stale
 locks and expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
+Plain `jit validate` does not check leases; `--leases` checks lease records
+for expiry and references to missing worktrees or issues.
 
 ### Options
 
@@ -376,7 +378,7 @@ locks and expired leases — is repaired by
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
-| `--leases` | Report active leases that are inconsistent or stale |
+| `--leases` | Report expired leases and leases referencing missing worktrees or issues |
 | `--json` | Output as JSON |
 
 `--fix`, `--branch-drift`, and `--leases` are repo-wide and cannot be combined
@@ -400,7 +402,7 @@ jit validate a1b2c3d4 --rule coverage-preview
 # Validate a container's bracket subtree as a gate check
 jit validate --scope <container-id>
 
-# Check git branch drift and lease health
+# Check git branch drift and expired or dangling leases
 jit validate --branch-drift --leases
 
 # Preview, then apply, the auto-fixes
@@ -442,8 +444,8 @@ its repairs complete). It signals findings by exiting non-zero:
 
 - **Declarative-rule errors** — whole-repo or per-issue.
 - **Repository-integrity failures** — a broken dependency, a DAG cycle, an
-  isolated issue, a redundant edge, an unknown gate reference, or a bad claims
-  index. A `--scope` error finding reports the same way.
+  isolated issue, a redundant edge, or an unknown gate reference. A `--scope`
+  error finding reports the same way.
 - **Check failures** under `--explain`, `--branch-drift`, or `--leases`.
 
 It fails as a usage error when `--dry-run` is given without `--fix`, and on the
@@ -489,8 +491,10 @@ then runs, in sequence:
 1. Repair declaration-derived state through the `jit validate --fix` path
 2. In a Git repository, the coordination routines under `.git/jit/`: clear
    claim locks left by dead processes (checked by PID), evict expired leases,
-   and reclaim indefinite leases whose heartbeat is [stale](claim.md#staleness). Without Git they are
-   skipped with a warning.
+   reclaim indefinite leases whose heartbeat is [stale](claim.md#staleness), and remove
+   interrupted lease operations' `*.tmp` stage files under `leases/` older than
+   the [cleanup threshold](runtime-defaults.md). Without Git they are skipped
+   with a warning.
 3. Remove orphaned `*.tmp` files under `.jit/` older than the
    [cleanup threshold](runtime-defaults.md)
 

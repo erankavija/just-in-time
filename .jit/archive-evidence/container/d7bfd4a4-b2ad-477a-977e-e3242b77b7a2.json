@@ -1,0 +1,133 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/d7bfd4a4-observability",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 10501,
+            "sha256": "0357dc58d38b508a9dbdf4467f0057b736d0273ddbdd28cd240f8c4c16b95fe1"
+          },
+          "source": "dev/active/observability-design.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 13555,
+            "sha256": "c80317d6669481322114434288dde4fd91b3e229c362ef950fda8a8689da1bb5"
+          },
+          "source": "dev/plans/metrics-713ff59d.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 13494,
+            "sha256": "9d7a585b15d5389fd6074e165057faa63c218dc4098876d8854ebb0af554556e"
+          },
+          "source": "dev/plans/stalled-detection-c802a9b0.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10501,
+            "sha256": "0357dc58d38b508a9dbdf4467f0057b736d0273ddbdd28cd240f8c4c16b95fe1"
+          },
+          "destination": "dev/archive/d7bfd4a4-observability/dev/active/observability-design.md",
+          "source": "dev/active/observability-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 13555,
+            "sha256": "c80317d6669481322114434288dde4fd91b3e229c362ef950fda8a8689da1bb5"
+          },
+          "destination": "dev/archive/d7bfd4a4-observability/dev/plans/metrics-713ff59d.md",
+          "source": "dev/plans/metrics-713ff59d.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 13494,
+            "sha256": "9d7a585b15d5389fd6074e165057faa63c218dc4098876d8854ebb0af554556e"
+          },
+          "destination": "dev/archive/d7bfd4a4-observability/dev/plans/stalled-detection-c802a9b0.md",
+          "source": "dev/plans/stalled-detection-c802a9b0.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "e55ec011f00c5ef4c54f15ffa7f0e7ad434838c704c35c39c8f4ebfe9da88e59"
+          },
+          "destination": "dev/archive/d7bfd4a4-observability/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/plans/metrics-713ff59d.md",
+          "issue": "713ff59d-5d50-4401-b48c-3966bf82f319",
+          "to_path": "dev/archive/d7bfd4a4-observability/dev/plans/metrics-713ff59d.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/plans/stalled-detection-c802a9b0.md",
+          "issue": "c802a9b0-79df-4ce3-b129-2f86fff3c9ce",
+          "to_path": "dev/archive/d7bfd4a4-observability/dev/plans/stalled-detection-c802a9b0.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/observability-design.md",
+          "issue": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+          "to_path": "dev/archive/d7bfd4a4-observability/dev/active/observability-design.md"
+        }
+      ],
+      "target": {
+        "id": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/d7bfd4a4-observability",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 556,
+            "sha256": "2f26e5705e5f406512ee1cf7974008ac103844c4e47d14673f53efc821875ab8"
+          },
+          "source": "dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 556,
+            "sha256": "2f26e5705e5f406512ee1cf7974008ac103844c4e47d14673f53efc821875ab8"
+          },
+          "destination": "dev/archive/d7bfd4a4-observability/dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md",
+          "source": "dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 1,
+          "from_path": "dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md",
+          "issue": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+          "to_path": "dev/archive/d7bfd4a4-observability/dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md"
+        }
+      ],
+      "target": {
+        "id": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+    "kind": "container"
+  }
+}

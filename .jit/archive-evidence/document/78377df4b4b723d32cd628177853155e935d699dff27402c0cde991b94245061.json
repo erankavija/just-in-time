@@ -1,0 +1,37 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 8210,
+            "sha256": "9e0018619e7b0d8d6c105ce5a70fc289bb2ccf54ac401d1fd042098385e2dc8c"
+          },
+          "source": "dev/active/a2546471-json-error-contract/handoff.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 8210,
+            "sha256": "9e0018619e7b0d8d6c105ce5a70fc289bb2ccf54ac401d1fd042098385e2dc8c"
+          },
+          "destination": "dev/archive/dev/active/a2546471-json-error-contract/handoff.md",
+          "source": "dev/active/a2546471-json-error-contract/handoff.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "kind": "document",
+        "path": "dev/active/a2546471-json-error-contract/handoff.md"
+      }
+    }
+  ],
+  "target": {
+    "kind": "document",
+    "path": "dev/active/a2546471-json-error-contract/handoff.md"
+  }
+}

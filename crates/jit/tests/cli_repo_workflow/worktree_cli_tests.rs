@@ -505,6 +505,15 @@ fn test_validate_branch_drift_detects_drifted_branch() {
         stderr.contains("Fix: git rebase origin/main"),
         "branch-drift failure gives the rebase remedy: {stderr}"
     );
+
+    let json_output = cli
+        .command(["validate", "--branch-drift", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(json_output.status.code(), Some(4));
+    assert!(json_output.stderr.is_empty(), "JSON stays stream-pure");
+    let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
 }
 
 #[test]

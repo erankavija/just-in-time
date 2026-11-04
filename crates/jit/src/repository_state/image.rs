@@ -566,7 +566,8 @@ pub struct CaptureSpec {
 }
 
 impl CaptureSpec {
-    /// Request `paths` whole, within `budget`.
+    /// Request `paths` whole, within `budget`; the event log requires
+    /// [`discover_tail`](Self::discover_tail).
     pub fn new(
         paths: impl IntoIterator<Item = VirtualPath>,
         budget: CaptureBudget,
@@ -585,13 +586,16 @@ impl CaptureSpec {
     }
 
     /// Add paths to read whole; a path requested as a tail or kind is read
-    /// whole instead.
+    /// whole instead. The event log requires [`discover_tail`](Self::discover_tail).
     pub fn discover_paths(
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
     ) -> Result<(), CaptureError> {
         let mut candidate = self.clone();
         for path in paths {
+            if path == VirtualPath::EVENTS {
+                return Err(CaptureError::WholeEventLogCapture);
+            }
             candidate.tails.remove(&path);
             candidate.kinds.remove(&path);
             candidate.paths.insert(path);
@@ -601,13 +605,12 @@ impl CaptureSpec {
         Ok(())
     }
 
-    /// Add a path to read as its length and tail, unless it is already
-    /// requested whole or as a tail.
+    /// Request a path's length and tail.
     pub fn discover_tail(&mut self, path: VirtualPath) -> Result<(), CaptureError> {
         let mut candidate = self.clone();
-        if candidate.paths.insert(path.clone()) || candidate.kinds.remove(&path) {
-            candidate.tails.insert(path);
-        }
+        candidate.paths.insert(path.clone());
+        candidate.kinds.remove(&path);
+        candidate.tails.insert(path);
         candidate.validate()?;
         *self = candidate;
         Ok(())
@@ -1506,6 +1509,8 @@ fn serialize_content_digest<S: serde::Serializer>(
 pub enum CaptureError {
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
+    #[error("the event log can only be captured through discover_tail")]
+    WholeEventLogCapture,
     #[error("capture requested {actual} listings but the maximum is {maximum}")]
     ListingBudgetExceeded { actual: usize, maximum: usize },
     #[error("captured {actual} bytes but the maximum is {maximum}")]
@@ -1784,6 +1789,24 @@ mod tests {
                     if actual == read && maximum == read - 1
             ));
         }
+    }
+
+    #[test]
+    fn test_capture_spec_refuses_whole_event_log_reads() {
+        let budget = image().capture_spec().budget();
+        assert!(matches!(
+            CaptureSpec::new([VirtualPath::EVENTS], budget),
+            Err(CaptureError::WholeEventLogCapture)
+        ));
+
+        let mut spec = CaptureSpec::new([], budget).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        let prior = spec.clone();
+        assert!(matches!(
+            spec.discover_paths([VirtualPath::EVENTS]),
+            Err(CaptureError::WholeEventLogCapture)
+        ));
+        assert_eq!(spec, prior);
     }
 
     /// A kind request never narrows a request for content: whichever order they
