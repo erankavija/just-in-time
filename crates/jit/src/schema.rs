@@ -770,25 +770,6 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
                 "ProjectRenderResult",
             ),
-            "archive_candidates" => (
-                Some(schema_to_value::<
-                    crate::domain::artifact_plan::ArchiveCandidates,
-                >()),
-                "ArchiveCandidates",
-            ),
-            // Without `--execute` the command previews the plan it would run.
-            "archive_document" | "archive_container" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<crate::domain::artifact_plan::ArtifactPlan>(),
-                        schema_to_value::<crate::domain::artifact_execution::ArchiveExecutionResult>(),
-                    ],
-                    "description": "Default: the ArtifactPlan preview. With --execute: \
-                        the ArchiveExecutionResult of the run."
-                });
-                (Some(union), "ArtifactPlan")
-            }
-
             // Default: no specific schema
             _ => (None, "CommandResponse"),
         };

@@ -14,6 +14,7 @@ use std::io::{self, Write};
 use thiserror::Error;
 
 mod apply;
+mod archive;
 mod claim;
 pub mod config;
 mod emit;
@@ -26,6 +27,7 @@ mod search;
 mod serve;
 mod version;
 
+pub use archive::ArchiveTargetResponse;
 pub use claim::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
     ClaimRenewResponse, LeaseListResponse, LeasesKey, RecoverResponse,

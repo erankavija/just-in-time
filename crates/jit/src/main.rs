@@ -17,13 +17,13 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    ArchiveCommands, Cli, Commands, DepCommands, DocCommands, GateCommands, GraphCommands,
-    IssueCommands, ProfileCommands, ProjectCommands,
+    Cli, Commands, DepCommands, DocCommands, GateCommands, GraphCommands, IssueCommands,
+    ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, claim, config, events, init, invariant, item, resolve_issue, search, serve, version,
-    CommandContext,
+    apply, archive, claim, config, events, init, invariant, item, resolve_issue, search, serve,
+    version, CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -4622,51 +4622,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 std::process::exit(i32::from(!result.valid));
             }
         },
-        Commands::Archive(archive_cmd) => match archive_cmd {
-            ArchiveCommands::Candidates => {
-                let report = executor.archive().archive_candidates()?;
-                if json {
-                    println!("{}", serde_json::to_string_pretty(&report)?);
-                } else {
-                    print!("{}", jit::output::render_archive_candidates(&report));
-                }
-            }
-            ArchiveCommands::Document { path, execute } => {
-                if execute {
-                    let result = executor.archive().execute_archive_document(&path)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&result)?);
-                    } else {
-                        print!("{}", jit::output::render_archive_execution(&result));
-                    }
-                } else {
-                    let plan = executor.archive().preview_archive_document(&path)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&plan)?);
-                    } else {
-                        print!("{}", jit::output::render_archive_plan(&plan));
-                    }
-                }
-            }
-            ArchiveCommands::Container { id, execute } => {
-                let id = resolve_issue(&storage, &id)?;
-                if execute {
-                    let result = executor.archive().execute_archive_container(&id)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&result)?);
-                    } else {
-                        print!("{}", jit::output::render_archive_execution(&result));
-                    }
-                } else {
-                    let plan = executor.archive().preview_archive_container(&id)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&plan)?);
-                    } else {
-                        print!("{}", jit::output::render_archive_plan(&plan));
-                    }
-                }
-            }
-        },
+        Commands::Archive(archive_cmd) => {
+            return archive::dispatch(archive_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Query {
             subcommand,
             filters: bare_filters,

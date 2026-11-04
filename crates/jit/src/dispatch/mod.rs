@@ -127,6 +127,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     apply::output_schema,
+    archive::output_schema,
     claim::output_schema,
     claim::recover::output_schema,
     config::output_schema,
@@ -323,6 +324,7 @@ macro_rules! command_group {
 }
 
 pub mod apply;
+pub mod archive;
 pub mod claim;
 pub mod config;
 pub mod events;
