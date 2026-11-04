@@ -87,7 +87,8 @@ mcp-server/
 ### Schema Loading
 
 The CLI is the source of truth for the command schema. The server invokes `jit --schema` once at
-startup and fails fast when the binary is absent from `PATH`. Its MCP surface matches that loaded
+startup and fails fast when the binary is absent from `PATH` (or from `JIT_BIN`, which names the executable
+explicitly). Its MCP surface matches that loaded
 schema; after rebuilding or replacing `jit`, restart the MCP server to load the changed schema.
 The generated `jit_profile_apply`, `jit_project_render`, and `jit_validate` tools therefore expose
 the same redo-record publication, managed-region, and actionable JSON error contracts
@@ -208,6 +209,10 @@ Run the automated test suite, from the same setup:
 ```bash
 npm test
 ```
+
+`npm test` builds `jit` from this checkout and runs both suites against that binary, whatever
+`jit` is on `PATH`. `npm run test:suites` runs them against `JIT_BIN`, or the `jit` on `PATH` when
+it is unset. The server also honours `JIT_BIN` as the executable it invokes.
 
 The test suite verifies:
 - MCP protocol initialization
