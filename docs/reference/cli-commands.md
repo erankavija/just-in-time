@@ -1909,6 +1909,9 @@ jit gate status-all <ISSUE_ID> [--json] [--full]
   / `failed` / `pending`) so a caller can tell a failed gate from a pending one.
   `all_passed` mirrors the exit contract. `--full` includes stdout/stderr for
   passing automated runs (failing runs always include them).
+- When a gate has not passed, `--json` prints the failure envelope with code
+  `GATE_FAILED` and this report under `error.details`; when all gates have passed
+  it prints the report as the success envelope.
 
 The singular [`jit gate status`](#jit-gate-status) carries the history
 (`--all` / `--limit` / `--status`) and flat (`--stdout` / `--stderr` / `--tail`)
