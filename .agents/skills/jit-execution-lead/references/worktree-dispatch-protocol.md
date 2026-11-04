@@ -16,10 +16,10 @@ The lead follows these steps **every time** a parallel worktree dispatch is requ
 
 ```bash
 git checkout main
-git status        # must be clean (no staged or unstaged changes)
+git status        # tracked changes allowed only under the resolved data root
 ```
 
-If main is dirty, commit, stash, or revert first. Dispatch from a dirty `main` is forbidden — the leak-check guard in step 4 cannot work without a clean baseline.
+The script obtains the absolute data root from `jit worktree info --json` (requires `jit` and `jq`). Staged or unstaged changes under that root may remain: workers branch from the committed main revision. Any other tracked change blocks dispatch and is named in the refusal; commit or stash it first. An external data root exempts no checkout path. The snapshot includes all dirt, preserving the leak-check baseline in step 4.
 
 ### Step 2 — Manual worktree creation + snapshot
 
@@ -31,7 +31,7 @@ Run the project's wrapper script:
 
 The script lives in this skill's directory and is generic across projects (it operates on whatever git repo your current working directory belongs to). It:
 
-1. Verifies the current branch is `main` and the working tree is clean.
+1. Verifies the current branch is `main` and no tracked change lies outside the resolved data root.
 2. Snapshots `git status -uall --porcelain` of main to `/tmp/lead-pre-dispatch-<ts>.txt` and links `/tmp/lead-pre-dispatch-latest.txt` to it.
 3. For each short-id, runs `git worktree add -b worktree-agent-<short-id> .agents/worktrees/agent-<short-id> <main-HEAD-sha>`. Anchoring explicitly on `main`'s commit SHA (not the branch name) prevents any race where main moves mid-dispatch.
 4. Verifies each worktree's HEAD SHA exactly matches `main`'s HEAD SHA.
