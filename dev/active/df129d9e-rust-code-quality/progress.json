@@ -940,6 +940,6 @@
   },
   "post_release_followups": [
     "Land b23faa59, then 1eb949a5; fan out wave 7; implement 8c67b21a, then delete the private dispatch.sh copy.",
-    "File a standalone v1.0 task under milestone 9db27a3a (steward request): the mcp-ci gate tests the jit built from the commit under evaluation, not the first jit on PATH, and that binary's source is part of the gate's input digest so a reused verdict cannot vouch for a different binary. Tell 6a the ID. Once it lands, delete the PATH workaround from land-one.sh."
+    "26307dfd (mcp-ci builds the binary under evaluation) filed; once it lands, delete the PATH workaround from land-one.sh."
   ]
 }
