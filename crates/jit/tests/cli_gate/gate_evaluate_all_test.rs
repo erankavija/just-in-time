@@ -5,7 +5,7 @@
 //! auto/manual gate set, fail-fast at an unattested manual gate rather than a
 //! silent pass (jit:1d59070d REQ-03).
 
-use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
+use super::{create_issue_requiring, define_auto_gate, define_manual_gate};
 use jit::test_cli::JitCli;
 use std::fs;
 

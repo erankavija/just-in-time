@@ -67,8 +67,8 @@ fn test_apply_plan_creates_bracket_nodes() {
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     let data = out.get("data").unwrap_or(&out);
@@ -130,8 +130,8 @@ fn test_apply_plan_json_reports_template_and_created_nodes() {
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     let data = out.get("data").unwrap_or(&out);
@@ -170,8 +170,8 @@ fn test_apply_with_explicit_container_anchor_creates_bracket() {
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     let out = cli
         .run_json([
@@ -239,8 +239,8 @@ fn test_apply_rejects_malformed_anchor() {
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, PLAN_TEMPLATE_TOML);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     cli.command(["apply", "plan", &epic, "--anchor", "noequals"])
         .assert()

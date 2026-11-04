@@ -2,7 +2,7 @@
 //!
 //! These tests verify the full CLI → CommandExecutor → Storage flow
 
-use crate::{add_auto_gate_issue, create_issue_requiring, define_auto_gate};
+use super::{add_auto_gate_issue, create_issue_requiring, define_auto_gate};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
@@ -303,7 +303,7 @@ fn test_gate_preset_apply_partial_batch_retains_lease_warnings_in_both_modes() {
     let source = add_auto_gate_issue(&temp, "test-gate", "exit 0");
     temp.run(["gate", "preset", "create", &source, "team"])
         .unwrap();
-    let target = crate::create_titled_issue(&temp, "Target");
+    let target = super::create_titled_issue(&temp, "Target");
     enable_warn_leases(&temp);
     lease_to_another_agent(&temp, &target);
 

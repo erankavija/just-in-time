@@ -4,8 +4,8 @@
 //! `doc_show_tests` module, and each owned directory is whatever `jit doc dir`
 //! resolves, so no expectation here restates the naming rule.
 
-use crate::doc_show_tests::{declared_area, declared_config};
-use crate::linked_checkout_write_policy_tests::store_bytes;
+use super::doc_show_tests::{declared_area, declared_config};
+use super::linked_checkout_write_policy_tests::store_bytes;
 use jit::domain::identity::IssueId;
 use jit::test_cli::JitCli;
 use jit::test_utils::declaration_dir;

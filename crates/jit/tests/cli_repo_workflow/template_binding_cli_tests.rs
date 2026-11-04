@@ -154,12 +154,12 @@ fn assert_bound_to_configured_anchor(out: &Value, epic: &str) {
 #[test]
 fn test_apply_auto_binds_the_configured_container_anchor() {
     let cli = JitCli::with_repository(
-        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+        jit::test_utils::setup_test_repo_with_config(super::apply_cli_tests::CONFIG_TOML)
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     assert_bound_to_configured_anchor(&out, &epic);
@@ -191,12 +191,12 @@ fn test_apply_auto_binds_the_configured_container_anchor() {
 #[test]
 fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
     let cli = JitCli::with_repository(
-        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+        jit::test_utils::setup_test_repo_with_config(super::apply_cli_tests::CONFIG_TOML)
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, UNBOUND_ANCHOR_TEMPLATE);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, UNBOUND_ANCHOR_TEMPLATE);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     cli.command(["apply", "plan", &epic])
         .assert()
@@ -218,12 +218,12 @@ fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
 #[test]
 fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
     let cli = JitCli::with_repository(
-        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+        jit::test_utils::setup_test_repo_with_config(super::apply_cli_tests::CONFIG_TOML)
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
-    let epic = crate::create_epic(&cli, "Auth epic");
+    super::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
+    let epic = super::create_epic(&cli, "Auth epic");
 
     let applied = cli.run_json(["apply", "plan", &epic]).unwrap();
     let roles = &data(&applied)["created_node_ids_by_role"];
@@ -271,14 +271,14 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
         1,
     );
     let cli = JitCli::with_repository(
-        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+        jit::test_utils::setup_test_repo_with_config(super::apply_cli_tests::CONFIG_TOML)
             .unwrap()
             .0,
     );
-    crate::install_templates(&cli, &templates);
-    let positional = crate::create_epic(&cli, "Positional epic");
-    let target = crate::create_epic(&cli, "Target epic");
-    let reviewer = crate::create_epic(&cli, "Reviewer epic");
+    super::install_templates(&cli, &templates);
+    let positional = super::create_epic(&cli, "Positional epic");
+    let target = super::create_epic(&cli, "Target epic");
+    let reviewer = super::create_epic(&cli, "Reviewer epic");
     let target_binding = format!("target={target}");
     let reviewer_binding = format!("reviewer={reviewer}");
 

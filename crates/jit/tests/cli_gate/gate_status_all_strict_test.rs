@@ -7,7 +7,7 @@
 //! fails. The retired verbs no longer parse at all: clap rejects them
 //! as unrecognized subcommands rather than resolving them as aliases.
 
-use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
+use super::{create_issue_requiring, define_auto_gate, define_manual_gate};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;

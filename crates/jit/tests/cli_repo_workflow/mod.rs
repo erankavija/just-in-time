@@ -1,7 +1,3 @@
-//! `cli_repo_workflow` integration-test suite. Aggregates former per-file
-//! integration targets as modules under one Cargo test target so Cargo links
-//! and runs them as a single executable (jit:8d4f7084).
-
 mod apply_cli_tests;
 mod archive_preview_cli_tests;
 mod artifact_conformance_cli_tests;
