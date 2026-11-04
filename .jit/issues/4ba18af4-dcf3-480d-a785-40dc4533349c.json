@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b90299c6-4567-48ac-a459-ddb2a79d24b0",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:47:26.900432705Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One head lookup in the git module",
-  "updated_at": "2026-11-04T21:53:57.942387888Z"
+  "updated_at": "2026-11-04T22:47:26.900432705Z"
 }
