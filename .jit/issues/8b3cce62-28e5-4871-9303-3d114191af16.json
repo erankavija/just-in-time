@@ -23,7 +23,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Derive per-command exit-code rows from the handler registry",
-  "updated_at": "2026-11-04T16:19:47.070038265Z"
+  "updated_at": "2026-11-04T17:25:30.546457362Z"
 }
