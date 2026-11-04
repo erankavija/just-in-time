@@ -26,7 +26,7 @@ use crate::validation::engine::{Finding, SchemaEngine};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// One named stage in whole-repository validation.
@@ -278,11 +278,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
             namespace_and_hierarchy_complete = false;
         }
     }
-    findings.extend(collect_enforcement_drift_findings(
-        config,
-        rules_loaded.then_some(rules),
-        gates,
-    ));
+    findings.extend(collect_enforcement_drift_findings(&declarations));
     findings.extend(collect_review_placeholder_findings(gates));
     if namespace_and_hierarchy_complete {
         passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
@@ -528,36 +524,23 @@ fn collect_rule_findings(
 }
 
 fn collect_enforcement_drift_findings(
-    config: &JitConfig,
-    rules: Option<&RuleSet>,
-    gates: &GateRegistry,
+    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
 ) -> Vec<ReportedFinding> {
-    use crate::validation::drift::{enforcement_drift, SourceState};
-
-    let rule_names: Option<BTreeSet<&str>> =
-        rules.map(|rules| rules.rules.iter().map(|rule| rule.name.as_str()).collect());
-    let gate_keys: BTreeSet<GateKey> = gates.gates.keys().cloned().collect();
-    enforcement_drift(
-        &config.invariants.invariants,
-        rule_names
-            .as_ref()
-            .map_or(SourceState::Unloadable, SourceState::Loaded),
-        SourceState::Loaded(&gate_keys),
-    )
-    .into_iter()
-    .map(|finding| {
-        ReportedFinding::new(
-            None,
-            &Finding {
-                rule: crate::validation::report::BuiltInPass::EnforcementDrift
-                    .as_str()
-                    .to_owned(),
-                severity: Severity::Error,
-                message: finding.message(),
-            },
-        )
-    })
-    .collect()
+    crate::validation::drift::from_declarations(declarations)
+        .into_iter()
+        .map(|finding| {
+            ReportedFinding::new(
+                None,
+                &Finding {
+                    rule: crate::validation::report::BuiltInPass::EnforcementDrift
+                        .as_str()
+                        .to_owned(),
+                    severity: Severity::Error,
+                    message: finding.message(),
+                },
+            )
+        })
+        .collect()
 }
 
 fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFinding> {
