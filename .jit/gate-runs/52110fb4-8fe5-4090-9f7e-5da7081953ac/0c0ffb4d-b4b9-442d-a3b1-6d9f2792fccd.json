@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:36:27.862884675Z",
+  "duration_ms": 274164,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Label commands are correctly migrated to typed library handlers with preserved output and error propagation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "52110fb4-8fe5-4090-9f7e-5da7081953ac",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0c0ffb4d-b4b9-442d-a3b1-6d9f2792fccd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:31:53.698014211Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8dba6a6b, 244e1084, 36c1ad3c, 0e2f3e87 (`jit:52110fb4`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown); @/invariant/architecture-dependency-direction, essential-code-prose, orthogonal-tests, semantic-test-assertions, shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code n/a, 2026-11-04T09:14:59Z); mcp-ci passed (exit code n/a, 2026-11-04T09:15:00Z); code-review pending\nTruncation recovery: narrowed initial truncated merge output to per-parent label/schema patches and current dispatch, output, envelope, emitter, and test reads; unrelated prerequisite-import diffs were outside the label impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Label commands are correctly migrated to typed library handlers with preserved output and error propagation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

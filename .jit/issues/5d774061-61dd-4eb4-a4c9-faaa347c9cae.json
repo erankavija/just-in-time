@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T09:33:25.952702380Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -30,5 +30,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Measure validation views on this repository",
-  "updated_at": "2026-11-04T09:33:25.952702380Z"
+  "updated_at": "2026-11-04T09:39:16.698691141Z"
 }

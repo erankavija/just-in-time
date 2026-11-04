@@ -880,6 +880,13 @@
       "issue": "06ee9b67",
       "summary": "F1/F2 trace to 9876a23a wave 8 on main; F3 is the uniform findings-stderr rule",
       "status": "ruled: D-01, D-02; rerun done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "review-convention",
+      "issue": "1a4f2ebd,8e91126b,66790c84",
+      "summary": "output-owned response convention; conflicting verdicts on 8e91126b; 66790c84 F1 traces to 614a6f97",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -946,7 +953,9 @@
       "summary": "cargo-pool-run waits for a jobserver token inside nextest's per-test timer, so millisecond tests TIMEOUT at 20 s under parallel load. Not content failures; land-one retries TIMEOUT-only failures. f487aeef must not tighten limits until settled (D-43).",
       "status": "with the user via steward"
     },
-    "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence."
+    "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence.",
+    "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
+    "Some code-review evaluations recorded two runs a minute apart with different verdicts (8e91126b, 1a4f2ebd); cause unknown."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1024,28 +1033,29 @@
       "note": "resumed: merge main after 9529b9ac"
     },
     "66790c84": {
-      "status": "landed_gating",
+      "status": "code_review_failed",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "code-review cdebd1af: F1 heartbeat/force-evict issue_id = main 614a6f97 (escalated), F2 restating rustdoc (rework)"
     },
     "8c46fc85": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "8f297e60": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "ran one git checkout in its own worktree to discard its own uncommitted additions; tree clean, nothing committed touched",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "f930acf2": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
@@ -1058,7 +1068,7 @@
       "note": "on main (4ec8f06cc, fix d735276b5); code-review F1: GateRunId path extractor rejects before classify (REQ-02); rework 2 of 2"
     },
     "20fc3b92": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "lead review: top-level rdeps left in legacy table (REQ-01/02); batch boundary-edge human text changed (REQ-06); +162 lines",
@@ -1071,35 +1081,36 @@
       "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
     },
     "b25c2e54": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "reviewed; landing paused until e5d618ee's fix restores main",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "3cf69ecf": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "1a4f2ebd": {
-      "status": "landed_gating",
+      "status": "code_review_failed",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code)"
     },
     "98cc2097": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "branch CI: two new search exit-code rows (1, 10) lack binding cases; rework 2 of 2",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "0fe46027": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Codex gpt-6.1-sol (high)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines -1",
@@ -1121,7 +1132,7 @@
       "review": "landed c5a125d74; cargo-ci, mcp-ci passed; code-review R1 failed (run 8613707b): F1 --fix contract (9876a23a 1f24e3e9 on main), F2 container-pointer tests deleted by 9876a23a eae1c56a2, F3 uniform findings stderr (c9103fcf/1ac651c7 D-01 rule). Escalated to 6a. D-01/D-02 recorded; code-review R2 (run d4f538b0): R1 findings closed; new F1 cli-commands.md:3276 says --rule failures exit 1 (now 4). Rework 2 of 2 to Codex gpt-6-luna."
     },
     "71f5296c": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines -2",
@@ -1136,7 +1147,7 @@
       "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT."
     },
     "52110fb4": {
-      "status": "landed_gating",
+      "status": "done",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines +54",
@@ -1157,11 +1168,12 @@
       "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge). Rework 1 at e69f46779: lead PASS; rows narrowed to worktree info/list with one binding each; WorktreesKey moved into collection_keys!. Whole-tree run left to branch CI (worker's locked run starved behind gate runs)."
     },
     "8e91126b": {
-      "status": "landed_gating",
+      "status": "held",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines -17",
-      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "two code-review runs: 1f2dbb8f failed (output-owned), 3f255520 passed; close held for steward ruling"
     },
     "12c0f3fb": {
       "status": "done",
