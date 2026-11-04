@@ -19,6 +19,12 @@
       "status": "failed",
       "updated_at": "2026-11-04T06:52:51.344187177Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5a9c33f3-c424-4537-a00d-d6f5ca024cc6",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:56:54.264263091Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7244ecb2-dd0a-4f74-8f62-1e4434a14be3",
@@ -37,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "An interrupted lease operation leaves the prior or the next lease",
-  "updated_at": "2026-11-04T06:52:51.344187177Z"
+  "updated_at": "2026-11-04T06:56:54.264263091Z"
 }
