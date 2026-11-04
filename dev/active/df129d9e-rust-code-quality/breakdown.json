@@ -3813,7 +3813,9 @@
       "scripts/rust-build-budget.sh",
       "dev/benchmarks/rust-build-budgets/README.md",
       "scripts/production-lines.py",
-      ".jit/gates.toml"
+      ".jit/gates.toml",
+      "dev/TESTING.md",
+      "docs/reference/rules-and-gates.md"
      ]
     }
    }
