@@ -1307,16 +1307,6 @@ impl IssueStore for JsonFileStorage {
         self.read_gate_runs(|result| &result.issue_id == issue_id)
     }
 
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &crate::domain::identity::GateKey,
-        digest: &crate::domain::repository_inputs::InputsDigest,
-    ) -> Result<Option<crate::domain::GateRunResult>> {
-        Ok(crate::domain::latest_gate_run(self.read_gate_runs(
-            |result| result.is_reusable_for(gate_key, digest),
-        )?))
-    }
-
     fn root(&self) -> &Path {
         &self.root
     }
