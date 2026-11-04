@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:38:05.636648365Z",
+  "duration_ms": 327785,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/dispatch/graph.rs",
+        "id": "F1",
+        "line": 118,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Historical comment narrates the old arm instead of a necessary current contract."
+      }
+    ],
+    "summary": "Graph handlers, typed schema registration, alias coverage, output emission, and D-01 warning behavior meet the issue criteria; one advisory prose cleanup remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "20fc3b92-6ce6-48e1-9d51-9bd77956236e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2ab40ded-5074-46d7-9ffa-7b09e23a6db3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:32:37.851395751Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 09846bb1, 1402ce4c, c900660d, 14a1de6e, 5376c344, 9160ec57 (`jit:20fc3b92`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (.jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json); @/issue/20fc3b92/decision/D-01 (.jit/issues/20fc3b92-6ce6-48e1-9d51-9bd77956236e.json); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:15:00Z); mcp-ci passed (2026-11-04T09:15:00Z); code-review pending\nTruncation recovery: narrowed reads by commit, merge parent, affected path, emitter, schema, tests, and documentation; unrelated broad-plan material excluded from the impact cone\n\n1. [advisory][issue-impact] `crates/jit/src/dispatch/graph.rs:118` narrates the old arm’s behavior rather than documenting a necessary current contract. Remove it or state only the current D-01 warning behavior. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Graph handlers, typed schema registration, alias coverage, output emission, and D-01 warning behavior meet the issue criteria; one advisory prose cleanup remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Historical comment narrates the old arm instead of a necessary current contract.\",\"file\":\"crates/jit/src/dispatch/graph.rs\",\"line\":118,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
