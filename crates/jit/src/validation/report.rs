@@ -525,7 +525,7 @@ impl ValidationReport {
 
 /// Group `(rule_name, message)` pairs by rule name, preserving first-seen
 /// order within each rule.
-pub(crate) fn group_messages(
+fn group_messages(
     pairs: impl IntoIterator<Item = (String, String)>,
 ) -> HashMap<String, Vec<String>> {
     pairs
@@ -538,7 +538,7 @@ pub(crate) fn group_messages(
 
 /// Render a rule selector for `--explain`: `"*"` when empty, otherwise the
 /// present dimensions joined with `", "` (e.g. `"type=epic, state=ready"`).
-pub(crate) fn render_selector(selector: &Selector) -> String {
+fn render_selector(selector: &Selector) -> String {
     let parts: Vec<String> = [
         selector.type_.as_ref().map(|t| format!("type={t}")),
         selector.label.as_ref().map(|l| format!("label={l}")),

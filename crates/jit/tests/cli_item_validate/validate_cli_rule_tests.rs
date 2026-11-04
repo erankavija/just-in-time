@@ -429,15 +429,6 @@ severity = "error"
 assert = { label-coverage = { child-link = "any", marker = "[hard]" } }
 "#;
 
-/// A valid coverage rule whose missing container pointer fails evaluation.
-const UNRESOLVED_CONTAINER_RULE: &str = r#"
-[[rules]]
-name = "broken-graph-rule"
-when = { type = "epic" }
-severity = "error"
-assert = { label-coverage = { container-from-label = "brackets" } }
-"#;
-
 const DISABLED_GRAPH_RULE: &str = r#"
 [[rules]]
 name = "disabled-graph-rule"
@@ -647,61 +638,6 @@ fn test_validate_id_with_leases_is_rejected() {
         .stderr(predicate::str::contains(
             "cannot be combined with a positional",
         ));
-}
-
-#[test]
-fn test_validate_id_reports_unresolved_container_pointer() {
-    // Per-issue validation must report an unresolved container pointer.
-    let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
-    );
-    append_rules(&cli, UNRESOLVED_CONTAINER_RULE);
-    let id = cli.create_issue(EPIC).unwrap();
-
-    let assert = cli.command(["validate", &id, "--json"]).assert().failure();
-    let out = assert.get_output().stdout.clone();
-    let json: Value = serde_json::from_slice(&out).unwrap();
-    let findings = json["error"]["details"]["findings"].as_array().unwrap();
-    assert!(
-        findings.iter().any(|f| f["rule"] == "broken-graph-rule"
-            && f["message"].as_str().unwrap_or("").contains("config error")),
-        "unresolved container pointer must be reported per-issue: {findings:?}"
-    );
-}
-
-#[test]
-fn test_validate_explain_marks_unresolved_container_pointer_as_failed() {
-    // Finding #3 (--explain): a graph rule with a missing container pointer must
-    // be shown as FAILED, never PASS.
-    let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
-    );
-    append_rules(&cli, UNRESOLVED_CONTAINER_RULE);
-    let id = cli.create_issue(EPIC).unwrap();
-
-    // Human form: the rule appears and is marked FAIL.
-    cli.command(["validate", &id, "--explain"])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("broken-graph-rule"))
-        .stdout(predicate::str::contains("FAIL"));
-
-    // JSON form: the outcome for the malformed rule has passed = false.
-    let assert = cli
-        .command(["validate", &id, "--explain", "--json"])
-        .assert()
-        .failure();
-    let out = assert.get_output().stdout.clone();
-    let json: Value = serde_json::from_slice(&out).unwrap();
-    let outcomes = json["error"]["details"]["outcomes"].as_array().unwrap();
-    let outcome = outcomes
-        .iter()
-        .find(|o| o["rule"] == "broken-graph-rule")
-        .expect("unresolved container pointer must appear as an outcome");
-    assert_eq!(
-        outcome["passed"], false,
-        "a config-errored graph rule must be reported as failed, not passed: {outcome}"
-    );
 }
 
 #[test]

@@ -5,7 +5,7 @@ use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
-use crate::validation::report::{group_messages, render_selector, BuiltInPass, RuleSelectionFault};
+use crate::validation::report::{BuiltInPass, RuleSelectionFault};
 use anyhow::Context;
 
 #[derive(Clone, Copy)]
@@ -595,6 +595,29 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     return Ok(SessionStep::Done((messages.len(), messages)));
                 }
                 Ok(SessionStep::Apply(plan, (messages.len(), messages)))
+            },
+        )
+    }
+
+    /// Capture the repository once and compute its report without the history
+    /// verdicts, the report every selection but `Whole` reads.
+    pub fn selection_report(&self) -> Result<crate::validation::ValidationReport> {
+        let layout = self.exec.require_layout()?;
+        with_mutation_session(
+            self.exec.storage(),
+            &layout,
+            "repository validation",
+            |session| {
+                let Some(captured) = self.capture_validation(session)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                Ok(SessionStep::Done(crate::validation::report(
+                    &captured,
+                    &crate::validation::ReportInputs {
+                        now: chrono::Utc::now(),
+                        history: None,
+                    },
+                )))
             },
         )
     }
@@ -1460,141 +1483,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         plan_content_with_issues(&image, &all_issues, emit_for)
     }
 
-    /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
-    /// whole-repo report.
-    ///
-    /// When `id` is `Some`, the issue's matching local rules are evaluated, then graph rules are evaluated across
-    /// the whole store and filtered to those that pertain to this issue using
-    /// structured attribution (each graph finding carries its issue id), plus any
-    /// `config-error` finding for a graph rule whose selector applies to this
-    /// issue — so a malformed graph rule is reported, never silently passed. When
-    /// `id` is `None`, local rules run for every issue and graph rules run across
-    /// the store, with every graph finding reported. The result is a pure
-    /// [`RuleReport`](crate::validation::report::RuleReport); rendering and exit
-    /// codes are the caller's concern.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
-    /// found, or a matching local rule's schema fails to compile (a
-    /// misconfigured rule never silently disables enforcement).
-    pub fn run_rules(&self, id: Option<&IssueId>) -> Result<crate::validation::report::RuleReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::validation::report::{ReportedFinding, RuleReport};
-
-        // If the rule SOURCE is unloadable, do NOT crash the whole report: the
-        // enforcement-drift pass still reports a declared-but-unenforced finding
-        // for a binding into the unloadable source (REQ-01), and the parse problem
-        // itself is surfaced as a config-error finding so validation still fails.
-        // This mirrors how a SEMANTIC config-error (a rule that parses but is
-        // rejected by its evaluator) is already reported as a finding rather than
-        // an early `?`.
-        let ruleset = match self.exec.effective_rules() {
-            Ok(set) => set,
-            Err(e) => {
-                let mut findings: Vec<ReportedFinding> = Vec::new();
-                // The drift pass loads the ruleset tolerantly on its own.
-                for gf in self.enforcement_drift_findings()? {
-                    findings.push(ReportedFinding::new(gf.issue_id.clone(), &gf.finding));
-                }
-                if id.is_none() {
-                    findings.extend(self.review_placeholder_findings()?);
-                }
-                // Surface the unparseable ruleset as an error-severity finding so
-                // the report still fails (config-error prefix keeps it grouped).
-                findings.push(ReportedFinding::new(
-                    None,
-                    &crate::validation::engine::Finding {
-                        rule: BuiltInPass::RulesFile.as_str().to_owned(),
-                        severity: crate::declarations::rules::Severity::Error,
-                        message: format!("config error: {e}"),
-                    },
-                ));
-                return Ok(RuleReport { findings });
-            }
-        };
-        let repo_format = self.exec.cached_config()?.content_format();
-        let issues = self.exec.storage.list_issues()?;
-
-        let mut findings: Vec<ReportedFinding> = Vec::new();
-
-        match id {
-            Some(full_id) => {
-                let issue = self.exec.storage.load_issue(full_id)?;
-
-                // Local rules for this issue only.
-                let evaluation = crate::validation::evaluate_local(&issue, ruleset, repo_format)
-                    .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-                findings.extend(
-                    evaluation
-                        .findings()
-                        .into_iter()
-                        .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
-                );
-
-                // Graph rules across the store. Keep, by EXACT structural
-                // attribution (not substring matching): findings attributed to
-                // this issue, plus any config-error for a graph rule whose
-                // selector applies to this issue (a malformed graph rule must be
-                // reported here, never silently dropped).
-                let applicable_rules: std::collections::HashSet<String> = ruleset
-                    .matching_rules(&issue)
-                    .into_iter()
-                    .map(|r| r.name.clone())
-                    .collect();
-                let mut graph_findings = self.evaluate_graph_rules(&issues)?;
-                // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
-                // attributed to issues, so per-issue filtering below keeps only
-                // this issue's dangling links.
-                graph_findings.extend(self.dangling_link_findings(&issues)?);
-                // The enforcement-drift pass is intentionally NOT folded into the
-                // single-issue report: drift is project-scoped (unattributed), not
-                // a property of one issue. It surfaces in the whole-repo report
-                // (the `None` arm below) and gates `validate_silent` / cargo-ci.
-                findings.extend(graph_findings.iter().filter_map(|gf| {
-                    let pertains = gf.issue_id.as_ref() == Some(&issue.id)
-                        || (gf.is_config_error() && applicable_rules.contains(&gf.finding.rule));
-                    pertains.then(|| ReportedFinding::new(Some(issue.id.clone()), &gf.finding))
-                }));
-            }
-            None => {
-                // Local rules for every issue.
-                for issue in &issues {
-                    let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
-                        .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-                    findings.extend(
-                        evaluation
-                            .findings()
-                            .into_iter()
-                            .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
-                    );
-                }
-
-                // Graph rules across the store; every finding is reported,
-                // carrying its structured issue attribution (None for config
-                // errors).
-                let mut graph_findings = self.evaluate_graph_rules(&issues)?;
-                // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
-                // every dangling link surfaces in the whole-repo report.
-                graph_findings.extend(self.dangling_link_findings(&issues)?);
-                // Built-in enforcement-drift pass (REQ-01/REQ-02): project-scoped
-                // (unattributed) drift surfaces in the whole-repo report. Gated on
-                // declared invariants, so a repo without any is unaffected.
-                graph_findings.extend(self.enforcement_drift_findings()?);
-                findings.extend(
-                    graph_findings
-                        .iter()
-                        .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
-                );
-                findings.extend(self.review_placeholder_findings()?);
-            }
-        }
-
-        Ok(RuleReport { findings })
-    }
-
     /// Report configured passing review placeholders as project-scoped warnings.
     ///
     /// The registry keys are sorted before rendering so the finding is stable
@@ -1805,117 +1693,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let image = self.exec.capture_validation_image()?;
         rule_validation_outcome(&image, issue_id, rule_name)
             .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
-    }
-
-    /// Build the `--explain` report for one issue: EVERY rule in the ruleset,
-    /// paired with whether its selector matched the issue and, for matched rules,
-    /// whether they passed and their messages.
-    ///
-    /// A rule whose selector excludes the issue is reported as skipped: its
-    /// [`RuleOutcome`](crate::validation::report::RuleOutcome) carries `matched =
-    /// false` and a `skip_reason` naming the excluding selector dimension(s) (the
-    /// state dimension is called out explicitly, e.g. "state predicate did not
-    /// match (issue is 'in_progress', wants 'done')"). Local rules that match are
-    /// evaluated against the issue; matching graph rules are evaluated across the
-    /// whole store and attributed to this issue by EXACT structural attribution
-    /// (each finding carries its issue id), and any `config-error` finding for an
-    /// applicable graph rule is also surfaced — so a malformed graph rule is
-    /// reported as a FAILED outcome, never shown as passing. Widening the report
-    /// to include non-matching rules does not change which rules EXECUTE: only
-    /// matched rules are evaluated.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
-    /// found, or a matching local rule's schema fails to compile.
-    pub fn explain_rules(&self, id: &IssueId) -> Result<crate::validation::report::ExplainReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::rules::RuleScope;
-        use crate::validation::report::{ExplainReport, RuleOutcome};
-
-        let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.cached_config()?.content_format();
-        let issue = self.exec.storage.load_issue(id)?;
-        let issues = self.exec.storage.list_issues()?;
-
-        // Local findings for this issue, grouped by rule name.
-        let local_eval = crate::validation::evaluate_local(&issue, ruleset, repo_format)
-            .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-        let local_messages = group_messages(
-            local_eval
-                .findings()
-                .into_iter()
-                .map(|f| (f.rule.clone(), f.message.clone())),
-        );
-
-        // Graph findings pertaining to this issue, grouped by rule name, using
-        // EXACT structural attribution: a finding attributed to this issue, or a
-        // config-error (which carries no issue id but must be surfaced so a
-        // malformed graph rule fails rather than silently passes). The
-        // selector-based "applies to this issue" decision is made per-rule below;
-        // including all config-errors here is safe because these messages are
-        // consumed only by the matched arm (non-matching rules are reported as
-        // skipped with no messages).
-        let graph_findings = self.evaluate_graph_rules(&issues)?;
-        let graph_messages = group_messages(graph_findings.iter().filter_map(|gf| {
-            let pertains = gf.issue_id.as_ref() == Some(&issue.id) || gf.is_config_error();
-            pertains.then(|| (gf.finding.rule.clone(), gf.finding.message.clone()))
-        }));
-
-        // EVERY rule in the ruleset becomes one outcome, not just the matching
-        // ones: a rule excluded by its selector is reported with `matched =
-        // false` and a `skip_reason` naming the dimension(s) that excluded the
-        // issue, so `--explain` can show "the state predicate did not match".
-        // Matching rules keep their PASS/FAIL semantics. This widens only the
-        // REPORT; which rules EXECUTE is still decided by `matching_rules`
-        // (here, the per-rule `when.matches` check selecting the matched arm).
-        let outcomes: Vec<RuleOutcome> = ruleset
-            .rules
-            .iter()
-            .map(|rule| {
-                match rule.when.match_failure(&issue) {
-                    // Selector excluded the issue: report it as skipped.
-                    Some(skip_reason) => RuleOutcome {
-                        rule: rule.name.clone(),
-                        scope: rule.scope,
-                        severity: rule.severity,
-                        selector: render_selector(&rule.when),
-                        matched: false,
-                        skip_reason: Some(skip_reason),
-                        passed: true,
-                        messages: Vec::new(),
-                    },
-                    // Selector matched: PASS/FAIL from the evaluated findings.
-                    None => {
-                        let messages = match rule.scope {
-                            RuleScope::Local => {
-                                local_messages.get(&rule.name).cloned().unwrap_or_default()
-                            }
-                            RuleScope::Graph => {
-                                graph_messages.get(&rule.name).cloned().unwrap_or_default()
-                            }
-                        };
-                        RuleOutcome {
-                            rule: rule.name.clone(),
-                            scope: rule.scope,
-                            severity: rule.severity,
-                            selector: render_selector(&rule.when),
-                            matched: true,
-                            skip_reason: None,
-                            passed: messages.is_empty(),
-                            messages,
-                        }
-                    }
-                }
-            })
-            .collect();
-
-        Ok(ExplainReport {
-            issue_id: issue.id,
-            outcomes,
-        })
     }
 
     pub fn get_status(&self) -> Result<StatusSummary> {
@@ -3082,44 +2859,6 @@ priority = 100
             msg.contains(BuiltInPass::DanglingItemLink.as_str()) && msg.contains("BOGUS"),
             "expected dangling-link rule failure, got: {msg}"
         );
-    }
-
-    #[test]
-    fn test_run_rules_whole_repo_surfaces_dangling_link() {
-        // REQ-03 via the structured report `jit validate [--json]` consumes:
-        // `run_rules(None)` reports the dangling link as an error finding (which
-        // serializes for `--json`).
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let short = target.short_id();
-        let mut node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
-        node.dependencies = vec![target.id.clone()];
-        let config = crate::test_utils::shipped_item_kinds_toml();
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), target);
-        seed_issue(exec.storage(), node);
-
-        let report = exec.validation().run_rules(None).unwrap();
-        assert!(report.has_errors());
-        let dangling: Vec<_> = report
-            .findings
-            .iter()
-            .filter(|f| f.rule == BuiltInPass::DanglingItemLink.as_str())
-            .collect();
-        assert_eq!(dangling.len(), 1);
-        assert!(dangling[0].message.contains("BOGUS"));
-        // The finding serializes (used by `jit validate --json`).
-        let value = serde_json::to_value(&report.findings).unwrap();
-        assert!(value
-            .to_string()
-            .contains(BuiltInPass::DanglingItemLink.as_str()));
     }
 
     /// Shared bases exclude references; a consuming pass requests its own scope.
