@@ -228,7 +228,7 @@ impl ExplainReport {
 /// A validation view, computed by [`ValidationReport::select`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
-    /// Every finding; the report's structural failure accompanies it.
+    /// Every finding, and the structural failure as [`StructuralFailure`].
     Whole,
     /// The findings concerning one issue, reported as that issue's.
     Issue(IssueIdPrefix),
@@ -303,6 +303,17 @@ impl Selectable {
 #[derive(Debug, thiserror::Error)]
 #[error("whole-repository validation needs a report carrying the history verdicts")]
 pub struct MissingHistoryError;
+
+/// A whole-repository selection from a report with a structural failure,
+/// holding the findings collected beside it.
+#[derive(Debug, thiserror::Error)]
+#[error("{failure:#}")]
+pub struct StructuralFailure {
+    /// The report's structural failure.
+    pub failure: Arc<anyhow::Error>,
+    /// Every finding of the report.
+    pub findings: RuleReport,
+}
 
 /// A configured rule that cannot be evaluated against the selected issue.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -404,17 +415,26 @@ impl ValidationReport {
     /// A prefix naming no issue or several fails with the lookup error. A
     /// report without parsed declarations or records fails every selection but
     /// `Whole` with its structural failure; `Whole` from a report without
-    /// history fails with [`MissingHistoryError`]; a rule that cannot be
+    /// history fails with [`MissingHistoryError`], and from a report with a
+    /// structural failure with [`StructuralFailure`]; a rule that cannot be
     /// selected for the issue fails with its [`RuleSelectionFault`].
     pub fn select(&self, selection: &Selection) -> Result<RuleReport> {
         let membership = self.membership(selection)?;
-        Ok(RuleReport {
+        let findings = RuleReport {
             findings: self
                 .findings
                 .iter()
                 .filter_map(|finding| membership.admit(finding))
                 .collect(),
-        })
+        };
+        match (&membership, &self.structural_failure) {
+            (Membership::Whole, Some(failure)) => Err(StructuralFailure {
+                failure: Arc::clone(failure),
+                findings,
+            }
+            .into()),
+            _ => Ok(findings),
+        }
     }
 
     /// Every rule's outcome for one issue; a matched rule fails exactly when
@@ -1040,7 +1060,8 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
             selectable: Err(failure),
             ..fixture.report()
         };
-        assert!(report.select(&Selection::Whole).is_ok());
+        let whole = report.select(&Selection::Whole).unwrap_err();
+        assert!(whole.downcast_ref::<StructuralFailure>().is_some());
         for selection in [
             Selection::Issue(prefix(&fixture.a)),
             Selection::Scope(prefix(&fixture.c)),
@@ -1056,7 +1077,7 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
     }
 
     #[test]
-    fn test_select_reports_a_failed_history_verdict_only_beside_whole() {
+    fn test_select_reports_a_failed_history_verdict_only_in_whole() {
         let fixture = Fixture::new();
         let healthy = fixture.report();
         let report = ValidationReport {
@@ -1065,6 +1086,12 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
             ))),
             ..fixture.report()
         };
+        let whole = report.select(&Selection::Whole).unwrap_err();
+        let whole = whole.downcast_ref::<StructuralFailure>().unwrap();
+        assert!(whole
+            .to_string()
+            .starts_with("record-fidelity validation pass"));
+        assert_eq!(whole.findings, healthy.select(&Selection::Whole).unwrap());
         for selection in [
             Selection::Issue(prefix(&fixture.a)),
             Selection::Scope(prefix(&fixture.c)),
