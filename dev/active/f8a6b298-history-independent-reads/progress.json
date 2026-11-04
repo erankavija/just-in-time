@@ -435,6 +435,10 @@
     {
       "item": "ac8f07c2 REQ-01 says each per-key record (incl. leases) is written in a redo record; lease-record-layout commits by rename/unlink. Recommend (a) restrict to repository records + epic Constraints qualifier",
       "status": "resolved: steward (a), DEC-25, ac8f07c2 D-1"
+    },
+    {
+      "item": "735949ef holistic-review 2413b19d F1: story REQ-03 \"validation capture no other issue run records\" vs epic REQ-13 whole-repo validate as history reader. Recommend (a) amend story REQ-03",
+      "status": "pending with just-in-time-6a"
     }
   ],
   "rework_counts": {
