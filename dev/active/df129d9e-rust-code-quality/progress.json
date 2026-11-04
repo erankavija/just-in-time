@@ -1157,13 +1157,13 @@
       "status": "dispatched",
       "vendor": "Claude Sonnet",
       "reason": "script change with self-test; steward priority",
-      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker."
+      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker. Rework 2 (c8852b99e) passed lead review. Landing attempt failed for host reasons twice (exit 75, then 24/24 TIMEOUT at 20 s under the integrator's advisory run); not landed; relaunch asked of 6a (D-46)."
     },
     "b51291e4": {
       "status": "rework",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained script change without sockets; alternation",
-      "review": "lead R1 PASS; landed f0ed97f2e; worktree-cache-test passed; code-review R1 failed (run efb94dd6): F1 self-test leaks default-root temp dirs. Rework 1 to Claude Haiku."
+      "review": "lead R1 PASS; landed f0ed97f2e; worktree-cache-test passed; code-review R1 failed (run efb94dd6): F1 self-test leaks default-root temp dirs. Rework 1 to Claude Haiku. Rework 1 (64a2866c4) passed lead review; re-landing."
     }
   },
   "handoff": {
