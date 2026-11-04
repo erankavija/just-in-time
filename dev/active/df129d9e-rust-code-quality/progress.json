@@ -876,7 +876,8 @@
     "153c9851": 1,
     "98cc2097": 2,
     "20fc3b92": 1,
-    "10751360": 1
+    "10751360": 1,
+    "8a14e8e9": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1121,6 +1122,12 @@
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43)."
+    },
+    "8a14e8e9": {
+      "status": "rework",
+      "vendor": "Claude Sonnet",
+      "reason": "ENOSPC classification (D-47)",
+      "note": "landed 59257f573; cargo-ci and selftest pass; code-review F1: non-test step with ENOSPC plus content error exits 75 (REQ-02)"
     }
   }
 }
