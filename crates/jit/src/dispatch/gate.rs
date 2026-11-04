@@ -1,8 +1,8 @@
 //! Gate definitions, presets, status and evaluation.
 
 use super::{
-    resolve_gate_key, resolve_gate_key_for, resolve_issue, CommandContext, HandlerResult,
-    HandlerStore, Outcome,
+    count_message, resolve_gate_key, resolve_gate_key_for, resolve_issue, CommandContext,
+    HandlerResult, HandlerStore, Outcome,
 };
 use crate::cli::{GateCommands, PresetCommands};
 use crate::commands::{FieldEdit, GateStatusArgumentsTransposedError, GateUpdate};
@@ -192,7 +192,7 @@ fn add<S: HandlerStore>(
 
 fn list<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GateListResponse> {
     let gates = ctx.executor.gates().list_gates()?;
-    let message = format!("{} gate definition(s)", gates.len());
+    let message = count_message(gates.len(), "", " gate definition(s)");
     Ok(Outcome::success_with(
         GateListResponse::new(gates.into_iter().map(GateDefinition::from).collect()),
         message,
@@ -215,7 +215,7 @@ fn preset_list<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> HandlerResult<GatePresetListResponse> {
     let presets = ctx.executor.gates().list_gate_presets()?;
-    let message = format!("{} preset(s)", presets.len());
+    let message = count_message(presets.len(), "", " preset(s)");
     Ok(Outcome::success_with(
         GatePresetListResponse::new(presets),
         message,
@@ -430,7 +430,11 @@ fn gate_status<S: IssueStore>(
             .take(limit.unwrap_or(usize::MAX))
             .map(|run| GateRunSummary::full(&run))
             .collect::<Vec<_>>();
-        let message = format!("{} gate run(s) listed for issue {issue_id}", runs.len());
+        let message = count_message(
+            runs.len(),
+            "",
+            &format!(" gate run(s) listed for issue {issue_id}"),
+        );
         let history = GateStatusOutput::History(ForIssue {
             issue_id,
             response: GateRunHistoryResponse::new(runs),

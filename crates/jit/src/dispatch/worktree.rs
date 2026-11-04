@@ -1,6 +1,6 @@
 //! Worktree inspection handlers.
 
-use super::{CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::WorktreeCommands;
 use crate::commands::worktree::{
     execute_worktree_exec, execute_worktree_info, execute_worktree_list,
@@ -22,7 +22,7 @@ fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeInfo
 fn list(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeListResponse> {
     let (worktrees, warnings) =
         execute_worktree_list(&ctx.executor.storage().configured_worktree_paths()?)?;
-    let message = format!("{} worktree(s)", worktrees.len());
+    let message = count_message(worktrees.len(), "", " worktree(s)");
     Ok(
         Outcome::success_with(WorktreeListResponse::new(worktrees), message)
             .with_warnings(warnings),
@@ -34,7 +34,7 @@ fn store_divergence(
 ) -> HandlerResult<WorktreeStoreDivergenceResponse> {
     let report =
         execute_worktree_store_divergence(&ctx.executor.storage().configured_worktree_paths()?)?;
-    let message = format!("{} divergence(s)", report.divergences.len());
+    let message = count_message(report.divergences.len(), "", " divergence(s)");
     Ok(Outcome::success_with(
         WorktreeStoreDivergenceResponse::with_extras(
             report.divergences,

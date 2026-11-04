@@ -1,11 +1,12 @@
 //! `jit claim` and `jit recover` handlers.
 
 use super::{
-    resolve_issue, resolve_issue_filter, CommandContext, HandlerResult, HandlerStore, Outcome,
+    count_message, resolve_issue, resolve_issue_filter, CommandContext, HandlerResult,
+    HandlerStore, Outcome,
 };
 use crate::cli::ClaimCommands;
-use crate::commands::RecoveryFailedError;
 use crate::domain::identity::IssueIdPrefix;
+use crate::errors::RecoveryFailedError;
 use crate::output::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
     ClaimRenewResponse, LeaseListResponse, RecoverResponse,
@@ -83,7 +84,7 @@ fn status<S: HandlerStore>(
         .executor
         .claims()
         .status(issue.as_ref(), agent.as_deref())?;
-    let message = format!("{} active lease(s)", leases.len());
+    let message = count_message(leases.len(), "", " active lease(s)");
     Ok(Outcome::success_with(
         LeaseListResponse::listing(leases, false),
         message,
@@ -92,7 +93,7 @@ fn status<S: HandlerStore>(
 
 fn list<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<LeaseListResponse> {
     let leases = ctx.executor.claims().list()?;
-    let message = format!("{} lease(s) found", leases.len());
+    let message = count_message(leases.len(), "", " lease(s) found");
     Ok(Outcome::success_with(
         LeaseListResponse::listing(leases, true),
         message,

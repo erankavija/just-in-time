@@ -115,6 +115,10 @@ impl<R> Outcome<R> {
     }
 }
 
+fn count_message(count: usize, prefix: &str, suffix: &str) -> String {
+    format!("{prefix}{count}{suffix}")
+}
+
 /// Open the repository `cli`'s command runs over; `--schema`, a missing
 /// command, `version` and `init` run without one.
 ///
@@ -347,8 +351,8 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 ///
 /// - `storage: [Bounds]`: handlers are generic over `S: Bounds` and take the
 ///   [`CommandContext`] first.
-/// - `storage: Type`: handlers take a `CommandContext<'_, Type>`, for
-///   operations only that store implements.
+/// - `storage: Type` (parenthesized for a qualified type): handlers take a
+///   `CommandContext<'_, Type>`, for operations only that store implements.
 /// - No `storage:` entry (executor-free): for leaves that run before
 ///   repository bootstrap. Handlers take no context and `dispatch(command,
 ///   mode, out, err)` takes the [`OutputMode`] in its place.
@@ -365,43 +369,30 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 macro_rules! command_group {
     (
         command: $command:ty,
-        storage: [$($bound:tt)+],
-        leaves: { $($leaves:tt)+ } $(,)?
+        $(storage: $storage:tt,)?
+        leaves: $leaves:tt $(,)?
     ) => {
-        command_group!(@body
-            generics [<S: $($bound)+>]
-            params [ctx: &$crate::dispatch::CommandContext<'_, S>,]
-            mode [ctx.mode]
-            handler_args [ctx,]
-            command $command,
-            leaves { $($leaves)+ }
-        );
+        command_group!(@context [$($storage)?] [] [command $command, leaves $leaves]);
     };
-    (
-        command: $command:ty,
-        storage: $storage:ty,
-        leaves: { $($leaves:tt)+ } $(,)?
-    ) => {
+    (@context [[$($bound:tt)+]] [] $body:tt) => {
+        command_group!(@context [S] [<S: $($bound)+>] $body);
+    };
+    (@context [$storage:ty] [$($generics:tt)*] [$($body:tt)*]) => {
         command_group!(@body
-            generics []
+            generics [$($generics)*]
             params [ctx: &$crate::dispatch::CommandContext<'_, $storage>,]
             mode [ctx.mode]
             handler_args [ctx,]
-            command $command,
-            leaves { $($leaves)+ }
+            $($body)*
         );
     };
-    (
-        command: $command:ty,
-        leaves: { $($leaves:tt)+ } $(,)?
-    ) => {
+    (@context [] [] [$($body:tt)*]) => {
         command_group!(@body
             generics []
             params [mode: $crate::output::OutputMode,]
             mode [mode]
             handler_args []
-            command $command,
-            leaves { $($leaves)+ }
+            $($body)*
         );
     };
     (@body
@@ -480,3 +471,19 @@ mod test_group;
 pub mod validate;
 pub mod version;
 pub mod worktree;
+
+#[cfg(test)]
+mod tests {
+    use super::count_message;
+
+    #[test]
+    fn test_count_message_preserves_count_and_surrounding_text() {
+        for (count, prefix, suffix, expected) in [
+            (0, "", " event(s)", "0 event(s)"),
+            (1, "Found ", " item(s)", "Found 1 item(s)"),
+            (12, "", " document(s) attached", "12 document(s) attached"),
+        ] {
+            assert_eq!(count_message(count, prefix, suffix), expected);
+        }
+    }
+}

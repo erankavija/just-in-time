@@ -227,13 +227,11 @@ impl Drop for LayoutReentry {
     }
 }
 
-/// Opaque mutation session retaining serialization through capture and apply.
-pub trait RepositoryMutationSession {
+/// The capture half of a session: what a read derives from.
+pub trait RepositoryReadSession {
     /// Canonical layout held by this session.
     fn layout(&self) -> &RepositoryLayout;
-    /// Recovery completed before this session became available for capture.
-    fn recovery_report(&self) -> &RecoveryDispatchReport;
-    /// Capture one complete bounded image after recovery has converged.
+    /// Capture one complete bounded image.
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError>;
     /// Grow `image` to `spec`, reading only the requests `image` does not
     /// already answer the same way; what it read is kept, never re-read.
@@ -242,6 +240,12 @@ pub trait RepositoryMutationSession {
         image: RepositoryImage,
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError>;
+}
+
+/// Opaque mutation session retaining serialization through capture and apply.
+pub trait RepositoryMutationSession: RepositoryReadSession {
+    /// Recovery completed before this session became available for capture.
+    fn recovery_report(&self) -> &RecoveryDispatchReport;
     /// Publish one complete semantic plan, refused if the files it writes moved.
     fn apply(
         &mut self,
@@ -267,6 +271,29 @@ fn history_log_bytes(
     }
 }
 
+/// Whether a lock-free read's capture is one whole repository version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadAdmission {
+    /// No commit crossed the capture.
+    Granted,
+    /// A redo record was present at open or at admission.
+    Busy,
+    /// The event log changed, the data root's presence changed, or a root was
+    /// replaced.
+    Moved,
+}
+
+/// A lock-free read session (`@/charter/D-22`): its capture counts only once
+/// [`admit`](Self::admit) grants it.
+pub trait OptimisticReadSession: RepositoryReadSession {
+    /// Judge the captures made so far against the repository now.
+    ///
+    /// Sound because every record over a present data root appends an event
+    /// and is committed before its first live write: a commit whose live write
+    /// fell inside the capture either left its record in place or grew the log.
+    fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError>;
+}
+
 /// Storage backend capable of one capture/apply mutation boundary.
 pub trait RepositoryStateStore {
     /// Open a mutation session for exactly `layout`, applying any leftover redo
@@ -275,6 +302,51 @@ pub trait RepositoryStateStore {
         &self,
         layout: RepositoryLayout,
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
+
+    /// Open a read session for exactly `layout`, taking no lock and applying
+    /// nothing.
+    fn open_read_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError>;
+}
+
+/// What a read session observes of commits: whether a record is present, then
+/// the event log's length and tail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommitObservation {
+    data_root: bool,
+    record: bool,
+    log: Option<EventLogTail>,
+}
+
+impl CommitObservation {
+    /// The admission of a read opened at `self` and observing `now`; a
+    /// retryable conflict while observing is a move.
+    fn admit(
+        &self,
+        now: Result<CommitObservation, RepositoryStateStoreError>,
+    ) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        match now {
+            _ if self.record => Ok(ReadAdmission::Busy),
+            Ok(now) if now.record => Ok(ReadAdmission::Busy),
+            Ok(now) if now == *self => Ok(ReadAdmission::Granted),
+            Ok(_) | Err(RepositoryStateStoreError::RetryableConflict { .. }) => {
+                Ok(ReadAdmission::Moved)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Refuse a capture over a record the open saw: its admission is `Busy`.
+    fn ensure_capturable(&self) -> Result<(), RepositoryStateStoreError> {
+        match self.record {
+            true => Err(RepositoryStateStoreError::RetryableConflict {
+                path: format!("{RECORD_SCRATCH_DIR}/{RECORD_FILE_NAME}"),
+            }),
+            false => Ok(()),
+        }
+    }
 }
 
 /// The record [`read_leftover_record`] found, applied and cleared: one, or
@@ -298,27 +370,14 @@ fn apply_leftover_record(
 }
 
 /// Runs before the record is applied, so a record this open refuses is refused
-/// over an untouched repository. A repository holding none pays one look at the
-/// record's own name: the parent walk stops at an absent scratch directory and
-/// the open at an absent record, and nothing there is enumerated or otherwise
-/// read.
+/// over an untouched repository.
 fn read_leftover_record(
     roots: &CapabilityRoots,
 ) -> Result<Option<RedoRecord>, RepositoryStateStoreError> {
-    let Some(data) = roots.root(RepositoryRootClass::Data) else {
+    let Some(mut file) = open_leftover_record(roots)? else {
         return Ok(None);
     };
     let relative = Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
-    let Some((scratch, leaf)) = open_capability_parent(data, &relative)? else {
-        return Ok(None);
-    };
-    let mut file = match open_regular_file_nofollow(&scratch, &leaf) {
-        Ok(file) => file,
-        Err(CapabilityFsError::Io(error)) if error.kind() == ErrorKind::NotFound => {
-            return Ok(None)
-        }
-        Err(error) => return Err(error.into()),
-    };
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
     RedoRecord::parse(&bytes).map(Some).map_err(|source| {
@@ -327,6 +386,26 @@ fn read_leftover_record(
             source,
         }
     })
+}
+
+/// The leftover record, opened by name. A repository holding none pays one look
+/// at that name: the parent walk stops at an absent scratch directory and the
+/// open at an absent record, and nothing there is enumerated or otherwise read.
+fn open_leftover_record(
+    roots: &CapabilityRoots,
+) -> Result<Option<cap_std::fs::File>, RepositoryStateStoreError> {
+    let Some(data) = roots.root(RepositoryRootClass::Data) else {
+        return Ok(None);
+    };
+    let relative = Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+    let Some((scratch, leaf)) = open_capability_parent(data, &relative)? else {
+        return Ok(None);
+    };
+    match open_regular_file_nofollow(&scratch, &leaf) {
+        Ok(file) => Ok(Some(file)),
+        Err(CapabilityFsError::Io(error)) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// [`apply_leftover_record`] over the record the in-memory backend holds.
@@ -388,11 +467,28 @@ struct MemoryMutationSession {
     captured: Option<ImageToken>,
 }
 
-impl RepositoryStateStore for JsonFileStorage {
-    fn open_mutation_session(
+/// A lock-free read over the filesystem, holding no guard.
+struct JsonReadSession {
+    layout: RepositoryLayout,
+    storage: JsonFileStorage,
+    roots: CapabilityRoots,
+    opened: CommitObservation,
+}
+
+/// A lock-free read over the in-memory backend's entry map.
+struct MemoryReadSession {
+    layout: RepositoryLayout,
+    storage: InMemoryStorage,
+    opened: CommitObservation,
+}
+
+impl JsonFileStorage {
+    /// The layout a session opens: the one this storage is bound to when it
+    /// names the same roots, refused when it names others.
+    fn session_layout(
         &self,
         layout: RepositoryLayout,
-    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+    ) -> Result<RepositoryLayout, RepositoryStateStoreError> {
         let layout = match self.configured_layout() {
             Ok(configured)
                 if configured.worktree_root() == layout.worktree_root()
@@ -416,6 +512,46 @@ impl RepositoryStateStore for JsonFileStorage {
                 RepositoryLayoutError::OutsideRepositoryRoots(self.root().to_path_buf()).into(),
             );
         }
+        Ok(layout)
+    }
+}
+
+/// The record probe, then the event log's tail: a commit removes its record
+/// only after its append.
+fn observe_json_commits(
+    layout: &RepositoryLayout,
+    roots: &CapabilityRoots,
+) -> Result<CommitObservation, RepositoryStateStoreError> {
+    let record = open_leftover_record(roots)?.is_some();
+    Ok(CommitObservation {
+        data_root: roots.root(RepositoryRootClass::Data).is_some(),
+        record,
+        log: live_event_log_tail(layout, roots)?,
+    })
+}
+
+/// [`observe_json_commits`] over the in-memory backend, read under one lock
+/// of its state.
+fn observe_memory_commits(storage: &InMemoryStorage) -> CommitObservation {
+    let state = storage.repository_state();
+    CommitObservation {
+        data_root: state.data_root_exists,
+        record: state.record.is_some(),
+        log: match state.entries.get(&VirtualPath::EVENTS) {
+            Some(RepositoryEntry::File { content, .. }) => {
+                Some(EventLogTail::of_bytes(content.bytes()))
+            }
+            _ => None,
+        },
+    }
+}
+
+impl RepositoryStateStore for JsonFileStorage {
+    fn open_mutation_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        let layout = self.session_layout(layout)?;
         // A retained session may reenter the reentrant lock chain only for the
         // same canonical layout.
         self.active_mutation_layout().enter(&layout)?;
@@ -478,6 +614,24 @@ impl RepositoryStateStore for JsonFileStorage {
             captured: None,
         }))
     }
+
+    fn open_read_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError> {
+        let layout = self.session_layout(layout)?;
+        revalidate_layout(&layout)?;
+        let (roots, _, _) = CapabilityRoots::open(&layout)?;
+        self.mutation_interruptions()
+            .check(&MutationPoint::ReadSessionOpen)?;
+        let opened = observe_json_commits(&layout, &roots)?;
+        Ok(Box::new(JsonReadSession {
+            layout,
+            storage: self.clone(),
+            roots,
+            opened,
+        }))
+    }
 }
 
 impl RepositoryStateStore for InMemoryStorage {
@@ -511,15 +665,24 @@ impl RepositoryStateStore for InMemoryStorage {
             captured: None,
         }))
     }
+
+    fn open_read_session(
+        &self,
+        layout: RepositoryLayout,
+    ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError> {
+        self.mutation_interruptions()
+            .check(&MutationPoint::ReadSessionOpen)?;
+        Ok(Box::new(MemoryReadSession {
+            layout,
+            storage: self.clone(),
+            opened: observe_memory_commits(self),
+        }))
+    }
 }
 
-impl RepositoryMutationSession for JsonMutationSession {
+impl RepositoryReadSession for JsonReadSession {
     fn layout(&self) -> &RepositoryLayout {
         &self.layout
-    }
-
-    fn recovery_report(&self) -> &RecoveryDispatchReport {
-        &self.recovery_report
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -532,6 +695,82 @@ impl RepositoryMutationSession for JsonMutationSession {
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         self.capture_over(image.into_answers(&spec), spec)
+    }
+}
+
+impl JsonReadSession {
+    fn capture_over(
+        &mut self,
+        prior: CapturedAnswers,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        capture_capability_image(&self.layout, &self.roots, &self.storage, spec, prior)
+    }
+}
+
+impl OptimisticReadSession for JsonReadSession {
+    fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        self.opened.admit(
+            revalidate_layout_capabilities(&self.layout, &self.roots)
+                .and_then(|()| observe_json_commits(&self.layout, &self.roots)),
+        )
+    }
+}
+
+impl RepositoryReadSession for MemoryReadSession {
+    fn layout(&self) -> &RepositoryLayout {
+        &self.layout
+    }
+
+    fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        capture_memory_image(
+            &self.layout,
+            &self.storage.repository_state(),
+            spec,
+            CapturedAnswers::default(),
+        )
+    }
+
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        let prior = image.into_answers(&spec);
+        capture_memory_image(&self.layout, &self.storage.repository_state(), spec, prior)
+    }
+}
+
+impl OptimisticReadSession for MemoryReadSession {
+    fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        self.opened.admit(Ok(observe_memory_commits(&self.storage)))
+    }
+}
+
+impl RepositoryReadSession for JsonMutationSession {
+    fn layout(&self) -> &RepositoryLayout {
+        &self.layout
+    }
+
+    fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.capture_over(CapturedAnswers::default(), spec)
+    }
+
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.capture_over(image.into_answers(&spec), spec)
+    }
+}
+
+impl RepositoryMutationSession for JsonMutationSession {
+    fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
     }
 
     fn apply(
@@ -684,13 +923,9 @@ impl JsonMutationSession {
     }
 }
 
-impl RepositoryMutationSession for MemoryMutationSession {
+impl RepositoryReadSession for MemoryMutationSession {
     fn layout(&self) -> &RepositoryLayout {
         &self.layout
-    }
-
-    fn recovery_report(&self) -> &RecoveryDispatchReport {
-        &self.recovery_report
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -703,6 +938,12 @@ impl RepositoryMutationSession for MemoryMutationSession {
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         self.capture_over(image.into_answers(&spec), spec)
+    }
+}
+
+impl RepositoryMutationSession for MemoryMutationSession {
+    fn recovery_report(&self) -> &RecoveryDispatchReport {
+        &self.recovery_report
     }
 
     fn apply(
@@ -1720,6 +1961,9 @@ fn lexical_absolute(path: &Path) -> Result<PathBuf, RepositoryStateStoreError> {
 #[cfg(test)]
 #[path = "repository_state_store_contention_tests.rs"]
 mod repository_state_store_contention_tests;
+#[cfg(test)]
+#[path = "repository_state_store_fixtures.rs"]
+pub(crate) mod test_fixtures;
 #[cfg(test)]
 #[path = "repository_state_store_tests.rs"]
 mod tests;

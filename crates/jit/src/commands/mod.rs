@@ -51,6 +51,8 @@ mod labels;
 mod profile;
 pub mod project;
 mod query;
+#[cfg(test)]
+mod read_session_tests;
 mod search;
 pub mod serve;
 pub mod snapshot;
@@ -74,7 +76,7 @@ pub use batch_create::{
     BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
     BatchValidationProblem,
 };
-pub use bootstrap::{open_repository, OpenedRepository, RecoveryFailedError, RepositoryInvocation};
+pub use bootstrap::{open_repository, OpenedRepository, RepositoryInvocation};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use claim::ClaimOps;
 pub use config::{
@@ -361,7 +363,7 @@ pub fn capture_or_retry(
 /// recapturing it, so no read is compared with an earlier one. `Ok(None)` is a
 /// retryable conflict.
 pub(crate) fn capture_discovering(
-    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     spec: crate::repository_state::CaptureSpec,
     discover: impl FnMut(
         &crate::repository_state::RepositoryImage,
@@ -376,7 +378,7 @@ pub(crate) fn capture_discovering(
 
 /// [`capture_discovering`] continued from an `image` the round has read.
 pub(crate) fn grow_discovering(
-    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     image: crate::repository_state::RepositoryImage,
     mut discover: impl FnMut(
         &crate::repository_state::RepositoryImage,
@@ -492,6 +494,85 @@ pub fn with_mutation_session<S: crate::storage::RepositoryStateStore, T>(
             SessionStep::Apply(plan, value) => classify_apply(session.apply(&plan), value),
         }
     })
+}
+
+/// Lock-free attempts a read makes before it takes the operation's mutation
+/// session.
+const READ_OPTIMISTIC_ATTEMPTS: u32 = 4;
+
+/// Run `read` over a lock-free read session, and surface what it returned,
+/// value or error, only once the store admits the capture (`@/charter/D-22`).
+///
+/// A capture a commit crossed can be torn, so a refused attempt's result is
+/// discarded; `None`, a `Busy` and a `Moved` admission each fail an attempt.
+/// After [`READ_OPTIMISTIC_ATTEMPTS`] failed attempts, each followed by a
+/// jittered backoff of about 1, 2, 4 and 8 ms, `read` runs once through
+/// [`with_mutation_session`], whose open applies a leftover redo record.
+///
+/// # Errors
+///
+/// [`RecoveryFailedError`](crate::errors::RecoveryFailedError) when that open
+/// cannot apply a leftover record, and otherwise what `read` or the store
+/// returned.
+pub fn with_read_session<S: crate::storage::RepositoryStateStore, T>(
+    store: &S,
+    layout: &crate::repository_state::RepositoryLayout,
+    operation: &'static str,
+    mut read: impl FnMut(&mut dyn crate::storage::RepositoryReadSession) -> Result<Option<T>>,
+) -> Result<T> {
+    for attempt in 0..READ_OPTIMISTIC_ATTEMPTS {
+        if let Some(outcome) = read_optimistically(store, layout, &mut read)? {
+            return outcome;
+        }
+        std::thread::sleep(read_backoff(attempt));
+    }
+    with_mutation_session(store, layout, operation, |session| {
+        Ok(match read(session)? {
+            Some(value) => SessionStep::Done(value),
+            None => SessionStep::Retry,
+        })
+    })
+    .map_err(
+        |error| match crate::storage::repository_state_store::is_leftover_record_failure(&error) {
+            true => crate::errors::RecoveryFailedError(error.context(
+                "a leftover redo record blocks this read; run `jit recover` with write access",
+            ))
+            .into(),
+            false => error,
+        },
+    )
+}
+
+/// One optimistic attempt: `read`'s outcome when the store admits it.
+fn read_optimistically<S: crate::storage::RepositoryStateStore, T>(
+    store: &S,
+    layout: &crate::repository_state::RepositoryLayout,
+    read: &mut impl FnMut(&mut dyn crate::storage::RepositoryReadSession) -> Result<Option<T>>,
+) -> Result<Option<Result<T>>> {
+    let mut session = match store.open_read_session(layout.clone()) {
+        Ok(session) => session,
+        Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
+            return Ok(None)
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let outcome = read(session.as_mut());
+    Ok(match session.admit()? {
+        crate::storage::ReadAdmission::Granted => outcome.transpose(),
+        crate::storage::ReadAdmission::Busy | crate::storage::ReadAdmission::Moved => None,
+    })
+}
+
+/// About `2^attempt` ms, drawn from `[1/2, 3/2)` of it so contending readers
+/// spread out.
+fn read_backoff(attempt: u32) -> std::time::Duration {
+    use std::hash::{BuildHasher, Hasher};
+
+    let base = 1_000u64 << attempt;
+    let draw = std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish();
+    std::time::Duration::from_micros(base / 2 + draw % base)
 }
 
 /// Closed issue-local operations whose final record is derived from the issue

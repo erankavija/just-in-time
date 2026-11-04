@@ -1,7 +1,7 @@
 //! `jit query` and `jit status` handlers.
 
 use super::issue::{list as list_all, ISSUE_LISTING};
-use super::{CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::{CountDimension, IssueFilterArgs, QueryArgs, QueryCommands};
 use crate::domain::Issue;
 use crate::errors::InvalidArgumentError;
@@ -11,12 +11,8 @@ use crate::output::{
 };
 use crate::storage::IssueStore;
 
-fn found(count: usize) -> String {
-    format!("Found {count} issue(s)")
-}
-
 fn subset(subset: QuerySubset, issues: Vec<Issue>, full: bool) -> HandlerResult<SubsetListing> {
-    let message = found(issues.len());
+    let message = count_message(issues.len(), "Found ", " issue(s)");
     Ok(Outcome::success_with(
         SubsetListing::new(subset, issues, full),
         message,
@@ -65,7 +61,7 @@ fn blocked<S: IssueStore>(
         .executor
         .queries()
         .query_blocked_filtered(filters.parse()?)?;
-    let message = found(blocked.len());
+    let message = count_message(blocked.len(), "Found ", " issue(s)");
     Ok(Outcome::success_with(
         BlockedListing::new(&blocked, full),
         message,
@@ -90,7 +86,7 @@ fn count<S: IssueStore>(
 
 fn divergence<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<DivergenceResponse> {
     let report = ctx.executor.graph().detect_divergences()?;
-    let message = format!("{} divergence(s)", report.count());
+    let message = count_message(report.count(), "", " divergence(s)");
     Ok(Outcome::success_with(report, message))
 }
 
