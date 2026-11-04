@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Every repository write appends an event.** A write that records no domain
+  event, such as `jit config set`, `jit project render`, `jit validate --fix`
+  repair or an export into the repository, now appends one `files_published`
+  event naming the paths it writes, so the event log's length counts every
+  commit. See [Event Log Tags](docs/reference/events.md).
+
 - **Default validation rules apply when their rows are missing.** A repository
   that disabled a default by deleting its row sees that rule in force again,
   including with an empty or custom-only `rules.toml`. Config writes and

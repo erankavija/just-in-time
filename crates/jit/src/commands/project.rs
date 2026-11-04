@@ -139,8 +139,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
 
         // One bounded capture round: the engine registries, then the closure
         // their declarations enumerate.
+        let context = super::production_mutation_context();
         with_mutation_session(self.exec.storage(), &layout, "project render", |session| {
-            let spec = CaptureSpec::new(registries()?, budget)?;
+            let mut spec = CaptureSpec::new(registries()?, budget)?;
+            spec.discover_tail(VirtualPath::EVENTS)?;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
                 let config = assemble_config(image)?;
                 let rules_text = super::image_virtual_bytes(image, &VirtualPath::RULES)?
@@ -169,6 +171,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
             let selected_set: BTreeSet<String> = selected_names.iter().cloned().collect();
             let plan = derive_materialization(
                 &image,
+                &context,
                 MaterializationRequest::RenderConfiguredProjections {
                     declarations: declarations.borrowed(),
                     selected: Some(selected_set),

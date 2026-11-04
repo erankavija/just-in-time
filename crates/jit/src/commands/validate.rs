@@ -109,7 +109,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                             "derived-state repair",
                             format_args!("rules.toml could not be loaded: {error:#}"),
                         ),
-                        None => plan_derived_state_fixes(image, declarations.borrowed()),
+                        None => plan_derived_state_fixes(image, &context, declarations.borrowed()),
                     };
                     fixes = fixes.merge(repairs);
                 }
@@ -139,7 +139,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     actions.push(action);
                 }
                 let (count, messages) = (fixes.count, fixes.messages);
-                let plan = MaterializationPlan::new(image, RepositoryDelta::new(&layout, actions)?);
+                let plan = MaterializationPlan::new(
+                    image,
+                    RepositoryDelta::new(&layout, actions)?,
+                    &context,
+                )?;
                 if dry_run || plan.delta().actions().is_empty() {
                     Ok(SessionStep::Done((count, messages)))
                 } else {
@@ -294,11 +298,13 @@ fn plan_readiness_fixes(projected: &mut [Issue]) -> PlannedFixes {
 
 fn plan_derived_state_fixes(
     image: &RepositoryImage,
+    context: &crate::repository_state::MutationContext,
     declarations: RepositoryDeclarations<'_>,
 ) -> PlannedFixes {
     use crate::repository_state::{derive_materialization, MaterializationRequest};
     match derive_materialization(
         image,
+        context,
         MaterializationRequest::RepairDerivedState { declarations },
     ) {
         Ok(repair) => {
@@ -692,12 +698,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         use crate::repository_state::RepositoryAction;
 
         let layout = self.exec.require_layout()?;
+        let context = production_mutation_context();
         with_mutation_session(
             self.exec.storage(),
             &layout,
             "derived-state repair",
             |session| {
-                let Some(derived) = self.capture_repair_plan(session)? else {
+                let Some(derived) = self.capture_repair_plan(session, &context)? else {
                     return Ok(SessionStep::Retry);
                 };
                 let mut captured = derived.map_err(|error| {
@@ -810,6 +817,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     fn capture_repair_plan(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        context: &crate::repository_state::MutationContext,
     ) -> Result<Option<Result<CapturedRepairPlan>>> {
         use crate::repository_state::{derive_materialization, MaterializationRequest};
 
@@ -830,6 +838,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
             .then(|| {
                 derive_materialization(
                     &image,
+                    context,
                     MaterializationRequest::RepairDerivedState {
                         declarations: declarations.borrowed(),
                     },
@@ -2212,7 +2221,10 @@ depends_on = ["planning"]
         };
         let captured = executor
             .validation()
-            .capture_repair_plan(&mut session)
+            .capture_repair_plan(
+                &mut session,
+                &crate::repository_state::MutationContext::preview(),
+            )
             .unwrap()
             .expect("settled capture")
             .unwrap();
@@ -2525,6 +2537,7 @@ depends_on = ["planning"]
             let declarations = crate::repository_state::declarations_from_image(proposed)?;
             let plan = crate::repository_state::derive_materialization(
                 proposed,
+                &crate::repository_state::MutationContext::preview(),
                 crate::repository_state::MaterializationRequest::RepairDerivedState {
                     declarations: declarations.borrowed(),
                 },

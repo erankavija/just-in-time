@@ -11,8 +11,8 @@
 
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
-    RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositoryLayoutError, RepositoryRootClass, VirtualPath,
+    MutationContext, RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::domain::relative_path::RootRelativePath;
 use std::collections::BTreeSet;
@@ -56,6 +56,9 @@ pub enum PackageTreeCaptureError {
     /// A path the tree needs as a directory is occupied by something else.
     #[error("package tree path '{0}' is occupied by an entry that is not a directory")]
     OccupiedDirectory(String),
+    /// Composing the publication's event append failed.
+    #[error(transparent)]
+    Mutation(#[from] super::MutationError),
 }
 
 impl PackageTreeCapture {
@@ -88,8 +91,8 @@ impl PackageTreeCapture {
     }
 
     /// The bounded capture declaration this publication reads: the destination,
-    /// every directory above it, and every path the tree writes together with
-    /// the directories those need.
+    /// every directory above it, every path the tree writes together with the
+    /// directories those need, and the event log's tail its record appends to.
     pub fn capture_spec(
         &self,
         budget: CaptureBudget,
@@ -101,7 +104,9 @@ impl PackageTreeCapture {
             paths.extend(path.ancestor_directories()?);
             paths.insert(path);
         }
-        Ok(CaptureSpec::new(paths, budget)?)
+        let mut spec = CaptureSpec::new(paths, budget)?;
+        spec.discover_tail(VirtualPath::EVENTS)?;
+        Ok(spec)
     }
 
     /// The repository identity of one tree-relative path.
@@ -130,6 +135,7 @@ impl PackageTreeCapture {
 /// shared plan boundary.
 pub fn finalize_package_tree_capture(
     base: &RepositoryImage,
+    context: &MutationContext,
     capture: &PackageTreeCapture,
 ) -> Result<MaterializationPlan, PackageTreeCaptureError> {
     let written = capture
@@ -179,5 +185,5 @@ pub fn finalize_package_tree_capture(
         )
         .collect::<Vec<_>>();
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    Ok(MaterializationPlan::new(base, delta))
+    Ok(MaterializationPlan::new(base, delta, context)?)
 }
