@@ -14,13 +14,12 @@
 //! 4. obtain each rule's JSON Schema (raw [`Assertion::JsonSchema`] uses its
 //!    schema directly; the shorthand kinds are lowered via
 //!    [`desugar`](crate::validation::desugar::desugar)) and validate the
-//!    projection through a locally-constructed
+//!    projection through a
 //!    [`SchemaEngine`](crate::validation::engine::SchemaEngine), collecting
 //!    [`Finding`]s carrying the rule's severity.
 //!
-//! The [`SchemaEngine`] is constructed locally per call: it uses interior
-//! mutability and is `!Sync`, so it must never be stored on a long-lived
-//! executor or server state.
+//! [`evaluate_local`] owns an engine; [`evaluate_local_with_engine`] shares a
+//! caller's engine across issues in a report.
 //!
 //! # Enforcement helpers
 //!
@@ -232,6 +231,16 @@ pub fn evaluate_local(
     rules: &RuleSet,
     repo_default_format: ContentFormat,
 ) -> Result<LocalEvaluation, LocalEvalError> {
+    evaluate_local_with_engine(issue, rules, repo_default_format, &SchemaEngine::new())
+}
+
+/// Evaluate local rules using the caller's compiled-schema cache.
+pub fn evaluate_local_with_engine(
+    issue: &Issue,
+    rules: &RuleSet,
+    repo_default_format: ContentFormat,
+    engine: &SchemaEngine,
+) -> Result<LocalEvaluation, LocalEvalError> {
     // Select matching LOCAL rules; graph-scope rules never run on write.
     let local_rules: Vec<&Rule> = rules
         .matching_rules(issue)
@@ -286,8 +295,6 @@ pub fn evaluate_local(
     let projection = build_projection(issue, needs_body, repo_default_format)?;
     let value = serde_json::to_value(&projection)?;
 
-    // One engine per call (the engine is !Sync; never store it long-lived).
-    let engine = SchemaEngine::new();
     for (rule, schema) in &resolved {
         let key = crate::validation::engine::schema_key(schema);
         let validator = engine.validator_for(&key, &rule.name, schema)?;
@@ -416,6 +423,35 @@ severity = "error"
 enforce = true
 assert = { require-label = { label = "req:*", min = 1 } }
 "#;
+
+    #[test]
+    fn test_evaluate_local_with_engine_reuses_validator_across_issues() {
+        let rules = rules_from(EPIC_REQ_WARN);
+        let engine = SchemaEngine::new();
+        let first_issue = epic_without_req();
+        let mut second_issue = epic_without_req();
+        second_issue.labels.push("req:example".to_string());
+        let schema = rule_schema(&rules.rules[0]).unwrap();
+        let key = crate::validation::engine::schema_key(&schema);
+
+        let first =
+            evaluate_local_with_engine(&first_issue, &rules, ContentFormat::Markdown, &engine)
+                .unwrap();
+        assert!(!first.findings().is_empty());
+        assert!(!engine.is_empty());
+        let validator = engine
+            .validator_for(&key, &rules.rules[0].name, &schema)
+            .unwrap();
+
+        let second =
+            evaluate_local_with_engine(&second_issue, &rules, ContentFormat::Markdown, &engine)
+                .unwrap();
+        assert!(second.findings().is_empty());
+        let reused = engine
+            .validator_for(&key, &rules.rules[0].name, &schema)
+            .unwrap();
+        assert!(std::sync::Arc::ptr_eq(&validator, &reused));
+    }
 
     #[test]
     fn test_strictness_warn_only_violation_is_distinct_per_level() {
