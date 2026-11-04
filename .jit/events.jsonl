@@ -24217,3 +24217,14 @@
 {"fields":["description"],"id":"b21462a9-c619-46f2-9332-65c4215a130c","issue_id":"a08c4b38-f5c2-4589-a195-a5ba1a8e6324","timestamp":"2026-11-04T12:35:03.125697184Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["assignee"],"id":"3165c0dc-9fdc-4669-9edb-6cafc4021800","issue_id":"a08c4b38-f5c2-4589-a195-a5ba1a8e6324","timestamp":"2026-11-04T12:35:03.162155446Z","type":"issue_updated","updated_by":"issue-unassign"}
 {"fields":["documents"],"id":"eab9f422-e64e-4a06-a90e-8f892fde3f32","issue_id":"4a01ccba-b6b9-46db-ae4a-cf92a98c9279","timestamp":"2026-11-04T12:35:32.306042341Z","type":"issue_updated","updated_by":"doc-add"}
+{"assignee":"agent:df129d9e-lead","id":"1ec4516d-dd26-43f8-ad25-5a2532269dea","issue_id":"f56bad8d-92e6-43a1-91f5-972ff56c7734","timestamp":"2026-11-04T12:43:03.690961969Z","type":"issue_claimed"}
+{"assignee":"agent:df129d9e-lead","id":"8bc81b3c-43f7-4202-a1fb-860d75dbac70","issue_id":"f7a59f5f-ff7f-42e9-bd95-4f3d163f2d5b","timestamp":"2026-11-04T12:43:03.724721976Z","type":"issue_claimed"}
+{"assignee":"agent:df129d9e-lead","id":"bd95ef58-aa8b-4ca6-b618-096ab8f89db4","issue_id":"4575a03d-f938-4c6b-bf01-929c9d902d40","timestamp":"2026-11-04T12:45:42.330481691Z","type":"issue_claimed"}
+{"fields":["description"],"id":"721d8d3d-5b17-4f35-82f3-5de77ba968d7","issue_id":"4575a03d-f938-4c6b-bf01-929c9d902d40","timestamp":"2026-11-04T12:45:42.442303525Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"acd02498-44ac-49be-ab54-bed9f2b684bc","issue_id":"4575a03d-f938-4c6b-bf01-929c9d902d40","timestamp":"2026-11-04T12:45:42.471663618Z","type":"gate_added"}
+{"gate_key":"code-review","id":"7365e80e-edd6-496a-946d-ee198435b2f7","issue_id":"4575a03d-f938-4c6b-bf01-929c9d902d40","timestamp":"2026-11-04T12:45:42.488482912Z","type":"gate_added"}
+{"id":"98712c35-3b01-4565-aa2f-6671caa5ca15","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","priority":"high","timestamp":"2026-11-04T12:46:00.591619520Z","title":"Graceful-shutdown tests observe the server through explicit signals","type":"issue_created"}
+{"fields":["dependencies"],"id":"9ecd1ac5-184e-4b9a-8550-3a41826c0220","issue_id":"fb2dc5c3-1f32-418f-896b-41df16f57997","timestamp":"2026-11-04T12:46:01.196181194Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:df129d9e-lead","id":"9b816759-a7af-411c-a31f-883e436ad846","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","timestamp":"2026-11-04T12:46:34.652832377Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"b45eebe2-0a55-43d4-8748-781790b8f518","issue_id":"f82a2e4a-61b1-4f31-8360-ac55c4e5d579","timestamp":"2026-11-04T12:47:52.640561638Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"ffc59aa1-bc9c-4f2b-89c9-4cf9c548683f","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","timestamp":"2026-11-04T12:50:27.187306624Z","type":"issue_updated","updated_by":"issue-update"}
