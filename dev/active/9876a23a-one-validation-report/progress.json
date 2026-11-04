@@ -426,7 +426,8 @@
     "3acaa5a3": 2,
     "612ee9d4": 1,
     "1f24e3e9": 2,
-    "a106d1be": 1
+    "a106d1be": 1,
+    "f22147ec": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
