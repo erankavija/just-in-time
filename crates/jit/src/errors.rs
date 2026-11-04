@@ -1042,6 +1042,12 @@ pub fn not_owner(resource: &str, owner: &str, requester: &str) -> ActionableErro
     .with_remedy("If you need to override, use force-evict (requires reason)")
 }
 
+/// A leftover redo record could not be applied, or `jit recover` could not run
+/// its repairs; the source is that failure.
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub struct RecoveryFailedError(pub anyhow::Error);
+
 #[cfg(test)]
 mod tests {
     use super::*;
