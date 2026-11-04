@@ -333,19 +333,6 @@ pub struct GateState {
     pub run_id: Option<GateRunId>,
 }
 
-impl GateState {
-    /// The run of `gate_key` among `runs` this status was projected from.
-    pub fn projected_run<'a>(
-        &self,
-        gate_key: &GateKey,
-        runs: &'a [GateRunResult],
-    ) -> Option<&'a GateRunResult> {
-        let run_id = self.run_id.as_ref()?;
-        runs.iter()
-            .find(|run| &run.run_id == run_id && &run.gate_key == gate_key)
-    }
-}
-
 /// An issue representing a unit of work
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "IssueWire")]
@@ -929,6 +916,17 @@ pub struct GateRunResult {
     pub evaluation_stability: GateEvaluationStability,
 }
 
+/// The reuse source for one gate over one inputs digest, as persisted to
+/// `.jit/gate-runs/verdicts/<gate-key>/<inputs-digest>.json`: the latest
+/// recorded run that [`GateRunResult::is_reusable_for`] that key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GateVerdictRecord {
+    /// Issue the named run was recorded against
+    pub issue_id: IssueId,
+    /// The run whose verdict an evaluation over this key may carry
+    pub run_id: GateRunId,
+}
+
 impl GateRunResult {
     /// Whether an evaluation of `gate_key` over inputs digesting to `digest`
     /// may carry this run's verdict.
@@ -949,6 +947,14 @@ impl GateRunResult {
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
             && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
+    }
+
+    /// The inputs digest under which this run is a reuse source
+    /// ([`is_reusable_for`](Self::is_reusable_for) its own gate), or `None`.
+    pub fn reusable_digest(&self) -> Option<&crate::domain::repository_inputs::InputsDigest> {
+        self.inputs_digest
+            .as_ref()
+            .filter(|digest| self.is_reusable_for(&self.gate_key, digest))
     }
 
     /// The draft record of a manual gate's attestation of `status` by `by`.
@@ -993,18 +999,6 @@ impl GateRunResult {
             evaluation_stability: GateEvaluationStability::Stable,
         }
     }
-}
-
-/// The most recently started run among `runs`, or `None` when empty.
-///
-/// Ties on the start instant fall back to the run id so one repository state
-/// always selects one run.
-pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
-    runs.into_iter().max_by(|left, right| {
-        left.started_at
-            .cmp(&right.started_at)
-            .then_with(|| left.run_id.cmp(&right.run_id))
-    })
 }
 
 /// Where a recorded gate verdict came from.

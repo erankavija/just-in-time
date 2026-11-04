@@ -152,6 +152,18 @@
           "worker": "codex gpt-6-luna xhigh"
         }
       ]
+    },
+    {
+      "wave_number": 6,
+      "base": "995afbd3a",
+      "issues": [
+        {
+          "short_id": "6ba4f623",
+          "status": "rework 1 done 673c5daaa (-32 prod); lead review PASS; awaiting host release for CI, land, gates",
+          "worker": "claude opus",
+          "worker_reason": "central contract validation-report"
+        }
+      ]
     }
   ],
   "held": {},
@@ -261,14 +273,15 @@
     "c92f4011": 2,
     "ea843d26": 1,
     "f968dfe1": 1,
-    "5d5a1794": 2
+    "5d5a1794": 2,
+    "6ba4f623": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
     "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
     "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
-    "f8a6b298: 53d19851 merged into 2f563673, which deletes the claims-index check; after it lands drop plan contract claims-index-input and correct 6ba4f623 Background/Note (REQ-02 clause is conditional, no criteria change)"
+    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
@@ -279,7 +292,8 @@
     "Workers verify only --lib and named suites; a behaviour change needs the whole-workspace nextest run with --no-fail-fast (c92f4011 r1).",
     "Never wrap land.sh in `jit worktree exec`: it takes the repository lock itself, so nesting waits on its own parent.",
     "Plan and manifest edits in main's checkout block other leads' land.sh; edit in scratch, then copy and commit in one command.",
-    "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review."
+    "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review.",
+    "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief)."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",

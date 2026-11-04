@@ -898,16 +898,6 @@ impl IssueStore for InMemoryStorage {
         self.read_gate_runs(|result| &result.issue_id == issue_id)
     }
 
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &crate::domain::identity::GateKey,
-        digest: &crate::domain::repository_inputs::InputsDigest,
-    ) -> Result<Option<GateRunResult>> {
-        Ok(crate::domain::latest_gate_run(self.read_gate_runs(
-            |result| result.is_reusable_for(gate_key, digest),
-        )?))
-    }
-
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
         let mut presets = self
             .gate_presets_from_repository_state()?

@@ -195,6 +195,24 @@ fn gate_run_record_paths(
         .collect()
 }
 
+/// The verdict record a mutation recording `run` publishes, with the
+/// directories above it that decide its creates: what that mutation must
+/// capture. Empty when `run` holds no reusable verdict.
+fn gate_verdict_record_paths(
+    run: &crate::domain::GateRunResult,
+) -> Result<Vec<crate::repository_state::VirtualPath>> {
+    run.reusable_digest()
+        .map(|digest| {
+            let record =
+                crate::repository_state::VirtualPath::gate_verdict_record(&run.gate_key, digest);
+            let mut paths = record.ancestor_directories()?;
+            paths.push(record);
+            Ok(paths)
+        })
+        .transpose()
+        .map(Option::unwrap_or_default)
+}
+
 /// An annotation installed for as long as this guard lives.
 ///
 /// This is the mechanism behind the dispatch-scoped annotation: dropping the guard
@@ -2211,8 +2229,10 @@ fn named_gate_run_records(
 /// directory the image lists, then the result leaf of each the image holds as
 /// a directory. Direct occupants not named by a run id are evidence only through
 /// the listing, and direct non-directory occupants are captured as evidence but
-/// ignored as storage clutter, matching the typed readers.
-fn discover_gate_run_results(
+/// ignored as storage clutter, matching the typed readers. The verdict records
+/// are discovered the same way: the `verdicts` directory and its listing, each
+/// gate-key directory it names and its listing, then each record named there.
+fn discover_gate_records(
     image: &crate::repository_state::RepositoryImage,
     spec: &mut crate::repository_state::CaptureSpec,
 ) -> Result<()> {
@@ -2236,6 +2256,26 @@ fn discover_gate_run_results(
             .iter()
             .map(VirtualPath::gate_run_record),
     )?;
+    let verdicts = VirtualPath::GATE_VERDICTS;
+    spec.discover_paths([verdicts.clone()])?;
+    spec.discover_listing(verdicts.clone())?;
+    if let Some(listing) = image.directory_listings().get(&verdicts) {
+        spec.discover_paths(
+            listing
+                .names()
+                .iter()
+                .filter_map(|name| crate::domain::identity::GateKey::try_from(name.as_str()).ok())
+                .map(|key| VirtualPath::gate_verdict_directory(&key)),
+        )?;
+    }
+    spec.discover_listings(
+        crate::repository_state::captured_gate_verdict_keys(image)
+            .iter()
+            .map(VirtualPath::gate_verdict_directory),
+    )?;
+    spec.discover_paths(crate::repository_state::captured_gate_verdict_records(
+        image,
+    ))?;
     Ok(())
 }
 

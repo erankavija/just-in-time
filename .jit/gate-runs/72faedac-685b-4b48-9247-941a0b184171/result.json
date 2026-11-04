@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b607a1d7cd216c176c7486e9ffb04ecbc093e91e",
+  "completed_at": "2026-11-04T01:43:59.456021237Z",
+  "duration_ms": 201737,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change satisfies all four hard requirements: reuse captures only the keyed verdict record and named run, obsolete selection APIs are removed, and focused corruption coverage proves unrelated records are not read.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6c0f8739-f103-4b20-91c4-9990fd0473a0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "72faedac-685b-4b48-9247-941a0b184171",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T01:40:37.718087849Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 37c189d10 `feat(jit:6c0f8739): gate reuse reads one verdict record`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 and @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-02 and REQ-03 (parent issue criteria); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T01:38:50Z); code-review pending\nTruncation recovery: narrowed reads of capture/session behavior, verdict-record finalization, current gate-check code, and removed-symbol searches\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change satisfies all four hard requirements: reuse captures only the keyed verdict record and named run, obsolete selection APIs are removed, and focused corruption coverage proves unrelated records are not read.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

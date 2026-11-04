@@ -255,6 +255,57 @@ fn replace_named_run(history: &mut Vec<GateRunResult>, fresh: GateRunResult) {
     history.push(fresh);
 }
 
+/// The run the verdict record of `(gate_key, digest)` names, captured with that
+/// record and nothing else. `Ok(None)` is a retryable conflict; the inner
+/// `None` means no record names a run reusable for that key.
+fn captured_reusable_gate_run(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    gate_key: &GateKey,
+    digest: &crate::domain::repository_inputs::InputsDigest,
+) -> Result<Option<Option<GateRunResult>>> {
+    use crate::repository_state::{CaptureSpec, RepositoryImage, VirtualPath};
+
+    let record_path = VirtualPath::gate_verdict_record(gate_key, digest);
+    let record = |image: &RepositoryImage| -> Result<Option<crate::domain::GateVerdictRecord>> {
+        image
+            .file_bytes(&record_path)?
+            .map(|bytes| {
+                serde_json::from_slice(bytes)
+                    .with_context(|| format!("failed to parse verdict record at {record_path:?}"))
+            })
+            .transpose()
+    };
+    let spec = CaptureSpec::new(
+        [record_path.clone()],
+        super::validate::MUTATION_CAPTURE_BUDGET,
+    )?;
+    let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+        if let Some(record) = record(image)? {
+            spec.discover_paths([VirtualPath::gate_run_record(&record.run_id)])?;
+        }
+        Ok(())
+    })?
+    else {
+        return Ok(None);
+    };
+    let Some(record) = record(&image)? else {
+        return Ok(Some(None));
+    };
+    let run_path = VirtualPath::gate_run_record(&record.run_id);
+    let run = image
+        .file_bytes(&run_path)?
+        .map(|bytes| {
+            serde_json::from_slice::<GateRunResult>(bytes)
+                .with_context(|| format!("failed to parse captured gate run at {run_path:?}"))
+        })
+        .transpose()?;
+    Ok(Some(run.filter(|run| {
+        run.issue_id == record.issue_id
+            && run.run_id == record.run_id
+            && run.is_reusable_for(gate_key, digest)
+    })))
+}
+
 /// Read the run each required gate's state on `issue` names from `image`.
 ///
 /// A named record that is absent, or that does not record that gate's run on
@@ -924,10 +975,17 @@ impl<S: IssueStore> GateOps<'_, S> {
         // the verdict was derived over, not what the checker left behind.
         let digest = self.exec.declared_inputs_digest(gate)?;
         let reused = match (source, digest.as_ref()) {
-            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => self
-                .exec
-                .storage
-                .find_reusable_gate_run(&gate.key, digest)?,
+            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
+                with_mutation_attempts("gate verdict reuse", || {
+                    let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
+                    Ok(
+                        match captured_reusable_gate_run(session.as_mut(), &gate.key, digest)? {
+                            Some(run) => AttemptOutcome::Done(run),
+                            None => AttemptOutcome::Retry,
+                        },
+                    )
+                })?
+            }
             _ => None,
         };
         let mut result = match reused {
@@ -943,6 +1001,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             })?,
         };
         result.inputs_digest = digest;
+        let record_paths = run_paths
+            .iter()
+            .cloned()
+            .chain(super::gate_verdict_record_paths(&result)?)
+            .collect::<Vec<_>>();
 
         with_mutation_attempts("gate evaluation record", || {
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
@@ -950,7 +1013,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 session.as_mut(),
                 &target_id.clone(),
                 gate_key,
-                &run_paths,
+                &record_paths,
             )?
             else {
                 return Ok(AttemptOutcome::Retry);
@@ -1276,14 +1339,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter_map(|id| input.issues.iter().find(|candidate| candidate.id == *id))
             .map(crate::domain::MinimalIssue::from)
             .collect();
-        let latest_runs: Vec<_> = input
-            .issue
-            .gates_status
-            .iter()
-            .filter_map(|(key, state)| state.projected_run(key, input.runs).cloned())
-            .collect();
         let mut issue_view =
-            IssueShowResponse::from_issue(input.issue.clone(), enriched, &latest_runs);
+            IssueShowResponse::from_issue(input.issue.clone(), enriched, input.runs);
         issue_view.documents = documents.to_vec();
         omit_current_gate_projection(&mut issue_view, &input.gate.key);
         Ok(Some(GateContext {
@@ -1844,53 +1901,6 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         assert_eq!(
             serde_json::to_value(&view.gates).unwrap(),
             serde_json::json!([expected])
-        );
-    }
-
-    #[test]
-    fn test_projected_precheck_run_matches_next_checker_issue_view() {
-        let executor = setup();
-        let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
-        issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
-        issue.gates_required = vec!["first".parse().unwrap(), "second".parse().unwrap()];
-        let mut run = prior_run(
-            &crate::test_utils::gate_run_id(7),
-            &"first".parse().unwrap(),
-            10,
-            None,
-        );
-        run.status = GateRunStatus::Passed;
-        issue
-            .gates_status
-            .insert("first".parse().unwrap(), super::gate_state_from_run(&run));
-
-        let mut older = run.clone();
-        older.run_id = crate::test_utils::gate_run_id(6);
-        older.started_at -= chrono::Duration::seconds(1);
-        let mut gate = make_auto_gate(&"second".parse().unwrap(), "exit 0");
-        let checker = gate.checker.as_mut().unwrap();
-        if let GateChecker::Exec { pass_context, .. } = checker {
-            *pass_context = true;
-        }
-        let image = crate::test_harness::image::ImageBuilder::new().build();
-        let runs = [run.clone(), older];
-        let input = super::CapturedGateExecution {
-            run_id: &crate::test_utils::gate_run_id(8),
-            image: &image,
-            issue: &issue,
-            issues: &[],
-            gate: &gate,
-            runs: &runs,
-            prompt: None,
-        };
-        let context = executor
-            .build_captured_gate_context(gate.checker.as_ref().unwrap(), &input, &[])
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(
-            context.issue["gates"][0]["last_run_at"],
-            run.started_at.to_rfc3339()
         );
     }
 
@@ -2500,6 +2510,63 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(restored.origin.source_run(), Some(&original.run_id));
     }
 
+    /// Reuse reads only the verdict record for its key and the run it names.
+    #[test]
+    fn test_check_gate_reuses_while_every_other_run_and_verdict_record_is_unparseable() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let source = fixture.evaluate(&fixture.issue("Test", "Test"));
+        fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
+        fixture.evaluate(&fixture.issue("Test", "Test"));
+        fixture.write("workspace/src/lib.rs", "fn main() {}\n");
+        let reusing = fixture.issue("Test", "Test");
+        let layout = fixture.executor.require_layout().unwrap();
+        let kept = [
+            crate::repository_state::VirtualPath::gate_verdict_record(
+                &fixture.gate_key,
+                source.inputs_digest.as_ref().unwrap(),
+            ),
+            crate::repository_state::VirtualPath::gate_run_record(&source.run_id),
+        ]
+        .map(|path| layout.resolve(&path).unwrap());
+        fn corrupt_files_except(dir: &std::path::Path, kept: &[std::path::PathBuf]) -> usize {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .map(|path| match path.is_dir() {
+                    true => corrupt_files_except(&path, kept),
+                    false if kept.contains(&path) => 0,
+                    false => {
+                        std::fs::write(&path, "{ not json").unwrap();
+                        1
+                    }
+                })
+                .sum()
+        }
+        let corrupted = corrupt_files_except(
+            &layout
+                .resolve(&crate::repository_state::VirtualPath::GATE_RUNS)
+                .unwrap(),
+            &kept,
+        );
+        assert_eq!(corrupted, 2, "the other run and its verdict record");
+
+        let reused = fixture.evaluate(&reusing);
+
+        assert_eq!(fixture.executions(), 2);
+        assert_eq!(reused.origin.source_run(), Some(&source.run_id));
+    }
+
     /// REQ-07: a change to a file no declared root covers leaves the digest
     /// alone, so the next evaluation reuses instead of re-executing.
     #[test]
@@ -2610,6 +2677,91 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(
             forced.inputs_digest, executed.inputs_digest,
             "a forced run still records the digest it was derived over"
+        );
+    }
+
+    /// Replaces a verdict record at the first commit check, as an evaluation
+    /// racing to record the same key would.
+    struct RacingVerdictWriter {
+        path: std::path::PathBuf,
+        bytes: Vec<u8>,
+        commit_checks: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::storage::MutationInterruptionInjector for RacingVerdictWriter {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            use std::sync::atomic::Ordering;
+            if point == &MutationPoint::BeforeCommitCheck
+                && self.commit_checks.fetch_add(1, Ordering::SeqCst) == 0
+            {
+                std::fs::write(&self.path, &self.bytes)?;
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_check_gate_with_retries_a_verdict_record_replaced_by_a_racing_evaluation() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let first = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let layout = fixture.executor.require_layout().unwrap();
+        let record = layout
+            .resolve(&crate::repository_state::VirtualPath::gate_verdict_record(
+                &fixture.gate_key,
+                first.inputs_digest.as_ref().unwrap(),
+            ))
+            .unwrap();
+        let racer = Arc::new(RacingVerdictWriter {
+            path: record.clone(),
+            bytes: crate::repository_state::serialize_gate_verdict(
+                &crate::domain::GateVerdictRecord {
+                    issue_id: first.issue_id.clone(),
+                    run_id: crate::test_utils::gate_run_id(9),
+                },
+            )
+            .unwrap(),
+            commit_checks: Default::default(),
+        });
+        let racing = CommandExecutor::new(JsonFileStorage::with_mutation_interruptions(
+            fixture.executor.storage.root(),
+            racer.clone(),
+        ))
+        .with_layout(layout);
+
+        let forced = racing
+            .gates()
+            .check_gate_with(
+                &fixture.issue("Test", "Test"),
+                &fixture.gate_key,
+                super::VerdictSource::Execute,
+            )
+            .expect("the evaluation retries its record");
+
+        let stored: crate::domain::GateVerdictRecord =
+            serde_json::from_slice(&std::fs::read(record).unwrap()).unwrap();
+        assert_eq!(stored.run_id, forced.run_id);
+        assert_eq!(
+            fixture.executions(),
+            2,
+            "the retry reuses the checker's verdict"
+        );
+        assert!(
+            racer
+                .commit_checks
+                .load(std::sync::atomic::Ordering::SeqCst)
+                > 1,
+            "the replaced record must fail the first commit check"
         );
     }
 
