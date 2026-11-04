@@ -5,7 +5,7 @@
   "dependencies": [
     "2195c98f-95a9-45d0-8582-d93c1d1fec45"
   ],
-  "description": "Plan server/web convergence against the hard criteria of 0f8efc37 using current code and a worker-sized authoritative manifest.\n\n## Success Criteria\n\n- [hard] REQ-01: The linked plan and breakdown manifest cover every active container criterion, preserve shared producers and define an executable dependency graph.\n- [hard] REQ-02: Current-code investigation and adversarial review justify the contracts and worker-sized leaves.",
+  "description": "Plan server/web convergence against the hard criteria of 0f8efc37 using current code and a worker-sized authoritative manifest.\n\n## Success Criteria\n\n- [hard] REQ-01: The linked plan and breakdown manifest cover every active container criterion, preserve shared producers and define an executable dependency graph.\n- [hard] REQ-02: Current-code investigation and adversarial review justify the contracts and worker-sized leaves.\n\n## Notes\n\nExternal producer prerequisites recorded in the plan are part of the final stored graph. The established breakdown protocol publishes internal batch edges first and external edges afterward, before its completion checkpoint releases work. The plan's external-edge publication decision cites that protocol; a native batch schema extension is outside this work.\n",
   "documents": [
     {
       "commit": null,
@@ -32,9 +32,10 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-11-04T21:59:02.643703922Z",
-      "updated_by": null
+      "run_id": "d8f0b4fd-84e3-41a3-9b76-7fb8f2fccdd7",
+      "status": "failed",
+      "updated_at": "2026-11-04T22:16:52.559981696Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "110a4a2f-54fa-4f1a-b055-174b95276675",
@@ -52,5 +53,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Plan the server and web shared mechanisms",
-  "updated_at": "2026-11-04T22:12:05.201244193Z"
+  "updated_at": "2026-11-04T22:18:02.192086631Z"
 }
