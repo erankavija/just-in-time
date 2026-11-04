@@ -872,7 +872,8 @@
     "1539da29": 2,
     "abe555e9": 1,
     "b23faa59": 2,
-    "e5d618ee": 2
+    "e5d618ee": 2,
+    "153c9851": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1011,10 +1012,10 @@
       "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "153c9851": {
-      "status": "in_progress",
+      "status": "rework",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
-      "note": "worker holding for 12c0f3fb; resume with its landing commit"
+      "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
     },
     "b25c2e54": {
       "status": "in_progress",
