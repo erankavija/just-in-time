@@ -33,7 +33,7 @@ fn container(
     requested: String,
     execute: bool,
 ) -> HandlerResult<ArchiveTargetResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &requested)?;
+    let id = resolve_issue(ctx.executor, &requested)?;
     let archive = ctx.executor.archive();
     let response = if execute {
         ArchiveTargetResponse::Executed(archive.execute_archive_container(&id)?)

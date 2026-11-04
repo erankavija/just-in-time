@@ -29,7 +29,7 @@ fn show_response<S: IssueStore>(
     requested: &str,
 ) -> anyhow::Result<IssueShowResponse> {
     let issues = ctx.executor.issues();
-    let id = resolve_issue(ctx.executor.storage(), requested)?;
+    let id = resolve_issue(ctx.executor, requested)?;
     let issue = issues
         .show_issue(&id)
         .with_context(|| format!("Failed to load issue {id}"))?;
@@ -66,7 +66,7 @@ fn show<S: IssueStore>(
         return Ok(IssueShowOutput::Item(item).into());
     }
     let issues = ctx.executor.issues();
-    let issue = issues.show_issue(&resolve_issue(ctx.executor.storage(), requested)?)?;
+    let issue = issues.show_issue(&resolve_issue(ctx.executor, requested)?)?;
     if summary && ctx.mode.json && !projecting {
         let summary = IssueShowSummaryResponse::from(&issue);
         let message = format!(
@@ -177,9 +177,7 @@ fn status<S: IssueStore>(
     let statuses = ids
         .iter()
         .map(|id| {
-            issues.issue_status_response(
-                issues.show_issue(&resolve_issue(ctx.executor.storage(), id)?)?,
-            )
+            issues.issue_status_response(issues.show_issue(&resolve_issue(ctx.executor, id)?)?)
         })
         .collect::<anyhow::Result<Vec<IssueStatusResponse>>>()?;
     // A single id stays a bare object, like `issue show`.
@@ -197,7 +195,7 @@ fn children<S: IssueStore>(
     let response = ctx
         .executor
         .issues()
-        .issue_children(&resolve_issue(ctx.executor.storage(), &id)?)?;
+        .issue_children(&resolve_issue(ctx.executor, &id)?)?;
     Ok(response.into())
 }
 
@@ -208,7 +206,7 @@ fn progress<S: IssueStore>(
     let response = ctx
         .executor
         .issues()
-        .issue_progress(&resolve_issue(ctx.executor.storage(), &id)?)?;
+        .issue_progress(&resolve_issue(ctx.executor, &id)?)?;
     Ok(response.into())
 }
 

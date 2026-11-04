@@ -140,7 +140,7 @@ mod with_executor {
     }
 
     fn ping<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<Count> {
-        let issues = ctx.executor.storage().list_issues()?.len();
+        let issues = ctx.executor.issues().list_issues(None, None, None)?.len();
         Ok(Count { issues }.into())
     }
 
@@ -167,7 +167,7 @@ mod concrete {
     use super::*;
 
     fn count(ctx: &CommandContext<'_, InMemoryStorage>) -> HandlerResult<Count> {
-        let issues = ctx.executor.storage().list_issues()?.len();
+        let issues = ctx.executor.issues().list_issues(None, None, None)?.len();
         Ok(Count { issues }.into())
     }
 
