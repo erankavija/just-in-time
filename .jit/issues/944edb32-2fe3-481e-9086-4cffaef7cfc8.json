@@ -15,7 +15,14 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "33a42940-1b10-4d72-bf02-f73f4b940e27",
+      "status": "failed",
+      "updated_at": "2026-11-04T04:46:25.152665445Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "944edb32-2fe3-481e-9086-4cffaef7cfc8",
   "labels": [
     "epic:history-independent-reads",
@@ -32,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A rewrite script and window driver move a repository to format 4",
-  "updated_at": "2026-11-04T03:29:01.499545940Z"
+  "updated_at": "2026-11-04T04:46:25.152665445Z"
 }

@@ -24,6 +24,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T04:38:41.148407405Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e154ca06-f97b-4743-aa86-5fbc9169fa63",
+      "status": "failed",
+      "updated_at": "2026-11-04T04:43:03.037900652Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "8a14e8e9-689d-4d78-ac1e-d9b312966faa",
@@ -37,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cargo-ci classifies out-of-space failures as environment faults",
-  "updated_at": "2026-11-04T04:38:41.148407405Z"
+  "updated_at": "2026-11-04T04:43:03.037900652Z"
 }
