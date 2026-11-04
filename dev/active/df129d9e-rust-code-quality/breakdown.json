@@ -3812,7 +3812,8 @@
      "touches": [
       "scripts/rust-build-budget.sh",
       "dev/benchmarks/rust-build-budgets/README.md",
-      "scripts/production-lines.py"
+      "scripts/production-lines.py",
+      ".jit/gates.toml"
      ]
     }
    }

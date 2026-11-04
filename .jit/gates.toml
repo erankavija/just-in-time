@@ -441,6 +441,7 @@ pass_context = false
 [gates.inputs]
 roots = [
   "scripts/rust-build-budget.sh",
+  "scripts/production-lines.py",
 ]
 
 [gates.reserved]
