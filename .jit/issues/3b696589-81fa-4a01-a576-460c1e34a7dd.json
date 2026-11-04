@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T12:46:00.591619520Z",
+  "dependencies": [],
+  "description": "The server's graceful-shutdown tests observe the drain and the force-close through explicit signals instead of timed log scraping, so they pass deterministically alone and under parallel load.\n\n## Background\n\n`test_the_drain_assertion_rejects_a_server_that_force_closes_early` in `crates/server/tests/server_integration/graceful_shutdown_tests.rs` failed in an authoritative branch CI run (2026-11-04) with \"no log line reports \\\"force-closing\\\"\" at line 256, and passed five times in a row when run alone on the same commit. The suite observes server behaviour by polling the process log with sleeps (`READ_POLL`), with a one-second configured drain deadline (`CONFIGURED_DRAIN_DEADLINE`) and a one-second observation window (`STOPPED_OBSERVATION_WINDOW`), and reads the drain duration back out of log fields. Under parallel load the log line can arrive after the observation ends. The project's test rules require deterministic tests that never wait on wall-clock time to observe the property they own.\n\n## Success Criteria\n\n- [hard] REQ-01: `test_the_drain_assertion_rejects_a_server_that_force_closes_early` observes the force-close through an explicit signal or event the server emits (for example a structured shutdown event on a channel, pipe or file the test reads blocking), not by polling log text against a time window.\n- [hard] REQ-02: Every other test in `graceful_shutdown_tests.rs` that observes a drain, force-close or exit by polling log text or sleeping against a wall-clock window uses the same mechanism; any wall-clock duration a test still needs (a drain deadline) is injected small and is never the means of observation.\n- [hard] REQ-03: Each test keeps the property it owns, with no weakened assertion and no ignored or deleted test.\n- [hard] REQ-04: The suite passes 20 consecutive runs alone and 20 runs inside a full parallel workspace test run.\n\n## Notes\n\nThe production shutdown behaviour and its log lines stay unchanged; only how tests observe them changes, plus whatever minimal seam the server needs to emit the signal.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T12:46:00.591619520Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3b696589-81fa-4a01-a576-460c1e34a7dd",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:server",
+    "story:build-hygiene",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Graceful-shutdown tests observe the server through explicit signals",
+  "updated_at": "2026-11-04T12:46:00.591619520Z"
+}
