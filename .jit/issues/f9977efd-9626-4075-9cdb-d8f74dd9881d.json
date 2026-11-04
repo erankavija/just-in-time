@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a136a894-1b3e-4c8e-a945-a440950593c4",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:45:01.494105225Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f9977efd-9626-4075-9cdb-d8f74dd9881d",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Enforce a main.rs production-line ceiling in the budget script",
-  "updated_at": "2026-11-04T23:35:50.315248077Z"
+  "updated_at": "2026-11-04T23:45:01.494105225Z"
 }
