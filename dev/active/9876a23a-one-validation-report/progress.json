@@ -361,7 +361,8 @@
     "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief).",
     "dispatch-worker-worktree.sh refuses whenever main's checkout has any tracked change, including other leads' tracker files: commit a tracker sync immediately before dispatching, and check the [ok] line before writing briefs (03c59566, wave 7).",
     "Pipelines wait at most 30 min for load<4, then run CI (user ruling); exit 75 suite-budget faults are known environment faults until 88's f487aeef. Never launch a pipeline with & inside a foreground Bash call; use run_in_background.",
-    "A nextest TIMEOUT on a normally millisecond test is a host artifact (cargo-pool-run waits for a jobserver token inside nextest's timer): rerun, never rework. Host measures: TMPDIR=/mnt/nvme/jit/tmp/9876-lead, CARGO_INCREMENTAL=0; reclaim worktrees as issues land; never touch the cache pool."
+    "A nextest TIMEOUT on a normally millisecond test is a host artifact (cargo-pool-run waits for a jobserver token inside nextest's timer): rerun, never rework. Host measures: TMPDIR=/mnt/nvme/jit/tmp/9876-lead, CARGO_INCREMENTAL=0; reclaim worktrees as issues land; never touch the cache pool.",
+    "Codex workers never merge main or run any git write (read-only metadata leaves half-merges or copies main's uncommitted .jit lines); the lead merges main into Codex branches and commits their diffs with git add -A crates."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
