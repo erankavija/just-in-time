@@ -1741,12 +1741,8 @@ mod tests {
                     .and_then(|output| output.success_schema.clone());
                 let mut raw = CommandSchema::resolve_output_schema(&path)
                     .and_then(|output| output.success_schema);
-                // Dropped by c9103fcf and cd8e04cc; remove each entry when its issue lands.
-                let own_warnings_exempt = [
-                    "doc_assets_list",
-                    "worktree_list",
-                    "worktree_store-divergence",
-                ];
+                // Dropped by c9103fcf; remove when it lands.
+                let own_warnings_exempt = ["doc_assets_list"];
                 if raw
                     .as_ref()
                     .and_then(|r| r.pointer("/properties/warnings"))
