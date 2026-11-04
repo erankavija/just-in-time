@@ -942,15 +942,36 @@ test_ignored_doctest_is_rejected() {
 }
 
 # --- the exit-status classifier ----------------------------------------------
-# A failure is an infrastructure fault (75) only when every failing step is a
-# test TIMEOUT with no FAIL, or a suite-duration-only budget violation, and the
-# host was loaded before the run started; everything else is a verdict (1). Synthetic nextest and
+# A failure is an infrastructure fault (75) only when every failing step ran out
+# of disk space (ENOSPC, whatever the load), or is a test TIMEOUT with no FAIL
+# or a suite-duration-only budget violation on a host that was loaded before
+# the run started; everything else is a verdict (1). Synthetic nextest and
 # budget output stand in for the steps, so no suite runs.
 readonly LOADED_LOAD1=9.00 QUIET_LOAD1=0.50 FIXTURE_CPUS=4
 # Baselines on each side of the 0.17 x FIXTURE_CPUS = 0.68 threshold.
 readonly JUST_BELOW_LOAD1=0.67 AT_THRESHOLD_LOAD1=0.68
 readonly TIMEOUT_LINE='        TIMEOUT [  60.001s] jit commands::slow::test_slow'
 readonly FAIL_LINE='        FAIL [   0.120s] jit commands::x::test_broken'
+readonly ENOSPC_FAIL_BLOCK='        FAIL [   0.200s] jit profile_cli_tests::test_pack
+--- STDERR: jit profile_cli_tests::test_pack ---
+thread test_pack panicked at crates/jit/tests/pack.rs:12:5:
+create the bounded package asset directory: Os { code: 28, kind: StorageFull, message: "No space left on device" }
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace'
+readonly ENOSPC_ASSERT_BLOCK='        FAIL [   0.200s] jit profile_cli_tests::test_add
+--- STDERR: jit profile_cli_tests::test_add ---
+thread test_add panicked at crates/jit/tests/add.rs:30:5:
+command failed: Output { status: ExitStatus(1), stdout: "", stderr: "write: No space left on device (os error 28)" }
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace'
+readonly MIXED_BLOCK='        FAIL [   0.200s] jit gate_tests::test_digest
+--- STDOUT: jit gate_tests::test_digest ---
+log: write failed: No space left on device (os error 28)
+--- STDERR: jit gate_tests::test_digest ---
+thread test_digest panicked at crates/jit/tests/digest.rs:9:5:
+assertion left == right failed
+  left: Stable
+ right: InputsMoved
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace
+log: later No space left on device'
 readonly DURATION_VIOLATION='  - test suite duration: observed 41000 ms, threshold 30000 ms (must be below threshold).'
 readonly FOOTPRINT_VIOLATION='  - integration-test targets: observed 99, limit 10.'
 
@@ -1000,6 +1021,37 @@ test_classifier_exit_paths() {
   expect_classification "unknown load" 1 "" "$TIMEOUT_LINE" "" test
 }
 
+expect_enospc_classification() { # expect_enospc_classification <message> <exit> <load1> <test> <budget> <steps...>
+  local msg="$1" want="$2"
+  shift 2
+  classify "$@"
+  check "$msg: exits $want" test "$classify_rc" -eq "$want"
+  [ "$want" -ne 75 ] ||
+    check "$msg: the diagnosis names ENOSPC as the cause" grep -qF 'ENOSPC' "$scratch/classify/diagnosis"
+}
+
+test_classifier_enospc_exit_paths() {
+  echo
+  echo "== classifier: ENOSPC exits 75 whatever the load, unless a genuine failure joins it =="
+  local beside_fail="$ENOSPC_FAIL_BLOCK"$'\n'"$FAIL_LINE"$'\n'"thread 'x' panicked at a.rs:1:1:"$'\n'"assertion failed"
+  expect_enospc_classification "ENOSPC test failure on a quiet host" 75 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK" "" test
+  expect_enospc_classification "ENOSPC test failure on a loaded host" 75 "$LOADED_LOAD1" "$ENOSPC_FAIL_BLOCK" "" test
+  expect_enospc_classification "ENOSPC test failure with unknown load" 75 "" "$ENOSPC_FAIL_BLOCK" "" test
+  expect_enospc_classification "ENOSPC budget failure on a quiet host" 75 "$QUIET_LOAD1" "" "write failed: No space left on device" budget
+  expect_enospc_classification "ENOSPC clippy-style error alone" 75 "$QUIET_LOAD1" "" "error: failed to write: No space left on device (os error 28)
+error: could not compile \`x\` due to 1 previous error" budget
+  expect_enospc_classification "ENOSPC beside a compiler error in a non-test step" 1 "$QUIET_LOAD1" "" "error: failed to write: No space left on device (os error 28)
+error[E0308]: mismatched types" budget
+  expect_enospc_classification "ENOSPC beside a footprint violation in a non-test step" 1 "$QUIET_LOAD1" "" "write failed: No space left on device
+$FOOTPRINT_VIOLATION" budget
+  expect_enospc_classification "ENOSPC assert-message failure" 75 "$QUIET_LOAD1" "$ENOSPC_ASSERT_BLOCK" "" test
+  expect_enospc_classification "ENOSPC elsewhere in a block whose panic is an assertion" 1 "$QUIET_LOAD1" "$MIXED_BLOCK" "" test
+  expect_enospc_classification "one ENOSPC panic and one assertion panic in a block" 1 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK"$'\n'"thread 'y' panicked at b.rs:2:2:"$'\n'"assertion failed" "" test
+  expect_enospc_classification "ENOSPC failure beside a genuine test FAIL" 1 "$LOADED_LOAD1" "$beside_fail" "" test
+  expect_enospc_classification "ENOSPC failure beside a genuine FAIL on a quiet host" 1 "$QUIET_LOAD1" "$beside_fail" "" test
+  expect_enospc_classification "ENOSPC test step beside a footprint budget failure" 1 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK" "$FOOTPRINT_VIOLATION" test budget
+}
+
 # Without errexit a test that cannot run, such as a missing function, would only
 # print to stderr. Each test ends with a status-0 assertion, so nonzero means it did
 # not complete.
@@ -1015,6 +1067,7 @@ echo "== wrong-nextest-version: the gate must fail before its first step =="
 run_test test_wrong_nextest_version_fails_fast
 run_test test_suite_mode_runs_only_the_suite_steps
 run_test test_classifier_exit_paths
+run_test test_classifier_enospc_exit_paths
 run_test test_build_lock_status_propagation
 run_test test_script_build_lock_wait
 run_test test_unrunnable_compiler_wrapper
