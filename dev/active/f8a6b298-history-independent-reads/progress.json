@@ -718,6 +718,12 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "gate/search docs"
+    },
+    {
+      "id": "7244ecb2",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "lease interruption matrix; concurrency-critical"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

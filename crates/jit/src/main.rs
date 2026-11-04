@@ -4764,18 +4764,19 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 
                     let output_ctx = OutputContext::new(quiet, json);
                     let id = resolve_issue(&storage, &id)?;
-                    let result = executor
+                    let (result, warnings) = executor
                         .documents()
                         .list_document_assets(&id, &path, rescan)?;
 
-                    // Print warnings first if any
-                    for warning in &result.extras.warnings {
+                    for warning in &warnings {
                         output_ctx.print_warning(warning)?;
                     }
 
                     if json {
                         let msg = format!("{} assets found", result.extras.summary.total);
-                        let output = JsonOutput::success(&result).with_message(msg);
+                        let output = JsonOutput::success(&result)
+                            .with_message(msg)
+                            .with_warnings(warnings);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let repo_root = executor_layout.worktree_root();
