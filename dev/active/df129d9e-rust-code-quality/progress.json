@@ -893,6 +893,11 @@
       "id": "inherited-landing-lock",
       "summary": "A lead landing script holding its serial flock on an inherited fd lost it to the sccache server a child cargo run daemonized, deadlocking b23faa59 and 1eb949a5 for two hours past the 03:30 hold. Take serial locks with `flock -o` so children never inherit them.",
       "status": "fixed in the lead's scratchpad script"
+    },
+    {
+      "id": "mcp-ci-format-cutover",
+      "summary": "Since format 4 landed (55438f664), a HEAD-built jit cannot read this repository's format-3 tracker, so the mcp-ci PATH workaround fails (REPOSITORY_FORMAT_UNSUPPORTED). Because the digest excludes the binary, the failed verdict is then reused for the installed binary. b23faa59's mcp-ci is held pending the steward's ruling on --force; the workaround has been removed from land-one.sh. Tracked by 26307dfd.",
+      "status": "open"
     }
   ],
   "external_blockers": {},
@@ -940,6 +945,9 @@
   },
   "post_release_followups": [
     "Land b23faa59, then 1eb949a5; fan out wave 7; implement 8c67b21a, then delete the private dispatch.sh copy.",
-    "File a standalone v1.0 task under milestone 9db27a3a (steward request): the mcp-ci gate tests the jit built from the commit under evaluation, not the first jit on PATH, and that binary's source is part of the gate's input digest so a reused verdict cannot vouch for a different binary. Tell 6a the ID. Once it lands, delete the PATH workaround from land-one.sh."
-  ]
+    "26307dfd (mcp-ci builds the binary under evaluation) filed; once it lands, delete the PATH workaround from land-one.sh."
+  ],
+  "issues": {
+    "b23faa59": {}
+  }
 }
