@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-0546fc82",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ad8c2fb1d9d1f17e3577045a186c4937ea2f3321",
+  "completed_at": "2026-11-04T23:09:25.485497085Z",
+  "duration_ms": 192658,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 32,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Replace internal 'clap' and 'JIT-handled' terminology with plain parser and command-failure wording."
+      }
+    ],
+    "summary": "The canonical contract is accurate, but issue-authored prose exposes internal parser terminology.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "0546fc82-435f-4d02-9af2-0dc22e301d60",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0c9f1d6b-809e-4c73-ba4c-51bc5a67cc8b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:06:12.826703187Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 34502 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-0546fc82\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8d0-1afc-7af1-926e-7343e56728a2\n--------\nuser\n--- 34489 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf `task` with no resolved children. Reviewed two `jit:0546fc82` commits individually; the documentation commit defines the footprint. Current code confirms the output contract, including the approved D-01 warning behavior. The full link check has unrelated pre-existing diagnostics, not attributed here.\n\n1. **F1 — blocking, issue-impact, medium:** [docs/reference/cli-commands.md:32](/mnt/nvme/jit/agents/worktrees/agent-0546fc82/docs/reference/cli-commands.md:32) and [line 49](/mnt/nvme/jit/agents/worktrees/agent-0546fc82/docs/reference/cli-commands.md:49) expose the implementation name “clap” and “JIT-handled” to adopters. Replace with plain wording: “After arguments are parsed, a command failure…” and “the parser’s diagnostic.”\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The canonical contract is accurate, but issue-authored prose exposes internal parser terminology.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Replace internal 'clap' and 'JIT-handled' terminology with plain parser and command-failure wording.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":32}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
