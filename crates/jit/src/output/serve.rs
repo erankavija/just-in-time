@@ -8,12 +8,9 @@ use std::path::PathBuf;
 
 /// Where a started server serves the web UI from.
 #[derive(Debug, Serialize, JsonSchema)]
-#[serde(tag = "web_ui_source", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum WebUiSource {
-    Filesystem {
-        #[serde(skip)]
-        dir: String,
-    },
+    Filesystem,
     Embedded,
 }
 
@@ -42,8 +39,9 @@ pub enum ServeResponse {
         url: String,
         log_file: PathBuf,
         web_ui: bool,
-        #[serde(flatten)]
         web_ui_source: WebUiSource,
+        #[serde(skip)]
+        web_dir: Option<String>,
     },
     Exited {
         port: u16,
@@ -71,13 +69,13 @@ impl HumanRender for ServeResponse {
                 pid,
                 url,
                 log_file,
-                web_ui_source,
+                web_dir,
                 ..
             } => {
-                let web = match web_ui_source {
-                    WebUiSource::Filesystem { dir } => format!("(from {dir})"),
-                    WebUiSource::Embedded => "(embedded assets)".to_owned(),
-                };
+                let web = web_dir.as_ref().map_or_else(
+                    || "(embedded assets)".to_owned(),
+                    |dir| format!("(from {dir})"),
+                );
                 format!(
                     "Server started on {url} (PID {pid})\n  API: {url}/api\n  Web: {url}/ {web}\n  Log: {}\n",
                     log_file.display()
