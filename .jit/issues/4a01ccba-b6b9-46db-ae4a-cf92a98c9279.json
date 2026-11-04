@@ -7,15 +7,7 @@
     "1eb949a5-7b70-4b32-92f3-aa5e2f703d44"
   ],
   "description": "Slow tests are refactored, never excused. This brings every test the measurement flagged under its layer's limit.\n\n## Background\n\nThe per-test benchmark note under `dev/benchmarks/` lists each test above its layer's limit. Tests that wait on wall-clock timers or sleeps (lease expiry, lock timeouts, server start-up and shutdown, watch loops) are the usual cause. They drive time through an injected clock or an explicit event instead.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test the benchmark note lists runs under its layer's limit on a quiet host, re-measured with the same method.\n- [hard] REQ-02: No refactored test sleeps or waits on wall-clock time to observe the property it owns. Time-dependent behaviour is driven through an injected clock, a channel or an explicit readiness signal.\n- [hard] REQ-03: Each refactored test still owns the property it owned before, at the same or a cheaper layer, with no weakened assertion, no ignored test and no test deleted without its property moving to another owning test.\n\n## Notes\n\nIf a test cannot meet the limit without losing its property, report it as a blocking concern rather than raising the limit.\n",
-  "documents": [
-    {
-      "commit": null,
-      "doc_type": "benchmark",
-      "format": "markdown",
-      "label": null,
-      "path": "dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md"
-    }
-  ],
+  "documents": [],
   "first_ready_at": "2026-11-03T22:39:27.306285729Z",
   "gates_required": [
     "cargo-ci",
@@ -46,5 +38,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T12:26:26.081742472Z"
+  "updated_at": "2026-11-04T12:12:32.191129661Z"
 }

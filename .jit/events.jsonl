@@ -24159,4 +24159,3 @@
 {"from":"ready","id":"19fc01cb-d181-41e4-9e5f-3f1dc36a1bcb","issue_id":"5ee85aed-c152-470f-881c-2b2be7b8ef53","timestamp":"2026-11-04T12:12:58.659591280Z","to":"done","type":"issue_state_changed"}
 {"id":"4276b474-239c-4074-b136-5de2ec2636b1","issue_id":"5ee85aed-c152-470f-881c-2b2be7b8ef53","timestamp":"2026-11-04T12:12:58.659591280Z","type":"issue_completed"}
 {"from":"backlog","id":"fda35cec-2a76-4242-9ec8-7bf07ccd9862","issue_id":"f8a6b298-e6b5-4d62-b73c-3f7b217c1a01","timestamp":"2026-11-04T12:12:58.771096068Z","to":"ready","type":"issue_state_changed"}
-{"fields":["documents"],"id":"4973729e-a187-4261-8219-9ede4da44ea2","issue_id":"4a01ccba-b6b9-46db-ae4a-cf92a98c9279","timestamp":"2026-11-04T12:26:26.081742472Z","type":"issue_updated","updated_by":"doc-add"}
