@@ -1159,9 +1159,10 @@
       "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker."
     },
     "b51291e4": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Codex gpt-6-luna (xhigh)",
-      "reason": "self-contained script change without sockets; alternation"
+      "reason": "self-contained script change without sockets; alternation",
+      "review": "lead R1 PASS (7c); committed af138a794 for Codex"
     }
   },
   "handoff": {
