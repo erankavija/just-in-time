@@ -810,6 +810,12 @@ impl CommandSchema {
                 "An I/O failure prevented worktree inspection.",
                 false,
             ),
+            row(
+                "worktree store-divergence",
+                5,
+                "A filesystem operation reading the primary checkout's store was denied.",
+                false,
+            ),
             // Universal: any command reaches these — `0` on successful completion,
             // the failure codes through the shared classifier.
             row("*", 0, "Command completed successfully.", false),
