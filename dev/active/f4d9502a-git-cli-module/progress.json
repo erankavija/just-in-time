@@ -524,7 +524,9 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    "783b33fa"
+  ],
   "escalations": [
     {
       "issue": "a273667c",
@@ -544,6 +546,12 @@
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
       "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate.",
       "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch."
+    },
+    {
+      "issue": "783b33fa",
+      "status": "approved_for_implementation",
+      "subject": "Explicit actor input for issue release; isolated correction outside original manifest",
+      "ruling": "Steward approves four hard criteria/fourfiles, Sol/high and temporary fourth tree. Native504 prerequisite; actorlands+Done before504refresh. Fifthowner requires evidence/approval; no newCLIflag/ambient actor/parallel producer."
     }
   ],
   "rework_counts": {
@@ -582,7 +590,8 @@
     }
   ],
   "reconciled_after_breakdown": [
-    "5046408a"
+    "5046408a",
+    "783b33fa"
   ],
   "started_at": "2026-10-24T21:43:21+03:00",
   "dispatches": [
@@ -808,6 +817,13 @@
       "model": "gpt-6-astra",
       "effort": "xhigh",
       "reason": "Steward-authorized one additional bounded cycle3 after diagnostic design R2; exact ten-file correction, no unlimited retries."
+    },
+    {
+      "issue": "783b33fa",
+      "agent": "/root/release_actor",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Steward-approved bounded four-file explicit actor facade/input correction; only active implementation,504 frozen. Temporary fourth tree approved."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -923,7 +939,8 @@
     "504 diagnostics R1 footprint FAIL resolved by restoring existing storage test owner; R2 design PASS. Steward accepts ten-file correction and exactly cycle3, prior two gate failures retained. Durable proposal/reviews linked before source dispatch. Main remains source-free until all checks/reviews pass.",
     "Lease renewal correction: claim acquire did not extend existing expiry. Actual claim renew --extension14400 at06:31UTC extends a273/c140/504 to10:31UTC; use renew and verify expires_at, not acquire, for held leases.",
     "Cycle3 original config diagnostics/repair regression now green; broad non-fail-fast CLI/contracts exposes five failing tests plus two hidden registry arms. Source ten-file diff frozenf0c5fd8a over376978ed0. Concrete boundary proposal sent steward: recommend shared existing adapters/data-only exec (+3owners), explicit release actor (+3distinct owners,6total), permission source repair in current scope. No further edits pending ruling; prior single-extra-cycle limit remains.",
-    "Steward selects boundary optionA and in-footprint Io fix, exact13files subject to fresh independent design review before edits, no B/retryreset. Actor defect excluded from504 pending unchanged-main sanitized reproduction and injection audit; if confirmed propose separate same-epic leaf outside original53/noREQcredit, fourfiles, mainfix then504refresh. Primary read-only/proposal dispatch active."
+    "Steward selects boundary optionA and in-footprint Io fix, exact13files subject to fresh independent design review before edits, no B/retryreset. Actor defect excluded from504 pending unchanged-main sanitized reproduction and injection audit; if confirmed propose separate same-epic leaf outside original53/noREQcredit, fourfiles, mainfix then504refresh. Primary read-only/proposal dispatch active.",
+    "Steward approved separate actor task783b33fa with four hard criteria/exactfourfiles, sameGit epic outside53manifest/noREQcredit. Native504->783 dependency added, Ready task claimed to lead; plan linked. Sol/high isolated temporary fourth tree approved; actorland+Done then504refresh before13-file work. Main baseline and matchedworker2tests bothRED, sevenrelevantfiles identical. No504retryreset."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1451,9 +1468,10 @@
     }
   },
   "source_queue": [
-    "fb5e8e8d implementation",
-    "c140921c held forsharedproducerproposal",
-    "a273667c reviewed; explicituserdecision pending"
+    "783b33fa explicit actor correction",
+    "5046408a frozen; selected-A design review and actor prerequisite",
+    "a273667c reviewed; explicit user decision pending",
+    "c140921c held for floor/a273/504 prerequisites"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",

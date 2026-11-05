@@ -25332,3 +25332,8 @@
 {"fields":["documents"],"id":"da5da024-133d-49f5-a3d0-db8d73dcd8cf","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-11-05T06:34:48.292593495Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"c1c4271a-6618-4a45-99d1-529da4de9820","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-11-05T06:35:44.167891470Z","type":"issue_updated","updated_by":"doc-update"}
 {"fields":["documents"],"id":"1c01bfdb-cbfd-41d7-9da8-524e5eb3ba1d","issue_id":"f4d9502a-c585-4436-8819-bcd3d5c59171","timestamp":"2026-11-05T07:19:25.963026471Z","type":"issue_updated","updated_by":"doc-add"}
+{"id":"4319cd14-e1a5-4154-b027-587fafe42bc1","issue_id":"783b33fa-6fdf-4cf4-a9f2-323a90c27734","priority":"high","timestamp":"2026-11-05T07:40:20.352306336Z","title":"Allow an explicit acting identity for issue release","type":"issue_created"}
+{"fields":["dependencies"],"id":"4929c52f-6d3b-4708-9d83-691b56e0bf1b","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-11-05T07:40:41.051048311Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:f4d9502a-lead","id":"176b4952-bc5b-45c8-a994-bfd5ae070756","issue_id":"783b33fa-6fdf-4cf4-a9f2-323a90c27734","timestamp":"2026-11-05T07:40:41.088857258Z","type":"issue_claimed"}
+{"from":"ready","id":"3d2bd452-345f-4b07-bea8-e2527d4143b4","issue_id":"783b33fa-6fdf-4cf4-a9f2-323a90c27734","timestamp":"2026-11-05T07:40:41.270142557Z","to":"in_progress","type":"issue_state_changed"}
+{"fields":["documents"],"id":"e0dc09d1-d532-463c-823e-e8943f867034","issue_id":"783b33fa-6fdf-4cf4-a9f2-323a90c27734","timestamp":"2026-11-05T07:42:15.562898809Z","type":"issue_updated","updated_by":"doc-add"}

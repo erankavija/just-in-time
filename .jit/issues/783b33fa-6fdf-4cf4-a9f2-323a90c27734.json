@@ -1,0 +1,34 @@
+{
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T07:40:41.088857258Z",
+  "context": {},
+  "created_at": "2026-11-05T07:40:20.352306336Z",
+  "dependencies": [],
+  "description": "Issue release requires an attributable actor, but its library facade only resolves that identity from invocation configuration or Git. Add an explicit typed actor input so isolated callers can release issues without ambient identity, while keeping the existing convenience API and one publication computation.\n\n## Background\n\nThe existing in-memory release-result and no-coordinator lifecycle tests provide a claim assignee but no release actor. Those are separate identities: a person or agent may release someone else's claim, and the audit must record who performed the release. Both tests fail on unchanged main when agent environment/configuration and ambient Git identity are unavailable.\n\n## Success Criteria\n\n- [hard] REQ-01: An issue-release facade accepting the canonical Assignee actor releases a claimed issue without resolving environment, user configuration or Git identity, returns the persisted Issue and records the supplied actor independently of the former assignee.\n- [hard] REQ-02: Existing convenience release retains its issue-prefix lookup and validation/error precedence, resolves invocation identity only after that existing lookup, and publishes through the same captured lifecycle release producer. A missing issue still fails before actor resolution; absent acting identity still fails without publishing, rather than becoming an anonymous/default actor.\n- [hard] REQ-03: Release keeps its current reason, previous-assignee and acting-identity audit data, issue transition/no-op behavior, coupled publication and failure atomicity. Explicit and convenience callers use one release producer, with no alternate mutation or event path.\n- [hard] REQ-04: The existing release-result and no-coordinator lifecycle scenarios pass alone and together under sanitized actor inputs, preserving their persisted-result and cleared-assignee assertions. Tests use explicit operation inputs and owned shared fixtures, without process-wide environment/cwd mutation, a fake Git authority or a test-only actor provider.\n\n## Notes\n\nUse the existing canonical Assignee type and captured lifecycle Release request. This is an input capability of the command facade; no new CLI flag, actor vocabulary, identity-resolution priority, storage format, Git floor, coordination backend or actor-setting mechanism is required.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Accepted explicit release actor plan",
+      "path": "dev/active/783b33fa/plan.md"
+    }
+  ],
+  "first_ready_at": "2026-11-05T07:40:20.352306336Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "783b33fa-6fdf-4cf4-a9f2-323a90c27734",
+  "labels": [
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Allow an explicit acting identity for issue release",
+  "updated_at": "2026-11-05T07:42:15.562898809Z"
+}

@@ -341,6 +341,10 @@ Snapshot source selection and repository metadata use `code_checkout()`, preserv
 
 The two-version document diff likewise waits for the shared revision producer: it resolves each original expression before requesting canonical commit:path, using one reader child for both versions. This post-plan prerequisite preserves the existing diff criteria and libgit2 expression semantics; document show retains its existing prerequisite chain.
 
+## Post-plan actor-input correction
+
+Steward-approved corrective task @/issue/783b33fa/requirement/REQ-01 through @/issue/783b33fa/requirement/REQ-04 supplies an explicit typed release actor through one existing lifecycle producer. Its [bounded plan](../783b33fa/plan.md) records the unchanged-main failures and exact four-file footprint. It belongs to this epic but remains outside the original 53-node manifest and claims no epic REQ credit; the manifest and coverage mapping are unchanged. The live graph makes it a prerequisite of split-root selection. Land and close this isolated correction, then refresh split-root work before its shared command-module edits resume. Other holds remain unchanged.
+
 ## Investigation sources
 
 - [Layout process-budget investigation](layout-probe-investigation.md): prior universal-bound failure and evidence for the distinct-context reconciliation.
