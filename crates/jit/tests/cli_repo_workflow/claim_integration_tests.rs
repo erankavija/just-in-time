@@ -22,7 +22,14 @@ fn test_issue_release() {
     let id = cli.create_issue(["--title", "Task"]).unwrap();
     cli.run(["issue", "claim", &id, "agent:worker-1"]).unwrap();
 
-    cli.run(["issue", "release", &id, "timeout"]).unwrap();
+    let release = cli
+        .command_with_env(
+            ["issue", "release", &id, "timeout"],
+            [("JIT_AGENT_ID", "agent:worker-1")],
+        )
+        .output()
+        .unwrap();
+    assert!(release.status.success(), "{release:?}");
 
     assert!(cli.run_json(["issue", "show", &id]).unwrap()["assignee"].is_null());
 }

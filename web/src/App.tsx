@@ -9,7 +9,7 @@ import { useTheme } from './hooks/useTheme';
 import { useEventStream } from './hooks/useEventStream';
 import { useSearch } from './components/Search/useSearch';
 import { apiClient } from './api/client';
-import type { Issue, NamespaceInfo } from './types/models';
+import type { GraphNode, NamespaceInfo } from './types/models';
 import './App.css';
 
 import type { LayoutAlgorithm } from './components/Graph/GraphView';
@@ -18,7 +18,7 @@ function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [focusIssueId, setFocusIssueId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [allIssues, setAllIssues] = useState<Issue[]>([]);
+  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('compact');
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [isDetailPaneMinimized, setIsDetailPaneMinimized] = useState(false);
@@ -86,20 +86,17 @@ function App() {
       .catch((err) => console.warn('Failed to fetch namespace configuration:', err));
   }, []);
 
-  useEffect(() => {
-    apiClient.listIssues().then(setAllIssues).catch(console.error);
-  }, [version]);
-
-  // Extract all unique labels from issues
-  const allLabels = useMemo(() => {
-    const labelSet = new Set<string>();
-    for (const issue of allIssues) {
-      for (const label of issue.labels) {
-        labelSet.add(label);
+  const { allLabels, issueTitles } = useMemo(() => {
+    const labels = new Set<string>();
+    const titles = new Map<string, string>();
+    for (const node of graphNodes) {
+      titles.set(node.id, node.label);
+      for (const label of node.labels) {
+        labels.add(label);
       }
     }
-    return Array.from(labelSet).sort();
-  }, [allIssues]);
+    return { allLabels: Array.from(labels).sort(), issueTitles: titles };
+  }, [graphNodes]);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -221,6 +218,7 @@ function App() {
           <div style={{ height: '100%', position: 'relative' }}>
             <GraphView
               onNodeClick={setSelectedIssueId}
+              onGraphNodes={setGraphNodes}
               labelFilters={labelFilters}
               layoutAlgorithm={layoutAlgorithm}
               onLayoutChange={setLayoutAlgorithm}
@@ -279,7 +277,7 @@ function App() {
           }}>
             <IssueDetail
               issueId={selectedIssueId}
-              allIssues={allIssues}
+              issueTitles={issueTitles}
               onNavigate={setSelectedIssueId}
               onFocusInGraph={setFocusIssueId}
               version={version}

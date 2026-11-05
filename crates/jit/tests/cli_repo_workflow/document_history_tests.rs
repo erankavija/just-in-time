@@ -74,6 +74,91 @@ fn test_doc_history_lists_commits() {
 }
 
 #[test]
+fn test_doc_history_lists_document_deletion() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+
+    write_file(&cli, "docs/removed.md", "original");
+    cli.commit("Add document").unwrap();
+    let issue_id = cli.create_issue(["--title", "Track document"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/removed.md"])
+        .unwrap();
+
+    fs::remove_file(cli.root().join("docs/removed.md")).unwrap();
+    cli.commit("Delete document").unwrap();
+    let deletion = cli.git(["rev-parse", "HEAD"]).unwrap();
+
+    let history = cli
+        .run_json(["doc", "history", issue_id.as_str(), "docs/removed.md"])
+        .unwrap();
+    let commits = history["commits"].as_array().unwrap();
+    assert_eq!(commits.len(), 2);
+    assert_eq!(commits[0]["sha"].as_str().unwrap(), &deletion[..7]);
+    assert_eq!(commits[0]["message"], "Delete document");
+}
+
+#[test]
+fn test_doc_history_omits_merge_identical_to_second_parent() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+
+    write_file(&cli, "docs/merged.md", "base");
+    cli.commit("Add document").unwrap();
+    let issue_id = cli.create_issue(["--title", "Track document"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/merged.md"])
+        .unwrap();
+
+    cli.git(["branch", "side"]).unwrap();
+    write_file(&cli, "main.txt", "unrelated");
+    cli.commit("Change unrelated file on main").unwrap();
+
+    cli.git(["checkout", "-q", "side"]).unwrap();
+    write_file(&cli, "docs/merged.md", "side version");
+    cli.commit("Update document on side").unwrap();
+    let document_update = cli.git(["rev-parse", "HEAD"]).unwrap();
+    cli.git(["checkout", "-q", "main"]).unwrap();
+    cli.git(["merge", "-q", "--no-ff", "--no-edit", "side"])
+        .unwrap();
+    let merge = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let merged_blob = cli.git(["rev-parse", "HEAD:docs/merged.md"]).unwrap();
+    assert_ne!(
+        merged_blob,
+        cli.git(["rev-parse", "HEAD^1:docs/merged.md"]).unwrap()
+    );
+    assert_eq!(
+        merged_blob,
+        cli.git(["rev-parse", "HEAD^2:docs/merged.md"]).unwrap()
+    );
+
+    let history = cli
+        .run_json(["doc", "history", issue_id.as_str(), "docs/merged.md"])
+        .unwrap();
+    let commits = history["commits"].as_array().unwrap();
+    assert!(commits
+        .iter()
+        .any(|commit| commit["sha"].as_str() == Some(&document_update[..7])));
+    assert!(!commits
+        .iter()
+        .any(|commit| commit["sha"].as_str() == Some(&merge[..7])));
+}
+
+#[test]
+fn test_doc_history_fails_outside_git() {
+    let cli = JitCli::initialised().unwrap();
+    write_file(&cli, "docs/local.md", "local");
+    let issue_id = cli.create_issue(["--title", "Track document"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/local.md"])
+        .unwrap();
+
+    let output = cli
+        .command(["doc", "history", issue_id.as_str(), "docs/local.md"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("git repository"));
+}
+
+#[test]
 fn test_doc_history_nonexistent_document() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap();

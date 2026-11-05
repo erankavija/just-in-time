@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-3f8da8c4",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "53af83b6e6a522144b56cef4efba4c96fa855403",
+  "completed_at": "2026-11-05T03:50:00.451329547Z",
+  "duration_ms": 151552,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable requirements are satisfied; the passing cargo-ci run covers the tagged commit.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3f8da8c4-4fb4-4191-bec4-d496155b6266",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4c16f96a-c643-46c0-bc48-3cca022950b9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:47:28.898591596Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9ac82c6c2fde23c606f4e3e6bd6e71ccf9de468f (`jit:3f8da8c4`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02, REQ-03, REQ-05, REQ-09 (issue description); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); run 53af83b6e6a522144b56cef4efba4c96fa855403 contains 9ac82c6c2fde23c606f4e3e6bd6e71ccf9de468f\nTruncation recovery: Re-read direct callers, gate-execution and gate-check slices, and GitCheckout/WorktreePaths APIs after a broad git-module search truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable requirements are satisfied; the passing cargo-ci run covers the tagged commit.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

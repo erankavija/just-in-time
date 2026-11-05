@@ -2994,6 +2994,12 @@ unique = false
         )
         .unwrap();
         jit::test_cli::init_git_repository(temp.path()).unwrap();
+        let paths = jit::storage::WorktreePaths::detect_for_data_root(
+            executor.storage().root(),
+            temp.path(),
+        )
+        .unwrap();
+        let executor = executor.with_worktree_paths(paths);
         let git = |args: &[&str]| {
             let status = Command::new("git")
                 .current_dir(temp.path())
