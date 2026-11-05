@@ -325,8 +325,10 @@
           "short_id": "47d62472",
           "title": "Branch drift validation compares in the selected worktree",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared",
+          "worker": "agent:f4d9502a-lead"
         },
         {
           "id": "83c8632f-5495-4fef-a774-730ebeae95be",
@@ -342,8 +344,10 @@
           "short_id": "92afc5d8",
           "title": "Init reads git classification from the invocation's layout",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared",
+          "worker": "agent:f4d9502a-lead"
         },
         {
           "id": "9ecde705-8aa9-4ceb-a352-c08fc285af12",
@@ -833,7 +837,8 @@
     "d5cae9e3 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "d5 actual mergedCargo172143f1 stable PASS, Done/released3181d2865. a273 corrected fullCargo passed, independent review running. Ready9ecde705 claimed/prepared for next available worker slot, exact document asset-presence function/tests independent of83 history functions; preserve landed7516 timed HTTP probe pool per recorded second-lander ruling. Source boundary remains unreserved while632 is unready.",
     "Steward approved EA seventh file only obsolete two-line Git comment; approved 9ec shared exact submodule-status parsing and owning test (four-file footprint). 83 second-parent merge regression and 3f actual old-code RED rework each counted once. Do not cancel queued checks; collect before edits. b067 frontend received idle source slot before EA.",
-    "ea4b7363 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "ea4b7363 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Dependency-ready 47d62472 branch drift and92afc5d8 init classification claimed after EA closure; isolated Sol-high workers next. Initial issue-claim --ttl syntax rejected without mutation; separate claim acquire owns TTL."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1290,11 +1295,10 @@
     }
   },
   "source_queue": [
-    "ea4b7363 ready after frontend b067",
-    "83c8632f reviewed",
-    "3f8da8c4 branch gates running",
-    "9ecde705 branch gates next",
-    "a273667c isolated proposal awaiting user decision"
+    "83c8632f ready",
+    "3f8da8c4 review running",
+    "9ecde705 branch gates running",
+    "a273667c proposal only awaiting user decision"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
