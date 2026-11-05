@@ -324,8 +324,6 @@ impl GitCheckout {
         Ok(Some(name.strip_suffix('\n').unwrap_or(name).to_owned()))
     }
 
-    // Temporary @/inv/convention-convergence exception: document history
-    // converges here when 83c8632f lands.
     /// List commits touching a literal worktree-relative path, newest first,
     /// with git's default history simplification. One git process.
     ///
