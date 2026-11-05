@@ -288,15 +288,16 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_running"
+          "worker_status": "full_gates_running"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
           "short_id": "ea4b7363",
           "title": "Release actor reads git user.name through the module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementation_complete_pending_gates"
         }
       ]
     },
@@ -348,8 +349,9 @@
           "short_id": "a273667c",
           "title": "Path reads at a commit go through the git module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -372,8 +374,9 @@
           "short_id": "dcf88b6f",
           "title": "Pinned target inspection reads blobs through the object reader",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -749,7 +752,8 @@
     "Base099Donecbe2c0651 mergedCargo28900273; init732 next. D25 charter authority121816926 and link3db4377c5 landed by frontend, preserve nonblocking cutover632 on integration. d48 corrected full gatesab9c87a8/42705ea4 pass on d8d04ef4; ten new tests include NUL rejection; base additive test conflict being verified. Server/base worktrees reclaimed. d681 implementation owns only reviewed seven-file context/fallback footprint, excluding632 read admission/with_read_session.",
     "f6eaba42 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward approved ea4b7363 footprint-only reconciliation: actual second caller commands/mod.rs::publish_captured_release now supplies canonical WorktreePaths alongside claim-release callback. Two existing files, criteria unchanged, no new probe/cache/error/read-session behavior. Background/manifest/overview updated and native validation passed. Exclude frontend632 D25 admission/with_read_session edits and preserve actor precedence/fallback semantics.",
-    "d48e28bf Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "d48e28bf Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "d48Done507748f7b after mergedstableCargo e91fc299 on524e7b6f5; object/base byteproof69PASS. Frontend a236 tracker boundary finished eccbe08e1. Ready dcf/a273 consumers claimed for isolated parallel work. EA two-file implementation complete, fullgates next; d681 fullgates running after149focused regressions. 9de refresh has only conjunction-comment conflict combining reviewed f6/9de ID removals; exact byte proof+fmt, mandatory mergedCargo."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1145,9 +1149,10 @@
     }
   },
   "source_queue": [
-    "f6eaba42 if frontend unready",
-    "d48e28bf after composition ready",
-    "ready interleave"
+    "9de4c09c after comment integration",
+    "e3c38fea",
+    "f649c144",
+    "632 when ready interleave"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
