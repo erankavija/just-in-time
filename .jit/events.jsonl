@@ -24865,3 +24865,5 @@
 {"fields":["dependencies"],"id":"00a59db4-5d6d-440b-8f14-26bb85f20727","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-05T00:01:34.702986595Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"0c8ab1aa-f7ea-4ec7-8bdd-f8b112a392e0","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","timestamp":"2026-11-05T00:01:34.918700893Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:frontend-install-policy","id":"b34d9f10-396e-480d-850b-476d4009ac34","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","timestamp":"2026-11-05T00:01:34.918700893Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"22ce5d74-127d-4489-bb03-cc04d5bf26b7","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T00:10:31.429704603Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"8b79be56-f742-459b-87d6-5cf3a34361ec","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T00:13:20.685286903Z","type":"gate_passed","updated_by":"auto:executor"}
