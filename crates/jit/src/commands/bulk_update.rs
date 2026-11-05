@@ -329,7 +329,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// check a real mutation's apply gets -- a concurrent change to anything
     /// within the captured footprint (the same footprint the per-issue
     /// publication session captures, since both call
-    /// `CommandExecutor::capture_proposed_base` identically) raises a retryable
+    /// [`CommandExecutor::capture_proposed_base`] identically) raises a retryable
     /// conflict and the driver re-runs this whole closure against a fresh
     /// capture, so a confirmed candidate is never stale by more than one
     /// failed apply attempt -- the same guarantee any pre-change per-issue
