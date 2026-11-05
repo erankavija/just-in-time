@@ -1626,7 +1626,7 @@
     },
     "0546fc82": {
       "status": "backlog",
-      "note": "Docs270d8c7d7 + wording70853144d; configured R2 doc-review PASS5a6df072, record454951f05; still backlog pending0ecaDone and mechanical gate"
+      "note": "Search prose repair32ab62d01 included. Mechanical failureecc372aa preserveda307e3010; actual deps0eca+dc048377. Prior docreview predates latestfix; finalmechanical/docreview pending."
     },
     "083c9a91": {
       "status": "done"
@@ -1636,8 +1636,8 @@
     },
     "0eca332a": {
       "status": "in_progress",
-      "model": "gpt-6.1-sol high",
-      "note": "Astra repairing evaluate-many typed findings admission defect; canonical code-slice representation; focusedchecks/generation pending; issue delta projected\u221239core"
+      "model": "gpt-6-astra high (substantive rework)",
+      "note": "Final positive producer set and real CLI bindings pass5052+25/fullClippy; finalreview766aceb2 stablePASS. FormalleadPASS, ready59e3ba681. -21core/-8server; integration pending."
     },
     "1002524a": {
       "status": "done"
@@ -1822,7 +1822,8 @@
       "status": "done"
     },
     "f9977efd": {
-      "status": "backlog"
+      "status": "in_progress",
+      "note": "Ready231233d48 after finalCargo4eb950c8/review15c7cc86 and formalleadPASS; main37/40, zeroRustcoredelta."
     },
     "fb2dc5c3": {
       "status": "backlog"
@@ -1842,7 +1843,7 @@
     "from": "Codex session13",
     "date": "2026-11-04"
   },
-  "lead": "Codex execution lead (session 13)",
+  "lead": "Codex execution lead (session 14)",
   "b697a3f7_execution": {
     "ruling": "user via 6a 2026-11-04: lead executes 693a2fdd, 65aafaba, c0775a83, 19404174 and their b697a3f7 deps as b697a3f7 issues; separate ledger",
     "track_A_bulk": [
@@ -1968,7 +1969,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "ab168 reviewed and ready; f997 final Cargo passed and review running;0eca rework2 focused checks passed, full validation next; primary source queue paused by steward pending separate merge approval.",
+    "status": "ab168, 0eca and f997 have stable passing branch gates and formal lead PASS; await sequential integration. Independent source queue reopened by steward; only 061-specific merge and38df policy remain held. Docs wait on actual dc048377 external repair.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1977,12 +1978,12 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "0eca rework2 focused verification",
-      "ab168 full gate",
-      "f997 final current prose correction/gates",
-      "0546 final mechanical/review after0eca"
+      "ab168 reserved merge slot after frontend watcher",
+      "0eca ready for later interleaved merge",
+      "f997 ready for later interleaved merge",
+      "0546 mechanical/review after0eca anddc048377"
     ],
-    "parallelism": "Three isolated rework workers; no idle primary slot reservation. Root coordinates ready-only source merges; focused test/build operations share existing host locks.",
+    "parallelism": "Pinned isolated reviews completed concurrently; read-only Rustdoc criterion audit runs while ready source merges interleave across leads. Full merged Cargo checks remain serial; cheap checks and AI reviews hold no Cargo locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
     "b22aabce": {
       "status": "done",
@@ -2002,10 +2003,10 @@
         "production_delta": -3
       },
       "0eca332a": {
-        "commit": "6b563b365",
-        "tests": 5038,
+        "commit": "59e3ba681",
+        "tests": 5052,
         "doctests": 25,
-        "production_delta": -41,
+        "production_delta": -21,
         "server_lines_removed": 8
       },
       "487f45a9_rework": {
@@ -2039,8 +2040,8 @@
     "holistic_audit": {
       "artifact": "/tmp/jit-df129d9e-session14/remaining-stories-audit.md",
       "findings": {
-        "F1": "Fixed88c419187: positive15-code declaration; all35CLI bindings and21focused library tests pass; full validation/review pending.",
-        "F2": "ab168296 isolated repair in progress;46 depends on repair",
+        "F1": "Fixed88c419187; exact CLI row census and reports pass in final5052+25 Cargo bad751b7; finalreview766aceb2 stablePASS.",
+        "F2": "ab168 sourcef9b680614, Cargo f88c56f3 and review93f3da67 PASS; ready836992d50;46 depends on repair.",
         "F3": "0546 fixed32ab62d01; mechanical and affected review pending",
         "F4": "active findings prose fixed6d61a3c78 with approved story contracts"
       }
@@ -2121,8 +2122,9 @@
       "implementation": "16aada055",
       "budget": "main.rs37/40",
       "production_delta": 0,
-      "branch_cargo_run": "516644d5-5435-4b09-b64c-34a577600e63",
-      "final_prose": "current budget prose and canonical gate projection reconciled; final Cargo5049+25passed; pinned review running"
+      "branch_cargo_run": "4eb950c8-0357-4698-9f80-eaa8c7c3740d",
+      "final_prose": "All current prose and both transitive gate input roots reconciled; final Cargo5049+25 and review15c7cc86 stablePASS; evidence231233d48.",
+      "review_run": "15c7cc86-2177-42fd-a132-8d0c82dc2c49"
     },
     "ab168296": {
       "status": "in_progress",
@@ -2132,8 +2134,8 @@
       "branch_cargo": "passed f88c56f3;5049+25",
       "review": "stablePASS93f3da67, zero findings; evidence836992d50"
     },
-    "0eca_extra_rework": "Steward approved one extra mechanical round: full650e4906 passed5052tests+25doctests/budgets, Clippy rejected decimal permission0. Replace only0 with0o000, then fullgate/review. No behavior change.",
-    "0546_mechanical_blocker": "Actual run ecc372aa: M2/M3/M5/M6/M7/M9 pass; M8 rejects jq in installed8c dispatch script/protocol. Steward assigning original owner; no waiver.",
-    "f997_transitive_input": "Steward approved counter root in cargo-ci-selftest after positive review cb10432b; source52c2ec0fb, affected validation/review pending. Prior actualPASS retained, not current acceptance."
+    "0eca_extra_rework": "Approved extra mechanical round complete43d8ad971 (0o000); finalCargo bad751b7 stablePASS5052+25 and cleanClippy; review766aceb2 stablePASS; actualrecords59e3ba681. No behavior change.",
+    "0546_mechanical_blocker": "Actual failedrun ecc372aa preserved a307e3010: M8 rejects installed jq dependency. External dc048377 owns native projection repair; primary dependency0546->dc048 recordedfd05b3281 with approved reduction of redundant milestone edge. No waiver; await repairDone and finalchecks.",
+    "f997_transitive_input": "Approved counter root in cargo-ci-selftest52c2ec0fb; finalCargo4eb950c8 and review15c7cc86 stablePASS. Earlier actualrecords preserved."
   }
 }
