@@ -25121,3 +25121,4 @@
 {"gate_key":"cargo-ci","id":"111d89c4-88ed-4ce9-9931-d3bfcdfe04b9","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T02:14:05.809183408Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"b46af3ac-fdc3-45bb-b0a3-4b186e251b21","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T02:14:36.024161872Z","to":"done","type":"issue_state_changed"}
 {"id":"6114dfec-a4ff-4d95-a18f-68df3d5660b1","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T02:14:36.024161872Z","type":"issue_completed"}
+{"id":"e1f90467-221e-4c54-bfb4-2e240800d469","paths":["AGENTS.md"],"timestamp":"2026-11-05T02:09:50.917579522Z","type":"files_published"}
