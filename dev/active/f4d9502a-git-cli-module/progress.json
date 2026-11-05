@@ -432,7 +432,7 @@
           "status": "in_progress",
           "external_blockers": [],
           "worker_status": "implementation_running",
-          "worker": "split_root_impl Astra/xhigh; split_root_design Terra/high docs only"
+          "worker": "split_root_impl Astra/xhigh; split_root_consumers Terra/high"
         },
         {
           "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
@@ -890,7 +890,8 @@
     "c0ea checkpoint Done after actual clean Cargo and independent holisticPASS; seeded artifact failures3d160332/ffdc3aee and cached failurec5ff62bc preserved. Local target cleanup resolved E0463/E0460 without source edits. Tracker-only landing adds no production change; mandatory merged-source policy not triggered.",
     "504 designR3PASS: allR1/R2findingsclosed atdesignlevel underD26/D27. Durable design andall3reviews in dev/active/5046408a linked. No implementation yet; awaiting steward exact-footprint acceptance. Initial doclink lacked lead actor and failed; retried successfully with owning actor before commit/validation.",
     "Steward accepted504 exact reviewed design footprint and authorized Astra/xhigh primary implementation owner, with test-first owning crash/admission/policy matrix and mandatory D25 held-writer/no-reader-replay checks. All implementation remains isolated; no manifest fanout or Git-floor change.",
-    "Live checkpoint handoff-2.md records current holds, active504 source/docs ownership, completedfb/c0ea gates, D26/D27 design acceptance and tool traps. Work continues; no stop or pause requested."
+    "Live checkpoint handoff-2.md records current holds, active504 source/docs ownership, completedfb/c0ea gates, D26/D27 design acceptance and tool traps. Work continues; no stop or pause requested.",
+    "504 pinned APIs code_checkout (code), git (data), write_checkout/checkout_top_level (data or relocated coordination), with_worktree_root (code selection only, shared context). Primary reported44redo testsPASS +originalA/newB recoveryRED\u2192PASS. Consumer slice transferred after no-edit/current-check confirmation; docs complete. Ownership in design_acceptances supersedes live handoff2 worker snapshot."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1435,7 +1436,13 @@
       "primary_worker": "Astra/xhigh shared storage/bootstrap owner",
       "optional_worker": "Terra/high disjoint consumers/docs only after interfaces/ownership pinned; max3implementationworkers and no concurrent recovery-file edits",
       "independent_implementation_review": "Fresh Astra/high after full configured Cargo gate",
-      "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic"
+      "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic",
+      "active_ownership": {
+        "split_root_impl": "Astra/xhigh: config/bootstrap/JSON/recovery/dispatch/errors/server, storage/policy/recover tests, and completed docs. Sole shared-tree build coordinator.",
+        "split_root_consumers": "Terra/high: exact WorktreePaths/consumer/test slice in /tmp/f4d9502a-lead/5046408a-consumers-brief.md; no recovery/config/JSON/server/docs edits.",
+        "split_root_design": "Docs slice complete and lead reviewed; ownership returned to primary."
+      },
+      "build_coordination": "One shared-tree Cargo owner at a time, primary arbitrates freeze slots; peer pauses edits and acknowledges before queueing; collect every check then coordinator releases edits. No concurrent recovery edits or cancelled checks."
     }
   }
 }
