@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
+import { useEventStream } from '../../../hooks/useEventStream';
 import { act, render, waitFor } from '@testing-library/react';
 import { GraphView } from '../GraphView';
 import { apiClient } from '../../../api/client';
@@ -46,6 +48,7 @@ vi.mock('../../../utils/clusteredGraphLayout', () => ({
 
 // Mock API client
 vi.mock('../../../api/client', () => ({
+  API_BASE: '/api',
   apiClient: {
     getGraph: vi.fn(() => Promise.resolve({
       count: 3,
@@ -104,6 +107,8 @@ vi.mock('../../../api/client', () => ({
 }));
 
 describe('GraphView', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   beforeEach(() => {
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
@@ -137,6 +142,51 @@ describe('GraphView', () => {
     render(<GraphView labelFilters={['milestone:*', 'epic:*']} />);
     await waitFor(() => {});
     // Component renders with multiple filters
+  });
+
+  it('reloads changed hierarchy after a change event', async () => {
+    class TestEventSource extends EventTarget {
+      static instance: TestEventSource;
+      constructor() { super(); TestEventSource.instance = this; }
+      close() {}
+    }
+    vi.stubGlobal('EventSource', TestEventSource);
+    const getHierarchy = vi.mocked(apiClient.getHierarchy);
+    getHierarchy.mockResolvedValue({ types: { epic: 2 }, strategic_types: [], icons: {} });
+    vi.mocked(prepareClusteredGraphForReactFlow).mockClear();
+    const filters: string[] = [];
+    function LiveGraph() {
+      const [version, setVersion] = useState(0);
+      useEventStream({ onChanged: setVersion });
+      return <GraphView layoutAlgorithm="compact" labelFilters={filters} version={version} />;
+    }
+    render(<LiveGraph />);
+    await waitFor(() => expect(prepareClusteredGraphForReactFlow).toHaveBeenCalledWith(
+      expect.any(Array), expect.any(Array), { epic: 2 }, expect.any(Object)
+    ));
+    getHierarchy.mockResolvedValue({ types: { epic: 3 }, strategic_types: [], icons: {} });
+    act(() => TestEventSource.instance.dispatchEvent(new MessageEvent('change', { data: '{"version":1}' })));
+    await waitFor(() => expect(prepareClusteredGraphForReactFlow).toHaveBeenCalledWith(
+      expect.any(Array), expect.any(Array), { epic: 3 }, expect.any(Object)
+    ));
+  });
+
+  it('ignores a hierarchy response superseded by a change event', async () => {
+    let resolveOld!: (value: { types: Record<string, number>; strategic_types: string[]; icons: Record<string, string> }) => void;
+    const getHierarchy = vi.mocked(apiClient.getHierarchy);
+    getHierarchy.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+    getHierarchy.mockResolvedValue({ types: { epic: 3 }, strategic_types: [], icons: {} });
+    const filters: string[] = [];
+    vi.mocked(prepareClusteredGraphForReactFlow).mockClear();
+    const view = render(<GraphView layoutAlgorithm="compact" labelFilters={filters} version={0} />);
+    view.rerender(<GraphView layoutAlgorithm="compact" labelFilters={filters} version={1} />);
+    await waitFor(() => expect(prepareClusteredGraphForReactFlow).toHaveBeenCalledWith(
+      expect.any(Array), expect.any(Array), { epic: 3 }, expect.any(Object)
+    ));
+    await act(async () => resolveOld({ types: { epic: 2 }, strategic_types: [], icons: {} }));
+    expect(prepareClusteredGraphForReactFlow).not.toHaveBeenCalledWith(
+      expect.any(Array), expect.any(Array), { epic: 2 }, expect.any(Object)
+    );
   });
 
   it('test_graph_view_omits_clustering_when_hierarchy_fetch_fails', async () => {
