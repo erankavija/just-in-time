@@ -24,7 +24,7 @@
     "per:@/charter/D-4"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-04T22:02:09.379920019Z"
+  "updated_at": "2026-11-05T03:56:56.968114603Z"
 }
