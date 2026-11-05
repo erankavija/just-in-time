@@ -80,7 +80,7 @@ function timeAgo(dateStr: string): string {
 
 interface IssueDetailProps {
   issueId: string | null;
-  allIssues?: Issue[];
+  issueTitles?: ReadonlyMap<string, string>;
   onNavigate?: (issueId: string) => void;
   onFocusInGraph?: (issueId: string) => void;
   /** Monotonic version from SSE — triggers re-fetch when changed */
@@ -88,7 +88,7 @@ interface IssueDetailProps {
   namespaces?: Record<string, NamespaceInfo>;
 }
 
-export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGraph, version, namespaces }: IssueDetailProps) {
+export function IssueDetail({ issueId, issueTitles, onNavigate, onFocusInGraph, version, namespaces }: IssueDetailProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -427,8 +427,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
           </h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {issue.dependencies.map(({ id: depId, short_id: depShortId }) => {
-              const depIssue = allIssues.find(i => i.id === depId);
-              const depTitle = depIssue?.title || 'Unknown issue';
+              const depTitle = issueTitles?.get(depId) || 'Unknown issue';
               
               return (
                 <li 

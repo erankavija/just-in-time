@@ -11,12 +11,26 @@
   ],
   "description": "Pass gate execution the selected worktree's head from the git module, instead of having it start git in the checker's working directory.\n\n## Background\n\n- `execute_gate_checker_with_context` (`crates/jit/src/gate_execution.rs:90-187`) calls `get_git_commit` (`crates/jit/src/gate_execution.rs:551-565`) and `get_git_branch` (`crates/jit/src/gate_execution.rs:567-582`): two processes per exec gate run, each naming the literal `git` and running in `working_dir`.\n- `working_dir` is the worktree root or the checker's declared subdirectory (`execute_captured_gate`, `crates/jit/src/commands/gate_check.rs:1303-1343`). A declared subdirectory that is a separate git repository supplies that repository's head. With in-memory storage the working directory is the process directory (`checker_repo_root`, `crates/jit/src/commands/gate_check.rs:668-674`), so evidence comes from whichever repository the process runs in.\n- The evidence lands in `GateRunResult.commit` and `.branch` (`crates/jit/src/domain/types.rs:995`, `:998`).\n- Callers of the entry point: `crates/jit/src/commands/gate_check.rs:1324` and the unit tests in `crates/jit/src/gate_execution.rs`'s test module. `test_execute_gate_checker_records_head_commit` (`crates/jit/src/gate_execution.rs:1112-1131`) compares the recorded commit with `get_git_commit`, and `test_git_context_graceful_degradation` (`crates/jit/src/gate_execution.rs:720-729`) probes both helpers directly.\n- Kept as one change for a build reason: `get_git_commit` and `get_git_branch` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `execute_gate_checker_with_context` takes the run's head evidence as an argument and starts no git process. `get_git_commit` and `get_git_branch` no longer exist, and `gate_execution.rs` names no git executable.\n- [hard] REQ-02: The executor passes the head of `require_worktree_paths()?.git()`, so a run records the selected worktree's commit and branch label whatever the checker's working directory; a store without a git checkout records neither.\n- [hard] REQ-03: Two tests assert the behaviour change and fail on today's code. An exec gate whose declared working directory is a separate nested git repository records the selected worktree's commit, where today it records the nested repository's. An exec gate run on in-memory storage, with a git repository as the directory it would otherwise read (passed explicitly; the test does not change the process directory), records no commit, where today it records the process directory's.\n- [hard] REQ-04: Every caller of the entry point, unit tests included, passes evidence. `test_execute_gate_checker_records_head_commit` asserts that the evidence passed in is the evidence recorded, and `test_git_context_graceful_degradation` is removed because the module owns lookup failures.\n\n## Notes\n\n- Behaviour change: gate evidence always describes the selected worktree, and in-memory runs carry none.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T03:56:56.968114603Z",
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "083bd832-a288-4fe6-a201-a243b31d72d6",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:56:16.781406283Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4c16f96a-c643-46c0-bc48-3cca022950b9",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:50:00.453477430Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3f8da8c4-4fb4-4191-bec4-d496155b6266",
   "labels": [
     "type:task",
@@ -31,7 +45,7 @@
     "satisfies:f4d9502a/REQ-09"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Gate runs take commit and branch evidence from the module",
-  "updated_at": "2026-11-05T03:03:44.336926588Z"
+  "updated_at": "2026-11-05T03:56:56.968114603Z"
 }

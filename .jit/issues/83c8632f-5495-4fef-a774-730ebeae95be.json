@@ -11,12 +11,26 @@
   ],
   "description": "Make the CLI and server document history read the git module's path history instead of walking history in libgit2.\n\n## Background\n\n- `get_file_history` (`crates/jit/src/commands/document.rs:864-914`) walks the whole history from `HEAD` in libgit2. It lists a commit whose tree holds the path when the path is added or its blob differs from the first parent's; a commit deleting the path is never listed, and a merge is compared with its first parent only.\n- `document_history` (`crates/jit/src/commands/document.rs:556-579`) fails outside git; `get_document_history` (`crates/jit/src/commands/document.rs:731-754`) returns an empty list there. Both produce `CommitInfo` with a seven-character id, the author name, the commit time as `%Y-%m-%d %H:%M:%S` UTC and the trimmed message.\n- `GitCheckout::file_history(path)` returns the path's commits under git's default history simplification.\n- The server route fixture `test_document_reads_serve_a_derived_document_without_a_link` now uses the shared non-Git `setup_test_repo_with_config`, then initializes Git in its owned temporary root. Bind detected paths after that initialization using its actual selected data root; its history and diff assertions remain unchanged.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:108` onwards.\n- Kept as one change for a build reason: `get_file_history` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants map `file_history` of the executor's git checkout to `CommitInfo` as today, `get_file_history` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: CLI tests assert the behaviour change: a commit that deletes the document is listed (today omitted, so this assertion fails on today's code), and a merge identical to one parent for it is omitted. The CLI command still fails outside git and the server variant still returns an empty list there.\n- [hard] REQ-03: The existing real-Git route fixture supplies detected `WorktreePaths` through `with_worktree_paths` after Git initialization, using its actual selected data root and the same owned temporary root; `test_document_reads_serve_a_derived_document_without_a_link` keeps its assertions and passes.\n\n## Notes\n\n- Behaviour change: history follows git's default history simplification for the path.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T03:54:16.452096127Z",
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "de6c3c8e-f6b2-4998-8fb6-f1a7529bfb88",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:53:13.876707495Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0da733bd-2324-4d8f-9c4d-482e16a3b912",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:39:12.000931516Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "83c8632f-5495-4fef-a774-730ebeae95be",
   "labels": [
     "type:task",
@@ -30,7 +44,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Document history comes from the module's path history",
-  "updated_at": "2026-11-05T03:11:42.035956019Z"
+  "updated_at": "2026-11-05T03:54:16.452096127Z"
 }
