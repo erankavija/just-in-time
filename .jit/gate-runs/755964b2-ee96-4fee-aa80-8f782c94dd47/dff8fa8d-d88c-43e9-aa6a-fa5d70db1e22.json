@@ -1,0 +1,53 @@
+{
+  "branch": "worktree-agent-755964b2",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "15097fbfd6cec461cfa181460b33f4a80947ee97",
+  "completed_at": "2026-11-05T00:45:15.128173210Z",
+  "duration_ms": 278689,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 332,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/755964b2/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The bulk-update capture-helper reference is a code span rather than an intra-doc link to CommandExecutor."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/docs.yml",
+        "id": "F2",
+        "line": 53,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/755964b2/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "No evidence verifies the required private-items API documentation generation without link diagnostics."
+      }
+    ],
+    "summary": "The capture-helper link is absent and the required private-items rustdoc build is unverified.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dff8fa8d-d88c-43e9-aa6a-fa5d70db1e22",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:40:36.438664348Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5687 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-755964b2\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a926-8610-7043-a862-ee893a3a4aa4\n--------\nuser\n--- 5674 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5c0d5a395, e2343f56e, 15097fbfd\nPolicy sources: AGENTS.md\nResolved items: @/issue/755964b2/requirement/REQ-01 and REQ-02 (issue description, markdown-first); @/issue/df129d9e/requirement/REQ-03 (issue description, markdown-first); @/invariant/essential-code-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed, exit 0; its run contains 5c0d5a395 and e2343f56e but not 15097fbfd. code-review has no prior recorded projection.\nTruncation recovery: re-read e2343f56e in four bounded patch groups; separately inspected workflow-record patches, gate script, private-doc workflow, and owner declarations.\n\n1. **Blocking, issue-impact:** `crates/jit/src/commands/bulk_update.rs:332` demotes the required capture-helper reference to a code span. It names `CommandExecutor::capture_proposed_base`, but does not create an intra-doc link to its canonical owner, leaving REQ-01 unmet.\n\n2. **Blocking, issue-impact:** REQ-02 remains materially unverified. The passing `cargo-ci` runs doctests (`scripts/cargo-ci.sh:668`), not the required private-items API documentation build; that build exists at `.github/workflows/docs.yml:53`, but has no current run evidence. Read-only review cannot run it because it writes `target/doc`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The capture-helper link is absent and the required private-items rustdoc build is unverified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The bulk-update capture-helper reference is a code span rather than an intra-doc link to CommandExecutor.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":332,\"references\":[\"@/issue/755964b2/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No evidence verifies the required private-items API documentation generation without link diagnostics.\",\"file\":\".github/workflows/docs.yml\",\"line\":53,\"references\":[\"@/issue/755964b2/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

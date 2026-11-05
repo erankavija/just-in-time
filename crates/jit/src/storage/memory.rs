@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// Every repository-owned typed record — issues, the gate registry, the audit
 /// log, and gate-run results — is held solely as its canonical bytes in the
-/// aggregate [`MemoryRepositoryState`] image, the single store a
+/// aggregate `MemoryRepositoryState` image, the single store a
 /// mutation session captures and applies. There is no parallel typed cache: a
 /// record read through [`IssueStore`] and one published by a session share one
 /// source of truth and round-trip through the identical canonical serializers.
@@ -396,7 +396,7 @@ impl InMemoryStorage {
     ///
     /// Mirrors the issue/gate seeding pattern: a test setter so command and domain
     /// tests can stage a config-declared file (e.g. a project-scope item source)
-    /// and have [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
+    /// and have [`IssueStore::read_repo_file`]
     /// return it, without touching disk. The file lands in the same aggregate image
     /// a mutation session captures, so seeded state and session-published state
     /// share one store.

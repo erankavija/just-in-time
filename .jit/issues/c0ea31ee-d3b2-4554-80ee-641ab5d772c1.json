@@ -4,10 +4,9 @@
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
     "3d93442b-2764-4ada-b924-405220a9e6f4",
-    "7297f922-d3fd-4118-b533-c9d0b7638bc1",
     "92afc5d8-ddeb-405b-a708-b4b97f19d024"
   ],
-  "description": "Detect the selected checkout's layout once per invocation with one git process, inside the storage-owned git module, and hand that value to every consumer so none detects again.\n\n## Success Criteria\n\n- [hard] REQ-01: One module under storage starts git, and layout detection is one probe process per invocation in the CLI and the server.\n- [hard] REQ-02: Storage, the executor, init and hook installation use the supplied layout, and none of them starts git to detect it.\n- [hard] REQ-03: A CLI test with a counting stand-in shows that `query available` and `issue show` start at most one git process in a primary and in a linked checkout.\n\n## Notes\n\n- Shared git test fixtures belong to this story.\n",
+  "description": "Resolve layout facts once per distinct checkout context and share those invocation-owned observations with every consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned Git module performs at most one layout probe per distinct queried checkout context. Ordinary checkout reads use at most one Git process, external-store startup at most two layout probes, and external listing or lease validation across N queried checkout contexts at most N+1, including the failed data-root probe. Known aliases and repeated consumers reuse observations; lease and issue counts do not multiply probes.\n- [hard] REQ-02: Storage, executor, recovery, server, init and hooks share supplied context. Missing context never triggers hidden discovery; data-root selection, external-store coordination and moved or unvisited checkout identities remain correct.\n- [hard] REQ-03: The existing counting suite retains ordinary primary/linked issue-read assertions and proves the external-context bounds. Mechanism tests own alias, absent/error-result, clone and concurrency behavior; existing external-store tests retain behavioral ownership.\n\n## Notes\n\nDEC-27 deliberately reconciles the former universal one-process promise while retaining the prohibition on duplicate detection. No direct Git metadata parser, new authority flag or cross-invocation cache is introduced.\n",
   "documents": [],
   "gates_required": [
     "cargo-ci",
@@ -27,5 +26,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Layout facts are detected once and reach every consumer",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-05T01:20:52.988265128Z"
 }

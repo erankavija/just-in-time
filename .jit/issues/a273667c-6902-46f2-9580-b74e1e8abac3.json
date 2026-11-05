@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T02:33:42.736646943Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -9,6 +10,7 @@
   ],
   "description": "Make storage's read of a repository path at a commit use the git module's object reader instead of libgit2.\n\n## Background\n\n- `JsonFileStorage::read_path_bytes` (`crates/jit/src/storage/json.rs:1474-1530`) opens libgit2 for a read at a commit (`crates/jit/src/storage/json.rs:1492`), resolves the revision and peels it to a commit, and reads the path from its tree. It maps an unresolvable revision to `PathReadError::CommitNotFound`, an absent path to `NotFound` and other failures to `Other`, and labels the result with the commit's first seven hex digits. Working-tree reads use the confined reader.\n- Consumers: `CommandExecutor::read_path_bytes` (`crates/jit/src/commands/document.rs:840`), `read_document_content` and `read_document_bytes` (`crates/jit/src/commands/document.rs:666`, `crates/jit/src/commands/document.rs:700`), `IssueStore::read_path_text` (`crates/jit/src/storage/mod.rs:389`), and the server's raw document routes (`crates/server/src/routes.rs:369`, `:685`, `:739`).\n\n## Success Criteria\n\n- [hard] REQ-01: A read at a commit resolves the commit and reads the path through one object reader on a checkout of the storage's `Git` at the layout's worktree root, and `read_path_bytes` uses no git2.\n- [hard] REQ-02: Results and error variants are unchanged: the bytes, the first seven hex digits of the resolved commit, `CommitNotFound` for an unresolvable revision, `NotFound` for an absent path, and `InvalidPath` for a rejected path.\n- [hard] REQ-03: The existing `read_path_bytes` tests and the server document API tests pass, and a unit test reads a binary file and an absent path at a commit of a real repository.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T02:30:03.066260495Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +29,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Path reads at a commit go through the git module",
-  "updated_at": "2026-10-21T15:43:47.070591659Z"
+  "updated_at": "2026-11-05T02:33:42.736646943Z"
 }

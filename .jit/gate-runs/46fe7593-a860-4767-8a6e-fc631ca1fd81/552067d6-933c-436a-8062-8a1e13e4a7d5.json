@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-46fe7593",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5a61c82261f96f8aee807dbb8578cbe79104d3e8",
+  "completed_at": "2026-11-05T01:55:45.570175018Z",
+  "duration_ms": 295515,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current integration satisfies the issue’s hard output, schema, renderer, documentation, and test-contract criteria; the sole attributed commit records gate metadata only.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "46fe7593-a860-4767-8a6e-fc631ca1fd81",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "552067d6-933c-436a-8062-8a1e13e4a7d5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:50:50.055130964Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5a61c8226 (`jit:46fe7593`); only JIT event, gate-record, and issue metadata changed  \nPolicy sources: AGENTS.md; .jit/config.toml  \nResolved items: @/issue/46fe7593/requirement/REQ-01–REQ-05, @/issue/46fe7593/decision/D-01, @/issue/df129d9e/requirement/REQ-09; @/invariant/architecture-dependency-direction, canonical-cutover, essential-code-prose, orthogonal-tests, gate-semantics, no-ignored-tests, bounded-rust-build-footprint  \nGate evidence: cargo-ci passed (exit 0, 2026-11-05T01:48:16Z; its run commit does not contain 5a61c8226); code-review pending  \nTruncation recovery: separately inspected the tagged patch, source aliases/renderers/schema registry, tests, canonical documentation, and linked plan sections  \n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current integration satisfies the issue’s hard output, schema, renderer, documentation, and test-contract criteria; the sole attributed commit records gate metadata only.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

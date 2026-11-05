@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T02:52:44.070018721Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Prove that core commands succeed, and claim commands fail with the typed git-requirement error, when no git executable is available.\n\n## Background\n\n- Existing tests cover a directory outside any repository with git present: the core lifecycle (`crates/jit/tests/cli_repo_workflow/profile_no_git_lifecycle_tests.rs:46`) and claims failing with exit 10 (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1189` onwards).\n- No test runs commands with no git executable. `crates/jit/tests/cli_issue/search_exit_status_tests.rs:42` runs `search` with an empty `PATH`, which shows only that startup survives.\n- Without an executable the layout probe cannot start, so the checkout is classified as outside git, and claims report `REQUIRES_GIT` with exit 10 (`@/charter/D-4`).\n\n## Success Criteria\n\n- [hard] REQ-01: A `cli_repo_workflow` module runs `init`, `issue create`, `issue show`, `query available` and `dep add` inside a git repository with a `PATH` holding no git executable, and asserts that each succeeds.\n- [hard] REQ-02: The module runs each claim subcommand (`acquire`, `release`, `renew`, `heartbeat`, `status`, `list`, `force-evict`) with no git executable and asserts `REQUIRES_GIT` with exit 10. Against the claim code before the typed mapping, `claim list` exits 3 with `REPOSITORY_NOT_FOUND`, so the test fails there.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T02:24:22.312905070Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +26,7 @@
     "satisfies:f4d9502a/REQ-12"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "CLI tests for commands with no git executable",
-  "updated_at": "2026-11-04T23:02:06.166734513Z"
+  "updated_at": "2026-11-05T02:52:44.326476862Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-755964b2",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8f7221efc9c8aad939a6630b5d9058617826a67f",
+  "completed_at": "2026-11-05T01:03:41.643636307Z",
+  "duration_ms": 293506,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable repair is documentation-only, links canonical owners, and the verified private-items Rustdoc source remains unchanged.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "59b5ca56-d680-4d80-8970-3c9e96908f79",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:58:48.137426662Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5c0d5a395, e2343f56e, 15097fbfd, 37e3b15a, c26f2bf2, a081013d, 760dcdeab, 8f7221efc\nPolicy sources: AGENTS.md\nResolved items: @/issue/755964b2/requirement/REQ-01, REQ-02, REQ-03 and @/issue/df129d9e/requirement/REQ-03 (issue descriptions, markdown-first); @/gate/cargo-ci (.jit/gates.toml, registry-first); @/invariant/essential-code-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0; ancestry covers all source-changing tagged commits); code-review previously failed (exit 1), with both findings addressed by c26f2bf2 and a081013d\nTruncation recovery: partitioned e2343f56e into bounded patch groups; re-read affected links and extracted generated Rustdoc hrefs after broad searches truncated\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable repair is documentation-only, links canonical owners, and the verified private-items Rustdoc source remains unchanged.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

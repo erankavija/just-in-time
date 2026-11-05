@@ -6,14 +6,28 @@
   "dependencies": [
     "4ba18af4-dcf3-480d-a785-40dc4533349c"
   ],
-  "description": "Make `jit worktree info` take its branch from the git module's head lookup instead of its own `git rev-parse`.\n\n## Background\n\n- `execute_worktree_info` (`crates/jit/src/commands/worktree.rs:169-189`) calls the file's own `get_current_branch` (`crates/jit/src/commands/worktree.rs:46-63`), which runs `git rev-parse --abbrev-ref HEAD` in the worktree root. When git fails it reports \"Failed to get current git branch. Are you in a git repository?\" followed by git's stderr, which the CLI reports as `WORKTREE_INFO_ERROR` with exit 1.\n- Through the module, a missing checkout starts no process and an unborn branch is `head() == Ok(None)`, so neither case has stderr to quote.\n- The branch feeds the worktree identity load and the reported entry.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:195` onwards; unit test `crates/jit/src/commands/worktree.rs:489`.\n- Kept as one change for a build reason: the file's `get_current_branch` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree info` takes its branch from the head lookup of the paths' git checkout, rendered as the branch name or `HEAD` when detached. The file's `get_current_branch` no longer exists.\n- [hard] REQ-02: Without a git checkout the command fails with \"jit worktree info requires a git repository\", and on an unborn branch with \"the current branch has no commits yet; make a first commit\"; both report `WORKTREE_INFO_ERROR` with exit 1. CLI tests assert both, and they fail on today's message.\n- [hard] REQ-03: The existing worktree info tests pass unchanged.\n\n## Notes\n\n- Behaviour change: the two failure messages name the requirement and no longer quote git's stderr; the code and exit status are unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit worktree info` read the selected checkout's current branch through the Git module while preserving its stable worktree identity.\n\n## Background\n\n- The command has a private branch subprocess. The shared Git module supplies the same branch label and distinguishes a confirmed unborn checkout from failed Git operations.\n- The shared `RequiresGitError` already represents a missing repository and a repository without commits. The earlier plan incorrectly described `WORKTREE_INFO_ERROR` as the preserved code; the current classifier uses the shared error vocabulary.\n- An external data store can still have a selected checkout for coordination. Use the already-resolved checkout authority, preserve that behavior, and keep the worktree ID stable when the branch changes.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree info` reports the selected checkout's current branch through `head()` and `Head::branch_label()`, including `HEAD` when detached, while preserving the stable worktree ID. The private `get_current_branch` helper no longer exists.\n- [hard] REQ-02: A missing checkout and a confirmed unborn checkout return the existing `RequiresGitError` with `GitRequirementGap::NoRepository` and `NoCommits`, respectively: `REQUIRES_GIT`, exit 10, and the canonical remediation for each gap. Dispatch declares the shared error contract; other Git failures propagate without a command-specific wrapper. CLI coverage verifies both gaps.\n- [hard] REQ-03: Existing worktree-info behavior, including selected data roots and external-store identities, remains covered; branch-switch coverage asserts a fresh branch with the same worktree ID.\n\n## Notes\n\n- Steward-approved reconciliation in plan DEC-26 replaces the incorrect command-specific error promise with the existing typed contract. Historical planning evidence remains in version history.\n- Reuse the already-resolved selected checkout; do not add a probe or broaden guarded init-identity behavior.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:40:46.616740253Z",
   "first_ready_at": "2026-11-05T00:39:42.448608679Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c0b5201-5a87-49ca-9d62-80f3662bf7be",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:36:27.907289554Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "38f4141a-3d72-47ee-b610-65c8ca6317f4",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:36:58.961546045Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9de4c09c-207b-4ea1-9482-3846383cd3c7",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:f4d9502a/REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Worktree info reads its branch through the module",
-  "updated_at": "2026-11-05T00:41:00.158423237Z"
+  "updated_at": "2026-11-05T02:40:46.616740253Z"
 }

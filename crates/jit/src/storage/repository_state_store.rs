@@ -2,7 +2,7 @@
 //!
 //! Session orchestration lives here; an apply publishes through one redo record
 //! and an opening session applies the record a crash left. A delta creating an
-//! absent data root is the exception, published by [`init_publish`] because the
+//! absent data root is the exception, published by `init_publish` because the
 //! record's home is inside the root that does not exist yet.
 
 use crate::domain::relative_path::RootRelativePath;
@@ -1211,7 +1211,7 @@ fn ensure_delta_is_captured(
 /// Compares the live occupant of every path `record` makes a directory at, puts
 /// or deletes with what `captured` holds for it, and the event log as its length
 /// together with
-/// its last [`EVENT_LOG_TAIL_WINDOW`] bytes — the one answer for that path, so
+/// its last [`crate::repository_state::EVENT_LOG_TAIL_WINDOW`] bytes — the one answer for that path, so
 /// the log's whole contents are never reread (`@/charter/D-17`). A path the
 /// mutation read but does not write is left out, so a change there leaves the
 /// mutation admissible; the repository write lock keeps concurrent writers of

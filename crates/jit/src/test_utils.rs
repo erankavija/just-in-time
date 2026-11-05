@@ -1601,14 +1601,11 @@ pub fn linked_checkout_paths(
     checkout: impl AsRef<Path>,
 ) -> WorktreePaths {
     let (primary, checkout) = (primary.as_ref(), checkout.as_ref());
-    WorktreePaths {
-        git_repository: true,
-        common_dir: primary.join(".git"),
-        worktree_root: checkout.to_path_buf(),
-        local_jit: checkout.join(".jit"),
-        shared_jit: primary.join(".git/jit"),
-        relocated_worktree_checkout: None,
-    }
+    let mut paths = WorktreePaths::non_git(&checkout.join(".jit"), checkout);
+    paths.git_repository = true;
+    paths.common_dir = primary.join(".git");
+    paths.shared_jit = primary.join(".git/jit");
+    paths
 }
 
 #[cfg(test)]

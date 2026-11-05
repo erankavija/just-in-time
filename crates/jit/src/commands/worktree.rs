@@ -3,6 +3,7 @@
 use super::CommandExecutor;
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
+use crate::errors::{GitRequirementGap, RequiresGitError};
 use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
 use crate::storage::claim_coordinator::{read_active_leases, Lease};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
@@ -79,14 +80,24 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
     /// Current checkout identity, branch and paths, with relocation warnings.
     pub fn info(&self) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = paths
+            .write_checkout()
+            .ok_or_else(|| {
+                crate::errors::RequiresGitError::new(crate::errors::GitRequirementGap::NoRepository)
+            })?
+            .head()?
+            .ok_or_else(|| {
+                crate::errors::RequiresGitError::new(crate::errors::GitRequirementGap::NoCommits)
+            })?
+            .branch_label()
+            .to_string();
 
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
         Ok((
             WorktreeInfo {
                 worktree_id: identity.worktree_id,
-                branch: identity.branch,
+                branch,
                 root_path: paths.worktree_root.to_string_lossy().to_string(),
                 data_root: self
                     .exec
@@ -148,86 +159,6 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
     }
 }
 
-/// Get current git branch name.
-fn get_current_branch(worktree_root: &std::path::Path) -> Result<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .current_dir(worktree_root)
-        .output()
-        .context("Failed to get current git branch")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!(
-            "Failed to get current git branch. Are you in a git repository?\n\
-             Git error: {}",
-            stderr.trim()
-        );
-    }
-
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
-}
-
-/// Parsed git worktree entry
-#[derive(Debug)]
-struct GitWorktreeEntry {
-    path: String,
-    branch: String,
-}
-
-/// Parse git worktree list --porcelain output.
-///
-/// Porcelain format provides machine-readable output with lines like:
-/// ```text
-/// worktree /path/to/worktree
-/// HEAD abc123def456...
-/// branch refs/heads/main
-///
-/// worktree /path/to/secondary
-/// HEAD 789ghi...
-/// branch refs/heads/feature/x
-/// ```
-///
-/// # Returns
-/// Vector of parsed worktree entries with path and branch name
-///
-/// # Errors
-/// Returns error if output format is invalid
-fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
-    let mut entries = Vec::new();
-    let mut current_path: Option<String> = None;
-    let mut current_branch: Option<String> = None;
-
-    for line in output.lines() {
-        if line.is_empty() {
-            // Empty line signals end of entry
-            if let (Some(path), Some(branch)) = (current_path.take(), current_branch.take()) {
-                entries.push(GitWorktreeEntry { path, branch });
-            }
-            continue;
-        }
-
-        if let Some(path) = line.strip_prefix("worktree ") {
-            current_path = Some(path.to_string());
-        } else if let Some(branch_ref) = line.strip_prefix("branch ") {
-            // Extract branch name from refs/heads/...
-            let branch = branch_ref
-                .strip_prefix("refs/heads/")
-                .unwrap_or(branch_ref)
-                .to_string();
-            current_branch = Some(branch);
-        }
-        // Ignore HEAD and other fields
-    }
-
-    // Handle last entry if no trailing newline
-    if let (Some(path), Some(branch)) = (current_path, current_branch) {
-        entries.push(GitWorktreeEntry { path, branch });
-    }
-
-    Ok(entries)
-}
-
 /// Group leases already filtered for activeness by worktree.
 fn count_claims_for_worktree(leases: &[Lease], worktree_id: &WorktreeId) -> usize {
     leases
@@ -241,27 +172,10 @@ fn execute_worktree_list_at(
     paths: &WorktreePaths,
     clock: &dyn crate::storage::clock::Clock,
 ) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
-    use std::path::PathBuf;
-
-    // Execute git worktree list --porcelain from this worktree's root.
-    let output = Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(&paths.worktree_root)
-        .output()
-        .context("Failed to execute git worktree list")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!(
-            "{}",
-            crate::errors::git_command_failed("git worktree list --porcelain", &stderr)
-        );
-    }
-
-    let porcelain_output =
-        String::from_utf8(output.stdout).context("Invalid UTF-8 in git worktree output")?;
-
-    let git_entries = parse_git_worktree_porcelain(&porcelain_output)?;
+    let git_entries = paths
+        .write_checkout()
+        .ok_or_else(|| RequiresGitError::new(GitRequirementGap::NoRepository))?
+        .list_worktrees()?;
 
     let leases = read_active_leases(paths, clock.now())?;
 
@@ -269,11 +183,11 @@ fn execute_worktree_list_at(
     // observed while loading each worktree's identity.
     let mut warnings = Vec::new();
     let entries = git_entries
-        .into_iter()
-        .map(|git_entry| -> Result<WorktreeListEntry> {
-            let worktree_path = PathBuf::from(&git_entry.path);
+        .iter()
+        .filter_map(|entry| entry.branch().map(|branch| (entry.path(), branch)))
+        .map(|(worktree_path, branch)| -> Result<WorktreeListEntry> {
             let entry_paths = paths
-                .for_worktree_root(worktree_path.clone())?
+                .for_worktree_root(worktree_path.to_path_buf())?
                 .filter(|entry_paths| entry_paths.local_jit.exists());
 
             // Load worktree identity - error if the store exists but the identity
@@ -281,39 +195,31 @@ fn execute_worktree_list_at(
             let worktree_id = match entry_paths {
                 Some(entry_paths) => {
                     let (identity, entry_warnings) =
-                        load_or_create_worktree_identity_with_warnings(
-                            &entry_paths,
-                            &git_entry.branch,
-                        )
-                        .with_context(|| {
-                            format!(
-                                "Failed to load worktree identity for {}",
-                                worktree_path.display()
-                            )
-                        })?;
+                        load_or_create_worktree_identity_with_warnings(&entry_paths, branch)
+                            .with_context(|| {
+                                format!(
+                                    "Failed to load worktree identity for {}",
+                                    worktree_path.display()
+                                )
+                            })?;
                     warnings.extend(entry_warnings);
                     identity.worktree_id
                 }
                 // No store for this checkout yet - use branch-based temporary ID
-                None => {
-                    WorktreeId::try_from(format!("wt:{}", git_entry.branch)).with_context(|| {
-                        format!(
-                            "Invalid worktree id fallback from branch '{}'",
-                            git_entry.branch
-                        )
-                    })?
-                }
+                None => WorktreeId::try_from(format!("wt:{branch}")).with_context(|| {
+                    format!("Invalid worktree id fallback from branch '{}'", branch)
+                })?,
             };
 
             // Count active claims for this worktree
             let active_claims = count_claims_for_worktree(&leases, &worktree_id);
 
-            let is_main = paths.is_primary_worktree_path(&worktree_path)?;
+            let is_main = paths.is_primary_worktree_path(worktree_path)?;
 
             Ok(WorktreeListEntry {
                 worktree_id,
-                branch: git_entry.branch,
-                path: git_entry.path,
+                branch: branch.to_owned(),
+                path: worktree_path.to_string_lossy().into_owned(),
                 is_main,
                 active_claims,
             })
@@ -457,27 +363,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn test_parse_git_worktree_porcelain() {
-        // Test parsing git worktree list --porcelain output
-        let porcelain = "worktree /home/user/project\nHEAD abc123\nbranch refs/heads/main\n\nworktree /home/user/project/wt1\nHEAD def456\nbranch refs/heads/feature/task-1\n";
-
-        let entries = parse_git_worktree_porcelain(porcelain).unwrap();
-
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].path, "/home/user/project");
-        assert_eq!(entries[0].branch, "main");
-        assert_eq!(entries[1].path, "/home/user/project/wt1");
-        assert_eq!(entries[1].branch, "feature/task-1");
-    }
-
-    // Note: test_worktree_list_returns_current_worktree() removed.
-    // Note: test_json_output_structure() removed.
-    // These tests used execute_worktree_list() without injected worktree paths,
-    // making them inspect the REAL repository rather than test temp dirs.
-    // Tests must NEVER touch production .jit/ directory!
-    // The worktree list functionality is tested with parse_git_worktree_porcelain() above.
 
     #[test]
     fn test_worktree_list_entry_structure() {
@@ -955,15 +840,5 @@ mod tests {
                 "a store outside version control names no reference store"
             );
         }
-    }
-
-    #[test]
-    fn test_parse_git_worktree_porcelain_invalid() {
-        // Test error handling for malformed output
-        let invalid = "worktree /path\nHEAD abc123\n";
-        // Missing branch line - should still work, just no branch entry created
-        let result = parse_git_worktree_porcelain(invalid);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().len(), 0);
     }
 }

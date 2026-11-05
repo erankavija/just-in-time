@@ -1375,30 +1375,15 @@ fn format_duration(duration: chrono::Duration) -> String {
 fn recorded_worktree_ids(
     paths: &crate::storage::worktree_paths::WorktreePaths,
 ) -> Result<std::collections::HashSet<crate::domain::identity::WorktreeId>> {
-    use std::path::PathBuf;
-    use std::process::Command;
-
-    // Get all git worktrees
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(&paths.worktree_root)
-        .args(["worktree", "list", "--porcelain"])
-        .output()
-        .context("Failed to execute git worktree list")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("git worktree list failed: {}", stderr);
-    }
-
-    let porcelain_output =
-        String::from_utf8(output.stdout).context("Invalid UTF-8 in git worktree output")?;
+    let checkout = paths
+        .write_checkout()
+        .context("lease validation requires a git repository to check lease worktrees")?;
 
     // A checkout that is gone or whose identity is unreadable records no id.
-    Ok(porcelain_output
-        .lines()
-        .filter_map(|line| line.strip_prefix("worktree "))
-        .map(PathBuf::from)
+    Ok(checkout
+        .list_worktrees()?
+        .into_iter()
+        .map(|worktree| worktree.path().to_path_buf())
         .filter_map(|worktree_path| paths.for_worktree_root(worktree_path).ok().flatten())
         .filter_map(|checkout| {
             crate::storage::worktree_identity::read_worktree_id(&checkout)

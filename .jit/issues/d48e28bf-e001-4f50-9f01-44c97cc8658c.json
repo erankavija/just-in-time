@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T01:52:01.370001536Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Give the git module one object reader that serves any number of reads through one `git cat-file --batch` process, and one presence check that serves any number of names through one `--batch-check` process.\n\n## Background\n\n- Readers that need objects use libgit2 today: storage reads at a commit (`crates/jit/src/storage/json.rs:1474-1530`), document show and diff (`read_file_from_git`, `crates/jit/src/commands/document.rs:848-862`), snapshot export (`read_from_git`, `crates/jit/src/commands/snapshot.rs:138-172`) and the asset presence check (`check_asset_in_git`, `crates/jit/src/commands/document.rs:1912-1927`). The archive planner starts three processes per pinned document (`inventory_issues_pinned_evidence`, `crates/jit/src/commands/archive.rs:90-105`).\n- Snapshot export learns which assets to read only after reading the documents that cite them, so a reader must accept requests after it has answered earlier ones.\n- `git cat-file --batch` without `--buffer` flushes each answer before reading the next request line, accepts names such as `<rev>:<path>` and `<rev>^{commit}`, and answers `<name> missing` for an absent object.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::object_reader()` starts one `cat-file --batch` process that answers reads until it is dropped. Each read returns the object's id, type and bytes, or absent when git reports the name missing; bytes holding NUL and newline round-trip.\n- [hard] REQ-02: `GitCheckout::object_types(names)` starts one `cat-file --batch-check` process and returns each name's object type, or absent.\n- [hard] REQ-03: A name containing a newline is rejected with the module's invalid-path error before git sees it.\n- [hard] REQ-04: The behaviour suite covers a blob, a tree, a missing path, an unresolvable revision, binary bytes and a missing executable, and counts one process per reader or presence call.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:30:03.066260495Z",
+  "first_ready_at": "2026-11-05T01:51:37.359696331Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e91fc299-886a-4061-941f-7bb9272ccccc",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:28:45.918605909Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "42705ea4-66dd-4ccb-b9fa-f006bde39978",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:15:30.790970239Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d48e28bf-e001-4f50-9f01-44c97cc8658c",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Object reader and presence check in the git module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-05T02:30:03.066260495Z"
 }

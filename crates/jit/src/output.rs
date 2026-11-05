@@ -1663,7 +1663,7 @@ impl From<&Issue> for IssueUpdateResponse {
 /// the description and enriched dependency list. `gates` is the same field name
 /// the full `issue show --json` ([`IssueShowResponse`]) exposes, projected to
 /// `{key, status}` per gate: the summary drops the `last_run_at`/`exit_code`
-/// run enrichment that the full view's [`GateView`] carries, so a consumer that
+/// run enrichment that the full view's [`crate::commands::GateView`] carries, so a consumer that
 /// only needs per-gate status reads it identically on both shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowSummaryResponse {
@@ -1969,7 +1969,7 @@ pub struct GateFlatReportResponse {
 ///
 /// The structured-findings view of a single gate's latest run. `verdict`,
 /// `summary`, and `findings` come straight from the checker's machine-readable
-/// block ([`GateFindings`](crate::domain::gate_findings::GateFindings)); they are present only
+/// block ([`GateFindings`]); they are present only
 /// when that run carried a block. `has_findings` is `false` for a plain-text
 /// checker (no block emitted) so a consumer can distinguish "ran, no structured
 /// findings" from "no findings recorded", without inspecting the optional

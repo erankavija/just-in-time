@@ -492,7 +492,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     ///
     /// # Errors
     ///
-    /// Every [`PackageArchiveError`] the read reports; an archive that cannot
+    /// Every [`crate::profile::PackageArchiveError`] the read reports; an archive that cannot
     /// be read or is larger than a package archive may be; a destination that
     /// is not worktree content or is occupied; and the publication failures of
     /// the shared mutation session.
@@ -2180,7 +2180,11 @@ mod tests {
         let storage = JsonFileStorage::new(repository.root().join("state"));
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(&outside, storage.root()).unwrap())
-            .unwrap();
+            .unwrap()
+            .with_worktree_paths(
+                crate::storage::WorktreePaths::detect_for_data_root(storage.root(), &outside)
+                    .unwrap(),
+            );
         executor
             .profiles()
             .initialize_fresh_repository(&outside, None)

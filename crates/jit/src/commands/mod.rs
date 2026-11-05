@@ -119,7 +119,7 @@ pub use profile::{
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
 pub use query::{ByStateKey, RollupTotals, StateCount, StateRollup};
-pub use search::ContentMatch;
+pub use search::{ContentMatch, SemanticIssueMatch, SemanticSearchOptions};
 pub use template::{TemplateApplyResult, TemplateOps};
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
@@ -441,7 +441,7 @@ pub(crate) fn map_occupied_export_error(
     }
 }
 
-/// Drive `attempt` up to [`MUTATION_SESSION_RETRY_LIMIT`] times, owning the
+/// Drive `attempt` up to `MUTATION_SESSION_RETRY_LIMIT` times, owning the
 /// retry bound and the terminal [`MutationSessionExhausted`] error.
 ///
 /// Each call returns [`AttemptOutcome::Done`] to stop with a value,
@@ -2529,10 +2529,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Construct this executor over its canonical [`RepositoryLayout`].
+    /// Construct this executor over its canonical [`crate::repository_state::RepositoryLayout`].
     ///
     /// The permanent construction surface for the layout every session-opening
-    /// command mutates through (see the [`layout`](Self::layout) field). The CLI
+    /// command mutates through (see the `layout` field). The CLI
     /// supplies it at startup from the Git-optional worktree root plus the selected
     /// data root; tests supply a fixture layout over a temporary worktree.
     pub fn with_layout(
@@ -2557,7 +2557,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self
     }
 
-    /// Return or lazily derive the selected-data-root worktree authority.
+    /// Return supplied worktree authority, or undiscovered non-Git paths.
     pub(crate) fn require_worktree_paths(&self) -> Result<&crate::storage::WorktreePaths> {
         self.worktree_paths
             .get_or_init(|| {
@@ -2569,8 +2569,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                     },
                     |layout| (layout.data_root(), layout.worktree_root()),
                 );
-                crate::storage::WorktreePaths::detect_for_data_root(data_root, worktree_root)
-                    .map_err(|error| error.to_string())
+                Ok(crate::storage::WorktreePaths::non_git(
+                    data_root,
+                    worktree_root,
+                ))
             })
             .as_ref()
             .map_err(|message| anyhow!("{message}"))
@@ -3863,6 +3865,30 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         storage
             .load_issue(&issue_id)
             .expect("the mutation explained by the audit record must be durable");
+    }
+
+    #[test]
+    fn test_layout_context_omitted_from_executor_stays_non_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(dir.path().join("repo"));
+        let data = repository.root().join(".jit");
+        let explicit_root = repository.root().join("subdirectory");
+        std::fs::create_dir(&explicit_root).unwrap();
+        let storage = crate::storage::JsonFileStorage::new(&data);
+        let layout = crate::storage::discover_repository_layout(&explicit_root, &data).unwrap();
+        for (executor, expected_root) in [
+            (CommandExecutor::new(storage.clone()), repository.root()),
+            (
+                CommandExecutor::new(storage).with_layout(layout).unwrap(),
+                explicit_root.as_path(),
+            ),
+        ] {
+            let paths = executor.require_worktree_paths().unwrap();
+            assert!(!paths.has_claims_coordination());
+            assert!(claims_mutation_guard(paths).unwrap().is_none());
+            assert_eq!(paths.worktree_root, expected_root);
+            assert_eq!(paths.local_jit, data);
+        }
     }
 
     #[test]

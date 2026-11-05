@@ -16,6 +16,7 @@ use crate::repository_state::{
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
 };
 use crate::storage::{
+    git::{Git, GitCheckout, GitError},
     FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
     RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
     RepositoryNotFoundError, RepositoryStateStore, WorktreePaths,
@@ -440,7 +441,7 @@ pub struct JsonFileStorage {
     /// while the request resolves to the same commit and object, skipping the
     /// content hashing that dominates large pinned documents.
     pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
-    git_program: PathBuf,
+    git: Git,
 }
 
 #[cfg(test)]
@@ -491,7 +492,7 @@ impl JsonFileStorage {
             worktree_paths: Arc::new(Mutex::new(None)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
-            git_program: PathBuf::from("git"),
+            git: Git::default(),
             root,
             locker: FileLocker::new(timeout),
         }
@@ -511,12 +512,9 @@ impl JsonFileStorage {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_git_program<P: AsRef<Path>, G: Into<PathBuf>>(
-        root: P,
-        git_program: G,
-    ) -> Self {
+    pub(crate) fn with_git<P: AsRef<Path>>(root: P, git: Git) -> Self {
         let mut storage = Self::new(root);
-        storage.git_program = git_program.into();
+        storage.git = git;
         storage
     }
 
@@ -525,15 +523,12 @@ impl JsonFileStorage {
         repo_root: &Path,
         requests: &BTreeSet<(String, String)>,
         kind_only: &BTreeSet<(String, String)>,
-    ) -> BTreeMap<
-        (String, String),
-        Result<crate::storage::PinnedTargetRead, crate::storage::GitRevisionError>,
-    > {
+    ) -> BTreeMap<(String, String), Result<crate::storage::PinnedTargetRead, GitError>> {
         let mut cache = self
             .pinned_target_cache
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        crate::storage::GitRevisionResolver::with_git_program(repo_root, self.git_program.clone())
+        GitCheckout::new(self.git.clone(), repo_root.to_path_buf())
             .inspect_pinned_targets(requests, kind_only, &mut cache)
     }
 
@@ -634,15 +629,10 @@ impl JsonFileStorage {
             return Ok(paths);
         }
         let layout = self.configured_layout()?;
-        let detected =
-            WorktreePaths::detect_for_data_root(layout.data_root(), layout.worktree_root())?;
-        self.configure_worktree_paths(&detected);
-        Ok(self
-            .worktree_paths
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone()
-            .unwrap_or(detected))
+        Ok(WorktreePaths::non_git(
+            layout.data_root(),
+            layout.worktree_root(),
+        ))
     }
 
     /// Open and retain this storage's canonical startup mutation session.
@@ -698,7 +688,7 @@ impl JsonFileStorage {
     /// Acquire the bootstrap lock keyed at the WORKTREE root, serializing the
     /// worktree-side namespace across every session sharing the worktree
     /// regardless of its data root. For a nested repo this is the same reentrant
-    /// instance as [`acquire_bootstrap_write_lock`]; for a disjoint data root it
+    /// instance as `acquire_bootstrap_write_lock`; for a disjoint data root it
     /// is a distinct, outer lock that prevents two such sessions from
     /// concurrently publishing into one worktree.
     pub(crate) fn acquire_worktree_bootstrap_lock(
@@ -1408,6 +1398,8 @@ mod tests {
     fn configure_test_layout(storage: &JsonFileStorage, worktree: &Path, data: &Path) {
         let layout = crate::storage::discover_repository_layout(worktree, data).unwrap();
         storage.configure_repository_layout(&layout).unwrap();
+        let paths = WorktreePaths::detect_for_data_root(data, worktree).unwrap();
+        storage.configure_worktree_paths(&paths);
     }
 
     #[test]
@@ -1757,6 +1749,28 @@ mod tests {
                 String::from_utf8_lossy(&output.stderr)
             );
             (container, worktree_path)
+        }
+
+        #[test]
+        fn test_layout_context_omitted_from_storage_reads_only_the_local_store() {
+            let dir = tempfile::tempdir().unwrap();
+            let primary = crate::test_harness::git::GitRepository::init(dir.path().join("primary"));
+            primary.write("base", "base").commit("base");
+            let linked = dir.path().join("linked");
+            primary.git(&["worktree", "add", "-q", linked.to_str().unwrap()]);
+            let storage = JsonFileStorage::new(linked.join(".jit"));
+            let layout =
+                crate::storage::discover_repository_layout(&linked, linked.join(".jit")).unwrap();
+            storage.configure_repository_layout(&layout).unwrap();
+            let primary_storage = JsonFileStorage::new(primary.root().join(".jit"));
+            let issue = crate::test_utils::fixture_issue("Primary only".to_string(), String::new());
+            seed_issue_preimage(&primary_storage, &issue);
+
+            assert!(storage.list_issues().unwrap().is_empty());
+            assert!(!storage
+                .configured_worktree_paths()
+                .unwrap()
+                .has_claims_coordination());
         }
 
         fn seed_index_preimage(storage: &JsonFileStorage, index: &Index) {

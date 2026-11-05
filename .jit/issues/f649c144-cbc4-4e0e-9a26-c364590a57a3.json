@@ -1,19 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T01:39:58.241415836Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
     "437907da-4243-4ee2-828e-e13ba3efb5af",
     "614a6f97-e1fc-4e03-bd44-05949e33078c"
   ],
-  "description": "Make `jit validate --leases` list worktrees once before examining leases, instead of once per lease, and state what it does without a git checkout.\n\n## Background\n\n- `validate_leases` (`crates/jit/src/commands/validate.rs:2222-2276`) calls `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2422-2463`) for every lease. Each call starts `git worktree list --porcelain` and reads every listed worktree's identity file. Measured: `jit validate --leases --json` in a repository with nine leases starts nine listings.\n- Without a git checkout (outside a repository, or with no git executable) leases can still be stored under `.git/jit/`. Today the first lease's listing then fails with the untyped \"Failed to execute git worktree list\" or \"git worktree list failed\" error.\n- The exit-code projection states that `validate --leases` exits 1 when it finds invalid leases or cannot run (`crates/jit/src/schema.rs:989`, `docs/reference/exit-codes.md`). Claim subcommands, not validation, carry the typed git-requirement error with exit 10 (`@/charter/D-4`).\n- CLI lease-validation tests: `crates/jit/tests/cli_item_validate/validation_lease_tests.rs:229` onwards. CLI suites plant leases through their shared lease-store test helper.\n- Kept as one change for a build reason: `check_worktree_exists` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_leases` lists worktrees once through the module before examining leases and reads each listed worktree's id once; `check_worktree_exists` no longer exists, and `commands/validate.rs` starts no git process for lease validation. With a git checkout, findings and remedies are unchanged, and the lease-validation tests pass unchanged.\n- [hard] REQ-02: Without a git checkout, `validate --leases` reports no finding when no lease is stored. When leases are stored it fails with exit 1 and the message \"lease validation requires a git repository to check lease worktrees\", as the projected row states.\n- [hard] REQ-03: A CLI test plants three leases, puts the counting stand-in first on `PATH`, and asserts that `jit validate --leases --json` records exactly one `worktree list` invocation; today it records one per lease, so it fails.\n- [hard] REQ-04: A CLI test plants a lease, runs `jit validate --leases --json` with no git executable on `PATH`, and asserts exit 1 with REQ-02's message; today's message is the untyped listing failure, so it fails.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement instead of a failed `git worktree list`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Use the shared Git worktree listing for lease validation while preserving one listing per run and the existing findings response.\n\n## Background\n\n`validate_leases` already computes `recorded_worktree_ids` before its lease loop. That helper still starts `git worktree list --porcelain` and parses paths privately, then reads each listed checkout's identity. The historical per-lease listing and `check_worktree_exists` implementation have already been removed; the remaining change is module convergence and an explicit missing-checkout message.\n\nThe current validation dispatcher turns failed or unavailable lease checks into `Outcome::findings(ErrorCode::ValidationFailed, ...)`. Its generated exit-code row is `VALIDATION_FAILED` with exit 4, not the earlier plan's exit 1. Preserve this findings path, including its structured report.\n\n## Success Criteria\n\n- [hard] REQ-01: Lease validation obtains worktrees once through the module before examining stored leases and reads each listed checkout's ID once. It uses the already-resolved selected/relocated checkout; no lease-listing process starts in `commands/validate.rs`. Existing findings, remedies, external-store identity behavior and lease-validation tests remain unchanged.\n- [hard] REQ-02: Without a Git checkout, validation reports no finding when no lease is stored. With stored leases it reports \"lease validation requires a git repository to check lease worktrees\" through the existing `VALIDATION_FAILED` findings response with exit 4; it does not replace that report with an ordinary typed-error envelope.\n- [hard] REQ-03: A CLI test plants three leases, puts the shared counting stand-in first on the child's PATH, and asserts exactly one `worktree list` invocation. This preserves the already-landed listing bound while proving the module migration.\n- [hard] REQ-04: A CLI test plants a lease, runs without a Git executable on the child's PATH, and asserts the REQ-02 finding and exit 4. Existing canonical status/envelope owners remain authoritative; no duplicate matrix is added.\n\n## Notes\n\nDEC-28 reconciles the stale exit-status promise with the current shared validation contract. Layout-probe reuse is owned by the invocation-layout mechanism; this command continues to project each listed checkout through its shared paths API.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:48:37.509334186Z",
   "first_ready_at": "2026-11-05T01:05:34.432147653Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5ac87f4a-888e-4770-8514-ffe0147d915c",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:48:06.493940202Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0ada9cd5-1a64-4194-95f0-cbe4f1b96e77",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:56:00.314644695Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
   "labels": [
     "type:task",
@@ -27,7 +42,7 @@
     "satisfies:f4d9502a/REQ-12"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Lease validation lists worktrees once per run",
-  "updated_at": "2026-11-05T01:05:34.432147653Z"
+  "updated_at": "2026-11-05T02:48:37.509334186Z"
 }

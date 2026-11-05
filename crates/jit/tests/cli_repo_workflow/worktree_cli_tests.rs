@@ -4,6 +4,8 @@
 
 use assert_cmd::prelude::*;
 use jit::domain::store_divergence::{DivergenceClass, DivergentRecord};
+use jit::errors::{GitRequirementGap, RequiresGitError};
+use jit::output::ErrorCode;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -276,6 +278,64 @@ fn test_worktree_info_stable_across_invocations() {
     assert_eq!(id1, id2, "Worktree ID should be stable");
 }
 
+#[test]
+fn test_worktree_info_reports_current_branch_after_switch_with_stable_id() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+
+    let before = cli.run_json(["worktree", "info"]).unwrap();
+    cli.git(["switch", "-q", "-c", "next-branch"]).unwrap();
+    let after = cli.run_json(["worktree", "info"]).unwrap();
+
+    assert_eq!(after["branch"], "next-branch");
+    assert_eq!(after["worktree_id"], before["worktree_id"]);
+}
+
+#[test]
+fn test_worktree_info_reports_head_when_detached() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.git(["switch", "-q", "--detach"]).unwrap();
+
+    let info = cli.run_json(["worktree", "info"]).unwrap();
+
+    assert_eq!(info["branch"], "HEAD");
+}
+
+fn assert_worktree_info_requires_git(cli: &JitCli, remedy: &str) {
+    let human = cli.command(["worktree", "info"]).output().unwrap();
+    let json = cli
+        .command(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+    let failure: Value = serde_json::from_slice(&json.stdout).unwrap();
+
+    assert!(String::from_utf8_lossy(&human.stderr).contains(remedy));
+    assert_eq!(
+        failure["error"]["code"],
+        jit::output::ErrorCode::RequiresGit.as_str()
+    );
+    assert!(failure["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains(remedy));
+}
+
+#[test]
+fn test_worktree_info_without_git_checkout_reports_git_init_remedy() {
+    let cli = JitCli::initialised().unwrap();
+
+    assert_worktree_info_requires_git(&cli, "git init");
+}
+
+#[test]
+fn test_worktree_info_on_unborn_branch_reports_initial_commit_remedy() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+
+    assert_worktree_info_requires_git(&cli, "git commit --allow-empty");
+}
+
 /// Relocation must surface as a shared success warning on the `worktree info` command
 /// path (regression guard: storage no longer prints it, the output layer does).
 /// Previously this condition was an `eprintln!` from storage on every command;
@@ -328,6 +388,39 @@ fn test_worktree_info_surfaces_relocation_warning() {
 }
 
 // === jit worktree list tests ===
+
+#[test]
+fn test_worktree_list_without_checkout_reports_shared_git_requirement_and_remedy() {
+    let cli = JitCli::initialised().unwrap();
+    let remedy = RequiresGitError::new(GitRequirementGap::NoRepository).to_string();
+    let output = cli
+        .command(["worktree", "list", "--json"])
+        .output()
+        .unwrap();
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(response["error"]["code"], ErrorCode::RequiresGit.as_str());
+    assert_eq!(response["error"]["message"], remedy);
+
+    cli.command(["worktree", "list"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(remedy));
+}
+
+#[test]
+fn test_worktree_list_omits_detached_checkout() {
+    let (cli, linked) = JitCli::linked_checkouts().unwrap();
+    linked.git(["checkout", "--detach", "HEAD"]).unwrap();
+
+    let response: Value = cli.run_json(["worktree", "list"]).unwrap();
+    let paths: Vec<_> = response["worktrees"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(paths, vec![cli.root().to_str().unwrap()]);
+}
 
 #[test]
 fn test_worktree_list_single_worktree() {

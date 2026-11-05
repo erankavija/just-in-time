@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-cc9f213e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "334429c1e8ba6e5285fc907fbb3389f7849f2c57",
+  "completed_at": "2026-11-04T23:56:33.933333395Z",
+  "duration_ms": 221207,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/git.rs",
+        "id": "F1",
+        "line": 214,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Temporary convergence comment embeds a future commit identifier instead of essential code prose."
+      }
+    ],
+    "summary": "Path-history implementation meets the issue's hard criteria; one advisory prose finding remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ca9e3b4f-a1b6-4679-a246-53ba61137320",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:52:52.725584885Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ba1b8238, c8a96596, 334429c1 (`jit:cc9f213e`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-10 (parent issue); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T23:51:12Z; ancestry covers all attributable commits\nTruncation recovery: recovered parent-wise merge diffs for git.rs and its tests; excluded 60 listed merge files outside the path-history impact cone\n1. F1 — advisory, issue-impact (low): [`crates/jit/src/storage/git.rs:214`](crates/jit/src/storage/git.rs:214) embeds a future commit identifier in a temporary convergence comment. Track that delivery in JIT rather than code prose, or replace it with a concise enduring contract. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Path-history implementation meets the issue's hard criteria; one advisory prose finding remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Temporary convergence comment embeds a future commit identifier instead of essential code prose.\",\"file\":\"crates/jit/src/storage/git.rs\",\"line\":214,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

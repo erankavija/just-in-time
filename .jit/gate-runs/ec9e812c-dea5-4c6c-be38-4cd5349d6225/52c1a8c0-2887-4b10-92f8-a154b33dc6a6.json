@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-ec9e812c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "23894b96c90ee007abd5a4e305f9e32b66110109",
+  "completed_at": "2026-11-05T00:30:28.499367263Z",
+  "duration_ms": 118514,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All pinned-read cases were moved to the Git module suite with their assertions retained, and the obsolete suite registration and file are absent.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "52c1a8c0-2887-4b10-92f8-a154b33dc6a6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:28:29.984426466Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2cddd642, 79032087, 52f91ad2, e80bb894, 0fedb824\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/f4d9502a/requirement/REQ-02 (parent issue criteria)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T00:26:59Z); run 23894b96 covers every attributable commit\nTruncation recovery: recovered the migrated suite and deleted source in bounded path/line reads after the aggregate patch truncated\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All pinned-read cases were moved to the Git module suite with their assertions retained, and the obsolete suite registration and file are absent.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

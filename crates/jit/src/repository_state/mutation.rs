@@ -175,7 +175,7 @@ impl IdAuthority {
 /// identifier allocation, the timestamp on the first transition — so a no-op
 /// mutation samples neither. Interior mutability keeps the context shared
 /// by `&self` across the finalizer's passes while remaining reusable across
-/// retries: [`MutationContext::begin`] restarts the frozen allocation order.
+/// retries: `MutationContext::begin` restarts the frozen allocation order.
 pub struct MutationContext {
     ids: IdAuthority,
     clock: Box<dyn MutationClock>,
@@ -344,7 +344,7 @@ impl MutationContext {
 ///
 /// The finalizer applies the mutation timestamp and assigns every identifier
 /// except a created issue's and a gate run's, which the caller derives through
-/// [`MutationContext::issue_id_at`] and [`MutationContext::gate_run_id_at`];
+/// `MutationContext::issue_id_at` and `MutationContext::gate_run_id_at`;
 /// callers never stamp time. The set is
 /// closed: a new record class extends this enum.
 #[derive(Clone, Serialize)]

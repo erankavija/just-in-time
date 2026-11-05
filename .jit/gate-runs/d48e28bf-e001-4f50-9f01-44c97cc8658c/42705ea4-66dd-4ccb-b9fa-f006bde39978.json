@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-d48e28bf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d8d04ef41469b562aa4c64c508bc258d9238c7bf",
+  "completed_at": "2026-11-05T02:15:30.789390651Z",
+  "duration_ms": 192116,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed storage-module implementation satisfies the object reader and object-type behavior criteria with focused coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d48e28bf-e001-4f50-9f01-44c97cc8658c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "42705ea4-66dd-4ccb-b9fa-f006bde39978",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T02:12:18.672801715Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 922c1664d, 2a86d4df, 4e725c25, 87281c148 (`jit:d48e28bf`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/charter/D-21; @/invariant/orthogonal-tests; @/invariant/essential-code-prose; @/invariant/convention-convergence; @/gate/cargo-ci; @/issue/f4d9502a/requirement/REQ-10\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T02:10:50Z); ancestry covers all tagged commits\nTruncation recovery: reread bounded current ranges for git.rs:418-710 and git_module_tests.rs:1440-1704; inspected each tagged patch separately\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed storage-module implementation satisfies the object reader and object-type behavior criteria with focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

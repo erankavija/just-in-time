@@ -102,7 +102,7 @@ pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerErr
 /// registries are read; the resulting closure is what `derive_project_render` reads from.
 ///
 /// This planner enumerates exactly the paths
-/// [`compose_configured_projections`] and the effective-rule assembly read, so a
+/// `compose_configured_projections` and the effective-rule assembly read, so a
 /// selective `jit project render <name>` captures its own projection's sources and
 /// target without pulling in a sibling projection's closure. An unknown selected
 /// name or a projection referencing an unknown kind is an error; the command
@@ -391,7 +391,7 @@ fn data_root_ignore_claim() -> ManagedDocumentClaim {
     }
 }
 
-/// The data root's ignore file as [`compose_data_root_ignore`] composes it over
+/// The data root's ignore file as `compose_data_root_ignore` composes it over
 /// `existing`, without an image to capture it from.
 ///
 /// A repository fixture seeds the bytes the producer would publish through this

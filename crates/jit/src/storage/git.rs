@@ -3,9 +3,9 @@
 //! working directory.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, ChildStdout, Command, Output, Stdio};
 use std::sync::Arc;
 use std::thread;
 use thiserror::Error;
@@ -47,7 +47,7 @@ pub enum GitError {
         path: String,
         stderr: String,
     },
-    /// The artifact path violates the repository-relative storage contract.
+    /// A path or object name violates its input contract.
     #[error("{0}")]
     InvalidPath(String),
 }
@@ -169,6 +169,22 @@ pub struct GitCheckout {
     worktree_root: PathBuf,
 }
 
+/// The relationship between a checkout's HEAD and a requested base commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BaseComparison {
+    /// Both commits resolve and share history.
+    Compared {
+        /// The nearest shared ancestor of HEAD and the base commit.
+        merge_base: CanonicalCommitOid,
+        /// The base revision peeled to a full commit OID.
+        base_commit: CanonicalCommitOid,
+    },
+    /// The base revision cannot be peeled to a commit.
+    BaseUnresolved,
+    /// Both commits resolve but share no history.
+    NoMergeBase,
+}
+
 impl GitCheckout {
     /// Construct operations for a checkout already recognized by Git.
     pub(super) fn new(git: Git, worktree_root: PathBuf) -> Self {
@@ -182,7 +198,7 @@ impl GitCheckout {
     }
 
     // Temporary @/inv/convention-convergence exception: branch lookups converge
-    // here when 732f7afb, 9de4c09c, f6eaba42, 3f8da8c4 and c140921c land.
+    // here when 732f7afb, 3f8da8c4 and c140921c land.
     /// Read the checked-out commit and branch with at most two git processes.
     ///
     /// Validates the captured commit without history traversal or fetching.
@@ -241,9 +257,6 @@ impl GitCheckout {
         }
     }
 
-    // Temporary @/inv/convention-convergence exception: the parsers in
-    // parse_git_worktree_porcelain and recorded_worktree_ids converge here
-    // when e3c38fea and f649c144 land.
     /// List every worktree, including detached and bare entries, with one git
     /// process. Branch names omit the `refs/heads/` prefix.
     ///
@@ -311,6 +324,117 @@ impl GitCheckout {
         Ok(Some(name.strip_suffix('\n').unwrap_or(name).to_owned()))
     }
 
+    // Temporary @/inv/convention-convergence exception: document history
+    // converges here when 83c8632f lands.
+    /// List commits touching a literal worktree-relative path, newest first,
+    /// with git's default history simplification. One git process.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails, or reports malformed
+    /// commit metadata.
+    pub fn file_history(&self, path: &str) -> Result<Vec<FileHistoryCommit>, GitError> {
+        let args = [
+            "--literal-pathspecs",
+            "log",
+            "-z",
+            "--no-show-signature",
+            "--no-notes",
+            "--encoding=UTF-8",
+            "--format=%H%x00%an%x00%ct%x00%B",
+            "--",
+            path,
+        ];
+        let output = self.git.run(&self.worktree_root, args)?;
+        let unexpected = |bytes: &[u8]| GitError::UnexpectedOutput {
+            command: args.join(" "),
+            output: String::from_utf8_lossy(bytes).into_owned(),
+        };
+        if !output.status.success() {
+            return Err(unexpected(&output.stderr));
+        }
+        parse_file_history(&output.stdout).ok_or_else(|| unexpected(&output.stdout))
+    }
+
+    // Temporary @/inv/convention-convergence exception: snapshot migration
+    // c140921c moves its origin lookup here.
+    /// Read the `origin` remote URL with one git process.
+    ///
+    /// Returns `None` when the checkout has no `origin` remote.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GitError::GitUnavailable`] if git cannot start, or
+    /// [`GitError::UnexpectedOutput`] if git fails for another reason or its
+    /// successful output is not one UTF-8 URL.
+    pub fn origin_url(&self) -> Result<Option<String>, GitError> {
+        const ARGS: [&str; 3] = ["remote", "get-url", "origin"];
+        let output = self.git.run(&self.worktree_root, ARGS)?;
+        if !output.status.success() {
+            if output.status.code() == Some(2) {
+                return Ok(None);
+            }
+            return Err(GitError::UnexpectedOutput {
+                command: ARGS.join(" "),
+                output: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+
+        let unexpected = || GitError::UnexpectedOutput {
+            command: ARGS.join(" "),
+            output: String::from_utf8_lossy(&output.stdout).into_owned(),
+        };
+        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
+        let url = stdout.strip_suffix('\n').ok_or_else(unexpected)?;
+        Ok(Some(url.to_owned()))
+    }
+
+    // Temporary @/inv/convention-convergence exception: branch comparisons
+    // converge here when fb5e8e8d (check_branch_divergence) and 47d62472
+    // (validate_branch_drift) migrate their consumers.
+    /// Compare this checkout's HEAD with a caller-selected base revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if git cannot start, produces a non-canonical OID, or
+    /// fails to compare two resolved commits for a reason other than unrelated
+    /// histories.
+    pub fn compare_with_base(&self, base: &str) -> Result<BaseComparison, GitError> {
+        let base_commit = match self.resolve_commit(base) {
+            Ok(ArtifactVersion::Pinned(oid)) => oid,
+            Ok(version) => {
+                return Err(GitError::UnexpectedOutput {
+                    command: format!("rev-parse --verify {base}^{{commit}}"),
+                    output: version.as_str().to_owned(),
+                });
+            }
+            Err(GitError::RevisionNotFound { .. }) => return Ok(BaseComparison::BaseUnresolved),
+            Err(error) => return Err(error),
+        };
+        let args = ["merge-base", "HEAD", base_commit.as_str()];
+        let output = self.git.run(&self.worktree_root, args)?;
+        match output.status.code() {
+            Some(0) => {
+                let oid = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+                let merge_base = CanonicalCommitOid::parse(oid.clone()).map_err(|_| {
+                    GitError::NonCanonicalOid {
+                        revision: "HEAD".to_owned(),
+                        output: oid,
+                    }
+                })?;
+                Ok(BaseComparison::Compared {
+                    merge_base,
+                    base_commit,
+                })
+            }
+            Some(1) => Ok(BaseComparison::NoMergeBase),
+            _ => Err(GitError::UnexpectedOutput {
+                command: args.join(" "),
+                output: stderr(&output),
+            }),
+        }
+    }
+
     /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.
     pub fn worktree_root(&self) -> &Path {
         &self.worktree_root
@@ -358,6 +482,334 @@ impl GitCheckout {
     }
 }
 
+/// A full lowercase SHA-1 or SHA-256 identity for any Git object.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct GitObjectId(String);
+
+impl GitObjectId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        (matches!(value.len(), 40 | 64)
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+        .then(|| Self(value.to_owned()))
+    }
+}
+
+/// Git's stored object kinds; tree entries such as symlinks remain blobs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitObjectType {
+    Blob,
+    Tree,
+    Commit,
+    Tag,
+}
+
+impl GitObjectType {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "blob" => Some(Self::Blob),
+            "tree" => Some(Self::Tree),
+            "commit" => Some(Self::Commit),
+            "tag" => Some(Self::Tag),
+            _ => None,
+        }
+    }
+}
+
+/// An object and its exact uncompressed contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitObject {
+    id: GitObjectId,
+    object_type: GitObjectType,
+    bytes: Vec<u8>,
+}
+
+impl GitObject {
+    pub fn id(&self) -> &GitObjectId {
+        &self.id
+    }
+
+    pub fn object_type(&self) -> GitObjectType {
+        self.object_type
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+/// An incremental reader owning one Git child, reaped on drop or protocol failure.
+pub struct GitObjectReader {
+    process: CatFileProcess,
+}
+
+impl GitObjectReader {
+    /// Read another name, including names discovered from an earlier answer.
+    /// Missing names return `None`; newline or NUL input is rejected before sending.
+    /// I/O or protocol errors end the session and return [`GitError::UnexpectedOutput`].
+    pub fn read(&mut self, name: &str) -> Result<Option<GitObject>, GitError> {
+        let Some(header) = self.process.request(name)? else {
+            return Ok(None);
+        };
+        let contents = (|| {
+            let output = self.process.output()?;
+            let mut bytes = Vec::new();
+            output.take(header.size).read_to_end(&mut bytes)?;
+            let mut separator = [0];
+            output.read_exact(&mut separator)?;
+            if bytes.len() as u64 != header.size || separator[0] != b'\n' {
+                return Err(invalid_object_output("invalid object body framing"));
+            }
+            Ok(bytes)
+        })();
+        let bytes = contents.map_err(|error| self.process.fail(error))?;
+        Ok(Some(GitObject {
+            id: header.id,
+            object_type: header.object_type,
+            bytes,
+        }))
+    }
+}
+
+impl GitCheckout {
+    /// Start one `cat-file --batch` process for any number of incremental reads.
+    /// Returns [`GitError::GitUnavailable`] when the executable cannot start.
+    pub fn object_reader(&self) -> Result<GitObjectReader, GitError> {
+        Ok(GitObjectReader {
+            process: CatFileProcess::start(self, CatFileMode::Contents)?,
+        })
+    }
+
+    /// Look up object kinds in input order through one `cat-file --batch-check`.
+    /// Missing names return `None`. Every name is validated before starting Git.
+    /// Startup, I/O and protocol failures use the module's typed errors.
+    pub fn object_types(
+        &self,
+        names: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Result<Vec<Option<GitObjectType>>, GitError> {
+        let names = names
+            .into_iter()
+            .map(|name| {
+                validate_object_name(name.as_ref())?;
+                Ok(name.as_ref().to_owned())
+            })
+            .collect::<Result<Vec<_>, GitError>>()?;
+        let mut process = CatFileProcess::start(self, CatFileMode::Types)?;
+        let types = names
+            .iter()
+            .map(|name| {
+                process
+                    .request(name)
+                    .map(|header| header.map(|header| header.object_type))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        process.finish()?;
+        Ok(types)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CatFileMode {
+    Contents,
+    Types,
+}
+
+impl CatFileMode {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Contents => "--batch",
+            Self::Types => "--batch-check",
+        }
+    }
+}
+
+struct ObjectHeader {
+    id: GitObjectId,
+    object_type: GitObjectType,
+    size: u64,
+}
+
+struct CatFileProcess {
+    child: Child,
+    stdout: Option<BufReader<ChildStdout>>,
+    stderr_reader: Option<thread::JoinHandle<io::Result<Vec<u8>>>>,
+    mode: CatFileMode,
+    reaped: bool,
+}
+
+impl CatFileProcess {
+    fn start(checkout: &GitCheckout, mode: CatFileMode) -> Result<Self, GitError> {
+        let mut child = checkout
+            .git
+            .command(&checkout.worktree_root, ["cat-file", mode.argument()])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|source| checkout.git.unavailable(source))?;
+        let stdout = child.stdout.take().map(BufReader::new);
+        let mut process = Self {
+            child,
+            stdout,
+            stderr_reader: None,
+            mode,
+            reaped: false,
+        };
+        let setup = (|| {
+            let mut stderr = process
+                .child
+                .stderr
+                .take()
+                .ok_or_else(|| io::Error::other("git did not expose stderr"))?;
+            thread::Builder::new().spawn(move || {
+                // Drain continuously; retain only bounded diagnostic text.
+                let mut bytes = Vec::new();
+                stderr.by_ref().take(64 * 1024).read_to_end(&mut bytes)?;
+                io::copy(&mut stderr, &mut io::sink())?;
+                Ok(bytes)
+            })
+        })();
+        process.stderr_reader = Some(setup.map_err(|error| process.fail(error))?);
+        Ok(process)
+    }
+
+    fn output(&mut self) -> io::Result<&mut BufReader<ChildStdout>> {
+        self.stdout
+            .as_mut()
+            .ok_or_else(|| io::Error::other("git object session is closed"))
+    }
+
+    fn request(&mut self, name: &str) -> Result<Option<ObjectHeader>, GitError> {
+        validate_object_name(name)?;
+        let answer = (|| {
+            let input = self
+                .child
+                .stdin
+                .as_mut()
+                .ok_or_else(|| io::Error::other("git object session is closed"))?;
+            writeln!(input, "{name}")?;
+            input.flush()?;
+            let mut header = Vec::new();
+            self.output()?.read_until(b'\n', &mut header)?;
+            parse_object_header(name, &header)
+        })();
+        answer.map_err(|error| self.fail(error))
+    }
+
+    fn finish(&mut self) -> Result<(), GitError> {
+        self.child.stdin.take();
+        let finished = (|| {
+            if !self.output()?.fill_buf()?.is_empty() {
+                return Err(invalid_object_output("unexpected trailing response"));
+            }
+            let status = self.child.wait()?;
+            self.reaped = true;
+            if !status.success() {
+                return Err(io::Error::other(format!("git exited with {status}")));
+            }
+            self.stderr().map(|_| ())
+        })();
+        finished.map_err(|error| self.fail(error))
+    }
+
+    fn stderr(&mut self) -> io::Result<Vec<u8>> {
+        self.stderr_reader
+            .take()
+            .map(|reader| {
+                reader
+                    .join()
+                    .map_err(|_| io::Error::other("git stderr reader panicked"))?
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+    }
+
+    fn stop(&mut self) {
+        self.child.stdin.take();
+        self.stdout.take();
+        if !self.reaped {
+            let _ = self.child.kill();
+            self.reaped = self.child.wait().is_ok();
+        }
+    }
+
+    fn fail(&mut self, error: io::Error) -> GitError {
+        self.stop();
+        let diagnostic = match self.stderr() {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Err(error) => error.to_string(),
+        };
+        GitError::UnexpectedOutput {
+            command: format!("cat-file {}", self.mode.argument()),
+            output: format!("{error}: {diagnostic}"),
+        }
+    }
+}
+
+impl Drop for CatFileProcess {
+    fn drop(&mut self) {
+        self.stop();
+        let _ = self.stderr();
+    }
+}
+
+fn validate_object_name(name: &str) -> Result<(), GitError> {
+    if name.contains(['\n', '\0']) {
+        Err(GitError::InvalidPath(
+            "git object names cannot contain a newline or NUL".into(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn invalid_object_output(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message.into())
+}
+
+fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHeader>> {
+    let malformed = || {
+        invalid_object_output(format!(
+            "invalid object header: {:?}",
+            String::from_utf8_lossy(bytes)
+        ))
+    };
+    let line = std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|header| header.strip_suffix('\n'))
+        .ok_or_else(malformed)?;
+    if line.strip_suffix(" missing") == Some(name) {
+        return Ok(None);
+    }
+    let mut fields = line.split(' ');
+    let id = fields
+        .next()
+        .and_then(GitObjectId::parse)
+        .ok_or_else(malformed)?;
+    let object_type = fields
+        .next()
+        .and_then(GitObjectType::parse)
+        .ok_or_else(malformed)?;
+    let size = fields
+        .next()
+        .filter(|size| !size.is_empty() && size.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|size| size.parse().ok())
+        .ok_or_else(malformed)?;
+    if fields.next().is_some() {
+        return Err(malformed());
+    }
+    Ok(Some(ObjectHeader {
+        id,
+        object_type,
+        size,
+    }))
+}
+
 /// A repository worktree and its checked-out branch, if any.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Worktree {
@@ -375,6 +827,56 @@ impl Worktree {
     pub fn branch(&self) -> Option<&str> {
         self.branch.as_deref()
     }
+}
+
+/// A commit in a path's history; the message retains its whitespace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileHistoryCommit {
+    commit: CanonicalCommitOid,
+    author: String,
+    commit_time: i64,
+    message: String,
+}
+
+impl FileHistoryCommit {
+    pub fn commit(&self) -> &CanonicalCommitOid {
+        &self.commit
+    }
+
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+
+    /// Committer time as Unix seconds.
+    pub fn commit_time(&self) -> i64 {
+        self.commit_time
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+fn parse_file_history(output: &[u8]) -> Option<Vec<FileHistoryCommit>> {
+    if output.is_empty() {
+        return Some(Vec::new());
+    }
+    let stdout = std::str::from_utf8(output).ok()?.strip_suffix('\0')?;
+    let fields: Vec<_> = stdout.split('\0').collect();
+    let records = fields.chunks_exact(4);
+    if !records.remainder().is_empty() {
+        return None;
+    }
+    records
+        .map(|record| {
+            Some(FileHistoryCommit {
+                commit: CanonicalCommitOid::parse(record[0]).ok()?,
+                author: record[1].to_owned(),
+                commit_time: record[2].parse().ok()?,
+                message: record[3].to_owned(),
+            })
+        })
+        .collect()
 }
 
 fn parse_head_output<T>(
@@ -727,40 +1229,43 @@ impl GitCheckout {
         });
 
         if !pending_files.is_empty() {
-            let oids = pending_files.keys().cloned().collect::<BTreeSet<_>>();
-            match self.read_blob_batch(&oids) {
-                Ok(blob_results) => pending_files.into_iter().for_each(|(oid, requests)| {
+            match self.object_reader() {
+                Ok(mut reader) => pending_files.into_iter().for_each(|(oid, requests)| {
+                    let blob_result = reader
+                        .read(&oid)
+                        .map_err(|error| error.to_string())
+                        .and_then(|object| match object {
+                            Some(object)
+                                if object.id().as_str() == oid
+                                    && object.object_type() == GitObjectType::Blob =>
+                            {
+                                Ok(object.bytes().to_vec())
+                            }
+                            Some(object) if object.object_type() != GitObjectType::Blob => {
+                                Err("git cat-file --batch returned a non-blob object".into())
+                            }
+                            Some(_) => {
+                                Err("git cat-file --batch returned a different object".into())
+                            }
+                            None => Err("git cat-file --batch reported a missing object".into()),
+                        });
                     requests
                         .into_iter()
-                        .for_each(|(revision, path, commit, mut target)| {
-                            match blob_results.get(&oid) {
-                                Some(Ok(bytes)) => {
-                                    target.bytes = Some(bytes.clone());
-                                    results.insert((revision, path.clone()), Ok(target.clone()));
-                                    next_cache.insert((commit, path), target);
-                                }
-                                Some(Err(reason)) => {
-                                    results.insert(
-                                        (revision.clone(), path.clone()),
-                                        Err(GitError::PinnedReadFailed {
-                                            revision,
-                                            path,
-                                            stderr: reason.clone(),
-                                        }),
-                                    );
-                                }
-                                None => {
-                                    results.insert(
-                                        (revision.clone(), path.clone()),
-                                        Err(GitError::PinnedReadFailed {
-                                            revision,
-                                            path,
-                                            stderr:
-                                                "git cat-file --batch omitted the requested object"
-                                                    .into(),
-                                        }),
-                                    );
-                                }
+                        .for_each(|(revision, path, commit, mut target)| match &blob_result {
+                            Ok(bytes) => {
+                                target.bytes = Some(bytes.clone());
+                                results.insert((revision, path.clone()), Ok(target.clone()));
+                                next_cache.insert((commit, path), target);
+                            }
+                            Err(reason) => {
+                                results.insert(
+                                    (revision.clone(), path.clone()),
+                                    Err(GitError::PinnedReadFailed {
+                                        revision,
+                                        path,
+                                        stderr: reason.clone(),
+                                    }),
+                                );
                             }
                         });
                 }),
@@ -875,103 +1380,6 @@ impl GitCheckout {
             .map(|revision| (revision.clone(), self.resolve_commit(revision)))
             .collect()
     }
-
-    fn read_blob_batch(
-        &self,
-        oids: &BTreeSet<String>,
-    ) -> Result<BTreeMap<String, Result<Vec<u8>, String>>, GitError> {
-        let mut child = self
-            .git
-            .command(&self.worktree_root, ["cat-file", "--batch"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|source| self.git.unavailable(source))?;
-        let Some(mut stdin) = child.stdin.take() else {
-            return Ok(oids
-                .iter()
-                .map(|oid| {
-                    (
-                        oid.clone(),
-                        Err("git cat-file --batch did not expose stdin".into()),
-                    )
-                })
-                .collect());
-        };
-        let write_oids = oids.iter().cloned().collect::<Vec<_>>();
-        let writer = thread::spawn(move || {
-            let result = write_oids
-                .iter()
-                .try_for_each(|oid| writeln!(stdin, "{oid}"));
-            drop(stdin);
-            result
-        });
-        let Some(mut stdout) = child.stdout.take() else {
-            let _ = child.wait();
-            let _ = writer.join();
-            return Ok(oids
-                .iter()
-                .map(|oid| {
-                    (
-                        oid.clone(),
-                        Err("git cat-file --batch did not expose stdout".into()),
-                    )
-                })
-                .collect());
-        };
-        let stderr_reader = child.stderr.take().map(|mut stderr_pipe| {
-            thread::spawn(move || {
-                let mut bytes = Vec::new();
-                let result = stderr_pipe.read_to_end(&mut bytes);
-                result.map(|_| bytes)
-            })
-        });
-        let mut bytes = Vec::new();
-        let read_result = stdout.read_to_end(&mut bytes).map(|_| ());
-        let wait_result = child.wait();
-        let writer_result = writer
-            .join()
-            .map_err(|_| io::Error::other("git cat-file input writer panicked"))
-            .and_then(|result| result);
-        let stderr_bytes = stderr_reader
-            .map(|reader| {
-                reader
-                    .join()
-                    .map_err(|_| io::Error::other("git cat-file stderr reader panicked"))
-                    .and_then(|result| result)
-            })
-            .transpose()
-            .map_err(|error| GitError::PinnedReadFailed {
-                revision: "batch".into(),
-                path: "<blobs>".into(),
-                stderr: error.to_string(),
-            })?
-            .unwrap_or_default();
-        if let Err(error) = read_result.or(writer_result) {
-            return Ok(oids
-                .iter()
-                .map(|oid| (oid.clone(), Err(error.to_string())))
-                .collect());
-        }
-        let status = wait_result.map_err(|error| GitError::PinnedReadFailed {
-            revision: "batch".into(),
-            path: "<blobs>".into(),
-            stderr: error.to_string(),
-        })?;
-        if !status.success() {
-            let reason = String::from_utf8_lossy(&stderr_bytes).trim().to_string();
-            return Ok(oids
-                .iter()
-                .map(|oid| (oid.clone(), Err(reason.clone())))
-                .collect());
-        }
-        parse_cat_file_batch(&bytes, oids).map_err(|reason| GitError::PinnedReadFailed {
-            revision: "batch".into(),
-            path: "<blobs>".into(),
-            stderr: reason,
-        })
-    }
 }
 
 fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>, String> {
@@ -1003,59 +1411,6 @@ fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>,
             ))
         })
         .collect()
-}
-
-fn parse_cat_file_batch(
-    output: &[u8],
-    requested_oids: &BTreeSet<String>,
-) -> Result<BTreeMap<String, Result<Vec<u8>, String>>, String> {
-    let mut responses = BTreeMap::new();
-    let mut offset = 0;
-    while offset < output.len() {
-        let Some(header_length) = output[offset..].iter().position(|byte| *byte == b'\n') else {
-            return Err("git cat-file --batch response lacks a header terminator".into());
-        };
-        let header_end = offset + header_length;
-        let fields = output[offset..header_end]
-            .split(|byte| *byte == b' ')
-            .collect::<Vec<_>>();
-        let [oid, object_type, size] = fields.as_slice() else {
-            return Err("git cat-file --batch response has an invalid header".into());
-        };
-        let oid = std::str::from_utf8(oid)
-            .map(str::to_owned)
-            .map_err(|_| "git cat-file --batch response has a non-UTF-8 OID".to_string())?;
-        offset = header_end + 1;
-        if *object_type == b"missing" {
-            responses.insert(
-                oid,
-                Err("git cat-file --batch reported a missing object".into()),
-            );
-            continue;
-        }
-        if *object_type != b"blob" {
-            return Err("git cat-file --batch returned a non-blob object".into());
-        }
-        let size = std::str::from_utf8(size)
-            .map_err(|_| "git cat-file --batch response has an invalid size".to_string())?
-            .parse::<usize>()
-            .map_err(|_| "git cat-file --batch response has an invalid size".to_string())?;
-        let Some(content_end) = offset.checked_add(size) else {
-            return Err("git cat-file --batch response size overflows".into());
-        };
-        if content_end >= output.len() || output[content_end] != b'\n' {
-            return Err("git cat-file --batch response lacks its content terminator".into());
-        }
-        responses.insert(oid, Ok(output[offset..content_end].to_vec()));
-        offset = content_end + 1;
-    }
-    if requested_oids
-        .iter()
-        .any(|oid| !responses.contains_key(oid))
-    {
-        return Err("git cat-file --batch returned fewer responses than requested".into());
-    }
-    Ok(responses)
 }
 
 fn validate_path(path: &str) -> Result<(), GitError> {
@@ -1101,6 +1456,25 @@ impl Head {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_file_history_rejects_malformed_records() {
+        let oid = "a".repeat(40);
+        let record = format!("{oid}\0author\x00123\0message\n\0");
+        let malformed = [
+            record.trim_end_matches('\0').as_bytes().to_vec(),
+            format!("{oid}\0author\x00123\0").into_bytes(),
+            format!("{record}extra\0").into_bytes(),
+            b"short-oid\0author\x00123\0message\0".to_vec(),
+            format!("{oid}\0author\0invalid-time\0message\0").into_bytes(),
+            format!("{oid}\0author\x009223372036854775808\0message\0").into_bytes(),
+            [record.as_bytes(), &[0xff]].concat(),
+        ];
+
+        for output in malformed {
+            assert!(parse_file_history(&output).is_none(), "{output:?}");
+        }
+    }
 
     #[test]
     fn test_run_unstartable_program_is_unavailable_naming_program() {

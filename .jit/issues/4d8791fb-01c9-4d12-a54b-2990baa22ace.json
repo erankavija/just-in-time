@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-05T01:19:13.235574583Z",
   "context": {},
   "created_at": "2026-11-04T22:24:54.946576604Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Unify semantic issue and linked-document search for HTTP and the browser while preserving raw repository search as a distinct CLI capability.\n\n## Background\n\n`QueryOps::search_issues_with_filters` owns issue search today. HTTP currently uses ripgrep on serialized issue records; top-level `jit search` intentionally searches raw repository files and history.\n\n## Success Criteria\n\n- [hard] REQ-01: The existing issue-search computation serves both `jit issue search` and HTTP semantic issue matches over ID, title and description; default issue search retains case-insensitive whole-query substring, ID prefix and filters.\n- [hard] REQ-02: HTTP regex and case options apply to semantic issue fields and linked-document content, while ripgrep never reads serialized issue records for this HTTP search; an empty linked-document path list does not broaden the search.\n- [hard] REQ-03: Top-level `jit search` retains its raw-file and history corpus and existing regex, glob, case, context and limit behavior; shared ripgrep machinery is reused. Documentation distinguishes the raw search capability from semantic issue and document search.\n- [hard] REQ-04: Focused tests cover semantic matches, HTTP options, linked-document empty paths and preservation of raw history search.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-05T01:47:09.926235978Z",
   "first_ready_at": "2026-11-05T00:09:15.356213422Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3383f3dc-1e06-4345-957d-53fc462c32a3",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:59:15.140970004Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fb1ab38f-dd3d-4774-afb1-822712a18d55",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:46:26.206901694Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4d8791fb-01c9-4d12-a54b-2990baa22ace",
   "labels": [
     "type:task",
@@ -23,7 +38,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Unify issue and linked-document search",
-  "updated_at": "2026-11-05T00:09:15.356213422Z"
+  "updated_at": "2026-11-05T01:59:15.140970004Z"
 }

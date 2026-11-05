@@ -121,7 +121,7 @@ wire_vocabulary! {
 }
 
 wire_vocabulary! {
-    /// The content format of an issue body, selecting which [`ContentParser`] the
+    /// The content format of an issue body, selecting which [`crate::document::ContentParser`] the
     /// validation projection uses to extract `sections`.
     ///
     /// When absent on an issue the repo default (`[validation].content_format`)
@@ -177,7 +177,7 @@ wire_vocabulary! {
 /// [`FromStr`]) or take an engine-owned actor from its associated constant, and
 /// read the parts via [`Assignee::kind`] / [`Assignee::identifier`]. It
 /// serializes transparently as the `kind:identifier` string (through
-/// [`Display`] / [`FromStr`]), so on-disk issue JSON is unchanged.
+/// [`std::fmt::Display`] / [`FromStr`]), so on-disk issue JSON is unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignee {
     kind: Cow<'static, str>,
@@ -1103,7 +1103,7 @@ pub struct ProfileLifecycleProfile {
 ///
 /// This type is also the parser for both sources of that vocabulary: the
 /// `[worktree] write_policy` TOML key deserializes through
-/// [`FromStr`](std::str::FromStr) (case-insensitively), and so does the
+/// [`FromStr`] (case-insensitively), and so does the
 /// per-invocation override read from the environment, so neither source can
 /// drift from the other's accepted tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
@@ -1173,7 +1173,7 @@ impl LinkedCheckoutWriteStance {
     }
 
     /// The token naming this stance: the inverse of
-    /// [`FromStr`](std::str::FromStr), and the same text the type serializes to,
+    /// [`FromStr`], and the same text the type serializes to,
     /// so prose naming a stance and a machine-readable field carrying one agree.
     pub const fn as_token(self) -> &'static str {
         match self {
@@ -1194,7 +1194,7 @@ impl std::fmt::Display for LinkedCheckoutWriteStance {
 /// `JsonSchema` is derived so the event catalog's freshness guard can read the
 /// serde `type` tag of every variant off the derived schema
 /// (`event_catalog::tests::test_event_variant_tags_are_all_cataloged`): a new
-/// variant appears there whether or not it was given a distinct [`EventTag`].
+/// variant appears there whether or not it was given a distinct [`crate::domain::event_catalog::EventTag`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventBody {
@@ -1421,7 +1421,7 @@ pub enum EventBody {
 /// The body is flattened, so a record is the body's tagged object plus `id`
 /// and `timestamp`; flattening rules out `deny_unknown_fields`. Only the
 /// mutation finalizer, event decoding and
-/// [`EventTag::sample`](crate::domain::event_catalog::EventTag::sample) build
+/// `EventTag::sample` build
 /// one; everything else drafts an [`EventBody`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Event {

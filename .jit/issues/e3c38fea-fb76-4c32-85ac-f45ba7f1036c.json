@@ -1,19 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T01:39:57.932885810Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
     "437907da-4243-4ee2-828e-e13ba3efb5af",
     "c3e3e2ff-f7bd-44cd-bb89-e9b05c3310bc"
   ],
-  "description": "Make `jit worktree list` read worktrees through the git module's listing, deleting its private porcelain parser.\n\n## Background\n\n- `execute_worktree_list_at` (`crates/jit/src/commands/worktree.rs:223-301`) starts `git worktree list --porcelain` itself and parses it with `parse_git_worktree_porcelain` (`crates/jit/src/commands/worktree.rs:90-123`) into `GitWorktreeEntry` (`crates/jit/src/commands/worktree.rs:67`), dropping worktrees without a branch. A failed listing reports `git_command_failed(\"git worktree list --porcelain\", <stderr>)`, which the CLI reports as `WORKTREE_LIST_ERROR` with exit 1.\n- Without a git checkout the module starts no process, so there is no stderr to quote.\n- Parser unit tests: `crates/jit/src/commands/worktree.rs:513` and `crates/jit/src/commands/worktree.rs:1063`. CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:453` onwards.\n- Kept as one change for a build reason: the parser and its entry type are private, and uncalled private items fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree list` lists worktrees through `list_worktrees` of the paths' git checkout and still omits worktrees without a branch. `parse_git_worktree_porcelain`, `GitWorktreeEntry` and their two unit tests no longer exist, and the command starts no git process outside the module.\n- [hard] REQ-02: Output in a git checkout is unchanged, and the worktree list CLI tests pass unchanged.\n- [hard] REQ-03: Without a git checkout the command fails with \"jit worktree list requires a git repository\", reported as `WORKTREE_LIST_ERROR` with exit 1. A CLI test asserts it and fails on today's message.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement and no longer quotes git's stderr; the code and exit status are unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Read worktree listings through the shared Git module and remove the command's private porcelain parser.\n\n## Background\n\nThe worktree command currently starts Git itself and parses entries into a private `GitWorktreeEntry`, omitting detached and bare entries without branches. The module already owns porcelain parsing. An external data store can retain a selected checkout for coordination, so the command must use that already-resolved authority.\n\nThe prior plan incorrectly promised a preserved `WORKTREE_LIST_ERROR` code. The existing shared `RequiresGitError` represents a missing checkout; no command-specific classifier or wrapper is needed.\n\n## Success Criteria\n\n- [hard] REQ-01: Worktree listing uses `list_worktrees()` on the already-resolved selected checkout, including relocated external-store context through `write_checkout()`, and still omits entries without a branch. The private porcelain parser, `GitWorktreeEntry` and their two parser unit tests are removed; no listing process starts outside the Git module.\n- [hard] REQ-02: Existing Git-checkout output, filtering and external-store identity behavior remain unchanged, with the current worktree-list CLI tests passing.\n- [hard] REQ-03: A missing checkout returns the existing `RequiresGitError(GitRequirementGap::NoRepository)`: `REQUIRES_GIT`, exit 10 and canonical remediation. Dispatch declares `raises [RequiresGit]`; other Git failures propagate. CLI coverage owns the mapping and remedy, while the existing status-row census and generated reference reflect the shared contract.\n\n## Notes\n\nDEC-26 extends the shared worktree Git-requirement contract to listing. Reuse supplied checkout facts without adding discovery; sibling context reuse belongs to the invocation-layout mechanism. Historical planning evidence remains in version history.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:57:45.246765338Z",
   "first_ready_at": "2026-11-05T01:05:34.432147653Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a1d97e05-fb4e-4687-ab89-21607dc4e925",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:57:32.773552429Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d5c75795-96fa-4a34-90c2-1efd58116c6d",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:00:52.780854213Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "satisfies:f4d9502a/REQ-08"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Worktree list reads worktrees through the module",
-  "updated_at": "2026-11-05T01:05:34.432147653Z"
+  "updated_at": "2026-11-05T02:57:45.246765338Z"
 }

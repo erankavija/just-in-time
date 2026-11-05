@@ -35,7 +35,7 @@ pub enum VerdictSource {
 /// The verdict, the command behind it, and the checker's structured findings
 /// come from the run that produced them; the timing is this record's own, and
 /// no exit code is claimed, because no process ran here. The raw report text
-/// stays at the source run, which [`GateVerdictOrigin::Reused`] names, rather
+/// stays at the source run, which [`crate::domain::GateVerdictOrigin::Reused`] names, rather
 /// than being copied into every record that carries the verdict.
 fn reused_gate_run(
     run_id: &GateRunId,
@@ -958,7 +958,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Execute a built-in checker against one exact repository image.
-    /// [`GateChecker::RepositoryValidation`] instead runs the computation behind
+    /// [`crate::declarations::GateChecker::RepositoryValidation`] instead runs the computation behind
     /// `jit validate`, which captures the evidence it needs from the live repository.
     fn execute_builtin_checker_with_repository_view(
         &self,

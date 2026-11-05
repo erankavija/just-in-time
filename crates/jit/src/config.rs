@@ -109,7 +109,7 @@ pub struct ProjectConfig {
 
 /// Parse error for [`ProjectName`].
 ///
-/// Returned by [`ProjectName::from_str`] and (via serde) by TOML
+/// Returned by `ProjectName::from_str` and (via serde) by TOML
 /// deserialization when the value does not match `^[a-z][a-z0-9-]*$`.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProjectNameError {
@@ -127,7 +127,7 @@ pub enum ProjectNameError {
 ///
 /// Parsed from a string matching `^[a-z][a-z0-9-]*$` (starts with a lowercase
 /// letter; digits and hyphens allowed thereafter) by both
-/// [`ProjectName::from_str`] and TOML deserialization, mirroring the
+/// `ProjectName::from_str` and TOML deserialization, mirroring the
 /// [`EnforcementMode`] pattern: an invalid value is a
 /// descriptive parse error, not a silent fallback, so a misconfigured
 /// `[project] name` is rejected at configuration assembly and surfaces
@@ -1036,7 +1036,7 @@ pub enum ItemKindConfigError {
 
 /// Parse error for [`EnforcementMode`].
 ///
-/// Returned by [`EnforcementMode::from_str`] and (via serde) by TOML /
+/// Returned by `EnforcementMode::from_str` and (via serde) by TOML /
 /// environment-variable deserialization when the value is not one of the
 /// recognised tokens.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

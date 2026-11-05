@@ -19,10 +19,10 @@ pub mod watcher;
 pub use routes::create_routes;
 
 use anyhow::{Context, Result};
-use jit::repository_state::RepositoryLayout;
-use jit::storage::{JsonFileStorage, RepositoryMutationSession, RepositoryStateStore};
+use jit::commands::{open_repository, OpenedRepository, RepositoryInvocation};
 use listenfd::ListenFd;
 use std::net::TcpListener;
+use std::path::Path;
 
 /// Where the server's listening socket came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,42 +73,61 @@ fn listener_from(
     Ok((listener, ListenerSource::Bound))
 }
 
-/// Apply any leftover redo record and validate a mutation-capable server
-/// repository before constructing any command executor or configuration cache.
-/// Storage is rooted at the layout's normalized data root.
-pub fn prepare_server_storage(
-    layout: RepositoryLayout,
-) -> Result<(JsonFileStorage, Box<dyn RepositoryMutationSession>)> {
-    let storage = JsonFileStorage::new(layout.data_root());
-    let recovery_session = storage
-        .open_mutation_session(layout)
-        .context("Failed to open the repository session or apply its leftover redo record")?;
-    storage.validate().map_err(|error| {
-        anyhow::anyhow!(
-            "Failed to initialize storage: {}\n\n\
-             The server requires a JIT repository to be initialized.\n\
-             Run 'jit init' in the repository directory, or use --data-dir to point to an existing repository.",
-            error
-        )
-    })?;
-    Ok((storage, recovery_session))
+/// Open the selected server repository with startup recovery before validation.
+/// The caller releases the retained startup session before watching or serving.
+///
+/// # Errors
+/// Returns the shared repository bootstrap's discovery, recovery, or validation error.
+pub fn prepare_server_repository(data_dir: &Path, current_dir: &Path) -> Result<OpenedRepository> {
+    open_repository(RepositoryInvocation {
+        current_dir: current_dir.to_path_buf(),
+        data_dir_override: Some(data_dir.to_path_buf()),
+        is_init: false,
+        opens_mutation_session: true,
+        coordinates_claims_first: false,
+        is_validation_exempt: false,
+        is_recover: false,
+        write_override: None,
+    })
+    .context("Failed to initialize server repository")
 }
 
 #[cfg(test)]
-mod recovery_startup_tests {
+mod repository_startup_tests {
     use super::*;
     use jit::repository_state::{FileMode, VirtualPath};
     use jit::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
 
-    /// REQ-02, REQ-03, REQ-04: a spelling through `..` components and the
-    /// normalized one bind the same layout, so reads through either serve the
-    /// repository's issues. Resolving a relative `--data-dir` against the
-    /// process directory is observed by the spawned server in
-    /// `graceful_shutdown_tests`.
+    #[test]
+    fn test_server_startup_selects_the_data_roots_checkout_from_an_outside_directory() {
+        let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
+        jit::test_cli::init_git_repository(temp.path()).unwrap();
+        let checkout = temp.path().canonicalize().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+
+        let opened = prepare_server_repository(&checkout.join(".jit"), outside.path()).unwrap();
+
+        assert_eq!(opened.worktree_paths.worktree_root, checkout);
+        assert!(opened.worktree_paths.is_git_repository());
+        assert_eq!(opened.layout.worktree_root(), checkout);
+        assert_eq!(opened.data_root, checkout.join(".jit"));
+    }
+
+    #[test]
+    fn test_server_startup_preserves_the_process_directory_for_an_external_non_git_store() {
+        let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+
+        let opened = prepare_server_repository(&temp.path().join(".jit"), outside.path()).unwrap();
+
+        assert_eq!(opened.worktree_paths.worktree_root, outside.path());
+        assert!(!opened.worktree_paths.is_git_repository());
+        assert_eq!(opened.layout.worktree_root(), outside.path());
+        assert_eq!(opened.data_root, temp.path().join(".jit"));
+    }
+
     #[test]
     fn test_server_startup_serves_reads_from_relative_data_dir_spellings() {
-        use jit::storage::IssueStore;
-
         let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
         let repo = temp.path().canonicalize().unwrap();
         let id = jit::test_utils::file_executor(&repo)
@@ -131,12 +150,12 @@ mod recovery_startup_tests {
         let sibling = repo.join("sibling");
         std::fs::create_dir(&sibling).unwrap();
         for spelling in ["../.jit", "../sibling/../.jit"] {
-            let layout =
-                jit::storage::discover_repository_layout(&repo, sibling.join(spelling)).unwrap();
-            let (storage, _session) =
-                prepare_server_storage(layout).expect("startup over a relative data directory");
-            let ids: Vec<_> = storage
-                .list_issues()
+            let opened = prepare_server_repository(std::path::Path::new(spelling), &sibling)
+                .expect("startup over a relative data directory");
+            let ids: Vec<_> = opened
+                .executor
+                .issues()
+                .list_issues(None, None, None)
                 .expect("reads bind the layout")
                 .iter()
                 .map(|issue| issue.id.clone())
@@ -165,40 +184,10 @@ mod recovery_startup_tests {
         .unwrap();
         commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
 
-        let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        let (_storage, session) =
-            prepare_server_storage(layout).expect("startup applies the record first");
+        let opened = prepare_server_repository(&data, temp.path())
+            .expect("startup applies the record before validating the restored index");
 
-        assert_eq!(session.recovery_report().recovered_count(), 1);
-    }
-
-    /// REQ-03 at the count `main` logs on startup.
-    #[test]
-    fn test_server_startup_counts_the_leftover_redo_record_it_applied() {
-        let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
-        let data = temp.path().join(".jit");
-        let record = RedoRecord::new(
-            Vec::new(),
-            vec![PutFile {
-                path: VirtualPath::worktree("applied-at-startup.md").unwrap(),
-                bytes: b"published by the leftover record\n".to_vec(),
-                mode: FileMode::Regular,
-            }],
-            Vec::new(),
-            None,
-        )
-        .unwrap();
-        commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
-
-        let served_layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        let (_storage, session) = prepare_server_storage(served_layout).expect("startup recovery");
-
-        assert_eq!(
-            session.recovery_report().recovered_count(),
-            1,
-            "the applied record must reach the count the server reports at startup"
-        );
-        assert!(temp.path().join("applied-at-startup.md").exists());
+        assert_eq!(opened.recovered_records, 1);
     }
 }
 

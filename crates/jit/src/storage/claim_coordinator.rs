@@ -675,7 +675,11 @@ impl ClaimCoordinator {
             );
         }
         let lease_id = LeaseId::try_from(Uuid::new_v4().to_string())?;
-        let branch = self.get_current_branch().ok();
+        let branch = self
+            .paths
+            .write_checkout()
+            .and_then(|checkout| checkout.head().ok().flatten())
+            .map(|head| head.branch_label().to_owned());
 
         let mut lock = self.lock()?;
         let now = self.clock.now();
@@ -917,28 +921,6 @@ impl ClaimCoordinator {
                 })?;
                 Ok(lapsed)
             })
-    }
-
-    /// Get current git branch
-    fn get_current_branch(&self) -> Result<String> {
-        use std::process::Command;
-
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(&self.paths.worktree_root)
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
-            .output()
-            .context("Failed to get current branch")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!(
-                "{}",
-                errors::git_command_failed("git rev-parse --abbrev-ref HEAD", &stderr)
-            );
-        }
-
-        Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
 
     /// Renew the caller's lease on `issue_id`: a finite lease expires
