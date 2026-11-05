@@ -1158,7 +1158,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        self.exec.require_common_history_with_main()?;
 
         // Validate: auto gates must have checker
         if mode == crate::declarations::GateMode::Auto && checker.is_none() {
@@ -1255,7 +1255,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main (mirrors define_gate).
-        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        self.exec.require_common_history_with_main()?;
         let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
             key: key.clone(),
@@ -1291,7 +1291,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        self.exec.require_common_history_with_main()?;
 
         let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
@@ -1526,6 +1526,68 @@ mod tests {
     use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
+
+    #[test]
+    fn test_gate_registry_guard_maps_supplied_checkout_comparisons() {
+        use crate::test_cli::JitCli;
+
+        for scenario in ["unresolved", "unrelated", "matching", "diverged"] {
+            let cli = JitCli::uninitialised().unwrap();
+            cli.init_git().unwrap().commit("base").unwrap();
+            let base = match scenario {
+                "unresolved" => None,
+                "unrelated" => Some(
+                    cli.git(["commit-tree", "HEAD^{tree}", "-m", "unrelated"])
+                        .unwrap(),
+                ),
+                "matching" => Some(cli.git(["rev-parse", "HEAD"]).unwrap()),
+                "diverged" => Some(
+                    cli.git(["commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead"])
+                        .unwrap(),
+                ),
+                _ => unreachable!(),
+            };
+            if let Some(base) = base {
+                cli.git(["update-ref", "refs/remotes/origin/main", base.trim()])
+                    .unwrap();
+            }
+            let executor =
+                setup().with_worktree_paths(crate::test_utils::primary_checkout_paths(cli.root()));
+            let key = "guarded".parse().unwrap();
+            let result = executor.gates().define_gate(
+                &key,
+                "Guarded".to_string(),
+                String::new(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+            );
+            if scenario == "diverged" {
+                assert_eq!(
+                    result.unwrap_err().to_string(),
+                    "Global operations require common history with main\n\n\
+                     Your branch has diverged from origin/main. To proceed:\n  \
+                     git fetch origin\n  \
+                     git rebase origin/main"
+                );
+                assert!(!executor
+                    .storage
+                    .load_gate_registry()
+                    .unwrap()
+                    .gates
+                    .contains_key(&key));
+            } else {
+                result.unwrap_or_else(|error| panic!("{scenario}: {error}"));
+                assert!(executor
+                    .storage
+                    .load_gate_registry()
+                    .unwrap()
+                    .gates
+                    .contains_key(&key));
+            }
+        }
+    }
 
     #[test]
     fn test_pass_of_automated_gate_runs_checker() {

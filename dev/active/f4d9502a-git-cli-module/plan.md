@@ -120,11 +120,11 @@ A document read uses the explicit `--at` revision, else the reference's pinned c
 | pinned-counting-wrappers-converge | Pinned-read tests count processes with the shared stand-in | task | Pinned-read tests count git processes through the shared stand-in only. | git-test-fixtures | REQ-07, DEC-16 | touches 2 | — | git-cli-test-fixture |
 | git-object-reads | Object reader and presence check in the git module | task | The git module reads many objects through one cat-file process per reader. | git-pinned-reads | REQ-10, DEC-13, DEC-14 | touches 2 | — | pinned-read-suite-relocation |
 | pinned-inspection-object-reader | Pinned target inspection reads blobs through the object reader | task | Pinned inspection reads blobs through the single object reader. | git-object-reads, git-pinned-reads | REQ-10, DEC-13 | touches 1 | — | git-object-reads |
-| archive-pinned-reads-batched | Archive planning reads pinned evidence through one git process | task | Archive planning resolves pinned documents through one object reader process. | git-object-reads, git-revision-resolver-bridge, git-test-fixtures | REQ-03, REQ-10, DEC-13 | touches 2 | — | git-object-reads, layout-fallback-removal |
+| archive-pinned-reads-batched | Archive planning reads pinned evidence through one git process | task | Archive planning resolves pinned documents through one object reader process. | git-object-reads, git-revision-resolver-bridge, git-test-fixtures | REQ-03, REQ-10, DEC-13 | touches 2 | — | git-object-reads, snapshot-metadata-through-module |
 | git-revision-bridge-removal | Remove the revision resolver bridge | task | The revision resolver bridge and the single-path pinned read are gone. | git-revision-resolver-bridge, git-object-reads | REQ-02, REQ-11, DEC-13 | touches 4 | — | archive-pinned-reads-batched, storage-pinned-inspection-migration |
 | pinned-path-reads-through-module | Path reads at a commit go through the git module | task | Storage reads a path at a commit through the module object reader. | git-object-reads, document-read-versions | REQ-01, REQ-10, DEC-13, DEC-22 | touches 1 | — | git-object-reads, server-image-git-cli |
 | document-show-reads-storage | Document show reads through storage at the version it names | task | jit doc show reads unpinned documents from the working tree through storage. | document-read-versions | REQ-06, REQ-10, DEC-06, DEC-22 | touches 3 | — | pinned-path-reads-through-module |
-| document-diff-through-module | Document diff reads both versions through one git process | task | Both document diff variants read their two versions through one reader process. | git-object-reads, document-read-versions, git-test-fixtures | REQ-01, REQ-10, DEC-13 | touches 2 | — | document-show-reads-storage, document-history-through-module |
+| document-diff-through-module | Document diff reads both versions through one git process | task | Both document diff variants read their two versions through one reader process. | git-object-reads, document-read-versions, git-test-fixtures | REQ-01, REQ-10, DEC-13 | touches 2 | — | document-show-reads-storage, document-history-through-module, snapshot-metadata-through-module |
 | git-file-history | Path history query in the git module | task | The git module lists a path's history with one git log process. | git-module | REQ-10, DEC-13 | touches 2 | — | git-module-foundation |
 | document-history-through-module | Document history comes from the module's path history | task | Both document history variants read the module's path history. | git-file-history | REQ-01, REQ-10, DEC-13 | touches 4 | — | git-file-history, layout-fallback-removal, server-image-git-cli |
 | asset-check-through-module | Link checks test asset presence through one git process | task | The link check tests unpinned asset presence through one presence-check process. | git-object-reads, git-test-fixtures | REQ-01, REQ-10, DEC-13 | touches 4 | — | git-object-reads, layout-fallback-removal |
@@ -245,7 +245,7 @@ flowchart LR
     N28 --> N30
     N30 --> N31
     N30 --> N32
-    N5 --> N32
+    N42 --> N32
     N32 --> N33
     N27 --> N33
     N30 --> N34
@@ -253,6 +253,7 @@ flowchart LR
     N34 --> N35
     N35 --> N36
     N38 --> N36
+    N42 --> N36
     N2 --> N37
     N37 --> N38
     N5 --> N38
@@ -331,6 +332,12 @@ flowchart LR
 | Interim server window | `pinned-path-reads-through-module` and `document-history-through-module` follow `server-image-git-cli`, so the image carries git before any server path depends on it. |
 | Lazy-detection test sweep | A grep of in-process tests that build a git repository with a storage handle or executor and no paths finds three groups. The primary-checkout tier tests in `storage/json.rs` move with `layout-fallback-removal`. The server routes `test_executor` moves with `document-history-through-module`, which diff follows. The archive fixture moves with `archive-pinned-reads-batched`. Every entry whose consumer reads the executor's checkout depends on `layout-fallback-removal`. |
 | Shared-file contention | `storage/git.rs` and `git_module_tests.rs` receive one operation per mechanism entry, in distinct functions; `commands/document.rs`, `commands/worktree.rs`, `commands/claim.rs` and `storage/json.rs` are edited by several entries in distinct functions. Same-function edits are ordered by edges: show and history before diff, claims before the release actor, and the module-operation entries before their consumers. The remaining footprint advisories are distinct functions, and workers rebase. |
+
+## Post-plan sequencing correction
+
+The archive pinned-read consumer resolves the original revision expression before canonical-ID peeling, then requests the path at that canonical commit in the same reader. Appending peeling syntax to a message-search expression changes its meaning; the [shared revision-producer design](../c140921c/revision-producer-plan.md) records the correction and unchanged budgets. Steward-approved sequencing makes that producer a prerequisite of archive migration, replacing the now-transitive layout-context edge. Existing issue identities and completed migration history remain intact; archive implementation waits for the producer to land and pass gates.
+
+The two-version document diff likewise waits for the shared revision producer: it resolves each original expression before requesting canonical commit:path, using one reader child for both versions. This post-plan prerequisite preserves the existing diff criteria and libgit2 expression semantics; document show retains its existing prerequisite chain.
 
 ## Investigation sources
 

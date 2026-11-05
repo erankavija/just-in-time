@@ -12,7 +12,33 @@
     "d68150e2-d10c-4213-9056-9ce6b80f7d11"
   ],
   "description": "Make snapshot export resolve its source commit, origin URL, branch and dirtiness through the git module instead of libgit2.\n\n## Background\n\n- `determine_snapshot_source_mode` (`crates/jit/src/commands/snapshot.rs:47-80`) opens libgit2 to resolve `--at` or `HEAD`. Without a repository, `--at` and `--committed-only` fail and the default falls back to the working tree.\n- `get_repo_info` (`crates/jit/src/commands/snapshot.rs:352-392`) opens libgit2 for the origin URL (`origin_remote_url`, `crates/jit/src/commands/snapshot.rs:19-23`), the branch (`current_branch_name`, `crates/jit/src/commands/snapshot.rs:25-29`: `HEAD` when detached, none on an unborn branch) and dirtiness (`statuses(None)` non-empty, which with libgit2's default options includes ignored files).\n- The module offers `resolve_commit`, `origin_url`, `head` with its branch label, and `dirty_paths`.\n- The unit test `test_git_metadata_extracts_remote_and_branch_with_fallible_text_accessors` (`crates/jit/src/commands/snapshot.rs:1075`) builds its repository through git2.\n- Kept as one change for a build reason: `origin_remote_url` and `current_branch_name` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Source mode resolves commits with `GitCheckout::resolve_commit` on the executor's git checkout; without a checkout, `--at` and `--committed-only` fail and the default falls back to the working tree, as today.\n- [hard] REQ-02: Repository info takes the origin URL from `origin_url`, the branch from the head lookup's branch label (absent on an unborn branch), and dirtiness from the dirty-path query being non-empty.\n- [hard] REQ-03: A test asserts the behaviour change and fails on today's code: a checkout whose only difference from `HEAD` is an ignored file exports as clean.\n- [hard] REQ-04: `origin_remote_url` and `current_branch_name` no longer exist, and the unit test builds its repository with the shared git repository fixture.\n\n## Notes\n\n- Behaviour change: ignored files no longer make a snapshot's repository dirty.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://git-scm.com/docs/gitrevisions",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://libgit2.org/docs/reference/main/revparse/git_revparse_single.html",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Conditional shared revision producer correction",
+      "path": "dev/active/c140921c/revision-producer-plan.md"
+    }
+  ],
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
@@ -33,5 +59,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Snapshot source and repository facts come from the module",
-  "updated_at": "2026-11-05T03:58:56.766556156Z"
+  "updated_at": "2026-11-05T04:35:52.908769396Z"
 }
