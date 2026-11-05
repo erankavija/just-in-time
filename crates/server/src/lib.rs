@@ -1,7 +1,10 @@
 //! JIT REST API Server Library
+
 //!
 //! Provides a web API for the Just-In-Time issue tracker, enabling web UI
 //! and external integrations to query and visualize issues.
+
+mod capture_cache;
 
 #[cfg(feature = "embed-web")]
 pub mod embedded;

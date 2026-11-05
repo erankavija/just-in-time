@@ -324,6 +324,51 @@ pub enum ReadAdmission {
     Moved,
 }
 
+pub(crate) const READ_OPTIMISTIC_ATTEMPTS: u32 = 4;
+
+pub(crate) fn retry_optimistic_reads<T>(
+    mut attempt: impl FnMut() -> anyhow::Result<Option<anyhow::Result<T>>>,
+) -> anyhow::Result<Option<anyhow::Result<T>>> {
+    use std::hash::{BuildHasher, Hasher};
+    for index in 0..READ_OPTIMISTIC_ATTEMPTS {
+        if let Some(outcome) = attempt()? {
+            return Ok(Some(outcome));
+        }
+        let base = 1_000u64 << index;
+        let draw = std::collections::hash_map::RandomState::new()
+            .build_hasher()
+            .finish();
+        std::thread::sleep(std::time::Duration::from_micros(base / 2 + draw % base));
+    }
+    Ok(None)
+}
+
+pub(crate) fn admit_read_sources(
+    admissions: impl IntoIterator<Item = Result<ReadAdmission, RepositoryStateStoreError>>,
+) -> Result<Option<()>, RepositoryStateStoreError> {
+    let mut error = None;
+    let mut moved = false;
+    for admission in admissions {
+        match admission {
+            Ok(ReadAdmission::Granted) => {}
+            Ok(ReadAdmission::Busy | ReadAdmission::Moved)
+            | Err(RepositoryStateStoreError::RetryableConflict { .. }) => moved = true,
+            Err(failure) => {
+                if error.is_none() {
+                    error = Some(failure);
+                }
+            }
+        }
+    }
+    if moved {
+        Ok(None)
+    } else if let Some(error) = error {
+        Err(error)
+    } else {
+        Ok(Some(()))
+    }
+}
+
 /// A lock-free read session (`@/charter/D-22`): its capture counts only once
 /// [`admit`](Self::admit) grants it.
 pub trait OptimisticReadSession: RepositoryReadSession {

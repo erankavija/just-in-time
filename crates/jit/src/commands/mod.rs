@@ -529,7 +529,8 @@ fn derive_repository_export(
 
 /// Lock-free attempts a read makes before it takes the operation's mutation
 /// session.
-const READ_OPTIMISTIC_ATTEMPTS: u32 = 4;
+#[cfg(test)]
+use crate::storage::repository_state_store::READ_OPTIMISTIC_ATTEMPTS;
 
 /// Run `read` over a lock-free read session, and surface what it returned,
 /// value or error, only once the store admits the capture (`@/charter/D-22`).
@@ -551,11 +552,10 @@ pub fn with_read_session<S: crate::storage::RepositoryStateStore, T>(
     operation: &'static str,
     mut read: impl FnMut(&mut dyn crate::storage::RepositoryReadSession) -> Result<Option<T>>,
 ) -> Result<T> {
-    for attempt in 0..READ_OPTIMISTIC_ATTEMPTS {
-        if let Some(outcome) = read_optimistically(store, layout, &mut read)? {
-            return outcome;
-        }
-        std::thread::sleep(read_backoff(attempt));
+    if let Some(outcome) = crate::storage::repository_state_store::retry_optimistic_reads(|| {
+        read_optimistically(store, layout, &mut read)
+    })? {
+        return outcome;
     }
     with_mutation_session(store, layout, operation, |session| {
         Ok(match read(session)? {
@@ -588,22 +588,12 @@ fn read_optimistically<S: crate::storage::RepositoryStateStore, T>(
         Err(error) => return Err(error.into()),
     };
     let outcome = read(session.as_mut());
-    Ok(match session.admit()? {
-        crate::storage::ReadAdmission::Granted => outcome.transpose(),
-        crate::storage::ReadAdmission::Busy | crate::storage::ReadAdmission::Moved => None,
-    })
-}
-
-/// About `2^attempt` ms, drawn from `[1/2, 3/2)` of it so contending readers
-/// spread out.
-fn read_backoff(attempt: u32) -> std::time::Duration {
-    use std::hash::{BuildHasher, Hasher};
-
-    let base = 1_000u64 << attempt;
-    let draw = std::collections::hash_map::RandomState::new()
-        .build_hasher()
-        .finish();
-    std::time::Duration::from_micros(base / 2 + draw % base)
+    Ok(
+        match crate::storage::repository_state_store::admit_read_sources([session.admit()])? {
+            Some(()) => outcome.transpose(),
+            None => None,
+        },
+    )
 }
 
 /// Closed issue-local operations whose final record is derived from the issue

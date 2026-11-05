@@ -886,7 +886,17 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        Self::load_issues(&self.repository_state())
+        let outcome = crate::storage::repository_state_store::retry_optimistic_reads(|| {
+            let state = self.repository_state();
+            if state.data_root_exists && state.record.is_some() {
+                Ok(None)
+            } else {
+                Ok(Some(Self::load_issues(&state)))
+            }
+        })?;
+        outcome.unwrap_or_else(|| Err(crate::storage::RepositoryStateStoreError::RetryableConflict {
+            path: "issue snapshot has a pending redo record; run `jit recover` if the record remains".into(),
+        }.into()))
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {

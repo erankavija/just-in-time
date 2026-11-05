@@ -1,5 +1,6 @@
 //! API route definitions
 
+use crate::capture_cache::CaptureCache;
 use axum::{
     body::Body,
     extract::{FromRequestParts, State},
@@ -10,6 +11,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::sync::OnceCell;
 use tokio_util::sync::CancellationToken;
 
 use jit::commands::CommandExecutor;
@@ -124,10 +126,44 @@ classified_extractor!(Query, Query);
 pub struct AppState<S: IssueStore> {
     pub executor: Arc<CommandExecutor<S>>,
     pub tracker: Arc<ChangeTracker>,
+    pub capture_cache: Arc<ProjectionCache>,
     pub project_name: String,
     /// Cancelled when the process starts shutting down, so live event streams
     /// end instead of holding their connections through the drain deadline.
     pub shutdown: CancellationToken,
+}
+
+/// Per-version repository capture and its projections.
+#[derive(Default)]
+pub struct ProjectionCache {
+    captures: CaptureCache<Snapshot>,
+}
+
+struct Snapshot {
+    issues: Vec<Issue>,
+    responses: Vec<IssueResponse>,
+    graph: OnceCell<GraphData>,
+}
+
+async fn capture_snapshot<S: IssueStore + Send + Sync + 'static>(
+    state: &AppState<S>,
+) -> Result<Arc<Snapshot>, StatusCode> {
+    state
+        .capture_cache
+        .captures
+        .get(&state.tracker, || async {
+            execute_blocking(state, |executor| {
+                let issues = executor.issues().list_issues(None, None, None)?;
+                let responses = issues.iter().cloned().map(IssueResponse::from).collect();
+                Ok(Snapshot {
+                    issues,
+                    responses,
+                    graph: OnceCell::new(),
+                })
+            })
+            .await
+        })
+        .await
 }
 
 /// Create API routes
@@ -177,7 +213,7 @@ async fn health_check<S: IssueStore>(State(state): State<AppState<S>>) -> impl I
 /// An issue as served by the API: the stored record's fields, plus its
 /// `short_id`, with each `dependencies` entry expanded to a [`DependencyRef`].
 /// The stored record keeps its own shape.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct IssueResponse {
     #[serde(flatten)]
     issue: IssueBody,
@@ -187,7 +223,7 @@ pub struct IssueResponse {
 }
 
 /// A dependency entry: the id and its short id, as `issue show --json` pairs them.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DependencyRef {
     pub id: IssueId,
     pub short_id: String,
@@ -214,7 +250,7 @@ impl From<Issue> for IssueResponse {
 
 /// An [`Issue`] serialized without its `dependencies`, which [`IssueResponse`]
 /// serves expanded.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct IssueBody(Issue);
 
 impl Serialize for IssueBody {
@@ -234,10 +270,15 @@ impl Serialize for IssueBody {
 async fn list_issues<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
-    execute_blocking(&state, |executor| {
-        let issues = executor.issues().list_issues(None, None, None)?;
+    let snapshot = capture_snapshot(&state).await?;
+    let issues = snapshot.issues.clone();
+    let mut responses = snapshot.responses.clone();
+    execute_blocking(&state, move |executor| {
         let issues = executor.documents().with_reported_documents(issues)?;
-        Ok(Json(issues.into_iter().map(IssueResponse::from).collect()))
+        for (response, issue) in responses.iter_mut().zip(issues) {
+            response.issue.0.documents = issue.documents;
+        }
+        Ok(Json(responses))
     })
     .await
 }
@@ -272,7 +313,7 @@ async fn get_issue<S: IssueStore + Send + Sync + 'static>(
 /// counts `nodes`, and [`jit::commands::IssueChildrenResponse`], where `count`
 /// counts the primary `issues` collection and leaves the secondary `dangling`
 /// list uncounted.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GraphData {
     /// Number of entries in `nodes` (equals `nodes.len()`).
     pub count: usize,
@@ -289,7 +330,7 @@ pub struct GraphData {
 /// `cluster`, and `rank` are flattened from [`NodeHierarchy`], the same
 /// serialization `jit graph tree` emits, so a consumer never re-derives
 /// containment.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: IssueId,
     /// Domain-derived short id ([`IssueId::short_id`]).
@@ -308,7 +349,7 @@ pub struct GraphNode {
     pub hierarchy: NodeHierarchy,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GraphEdge {
     pub from: IssueId,
     pub to: IssueId,
@@ -326,53 +367,59 @@ pub struct GraphEdge {
 async fn get_graph<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
-    execute_blocking(&state, |executor| {
-        let issues = executor.issues().list_issues(None, None, None)?;
+    let snapshot = capture_snapshot(&state).await?;
+    let graph = snapshot
+        .graph
+        .get_or_try_init(|| async {
+            let issues = snapshot.issues.clone();
+            execute_blocking(&state, move |executor| {
+                // Build node lookup for blocked state calculation
+                let issue_map: std::collections::HashMap<IssueId, &Issue> =
+                    issues.iter().map(|i| (i.id.clone(), i)).collect();
 
-        // Build node lookup for blocked state calculation
-        let issue_map: std::collections::HashMap<IssueId, &Issue> =
-            issues.iter().map(|i| (i.id.clone(), i)).collect();
+                // Resolve the hierarchy with the core resolver, over the repo's type levels.
+                let issue_refs: Vec<&Issue> = issues.iter().collect();
+                let config = executor.config().get_hierarchy_config()?;
+                let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
-        // Resolve the hierarchy with the core resolver, over the repo's type levels.
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = executor.config().get_hierarchy_config()?;
-        let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
+                // Create nodes
+                let nodes: Vec<GraphNode> = issues
+                    .iter()
+                    .map(|issue| GraphNode {
+                        id: issue.id.clone(),
+                        short_id: issue.id.short_id().to_string(),
+                        label: issue.title.clone(),
+                        state: issue.state,
+                        priority: issue.priority,
+                        assignee: issue.assignee.as_ref().map(|a| a.to_string()),
+                        labels: issue.labels.clone(),
+                        blocked: issue.is_blocked(&issue_map),
+                        type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
+                        hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
+                    })
+                    .collect();
 
-        // Create nodes
-        let nodes: Vec<GraphNode> = issues
-            .iter()
-            .map(|issue| GraphNode {
-                id: issue.id.clone(),
-                short_id: issue.id.short_id().to_string(),
-                label: issue.title.clone(),
-                state: issue.state,
-                priority: issue.priority,
-                assignee: issue.assignee.as_ref().map(|a| a.to_string()),
-                labels: issue.labels.clone(),
-                blocked: issue.is_blocked(&issue_map),
-                type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
-                hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
+                // Create edges
+                let mut edges = Vec::new();
+                for issue in &issues {
+                    for dep in &issue.dependencies {
+                        edges.push(GraphEdge {
+                            from: issue.id.clone(),
+                            to: dep.clone(),
+                        });
+                    }
+                }
+
+                Ok(GraphData {
+                    count: nodes.len(),
+                    nodes,
+                    edges,
+                })
             })
-            .collect();
-
-        // Create edges
-        let mut edges = Vec::new();
-        for issue in &issues {
-            for dep in &issue.dependencies {
-                edges.push(GraphEdge {
-                    from: issue.id.clone(),
-                    to: dep.clone(),
-                });
-            }
-        }
-
-        Ok(Json(GraphData {
-            count: nodes.len(),
-            nodes,
-            edges,
-        }))
-    })
-    .await
+            .await
+        })
+        .await?;
+    Ok(Json(graph.clone()))
 }
 
 /// Status summary
@@ -1176,6 +1223,7 @@ mod tests {
         let state = AppState {
             executor: Arc::new(executor),
             tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1190,6 +1238,7 @@ mod tests {
                 MemoryDeclarations::default(),
             )),
             tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1210,6 +1259,7 @@ mod tests {
                 MemoryDeclarations::default(),
             )),
             tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1616,6 +1666,113 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_list_and_graph_share_snapshot_while_artifacts_remain_live() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[documentation]\nissue_scoped_areas = [\"notes\"]\n")
+                .unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "First".into(),
+                String::new(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        let dir = executor
+            .documents()
+            .resolve_issue_artifact_directory(&id, "notes")
+            .unwrap()
+            .directory;
+        std::fs::create_dir_all(temp.path().join(&dir)).unwrap();
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor: Arc::new(executor),
+            tracker: tracker.clone(),
+            capture_cache: Default::default(),
+            project_name: "test".into(),
+            shutdown: CancellationToken::new(),
+        };
+        let executor = state.executor.clone();
+        let server = TestServer::new(create_routes(state)).unwrap();
+        let graph: serde_json::Value = server.get("/graph").await.json();
+        assert_eq!(graph["count"], 1);
+        executor
+            .issues()
+            .create_issue(
+                "Second".into(),
+                String::new(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        let first = temp.path().join(&dir).join("first.md");
+        let second = temp.path().join(&dir).join("second.md");
+        std::fs::write(&first, "first").unwrap();
+        let docs = |body: &serde_json::Value| {
+            body[0]["documents"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|doc| doc["path"].as_str().unwrap().to_string())
+                .collect::<Vec<_>>()
+        };
+        let listed: serde_json::Value = server.get("/issues").await.json();
+        assert_eq!(listed.as_array().unwrap().len(), 1);
+        assert!(docs(&listed).iter().any(|path| path.ends_with("first.md")));
+        std::fs::rename(&first, &second).unwrap();
+        let listed: serde_json::Value = server.get("/issues").await.json();
+        assert!(docs(&listed).iter().any(|path| path.ends_with("second.md")));
+        assert!(!docs(&listed).iter().any(|path| path.ends_with("first.md")));
+        std::fs::remove_file(&second).unwrap();
+        let listed: serde_json::Value = server.get("/issues").await.json();
+        assert!(docs(&listed).is_empty());
+        tracker.notify_change();
+        let listed: serde_json::Value = server.get("/issues").await.json();
+        assert_eq!(listed.as_array().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_graph_reloads_hierarchy_after_configuration_invalidation() {
+        let (temp, executor) = setup_test_repo_with_config(&taxonomy_config()).unwrap();
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor: Arc::new(executor),
+            tracker: tracker.clone(),
+            capture_cache: Default::default(),
+            project_name: "test".into(),
+            shutdown: CancellationToken::new(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        server.get("/graph").await.assert_status_ok();
+        let config = temp.path().join(".jit/config.toml");
+        let original = std::fs::read(&config).unwrap();
+        std::fs::write(
+            &config,
+            jit::test_taxonomy::invalid_hierarchy_config_fragment(),
+        )
+        .unwrap();
+        tracker.notify_change();
+        server
+            .get("/graph")
+            .await
+            .assert_status(StatusCode::INTERNAL_SERVER_ERROR);
+        std::fs::write(&config, original).unwrap();
+        tracker.notify_change();
+        server.get("/graph").await.assert_status_ok();
+    }
+
+    #[tokio::test]
     async fn test_list_issues_with_data() {
         let executor = Arc::new(memory_executor_declaring(
             InMemoryStorage::new(),
@@ -1661,6 +1818,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1704,6 +1862,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1812,6 +1971,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1880,6 +2040,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1935,6 +2096,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -1993,6 +2155,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2038,6 +2201,7 @@ mod tests {
         let state = AppState {
             executor,
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2214,6 +2378,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2292,6 +2457,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2539,6 +2705,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2580,6 +2747,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2661,6 +2829,7 @@ unique = false
         let state = AppState {
             executor,
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2736,6 +2905,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2769,6 +2939,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2828,6 +2999,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -2916,6 +3088,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3018,6 +3191,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3082,6 +3256,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3138,6 +3313,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3171,6 +3347,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3510,6 +3687,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3590,6 +3768,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3657,6 +3836,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
@@ -3698,6 +3878,7 @@ unique = false
         let state = AppState {
             executor: Arc::new(executor),
             tracker,
+            capture_cache: Default::default(),
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
         };
