@@ -14,7 +14,14 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3d160332-d599-407d-8a5c-083966317d37",
+      "status": "failed",
+      "updated_at": "2026-11-05T04:37:44.144086313Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c0ea31ee-d3b2-4554-80ee-641ab5d772c1",
   "labels": [
     "type:story",
@@ -28,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Layout facts are detected once and reach every consumer",
-  "updated_at": "2026-11-05T04:27:39.244025307Z"
+  "updated_at": "2026-11-05T04:37:44.144086313Z"
 }
