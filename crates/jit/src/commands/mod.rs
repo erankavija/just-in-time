@@ -2567,11 +2567,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// command mutates through (see the [`layout`](Self::layout) field). The CLI
     /// supplies it at startup from the Git-optional worktree root plus the selected
     /// data root; tests supply a fixture layout over a temporary worktree.
-    pub fn with_layout(mut self, layout: crate::repository_state::RepositoryLayout) -> Self {
-        self.storage.configure_repository_layout(&layout);
+    pub fn with_layout(
+        mut self,
+        layout: crate::repository_state::RepositoryLayout,
+    ) -> Result<Self> {
+        self.storage.configure_repository_layout(&layout)?;
         self.config_manager.bind_layout(layout.clone());
         self.layout = Some(layout);
-        self
+        Ok(self)
     }
 
     /// Construct this executor with the selected data root's worktree authority.
@@ -3895,6 +3898,13 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
     }
 
     #[test]
+    fn test_with_layout_propagates_storage_root_mismatch() {
+        let storage = crate::storage::InMemoryStorage::new();
+        let foreign = crate::storage::InMemoryStorage::new().repository_layout();
+        assert!(CommandExecutor::new(storage).with_layout(foreign).is_err());
+    }
+
+    #[test]
     fn test_repository_layout_normalizes_only_leading_current_directory_components() {
         use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence, VirtualPath};
         let layout = RepositoryLayout::new(
@@ -3949,7 +3959,9 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         let occupied_issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
         storage.add_data_file(occupied_issue_path.relative().as_str(), "{}");
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(layout.clone())
+            .unwrap();
         storage.inject_repository_state_apply_conflicts(1);
         let intent = RepositoryExportIntent::new_absent_file(
             VirtualPath::data("issues/snapshot.tar").unwrap(),
@@ -4506,7 +4518,7 @@ assert = { require-section = { heading = "Goals" } }
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         // First access parses and caches the file.
         let first = executor.rules().expect("valid rules");
@@ -4561,7 +4573,7 @@ unique = false
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         // First access parses config.toml and caches the namespace registry.
         let first = executor.cached_namespaces().expect("valid namespaces");
@@ -4601,7 +4613,7 @@ unique = false
         let layout = storage.repository_layout();
         // No rules.toml written.
 
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         let rules = executor.rules().expect("missing file is not an error");
         assert!(rules.rules.is_empty());
     }
@@ -4629,7 +4641,7 @@ assert = {}
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         assert!(
             executor.rules().is_err(),
             "malformed rules.toml must surface an error, not an empty set"

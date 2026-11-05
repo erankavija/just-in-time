@@ -31,7 +31,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     let storage = JsonFileStorage::new(&jit_dir);
     let layout = jit::storage::discover_repository_layout(repo.root(), storage.root())
         .expect("discover repository layout before initialization");
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     executor
         .profiles()
         .initialize_fresh_repository(repo.root(), None)
