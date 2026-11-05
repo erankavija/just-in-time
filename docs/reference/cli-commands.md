@@ -1133,7 +1133,10 @@ the created issue's full id. Human output lists each `key -> id`.
 ### Searching Issues (`jit issue search`)
 
 `jit issue search` matches issues by a text query and/or filter flags. The text
-query searches the title, description, and ID.
+query matches a case-insensitive whole-query substring in the title or description,
+or a prefix of the ID. The browser's HTTP search uses these same semantic fields
+and searches linked document contents; it also supports case-sensitive and regex
+matching. For raw data files and history, use [`jit search`](#jit-search).
 
 ```bash
 # Text query only
