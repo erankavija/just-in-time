@@ -47,7 +47,8 @@
           "title": "Dedicated, gate and template writes check their leases in their publishing session",
           "classification": "implementation",
           "worker": "claude opus (lock order and lease contract)",
-          "status": "pending"
+          "status": "landing",
+          "commit": "df59347fb"
         }
       ]
     },
@@ -136,7 +137,14 @@
     "f6477007": 1,
     "4334df62": 1
   },
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "found_in": "c2b3cefa review",
+      "subject": "pre-session lease checks with no owning issue",
+      "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up.",
+      "status": "open"
+    }
+  ],
   "started_at": "2026-11-06T01:20:00+02:00",
   "coordination": [
     {
