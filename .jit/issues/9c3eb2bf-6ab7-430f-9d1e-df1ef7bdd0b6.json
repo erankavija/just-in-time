@@ -8,12 +8,26 @@
   ],
   "description": "One fallible binding API cutover includes its mechanically migrated implementations and inventoried callers.\n\n## Background\n\n`IssueStore::configure_repository_layout` and `CommandExecutor::with_layout` currently bind without returning mismatch errors. The investigation inventories implementations and callers.\n\n## Success Criteria\n\n- [hard] REQ-01: Layout binding returns an error before side effects when roots differ, preserving same-root refresh and recovery ordering; callers propagate errors and tests cover mismatch and same-root binding.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-05T00:07:33.792690508Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9e0f1f2f-e2ac-42cd-9f29-c5bd01adb6c0",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:07:39.598706359Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0d50a4d4-a777-48ce-ad81-c10deb2da691",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:05:54.353842034Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "satisfies:a236e81e/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Reject incompatible repository layout bindings",
-  "updated_at": "2026-11-04T23:08:48.005987196Z"
+  "updated_at": "2026-11-05T01:07:39.598706359Z"
 }

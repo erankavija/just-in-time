@@ -298,11 +298,14 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .unwrap()
         .profiles()
         .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+    let executor = CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .unwrap();
     let id = create_issue(&executor, "Pinned docs");
 
     std::fs::write(
@@ -368,11 +371,14 @@ fn test_add_document_rejects_malformed_utf8_without_writes() {
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .unwrap()
         .profiles()
         .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+    let executor = CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .unwrap();
     let id = create_issue(&executor, "Malformed document");
     std::fs::create_dir_all(temp.path().join("docs")).unwrap();
     std::fs::write(temp.path().join("docs/guide.md"), [0xff, 0xfe]).unwrap();

@@ -840,7 +840,9 @@ mod tests {
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
         let layout =
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-        let initializer = CommandExecutor::new(storage.clone()).with_layout(layout);
+        let initializer = CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .unwrap();
         initializer
             .profiles()
             .initialize_fresh_repository(temp.path(), None)
@@ -855,7 +857,9 @@ mod tests {
 
         let layout =
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .unwrap();
         // Applied from inside the worktree it is applied to, because an
         // application records the package's worktree-relative location, and
         // beside the package it declares a dependency on, which is where that
@@ -928,7 +932,7 @@ mod tests {
         let layout =
             crate::storage::discover_repository_layout(temp.path(), temp.path().join(".jit"))
                 .unwrap();
-        let reloaded = CommandExecutor::new(storage).with_layout(layout);
+        let reloaded = CommandExecutor::new(storage).with_layout(layout).unwrap();
         let invariants = reloaded.items().project_render(Some("invariants")).unwrap();
         let invariants = &invariants.items[0];
         assert_eq!(invariants.target, "AGENTS.md");

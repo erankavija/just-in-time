@@ -479,7 +479,7 @@ mod tests {
         fs::create_dir(storage.root()).unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        storage.configure_repository_layout(&layout);
+        storage.configure_repository_layout(&layout).unwrap();
         (repo, storage)
     }
 

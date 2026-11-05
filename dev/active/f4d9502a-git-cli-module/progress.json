@@ -120,9 +120,10 @@
           "short_id": "437907da",
           "title": "One worktree listing in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "f4b9813452665c72b989f209fc2d54e3cee567ce"
         },
         {
           "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
@@ -491,6 +492,14 @@
     {
       "issue": "81664a6a",
       "note": "Remaining git-spawning sites outside storage/git.rs are not marked as tracked exceptions; only layout detection (until 07663984) is. A reviewer may hold other sites to @/inv/convention-convergence; each is migrated by its own issue in this epic."
+    },
+    {
+      "issue": "f4d9502a",
+      "criterion": "REQ-04",
+      "status": "unresolved_hard_criterion",
+      "finding": "External data-root fallback performs two layout probes; for_worktree_root adds probes for listed checkouts. Preserve external-store and relocated-checkout identity while resolving the invocation-wide one-process contract.",
+      "owner": "layout_probe_research",
+      "disposition": "Steward-authorized research; no waiver or remediation scope approved yet."
     }
   ],
   "reconciled_after_breakdown": [
@@ -702,7 +711,8 @@
     "24 worktree reclaimed; branch retained. HEAD/listing refreshed stable approvals preserveddd9335368/56fbb0c72; ec9 corrected approvaldc9741d27. All implemented branch gates pass, awaiting coordinated source integration.",
     "Listing old wrapper reused owned fixed TMPDIR; finished successfully. Empty-directory removal refused because a zero-byte Codex synthetic-mount marker remains, left untouched. Future wrapper replaced with unique mktemp and cleanup trap.",
     "Await explicit6d93 merged web/smoke release before HEAD canonical merge; ready branchdd9335368 contains only HEAD source plus actual evidence. Verify blocked061/policy ancestry and delta again immediately before landing.",
-    "HEAD Done after main74d539f68 and mergedCargodd02d9b5; release directly tofrontendoffload. 9de/732/f6 now ready. History/origin isolated additive conflicts delegated to Sol; base auto-merged main5469c7bf with its own62-line operation and91-line tests unchanged, retains prior stable review pending merged checks."
+    "HEAD Done after main74d539f68 and mergedCargodd02d9b5; release directly tofrontendoffload. 9de/732/f6 now ready. History/origin isolated additive conflicts delegated to Sol; base auto-merged main5469c7bf with its own62-line operation and91-line tests unchanged, retains prior stable review pending merged checks.",
+    "437907da Done after merged Cargo c23e078c; source slot releases directly to frontend binding9c3. REQ-04 layout process budget investigation remains unresolved: external-store fallback probes twice and per-worktree consumers probe again. Steward authorized focused research, not a criterion waiver."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -828,7 +838,7 @@
     "437907da": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "5dd13d62-baa7-4c92-b6ad-ae47b7b9eb8c",
+        "cargo-ci": "c23e078c-3240-4c3b-8fa2-ab1d3e361a44",
         "code-review": "12612785-0367-4000-b6e9-bd10587f82d9"
       },
       "reviewed_source": "47c808991067d7a7b83f3e0f7427dfe649e24fad",
@@ -841,7 +851,7 @@
       "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
       "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending.",
       "evidence_commit": "56fbb0c72",
-      "integration": "Refreshed against landed user-name primitive; both implementations and owning tests preserved; configured Cargo and independent review stable PASS. Main merge and merged Cargo remain pending."
+      "integration": "Main f4b981345 preserves reviewed listing additions and incoming HEAD byte-for-byte; focused composition check passed, merged Cargo stable PASS c23e078c. Prior independent review retained under explicit steward ruling."
     },
     "cc9f213e": {
       "verdict": "PASS",
@@ -941,13 +951,12 @@
     }
   },
   "source_queue": [
-    "frontend offload",
-    "df0eca",
-    "dc048377",
-    "437907da",
-    "frontend binding",
-    "dff997",
-    "readiness interleave"
+    "frontend binding9c3",
+    "df f997",
+    "frontend cd0",
+    "cc9f213e",
+    "frontend4858",
+    "ready interleave"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
