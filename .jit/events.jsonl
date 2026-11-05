@@ -24863,3 +24863,4 @@
 {"assignee":"agent:f4d9502a-lead","id":"2ee66e5b-e3af-4be1-9e96-230aef735480","issue_id":"c16c834c-f134-4af8-ab20-40c6a120e836","timestamp":"2026-11-04T23:59:18.233643240Z","type":"issue_claimed"}
 {"from":"ready","id":"bea45d35-8047-419f-90bd-7772bfe91aa0","issue_id":"ec9e812c-dea5-4c6c-be38-4cd5349d6225","timestamp":"2026-11-04T23:59:18.502818356Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:f4d9502a-lead","id":"157658f4-73df-460d-b7c7-af8b7f545470","issue_id":"ec9e812c-dea5-4c6c-be38-4cd5349d6225","timestamp":"2026-11-04T23:59:18.502818356Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"9b4bc74b-9dbb-4074-a744-36862f50d74e","issue_id":"0546fc82-435f-4d02-9af2-0dc22e301d60","timestamp":"2026-11-05T00:04:52.637579190Z","type":"gate_failed","updated_by":"auto:executor"}

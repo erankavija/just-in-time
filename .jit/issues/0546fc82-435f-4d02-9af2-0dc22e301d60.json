@@ -17,6 +17,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T23:14:07.954761437Z",
       "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "ecc372aa-db28-4f98-8fc7-69fec326b528",
+      "status": "failed",
+      "updated_at": "2026-11-05T00:04:52.637579190Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "0546fc82-435f-4d02-9af2-0dc22e301d60",
@@ -31,5 +37,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "State the CLI output contract once in the command reference",
-  "updated_at": "2026-11-04T23:14:07.954761437Z"
+  "updated_at": "2026-11-05T00:04:52.637579190Z"
 }
