@@ -1,5 +1,5 @@
 //! Closed wire vocabularies: enums whose variants each serialize as one fixed
-//! token, declared once through [`wire_vocabulary!`].
+//! token, declared once through `wire_vocabulary!`.
 
 /// A token outside a closed wire vocabulary.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

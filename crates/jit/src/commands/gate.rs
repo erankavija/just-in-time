@@ -916,7 +916,7 @@ impl<S: IssueStore> GateOps<'_, S> {
 
     /// Pass every required gate for an issue in declaration order, fail-fast.
     ///
-    /// Each gate is recorded via [`record_gate_pass`](Self::record_gate_pass), so
+    /// Each gate is recorded via `record_gate_pass`, so
     /// automated gates inherit its verdict reuse and manual gates record fresh
     /// evidence. The issue advances only after the last gate, so a re-evaluated
     /// gate that now fails cannot follow a completion. On the FIRST gate that does

@@ -246,7 +246,7 @@ impl ContributionOutcome {
 /// Compose resolved package claims by semantic identity.
 ///
 /// Only the packages being applied are parties, and
-/// [`drop_overridden_claims`] has already removed a definition a dependent
+/// `drop_overridden_claims` has already removed a definition a dependent
 /// overrides. Definitions that still differ decide one order-independent
 /// [`ContributionOutcome::Contested`] naming every package that declares one.
 pub fn compose_resolved_contributions(
@@ -604,7 +604,7 @@ impl ProfileTargetConflictsError {
 
 /// A profile package's contribution to a repository, in canonical repository-state
 /// vocabulary. Produced by `profile::package` from the immutable manifest and
-/// consumed only by [`compose_profile_targets_with_context`].
+/// consumed only by `compose_profile_targets_with_context`.
 #[derive(Clone)]
 pub struct ProfileClaims {
     /// Package that authored these claims.
