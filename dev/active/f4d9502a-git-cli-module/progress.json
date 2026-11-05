@@ -859,7 +859,8 @@
     "Steward-approved fb factual reconciliation: current worktree.rs255/303 accepts repository/layout and executes Git at data_root; no test-mode bypass or namedemptytests remain, gate.rs has3currentcalls. Preserve existing selectedrepositoryowner, allow/refuse semantics andliteralcase; do not restoreobsoletebypass. Actualexternalstoreauthority supplies missingbehavior forRED. Sameconsumer scope.",
     "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate.",
     "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision."
+    "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision.",
+    "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1326,13 +1327,13 @@
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 083bd832-a288-4fe6-a201-a243b31d72d6 on 9df9fe2fc2161580f28aaf9f1f499e24aca49ffd."
     },
     "9ecde705": {
-      "verdict": "FAIL",
-      "reviewed_source": "df106f2a10aec9b593d94b675a2d13466ff6d81c",
+      "verdict": "PASS",
+      "reviewed_source": "1ab12740c573c8d6e6cb8a043cd2cf65a60c7760",
       "gates": {
-        "cargo-ci": "5a7180dc-3924-4d23-b495-21a7ab7b86c2",
-        "code-review": "ce356156-738c-4af8-baf1-033a56ab4d6b"
+        "cargo-ci": "86c62420-2745-4f04-b9da-3068d5f85d77",
+        "code-review": "c85fcdaa-9f4f-4d4e-8e9f-f306f1906f3c"
       },
-      "criteria": "Lead uncovered REQ02 defect after stable PASS gates: Git2.39.5 and2.56 return Commit for gitlink whose target exists in superproject; Some(anytype) incorrectly counts it present. Rework1 explicitly accepts onlyBlob/Tree and extends existing owning gitlink fixture; no producer/footprint expansion. History composition e3ee25799 preserves exact methods and HTTP pool,40focusedPASS."
+      "criteria": "All4criteria met afterleadrework1: one selectedwrite_checkout batch; workingtree/pinned/HTTP behavior retained; onlyBlob/Tree count ascommittedassets; owninggitlink matrix coversmissing andavailabletarget, actualREDthenGREEN; oneprocess test. LeadF1availabletarget closed in03269c2d6, producer bytes unchanged, previous reviews preserved. No linked docs/deferrals/stale narrative. Historycomposition exactparentproof+40PASS. MandatorymergedCargo pending."
     },
     "92afc5d8": {
       "verdict": "PASS",
