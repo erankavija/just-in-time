@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "86c62420-2745-4f04-b9da-3068d5f85d77",
+      "status": "passed",
+      "updated_at": "2026-11-05T04:12:44.375333911Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c85fcdaa-9f4f-4d4e-8e9f-f306f1906f3c",
+      "status": "passed",
+      "updated_at": "2026-11-05T04:15:56.010737284Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9ecde705-8aa9-4ceb-a352-c08fc285af12",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Link checks test asset presence through one git process",
-  "updated_at": "2026-11-05T03:14:35.137139197Z"
+  "updated_at": "2026-11-05T04:15:56.010737284Z"
 }
