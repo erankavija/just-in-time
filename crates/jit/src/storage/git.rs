@@ -297,8 +297,6 @@ impl GitCheckout {
             .collect()
     }
 
-    // Temporary @/inv/convention-convergence exception: claim release's actor
-    // fallback still queries user.name directly until ea4b7363.
     /// Read the configured user name, if this checkout has one.
     ///
     /// # Errors
