@@ -1,10 +1,12 @@
 use anyhow::Result;
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use crate::domain::identity::IssueId;
-use crate::storage::git::{Git, GitCheckout, ProbedCheckout};
+use crate::storage::git::{Git, GitCheckout, GitError, ProbedCheckout};
 
 /// The checkout a command runs in when its data root lies outside every checkout
 /// and outside the worktree root.
@@ -26,11 +28,57 @@ impl From<ProbedCheckout> for RelocatedCheckout {
     }
 }
 
+#[derive(Debug, Default)]
+struct LayoutContext {
+    git: Git,
+    observations: Mutex<BTreeMap<PathBuf, Result<Option<ProbedCheckout>, GitError>>>,
+}
+
+impl LayoutContext {
+    fn probe(&self, path: &Path) -> Result<Option<ProbedCheckout>> {
+        // Hold only this context's lock across discovery; never acquire a repository
+        // or identity lock here. Publication must precede another clone's lookup.
+        let mut observations = self
+            .observations
+            .lock()
+            .map_err(|_| anyhow::anyhow!("layout observation lock poisoned"))?;
+        if let Some(observed) = observations.get(path) {
+            return observed.clone().map_err(Into::into);
+        }
+        let canonical = path.canonicalize().ok();
+        if let Some(observed) = canonical
+            .as_ref()
+            .and_then(|path| observations.get(path))
+            .cloned()
+        {
+            observations.insert(path.to_path_buf(), observed.clone());
+            return observed.map_err(Into::into);
+        }
+        let observed = self.git.probe(path);
+        let top_level = observed
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|checkout| checkout.worktree_root.clone());
+        let physical_top = top_level.as_ref().and_then(|path| path.canonicalize().ok());
+        std::iter::once(path.to_path_buf())
+            .chain(canonical)
+            .chain(top_level)
+            .chain(physical_top)
+            .for_each(|alias| {
+                observations
+                    .entry(alias)
+                    .or_insert_with(|| observed.clone());
+            });
+        observed.map_err(Into::into)
+    }
+}
+
 /// Paths for worktree-aware storage.
 ///
 /// Detects git worktree context and provides paths for both the data plane
 /// (`local_jit`) and the shared control plane (`shared_jit`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct WorktreePaths {
     /// Whether the selected data root belongs to a Git checkout.
     pub git_repository: bool,
@@ -47,9 +95,35 @@ pub struct WorktreePaths {
     /// The checkout holding the worktree root when the selected data root lies
     /// outside every checkout and outside the worktree root.
     pub relocated_worktree_checkout: Option<RelocatedCheckout>,
+    layout_context: Arc<LayoutContext>,
+}
+
+impl PartialEq for WorktreePaths {
+    fn eq(&self, other: &Self) -> bool {
+        self.git_repository == other.git_repository
+            && self.common_dir == other.common_dir
+            && self.worktree_root == other.worktree_root
+            && self.local_jit == other.local_jit
+            && self.shared_jit == other.shared_jit
+            && self.relocated_worktree_checkout == other.relocated_worktree_checkout
+    }
 }
 
 impl WorktreePaths {
+    /// Undiscovered paths never imply Git authority or claims coordination.
+    pub(crate) fn non_git(data_root: &Path, worktree_root: &Path) -> Self {
+        let common_dir = worktree_root.join(".git");
+        Self {
+            git_repository: false,
+            shared_jit: common_dir.join("jit"),
+            common_dir,
+            worktree_root: worktree_root.to_path_buf(),
+            local_jit: data_root.to_path_buf(),
+            relocated_worktree_checkout: None,
+            layout_context: Arc::default(),
+        }
+    }
+
     /// Detect worktree context using git commands.
     pub fn detect() -> Result<Self> {
         Self::detect_from(&env::current_dir()?)
@@ -86,10 +160,19 @@ impl WorktreePaths {
         non_git_root: &Path,
         selected_data_root: Option<&Path>,
     ) -> Result<Self> {
-        let Some(probed) = Git::default().probe(current)? else {
+        Self::detect_with_context(current, non_git_root, selected_data_root, Arc::default())
+    }
+
+    fn detect_with_context(
+        current: &Path,
+        non_git_root: &Path,
+        selected_data_root: Option<&Path>,
+        layout_context: Arc<LayoutContext>,
+    ) -> Result<Self> {
+        let Some(probed) = layout_context.probe(current)? else {
             let worktree_checkout = selected_data_root
                 .filter(|data_root| !data_root.starts_with(non_git_root))
-                .map(|_| Git::default().probe(non_git_root))
+                .map(|_| layout_context.probe(non_git_root))
                 .transpose()?
                 .flatten();
             let worktree_root = non_git_root.to_path_buf();
@@ -98,6 +181,7 @@ impl WorktreePaths {
                 None => (worktree_root.join(".git"), None),
             };
             return Ok(Self {
+                layout_context,
                 relocated_worktree_checkout,
                 git_repository: false,
                 shared_jit: common_dir.join("jit"),
@@ -120,6 +204,7 @@ impl WorktreePaths {
         let shared_jit = common_dir.join("jit");
 
         Ok(Self {
+            layout_context,
             git_repository: true,
             common_dir,
             worktree_root,
@@ -204,12 +289,13 @@ impl WorktreePaths {
     pub fn for_worktree_root(&self, worktree_root: PathBuf) -> Result<Option<Self>> {
         let (local_jit, relocated_worktree_checkout) = match self.relocated_worktree_checkout {
             None => (worktree_root.join(".jit"), None),
-            Some(_) => match Git::default().probe(&worktree_root)? {
+            Some(_) => match self.layout_context.probe(&worktree_root)? {
                 Some(checkout) => (self.local_jit.clone(), Some(checkout.into())),
                 None => return Ok(None),
             },
         };
         Ok(Some(Self {
+            layout_context: Arc::clone(&self.layout_context),
             git_repository: self.git_repository,
             common_dir: self.common_dir.clone(),
             relocated_worktree_checkout,
@@ -329,6 +415,226 @@ fn existing_directory_for(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    fn counted_external_paths(
+        store: &Path,
+        selected: &Path,
+        stand_in: &crate::test_harness::git::GitStandIn,
+    ) -> WorktreePaths {
+        WorktreePaths::detect_with_context(
+            &existing_directory_for(store),
+            selected,
+            Some(store),
+            Arc::new(LayoutContext {
+                git: Git::with_program(stand_in.program()),
+                ..LayoutContext::default()
+            }),
+        )
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_layout_context_reuses_exact_physical_and_git_reported_top_level_aliases() {
+        use crate::test_harness::git::GitStandIn;
+        let dir = tempfile::tempdir().unwrap();
+        let (repository, _, store) = external_store_layout(dir.path());
+        let subdirectory = repository.root().join("sub");
+        std::fs::create_dir(&subdirectory).unwrap();
+        let alias = dir.path().join("alias");
+        std::os::unix::fs::symlink(repository.root(), &alias).unwrap();
+        let stand_in = GitStandIn::new();
+        let paths = counted_external_paths(&store, &subdirectory, &stand_in);
+
+        for candidate in [subdirectory.as_path(), repository.root(), alias.as_path()] {
+            let projected = paths
+                .for_worktree_root(candidate.to_path_buf())
+                .unwrap()
+                .unwrap();
+            assert_eq!(projected.checkout_top_level(), repository.root());
+        }
+        // An exact alias retains its first observation even if it is retargeted.
+        std::fs::remove_file(&alias).unwrap();
+        std::os::unix::fs::symlink(dir.path(), &alias).unwrap();
+        assert!(paths.for_worktree_root(alias).unwrap().is_some());
+        assert_eq!(
+            stand_in.invocations().len(),
+            2,
+            "{:?}",
+            stand_in.invocations()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_layout_context_does_not_alias_nested_checkouts_or_git_administrative_directories() {
+        use crate::test_harness::git::{GitRepository, GitStandIn};
+        let dir = tempfile::tempdir().unwrap();
+        let (repository, linked, store) = external_store_layout(dir.path());
+        let nested = GitRepository::init(repository.root().join("nested"));
+        let stand_in = GitStandIn::new();
+        let paths = counted_external_paths(&store, repository.root(), &stand_in);
+        let nested_paths = paths
+            .for_worktree_root(nested.root().to_path_buf())
+            .unwrap()
+            .unwrap();
+        assert_eq!(nested_paths.checkout_top_level(), nested.root());
+        let sibling = paths.for_worktree_root(linked).unwrap().unwrap();
+
+        for administrative in [
+            paths.common_dir.as_path(),
+            sibling.checkout_git_dir().unwrap(),
+        ] {
+            assert_eq!(
+                paths
+                    .for_worktree_root(administrative.to_path_buf())
+                    .unwrap(),
+                None
+            );
+        }
+        assert_eq!(
+            stand_in.invocations().len(),
+            6,
+            "{:?}",
+            stand_in.invocations()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_layout_context_negative_observation_does_not_classify_descendants() {
+        use crate::test_harness::git::{GitRepository, GitStandIn};
+        let dir = tempfile::tempdir().unwrap();
+        let stand_in = GitStandIn::new();
+        let context = LayoutContext {
+            git: Git::with_program(stand_in.program()),
+            ..LayoutContext::default()
+        };
+        assert_eq!(context.probe(dir.path()).unwrap(), None);
+        let nested = GitRepository::init(dir.path().join("nested"));
+        assert_eq!(
+            context.probe(nested.root()).unwrap().unwrap().worktree_root,
+            nested.root()
+        );
+        assert_eq!(context.probe(dir.path()).unwrap(), None);
+        assert_eq!(stand_in.invocations().len(), 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_layout_context_reuses_typed_errors_through_canonical_aliases() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("bad-git");
+        crate::test_utils::write_executable(
+            &program,
+            "#!/bin/sh\nprintf x >> \"$0.calls\"\nprintf 'malformed\\n'\n",
+        )
+        .unwrap();
+        let alias = dir.path().join("alias");
+        std::os::unix::fs::symlink(dir.path(), &alias).unwrap();
+        let context = LayoutContext {
+            git: Git::with_program(&program),
+            ..LayoutContext::default()
+        };
+
+        for path in [dir.path(), alias.as_path(), dir.path()] {
+            let error = context.probe(path).unwrap_err();
+            assert!(matches!(
+                error.downcast_ref::<GitError>(),
+                Some(GitError::UnexpectedOutput { .. })
+            ));
+        }
+        assert_eq!(
+            std::fs::read(program.with_extension("calls")).unwrap(),
+            b"x"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_layout_context_keeps_an_unavailable_executable_observation() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("unavailable-git");
+        let context = LayoutContext {
+            git: Git::with_program(&program),
+            ..LayoutContext::default()
+        };
+        assert_eq!(context.probe(dir.path()).unwrap(), None);
+        crate::test_utils::write_executable(
+            &program,
+            "#!/bin/sh\nprintf x >> \"$0.calls\"\nexit 1\n",
+        )
+        .unwrap();
+
+        assert_eq!(context.probe(dir.path()).unwrap(), None);
+        assert!(!program.with_extension("calls").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_layout_context_concurrent_clones_publish_one_sibling_observation() {
+        use crate::test_harness::git::GitStandIn;
+        let dir = tempfile::tempdir().unwrap();
+        let (repository, linked, store) = external_store_layout(dir.path());
+        let stand_in = GitStandIn::new();
+        let paths = counted_external_paths(&store, repository.root(), &stand_in);
+        let barrier = std::sync::Barrier::new(8);
+        let projected = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|_| {
+                    let paths = paths.clone();
+                    let linked = linked.clone();
+                    let barrier = &barrier;
+                    scope.spawn(move || {
+                        barrier.wait();
+                        paths.for_worktree_root(linked).unwrap().unwrap()
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|thread| thread.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+
+        assert!(projected.windows(2).all(|pair| pair[0] == pair[1]));
+        assert!(projected[0]
+            .for_worktree_root(repository.root().to_path_buf())
+            .unwrap()
+            .is_some());
+        assert_eq!(
+            stand_in.invocations().len(),
+            3,
+            "{:?}",
+            stand_in.invocations()
+        );
+    }
+
+    #[test]
+    fn test_layout_context_clone_reuses_observed_sibling_after_it_disappears() {
+        let dir = tempfile::tempdir().unwrap();
+        let (repository, linked, store) = external_store_layout(dir.path());
+        let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+        let projected = paths.for_worktree_root(linked.clone()).unwrap();
+        std::fs::remove_dir_all(&linked).unwrap();
+
+        assert_eq!(paths.clone().for_worktree_root(linked).unwrap(), projected);
+    }
+
+    #[test]
+    fn test_layout_context_keeps_missing_sibling_absent_until_a_new_invocation() {
+        let dir = tempfile::tempdir().unwrap();
+        let (repository, _, store) = external_store_layout(dir.path());
+        let missing = repository.root().join("missing");
+        let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+        assert_eq!(paths.for_worktree_root(missing.clone()).unwrap(), None);
+        std::fs::create_dir(&missing).unwrap();
+
+        assert_eq!(paths.for_worktree_root(missing.clone()).unwrap(), None);
+        let fresh = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+        assert!(fresh.for_worktree_root(missing).unwrap().is_some());
+    }
 
     #[test]
     fn test_detect_in_non_git_directory() {
