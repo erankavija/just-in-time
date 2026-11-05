@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 8,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -741,7 +741,7 @@
           "short_id": "f9977efd",
           "title": "Enforce a main.rs production-line ceiling in the budget script",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "key": "cli-contract-docs",
@@ -749,7 +749,7 @@
           "short_id": "0546fc82",
           "title": "State the CLI output contract once in the command reference",
           "classification": "documentation",
-          "status": "backlog"
+          "status": "done"
         },
         {
           "key": "error-boundary",
@@ -757,7 +757,7 @@
           "short_id": "fe3ad1b0",
           "title": "One library error boundary for the CLI and the server",
           "classification": "story",
-          "status": "ready"
+          "status": "done"
         },
         {
           "key": "executor-surface",
@@ -781,7 +781,7 @@
           "short_id": "755964b2",
           "title": "Rust API links name the owners after facade extraction",
           "classification": "documentation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -802,7 +802,7 @@
           "short_id": "46fe7593",
           "title": "One stated output and schema contract for the CLI",
           "classification": "story",
-          "status": "backlog"
+          "status": "in_progress"
         }
       ]
     },
@@ -1853,8 +1853,10 @@
       "status": "done"
     },
     "fe3ad1b0": {
-      "status": "in_progress",
-      "note": "Final formalPASS8b915471f; Cargo f14a2f36/review6c6439db stablePASS. Queued afterGit ec9."
+      "status": "done",
+      "note": "All six literal criteria and cumulative findings passed formal review. Actual merged Cargo b59bcca8 and configured review6c6439db stablePASS; narrative repair e08e28738.",
+      "merge": "33e7e2d93",
+      "production_delta": 0
     },
     "ab168296": {
       "status": "done",
@@ -2001,7 +2003,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "0546/755/f997 Done; fe3 ready afterGit ec9;46claimed forfinalacceptance. Timing/trialheld.",
+    "status": "All independent implementation leaves and error-boundary story Done. Output/schema story final review running; timing chain intentionally held.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -2010,8 +2012,7 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "fe3 ready afterGit ec9",
-      "46 finalconfiguredacceptance"
+      "46 final configured review and formal acceptance"
     ],
     "parallelism": "Pinned isolated reviews completed concurrently; read-only Rustdoc criterion audit runs while ready source merges interleave across leads. Full merged Cargo checks remain serial; cheap checks and AI reviews hold no Cargo locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
@@ -2163,6 +2164,10 @@
           "before": 74053,
           "after": 74054,
           "delta": 1
+        },
+        {
+          "merge": "33e7e2d93",
+          "delta": 0
         }
       ],
       "current_epic_delta": 184,
@@ -2230,7 +2235,11 @@
       "cargo": "f14a2f36-a00e-4150-b4a4-b380f065656c",
       "review": "6c6439db-00f5-4742-b4f5-642efdba5422",
       "records": "8b915471f",
-      "production_delta": 0
+      "production_delta": 0,
+      "status": "done",
+      "merge": "33e7e2d93",
+      "merged_cargo": "b59bcca8-153a-407f-ac20-5e40113ae9dd",
+      "formal_review": "PASS all six tiers, complete cumulative findings and pitfall audit"
     },
     "0546fc82": {
       "status": "done",
@@ -2244,6 +2253,13 @@
       "artifact": "/tmp/jit-df129d9e-session14/46fe7593-final-preflight.md",
       "N1": "closed b4d26070a/49c2582ea canonical generator/citation",
       "N2": "closed b4d26070a/49c2582ea all3examples+graphsummary;9completeexamples coherent"
+    },
+    "46fe7593": {
+      "status": "in_progress",
+      "cargo": "8b15acf2-8cfd-433a-9958-982c484cf6f4",
+      "cargo_origin": "executed stablePASS",
+      "review": "running in isolated worktree at5a61c8226",
+      "production_delta": 0
     }
   }
 }
