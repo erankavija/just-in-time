@@ -240,7 +240,10 @@ fn test_workflow_task_release_and_reassignment() {
 
     // Release with reason
     let output = cli
-        .command(["issue", "release", &id, "timeout"])
+        .command_with_env(
+            ["issue", "release", &id, "timeout"],
+            [("JIT_AGENT_ID", "agent:worker-1")],
+        )
         .output()
         .unwrap();
     assert!(output.status.success());

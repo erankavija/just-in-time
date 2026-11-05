@@ -301,9 +301,10 @@
           "short_id": "ea4b7363",
           "title": "Release actor reads git user.name through the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "repository_wide_release_fixture_rework"
+          "worker_status": "merged_and_gated",
+          "source_merge": "8c91ded5f97f036e29ccf0bb8dfa76baf0b1611d"
         }
       ]
     },
@@ -324,8 +325,10 @@
           "short_id": "47d62472",
           "title": "Branch drift validation compares in the selected worktree",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared",
+          "worker": "agent:f4d9502a-lead"
         },
         {
           "id": "83c8632f-5495-4fef-a774-730ebeae95be",
@@ -341,8 +344,10 @@
           "short_id": "92afc5d8",
           "title": "Init reads git classification from the invocation's layout",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared",
+          "worker": "agent:f4d9502a-lead"
         },
         {
           "id": "9ecde705-8aa9-4ceb-a352-c08fc285af12",
@@ -831,7 +836,9 @@
     "dcf actual mergedCargo4b78c2a9 PASS, Done/released1893a4bf6. d5 fullCargo188acbdf/review5ce878f8 stable PASS, exact two-file preservation, next ready source. Steward approved83REQ03 factual reconciliation: removed test_executor replaced by current shared nonGit fixture followed by Git init; bind existing executor to detected paths after init, all history/diff assertions unchanged. Active criterion/manifest updated. Steward approved EA exact3 extra CLI fixture files (6 total); actual failure48bdc215 preserved8dda31d66, rework2 broader invocation audit/non-fail-fast tests. No production fallback or weakened actor contract.",
     "d5cae9e3 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "d5 actual mergedCargo172143f1 stable PASS, Done/released3181d2865. a273 corrected fullCargo passed, independent review running. Ready9ecde705 claimed/prepared for next available worker slot, exact document asset-presence function/tests independent of83 history functions; preserve landed7516 timed HTTP probe pool per recorded second-lander ruling. Source boundary remains unreserved while632 is unready.",
-    "Steward approved EA seventh file only obsolete two-line Git comment; approved 9ec shared exact submodule-status parsing and owning test (four-file footprint). 83 second-parent merge regression and 3f actual old-code RED rework each counted once. Do not cancel queued checks; collect before edits. b067 frontend received idle source slot before EA."
+    "Steward approved EA seventh file only obsolete two-line Git comment; approved 9ec shared exact submodule-status parsing and owning test (four-file footprint). 83 second-parent merge regression and 3f actual old-code RED rework each counted once. Do not cancel queued checks; collect before edits. b067 frontend received idle source slot before EA.",
+    "ea4b7363 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Dependency-ready 47d62472 branch drift and92afc5d8 init classification claimed after EA closure; isolated Sol-high workers next. Initial issue-claim --ttl syntax rejected without mutation; separate claim acquire owns TTL."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1262,10 +1269,11 @@
       "verdict": "PASS",
       "reviewed_source": "668ad13553bac72db224a6fb5a225c13447e6ce1",
       "gates": {
-        "cargo-ci": "38d0796c-dc72-4d2e-9470-f9affe52fef0",
+        "cargo-ci": "054a73f3-a91a-480e-9d3f-600c85db7241",
         "code-review": "58231415-f1e4-4a0c-9a39-7509fe8047c9"
       },
-      "criteria": "REQ-01 uses supplied write_checkout user_name with absent checkout treated as unset; no direct Git spawn. REQ-02 claim unit tests unchanged. Full CLI release fixture audit supplies explicit child actors only. No linked design docs/deferred work. F1 obsolete comment removed in d540c35e8 with exact-byte proof; approved comment-only cleanup needs no fresh branch gate. Reviewed five files and publish_captured_release preserved through D25 refresh; mandatory merged Cargo pending."
+      "criteria": "REQ-01 uses supplied write_checkout user_name with absent checkout treated as unset; no direct Git spawn. REQ-02 claim unit tests unchanged. Full CLI release fixture audit supplies explicit child actors only. No linked design docs/deferred work. F1 obsolete comment removed in d540c35e8 with exact-byte proof; approved comment-only cleanup needs no fresh branch gate. Reviewed five files and publish_captured_release preserved through D25 refresh; mandatory merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 054a73f3-a91a-480e-9d3f-600c85db7241 on 8c91ded5f97f036e29ccf0bb8dfa76baf0b1611d."
     },
     "83c8632f": {
       "verdict": "PASS",
@@ -1287,11 +1295,10 @@
     }
   },
   "source_queue": [
-    "ea4b7363 ready after frontend b067",
-    "83c8632f reviewed",
-    "3f8da8c4 branch gates running",
-    "9ecde705 branch gates next",
-    "a273667c isolated proposal awaiting user decision"
+    "83c8632f ready",
+    "3f8da8c4 review running",
+    "9ecde705 branch gates running",
+    "a273667c proposal only awaiting user decision"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",

@@ -134,9 +134,15 @@ fn test_issue_release_supports_json() {
     cli.run(["issue", "claim", &id, "agent:test"]).unwrap();
 
     // Release with JSON
-    let json = cli
-        .run_json(["issue", "release", &id, "Test"])
-        .expect("Should return JSON");
+    let output = cli
+        .command_with_env(
+            ["issue", "release", &id, "Test", "--json"],
+            [("JIT_AGENT_ID", "agent:test")],
+        )
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let json: Value = serde_json::from_slice(&output.stdout).expect("Should return JSON");
 
     assert_eq!(json["id"].as_str().unwrap(), id);
     assert!(json["assignee"].is_null(), "Assignee should be cleared");
