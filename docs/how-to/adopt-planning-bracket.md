@@ -26,9 +26,8 @@ exact blocks to lift:
   no baked-in altitude).
 
 > The files under `docs/examples/` are EXAMPLES, not active on this repository.
-> A template carries neither the gates it names nor the rules those gates
-> evaluate ([Graph Template Registry](../reference/storage-format.md#graph-template-registry)),
-> so copy an example as a set: its `config.toml` to
+> Copy an example as a set
+> ([why](../reference/storage-format.md#graph-template-registry)): its `config.toml` to
 > `.jit/config.toml`, its `rules.toml` to `.jit/rules.toml`, its
 > `templates.toml` to `.jit/templates.toml`, and its `schemas/` directory to
 > `.jit/schemas/`. Neither example carries a `gates.toml`; the three gate
