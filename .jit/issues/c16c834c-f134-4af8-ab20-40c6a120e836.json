@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-04T23:59:18.233643240Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "satisfies:f4d9502a/REQ-11"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Storage pinned inspection runs on a module checkout",
-  "updated_at": "2026-11-04T23:35:23.054710125Z"
+  "updated_at": "2026-11-04T23:59:18.233643240Z"
 }
