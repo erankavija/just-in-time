@@ -16,7 +16,7 @@
 //!
 //! Node types, gates, doc locations, descriptions, and labels all come from the
 //! template. The only interpretation this module applies is the fixed `{token}`
-//! substitution of [`InterpolationContext`], whose `{container.dir}` value is
+//! substitution of `InterpolationContext`, whose `{container.dir}` value is
 //! the domain resolver's own answer
 //! ([`resolve_artifact_directory`](crate::domain::artifact_directory::resolve_artifact_directory))
 //! for the area the node declares.
@@ -112,7 +112,7 @@ pub struct TemplateDelta {
 /// `documentation` and `hierarchy` are the repository declarations the
 /// `{container.dir}` field is resolved against: a node declaring a
 /// [`doc_area`](crate::templates::TemplateNode::doc_area) resolves that area
-/// through [`resolve_artifact_directory`], so the directory the container owns
+/// through [`crate::domain::artifact_directory::resolve_artifact_directory`], so the directory the container owns
 /// is composed in one place.
 ///
 /// # Errors

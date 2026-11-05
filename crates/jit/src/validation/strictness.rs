@@ -1,7 +1,7 @@
 //! Global validation strictness: the enforcement modulator layered on top of
 //! each rule's per-rule `enforce` flag and `severity`.
 //!
-//! A rule already carries a [`Severity`](crate::declarations::rules::Severity) and
+//! A rule already carries a [`Severity`] and
 //! an `enforce` flag; together they decide, per rule, whether a violation blocks
 //! a write or transition (only an `enforce = true` / `error` finding blocks). The
 //! repository-wide `[validation].strictness` key ([`Strictness`]) modulates that
