@@ -36,7 +36,7 @@
 
 use crate::domain::identity::IssueId;
 use crate::domain::LabelNamespaces;
-use crate::labels::is_type_label;
+use crate::labels::type_value_of;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -183,15 +183,6 @@ impl HierarchyConfig {
     }
 }
 
-/// Extracts the type value from a label with format "type:value".
-///
-/// Returns the normalized type name (lowercase, trimmed), or `None` for a non-type or empty label.
-pub fn extract_type(label: &str) -> Option<String> {
-    crate::labels::type_value_of(label)
-        .map(|v| v.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-}
-
 /// Calculates the Levenshtein distance between two strings.
 ///
 /// Used for finding the closest matching type when an unknown type is encountered.
@@ -285,18 +276,17 @@ pub fn detect_validation_issues(
     let mut issues = Vec::new();
 
     // Check if issue has a type label
-    let type_label = labels.iter().find(|l| is_type_label(l));
-
     // An invalid type label format is caught by label validation.
     // Type hierarchy is orthogonal to the dependency DAG, so dependencies are not checked here.
-    if let Some(type_name) = type_label
-        .and_then(|l| extract_type(l))
-        .filter(|t| !config.contains_type(t))
+    if let Some(type_name) = labels
+        .iter()
+        .find_map(|label| type_value_of(label))
+        .filter(|type_name| !config.contains_type(type_name))
     {
         issues.push(ValidationIssue::UnknownType {
             issue_id: issue_id.clone(),
-            suggested_fix: suggest_type_fix(config, &type_name),
-            unknown_type: type_name,
+            suggested_fix: suggest_type_fix(config, type_name),
+            unknown_type: type_name.to_string(),
         });
     }
 
@@ -323,17 +313,13 @@ pub fn validate_strategic_labels(
     let mut warnings = Vec::new();
 
     // Find type label
-    let type_label = issue.labels.iter().find(|l| is_type_label(l));
-    let type_name = match type_label {
-        Some(label) => match extract_type(label) {
-            Some(t) => t,
-            None => return warnings, // Invalid type label, handled by other validation
-        },
+    let type_name = match issue.labels.iter().find_map(|label| type_value_of(label)) {
+        Some(type_name) => type_name,
         None => return warnings, // No type label, handled by other validation
     };
 
     // Check if this type has a membership namespace (strategic types do)
-    if let Some(expected_namespace) = config.get_membership_namespace(&type_name) {
+    if let Some(expected_namespace) = config.get_membership_namespace(type_name) {
         // Check if issue has a label in that namespace
         let has_label = issue
             .labels
@@ -343,7 +329,7 @@ pub fn validate_strategic_labels(
         if !has_label {
             warnings.push(ValidationWarning::MissingStrategicLabel {
                 issue_id: issue.id.clone(),
-                type_name: type_name.clone(),
+                type_name: type_name.to_string(),
                 expected_namespace: expected_namespace.to_string(),
             });
         }
@@ -372,17 +358,13 @@ pub fn validate_orphans(
     let mut warnings = Vec::new();
 
     // Find type label
-    let type_label = issue.labels.iter().find(|l| is_type_label(l));
-    let type_name = match type_label {
-        Some(label) => match extract_type(label) {
-            Some(t) => t,
-            None => return warnings, // Invalid type label, handled by other validation
-        },
+    let type_name = match issue.labels.iter().find_map(|label| type_value_of(label)) {
+        Some(type_name) => type_name,
         None => return warnings, // No type label, handled by other validation
     };
 
     // Check if this is a leaf-level type
-    let type_level = match config.get_level(&type_name) {
+    let type_level = match config.get_level(type_name) {
         Some(level) => level,
         None => return warnings, // Unknown type, handled by other validation
     };
@@ -404,7 +386,7 @@ pub fn validate_orphans(
     if !has_parent_label {
         warnings.push(ValidationWarning::OrphanedLeaf {
             issue_id: issue.id.clone(),
-            type_name: type_name.clone(),
+            type_name: type_name.to_string(),
         });
     }
 
@@ -492,33 +474,6 @@ mod tests {
             HierarchyConfig::from_declarations(&declarations),
             Err(ConfigError::InvalidLevel(0))
         );
-    }
-
-    #[test]
-    fn test_extract_type_valid() {
-        let action = test_type(4);
-        let initiative = test_type(2);
-        assert_eq!(
-            extract_type(&format!("type:{action}")),
-            Some(action.clone())
-        );
-        assert_eq!(
-            extract_type(&format!("type:{initiative}")),
-            Some(initiative)
-        );
-        assert_eq!(extract_type("type:Action"), Some(action)); // normalized to lowercase
-    }
-
-    #[test]
-    fn test_extract_type_invalid_format() {
-        assert_eq!(extract_type(&format!("{}:v1.0", test_type(1))), None);
-
-        assert_eq!(extract_type("type"), None);
-
-        assert_eq!(extract_type("type:"), None);
-
-        // Spaces are not valid in label values per the label format regex.
-        assert_eq!(extract_type("type:  TASK  "), None);
     }
 
     #[test]
@@ -622,6 +577,22 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_validation_issues_preserves_unknown_type_value() {
+        let config =
+            HierarchyConfig::new(HashMap::from([("epic".to_string(), 1)]), HashMap::new()).unwrap();
+        let issue_id = crate::test_utils::issue_id(68);
+
+        assert_eq!(
+            detect_validation_issues(&config, &issue_id, &["type:Epic".to_string()]),
+            vec![ValidationIssue::UnknownType {
+                issue_id,
+                unknown_type: "Epic".to_string(),
+                suggested_fix: Some("epic".to_string()),
+            }]
+        );
+    }
+
+    #[test]
     fn test_detect_no_issues_for_valid_type() {
         use super::detect_validation_issues;
 
@@ -700,47 +671,5 @@ mod tests {
 
         let fixes = generate_fixes(&issues);
         assert!(fixes.is_empty()); // No fix generated without suggestion
-    }
-}
-
-#[cfg(test)]
-mod proptests {
-    use super::*;
-    use proptest::prelude::*;
-
-    // Strategy to generate valid type names
-    fn type_name() -> impl Strategy<Value = String> {
-        prop::string::string_regex("[a-z][a-z0-9]{0,15}").unwrap()
-    }
-
-    proptest! {
-
-        /// Property: Extract type is stable and normalized
-        #[test]
-        fn prop_extract_type_normalization(name in type_name()) {
-            let label = format!("type:{}", name);
-            let extracted = extract_type(&label).unwrap();
-
-            // Should be lowercase and trimmed
-            let normalized = name.trim().to_lowercase();
-            prop_assert_eq!(&extracted, &normalized);
-
-            // Should be idempotent
-            let label2 = format!("type:{}", extracted);
-            let extracted2 = extract_type(&label2).unwrap();
-            prop_assert_eq!(extracted2, normalized);
-        }
-
-        /// Property: Invalid labels always rejected
-        #[test]
-        fn prop_invalid_labels_rejected(
-            namespace in prop::string::string_regex("[a-z]{1,10}").unwrap(),
-            value in prop::string::string_regex("[a-z]{1,10}").unwrap()
-        ) {
-            prop_assume!(namespace != "type"); // Must not be "type"
-
-            let label = format!("{}:{}", namespace, value);
-            prop_assert!(extract_type(&label).is_none());
-        }
     }
 }
