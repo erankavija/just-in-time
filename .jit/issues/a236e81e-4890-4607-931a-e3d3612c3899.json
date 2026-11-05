@@ -8,6 +8,7 @@
   ],
   "description": "Repository layout binding enforces the storage root while server startup uses the shared repository constructor.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage binding rejects a mismatched root and server startup consumes the shared constructor.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T02:11:08.421679524Z",
   "gates_required": [
     "repo-validate",
     "code-review"
@@ -21,7 +22,7 @@
     "satisfies:0f8efc37/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Repository foundations",
-  "updated_at": "2026-11-04T22:25:09.314180990Z"
+  "updated_at": "2026-11-05T02:11:08.421679524Z"
 }
