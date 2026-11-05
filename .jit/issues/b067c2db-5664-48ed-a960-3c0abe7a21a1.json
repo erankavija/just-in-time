@@ -13,7 +13,14 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "npm-ci": {
+      "run_id": "3219bd5a-bd1c-4835-ac3a-0b803a063816",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:26:35.425197099Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b067c2db-5664-48ed-a960-3c0abe7a21a1",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Use server search results in browser",
-  "updated_at": "2026-11-05T03:17:09.927795628Z"
+  "updated_at": "2026-11-05T03:26:35.425197099Z"
 }

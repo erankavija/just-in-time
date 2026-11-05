@@ -25213,3 +25213,4 @@
 {"from":"ready","id":"10b2ad7b-2ecc-4f61-8845-3a9e64e3ff89","issue_id":"9ecde705-8aa9-4ceb-a352-c08fc285af12","timestamp":"2026-11-05T03:14:35.137139197Z","to":"in_progress","type":"issue_state_changed"}
 {"from":"ready","id":"2a5698a1-0abc-492d-9936-d14f867e58ac","issue_id":"b067c2db-5664-48ed-a960-3c0abe7a21a1","timestamp":"2026-11-05T03:17:09.927795628Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"e5d0c749-6f7e-48bb-8a76-63cbbff9101a","issue_id":"b067c2db-5664-48ed-a960-3c0abe7a21a1","timestamp":"2026-11-05T03:17:09.927795628Z","type":"issue_claimed"}
+{"gate_key":"npm-ci","id":"ba92ac1b-e334-4f94-8ecf-bd765ee69023","issue_id":"b067c2db-5664-48ed-a960-3c0abe7a21a1","timestamp":"2026-11-05T03:26:35.425197099Z","type":"gate_passed","updated_by":"auto:executor"}
