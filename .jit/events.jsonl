@@ -24794,6 +24794,7 @@
 {"gate_key":"cargo-ci","id":"65dd7364-b2cc-4e58-87e5-c2b2717d3699","issue_id":"7297f922-d3fd-4118-b533-c9d0b7638bc1","timestamp":"2026-11-04T23:10:47.831609625Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"84d1a61d-66f7-487c-99b3-e8f52de25ca6","issue_id":"7297f922-d3fd-4118-b533-c9d0b7638bc1","timestamp":"2026-11-04T23:11:21.423985674Z","to":"done","type":"issue_state_changed"}
 {"id":"07ff1204-f073-470c-8c29-89ef82688e23","issue_id":"7297f922-d3fd-4118-b533-c9d0b7638bc1","timestamp":"2026-11-04T23:11:21.423985674Z","type":"issue_completed"}
+{"gate_key":"code-review","id":"3f5d1845-bebf-4149-98b3-e9ba49cb3d83","issue_id":"0eca332a-76ac-4ae8-951b-043f1d5c3dd7","timestamp":"2026-11-04T23:16:32.066055236Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"bf403ae5-ebf2-464d-8307-e7192c1e617d","issue_id":"46a89061-8383-42e0-b20a-a92406f33fcb","timestamp":"2026-11-04T23:16:56.359875058Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"63da6d40-10a6-4f8a-b7b5-db7473ee1b3e","issue_id":"46a89061-8383-42e0-b20a-a92406f33fcb","timestamp":"2026-11-04T23:21:07.686674480Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"1f0aee7d-0fa4-4d6e-b591-9d0d87de9f2c","issue_id":"abf68973-3771-47cb-89d0-708290cb00ac","timestamp":"2026-11-04T23:13:43.102640247Z","to":"in_progress","type":"issue_state_changed"}
@@ -24875,6 +24876,9 @@
 {"assignee":"agent:f4d9502a-lead","id":"2ee66e5b-e3af-4be1-9e96-230aef735480","issue_id":"c16c834c-f134-4af8-ab20-40c6a120e836","timestamp":"2026-11-04T23:59:18.233643240Z","type":"issue_claimed"}
 {"from":"ready","id":"bea45d35-8047-419f-90bd-7772bfe91aa0","issue_id":"ec9e812c-dea5-4c6c-be38-4cd5349d6225","timestamp":"2026-11-04T23:59:18.502818356Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:f4d9502a-lead","id":"157658f4-73df-460d-b7c7-af8b7f545470","issue_id":"ec9e812c-dea5-4c6c-be38-4cd5349d6225","timestamp":"2026-11-04T23:59:18.502818356Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"4617284a-e3fd-4ecb-b892-33eb6b76dad2","issue_id":"0eca332a-76ac-4ae8-951b-043f1d5c3dd7","timestamp":"2026-11-05T00:04:50.350384714Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"956dc902-daf0-463a-8adb-b2beb2f73b33","issue_id":"0eca332a-76ac-4ae8-951b-043f1d5c3dd7","timestamp":"2026-11-05T00:08:38.194930340Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"5027f478-f2e8-4c13-b4ba-f284895b4a49","issue_id":"0eca332a-76ac-4ae8-951b-043f1d5c3dd7","timestamp":"2026-11-05T00:13:51.316635415Z","type":"gate_passed","updated_by":"auto:executor"}
 {"id":"55c888b9-5f28-4d78-9c55-c5b64c2a96ac","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","priority":"high","timestamp":"2026-11-05T00:01:26.294242287Z","title":"Declare the reviewed web build installer policy","type":"issue_created"}
 {"fields":["dependencies"],"id":"b4cae132-7e33-4873-97cb-1e5d57069351","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","timestamp":"2026-11-05T00:01:34.319904301Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"00a59db4-5d6d-440b-8f14-26bb85f20727","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-05T00:01:34.702986595Z","type":"issue_updated","updated_by":"dependency-add"}
