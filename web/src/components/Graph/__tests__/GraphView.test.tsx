@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { useEventStream } from '../../../hooks/useEventStream';
 import { act, render, waitFor } from '@testing-library/react';
@@ -107,6 +107,8 @@ vi.mock('../../../api/client', () => ({
 }));
 
 describe('GraphView', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   beforeEach(() => {
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
