@@ -13,7 +13,14 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "npm-ci": {
+      "run_id": "55bd2f91-88dc-4b1a-8edb-935f5b0c596c",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:29:18.033211553Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reload browser hierarchy on configuration events",
-  "updated_at": "2026-11-05T00:25:39.357566187Z"
+  "updated_at": "2026-11-05T00:29:18.033211553Z"
 }
