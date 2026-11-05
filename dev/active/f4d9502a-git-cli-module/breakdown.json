@@ -2149,7 +2149,7 @@
    "terminal": {
     "consumer_family": "snapshot repository facts",
     "test_boundary": "snapshot unit tests",
-    "worker_sized_reason": "Snapshot source and metadata queries use shared primitives; remove only the fulfilled two-line HEAD convergence comment once all named consumers converge.",
+    "worker_sized_reason": "Snapshot source and metadata queries use shared primitives; remove only fulfilled HEAD and origin convergence comments once all named consumers converge.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/snapshot.rs",

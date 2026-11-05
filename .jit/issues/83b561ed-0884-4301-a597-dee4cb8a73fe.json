@@ -22,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "npm-ci": {
-      "run_id": "88f99c6f-ecf1-4df0-9a87-b42c11268fd4",
+      "run_id": "ae213382-a4f2-401f-b9d4-18ddcb977412",
       "status": "passed",
-      "updated_at": "2026-11-05T03:53:39.919825495Z",
+      "updated_at": "2026-11-05T03:58:19.965686714Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Use unfiltered graph summaries for browser metadata",
-  "updated_at": "2026-11-05T03:57:27.939988118Z"
+  "updated_at": "2026-11-05T03:58:19.965686714Z"
 }
