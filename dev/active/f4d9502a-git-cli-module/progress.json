@@ -150,9 +150,10 @@
           "short_id": "bb5040a8",
           "title": "Origin URL query in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "ab946ec369ddd9299eb5f084086377b58ee2d6ea"
         },
         {
           "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
@@ -195,7 +196,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "c16c834c-f134-4af8-ab20-40c6a120e836",
@@ -213,7 +214,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "claimed_dispatch_prepared"
+          "worker_status": "full_gates_running"
         },
         {
           "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
@@ -247,7 +248,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "fixture_rework"
+          "worker_status": "reviewed_waiting_source_slot"
         }
       ]
     },
@@ -722,7 +723,8 @@
     "cc9 Done after merged stable Cargo e2dd6940; actual gate evidence already preserved by frontend neutral tracker commit c7b0f506b. Next ready slot origin; df0546 withdrawn for real docs findings, then df755.",
     "Steward approved DEC27 reconciliation to distinct-context layout bounds and concrete d681 scope expansion/field exception with reduced dependencies, preserving53 nodes. Required independent plan review precedes implementation. DEC26 shared worktree-info errors is validated in isolated952fa6f32; 9de full gates running after canonical row/reference integration.",
     "f6 Cargo cc72ca26 failed four shared corpus setups because child Git ceiling excludes own root from .jit discovery. Steward authorized parent-ceiling fix preserving host isolation, child-only environment and existing test owners; failed evidence86cb8402c retained, red/green rework in progress.",
-    "Do not nest tracker commands under jit worktree exec: repository lock is non-reentrant and times out. Tracker commands take own locks; use exec only around short Git commit/file updates."
+    "Do not nest tracker commands under jit worktree exec: repository lock is non-reentrant and times out. Tracker commands take own locks; use exec only around short Git commit/file updates.",
+    "Origin Done after merged stable Cargo4e0b64b4. Corrected claims fullgates848ee4a5/2682790f and info1ee8a09a/38f4141a pass; shared fixture fix0f144b98d reused exactly in11871fa14. Final DEC26-28 plan review97a30f16 passes on21cd8fb9; pending metadata integration. Completed HEAD/list/history trees reclaimed canonically."
   ],
   "planning_reviews_pending": [
     "DEC26 shared worktree-info contract and DEC27 bounded-context remediation refresh"
@@ -892,10 +894,10 @@
     "bb5040a8": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "993734b8-08c1-42ad-a1a9-23e19c3cf53f",
-        "code-review": "57280492-270c-44bb-a854-7b0770ecc954"
+        "cargo-ci": "4e0b64b4-735d-44d5-879d-b108a7b982dc",
+        "code-review": "bc67bc3d-d4d7-433d-ba92-b8be3a334e90"
       },
-      "reviewed_source": "32c40f08e934c80ae4ba90a1fcbf661a7c087310",
+      "reviewed_source": "a5b532cf031c8ac138f643fa0825b0c1037e4ebe",
       "evidence_commit": "33616e5fe",
       "criteria": {
         "REQ-01": "One origin query; absent origin yields None, failures remain typed; only final command newline stripped.",
@@ -904,7 +906,8 @@
       "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
       "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
       "deferred_items": "No linked design documents or in-scope deferrals.",
-      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending.",
+      "integration": "History integration preserved both implementations byte-for-byte; focused46tests passed. Main ab946ec36 merged Cargo stable PASS4e0b64b4. Lease released."
     },
     "09974ad1": {
       "verdict": "PASS",
@@ -983,9 +986,9 @@
     }
   },
   "source_queue": [
-    "bb5040a8 if ready",
-    "df755",
-    "repaired df0546 when ready",
+    "df0546",
+    "ec9e812c",
+    "df fe3",
     "ready interleave"
   ],
   "blocked_source_exclusions": [
