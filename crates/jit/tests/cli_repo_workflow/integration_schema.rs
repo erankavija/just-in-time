@@ -13,8 +13,14 @@ fn test_schema_worktree_info_exposes_resolved_data_root() {
         .success_schema
         .as_ref()
         .unwrap();
-    assert_eq!(success["properties"]["data_root"]["type"], "string");
-    assert!(success["required"]
+    assert!(jsonschema::is_valid(
+        success,
+        &Value::from("/resolved/store")
+    ));
+    assert!(jsonschema::is_valid(success, &Value::Bool(true)));
+    let info_schema = &success["definitions"]["WorktreeInfo"];
+    assert_eq!(info_schema["properties"]["data_root"]["type"], "string");
+    assert!(info_schema["required"]
         .as_array()
         .unwrap()
         .contains(&Value::from("data_root")));

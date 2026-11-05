@@ -37,13 +37,14 @@ jit worktree info [OPTIONS]
 
 #### Description
 
-Displays the current worktree's identity, branch, root path, and whether this is the main worktree or a secondary one. Useful for debugging worktree detection and understanding context.
+Displays the current worktree's identity, branch, checkout root, resolved data root, and whether this is the main worktree or a secondary one. Useful for debugging worktree detection and understanding context.
 
 #### Options
 
 | Option | Description |
 |--------|-------------|
 | `--json` | Output as JSON |
+| `--field NAME` | Select one top-level field; print scalars as plain text, or retain the JSON type with `--json` |
 
 #### Examples
 
@@ -53,6 +54,9 @@ jit worktree info
 
 # JSON output for scripting
 jit worktree info --json
+
+# Read the resolved store path without a JSON processor
+jit worktree info --field data_root
 ```
 
 #### Output
@@ -62,6 +66,7 @@ Worktree Information:
   ID:         wt:a1b2c3d4
   Branch:     feature/my-work
   Root:       /home/user/project-wt
+  Data root:  /home/user/project-wt/.jit
   Type:       secondary worktree
   Common dir: /home/user/project/.git
 ```
@@ -76,10 +81,16 @@ For JSON output (the response envelope also carries `message` and `warnings`):
   "worktree_id": "wt:a1b2c3d4",
   "branch": "feature/my-work",
   "root_path": "/home/user/project-wt",
+  "data_root": "/home/user/project-wt/.jit",
   "is_main_worktree": false,
   "common_dir": "/home/user/project/.git"
 }
 ```
+
+`--field` selects from the response fields described by `jit --schema`. Strings
+print without quotes, other scalars print their value, and collections print compact
+JSON. With `--json`, the selected value keeps its JSON type. An unknown field is a
+usage error.
 
 #### Failure modes
 

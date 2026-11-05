@@ -2,17 +2,32 @@
 
 use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::WorktreeCommands;
-use crate::commands::worktree::WorktreeInfo;
+use crate::errors::InvalidArgumentError;
 use crate::output::{
-    StoreComparison, WorktreeExecResponse, WorktreeListResponse, WorktreeStoreDivergenceResponse,
+    FieldProjection, StoreComparison, WorktreeExecResponse, WorktreeInfoOutput,
+    WorktreeListResponse, WorktreeStoreDivergenceResponse,
 };
 use crate::storage::JsonFileStorage;
 use anyhow::Context;
 
-fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeInfo> {
+fn info(
+    ctx: &CommandContext<'_, JsonFileStorage>,
+    field: Option<String>,
+) -> HandlerResult<WorktreeInfoOutput> {
     let (info, warnings) = ctx.executor.worktrees().info()?;
+    if let Some(name) = field {
+        let value = serde_json::to_value(&info)?;
+        let projection = FieldProjection::field(&value, &name).ok_or_else(|| {
+            InvalidArgumentError::new(format!(
+                "invalid field: unknown field '{name}' for worktree info"
+            ))
+        })?;
+        return Ok(
+            Outcome::from(WorktreeInfoOutput::Projection(projection)).with_warnings(warnings)
+        );
+    }
     let message = format!("Worktree {} on branch {}", info.worktree_id, info.branch);
-    Ok(Outcome::success_with(info, message).with_warnings(warnings))
+    Ok(Outcome::success_with(WorktreeInfoOutput::Info(info), message).with_warnings(warnings))
 }
 
 fn list(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeListResponse> {
@@ -58,7 +73,7 @@ command_group! {
     command: WorktreeCommands,
     storage: JsonFileStorage,
     leaves: {
-        "worktree_info" => WorktreeCommands::Info => info() -> WorktreeInfo,
+        "worktree_info" => WorktreeCommands::Info { field } => info(field) -> WorktreeInfoOutput,
         "worktree_list" => WorktreeCommands::List => list() -> WorktreeListResponse,
         "worktree_store-divergence" => WorktreeCommands::StoreDivergence => store_divergence() -> WorktreeStoreDivergenceResponse,
         "worktree_exec" => WorktreeCommands::Exec { command } => exec(command) -> WorktreeExecResponse,
@@ -73,7 +88,7 @@ mod tests {
     #[test]
     fn test_worktree_registration_exposes_each_typed_success_schema() {
         for (path, expected) in [
-            ("worktree_info", OutputSchema::of::<WorktreeInfo>()),
+            ("worktree_info", OutputSchema::of::<WorktreeInfoOutput>()),
             ("worktree_list", OutputSchema::of::<WorktreeListResponse>()),
             (
                 "worktree_store-divergence",

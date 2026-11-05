@@ -1,0 +1,60 @@
+{
+  "assignee": "agent:dispatch-projection",
+  "claimed_at": "2026-11-05T00:08:43.071426859Z",
+  "context": {},
+  "created_at": "2026-11-05T00:08:14.312789221Z",
+  "dependencies": [],
+  "description": "Remove the external JSON-processor dependency from the packaged worktree dispatcher while retaining its resolved-store guard.\n\n## Background\n\nThe dispatch change delivered in 8c67b21a resolves the store through worktree information, but its packaged script and protocol require an external JSON processor. Installed package policy requires these paths to work without one. The existing issue-show field projection already provides raw scalar output that worktree information can share.\n\n## Success Criteria\n\n- [hard] REQ-01: Worktree information supports single-field projection through the shared output projection mechanism, including raw scalar output, typed JSON output, unknown-field errors and schema coverage; existing issue-show projection behavior is preserved.\n- [hard] REQ-02: The canonical dispatcher consumes the raw resolved data root without an external JSON processor, refuses missing, empty, relative or unsuccessful root resolution, and preserves literal-path exclusions and rejection of tracked changes outside the store.\n- [hard] REQ-03: The installed protocol describes the supported invocation and package content contains no prohibited processor dependency; the dispatcher regression suite covers valid and invalid root responses.\n\n## Notes\n\nFollow-up to the completed dispatch implementation in 8c67b21a (source commit 12ad7f0af); that issue remains Done. Generalize the existing projection once, without a private parser, special root flag, package-policy suppression or copied dispatch variant.\n",
+  "documents": [],
+  "done_at": "2026-11-05T00:27:08.736803573Z",
+  "first_ready_at": "2026-11-05T00:08:14.312789221Z",
+  "gates_required": [
+    "worktree-cache-test",
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "12b19028-fa8a-4c96-b70f-5f41daeb97b7",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:18:41.132980535Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1bebc5fa-a43d-4407-98db-fe85e43d1b0e",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:26:01.440434859Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "15425177-d96c-41c1-8fc6-7eeb4a3687d2",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:20:33.725397257Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "5fdec042-c3cf-4616-9d98-316525174536",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:17:07.554277298Z",
+      "updated_by": "auto:executor"
+    },
+    "worktree-cache-test": {
+      "run_id": "b5be2a61-1d9f-4be8-890b-cd936d9bbb9c",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:17:04.485023843Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "dc048377-19b5-425d-90e6-11d4a7427e34",
+  "labels": [
+    "milestone:v1.0",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Remove the dispatcher JSON-processor dependency",
+  "updated_at": "2026-11-05T00:27:08.736803573Z"
+}

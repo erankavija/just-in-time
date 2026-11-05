@@ -16,7 +16,7 @@
 #
 # Effects:
 #   - Allows staged/unstaged changes only under the data root reported by
-#     `jit worktree info --json`; rejects other tracked changes.
+#     `jit worktree info --field data_root`; rejects other tracked changes.
 #   - Snapshots `git status -uall --porcelain` of main to
 #     <dir>/lead-pre-dispatch-<ts>.txt and symlinks
 #     <dir>/lead-pre-dispatch-latest.txt to it, where <dir> is
@@ -71,10 +71,10 @@ fi
 
 # Fail closed if jit cannot resolve the selected store. Literal pathspecs keep
 # spaces and glob characters in configured data-root names uninterpreted.
-data_root="$(jit worktree info --json | jq -er '.data_root | select(type == "string" and startswith("/"))')" || {
-    echo "ERROR: cannot resolve the data root with jit worktree info --json." >&2
+if ! data_root="$(jit worktree info --field data_root)" || [[ "$data_root" != /* ]]; then
+    echo "ERROR: cannot resolve the data root with jit worktree info --field data_root." >&2
     exit 1
-}
+fi
 paths=(.)
 if [[ "$data_root" == "$repo_root/"* ]]; then
     paths+=(":(top,literal,exclude)${data_root#"$repo_root/"}")
