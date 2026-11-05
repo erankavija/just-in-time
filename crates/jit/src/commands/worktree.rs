@@ -80,14 +80,24 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
     /// Current checkout identity, branch and paths, with relocation warnings.
     pub fn info(&self) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = paths
+            .write_checkout()
+            .ok_or_else(|| {
+                crate::errors::RequiresGitError::new(crate::errors::GitRequirementGap::NoRepository)
+            })?
+            .head()?
+            .ok_or_else(|| {
+                crate::errors::RequiresGitError::new(crate::errors::GitRequirementGap::NoCommits)
+            })?
+            .branch_label()
+            .to_string();
 
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
         Ok((
             WorktreeInfo {
                 worktree_id: identity.worktree_id,
-                branch: identity.branch,
+                branch,
                 root_path: paths.worktree_root.to_string_lossy().to_string(),
                 data_root: self
                     .exec
@@ -147,26 +157,6 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
             ),
         })
     }
-}
-
-/// Get current git branch name.
-fn get_current_branch(worktree_root: &std::path::Path) -> Result<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .current_dir(worktree_root)
-        .output()
-        .context("Failed to get current git branch")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!(
-            "Failed to get current git branch. Are you in a git repository?\n\
-             Git error: {}",
-            stderr.trim()
-        );
-    }
-
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
 /// Group leases already filtered for activeness by worktree.

@@ -12,14 +12,14 @@ use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
-use jit::commands::CommandExecutor;
+use jit::commands::OpenedRepository;
 #[cfg(feature = "embed-web")]
 use jit_server::embedded;
 use jit_server::routes::AppState;
 use jit_server::shutdown::{
     await_shutdown_signal, configured_drain_deadline, run_shutdown_sequence, ServerHandle,
 };
-use jit_server::{prepare_server_storage, resolve_listener, routes, watcher, ListenerSource};
+use jit_server::{prepare_server_repository, resolve_listener, routes, watcher, ListenerSource};
 
 /// JIT REST API Server
 #[derive(Parser, Debug)]
@@ -56,30 +56,30 @@ async fn main() -> Result<()> {
 
     info!("Starting JIT API Server...");
 
-    // Discover one Git-optional repository layout before recovery, validation,
-    // or command-service construction. The selected worktree comes from the
-    // process boundary, never from the data directory's parent.
-    let data_dir_path = std::path::Path::new(&args.data_dir);
-    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect()
-        .context("failed to discover repository worktree layout")?;
-    let worktree_root = worktree_paths.worktree_root;
-    let executor_layout = jit::storage::discover_repository_layout(&worktree_root, data_dir_path)
-        .context("failed to construct repository layout")?;
-    let data_root = executor_layout.data_root().to_path_buf();
-    let (storage, recovery_session) = prepare_server_storage(executor_layout.clone())?;
+    let OpenedRepository {
+        executor,
+        data_root,
+        worktree_paths,
+        recovered_records,
+        write_override_annotation,
+        retained_session,
+        ..
+    } = prepare_server_repository(
+        std::path::Path::new(&args.data_dir),
+        &std::env::current_dir().context("failed to read process directory")?,
+    )?;
 
     info!("Using JIT repository at: {}", data_root.display());
-    let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout)?);
-    if recovery_session.recovery_report().recovered_count() > 0 {
+    let executor = Arc::new(executor);
+    if recovered_records > 0 {
         info!(
             "Applied {} leftover redo record(s) before server startup",
-            recovery_session.recovery_report().recovered_count()
+            recovered_records
         );
     }
-    // The current HTTP surface is read-only. Release startup serialization
-    // after validation and executor construction; any future mutation route
-    // must enter through the same repository mutation boundary as the CLI.
-    drop(recovery_session);
+    // The HTTP surface is read-only; release startup serialization before serving.
+    drop(write_override_annotation);
+    drop(retained_session);
 
     // Start file watcher for live updates
     let (tracker, _watcher) = watcher::start_watching(&data_root)?;
@@ -87,7 +87,8 @@ async fn main() -> Result<()> {
     info!("Watching {} for changes", data_root.display());
 
     // The display name follows the already-discovered repository boundary.
-    let project_name = worktree_root
+    let project_name = worktree_paths
+        .worktree_root
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "jit".to_string());

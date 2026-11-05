@@ -849,6 +849,7 @@ fn invoke_commands_without_git(json: bool) -> Vec<Output> {
     [
         ["claim", "status"],
         ["hooks", "install"],
+        ["worktree", "info"],
         ["worktree", "list"],
     ]
     .into_iter()
@@ -985,7 +986,7 @@ row_bindings! {
     test_command_exit_codes_expired_lock_wait_emits_11: ("*", 11, false) => invoke_expired_lock_wait;
     test_command_exit_codes_broken_pipe_emits_141: ("*", 141, true) => invoke_broken_pipe;
     test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
-    test_command_exit_codes_commands_without_git_emit_10: ("claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install, worktree list", 10, false) => invoke_commands_without_git;
+    test_command_exit_codes_commands_without_git_emit_10: ("claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install, worktree info, worktree list", 10, false) => invoke_commands_without_git;
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, true) => invoke_config_validate;
     test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", 4, false) => invoke_dep_add_cycle;
     test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;

@@ -802,7 +802,7 @@
           "short_id": "46fe7593",
           "title": "One stated output and schema contract for the CLI",
           "classification": "story",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -1689,7 +1689,11 @@
       "status": "done"
     },
     "46fe7593": {
-      "status": "in_progress"
+      "status": "done",
+      "merge": "3ed24cd50",
+      "closure": "efd289afc",
+      "production_delta": 0,
+      "note": "All five hard criteria and complete cumulative findings/pitfalls passed formal acceptance. Actual Cargo8b15acf2 and code-review552067d6 stablePASS; gate-only integration, native validationPASS."
     },
     "487f45a9": {
       "status": "done",
@@ -1873,9 +1877,9 @@
     }
   },
   "handoff": {
-    "file": "handoff-13.md",
-    "from": "Codex session13",
-    "date": "2026-11-04"
+    "file": "handoff-14.md",
+    "from": "Codex session 14",
+    "date": "2026-11-05"
   },
   "lead": "Codex execution lead (session 14)",
   "b697a3f7_execution": {
@@ -2003,7 +2007,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "All independent implementation leaves and error-boundary story Done. Output/schema story final review running; timing chain intentionally held.",
+    "status": "Independent scope complete. Only the explicitly deferred f487 timing enforcement, dependent fba host-lock trial, completion report a08, build-hygiene story fb2 and epic gates remain.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -2012,7 +2016,7 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "46 final configured review and formal acceptance"
+      "f487aeef intentionally held; dependent timing chain remains blocked"
     ],
     "parallelism": "Pinned isolated reviews completed concurrently; read-only Rustdoc criterion audit runs while ready source merges interleave across leads. Full merged Cargo checks remain serial; cheap checks and AI reviews hold no Cargo locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
@@ -2168,6 +2172,10 @@
         {
           "merge": "33e7e2d93",
           "delta": 0
+        },
+        {
+          "merge": "3ed24cd50",
+          "delta": 0
         }
       ],
       "current_epic_delta": 184,
@@ -2255,11 +2263,23 @@
       "N2": "closed b4d26070a/49c2582ea all3examples+graphsummary;9completeexamples coherent"
     },
     "46fe7593": {
-      "status": "in_progress",
+      "status": "done",
       "cargo": "8b15acf2-8cfd-433a-9958-982c484cf6f4",
       "cargo_origin": "executed stablePASS",
-      "review": "running in isolated worktree at5a61c8226",
-      "production_delta": 0
-    }
+      "review": "552067d6-933c-436a-8062-8a1e13e4a7d5",
+      "production_delta": 0,
+      "formal_review": "PASS all six tiers; all prior findings and final N1/N2 closed",
+      "merge": "3ed24cd50",
+      "closure": "efd289afc",
+      "integration": "Gate records only, zero product delta; steward explicitly allowed tracker-only closure without duplicate Cargo."
+    },
+    "completed_at": "2026-11-05T02:02:12.227789+00:00",
+    "reclaimed_worktrees": [
+      "f9977efd",
+      "755964b2",
+      "0546fc82",
+      "fe3ad1b0",
+      "46fe7593"
+    ]
   }
 }

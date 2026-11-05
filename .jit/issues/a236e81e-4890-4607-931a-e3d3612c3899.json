@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-05T02:30:27.900463186Z",
   "context": {},
   "created_at": "2026-11-04T22:24:54.946576604Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Repository layout binding enforces the storage root while server startup uses the shared repository constructor.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage binding rejects a mismatched root and server startup consumes the shared constructor.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:34:48.129080860Z",
+  "first_ready_at": "2026-11-05T02:11:08.421679524Z",
   "gates_required": [
     "repo-validate",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "32dd81fe-bda4-4ae3-b5d0-5463bb378f9b",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:34:38.009353063Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "134bf0dc-5617-47e7-b455-ed223e8151b1",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:30:52.721634639Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a236e81e-4890-4607-931a-e3d3612c3899",
   "labels": [
     "type:story",
@@ -21,7 +37,7 @@
     "satisfies:0f8efc37/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Repository foundations",
-  "updated_at": "2026-11-04T22:25:09.314180990Z"
+  "updated_at": "2026-11-05T02:34:48.129080860Z"
 }

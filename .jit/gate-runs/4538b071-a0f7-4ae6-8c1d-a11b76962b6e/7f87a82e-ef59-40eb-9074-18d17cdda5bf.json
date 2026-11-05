@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-4538b071",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a7d14e6d4bfdaf37bc9374ad5a537ecbb0a1bf17",
+  "completed_at": "2026-11-05T01:39:43.782892875Z",
+  "duration_ms": 292997,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/tests/server_integration/document_api_tests.rs",
+        "id": "F1",
+        "line": 108,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/0f8efc37/requirement/REQ-10",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The retained document-diff route is not covered by a route-distinguishing test."
+      }
+    ],
+    "summary": "HTTP document-diff route preservation lacks route-distinguishing coverage.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7f87a82e-ef59-40eb-9074-18d17cdda5bf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:34:50.785547998Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5512 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-4538b071\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a958-2e5a-7ad2-9de3-7662ab7b9b92\n--------\nuser\n--- 5499 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a7d14e6, f84d2d95, c7b0f506 (all `jit:4538b071`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/0f8efc37-8054-420d-9409-dde888ea0040.json\nResolved items: @/issue/0f8efc37/requirement/REQ-10 (.jit issue); @/issue/c8e79465/requirement/REQ-01 (.jit issue); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0); npm-ci passed (exit 0); code-review pending. Passing runs cover f84d2d95 and c7b0f506, not the later gate-record commit a7d14e6.\nTruncation recovery: Re-read the truncated implementation patch per affected file; inspected current routes, callers, models, and focused route tests.\n\n1. **[blocking][issue-impact] F1 — HTTP document-diff presence is not covered.** [`test_get_document_diff_missing_issue`](crates/server/tests/server_integration/document_api_tests.rs:108) only asserts `404` for a nonexistent issue, which is indistinguishable from Axum’s response for no registered route. Although the route is currently registered at [`routes.rs:153`](crates/server/src/routes.rs:153), this does not test the required retained-route presence. Add a valid or otherwise route-distinguishing document-diff request. References: @/issue/0f8efc37/requirement/REQ-10, @/invariant/orthogonal-tests.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"HTTP document-diff route preservation lacks route-distinguishing coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The retained document-diff route is not covered by a route-distinguishing test.\",\"file\":\"crates/server/tests/server_integration/document_api_tests.rs\",\"line\":108,\"references\":[\"@/issue/0f8efc37/requirement/REQ-10\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

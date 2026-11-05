@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-4538b071",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "31275fe7f8ba04faa6c2e02481e2eae9de5f99ed",
+  "completed_at": "2026-11-05T01:54:29.138394941Z",
+  "duration_ms": 160254,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Specified API and web-client removals are complete; retained routes, core type reuse, and route coverage are verified.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b78d48a0-92ae-4e12-b845-5976b3d94991",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:51:48.884283879Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c7b0f506, f84d2d95, a7d14e6, abea882a, 31275fe7\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/0f8efc37/requirement/REQ-10 and @/issue/c8e79465/requirement/REQ-01 (issue descriptions); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; covers implementation commits through abea882a); npm-ci passed (exit null; ancestry unavailable)\nTruncation recovery: narrowed reads of each implementation patch, routes, client, route tests, linked plan, and resolved-policy sources\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Specified API and web-client removals are complete; retained routes, core type reuse, and route coverage are verified.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

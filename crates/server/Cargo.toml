@@ -20,7 +20,7 @@ path = "src/main.rs"
 
 [features]
 default = ["embed-web"]
-embed-web = ["dep:rust-embed", "dep:mime_guess"]
+embed-web = ["dep:rust-embed"]
 # Compiles the graceful-shutdown suite's seams: the drain-deadline fault
 # injection in `shutdown`, through which one server force-closes a stalled
 # connection short of its entitlement, and the first-read report in
@@ -59,7 +59,8 @@ listenfd = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rust-embed = { version = "8", optional = true }
-mime_guess = { version = "2", optional = true }
+mime_guess = "2"
+percent-encoding = "2"
 
 [dev-dependencies]
 # Enables jit's test-support feature so this crate's own #[cfg(test)] modules
