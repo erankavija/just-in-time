@@ -773,6 +773,14 @@
           "short_id": "ab168296",
           "title": "Issue listing renders directly through the shared output contract",
           "classification": "implementation",
+          "status": "done"
+        },
+        {
+          "key": "facade-rustdoc-links",
+          "id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
+          "short_id": "755964b2",
+          "title": "Rust API links name the owners after facade extraction",
+          "classification": "documentation",
           "status": "in_progress"
         }
       ]
@@ -834,6 +842,10 @@
     {
       "id": "fb38bf1f",
       "why": "steward ruling: every registered success response is output-owned; depends on all open handler issues"
+    },
+    {
+      "id": "755964b2",
+      "why": "Literal facade intra-doc link criterion regression found by epic pitfall audit; bounded existing documentation repair"
     }
   ],
   "escalations": [
@@ -983,7 +995,8 @@
     "487f45a9": 3,
     "0eca332a": 3,
     "0546fc82": 2,
-    "ab168296": 0
+    "ab168296": 0,
+    "755964b2": 0
   },
   "surfaced_pitfalls": [
     {
@@ -1836,6 +1849,16 @@
     },
     "fe3ad1b0": {
       "status": "backlog"
+    },
+    "ab168296": {
+      "status": "done",
+      "production_delta": 0,
+      "merge": "67f4514c3",
+      "closure": "85e56e0cd"
+    },
+    "755964b2": {
+      "status": "in_progress",
+      "model": "gpt-6-luna high"
     }
   },
   "handoff": {
@@ -1969,7 +1992,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "ab168, 0eca and f997 have stable passing branch gates and formal lead PASS; await sequential integration. Independent source queue reopened by steward; only 061-specific merge and38df policy remain held. Docs wait on actual dc048377 external repair.",
+    "status": "ab168 completed on main with merged Cargo PASS; 0eca/f997 ready for their interleaved slots; 0546 combined preparation includes final reviewed dc048377 under explicit exception; bounded Rustdoc repair755964b2 active.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -2041,7 +2064,7 @@
       "artifact": "/tmp/jit-df129d9e-session14/remaining-stories-audit.md",
       "findings": {
         "F1": "Fixed88c419187; exact CLI row census and reports pass in final5052+25 Cargo bad751b7; finalreview766aceb2 stablePASS.",
-        "F2": "ab168 sourcef9b680614, Cargo f88c56f3 and review93f3da67 PASS; ready836992d50;46 depends on repair.",
+        "F2": "Closed: ab168 merge67f4514c3, actualmergedCargo244d875e PASS, Done85e56e0cd, worktree reclaimed.",
         "F3": "0546 fixed32ab62d01; mechanical and affected review pending",
         "F4": "active findings prose fixed6d61a3c78 with approved story contracts"
       }
@@ -2127,15 +2150,27 @@
       "review_run": "15c7cc86-2177-42fd-a132-8d0c82dc2c49"
     },
     "ab168296": {
-      "status": "in_progress",
+      "status": "done",
       "implementation": "f9b680614",
       "production_delta": 0,
       "focused_tests": "14 passed",
       "branch_cargo": "passed f88c56f3;5049+25",
-      "review": "stablePASS93f3da67, zero findings; evidence836992d50"
+      "review": "stablePASS93f3da67, zero findings; evidence836992d50",
+      "merge": "67f4514c3",
+      "merged_cargo": "244d875e-3f16-4841-b280-3679c73d4535",
+      "closure": "85e56e0cd",
+      "reclaimed": true
     },
     "0eca_extra_rework": "Approved extra mechanical round complete43d8ad971 (0o000); finalCargo bad751b7 stablePASS5052+25 and cleanClippy; review766aceb2 stablePASS; actualrecords59e3ba681. No behavior change.",
     "0546_mechanical_blocker": "Actual failedrun ecc372aa preserved a307e3010: M8 rejects installed jq dependency. External dc048377 owns native projection repair; primary dependency0546->dc048 recordedfd05b3281 with approved reduction of redundant milestone edge. No waiver; await repairDone and finalchecks.",
-    "f997_transitive_input": "Approved counter root in cargo-ci-selftest52c2ec0fb; finalCargo4eb950c8 and review15c7cc86 stablePASS. Earlier actualrecords preserved."
+    "f997_transitive_input": "Approved counter root in cargo-ci-selftest52c2ec0fb; finalCargo4eb950c8 and review15c7cc86 stablePASS. Earlier actualrecords preserved.",
+    "rustdoc_repair": {
+      "id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
+      "status": "in_progress",
+      "model": "gpt-6-luna high",
+      "audit": "/tmp/jit-df129d9e-session14/rustdoc-criterion-audit.md",
+      "scope": "Comment references only; actual facade REQ03 regression plus compiler-confirmed residual links; existing private-items Rustdoc command, no newchecker/runtime/import/API."
+    },
+    "docs_preparation_exception": "Steward explicitly approved final reviewed dc048377 branch7052b1fb3 plus final0eca in isolated0546; mainclaim/Done still wait realdepsDone. Frozen combinedsource1bd0afa7b; timestamp conflict resolved preservingactualrecords andnewdependency. docs-mechanical running."
   }
 }
