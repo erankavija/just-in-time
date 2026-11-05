@@ -852,7 +852,9 @@
     "Steward approved c140 second file git.rs solely fulfilled HEAD convergence comment deletion; primitive executable/test bytes must remain exact, no extra fullgate solelyprose.",
     "c140 snapshot migration claimed from actualReady after3fDone; stewardapprovedtwo-file scope includes only fulfilled HEAD convergence comment in git.rs. a273 proposal fullCargo/review running isolated; Gitfloorpublication remainsheld.",
     "47 rework1 consolidates literal selected-data-dir case into existing property owner without newfixture duplication. c140 stewardapproved deletion of both fulfilledHEAD andorigin convergence comments, exactgit.rs executable/testbytes preserved. 9ec landingheld for available-target gitlink consumerclassification; rawtwo-versionprobe preserved in lead scratch.",
-    "92afc5d8 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "92afc5d8 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward-approved fb factual reconciliation: current worktree.rs255/303 accepts repository/layout and executes Git at data_root; no test-mode bypass or namedemptytests remain, gate.rs has3currentcalls. Preserve existing selectedrepositoryowner, allow/refuse semantics andliteralcase; do not restoreobsoletebypass. Actualexternalstoreauthority supplies missingbehavior forRED. Sameconsumer scope.",
+    "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1336,6 +1338,15 @@
       },
       "criteria": "All3criteria met: existingclaim reads supplied classification and nesteddata-root containment; private processhelper removed; realGit/nonGitclassified regression actuallyRED thenGREEN; unchanged25initCLItests pass. No linked docs, deferrals, stale references or own-file drift afterrefresh. Mandatory mergedCargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 00a11171-3d1d-474f-bca6-063b8420d5c6 on 5363b6b99a931efd7a6282c8207427533240b851."
+    },
+    "47d62472": {
+      "verdict": "PASS",
+      "reviewed_source": "8bbd549e25e6c92ab216ed5b2f418ef573226154",
+      "gates": {
+        "cargo-ci": "b62e4d14-6ed0-4ccd-ba27-6d3d6e033c35",
+        "code-review": "41db8bbd-5147-40d0-a2b1-3e02f91713d0"
+      },
+      "criteria": "All4correctedcriteria met: supplied write_checkout typedbasecomparison, distinct exactmessages/findings exit4, actualRED missingbase/unrelated/noGit/externalstore, literal selected-data-dir scenario consolidated in existing owner. Leadrework1 duplicatefixtureclosed. No linked docs/deferrals; basecomparison convergencecomment legitimately awaitsfb. Mandatory mergedCargo pending."
     }
   },
   "source_queue": [
