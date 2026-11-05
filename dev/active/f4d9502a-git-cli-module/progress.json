@@ -536,7 +536,7 @@
       "issue": "c140921c",
       "status": "conditional_design_recorded",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval."
     }
   ],
   "rework_counts": {
@@ -891,7 +891,8 @@
     "504 designR3PASS: allR1/R2findingsclosed atdesignlevel underD26/D27. Durable design andall3reviews in dev/active/5046408a linked. No implementation yet; awaiting steward exact-footprint acceptance. Initial doclink lacked lead actor and failed; retried successfully with owning actor before commit/validation.",
     "Steward accepted504 exact reviewed design footprint and authorized Astra/xhigh primary implementation owner, with test-first owning crash/admission/policy matrix and mandatory D25 held-writer/no-reader-replay checks. All implementation remains isolated; no manifest fanout or Git-floor change.",
     "Live checkpoint handoff-2.md records current holds, active504 source/docs ownership, completedfb/c0ea gates, D26/D27 design acceptance and tool traps. Work continues; no stop or pause requested.",
-    "504 pinned APIs code_checkout (code), git (data), write_checkout/checkout_top_level (data or relocated coordination), with_worktree_root (code selection only, shared context). Primary reported44redo testsPASS +originalA/newB recoveryRED\u2192PASS. Consumer slice transferred after no-edit/current-check confirmation; docs complete. Ownership in design_acceptances supersedes live handoff2 worker snapshot."
+    "504 pinned APIs code_checkout (code), git (data), write_checkout/checkout_top_level (data or relocated coordination), with_worktree_root (code selection only, shared context). Primary reported44redo testsPASS +originalA/newB recoveryRED\u2192PASS. Consumer slice transferred after no-edit/current-check confirmation; docs complete. Ownership in design_acceptances supersedes live handoff2 worker snapshot.",
+    "Steward-approved code-authority reconciliation: native c140921c -> 5046408a dependency added with cycle checking and transitive reduction of direct 4ba18af4/d68150e2 edges. The external 504 issue remains outside the 53-node manifest; its internal contract prerequisites remain represented there. c140 source/metadata, d9 pinned evidence and 933 diff explicitly use code_checkout, preserving existing worktree-root authority. Source footprint and producer semantics unchanged. c140 remains held until explicit floor approval, a273 Done and 504 Done. Native reduction also removes 34851181 -> 5046408a because surface trim now reaches split-root selection through its existing downstream chain; reachability is preserved."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1438,8 +1439,8 @@
       "independent_implementation_review": "Fresh Astra/high after full configured Cargo gate",
       "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic",
       "active_ownership": {
-        "split_root_impl": "Astra/xhigh: config/bootstrap/JSON/recovery/dispatch/errors/server, storage/policy/recover tests, and completed docs. Sole shared-tree build coordinator.",
-        "split_root_consumers": "Terra/high: exact WorktreePaths/consumer/test slice in /tmp/f4d9502a-lead/5046408a-consumers-brief.md; no recovery/config/JSON/server/docs edits.",
+        "split_root_impl": "Astra/xhigh: sole owner of all accepted source/tests/docs; consumer and documentation slices complete and returned. Final focused checks running before full gate and independent reviews.",
+        "split_root_consumers": "Complete; ownership returned to primary.",
         "split_root_design": "Docs slice complete and lead reviewed; ownership returned to primary."
       },
       "build_coordination": "One shared-tree Cargo owner at a time, primary arbitrates freeze slots; peer pauses edits and acknowledges before queueing; collect every check then coordinator releases edits. No concurrent recovery edits or cancelled checks."

@@ -2,7 +2,7 @@
 
 **Issue:** c140921c  
 **Date:** 2026-11-05  
-**Status:** Conditionally approved design; implementation blocked on explicit Git-floor approval and a273 reaching Done and landing.
+**Status:** Conditionally approved design; implementation blocked on explicit Git-floor approval and a273 and split-root selection reaching Done and landing.
 
 ## Problem Statement
 
@@ -28,7 +28,11 @@ The conditionally approved producer correction additionally requires:
 
 ### Authorization boundary
 
-Implement this option only after the user explicitly approves the Git >=2.42/runtime proposal and a273 is landed and Done. The frozen six-file a273 decision patch remains unchanged. This document authorizes no floor, runtime, source, issue or manifest mutation. If the user declines that prerequisite, return the design decision to the lead rather than substituting another transport or increasing process counts.
+Implement this option only after the user explicitly approves the Git >=2.42/runtime proposal and a273 and split-root selection are landed and Done. The frozen six-file a273 decision patch remains unchanged. This document authorizes no floor, runtime, source, issue or manifest mutation. If the user declines that prerequisite, return the design decision to the lead rather than substituting another transport or increasing process counts.
+
+### Selected checkout authority
+
+Snapshot source selection and origin, branch and dirty metadata use the executor's `code_checkout()`, preserving the existing `layout.worktree_root()` authority when code and data are independent repositories. The data checkout returned by `git()` is not the snapshot source. Archive pinned evidence and document diff follow the same code authority. This changes only the existing snapshot migration within its approved file footprint; shared revision resolution is unchanged.
 
 ### One session operation
 
@@ -63,7 +67,7 @@ Only these four existing files are in the conditional correction scope. Existing
 | `crates/jit/src/storage/git.rs` | Shared session resolution and typed outcomes; unary/bulk delegation; reader exposure; shared bounded body drain; retire obsolete fallback and suffix-first contract/diagnostic wording. |
 | `crates/jit/tests/fast_docs_templates/git_module_tests.rs` | Owning producer regression and result/error matrix; update invocation-shape expectations while retaining process, SHA-256, framing and lifecycle assertions. |
 | `crates/jit/src/storage/json.rs` | After a273 lands, replace its local resolve/peel control flow with the reader operation; preserve missing/noncommit mapping, canonical identity, bytes and abbreviated label. |
-| `crates/jit/src/commands/snapshot.rs` | One message-search wiring case in the existing source-mode test; production keeps the mandated `checkout.resolve_commit(reference)` call. |
+| `crates/jit/src/commands/snapshot.rs` | One message-search wiring case in the existing source-mode test; production keeps the mandated `checkout.resolve_commit(reference)` call on `code_checkout()`, including the metadata checkout supplied to the snapshot exporter. |
 
 No Cargo target, dependency, documentation-floor or Docker change belongs to this implementation footprint. This design document is a separate planning artifact.
 
@@ -114,6 +118,6 @@ Use the existing focused suite commands in `dev/TESTING.md` and the shared check
 
 ## Risks and Open Questions
 
-Option A is conditionally selected; the outstanding decision is the user's Git-floor/runtime approval, followed by a273 completion. No alternative architecture is selected here. The approved error policy and four-file boundary are sufficient for implementation; Rust method/type spelling is an implementation detail, not permission to alter those contracts.
+Option A is conditionally selected; the outstanding decision is the user's Git-floor/runtime approval, followed by a273 and split-root selection completion. No alternative architecture is selected here. The approved error policy and four-file boundary are sufficient for implementation; Rust method/type spelling is an implementation detail, not permission to alter those contracts.
 
 The two-command Git 2.39-compatible alternative proved the semantics but expands process counts, while a `rev-list --no-walk` substitute incorrectly accepts ranges. Neither is an authorized fallback. The single-process design depends on the approved NUL-framed transport, and the bulk ambiguity/body-drain tests must establish that error classification and session alignment coexist. If that cannot be achieved within the approved boundary, report the concrete limitation to the lead before changing architecture.
