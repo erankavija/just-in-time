@@ -14,9 +14,9 @@ use crate::domain::identity::{GateKey, IssueIdPrefix};
 use crate::domain::{Assignee, ContentFormat, Issue, MinimalIssue, Priority, State};
 use crate::errors::InvalidArgumentError;
 use crate::output::{
-    BatchCreateResponse, IssueBatchCreateOutput, IssueCreateResponse, IssueDeleteResponse,
-    IssueLifecycleResponse, IssueListFullResponse, IssueListResponse, IssueListing,
-    IssueProjection, IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse,
+    BatchCreateResponse, FieldProjection, IssueBatchCreateOutput, IssueCreateResponse,
+    IssueDeleteResponse, IssueLifecycleResponse, IssueListFullResponse, IssueListResponse,
+    IssueListing, IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse,
     IssueSearchResults, IssueShowListResponse, IssueShowOutput, IssueShowSummaryResponse,
     IssueStatusListResponse, IssueStatusOutput, IssueUpdateOutput, IssueUpdateResponse,
 };
@@ -87,8 +87,8 @@ fn show<S: IssueStore>(
             ))
         };
         let projection = match field {
-            Some(name) => IssueProjection::field(&value, &name).ok_or_else(|| unknown(&name))?,
-            None => IssueProjection::fields(&value, &fields).map_err(|e| unknown(&e.0))?,
+            Some(name) => FieldProjection::field(&value, &name).ok_or_else(|| unknown(&name))?,
+            None => FieldProjection::fields(&value, &fields).map_err(|e| unknown(&e.0))?,
         };
         return Ok(IssueShowOutput::Projection(projection).into());
     }
@@ -594,7 +594,7 @@ command_group! {
     storage: [HandlerStore],
     leaves: {
         "issue_show" => IssueCommands::Show { ids, summary, field, fields } => show(ids, summary, field, fields) -> IssueShowOutput
-            as union [IssueShowResponse, IssueShowSummaryResponse, IssueShowListResponse, ItemShowResult, IssueProjection]
+            as union [IssueShowResponse, IssueShowSummaryResponse, IssueShowListResponse, ItemShowResult, FieldProjection]
             "Single id: a bare IssueShowResponse (IssueShowSummaryResponse with --summary; the addressed item for an <issue>/<self-id> argument; the projected value with --field/--fields). Multiple ids: the {count, issues} envelope of full IssueShowResponse objects in argument order.",
         "issue_list" => IssueCommands::List { filters, full } => list(filters, full) -> IssueListing
             as union [IssueListResponse, IssueListFullResponse]

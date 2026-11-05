@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-dc048377",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ad70a24579be282a8ef87679cf9cbda62f89389e",
+  "completed_at": "2026-11-05T00:20:33.723565428Z",
+  "duration_ms": 73787,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's parser-free worktree field projection and dispatcher protocol are accurately documented.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "dc048377-19b5-425d-90e6-11d4a7427e34",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "15425177-d96c-41c1-8fc6-7eeb4a3687d2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:19:19.936327897Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue; inspected its three tagged commits individually. Only `ad70a245` changes behavior/docs. It adds `jit worktree info --field data_root`, updates the packaged dispatcher protocol, and documents the public command in `docs/reference/worktree-validate.md`. No prior review findings.\n\nDocumentation impact: the reference update accurately covers the new option, raw and JSON output behavior, unknown-field failure, and a discoverable parser-free example. The packaged protocol matches the shipped invocation. No additional adopter-facing documentation is required.\n\nFindings:\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's parser-free worktree field projection and dispatcher protocol are accurately documented.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f9977efd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b920c9c19e997e663031b917604bfb4ced1a5fd0",
+  "completed_at": "2026-11-04T23:59:39.126758042Z",
+  "duration_ms": 214508,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and the attributable current tree is consistent with applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f9977efd-9626-4075-9cdb-d8f74dd9881d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cb10432b-f7e9-4314-b8d6-06adadd7d881",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:56:04.617907702Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c116d3a, 6541499, 5595358, 3a96a07, 16aada0, de83305, b41a623, 9354b02, b6463d7, 14c061d, b920c9c\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-08 and @/issue/f9977efd/decision/D-01,D-02 (issue Markdown); @/invariant/bounded-rust-build-footprint, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/build-budget-selftest (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T23:54:19Z); its run commit 14c061d covers 10 of 11 tagged commits, with only later gate-record commit b920c9c not contained; code-review pending\nTruncation recovery: recovered 6541499, 3a96a07, and 9354b02 individually; reread focused config and current sources; abandoned an overbroad gate-run filename listing outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and the attributable current tree is consistent with applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

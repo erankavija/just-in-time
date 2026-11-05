@@ -2,8 +2,8 @@
 
 use super::{
     minimal_blocked_reason, plain_issue_rows, render_issue_list, BlockedFullListResponse,
-    BlockedIssue, BlockedListResponse, BlockedReason, ContainerProgressResponse, HumanRender,
-    IssueChildrenResponse, IssueColumn, IssueCreateResponse, IssueListFullResponse,
+    BlockedIssue, BlockedListResponse, BlockedReason, ContainerProgressResponse, FieldProjection,
+    HumanRender, IssueChildrenResponse, IssueColumn, IssueCreateResponse, IssueListFullResponse,
     IssueListResponse, IssueSearchFullResponse, IssueSearchResponse, IssueShowListResponse,
     IssueShowResponse, IssueShowSummaryResponse, IssueStatusListResponse, IssueStatusResponse,
     IssueUpdateResponse, ListedIssue, OutputMode,
@@ -16,50 +16,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt::Write;
-
-/// The named top-level field(s) of one issue's show response: plain text for
-/// `--field`, one compact JSON object for `--fields`.
-#[derive(Serialize, JsonSchema)]
-#[serde(transparent)]
-pub struct IssueProjection {
-    value: serde_json::Value,
-    #[serde(skip)]
-    #[schemars(skip)]
-    text: String,
-}
-
-impl IssueProjection {
-    /// Project `name` from the serialized show response `shown`; `None` when
-    /// the response has no such field.
-    pub fn field(shown: &serde_json::Value, name: &str) -> Option<Self> {
-        Some(Self {
-            value: shown.get(name)?.clone(),
-            text: super::project_field(shown, name)?,
-        })
-    }
-
-    /// Project `names`, reporting the first one the response lacks.
-    pub fn fields(
-        shown: &serde_json::Value,
-        names: &[String],
-    ) -> Result<Self, super::UnknownFieldError> {
-        Ok(Self {
-            text: super::project_fields(shown, names)?,
-            value: serde_json::Value::Object(
-                names
-                    .iter()
-                    .filter_map(|name| Some((name.clone(), shown.get(name)?.clone())))
-                    .collect(),
-            ),
-        })
-    }
-}
-
-impl HumanRender for IssueProjection {
-    fn render_human(&self, _: OutputMode) -> String {
-        format!("{}\n", self.text)
-    }
-}
 
 /// Response of `jit issue show`: what its arguments select.
 #[derive(Serialize, JsonSchema)]
@@ -74,7 +30,7 @@ pub enum IssueShowOutput {
     /// The item a `<issue>/<self-id>` argument addresses.
     Item(ItemShowResult),
     /// `--field` or `--fields`.
-    Projection(IssueProjection),
+    Projection(FieldProjection),
 }
 
 impl HumanRender for IssueShowOutput {
@@ -260,19 +216,15 @@ impl IssueListing {
             ))
         }
     }
-
-    fn render(&self, header: &str, columns: &[IssueColumn], quiet: bool) -> String {
-        let header = |_| header.to_owned();
-        match self {
-            Self::Summary(list) => list_text(header, &list.items, columns, quiet),
-            Self::Full(list) => list_text(header, &list.items, columns, quiet),
-        }
-    }
 }
 
 impl HumanRender for IssueListing {
     fn render_human(&self, mode: OutputMode) -> String {
-        self.render("All issues (filtered):", STATE_AND_PRIORITY, mode.quiet)
+        let header = |_| "All issues (filtered):".to_owned();
+        match self {
+            Self::Summary(list) => list_text(header, &list.items, STATE_AND_PRIORITY, mode.quiet),
+            Self::Full(list) => list_text(header, &list.items, STATE_AND_PRIORITY, mode.quiet),
+        }
     }
 }
 
@@ -324,8 +276,11 @@ impl SubsetListing {
 
 impl HumanRender for SubsetListing {
     fn render_human(&self, mode: OutputMode) -> String {
-        self.listing
-            .render(self.subset.header(), self.subset.columns(), mode.quiet)
+        let (header, columns) = (|_| self.subset.header().to_owned(), self.subset.columns());
+        match &self.listing {
+            IssueListing::Summary(list) => list_text(header, &list.items, columns, mode.quiet),
+            IssueListing::Full(list) => list_text(header, &list.items, columns, mode.quiet),
+        }
     }
 }
 
@@ -683,20 +638,5 @@ mod tests {
         let json = serde_json::to_value(BlockedListing::new(&blocked, true)).unwrap();
 
         assert_eq!(json["issues"][0]["blocked_reasons"][0]["type"], "gate");
-    }
-
-    #[test]
-    fn test_issue_projection_serializes_as_the_projected_value() {
-        let shown = serde_json::json!({"state": "ready", "title": "T"});
-
-        let field = IssueProjection::field(&shown, "state").unwrap();
-        let fields = IssueProjection::fields(&shown, &["title".to_owned()]).unwrap();
-
-        assert_eq!(serde_json::to_value(&field).unwrap(), "ready");
-        assert_eq!(
-            serde_json::to_value(&fields).unwrap(),
-            serde_json::json!({"title": "T"})
-        );
-        assert_eq!(field.render_human(OutputMode::default()), "ready\n");
     }
 }

@@ -399,7 +399,7 @@ unique = false
         fs::create_dir(&jit_dir).unwrap();
         let storage = crate::storage::JsonFileStorage::new(&jit_dir);
         let layout = test_layout(&jit_dir);
-        storage.configure_repository_layout(&layout);
+        storage.configure_repository_layout(&layout).unwrap();
 
         let hierarchy = get_hierarchy_config(&storage).unwrap();
 

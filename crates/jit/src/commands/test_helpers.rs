@@ -404,6 +404,7 @@ pub fn memory_executor_wrapping<W: IssueStore>(
     }
     CommandExecutor::new(pristine.clone())
         .with_layout(layout.clone())
+        .unwrap()
         .profiles()
         .initialize_fresh_repository(storage.root(), None)
         .expect("product initialization seeds the memory repository");
@@ -420,7 +421,9 @@ pub fn memory_executor_wrapping<W: IssueStore>(
     }
     declarations.remove_absent(&storage);
     mirror_memory_declarations(&storage, &layout);
-    CommandExecutor::new(wrap(storage)).with_layout(layout)
+    CommandExecutor::new(wrap(storage))
+        .with_layout(layout)
+        .unwrap()
 }
 
 fn mirror_memory_declarations(
@@ -522,6 +525,7 @@ mod tests {
         reference.add_data_file("config.toml", declared);
         CommandExecutor::new(reference.clone())
             .with_layout(reference.repository_layout())
+            .unwrap()
             .profiles()
             .initialize_fresh_repository(reference.root(), None)
             .unwrap();

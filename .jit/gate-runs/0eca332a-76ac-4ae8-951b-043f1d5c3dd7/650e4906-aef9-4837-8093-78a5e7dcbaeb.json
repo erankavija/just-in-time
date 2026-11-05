@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-0eca332a",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d997484c6bc5e2380cff5a1bc0a17fea144dded3",
+  "completed_at": "2026-11-05T00:04:50.348832766Z",
+  "duration_ms": 90288,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "9536d7e054758238ba96260b80a453910cf1e58a05c6301749d7d3f64bfee496",
+  "issue_id": "0eca332a-76ac-4ae8-951b-043f1d5c3dd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "650e4906-aef9-4837-8093-78a5e7dcbaeb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:03:20.060139156Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\nerror: using a non-octal value to set unix file permissions\nerror: could not compile `jit` (test \"cli\") due to 1 previous error\nwarning: build failed, waiting for other jobs to finish...\n  ✓ fmt: ok (1618 ms)\n  ✗ clippy: FAILED (exit 101) (30700 ms)\n  ✓ suite-build: built in 42697 ms, warmed 11 executables (947674496 bytes) in 42 ms (42742 ms)\n  ✓ test: 5052 passed, 0 failed, 0 skipped (12195 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2672 ms)\n  ✓ suite-clock: 14887 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=3/3 active-executables=7 bytes=674342656/740294656 profile=line-tables-only dep-features=pruned suite-duration=14887ms (97 ms)\n\ncargo-ci: verdict (exit 1): step 'clippy' failed on repository content\n"
+}

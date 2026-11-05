@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-cd0ac0f7",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ba56dfbdd068c12ae7b494ebc496985b8b718757",
+  "completed_at": "2026-11-05T00:37:53.671664732Z",
+  "duration_ms": 133434,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The configuration-event hierarchy reload and its browser coverage satisfy the issue criteria; the prior global-stub finding is fixed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b20229ee-a4cc-4b3f-826e-8ac292d168ce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:35:40.236861614Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 571e16bba, 0dc4b242, 2c6c6e7, a9303b5, ba56dfb (jit:cd0ac0f7)\nPolicy sources: AGENTS.md\nResolved items: @/issue/0f8efc37/requirement/REQ-04 (issue Markdown); @/issue/3a61ff16/requirement/REQ-01 (issue Markdown); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: npm-ci passed (exit 0); run a9303b5 contains the implementation commits, but not later evidence-only ba56dfb\nTruncation recovery: narrowed the truncated plan/investigation search to the relevant requirement, hierarchy consumer, watcher, and route sections\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The configuration-event hierarchy reload and its browser coverage satisfy the issue criteria; the prior global-stub finding is fixed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -23,6 +23,10 @@ import { createClusterAwareLayout } from '../../utils/clusterAwareLayout';
 import { findParentClusters } from '../../utils/graphFocus';
 import ClusterNode from './nodes/ClusterNode';
 
+const recordsEqual = <T,>(a: Record<string, T>, b: Record<string, T>) =>
+  Object.keys(a).length === Object.keys(b).length &&
+  Object.entries(a).every(([key, value]) => Object.hasOwn(b, key) && b[key] === value);
+
 // Type for storing viewport state during cluster expansion/collapse
 type SavedViewportData = {
   nodeId: string;
@@ -572,22 +576,25 @@ export function GraphView({
     }
   }, [nodes, loading]);
 
-  // Fetch hierarchy config from API on mount
+  // Refresh hierarchy when the repository changes.
   useEffect(() => {
+    let active = true;
     const fetchHierarchyConfig = async () => {
       try {
         const config = await apiClient.getHierarchy();
-        // Store full config (types + icons)
-        setHierarchyConfig({
-          levels: config.types,
-          icons: config.icons || {},
-        });
+        if (active) {
+          const next = { levels: config.types, icons: config.icons || {} };
+          setHierarchyConfig(previous => previous &&
+            recordsEqual(previous.levels, next.levels) && recordsEqual(previous.icons ?? {}, next.icons)
+            ? previous : next);
+        }
       } catch (err) {
-        console.warn('Failed to fetch hierarchy config:', err);
+        if (active) console.warn('Failed to fetch hierarchy config:', err);
       }
     };
     fetchHierarchyConfig();
-  }, []);
+    return () => { active = false; };
+  }, [version]);
 
   const loadGraph = useCallback(async () => {
     const isBackground = hasLoadedOnceRef.current;

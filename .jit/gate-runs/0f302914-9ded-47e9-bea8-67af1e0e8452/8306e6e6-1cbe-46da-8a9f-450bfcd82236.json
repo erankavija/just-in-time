@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-0f302914",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "34a839d099b115a4cda3e21b2911af5cb16f6ea4",
+  "completed_at": "2026-11-04T23:49:39.962921442Z",
+  "duration_ms": 109521,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "e05892371699959ae3aea678e0246edc2ce06cc0253f4a733bed11984fb91922",
+  "issue_id": "0f302914-9ded-47e9-bea8-67af1e0e8452",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8306e6e6-1cbe-46da-8a9f-450bfcd82236",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:47:50.441495163Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\nerror: enclosing `Ok` and `?` operator are unneeded\nerror: enclosing `Ok` and `?` operator are unneeded\nerror: enclosing `Ok` and `?` operator are unneeded\nerror: enclosing `Ok` and `?` operator are unneeded\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\nerror: could not compile `jit-server` (lib) due to 4 previous errors\nwarning: build failed, waiting for other jobs to finish...\n  ✓ fmt: ok (1645 ms)\n  ✗ clippy: FAILED (exit 101) (34468 ms)\n  ✓ suite-build: built in 58064 ms, warmed 11 executables (966072912 bytes) in 43 ms (58110 ms)\n  ✓ test: 5051 passed, 0 failed, 0 skipped (12276 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2736 ms)\n  ✓ suite-clock: 15033 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (9 ms)\n  ✓ budget: integration-targets=3/3 active-executables=7 bytes=689730968/740294656 profile=line-tables-only dep-features=pruned suite-duration=15033ms (94 ms)\n\ncargo-ci: verdict (exit 1): step 'clippy' failed on repository content\n"
+}

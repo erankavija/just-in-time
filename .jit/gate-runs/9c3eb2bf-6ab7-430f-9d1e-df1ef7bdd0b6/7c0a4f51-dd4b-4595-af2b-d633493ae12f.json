@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-9c3eb2bf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1d81910d1ff9dda2bcac809915a5c798d4ff110b",
+  "completed_at": "2026-11-04T23:21:33.204527510Z",
+  "duration_ms": 335582,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/repository_state_store.rs",
+        "id": "F1",
+        "line": 576,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9c3eb2bf/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "JsonFileStorage binds before recovery completes, changing required recovery ordering."
+      }
+    ],
+    "summary": "Mutation-session binding now precedes recovery, violating the issue's ordering requirement.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7c0a4f51-dd4b-4595-af2b-d633493ae12f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:15:57.621752783Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14224 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-9c3eb2bf\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8d9-06f3-7c10-acca-499e27d23e5d\n--------\nuser\n--- 14211 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 1d81910d1ff9dda2bcac809915a5c798d4ff110b (`jit:9c3eb2bf`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/9c3eb2bf/requirement/REQ-01, @/issue/0f8efc37/requirement/REQ-02, @/issue/a236e81e/requirement/REQ-01 (issue descriptions); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci pending (no exit code)\nTruncation recovery: narrower per-path patches, caller inventory, conformance-suite, and pre-change mutation-session ordering reads performed\n\n1. [blocking][issue-impact] `crates/jit/src/storage/repository_state_store.rs:576` binds `JsonFileStorage` before bootstrap locking and leftover-record recovery (lines 592–613). Previously the binding occurred only after recovery completed. Since `configure_repository_layout` persists the initial binding (`crates/jit/src/storage/json.rs:938`), a failed recovery now leaves an otherwise unbound store permanently bound, changing the required recovery ordering. Preserve the post-recovery bind, with any needed incompatibility validation performed without committing the binding first. References: @/issue/9c3eb2bf/requirement/REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Mutation-session binding now precedes recovery, violating the issue's ordering requirement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"JsonFileStorage binds before recovery completes, changing required recovery ordering.\",\"file\":\"crates/jit/src/storage/repository_state_store.rs\",\"line\":576,\"references\":[\"@/issue/9c3eb2bf/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
