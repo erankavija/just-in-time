@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-487f45a9",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ade697f93c831e9d4ddbd311a1c24c6ad9e3affc",
+  "completed_at": "2026-11-04T22:55:23.920286008Z",
+  "duration_ms": 209719,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f4d9502a-git-cli-module/breakdown.json",
+        "id": "F1",
+        "line": 629,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/canonical-cutover",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The active backlog breakdown retains ClaimRequiresGitError and CLAIM_REQUIRES_GIT as current target contracts."
+      }
+    ],
+    "summary": "Active planning documentation still names the removed Git-requirement type and code.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "487f45a9-bd42-47f8-8dd1-6487ad287793",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c0c56b7d-20da-444e-b777-5dfd6c07dd64",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:51:54.200286111Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4257 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-487f45a9\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8c3-0095-7893-94aa-05580e71d0df\n--------\nuser\n--- 4244 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b0c51b0e7, eb0752bea, 2ec33f8c5, b72bd9aaa\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-24 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T22:08:49Z); code-review failed (exit 1, prior F1 addressed)\nTruncation recovery: recovered b0c51b0e7 through bounded per-path diffs and current source, test, schema, and documentation reads\n\n1. **F1 — Blocking, issue-impact:** The active backlog breakdown still names the removed `ClaimRequiresGitError` and `CLAIM_REQUIRES_GIT` as current requirements at [dev/active/f4d9502a-git-cli-module/breakdown.json](/mnt/nvme/jit/agents/worktrees/agent-487f45a9/dev/active/f4d9502a-git-cli-module/breakdown.json:629) and [line 1064](/mnt/nvme/jit/agents/worktrees/agent-487f45a9/dev/active/f4d9502a-git-cli-module/breakdown.json:1064). This violates REQ-04 and leaves future work targeting a removed contract. References: @/invariant/canonical-cutover, @/invariant/single-source-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Active planning documentation still names the removed Git-requirement type and code.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The active backlog breakdown retains ClaimRequiresGitError and CLAIM_REQUIRES_GIT as current target contracts.\",\"file\":\"dev/active/f4d9502a-git-cli-module/breakdown.json\",\"line\":629,\"references\":[\"@/invariant/canonical-cutover\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

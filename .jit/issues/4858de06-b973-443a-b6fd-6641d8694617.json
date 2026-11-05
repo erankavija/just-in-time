@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T23:46:36.731240824Z",
+  "dependencies": [
+    "32607213-7402-4c17-9889-7a6286e1959e",
+    "6d93ab14-4c72-4ec5-9c50-471cf0d95746"
+  ],
+  "description": "Keep issue details responsive on first selection and when selections or refreshes overlap.\n\n## Background\n\nThe load effect starts a request before a later issue-change effect resets its sequence counter. The resulting response no longer matches the counter, leaving the first selection loading. Resetting a reused counter can also let an older request match a later selection.\n\n## Success Criteria\n\n- [hard] REQ-01: Selecting an issue displays its returned details or error and clears loading, including the first selection.\n- [hard] REQ-02: Out-of-order responses from earlier selections, clearing the selection, or older refreshes cannot replace the current selection; fresh version updates still refresh it.\n- [hard] REQ-03: Automated component tests exercise first selection, overlapping selections and version refreshes, and clearing and reselecting an issue.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T23:46:36.731240824Z",
+  "gates_required": [
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4858de06-b973-443a-b6fd-6641d8694617",
+  "labels": [
+    "epic:frontends-share-core",
+    "story:frontend-web",
+    "milestone:v1.0",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Load issue details safely across selection changes",
+  "updated_at": "2026-11-04T23:46:41.091894074Z"
+}

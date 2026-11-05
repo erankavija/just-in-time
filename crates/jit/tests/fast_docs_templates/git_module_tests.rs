@@ -223,7 +223,53 @@ fn test_head_unstartable_program_returns_unavailable_error() {
         .head()
         .unwrap_err();
 
-    assert!(matches!(error, GitError::Unavailable { program: named, .. } if named == program));
+    assert!(matches!(error, GitError::GitUnavailable { program: named, .. } if named == program));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_user_name_returns_configured_name_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("primary"));
+    let stand_in = GitStandIn::new();
+
+    let user_name = checkout(Git::with_program(stand_in.program()), repository.root())
+        .user_name()
+        .unwrap();
+
+    assert_eq!(user_name.as_deref(), Some("Test User"));
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(repository.root()));
+    assert_eq!(invocations[0].args(), ["config", "user.name"]);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_user_name_returns_none_when_unset_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("primary"));
+    repository.git(&["config", "--local", "--unset", "user.name"]);
+    let empty_global_config = dir.path().join("empty-gitconfig");
+    std::fs::write(&empty_global_config, "").unwrap();
+    let stand_in = GitStandIn::with_environment(&[
+        ("GIT_CONFIG_GLOBAL", empty_global_config.to_str().unwrap()),
+        ("GIT_CONFIG_NOSYSTEM", "1"),
+    ]);
+
+    let user_name = checkout(Git::with_program(stand_in.program()), repository.root())
+        .user_name()
+        .unwrap();
+
+    assert_eq!(user_name, None);
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(repository.root()));
+    assert_eq!(invocations[0].args(), ["config", "user.name"]);
 }
 
 fn dirty_paths(repository: &GitRepository) -> BTreeSet<PathBuf> {

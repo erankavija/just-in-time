@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-abf68973",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b417404fce9c0516e8091fb78451f06d2c0f6993",
+  "completed_at": "2026-11-04T23:32:40.656157376Z",
+  "duration_ms": 187193,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/abf68973-3771-47cb-89d0-708290cb00ac.json",
+        "id": "F1",
+        "line": 37,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/c8e79465/requirement/REQ-01"
+        ],
+        "severity": "low",
+        "summary": "The pre-existing satisfies:c8e79465/REQ-01 label is unsupported because this module/dependency change does not make routes use shared core operations or preserve HTTP contracts."
+      }
+    ],
+    "summary": "The module and dependency cutover meets its hard criterion with passing cargo-ci evidence; one unrelated pre-existing coverage label remains unsupported.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abf68973-3771-47cb-89d0-708290cb00ac",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "30f89ff4-02e8-4fb3-8483-993271004345",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:29:33.462891748Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 38739cc6b, ea17f6ec9, 206d35cc6, e4aa30ddc, b417404fc\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/abf68973/requirement/REQ-01, @/issue/0f8efc37/requirement/REQ-11, @/issue/c8e79465/requirement/REQ-01 (issue descriptions); @/charter/D-18, @/charter/D-20 (charter); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/canonical-cutover (invariants registry); @/gate/cargo-ci (gates registry)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T23:25:59Z; code-review failed, exit 1, 2026-11-04T23:15:59Z (prior review; its test-evidence blocking finding is addressed)\nTruncation recovery: re-read individual tagged patches, current server source/manifest/lockfile, applicable policy sources, linked plan/investigation ranges, and issue provenance in bounded calls.\n\n1. F1 — advisory, pre-existing, low: The unchanged `satisfies:c8e79465/REQ-01` label at `.jit/issues/abf68973-3771-47cb-89d0-708290cb00ac.json:37` is unsupported. This task imports library modules and removes dependencies, but does not make supported routes use shared core operations or preserve their HTTP contracts. References: @/issue/c8e79465/requirement/REQ-01.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The module and dependency cutover meets its hard criterion with passing cargo-ci evidence; one unrelated pre-existing coverage label remains unsupported.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The pre-existing satisfies:c8e79465/REQ-01 label is unsupported because this module/dependency change does not make routes use shared core operations or preserve HTTP contracts.\",\"file\":\".jit/issues/abf68973-3771-47cb-89d0-708290cb00ac.json\",\"line\":37,\"references\":[\"@/issue/c8e79465/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

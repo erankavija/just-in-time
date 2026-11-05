@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b1b6484c-e4f7-4a19-9867-08ecfd29871a",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:42:42.310579230Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d6cd0057-7076-47da-b055-f871eeb6379f",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:46:14.489959775Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "User name query in the git module",
-  "updated_at": "2026-11-04T22:53:53.611979710Z"
+  "updated_at": "2026-11-04T23:46:14.489959775Z"
 }

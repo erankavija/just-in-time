@@ -12,8 +12,8 @@ impl HumanRender for WorktreeInfo {
             "secondary worktree"
         };
         format!(
-            "Worktree Information:\n  ID:         {}\n  Branch:     {}\n  Root:       {}\n  Type:       {kind}\n  Common dir: {}\n",
-            self.worktree_id, self.branch, self.root_path, self.common_dir
+            "Worktree Information:\n  ID:         {}\n  Branch:     {}\n  Root:       {}\n  Data root:  {}\n  Type:       {kind}\n  Common dir: {}\n",
+            self.worktree_id, self.branch, self.root_path, self.data_root, self.common_dir
         )
     }
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:frontend-modules",
+  "claimed_at": "2026-11-04T23:13:43.102640247Z",
   "context": {},
   "created_at": "2026-11-04T22:24:54.946576604Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "The binary imports its existing library modules and drops unused manifest dependencies.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary imports library modules without redeclaring them; unused server dependencies are removed and existing server tests compile and run once.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:33:23.244807767Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b8dd9e22-a90a-4c60-aa07-955dda216c50",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:17:30.329185256Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "30f89ff4-02e8-4fb3-8483-993271004345",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:32:40.657798175Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "abf68973-3771-47cb-89d0-708290cb00ac",
   "labels": [
     "type:task",
@@ -23,7 +38,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Compile server modules through the library",
-  "updated_at": "2026-11-04T23:06:53.853956706Z"
+  "updated_at": "2026-11-05T00:17:30.329185256Z"
 }
