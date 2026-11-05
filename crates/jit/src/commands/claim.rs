@@ -5,7 +5,9 @@
 use super::CommandExecutor;
 use crate::config::JitConfig;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
+use crate::errors::{GitRequirementGap, RequiresGitError};
 use crate::storage::claim_coordinator::{read_leases, LeaseChange};
+use crate::storage::git::{GitCheckout, GitError};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -17,52 +19,18 @@ use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 
-/// True when the selected worktree root is inside a git working tree, regardless
-/// of whether any commit exists yet.
-///
-/// Used by [`get_current_branch`] to tell apart "no git repository" from "git
-/// repository with no commits" when `git rev-parse --abbrev-ref HEAD` fails —
-/// both fail identically, but only `--is-inside-work-tree` still succeeds in
-/// the latter case (it doesn't need a resolvable `HEAD`).
-fn is_inside_git_work_tree(worktree_root: &Path) -> bool {
-    Command::new("git")
-        .arg("-C")
-        .arg(worktree_root)
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
-}
-
-/// Get current git branch name.
-///
-/// # Errors
-///
-/// Returns [`crate::errors::RequiresGitError`] when the selected worktree
-/// is not inside a git repository, when git is not available, or when the
-/// selected worktree is a git repository with no commits yet (so `HEAD` doesn't
-/// resolve to a branch) — the error's [`GitRequirementGap`](crate::errors::GitRequirementGap)
-/// distinguishes the two so the hint matches the actual gap (REQ-04). This
-/// typed error allows callers to classify the failure as an external
-/// dependency failure (exit code 10) rather than a generic error.
-fn get_current_branch(worktree_root: &Path) -> Result<String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(worktree_root)
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()
-        .context("Failed to execute git command for branch detection")?;
-
-    if !output.status.success() {
-        let gap = if is_inside_git_work_tree(worktree_root) {
-            crate::errors::GitRequirementGap::NoCommits
-        } else {
-            crate::errors::GitRequirementGap::NoRepository
-        };
-        return Err(crate::errors::RequiresGitError::new(gap).into());
+/// Read the selected checkout's branch, requiring Git and a committed HEAD.
+fn claim_branch(checkout: Option<GitCheckout>) -> Result<String> {
+    let checkout =
+        checkout.ok_or_else(|| RequiresGitError::new(GitRequirementGap::NoRepository))?;
+    match checkout.head() {
+        Ok(Some(head)) => Ok(head.branch_label().to_owned()),
+        Ok(None) => Err(RequiresGitError::new(GitRequirementGap::NoCommits).into()),
+        Err(GitError::GitUnavailable { .. }) => {
+            Err(RequiresGitError::new(GitRequirementGap::NoRepository).into())
+        }
+        Err(error) => Err(error.into()),
     }
-
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
 /// Claim and recovery operations of a [`CommandExecutor`].
@@ -113,7 +81,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
             .with_context(|| format!("Issue {} not found", full_id))?;
 
         // Get current branch
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = claim_branch(paths.write_checkout())?;
 
         // Load or generate worktree identity, surfacing relocation as a warning
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
@@ -242,7 +210,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         use crate::agent_config::resolve_agent_id;
 
         // Get current branch for identity
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = claim_branch(paths.write_checkout())?;
 
         // Load worktree identity, surfacing relocation as a warning
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
@@ -356,7 +324,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         let full_id = issue_id.clone();
 
         // Get current branch for identity
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = claim_branch(paths.write_checkout())?;
 
         // Load worktree identity, surfacing relocation as a warning
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
@@ -426,7 +394,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         use crate::agent_config::resolve_agent_id;
 
         // Get current branch
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = claim_branch(paths.write_checkout())?;
 
         // Load worktree identity, surfacing relocation as a warning
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
@@ -466,7 +434,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         use crate::agent_config::resolve_agent_id;
 
         // Claims require git (`@/charter/D-4`).
-        get_current_branch(&paths.worktree_root)?;
+        claim_branch(paths.write_checkout())?;
 
         // Default to the current agent when no filter is given.
         let filter_agent = match (issue, agent_id) {
@@ -520,7 +488,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     pub fn list(&self) -> Result<Vec<ListedLease>> {
         let paths = self.exec.require_worktree_paths()?;
         // Claims require git (`@/charter/D-4`).
-        get_current_branch(&paths.worktree_root)?;
+        claim_branch(paths.write_checkout())?;
         unexpired_leases(paths, None, None)
     }
 }
@@ -548,7 +516,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     ) -> Result<(Lease, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
         // Get current branch for identity
-        let branch = get_current_branch(&paths.worktree_root)?;
+        let branch = claim_branch(paths.write_checkout())?;
 
         // Load worktree identity, surfacing relocation as a warning
         let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
@@ -620,7 +588,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     use crate::storage::lock_cleanup;
 
     // Get current branch for identity.
-    let branch = get_current_branch(&paths.worktree_root)?;
+    let branch = claim_branch(paths.write_checkout())?;
 
     // Load worktree identity (surfacing any relocation as a typed warning).
     let (identity, identity_warnings) =
@@ -1828,18 +1796,19 @@ mod tests {
     }
 
     #[test]
-    fn test_get_current_branch_errors_when_git_fails() {
-        // Create a temp directory that's NOT a git repo
+    fn test_claim_branch_requires_git_when_executable_cannot_start() {
+        use crate::errors::RequiresGitError;
+        use crate::storage::git::{Git, GitCheckout};
+
         let temp = TempDir::new().unwrap();
-
-        // get_current_branch() should return an error, not "main"
-        let result = get_current_branch(temp.path());
-
-        // Should fail, not return "main" as fallback
-        assert!(
-            result.is_err(),
-            "get_current_branch() should error in non-git directory, not return fallback"
+        let checkout = GitCheckout::for_test(
+            Git::with_program(temp.path().join("missing-git")),
+            temp.path().to_path_buf(),
         );
+
+        let error = claim_branch(Some(checkout)).unwrap_err();
+        assert!(error.is::<RequiresGitError>(), "{error}");
+        assert!(error.to_string().contains("git init"), "{error}");
     }
 
     // REQ-04's "git repository with no commits" gap is covered at the CLI

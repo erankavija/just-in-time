@@ -8,12 +8,26 @@
   ],
   "description": "Add the module's one comparison of `HEAD` with a base branch, with a typed outcome, so the branch-drift check and the main-history guard compute it once, in the selected worktree.\n\n## Background\n\n- `check_branch_divergence` (`crates/jit/src/commands/worktree.rs:388-420`) and `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2162-2211`) each run `git merge-base HEAD origin/main` and `git rev-parse origin/main` with neither `-C` nor `current_dir`, so both inspect the process working directory. Both name the base as a literal.\n- They differ only in failure handling. The divergence check reads a failing merge base or a missing base as \"not diverged\"; the drift check reports each as its own error.\n- `git rev-parse --verify <base>^{commit}` fails when the base does not resolve, and `git merge-base HEAD <base>` exits 1 when the two share no history.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::compare_with_base(base)` runs in the checkout's worktree, takes the base as an argument, and returns a typed outcome: `Compared` with the merge base and the base's commit, `BaseUnresolved` when the base does not resolve to a commit, or `NoMergeBase` when `HEAD` and the base share no history.\n- [hard] REQ-02: The behaviour suite covers a base equal to the merge base, a diverged branch, a missing base and unrelated histories.\n\n## Notes\n\n- Which base branch the checks use, and whether they run, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:14:36.024161872Z",
   "first_ready_at": "2026-11-01T14:05:17.961281017Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "28900273-f4d7-4715-be37-524cc0fe3970",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:14:05.809183408Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "db8d37ea-9b42-4c8d-b290-956909bcf99f",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:13:20.685286903Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "09974ad1-7c28-4aba-8a7a-62b0020383f3",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Base comparison operation in the git module",
-  "updated_at": "2026-11-04T23:52:29.474333037Z"
+  "updated_at": "2026-11-05T02:14:36.024161872Z"
 }
