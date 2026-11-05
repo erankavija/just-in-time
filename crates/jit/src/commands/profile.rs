@@ -2180,7 +2180,11 @@ mod tests {
         let storage = JsonFileStorage::new(repository.root().join("state"));
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(&outside, storage.root()).unwrap())
-            .unwrap();
+            .unwrap()
+            .with_worktree_paths(
+                crate::storage::WorktreePaths::detect_for_data_root(storage.root(), &outside)
+                    .unwrap(),
+            );
         executor
             .profiles()
             .initialize_fresh_repository(&outside, None)
