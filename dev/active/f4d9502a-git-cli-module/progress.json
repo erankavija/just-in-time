@@ -316,9 +316,10 @@
           "short_id": "3f8da8c4",
           "title": "Gate runs take commit and branch evidence from the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "implementing"
+          "worker_status": "merged_and_gated",
+          "source_merge": "9df9fe2fc2161580f28aaf9f1f499e24aca49ffd"
         },
         {
           "id": "47d62472-731b-48a9-b27c-136cf86804ee",
@@ -840,7 +841,8 @@
     "Steward approved EA seventh file only obsolete two-line Git comment; approved 9ec shared exact submodule-status parsing and owning test (four-file footprint). 83 second-parent merge regression and 3f actual old-code RED rework each counted once. Do not cancel queued checks; collect before edits. b067 frontend received idle source slot before EA.",
     "ea4b7363 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Dependency-ready 47d62472 branch drift and92afc5d8 init classification claimed after EA closure; isolated Sol-high workers next. Initial issue-claim --ttl syntax rejected without mutation; separate claim acquire owns TTL.",
-    "83c8632f Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "83c8632f Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "3f8da8c4 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1300,10 +1302,11 @@
       "verdict": "PASS",
       "reviewed_source": "53af83b6e6a522144b56cef4efba4c96fa855403",
       "gates": {
-        "cargo-ci": "3c1b0cc1-ab9b-4179-a9c8-89feea8967e7",
+        "cargo-ci": "083bd832-a288-4fe6-a201-a243b31d72d6",
         "code-review": "4c16f96a-c643-46c0-bc48-3cca022950b9"
       },
-      "criteria": "All four criteria met: explicit Head argument, selected paths lookup before checker, actual baseline RED for nested and in-memory scenarios, argument-observing non-Git checker test. Private Git helpers/spawns removed. Two own files exact after refreshed reviewed branch; D25 test correction retained. No linked docs/deferrals. Head convergence comment still awaits c140 snapshot consumer, legitimately pending. Mandatory merged Cargo pending."
+      "criteria": "All four criteria met: explicit Head argument, selected paths lookup before checker, actual baseline RED for nested and in-memory scenarios, argument-observing non-Git checker test. Private Git helpers/spawns removed. Two own files exact after refreshed reviewed branch; D25 test correction retained. No linked docs/deferrals. Head convergence comment still awaits c140 snapshot consumer, legitimately pending. Mandatory merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 083bd832-a288-4fe6-a201-a243b31d72d6 on 9df9fe2fc2161580f28aaf9f1f499e24aca49ffd."
     }
   },
   "source_queue": [
