@@ -1229,40 +1229,43 @@ impl GitCheckout {
         });
 
         if !pending_files.is_empty() {
-            let oids = pending_files.keys().cloned().collect::<BTreeSet<_>>();
-            match self.read_blob_batch(&oids) {
-                Ok(blob_results) => pending_files.into_iter().for_each(|(oid, requests)| {
+            match self.object_reader() {
+                Ok(mut reader) => pending_files.into_iter().for_each(|(oid, requests)| {
+                    let blob_result = reader
+                        .read(&oid)
+                        .map_err(|error| error.to_string())
+                        .and_then(|object| match object {
+                            Some(object)
+                                if object.id().as_str() == oid
+                                    && object.object_type() == GitObjectType::Blob =>
+                            {
+                                Ok(object.bytes().to_vec())
+                            }
+                            Some(object) if object.object_type() != GitObjectType::Blob => {
+                                Err("git cat-file --batch returned a non-blob object".into())
+                            }
+                            Some(_) => {
+                                Err("git cat-file --batch returned a different object".into())
+                            }
+                            None => Err("git cat-file --batch reported a missing object".into()),
+                        });
                     requests
                         .into_iter()
-                        .for_each(|(revision, path, commit, mut target)| {
-                            match blob_results.get(&oid) {
-                                Some(Ok(bytes)) => {
-                                    target.bytes = Some(bytes.clone());
-                                    results.insert((revision, path.clone()), Ok(target.clone()));
-                                    next_cache.insert((commit, path), target);
-                                }
-                                Some(Err(reason)) => {
-                                    results.insert(
-                                        (revision.clone(), path.clone()),
-                                        Err(GitError::PinnedReadFailed {
-                                            revision,
-                                            path,
-                                            stderr: reason.clone(),
-                                        }),
-                                    );
-                                }
-                                None => {
-                                    results.insert(
-                                        (revision.clone(), path.clone()),
-                                        Err(GitError::PinnedReadFailed {
-                                            revision,
-                                            path,
-                                            stderr:
-                                                "git cat-file --batch omitted the requested object"
-                                                    .into(),
-                                        }),
-                                    );
-                                }
+                        .for_each(|(revision, path, commit, mut target)| match &blob_result {
+                            Ok(bytes) => {
+                                target.bytes = Some(bytes.clone());
+                                results.insert((revision, path.clone()), Ok(target.clone()));
+                                next_cache.insert((commit, path), target);
+                            }
+                            Err(reason) => {
+                                results.insert(
+                                    (revision.clone(), path.clone()),
+                                    Err(GitError::PinnedReadFailed {
+                                        revision,
+                                        path,
+                                        stderr: reason.clone(),
+                                    }),
+                                );
                             }
                         });
                 }),
@@ -1377,105 +1380,6 @@ impl GitCheckout {
             .map(|revision| (revision.clone(), self.resolve_commit(revision)))
             .collect()
     }
-
-    // Temporary @/inv/convention-convergence exception: dcf88b6f moves
-    // pinned inspection onto object_reader and removes this batch parser.
-    fn read_blob_batch(
-        &self,
-        oids: &BTreeSet<String>,
-    ) -> Result<BTreeMap<String, Result<Vec<u8>, String>>, GitError> {
-        let mut child = self
-            .git
-            .command(&self.worktree_root, ["cat-file", "--batch"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|source| self.git.unavailable(source))?;
-        let Some(mut stdin) = child.stdin.take() else {
-            return Ok(oids
-                .iter()
-                .map(|oid| {
-                    (
-                        oid.clone(),
-                        Err("git cat-file --batch did not expose stdin".into()),
-                    )
-                })
-                .collect());
-        };
-        let write_oids = oids.iter().cloned().collect::<Vec<_>>();
-        let writer = thread::spawn(move || {
-            let result = write_oids
-                .iter()
-                .try_for_each(|oid| writeln!(stdin, "{oid}"));
-            drop(stdin);
-            result
-        });
-        let Some(mut stdout) = child.stdout.take() else {
-            let _ = child.wait();
-            let _ = writer.join();
-            return Ok(oids
-                .iter()
-                .map(|oid| {
-                    (
-                        oid.clone(),
-                        Err("git cat-file --batch did not expose stdout".into()),
-                    )
-                })
-                .collect());
-        };
-        let stderr_reader = child.stderr.take().map(|mut stderr_pipe| {
-            thread::spawn(move || {
-                let mut bytes = Vec::new();
-                let result = stderr_pipe.read_to_end(&mut bytes);
-                result.map(|_| bytes)
-            })
-        });
-        let mut bytes = Vec::new();
-        let read_result = stdout.read_to_end(&mut bytes).map(|_| ());
-        let wait_result = child.wait();
-        let writer_result = writer
-            .join()
-            .map_err(|_| io::Error::other("git cat-file input writer panicked"))
-            .and_then(|result| result);
-        let stderr_bytes = stderr_reader
-            .map(|reader| {
-                reader
-                    .join()
-                    .map_err(|_| io::Error::other("git cat-file stderr reader panicked"))
-                    .and_then(|result| result)
-            })
-            .transpose()
-            .map_err(|error| GitError::PinnedReadFailed {
-                revision: "batch".into(),
-                path: "<blobs>".into(),
-                stderr: error.to_string(),
-            })?
-            .unwrap_or_default();
-        if let Err(error) = read_result.or(writer_result) {
-            return Ok(oids
-                .iter()
-                .map(|oid| (oid.clone(), Err(error.to_string())))
-                .collect());
-        }
-        let status = wait_result.map_err(|error| GitError::PinnedReadFailed {
-            revision: "batch".into(),
-            path: "<blobs>".into(),
-            stderr: error.to_string(),
-        })?;
-        if !status.success() {
-            let reason = String::from_utf8_lossy(&stderr_bytes).trim().to_string();
-            return Ok(oids
-                .iter()
-                .map(|oid| (oid.clone(), Err(reason.clone())))
-                .collect());
-        }
-        parse_cat_file_batch(&bytes, oids).map_err(|reason| GitError::PinnedReadFailed {
-            revision: "batch".into(),
-            path: "<blobs>".into(),
-            stderr: reason,
-        })
-    }
 }
 
 fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>, String> {
@@ -1507,59 +1411,6 @@ fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>,
             ))
         })
         .collect()
-}
-
-fn parse_cat_file_batch(
-    output: &[u8],
-    requested_oids: &BTreeSet<String>,
-) -> Result<BTreeMap<String, Result<Vec<u8>, String>>, String> {
-    let mut responses = BTreeMap::new();
-    let mut offset = 0;
-    while offset < output.len() {
-        let Some(header_length) = output[offset..].iter().position(|byte| *byte == b'\n') else {
-            return Err("git cat-file --batch response lacks a header terminator".into());
-        };
-        let header_end = offset + header_length;
-        let fields = output[offset..header_end]
-            .split(|byte| *byte == b' ')
-            .collect::<Vec<_>>();
-        let [oid, object_type, size] = fields.as_slice() else {
-            return Err("git cat-file --batch response has an invalid header".into());
-        };
-        let oid = std::str::from_utf8(oid)
-            .map(str::to_owned)
-            .map_err(|_| "git cat-file --batch response has a non-UTF-8 OID".to_string())?;
-        offset = header_end + 1;
-        if *object_type == b"missing" {
-            responses.insert(
-                oid,
-                Err("git cat-file --batch reported a missing object".into()),
-            );
-            continue;
-        }
-        if *object_type != b"blob" {
-            return Err("git cat-file --batch returned a non-blob object".into());
-        }
-        let size = std::str::from_utf8(size)
-            .map_err(|_| "git cat-file --batch response has an invalid size".to_string())?
-            .parse::<usize>()
-            .map_err(|_| "git cat-file --batch response has an invalid size".to_string())?;
-        let Some(content_end) = offset.checked_add(size) else {
-            return Err("git cat-file --batch response size overflows".into());
-        };
-        if content_end >= output.len() || output[content_end] != b'\n' {
-            return Err("git cat-file --batch response lacks its content terminator".into());
-        }
-        responses.insert(oid, Ok(output[offset..content_end].to_vec()));
-        offset = content_end + 1;
-    }
-    if requested_oids
-        .iter()
-        .any(|oid| !responses.contains_key(oid))
-    {
-        return Err("git cat-file --batch returned fewer responses than requested".into());
-    }
-    Ok(responses)
 }
 
 fn validate_path(path: &str) -> Result<(), GitError> {
