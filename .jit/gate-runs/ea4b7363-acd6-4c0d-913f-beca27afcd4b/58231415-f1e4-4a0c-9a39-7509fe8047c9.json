@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-ea4b7363",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "668ad13553bac72db224a6fb5a225c13447e6ce1",
+  "completed_at": "2026-11-05T03:25:59.200672827Z",
+  "duration_ms": 240031,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/git.rs",
+        "id": "F1",
+        "line": 300,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "low",
+        "summary": "Remove the obsolete temporary-exception comment after resolving the direct release-actor Git query."
+      }
+    ],
+    "summary": "Release actor resolution now uses the selected checkout through the storage git module; one isolated obsolete comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "58231415-f1e4-4a0c-9a39-7509fe8047c9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:21:59.169667993Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:ea4b7363 commits 971cd778, 49eb1e97, 156b0115, 22198ac1, 584bdfef, 8dda31d6, f1cfae9f  \nPolicy sources: AGENTS.md  \nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02, @/issue/f4d9502a/requirement/REQ-03 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/invariant/convention-convergence, @/invariant/essential-code-prose (.jit/invariants.toml)  \nGate evidence: cargo-ci passed (exit 0, 2026-11-05T03:20:28Z); run commit 668ad135 contains all seven attributable commits  \nTruncation recovery: per-commit and per-file reads; historical gate-run stdout excluded as past-record evidence  \n\n1. [advisory][issue-impact] `crates/jit/src/storage/git.rs:300` retains an obsolete temporary-exception comment claiming release actor fallback still queries Git directly until this issue. The current resolver uses `GitCheckout::user_name`; remove the now-false task-history comment. References: @/invariant/essential-code-prose, @/invariant/convention-convergence.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Release actor resolution now uses the selected checkout through the storage git module; one isolated obsolete comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Remove the obsolete temporary-exception comment after resolving the direct release-actor Git query.\",\"file\":\"crates/jit/src/storage/git.rs\",\"line\":300,\"references\":[\"@/invariant/essential-code-prose\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

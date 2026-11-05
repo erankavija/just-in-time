@@ -16,9 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "48bdc215-e267-468c-a544-277dff8f4c00",
-      "status": "failed",
-      "updated_at": "2026-11-05T03:06:04.266537110Z",
+      "run_id": "38d0796c-dc72-4d2e-9470-f9affe52fef0",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:21:59.026711738Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "58231415-f1e4-4a0c-9a39-7509fe8047c9",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:25:59.202295977Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Release actor reads git user.name through the module",
-  "updated_at": "2026-11-05T03:06:04.266537110Z"
+  "updated_at": "2026-11-05T03:25:59.202295977Z"
 }
