@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "doc-review": {
-      "run_id": "5f6275eb-d5ce-48f0-8526-e84508ee6cba",
+      "run_id": "f24a5166-cce6-43b1-bf01-288854ec4ba4",
       "status": "passed",
-      "updated_at": "2026-11-05T00:39:48.366222424Z",
+      "updated_at": "2026-11-05T01:25:28.731030851Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "State the CLI output contract once in the command reference",
-  "updated_at": "2026-11-05T01:23:09.301876583Z"
+  "updated_at": "2026-11-05T01:25:28.731030851Z"
 }
