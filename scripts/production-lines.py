@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Production code lines per top-level module of crates/jit/src at a git rev.
+"""Production code lines by module at a git rev, or for one working-tree file.
 
 Excludes: blank lines; doc comments (///, //!, /** */ blocks); `#[cfg(test)]`
 item extents (brace-matched from the attribute); whole files declared by a
@@ -8,17 +8,24 @@ item extents (brace-matched from the attribute); whole files declared by a
 Flags: --strip-line-comments also drops plain `//` comment lines;
 --test-support-as-test also drops files with an inner
 `#![cfg(any(test, feature = "test-support"))]` and items under that cfg.
-Usage: scripts/production-lines.py [REV] [--strip-line-comments] [--test-support-as-test]
+Usage: scripts/production-lines.py [REV | --file PATH] [--strip-line-comments] [--test-support-as-test]
 """
-import collections, os, re, subprocess, sys
-args=[a for a in sys.argv[1:] if not a.startswith('--')]
-REV=args[0] if args else 'HEAD'
-STRIP_LC='--strip-line-comments' in sys.argv
-TS='--test-support-as-test' in sys.argv
+import argparse, collections, os, re, subprocess, sys
+from pathlib import Path
+parser=argparse.ArgumentParser(description=__doc__)
+source=parser.add_mutually_exclusive_group()
+source.add_argument('revision',nargs='?',default='HEAD')
+source.add_argument('--file',metavar='PATH',help='print the production-line count of one working-tree file')
+parser.add_argument('--strip-line-comments',action='store_true')
+parser.add_argument('--test-support-as-test',action='store_true')
+args=parser.parse_args()
+REV,FILE=args.revision,args.file
+STRIP_LC=args.strip_line_comments
+TS=args.test_support_as_test
 ROOT='crates/jit/src'
 def git(*a): return subprocess.run(['git',*a],capture_output=True,text=True,check=True).stdout
-files=[f for f in git('ls-tree','-r','--name-only',REV,ROOT).split() if f.endswith('.rs')]
-src={f:git('show',f'{REV}:{f}').split('\n') for f in files}
+files=[FILE] if FILE else [f for f in git('ls-tree','-r','--name-only',REV,ROOT).split() if f.endswith('.rs')]
+src={f:(Path(f).read_text() if FILE else git('show',f'{REV}:{f}')).split('\n') for f in files}
 def is_test_attr(s):
     s=s.strip()
     if s.startswith('#[cfg(test)]'): return True
@@ -82,6 +89,9 @@ def count(L):
         if STRIP_LC and s.startswith('//'): continue
         n+=1
     return n
+if FILE:
+    print(0 if file_is_test(FILE) else count(src[FILE]))
+    sys.exit()
 per=collections.Counter(); tot=0; testonly=0
 for f in files:
     rel=f[len(ROOT)+1:]
