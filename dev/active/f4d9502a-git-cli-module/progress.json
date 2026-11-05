@@ -1324,6 +1324,15 @@
         "code-review": "ce356156-738c-4af8-baf1-033a56ab4d6b"
       },
       "criteria": "Lead uncovered REQ02 defect after stable PASS gates: Git2.39.5 and2.56 return Commit for gitlink whose target exists in superproject; Some(anytype) incorrectly counts it present. Rework1 explicitly accepts onlyBlob/Tree and extends existing owning gitlink fixture; no producer/footprint expansion. History composition e3ee25799 preserves exact methods and HTTP pool,40focusedPASS."
+    },
+    "92afc5d8": {
+      "verdict": "PASS",
+      "reviewed_source": "367506cae34e9dd0733ee1b5b8510fc1e6a1f4ae",
+      "gates": {
+        "cargo-ci": "a914c683-1b44-4374-bf54-c62308c817db",
+        "code-review": "ee04eed7-7675-461b-975d-88d909c10427"
+      },
+      "criteria": "All3criteria met: existingclaim reads supplied classification and nesteddata-root containment; private processhelper removed; realGit/nonGitclassified regression actuallyRED thenGREEN; unchanged25initCLItests pass. No linked docs, deferrals, stale references or own-file drift afterrefresh. Mandatory mergedCargo pending."
     }
   },
   "source_queue": [
