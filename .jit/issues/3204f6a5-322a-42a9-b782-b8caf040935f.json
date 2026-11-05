@@ -1,0 +1,40 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-05T23:38:10.153768672Z",
+  "dependencies": [
+    "2195c98f-95a9-45d0-8582-d93c1d1fec45"
+  ],
+  "description": "Plan Take engine vocabulary and test switches only from declarations and caller inputs (f368ce3d) against every hard success criterion, write the concise design at dev/active/f368ce3d-domain-agnostic-engine/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
+  "documents": [],
+  "first_ready_at": "2026-11-05T23:38:10.153768672Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-11-05T23:38:10.153768672Z",
+      "updated_by": null
+    }
+  },
+  "id": "3204f6a5-322a-42a9-b782-b8caf040935f",
+  "labels": [
+    "epic:domain-agnostic-engine",
+    "milestone:v1.0",
+    "component:core",
+    "component:cli",
+    "component:gates",
+    "component:validation",
+    "component:web",
+    "component:tooling",
+    "per:@/charter/D-18",
+    "per:@/charter/D-21",
+    "per:@/charter/D-4",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Take engine vocabulary and test switches only from declarations and caller inputs",
+  "updated_at": "2026-11-05T23:38:10.153768672Z"
+}
