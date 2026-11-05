@@ -287,6 +287,93 @@
       "format": "markdown",
       "label": "Live cycle3 boundary checkpoint",
       "path": "dev/active/f4d9502a-git-cli-module/handoff-4.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "label": "Frozen source and check evidence at user wind-down",
+      "path": "dev/active/f4d9502a-git-cli-module/wind-down-evidence.tar.gz"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "1aaea83e7dd4749ec36d14d4143bd71b6566fb5c66de26d9e2101530bfb32f12",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/design.md",
+          "resolved_path": "dev/active/5046408a/design.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b18b4bbdb3e361030c14e53ba8b8e02d8d28a7bf2ec98d470e14b09710e8172f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-3.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff-3.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d6178b23187f51de285a71faaa3fcedb08e60c6b1eaa386ec606804c5f0195bc",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-4.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff-4.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "58e376a3ba9445ca2c144a825bdd83b9dc10302bbc4806a195eae7bdcc7addfc",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../783b33fa/plan.md",
+          "resolved_path": "dev/active/783b33fa/plan.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5122f240a7c19728eca0663312a20a8e51055e1f6129195a4a2f47745af3e2af",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "wind-down-evidence.tar.gz",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/wind-down-evidence.tar.gz"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "c3448a1cee5ac55bb003b87a5a5b39282f650a1bb0cadc6e7741df27a84bfb4d",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "progress.json",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e7a194edee9c46c807b821a8a9cbd8cfbce0b009a72cd41ffc7fd211958b37d0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "plan.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/plan.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "be14e3775daceb625e97fff2ca493dd9e9b586757026df403ceb0fcd71b3105a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d40457b12dbfbeed22b345982002668878654d5eac18abb46a3d8d9f341ea93f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-2.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff-2.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "User wind-down handoff",
+      "path": "dev/active/f4d9502a-git-cli-module/handoff-5.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:37.009914436Z",
@@ -310,5 +397,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-05T07:19:25.963026471Z"
+  "updated_at": "2026-11-05T07:52:38.826295491Z"
 }

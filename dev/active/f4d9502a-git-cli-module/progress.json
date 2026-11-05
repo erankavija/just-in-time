@@ -542,14 +542,14 @@
     },
     {
       "issue": "5046408a",
-      "status": "cycle3_boundary_design_review_required",
+      "status": "parked_boundary_R1_unresolved",
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
       "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate.",
       "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch."
     },
     {
       "issue": "783b33fa",
-      "status": "approved_for_implementation",
+      "status": "approved_but_undispatched_user_wind_down",
       "subject": "Explicit actor input for issue release; isolated correction outside original manifest",
       "ruling": "Steward approves four hard criteria/fourfiles, Sol/high and temporary fourth tree. Native504 prerequisite; actorlands+Done before504refresh. Fifthowner requires evidence/approval; no newCLIflag/ambient actor/parallel producer."
     }
@@ -820,10 +820,11 @@
     },
     {
       "issue": "783b33fa",
-      "agent": "/root/release_actor",
+      "agent": null,
       "model": "gpt-6.1-sol",
       "effort": "high",
-      "reason": "Steward-approved bounded four-file explicit actor facade/input correction; only active implementation,504 frozen. Temporary fourth tree approved."
+      "reason": "Steward-approved bounded four-file explicit actor facade/input correction; only active implementation,504 frozen. Temporary fourth tree approved.",
+      "status": "prepared_not_dispatched_user_wind_down"
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -940,7 +941,8 @@
     "Lease renewal correction: claim acquire did not extend existing expiry. Actual claim renew --extension14400 at06:31UTC extends a273/c140/504 to10:31UTC; use renew and verify expires_at, not acquire, for held leases.",
     "Cycle3 original config diagnostics/repair regression now green; broad non-fail-fast CLI/contracts exposes five failing tests plus two hidden registry arms. Source ten-file diff frozenf0c5fd8a over376978ed0. Concrete boundary proposal sent steward: recommend shared existing adapters/data-only exec (+3owners), explicit release actor (+3distinct owners,6total), permission source repair in current scope. No further edits pending ruling; prior single-extra-cycle limit remains.",
     "Steward selects boundary optionA and in-footprint Io fix, exact13files subject to fresh independent design review before edits, no B/retryreset. Actor defect excluded from504 pending unchanged-main sanitized reproduction and injection audit; if confirmed propose separate same-epic leaf outside original53/noREQcredit, fourfiles, mainfix then504refresh. Primary read-only/proposal dispatch active.",
-    "Steward approved separate actor task783b33fa with four hard criteria/exactfourfiles, sameGit epic outside53manifest/noREQcredit. Native504->783 dependency added, Ready task claimed to lead; plan linked. Sol/high isolated temporary fourth tree approved; actorland+Done then504refresh before13-file work. Main baseline and matchedworker2tests bothRED, sevenrelevantfiles identical. No504retryreset."
+    "Steward approved separate actor task783b33fa with four hard criteria/exactfourfiles, sameGit epic outside53manifest/noREQcredit. Native504->783 dependency added, Ready task claimed to lead; plan linked. Sol/high isolated temporary fourth tree approved; actorland+Done then504refresh before13-file work. Main baseline and matchedworker2tests bothRED, sevenrelevantfiles identical. No504retryreset.",
+    "USER WIND-DOWN: no new dispatch/landing. Actor783 was never dispatched; prepared clean tree at2e1692cff, unused lease released.504 boundaryR1 designFAIL retained-identity gap remains unresolved; primary read report but wrote no revision. All workers/commands parked. Source/evidence archive verified, held proposals unchanged. Resume requires explicit authorization; no issue markedDone."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1499,7 +1501,7 @@
       "independent_implementation_review": "Fresh Astra/high after full configured Cargo gate",
       "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic",
       "active_ownership": {
-        "split_root_impl": "Read-only/proposal work only: concretize selected A thirteen-file boundary correction for fresh independent review; reproduce two actor failures on unchanged main with focused checks and audit existing injection. No source edits;504 ten-file correction remains frozen.",
+        "split_root_impl": "Parked by user. No active commands; ten-file source frozen. Selected-A R1 root/lock identity finding unresolved; proposal revision was not written.",
         "split_root_consumers": "Complete; ownership returned to primary.",
         "split_root_design": "Docs slice complete and lead reviewed; ownership returned to primary."
       },
@@ -1519,7 +1521,56 @@
         ],
         "cycle": 3,
         "limit": "One additional cycle only; prior2 failures retained. New material scope/design gap or next full-gate failure escalates."
+      },
+      "boundary_amendment": {
+        "status": "unaccepted_pending_finding_closure",
+        "footprint": 13,
+        "review": "5046408a-boundary-design-review-r1.md in wind-down-evidence.tar.gz",
+        "finding": "Retain data-root and bootstrap-parent/ancestry evidence across lock acquisition; bind pending/index capture and revalidate before child; deterministic storage-owned replacement assertion."
       }
     }
+  },
+  "session_status": "parked_by_user_wind_down",
+  "wind_down": {
+    "authority": "User wind-down relayed by steward; supersedes prior proceed and dispatch approvals. No new work until explicit resume.",
+    "main_before_handoff": "2e1692cffc3eb439ccbeabe779086a74a60b2d6a",
+    "source_snapshot": {
+      "5046408a": {
+        "head": "376978ed05c011717ab7c2d88fab54954f045f15",
+        "status": " M crates/jit/src/commands/bootstrap.rs\n M crates/jit/src/commands/config.rs\n M crates/jit/src/config.rs\n M crates/jit/src/declarations/mod.rs\n M crates/jit/src/dispatch/config.rs\n M crates/jit/src/dispatch/mod.rs\n M crates/jit/src/storage/json.rs\n M crates/jit/src/storage/repository_state_store.rs\n M crates/jit/src/storage/repository_state_store_tests.rs\n M crates/jit/tests/cli_repo_workflow/project_config_tests.rs\n",
+        "diff_sha256": "f0c5fd8a3e18932804cd4f02b412b9d1540321d408522733e66601a7ce22b9a3",
+        "untracked": {}
+      },
+      "783b33fa": {
+        "head": "2e1692cffc3eb439ccbeabe779086a74a60b2d6a",
+        "status": "",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untracked": {}
+      },
+      "a273667c": {
+        "head": "43706d377ae940ac3d4962136b16d6a647f58c99",
+        "status": "",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untracked": {}
+      },
+      "c140921c": {
+        "head": "042767de992eaadcd60cc2069d4040d8a48ec210",
+        "status": " M crates/jit/src/commands/snapshot.rs\n M crates/jit/src/storage/git.rs\n?? dev/active/c140921c/\n",
+        "diff_sha256": "6191229166e88165617628f8e3fd60cc3270b76c93d5238b522dab57bc06901a",
+        "untracked": {
+          "dev/active/c140921c/revision-producer-plan.md": "972e8235fcd5a9c595cf47106875484bc234aefd1837cc66c01781db42992b6e"
+        }
+      }
+    },
+    "evidence_archive": "dev/active/f4d9502a-git-cli-module/wind-down-evidence.tar.gz",
+    "actor_dispatch": "NOT started; clean worktree and prepared brief only. Lease released; assignment/state retained.",
+    "active_commands": [],
+    "active_workers": [],
+    "retained_leases": {
+      "a273667c": "2026-11-05T10:31:02.605641760Z",
+      "c140921c": "2026-11-05T10:31:09.827480854Z",
+      "5046408a": "2026-11-05T10:31:15.107216481Z"
+    },
+    "next_after_explicit_resume": "Verify current main/worktrees/leases, start approved783 actor correction; resolve504boundaryR1 proposal finding and independentR2 before13-file edits, after actorland+Done and504refresh."
   }
 }
