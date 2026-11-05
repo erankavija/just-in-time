@@ -24867,3 +24867,5 @@
 {"assignee":"agent:frontend-install-policy","id":"b34d9f10-396e-480d-850b-476d4009ac34","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","timestamp":"2026-11-05T00:01:34.918700893Z","type":"issue_claimed"}
 {"id":"e862ebea-4377-4d42-9dff-46437bc5579c","issue_id":"dc048377-19b5-425d-90e6-11d4a7427e34","priority":"high","timestamp":"2026-11-05T00:08:14.312789221Z","title":"Remove the dispatcher JSON-processor dependency","type":"issue_created"}
 {"fields":["dependencies"],"id":"40239fb4-9139-464a-9640-8a317d6f8c2e","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-05T00:08:14.746537954Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"58a61b17-dfb1-4591-8c90-92568e0aeca0","issue_id":"dc048377-19b5-425d-90e6-11d4a7427e34","timestamp":"2026-11-05T00:08:43.071426859Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:dispatch-projection","id":"c9241440-c8be-453b-91dc-1d71dae45e7a","issue_id":"dc048377-19b5-425d-90e6-11d4a7427e34","timestamp":"2026-11-05T00:08:43.071426859Z","type":"issue_claimed"}
