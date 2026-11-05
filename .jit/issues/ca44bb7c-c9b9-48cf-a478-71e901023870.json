@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "c5cc89df-5360-47da-84a7-2f8959ba902f",
+      "run_id": "5fae22b6-f408-4e5c-991c-5408903d87e9",
       "status": "passed",
-      "updated_at": "2026-11-05T02:18:32.376620700Z",
+      "updated_at": "2026-11-05T02:26:02.472177434Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Unify raw document response construction",
-  "updated_at": "2026-11-05T02:22:36.862613365Z"
+  "updated_at": "2026-11-05T02:26:02.472177434Z"
 }
