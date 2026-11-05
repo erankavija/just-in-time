@@ -221,8 +221,9 @@
           "short_id": "e3c38fea",
           "title": "Worktree list reads worktrees through the module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
@@ -238,8 +239,9 @@
           "short_id": "f649c144",
           "title": "Lease validation lists worktrees once per run",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "f6eaba42-e756-4b94-b66e-ea1f46838bde",
@@ -724,11 +726,10 @@
     "Steward approved DEC27 reconciliation to distinct-context layout bounds and concrete d681 scope expansion/field exception with reduced dependencies, preserving53 nodes. Required independent plan review precedes implementation. DEC26 shared worktree-info errors is validated in isolated952fa6f32; 9de full gates running after canonical row/reference integration.",
     "f6 Cargo cc72ca26 failed four shared corpus setups because child Git ceiling excludes own root from .jit discovery. Steward authorized parent-ceiling fix preserving host isolation, child-only environment and existing test owners; failed evidence86cb8402c retained, red/green rework in progress.",
     "Do not nest tracker commands under jit worktree exec: repository lock is non-reentrant and times out. Tracker commands take own locks; use exec only around short Git commit/file updates.",
-    "Origin Done after merged stable Cargo4e0b64b4. Corrected claims fullgates848ee4a5/2682790f and info1ee8a09a/38f4141a pass; shared fixture fix0f144b98d reused exactly in11871fa14. Final DEC26-28 plan review97a30f16 passes on21cd8fb9; pending metadata integration. Completed HEAD/list/history trees reclaimed canonically."
+    "Origin Done after merged stable Cargo4e0b64b4. Corrected claims fullgates848ee4a5/2682790f and info1ee8a09a/38f4141a pass; shared fixture fix0f144b98d reused exactly in11871fa14. Final DEC26-28 plan review97a30f16 passes on21cd8fb9; pending metadata integration. Completed HEAD/list/history trees reclaimed canonically.",
+    "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge."
   ],
-  "planning_reviews_pending": [
-    "DEC26 shared worktree-info contract and DEC27 bounded-context remediation refresh"
-  ],
+  "planning_reviews_pending": [],
   "worker_limit": 3,
   "reviews": {
     "b4ca051c": {
@@ -810,8 +811,8 @@
     },
     "28ccf9a9": {
       "verdict": "PASS",
-      "gate": "933f971b-74fb-4d70-b00a-f56c5d4c1d86",
-      "reviewed_source": "9c3206881dc48ef2fcbd3ea42f22544c9543c80b",
+      "gate": "97a30f16-04dc-45dd-84a9-74acd5cdf9f3",
+      "reviewed_source": "21cd8fb9fffec340c051edc316c80af2fbc19074",
       "source_merge": "45d1e8cd2",
       "prior_findings": [
         {
@@ -830,7 +831,9 @@
       "criteria": "Native manifest validate, generated overview check and native dry-run passed under approved DEC-24 existing-graph policy; independent stable review confirms all criteria.",
       "stale_narrative": "No new appendix remains; historical handoff preserved as history.",
       "deferred_items": "External split-root task5046408a is explicitly outside REQ credit but preserves layout contract and live sequencing. No in-scope deferral.",
-      "holistic": "DEC-23 Split roots, DEC-24 graph refresh, DEC-25 bounded HEAD each unique; existing identities retained."
+      "holistic": "DEC-23 Split roots, DEC-24 graph refresh, DEC-25 bounded HEAD each unique; existing identities retained.",
+      "evidence_commit": "3a079000c",
+      "integration": "Final DEC26-28 planning refresh merged after both independent reviews passed; native manifest/render/dryrun and repository validation pass, preserving53issues/91edges and completed identities."
     },
     "24d3b460": {
       "verdict": "PASS",
