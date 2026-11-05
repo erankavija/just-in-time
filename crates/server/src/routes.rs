@@ -441,37 +441,65 @@ async fn search_issues<S: IssueStore + Send + Sync + 'static>(
     execute_blocking(&state, move |executor| {
         let start = std::time::Instant::now();
 
-        // Restrict search to issue documents, explicit or derived
-        let document_paths = executor.documents().get_issue_document_paths()?;
-
+        let semantic = executor.queries().search_issue_matches(
+            &params.q,
+            jit::commands::SemanticSearchOptions {
+                case_sensitive: params.case_sensitive,
+                regex: params.regex,
+            },
+        )?;
         let config = executor.config();
         let layout = config.repository_layout()?;
-        // An empty glob list would search every worktree file, so documents are searched only when linked.
-        let mut results = if document_paths.is_empty() {
+        let data_root = match layout.data_root().canonicalize() {
+            Ok(root) => Some(root),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
+        let document_paths = executor
+            .documents()
+            .get_issue_document_paths()?
+            .into_iter()
+            .filter(|path| {
+                let candidate = layout.worktree_root().join(path);
+                !candidate.starts_with(layout.data_root())
+                    && !candidate
+                        .canonicalize()
+                        .ok()
+                        .zip(data_root.as_ref())
+                        .is_some_and(|(resolved, root)| resolved.starts_with(root))
+            })
+            .collect::<Vec<_>>();
+        let mut results = if params.limit == 0 {
             Vec::new()
         } else {
-            let options = SearchOptions {
-                case_sensitive: params.case_sensitive,
-                regex: params.regex,
-                max_results: Some(params.limit),
-                file_patterns: document_paths,
-                ..Default::default()
-            };
-            jit::search::search(layout.worktree_root(), &params.q, options)?
+            jit::search::search_files(
+                layout.worktree_root(),
+                &params.q,
+                SearchOptions {
+                    case_sensitive: params.case_sensitive,
+                    regex: params.regex,
+                    max_results: Some(params.limit),
+                    ..Default::default()
+                },
+                &document_paths,
+            )?
         };
-        if results.len() < params.limit {
-            let remaining = params.limit - results.len();
-            let data_options = SearchOptions {
-                case_sensitive: params.case_sensitive,
-                regex: params.regex,
-                max_results: Some(remaining),
-                file_patterns: vec!["issues/*.json".to_string()],
-                ..Default::default()
-            };
-            let mut data_results =
-                jit::search::search(layout.data_root(), &params.q, data_options)?;
-            results.append(&mut data_results);
+        for result in &mut results {
+            result.issue_id = None;
         }
+        results.extend(
+            semantic
+                .into_iter()
+                .take(params.limit.saturating_sub(results.len()))
+                .map(|item| SearchResult {
+                    // Semantic matches have no source line or byte offsets.
+                    path: format!("issues/{}.json", item.issue.id),
+                    issue_id: Some(item.issue.id),
+                    line_number: 0,
+                    line_text: item.text,
+                    matches: Vec::new(),
+                }),
+        );
 
         let duration_ms = start.elapsed().as_millis();
 
@@ -2390,6 +2418,60 @@ unique = false
             response.text()
         );
         response.json::<SearchResponse>().results
+    }
+
+    #[tokio::test]
+    async fn test_search_options_apply_to_issue_fields_and_linked_documents() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let issue_path = format!(".jit/issues/{id}.json");
+        executor
+            .documents()
+            .add_document_reference(&id, &issue_path, None, None, None, true)
+            .unwrap();
+        let server = test_app(executor);
+        let response = server
+            .get("/search")
+            .add_query_param("q", "^Test iss.e$")
+            .add_query_param("regex", "true")
+            .add_query_param("case_sensitive", "true")
+            .await;
+        response.assert_status_ok();
+        let hits = response.json::<SearchResponse>().results;
+        assert!(hits.iter().any(|hit| hit.issue_id.as_ref() == Some(&id)));
+        let response = server
+            .get("/search")
+            .add_query_param("q", "^test iss.e$")
+            .add_query_param("regex", "true")
+            .add_query_param("case_sensitive", "true")
+            .await;
+        assert!(response.json::<SearchResponse>().results.is_empty());
+        let response = server
+            .get("/search")
+            .add_query_param("q", "h.llo")
+            .add_query_param("regex", "true")
+            .await;
+        assert!(response
+            .json::<SearchResponse>()
+            .results
+            .iter()
+            .any(|hit| hit.path.ends_with(HTML_DOC)));
+        assert!(search_hits(&server, "enforce_leases").await.is_empty());
+        assert!(search_hits(&server, "normal").await.is_empty());
+        assert!(search_hits(&server, "desc")
+            .await
+            .iter()
+            .any(|hit| hit.issue_id.as_ref() == Some(&id)));
+    }
+
+    #[tokio::test]
+    async fn test_search_without_linked_documents_does_not_search_worktree() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        std::fs::write(temp.path().join("unlinked.md"), "unlinked-needle").unwrap();
+        let server = test_app(executor);
+        assert!(search_hits(&server, "unlinked-needle").await.is_empty());
     }
 
     #[tokio::test]
