@@ -1947,7 +1947,8 @@
      "touches": [
       "crates/jit/src/commands/document.rs",
       "crates/jit/tests/cli_repo_workflow/document_history_tests.rs",
-      "crates/server/src/routes.rs"
+      "crates/server/src/routes.rs",
+      "crates/jit/src/storage/git.rs"
      ]
     }
    }
