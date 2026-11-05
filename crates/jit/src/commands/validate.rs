@@ -1208,7 +1208,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let checkout = self
             .exec
             .require_worktree_paths()?
-            .write_checkout()
+            .code_checkout()
             .context("branch drift validation requires a git repository")?;
         match checkout.compare_with_base("origin/main")? {
             BaseComparison::BaseUnresolved => {
@@ -1367,6 +1367,27 @@ fn recorded_worktree_ids(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_validate_branch_drift_uses_selected_code_checkout() {
+        use crate::test_harness::git::GitRepository;
+        let outer = tempfile::tempdir().unwrap();
+        let data = GitRepository::init(outer.path().join("data"));
+        let code = GitRepository::init(outer.path().join("code"));
+        data.write("data", "data")
+            .commit("data history without origin/main");
+        code.write("code", "code").commit("code history");
+        code.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(paths);
+        assert!(executor.validation().validate_branch_drift().is_ok());
+    }
+
     use super::*;
     use crate::commands::test_helpers::{seed_issue, MemoryDeclarations};
     use crate::repository_state::VirtualPath;

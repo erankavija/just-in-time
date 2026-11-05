@@ -3,9 +3,11 @@
 //! the order the invocation's correctness depends on.
 
 use super::{CommandExecutor, DispatchMutationAnnotation};
-use crate::config_manager::ConfigManager;
 use crate::domain::LinkedCheckoutWriteStance;
-use crate::errors::{LinkedCheckoutWriteRefusedError, RecoveryFailedError};
+use crate::errors::{
+    InvalidWorktreeRootError, LinkedCheckoutWriteRefusedError, RecoveryFailedError,
+    WorktreeRootSource,
+};
 use crate::repository_state::{MutationContextAnnotation, RepositoryLayout};
 use crate::storage::discovery::{discover_jit_dir, discover_recovery_jit_dir};
 use crate::storage::repository_state_store::is_leftover_record_failure;
@@ -23,6 +25,8 @@ pub struct RepositoryInvocation {
     /// `JIT_DATA_DIR`, resolved against `current_dir`; it outranks every
     /// other selection.
     pub data_dir_override: Option<PathBuf>,
+    /// `JIT_WORKTREE_ROOT`, captured once at the invocation boundary.
+    pub worktree_root_override: Option<PathBuf>,
     /// `jit init` targets `<current_dir>/.jit` without searching upward.
     pub is_init: bool,
     /// The command opens a repository mutation session (recovery dispatch).
@@ -58,8 +62,8 @@ pub struct OpenedRepository {
 
 /// Open the repository `invocation` selects and return it ready for dispatch.
 ///
-/// A linked-checkout write refusal precedes every lock and write, and startup
-/// recovery precedes validation. A non-exempt command fails here when the
+/// Committed recovery precedes root selection and policy for new work. A clean
+/// store's write refusal precedes mutation locks and writes. A non-exempt command fails here when the
 /// selected store is absent or uninitialized.
 ///
 /// # Errors
@@ -71,72 +75,150 @@ pub struct OpenedRepository {
 pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedRepository> {
     let (data_root, non_git_worktree_root) = select_data_root(&invocation);
 
-    // Discovery is mandatory: startup reports discovery and wiring failures
-    // before dispatch. The worktree root always comes from this boundary, never
-    // inferred from the storage parent (`@/charter/D-4`).
-    let worktree_paths = WorktreePaths::detect_for_data_root(&data_root, &non_git_worktree_root)
-        .context("failed to discover repository worktree layout")?;
-    let layout = discover_repository_layout(&worktree_paths.worktree_root, &data_root)
-        .context("failed to construct repository layout")?;
-
-    // Decided strictly before the storage handle exists, so a refusal appends
-    // nothing and leaves no residue for recovery to converge.
-    let write_override = linked_checkout_write_decision(
-        invocation.opens_mutation_session,
-        &worktree_paths,
-        &layout,
-        invocation.write_override,
-    )?;
-
-    let storage = JsonFileStorage::new(&data_root);
-    storage.configure_worktree_paths(&worktree_paths);
-    // Session opening is the one recovery boundary. Claim-coordinating commands
-    // open their operation session only after coordination, so their startup
-    // open repairs residue without inverting coordinator -> repository.
-    let recovery_failure = |error: anyhow::Error| {
-        if invocation.is_recover && is_leftover_record_failure(&error) {
-            RecoveryFailedError(error).into()
-        } else {
-            error
-        }
-    };
-    let (retained_session, recovered_records) = match (
-        invocation.opens_mutation_session,
-        invocation.coordinates_claims_first,
-    ) {
-        (false, _) => (None, 0),
-        (true, true) => {
-            let session = RepositoryStateStore::open_mutation_session(&storage, layout.clone())
-                .map_err(|error| recovery_failure(error.into()))?;
-            (None, session.recovery_report().recovered_count())
-        }
-        (true, false) => {
-            let guard = storage
-                .open_and_retain_mutation_session(layout.clone())
-                .map_err(recovery_failure)?;
-            let recovered = guard.recovery_report().recovered_count();
-            (Some(guard), recovered)
-        }
-    };
-    let executor = CommandExecutor::new(storage.clone())
-        .with_layout(layout.clone())?
-        .with_worktree_paths(worktree_paths.clone())
-        .with_recovered_records(recovered_records);
-    let write_override_annotation = write_override.map(DispatchMutationAnnotation::install);
-
-    if !invocation.is_validation_exempt {
-        storage.validate()?;
-    }
-
-    Ok(OpenedRepository {
-        write_override_annotation,
-        retained_session,
-        executor,
-        data_root,
-        worktree_paths,
-        layout,
-        recovered_records,
-    })
+    let mut detected = None;
+    let mut recovered_records = 0;
+    crate::storage::repository_state_store::retry_optimistic_reads(
+        "repository root selection",
+        || {
+            let attempt = (|| -> Result<OpenedRepository> {
+                let storage = JsonFileStorage::new(&data_root);
+                let recovery_failure = |error: anyhow::Error| {
+                    if invocation.is_recover && is_leftover_record_failure(&error) {
+                        RecoveryFailedError(error).into()
+                    } else {
+                        error
+                    }
+                };
+                if invocation.opens_mutation_session {
+                    recovered_records += storage
+                        .recover_pending_records()
+                        .map_err(|error| recovery_failure(error.into()))?
+                        .recovered_count();
+                }
+                let observation =
+                    crate::storage::repository_state_store::ConfigurationObservation::capture(
+                        &data_root,
+                    )?;
+                let base = match &detected {
+                    Some(paths) => paths,
+                    None => detected.insert(
+                        WorktreePaths::detect_for_data_root(&data_root, &non_git_worktree_root)
+                            .context("failed to discover repository worktree layout")?,
+                    ),
+                };
+                let selection = invocation
+                    .worktree_root_override
+                    .as_ref()
+                    .map(|path| (WorktreeRootSource::Environment, path))
+                    .or_else(|| {
+                        observation
+                            .config
+                            .worktree
+                            .as_ref()
+                            .and_then(|worktree| worktree.root.as_ref())
+                            .map(|path| (WorktreeRootSource::Configuration, path))
+                    });
+                let (worktree_paths, layout) = match selection {
+                    Some((setting, supplied)) => {
+                        let resolved = normalize_absolute_path(&data_root.join(supplied));
+                        let invalid = |reason: String| InvalidWorktreeRootError {
+                            setting,
+                            supplied: supplied.clone(),
+                            resolved: resolved.clone(),
+                            reason,
+                        };
+                        if supplied.as_os_str().is_empty() {
+                            return Err(invalid("path is empty".into()).into());
+                        }
+                        crate::storage::repository_state_store::ensure_symlink_free_ancestry(
+                            &data_root.join(supplied),
+                            false,
+                        )
+                        .map_err(|error| invalid(error.to_string()))?;
+                        crate::storage::capability_fs::open_absolute_dir_nofollow(&resolved)
+                            .map_err(|error| invalid(error.to_string()))?;
+                        let layout = discover_repository_layout(&resolved, &data_root)
+                            .map_err(|error| invalid(error.to_string()))?;
+                        (base.with_worktree_root(&resolved)?, layout)
+                    }
+                    None => (
+                        base.clone(),
+                        discover_repository_layout(&base.worktree_root, &data_root)
+                            .context("failed to construct repository layout")?,
+                    ),
+                };
+                let declared = observation
+                    .config
+                    .worktree
+                    .as_ref()
+                    .map_or(LinkedCheckoutWriteStance::DEFAULT, |worktree| {
+                        worktree.write_policy()
+                    });
+                let write_override = linked_checkout_write_decision(
+                    invocation.opens_mutation_session,
+                    &worktree_paths,
+                    declared,
+                    invocation.write_override,
+                )?;
+                storage.configure_worktree_paths(&worktree_paths);
+                storage.bind_selection(
+                    observation,
+                    invocation.worktree_root_override.is_some(),
+                    worktree_paths.holds_linked_store(),
+                );
+                let retained_session = match (
+                    invocation.opens_mutation_session,
+                    invocation.coordinates_claims_first,
+                ) {
+                    (false, _) => None,
+                    (true, true) => {
+                        let session =
+                            RepositoryStateStore::open_mutation_session(&storage, layout.clone())
+                                .map_err(|error| recovery_failure(error.into()))?;
+                        recovered_records += session.recovery_report().recovered_count();
+                        None
+                    }
+                    (true, false) => {
+                        let guard = storage
+                            .open_and_retain_mutation_session(layout.clone())
+                            .map_err(recovery_failure)?;
+                        recovered_records += guard.recovery_report().recovered_count();
+                        Some(guard)
+                    }
+                };
+                let executor = CommandExecutor::new(storage.clone())
+                    .with_layout(layout.clone())?
+                    .with_worktree_paths(worktree_paths.clone())
+                    .with_recovered_records(recovered_records);
+                let write_override_annotation =
+                    write_override.map(DispatchMutationAnnotation::install);
+                if !invocation.is_validation_exempt {
+                    storage.validate()?;
+                }
+                Ok(OpenedRepository {
+                    write_override_annotation,
+                    retained_session,
+                    executor,
+                    data_root: data_root.clone(),
+                    worktree_paths,
+                    layout,
+                    recovered_records,
+                })
+            })();
+            if attempt.as_ref().err().is_some_and(|error| {
+                error.chain().any(|cause| {
+                    matches!(
+                        cause.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+                        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+                    )
+                })
+            }) {
+                Ok(None)
+            } else {
+                Ok(Some(attempt))
+            }
+        },
+    )
 }
 
 /// The data root and the worktree root used outside Git.
@@ -215,24 +297,23 @@ fn normalize_absolute_path(path: &Path) -> PathBuf {
 fn linked_checkout_write_decision(
     opens_mutation_session: bool,
     worktree_paths: &WorktreePaths,
-    layout: &RepositoryLayout,
+    declared: LinkedCheckoutWriteStance,
     invocation_override: Option<LinkedCheckoutWriteStance>,
 ) -> Result<Option<MutationContextAnnotation>> {
     if !opens_mutation_session || !worktree_paths.holds_linked_store() {
         return Ok(None);
     }
-    let declared = ConfigManager::new(layout.clone()).get_write_policy()?;
     let effective = LinkedCheckoutWriteStance::resolve(declared, invocation_override);
     match effective {
         LinkedCheckoutWriteStance::Refuse => Err(LinkedCheckoutWriteRefusedError::new(
-            worktree_paths.worktree_root.clone(),
+            worktree_paths.checkout_top_level().to_path_buf(),
             effective,
         )
         .into()),
         LinkedCheckoutWriteStance::Allow => Ok((declared == LinkedCheckoutWriteStance::Refuse)
             .then(
                 || MutationContextAnnotation::LinkedCheckoutWriteOverridden {
-                    checkout: worktree_paths.worktree_root.clone(),
+                    checkout: worktree_paths.checkout_top_level().to_path_buf(),
                     declared_stance: declared,
                     invocation_override: effective,
                 },
@@ -250,12 +331,242 @@ mod tests {
         RepositoryInvocation {
             current_dir: current_dir.to_path_buf(),
             data_dir_override: None,
+            worktree_root_override: None,
             is_init: false,
             opens_mutation_session: false,
             coordinates_claims_first: false,
             is_validation_exempt: false,
             is_recover: false,
             write_override: None,
+        }
+    }
+
+    #[test]
+    fn test_open_repository_selects_configured_root_relative_to_data() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let code = temp.path().join("code");
+        std::fs::create_dir(&code).unwrap();
+        std::fs::write(
+            temp.path().join(".jit/config.toml"),
+            "[worktree]\nroot = '../code'\n",
+        )
+        .unwrap();
+        let opened = open_repository(invocation(temp.path())).unwrap();
+        assert_eq!(opened.layout.worktree_root(), code);
+    }
+
+    #[test]
+    fn test_open_repository_environment_overrides_config_with_absolute_or_data_relative_root() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let code = temp.path().join("code");
+        std::fs::create_dir(&code).unwrap();
+        std::fs::write(
+            temp.path().join(".jit/config.toml"),
+            "[worktree]\nroot = 'missing'\n",
+        )
+        .unwrap();
+        for selected in [PathBuf::from("../code"), code.clone()] {
+            let opened = open_repository(RepositoryInvocation {
+                worktree_root_override: Some(selected),
+                ..invocation(temp.path())
+            })
+            .unwrap();
+            assert_eq!(opened.layout.worktree_root(), code);
+        }
+    }
+
+    #[test]
+    fn test_open_repository_explicit_invalid_roots_report_source_and_path() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::write(temp.path().join("file"), b"not a directory").unwrap();
+        std::fs::create_dir(data.join("child")).unwrap();
+        for selected in [
+            PathBuf::new(),
+            PathBuf::from("missing"),
+            PathBuf::from("../file"),
+            PathBuf::from("."),
+            PathBuf::from("child"),
+        ] {
+            for source in [
+                WorktreeRootSource::Environment,
+                WorktreeRootSource::Configuration,
+            ] {
+                std::fs::write(
+                    data.join("config.toml"),
+                    if source == WorktreeRootSource::Configuration {
+                        format!("[worktree]\nroot = {:?}\n", selected.to_string_lossy())
+                    } else {
+                        String::new()
+                    },
+                )
+                .unwrap();
+                let error = open_repository(RepositoryInvocation {
+                    worktree_root_override: (source == WorktreeRootSource::Environment)
+                        .then_some(selected.clone()),
+                    ..invocation(temp.path())
+                })
+                .err()
+                .unwrap();
+                let invalid = error.downcast_ref::<InvalidWorktreeRootError>().unwrap();
+                assert_eq!(invalid.setting, source);
+                assert_eq!(invalid.supplied, selected);
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_open_repository_explicit_root_rejects_symlinked_ancestors() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let target = temp.path().join("target");
+        std::fs::create_dir_all(target.join("child")).unwrap();
+        let alias = temp.path().join("alias");
+        std::os::unix::fs::symlink(&target, &alias).unwrap();
+        for root in [alias.clone(), alias.join("child"), alias.join("../target")] {
+            let error = open_repository(RepositoryInvocation {
+                worktree_root_override: Some(root),
+                ..invocation(temp.path())
+            })
+            .err()
+            .unwrap();
+            assert!(error.downcast_ref::<InvalidWorktreeRootError>().is_some());
+        }
+    }
+
+    #[test]
+    fn test_open_repository_data_only_recovery_precedes_invalid_new_root_selection() {
+        use crate::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
+        let (temp, _) = setup_test_repo().unwrap();
+        let data = temp.path().join(".jit");
+        let record = RedoRecord::new(
+            Vec::new(),
+            vec![PutFile {
+                path: crate::repository_state::VirtualPath::CONFIG,
+                bytes: b"[worktree]\nroot = 'missing'\n".to_vec(),
+                mode: crate::repository_state::FileMode::Regular,
+            }],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
+        let error = open_repository(RepositoryInvocation {
+            opens_mutation_session: true,
+            ..invocation(temp.path())
+        })
+        .err()
+        .unwrap();
+        assert!(error.downcast_ref::<InvalidWorktreeRootError>().is_some());
+        assert!(!data
+            .join(crate::storage::RECORD_SCRATCH_DIR)
+            .join(crate::storage::RECORD_FILE_NAME)
+            .exists());
+        assert_eq!(
+            std::fs::read(data.join("config.toml")).unwrap(),
+            record.puts()[0].bytes
+        );
+    }
+
+    #[test]
+    fn test_open_repository_replays_original_audit_before_recovered_write_policy() {
+        use crate::repository_state::{FileMode, VirtualPath};
+        use crate::storage::{commit_redo_record, DataRoot, EventAppend, PutFile, RedoRecord};
+        use crate::test_harness::git::GitRepository;
+        for next_policy in [
+            LinkedCheckoutWriteStance::Refuse,
+            LinkedCheckoutWriteStance::Allow,
+        ] {
+            for partial_config in [false, true] {
+                for override_stance in [None, Some(LinkedCheckoutWriteStance::Allow)] {
+                    let old_policy = match next_policy {
+                        LinkedCheckoutWriteStance::Refuse => LinkedCheckoutWriteStance::Allow,
+                        LinkedCheckoutWriteStance::Allow => LinkedCheckoutWriteStance::Refuse,
+                    };
+                    let (primary, _) = setup_test_repo().unwrap();
+                    let git = GitRepository::init(primary.path());
+                    git.commit("base data");
+                    let outer = tempfile::tempdir().unwrap();
+                    let linked = outer.path().join("linked");
+                    git.git(&["worktree", "add", "-b", "linked", linked.to_str().unwrap()]);
+                    let data = linked.join(".jit");
+                    let old_code = outer.path().join("old-code");
+                    let next_code = outer.path().join("next-code");
+                    std::fs::create_dir(&old_code).unwrap();
+                    std::fs::create_dir(&next_code).unwrap();
+                    let config = |root: &str, policy: LinkedCheckoutWriteStance| {
+                        format!("[worktree]\nroot = '../../{root}'\nwrite_policy = '{}'\nenforce_leases = 'off'\n", policy.as_token())
+                    };
+                    std::fs::write(data.join("config.toml"), config("old-code", old_policy))
+                        .unwrap();
+                    let new_config = config("next-code", next_policy).into_bytes();
+                    let before = std::fs::read(data.join("events.jsonl")).unwrap();
+                    let mut audit = serde_json::to_vec(
+                        &crate::domain::event_catalog::EventTag::LinkedCheckoutWriteOverridden
+                            .sample(),
+                    )
+                    .unwrap();
+                    audit.push(b'\n');
+                    let record = RedoRecord::for_layout(
+                        &discover_repository_layout(&old_code, &data).unwrap(),
+                        Vec::new(),
+                        vec![
+                            PutFile {
+                                path: VirtualPath::CONFIG,
+                                bytes: new_config.clone(),
+                                mode: FileMode::Regular,
+                            },
+                            PutFile {
+                                path: VirtualPath::worktree("committed.md").unwrap(),
+                                bytes: b"original target".to_vec(),
+                                mode: FileMode::Regular,
+                            },
+                        ],
+                        Vec::new(),
+                        Some(EventAppend {
+                            offset: before.len() as u64,
+                            bytes: audit.clone(),
+                        }),
+                    )
+                    .unwrap();
+                    commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
+                    if partial_config {
+                        std::fs::write(data.join("config.toml"), &new_config).unwrap();
+                    }
+                    let opened = open_repository(RepositoryInvocation {
+                        current_dir: linked.clone(),
+                        opens_mutation_session: true,
+                        write_override: override_stance,
+                        ..invocation(&linked)
+                    });
+                    if next_policy == LinkedCheckoutWriteStance::Refuse && override_stance.is_none()
+                    {
+                        assert!(opened
+                            .err()
+                            .unwrap()
+                            .downcast_ref::<LinkedCheckoutWriteRefusedError>()
+                            .is_some());
+                    } else {
+                        let opened = opened.unwrap();
+                        assert_eq!(opened.layout.worktree_root(), next_code);
+                        assert_eq!(opened.recovered_records, 1);
+                    }
+                    assert_eq!(
+                        std::fs::read(data.join("events.jsonl")).unwrap(),
+                        [before, audit].concat(),
+                        "recovery preserves exactly the original audit bytes"
+                    );
+                    assert_eq!(
+                        std::fs::read(old_code.join("committed.md")).unwrap(),
+                        b"original target"
+                    );
+                    assert!(!next_code.join("committed.md").exists());
+                    assert!(!data
+                        .join(crate::storage::RECORD_SCRATCH_DIR)
+                        .join(crate::storage::RECORD_FILE_NAME)
+                        .exists());
+                }
+            }
         }
     }
 
@@ -372,6 +683,16 @@ mod linked_checkout_write_decision_tests {
         temp
     }
 
+    fn declared_policy(data: &std::path::Path) -> LinkedCheckoutWriteStance {
+        crate::config::JitConfig::load(&repository_layout_for_data_root(data))
+            .unwrap()
+            .worktree
+            .as_ref()
+            .map_or(LinkedCheckoutWriteStance::DEFAULT, |config| {
+                config.write_policy()
+            })
+    }
+
     /// Paths describing either a linked non-primary checkout or the primary one.
     fn checkout_paths(linked: bool) -> WorktreePaths {
         if linked {
@@ -408,7 +729,7 @@ mod linked_checkout_write_decision_tests {
             let error = linked_checkout_write_decision(
                 true,
                 &linked,
-                &repository_layout_for_data_root(jit_dir),
+                declared_policy(jit_dir),
                 invocation_override,
             )
             .expect_err(reason);
@@ -435,7 +756,7 @@ mod linked_checkout_write_decision_tests {
         let annotation = linked_checkout_write_decision(
             true,
             &checkout_paths(true),
-            &repository_layout_for_data_root(refusing.path()),
+            declared_policy(refusing.path()),
             Some(LinkedCheckoutWriteStance::Allow),
         )
         .expect("an override outranking a refusal permits the invocation")
@@ -495,7 +816,7 @@ mod linked_checkout_write_decision_tests {
                 linked_checkout_write_decision(
                     opens_mutation_session,
                     worktree_paths,
-                    &repository_layout_for_data_root(jit_dir),
+                    declared_policy(jit_dir),
                     Some(LinkedCheckoutWriteStance::Allow)
                 )
                 .expect("the invocation is permitted")

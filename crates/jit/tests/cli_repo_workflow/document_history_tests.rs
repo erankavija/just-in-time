@@ -433,3 +433,42 @@ fn test_doc_history_empty_for_new_file() {
         }
     }
 }
+
+#[test]
+fn test_doc_history_uses_selected_code_checkout() {
+    use assert_cmd::prelude::*;
+
+    let data = JitCli::initialised().unwrap();
+    data.init_git().unwrap();
+    write_file(&data, "docs/design.md", "data history");
+    data.commit("data document").unwrap();
+    let code = JitCli::initialised().unwrap();
+    code.init_git().unwrap();
+    write_file(&code, "sub/docs/design.md", "code history");
+    code.commit("code document").unwrap();
+    let issue_id = data
+        .create_issue(["--title", "Track code document"])
+        .unwrap();
+    data.command(["doc", "add", issue_id.as_str(), "docs/design.md"])
+        .env("JIT_WORKTREE_ROOT", code.root().join("sub"))
+        .assert()
+        .success();
+    let output = data
+        .command([
+            "doc",
+            "history",
+            issue_id.as_str(),
+            "docs/design.md",
+            "--json",
+        ])
+        .env("JIT_WORKTREE_ROOT", code.root().join("sub"))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let history: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let commits = history["commits"].as_array().unwrap();
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0]["message"], "code document");
+}

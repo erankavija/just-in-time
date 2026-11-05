@@ -128,7 +128,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
             return Ok((identity, Vec::new()));
         }
         // Only a store in a linked checkout can arrive there by copy.
-        if !(paths.holds_linked_store() && is_copied_identity(&identity)) {
+        if !(paths.holds_linked_store() && is_copied_identity(paths, &identity)) {
             let warnings = vec![StorageWarning::WorktreeRelocated {
                 from: identity.root.clone(),
                 to: current_root.clone(),
@@ -158,11 +158,16 @@ pub fn load_or_create_worktree_identity_with_warnings(
 /// Whether the store at the identity's recorded root still holds the same id, or
 /// holds a file that cannot be read: `git worktree add` copied the file, where a
 /// `git worktree move` would have left no store behind.
-fn is_copied_identity(identity: &WorktreeIdentity) -> bool {
+fn is_copied_identity(paths: &WorktreePaths, identity: &WorktreeIdentity) -> bool {
     let old_root = PathBuf::from(&identity.root);
-    crate::storage::discover_repository_layout(&old_root, old_root.join(".jit"))
+    let relative = paths
+        .local_jit
+        .strip_prefix(paths.checkout_top_level())
+        .unwrap_or(Path::new(".jit"));
+    let old_data = old_root.join(relative);
+    crate::storage::repository_state_store::DataReadSession::open(&old_data)
         .ok()
-        .and_then(|layout| layout.resolve(&VirtualPath::WORKTREE_IDENTITY).ok())
+        .map(|_| old_data.join(VirtualPath::WORKTREE_IDENTITY.relative().as_path()))
         .filter(|old_file| old_file.exists())
         .is_some_and(|old_file| {
             read_identity(&old_file).map_or(true, |old_identity| {
@@ -179,9 +184,10 @@ fn identity_file(paths: &WorktreePaths) -> Result<PathBuf> {
             .join(GIT_DIR_IDENTITY_DIR)
             .join(file.relative().as_str()));
     }
-    let layout =
-        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-    Ok(layout.resolve(&VirtualPath::WORKTREE_IDENTITY)?)
+    crate::storage::repository_state_store::DataReadSession::open(&paths.local_jit)?;
+    Ok(paths
+        .local_jit
+        .join(VirtualPath::WORKTREE_IDENTITY.relative().as_path()))
 }
 
 /// Lock the identity of a checkout keeping it in its git directory, creating

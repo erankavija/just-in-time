@@ -82,9 +82,8 @@ impl LayoutContext {
 pub struct WorktreePaths {
     /// Whether the selected data root belongs to a Git checkout.
     pub git_repository: bool,
-    /// Git common directory shared by all worktrees: of the checkout holding the
-    /// data root, else of the checkout holding the worktree root, else the
-    /// unbacked `<worktree_root>/.git`.
+    /// Git common directory of the data checkout or preserved relocated
+    /// coordination checkout; selecting code never changes this authority.
     pub common_dir: PathBuf,
     /// Root of current worktree
     pub worktree_root: PathBuf,
@@ -95,6 +94,10 @@ pub struct WorktreePaths {
     /// The checkout holding the worktree root when the selected data root lies
     /// outside every checkout and outside the worktree root.
     pub relocated_worktree_checkout: Option<RelocatedCheckout>,
+    data_checkout_root: PathBuf,
+    pub(crate) code_git: bool,
+    code_top_level: PathBuf,
+    selected_code_root: bool,
     layout_context: Arc<LayoutContext>,
 }
 
@@ -106,6 +109,10 @@ impl PartialEq for WorktreePaths {
             && self.local_jit == other.local_jit
             && self.shared_jit == other.shared_jit
             && self.relocated_worktree_checkout == other.relocated_worktree_checkout
+            && self.data_checkout_root == other.data_checkout_root
+            && self.code_git == other.code_git
+            && self.code_top_level == other.code_top_level
+            && self.selected_code_root == other.selected_code_root
     }
 }
 
@@ -115,6 +122,10 @@ impl WorktreePaths {
         let common_dir = worktree_root.join(".git");
         Self {
             git_repository: false,
+            data_checkout_root: worktree_root.to_path_buf(),
+            code_git: false,
+            code_top_level: worktree_root.to_path_buf(),
+            selected_code_root: false,
             shared_jit: common_dir.join("jit"),
             common_dir,
             worktree_root: worktree_root.to_path_buf(),
@@ -176,12 +187,20 @@ impl WorktreePaths {
                 .transpose()?
                 .flatten();
             let worktree_root = non_git_root.to_path_buf();
-            let (common_dir, relocated_worktree_checkout) = match worktree_checkout {
-                Some(checkout) => (checkout.common_dir.clone(), Some(checkout.into())),
-                None => (worktree_root.join(".git"), None),
-            };
+            let (common_dir, relocated_worktree_checkout): (PathBuf, Option<RelocatedCheckout>) =
+                match worktree_checkout {
+                    Some(checkout) => (checkout.common_dir.clone(), Some(checkout.into())),
+                    None => (worktree_root.join(".git"), None),
+                };
             return Ok(Self {
                 layout_context,
+                code_git: relocated_worktree_checkout.is_some(),
+                code_top_level: relocated_worktree_checkout.as_ref().map_or_else(
+                    || worktree_root.clone(),
+                    |checkout| checkout.top_level.clone(),
+                ),
+                data_checkout_root: worktree_root.clone(),
+                selected_code_root: false,
                 relocated_worktree_checkout,
                 git_repository: false,
                 shared_jit: common_dir.join("jit"),
@@ -206,6 +225,10 @@ impl WorktreePaths {
         Ok(Self {
             layout_context,
             git_repository: true,
+            data_checkout_root: worktree_root.clone(),
+            code_git: true,
+            code_top_level: worktree_root.clone(),
+            selected_code_root: false,
             common_dir,
             worktree_root,
             local_jit,
@@ -262,7 +285,30 @@ impl WorktreePaths {
     /// or `None` outside a git checkout.
     pub fn git(&self) -> Option<GitCheckout> {
         self.git_repository
+            .then(|| GitCheckout::new(Git::default(), self.data_checkout_root.clone()))
+    }
+
+    /// Return the selected code checkout, if the code root is in Git.
+    pub fn code_checkout(&self) -> Option<GitCheckout> {
+        self.code_git
             .then(|| GitCheckout::new(Git::default(), self.worktree_root.clone()))
+    }
+
+    /// The top level of the Git checkout containing the code root.
+    pub fn code_checkout_top_level(&self) -> Option<&Path> {
+        self.code_git.then_some(self.code_top_level.as_path())
+    }
+
+    /// Select a code root while retaining data and coordination authority.
+    pub fn with_worktree_root(&self, root: &Path) -> Result<Self> {
+        let mut paths = self.clone();
+        let checkout = self.layout_context.probe(root)?;
+        paths.code_git = checkout.is_some();
+        paths.code_top_level =
+            checkout.map_or_else(|| root.to_path_buf(), |checkout| checkout.worktree_root);
+        paths.worktree_root = root.to_path_buf();
+        paths.selected_code_root = true;
+        Ok(paths)
     }
 
     /// Return the checkout holding the paths a mutation writes: this checkout,
@@ -288,7 +334,14 @@ impl WorktreePaths {
     /// Returns an error when git reports a checkout whose paths cannot be resolved.
     pub fn for_worktree_root(&self, worktree_root: PathBuf) -> Result<Option<Self>> {
         let (local_jit, relocated_worktree_checkout) = match self.relocated_worktree_checkout {
-            None => (worktree_root.join(".jit"), None),
+            None => (
+                worktree_root.join(
+                    self.local_jit
+                        .strip_prefix(&self.data_checkout_root)
+                        .unwrap_or(Path::new(".jit")),
+                ),
+                None,
+            ),
             Some(_) => match self.layout_context.probe(&worktree_root)? {
                 Some(checkout) => (self.local_jit.clone(), Some(checkout.into())),
                 None => return Ok(None),
@@ -298,8 +351,27 @@ impl WorktreePaths {
             layout_context: Arc::clone(&self.layout_context),
             git_repository: self.git_repository,
             common_dir: self.common_dir.clone(),
-            relocated_worktree_checkout,
-            worktree_root,
+            relocated_worktree_checkout: relocated_worktree_checkout.clone(),
+            data_checkout_root: worktree_root.clone(),
+            code_git: if self.selected_code_root {
+                self.code_git
+            } else {
+                self.git_repository || relocated_worktree_checkout.is_some()
+            },
+            selected_code_root: self.selected_code_root,
+            code_top_level: if self.selected_code_root {
+                self.code_top_level.clone()
+            } else {
+                relocated_worktree_checkout.as_ref().map_or_else(
+                    || worktree_root.clone(),
+                    |checkout| checkout.top_level.clone(),
+                )
+            },
+            worktree_root: if self.selected_code_root {
+                self.worktree_root.clone()
+            } else {
+                worktree_root
+            },
             local_jit,
             shared_jit: self.shared_jit.clone(),
         }))
@@ -321,10 +393,10 @@ impl WorktreePaths {
     }
 
     /// The worktree root may be a subdirectory of the recorded relocated checkout.
-    pub(crate) fn checkout_top_level(&self) -> &Path {
+    pub fn checkout_top_level(&self) -> &Path {
         self.relocated_worktree_checkout
             .as_ref()
-            .map_or(&self.worktree_root, |checkout| &checkout.top_level)
+            .map_or(&self.data_checkout_root, |checkout| &checkout.top_level)
     }
 
     /// Check if this is the main worktree.
@@ -378,7 +450,7 @@ impl WorktreePaths {
         };
         Ok(self
             .local_jit
-            .strip_prefix(&self.worktree_root)
+            .strip_prefix(&self.data_checkout_root)
             .ok()
             .map(|relative| primary_root.join(relative)))
     }
@@ -634,6 +706,79 @@ mod tests {
         assert_eq!(paths.for_worktree_root(missing.clone()).unwrap(), None);
         let fresh = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
         assert!(fresh.for_worktree_root(missing).unwrap().is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_selected_code_root_probes_each_distinct_context_once() {
+        use crate::test_harness::git::{GitRepository, GitStandIn};
+        let dir = tempfile::tempdir().unwrap();
+        let data = GitRepository::init(dir.path().join("data"));
+        let code = GitRepository::init(dir.path().join("code"));
+        let stand_in = GitStandIn::new();
+        let paths = WorktreePaths::detect_with_context(
+            data.root(),
+            data.root(),
+            Some(&data.root().join(".jit")),
+            Arc::new(LayoutContext {
+                git: Git::with_program(stand_in.program()),
+                ..LayoutContext::default()
+            }),
+        )
+        .unwrap();
+        let selected = paths.with_worktree_root(code.root()).unwrap();
+        selected.with_worktree_root(code.root()).unwrap();
+        assert_eq!(stand_in.invocations().len(), 2);
+    }
+
+    #[test]
+    fn test_selected_code_root_preserves_data_and_coordination_authority() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = crate::test_harness::git::GitRepository::init(dir.path().join("data"));
+        let code = crate::test_harness::git::GitRepository::init(dir.path().join("code"));
+        let paths =
+            WorktreePaths::detect_for_data_root(&data.root().join(".jit"), data.root()).unwrap();
+        let selected = paths.with_worktree_root(code.root()).unwrap();
+        assert_eq!(selected.git().unwrap().worktree_root(), data.root());
+        assert_eq!(
+            selected.code_checkout().unwrap().worktree_root(),
+            code.root()
+        );
+        assert_eq!(selected.checkout_top_level(), data.root());
+        assert_eq!(selected.common_dir, paths.common_dir);
+        let projected = selected
+            .for_worktree_root(dir.path().join("linked"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(projected.worktree_root, code.root());
+        assert_eq!(projected.checkout_top_level(), dir.path().join("linked"));
+    }
+
+    #[test]
+    fn test_selected_code_subdirectory_retains_checkout_top_level() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = crate::test_harness::git::GitRepository::init(dir.path().join("data"));
+        let code = crate::test_harness::git::GitRepository::init(dir.path().join("code"));
+        let sub = code.root().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        let paths =
+            WorktreePaths::detect_for_data_root(&data.root().join(".jit"), data.root()).unwrap();
+        let selected = paths.with_worktree_root(&sub).unwrap();
+        assert_eq!(selected.code_checkout().unwrap().worktree_root(), sub);
+        assert_eq!(selected.code_checkout_top_level(), Some(code.root()));
+    }
+
+    #[test]
+    fn test_selected_non_git_code_does_not_inherit_data_checkout() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = crate::test_harness::git::GitRepository::init(dir.path().join("data"));
+        let code = dir.path().join("code");
+        std::fs::create_dir(&code).unwrap();
+        let paths =
+            WorktreePaths::detect_for_data_root(&data.root().join(".jit"), data.root()).unwrap();
+        let selected = paths.with_worktree_root(&code).unwrap();
+        assert!(selected.git().is_some());
+        assert!(selected.code_checkout().is_none());
     }
 
     #[test]

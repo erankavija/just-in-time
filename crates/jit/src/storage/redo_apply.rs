@@ -117,6 +117,12 @@ impl RedoInterruptionInjector for NoRedoInterruptions {
 /// Failures of one record application.
 #[derive(Debug, thiserror::Error)]
 pub enum RedoApplyError {
+    #[error("original redo worktree {path} is unavailable: {source}")]
+    OriginalWorktree {
+        path: std::path::PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
     #[error("redo record addresses {path}, which the selected roots do not hold")]
     Unaddressable { path: String },
     #[error("redo application interrupted at {point:?}: {source}")]
@@ -170,9 +176,11 @@ impl RedoApplier {
         roots: &CapabilityRoots,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
+        roots.validate_record_root(record)?;
         self.apply_operations(roots, record)?;
         let injector = &*self.injector;
         check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
+        roots.validate_record_root(record)?;
         remove_record(roots)?;
         check_interruption(injector, RedoPoint::AfterApply)
     }
@@ -199,6 +207,7 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeMakeDirectory { index })?;
+                roots.validate_record_root(record)?;
                 make_directory(roots, path)
             })?;
         record
@@ -207,6 +216,7 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, put)| {
                 check_interruption(injector, RedoPoint::BeforePut { index })?;
+                roots.validate_record_root(record)?;
                 put_file(roots, put)
             })?;
         record
@@ -215,11 +225,13 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
+                roots.validate_record_root(record)?;
                 delete_file(roots, path)
             })?;
         match record.event_append() {
             Some(append) => {
                 check_interruption(injector, RedoPoint::BeforeEventAppend)?;
+                roots.validate_record_root(record)?;
                 append_events(roots, append)
             }
             None => Ok(()),
@@ -647,7 +659,8 @@ pub(crate) mod test_fixtures {
                         (puts, deletes)
                     },
                 );
-                RedoRecord::new(
+                RedoRecord::for_layout(
+                    &crate::storage::InMemoryStorage::new().repository_layout(),
                     make_directories,
                     puts,
                     deletes,
@@ -681,7 +694,8 @@ mod tests {
     }
 
     fn sample_record() -> RedoRecord {
-        RedoRecord::new(
+        RedoRecord::for_layout(
+            &crate::storage::InMemoryStorage::new().repository_layout(),
             vec![VirtualPath::data("templates").unwrap()],
             vec![put(VirtualPath::data("records/a.json").unwrap(), b"a")],
             vec![VirtualPath::worktree("dev/note.md").unwrap()],
@@ -825,7 +839,8 @@ mod tests {
         std::fs::write(data_root(&worktree).join("index.json"), b"captured").unwrap();
         std::fs::write(worktree.path().join("stale.md"), b"stale").unwrap();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             vec![VirtualPath::data("templates").unwrap()],
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             vec![VirtualPath::worktree("stale.md").unwrap()],
@@ -859,7 +874,8 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_removes_the_record_it_applied() {
         let (worktree, roots) = repository();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             Vec::new(),
@@ -880,7 +896,8 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_creates_the_directories_a_put_needs() {
         let (worktree, roots) = repository();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(
                 VirtualPath::data("issues/2026/a.json").unwrap(),
@@ -906,7 +923,8 @@ mod tests {
     fn test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published() {
         let (worktree, roots) = repository();
         let nested = VirtualPath::data("issues/2026/09/a.json").unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(nested, b"published")],
             Vec::new(),
@@ -946,7 +964,8 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let (worktree, roots) = repository();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![PutFile {
                 path: VirtualPath::worktree("scripts/publish.sh").unwrap(),
@@ -1008,7 +1027,8 @@ mod tests {
         let target = VirtualPath::data("index.json").unwrap();
         std::os::unix::fs::symlink(&outside_target, data_root(&worktree).join("index.json"))
             .unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![PutFile {
                 path: target.clone(),
@@ -1116,7 +1136,8 @@ mod tests {
             [CAPTURED_LOG, &b"{\"tag\":\"residue\"}\n".repeat(3)].concat(),
         )
         .unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -1141,14 +1162,16 @@ mod tests {
     fn test_redo_applier_apply_checks_every_application_through_the_held_injector() {
         let (_worktree, roots) = repository();
         let (recorded, applier) = recording_applier();
-        let published = RedoRecord::new(
+        let published = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             Vec::new(),
             None,
         )
         .unwrap();
-        let removed = RedoRecord::new(
+        let removed = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             Vec::new(),
             vec![VirtualPath::data("index.json").unwrap()],
@@ -1179,7 +1202,8 @@ mod tests {
     fn test_redo_applier_apply_checks_every_interruption_point_in_order() {
         let (worktree, roots) = repository();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             vec![VirtualPath::data("templates").unwrap()],
             vec![
                 put(VirtualPath::data("index.json").unwrap(), b"published"),
@@ -1217,7 +1241,8 @@ mod tests {
         let (worktree, roots) = repository();
         let outside = TempDir::new().unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("escape")).unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![
                 put(VirtualPath::data("inside.json").unwrap(), b"published"),

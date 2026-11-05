@@ -2920,13 +2920,23 @@ fn test_absent_root_publication_carries_its_worktree_targets_in_the_redo_record(
         "the published root must carry the record its worktree targets wait in"
     );
 
+    let committed = RedoRecord::parse(
+        &std::fs::read(data.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME)).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        committed.worktree_binding(),
+        Some(&crate::storage::redo_record::WorktreeRootBinding::from_layout(&layout))
+    );
+    let other = TempDir::new().unwrap();
     let next = JsonFileStorage::new(&data);
     let session = next
-        .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+        .open_mutation_session(discover_repository_layout(other.path(), &data).unwrap())
         .unwrap();
 
     assert_eq!(session.recovery_report().applied_records, 1);
     assert_eq!(std::fs::read(&note).unwrap(), b"note");
+    assert!(!other.path().join("note.txt").exists());
 }
 
 /// The delta's path order puts the run record first.
@@ -3150,4 +3160,348 @@ fn test_json_read_admission_refuses_a_capture_over_a_root_initialization_publish
 
     assert!(data.exists(), "initialization published the root");
     assert_eq!(read.admit().unwrap(), ReadAdmission::Moved);
+}
+
+#[test]
+fn test_open_mutation_session_recovers_original_worktree_before_opening_new_selection() {
+    let backend = FileSessionBackend::seeded();
+    let next = TempDir::new().unwrap();
+    let record = RedoRecord::for_layout(
+        &backend.layout(),
+        Vec::new(),
+        vec![put_file(
+            VirtualPath::worktree("original.md").unwrap(),
+            b"committed",
+        )],
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
+    backend.commit(&record);
+    let selected = discover_repository_layout(next.path(), backend.layout.data_root()).unwrap();
+    let session = backend.store().open_mutation_session(selected).unwrap();
+    assert_eq!(session.recovery_report().recovered_count(), 1);
+    assert_eq!(
+        std::fs::read(backend.worktree.path().join("original.md")).unwrap(),
+        b"committed"
+    );
+    assert!(!next.path().join("original.md").exists());
+    assert!(!backend.holds_record());
+}
+
+fn bind_configuration(backend: &FileSessionBackend) {
+    backend
+        .storage
+        .configure_repository_layout(&backend.layout)
+        .unwrap();
+    backend.storage.bind_selection(
+        ConfigurationObservation::capture(backend.layout.data_root()).unwrap(),
+        false,
+        false,
+    );
+}
+
+fn commit_configuration(backend: &FileSessionBackend, bytes: &[u8]) {
+    let offset = std::fs::metadata(backend.layout.data_root().join("events.jsonl"))
+        .unwrap()
+        .len();
+    backend.commit(
+        &RedoRecord::new(
+            Vec::new(),
+            vec![put_file(VirtualPath::CONFIG, bytes)],
+            Vec::new(),
+            event_append(offset),
+        )
+        .unwrap(),
+    );
+}
+
+#[test]
+fn test_selection_observation_spans_handoff_and_consumer_capture() {
+    for before_open in [true, false] {
+        let backend = FileSessionBackend::seeded();
+        bind_configuration(&backend);
+        let mut read = (!before_open).then(|| backend.open_read().unwrap());
+        commit_configuration(&backend, b"[worktree]\nroot = '../other'\n");
+        JsonFileStorage::new(backend.layout.data_root())
+            .recover_pending_records()
+            .unwrap();
+        if let Some(read) = read.as_mut() {
+            read.capture(CaptureSpec::new([VirtualPath::CONFIG], budget()).unwrap())
+                .unwrap();
+            assert_eq!(read.admit().unwrap(), ReadAdmission::Moved);
+        } else {
+            assert!(matches!(
+                backend.open_read(),
+                Err(RepositoryStateStoreError::RetryableConflict { .. })
+            ));
+        }
+    }
+}
+
+#[test]
+fn test_selection_observation_refreshes_after_an_unrelated_commit() {
+    let backend = FileSessionBackend::seeded();
+    bind_configuration(&backend);
+    assert_eq!(
+        backend.open_read().unwrap().admit().unwrap(),
+        ReadAdmission::Granted
+    );
+    backend.commit(&leftover_record());
+    backend.storage.recover_pending_records().unwrap();
+    let mut read = backend.open_read().unwrap();
+    let image = read
+        .capture(CaptureSpec::new([leftover_target()], budget()).unwrap())
+        .unwrap();
+    assert!(matches!(
+        image.entry(&leftover_target()).unwrap(),
+        RepositoryEntry::File { .. }
+    ));
+    assert_eq!(read.admit().unwrap(), ReadAdmission::Granted);
+}
+
+#[test]
+fn test_selection_observation_revalidates_retained_and_claim_first_sessions() {
+    for retained in [true, false] {
+        let backend = FileSessionBackend::seeded();
+        bind_configuration(&backend);
+        let mut session = retained.then(|| backend.open().unwrap());
+        commit_configuration(&backend, b"[worktree]\nroot = '../different'\n");
+        backend.storage.recover_pending_records().unwrap();
+        if let Some(session) = session.as_mut() {
+            assert!(matches!(
+                session.capture(CaptureSpec::new([VirtualPath::CONFIG], budget()).unwrap()),
+                Err(RepositoryStateStoreError::RetryableConflict { .. })
+            ));
+        } else {
+            assert!(matches!(
+                backend.open(),
+                Err(RepositoryStateStoreError::RetryableConflict { .. })
+            ));
+        }
+    }
+}
+
+#[test]
+fn test_configuration_read_with_held_writer_and_pending_record_conflicts_without_replay() {
+    let backend = FileSessionBackend::seeded();
+    let held = backend.open().unwrap();
+    backend.commit(&leftover_record());
+    let record = std::fs::read(backend.record_path()).unwrap();
+    let data = backend.layout.data_root().to_path_buf();
+    let (send, receive) = std::sync::mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        send.send(ConfigurationObservation::capture(&data).map(|_| ()))
+            .unwrap()
+    });
+    let result = receive.recv_timeout(std::time::Duration::from_secs(2));
+    drop(held);
+    reader.join().unwrap();
+    let error = result
+        .expect("a read never waits on the held writer")
+        .unwrap_err();
+    assert!(error
+        .downcast_ref::<RepositoryStateStoreError>()
+        .is_some_and(|error| matches!(error, RepositoryStateStoreError::RetryableConflict { .. })));
+    assert_eq!(std::fs::read(backend.record_path()).unwrap(), record);
+    assert!(backend.bytes_at(&leftover_target()).is_none());
+}
+
+#[test]
+fn test_data_read_admission_detects_root_replacement() {
+    let outer = TempDir::new().unwrap();
+    let data = outer.path().join("data");
+    std::fs::create_dir(&data).unwrap();
+    let read = DataReadSession::open(&data).unwrap();
+    std::fs::rename(&data, outer.path().join("old")).unwrap();
+    std::fs::create_dir(&data).unwrap();
+    assert_eq!(read.admit().unwrap(), ReadAdmission::Moved);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_recovery_original_root_preflight_refuses_all_writes_until_identity_returns() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    for failure in ["missing", "replaced", "symlink", "inaccessible"] {
+        let outer = TempDir::new().unwrap();
+        let code = outer.path().join("code");
+        let data = outer.path().join("data");
+        std::fs::create_dir(&code).unwrap();
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(data.join("marker"), b"old").unwrap();
+        let layout = discover_repository_layout(&code, &data).unwrap();
+        let record = RedoRecord::for_layout(
+            &layout,
+            Vec::new(),
+            vec![
+                put_file(VirtualPath::data("marker").unwrap(), b"new"),
+                put_file(VirtualPath::worktree("note").unwrap(), b"original"),
+            ],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        commit_redo_record(&crate::storage::DataRoot::open(&data).unwrap(), &record).unwrap();
+        let record_path = data.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+        let committed = std::fs::read(&record_path).unwrap();
+        let old = outer.path().join("original");
+        if failure == "inaccessible" {
+            std::fs::set_permissions(&code, std::fs::Permissions::from_mode(0o0)).unwrap();
+        } else {
+            std::fs::rename(&code, &old).unwrap();
+            match failure {
+                "replaced" => std::fs::create_dir(&code).unwrap(),
+                "symlink" => symlink(&old, &code).unwrap(),
+                _ => {}
+            }
+        }
+        let recovery = JsonFileStorage::new(&data).recover_pending_records();
+        if failure == "inaccessible" {
+            std::fs::set_permissions(&code, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        assert!(
+            matches!(recovery, Err(RepositoryStateStoreError::RedoApply(error)) if matches!(*error, RedoApplyError::OriginalWorktree { .. })),
+            "{failure}"
+        );
+        assert_eq!(
+            std::fs::read(data.join("marker")).unwrap(),
+            b"old",
+            "{failure}"
+        );
+        assert_eq!(std::fs::read(&record_path).unwrap(), committed);
+        if failure != "inaccessible" {
+            match failure {
+                "replaced" => std::fs::remove_dir_all(&code).unwrap(),
+                "symlink" => std::fs::remove_file(&code).unwrap(),
+                _ => {}
+            }
+            std::fs::rename(&old, &code).unwrap();
+        }
+        assert_eq!(
+            JsonFileStorage::new(&data)
+                .recover_pending_records()
+                .unwrap()
+                .recovered_count(),
+            1
+        );
+        assert_eq!(std::fs::read(code.join("note")).unwrap(), b"original");
+    }
+}
+
+#[test]
+fn test_clean_session_refuses_record_appearing_after_recovery_handoff() {
+    let backend = FileSessionBackend::seeded();
+    let data = backend.layout.data_root().to_path_buf();
+    let record = leftover_record();
+    let storage = JsonFileStorage::with_mutation_interruptions(
+        &data,
+        HookAtMoment::new(MutationPoint::SessionOpen, {
+            let data = data.clone();
+            move || {
+                commit_redo_record(&crate::storage::DataRoot::open(&data).unwrap(), &record)
+                    .unwrap()
+            }
+        }),
+    );
+    assert!(matches!(
+        storage.open_mutation_session(backend.layout()),
+        Err(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    assert!(backend.holds_record());
+    assert!(backend.bytes_at(&leftover_target()).is_none());
+    assert_eq!(
+        storage
+            .open_mutation_session(backend.layout())
+            .unwrap()
+            .recovery_report()
+            .recovered_count(),
+        1
+    );
+}
+
+#[test]
+fn test_recovery_restarts_when_record_identity_changes_after_lock_selection_peek() {
+    let backend = FileSessionBackend::seeded();
+    backend.commit(&leftover_record());
+    let path = backend.record_path();
+    let mut peek_count = 0;
+    let report = backend
+        .storage
+        .recover_after_peek(|| {
+            peek_count += 1;
+            if peek_count == 1 {
+                let old = path.with_extension("old");
+                std::fs::rename(&path, &old).unwrap();
+                std::fs::write(&path, std::fs::read(old).unwrap()).unwrap();
+            }
+        })
+        .unwrap();
+    assert_eq!(
+        peek_count, 2,
+        "identical record bytes on a different object still require another ordered acquisition"
+    );
+    assert_eq!(report.recovered_count(), 1);
+}
+
+#[test]
+fn test_recovery_restarts_with_new_binding_without_worktree_lock_inversion() {
+    let backend = FileSessionBackend::seeded();
+    let original_code = TempDir::new().unwrap();
+    let original =
+        discover_repository_layout(original_code.path(), backend.layout().data_root()).unwrap();
+    let next = TempDir::new().unwrap();
+    let layout = discover_repository_layout(next.path(), original.data_root()).unwrap();
+    let record = |layout: &RepositoryLayout| {
+        RedoRecord::for_layout(
+            layout,
+            Vec::new(),
+            vec![put_file(VirtualPath::worktree("note").unwrap(), b"bound")],
+            Vec::new(),
+            None,
+        )
+        .unwrap()
+    };
+    backend.commit(&record(&original));
+    let path = backend.record_path();
+    let replacement = record(&layout).serialize().unwrap();
+    let mut replace = Some(replacement);
+    backend
+        .storage
+        .recover_after_peek(|| {
+            if let Some(bytes) = replace.take() {
+                std::fs::remove_file(&path).unwrap();
+                std::fs::write(&path, bytes).unwrap();
+                std::fs::remove_dir(original.worktree_root()).unwrap();
+            }
+        })
+        .unwrap();
+    assert!(!original.worktree_root().join("note").exists());
+    assert_eq!(std::fs::read(next.path().join("note")).unwrap(), b"bound");
+}
+
+#[test]
+fn test_recovery_restarts_when_data_root_changes_after_lock_selection_peek() {
+    let outer = TempDir::new().unwrap();
+    let data = outer.path().join("data");
+    std::fs::create_dir(&data).unwrap();
+    let record = leftover_record();
+    commit_redo_record(&crate::storage::DataRoot::open(&data).unwrap(), &record).unwrap();
+    let mut replaced = false;
+    let report = JsonFileStorage::new(&data)
+        .recover_after_peek(|| {
+            if !replaced {
+                replaced = true;
+                std::fs::rename(&data, outer.path().join("old")).unwrap();
+                std::fs::create_dir(&data).unwrap();
+            }
+        })
+        .unwrap();
+    assert_eq!(report.recovered_count(), 0);
+    assert!(outer
+        .path()
+        .join("old")
+        .join(RECORD_SCRATCH_DIR)
+        .join(RECORD_FILE_NAME)
+        .exists());
+    assert!(!data.join(leftover_target().relative().as_path()).exists());
 }

@@ -1,8 +1,9 @@
 //! No-follow capability primitives: root handles and the walks, opens and reads that keep every traversal beneath a held directory.
 
 use crate::domain::relative_path::RootRelativePath;
-use crate::repository_state::{RepositoryLayout, RepositoryRootClass};
+use crate::repository_state::{RepositoryLayout, RepositoryRootClass, RepositoryRootEvidence};
 use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::redo_record::{RedoRecord, WorktreeRootBinding};
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use cap_std::{ambient_authority, fs::MetadataExt as _};
@@ -23,7 +24,7 @@ pub enum CapabilityFsError {
 /// Open no-follow handles for the selected roots, constructed only inside the
 /// session boundary that verified their identity.
 pub struct CapabilityRoots {
-    worktree: Dir,
+    worktree: Option<(Dir, WorktreeRootBinding)>,
     data: Option<DataRoot>,
 }
 
@@ -81,33 +82,35 @@ impl CapabilityRoots {
     pub(in crate::storage) fn open(
         layout: &RepositoryLayout,
     ) -> Result<(Self, Dir, String), CapabilityFsError> {
-        let worktree = open_absolute_dir_nofollow(layout.worktree_root())?;
-        ensure_capability_identity(
-            &worktree,
-            layout.worktree_identity(),
-            layout.worktree_root(),
-        )?;
-        let data_parent_path = layout.data_root().parent().ok_or_else(|| {
-            CapabilityFsError::UnsafeTarget(layout.data_root().display().to_string())
+        let evidence =
+            RepositoryRootEvidence::new(layout.data_root(), layout.data_identity(), true);
+        let (mut roots, parent, leaf) = Self::open_data(&evidence)?;
+        roots.bind_worktree(&WorktreeRootBinding::from_layout(layout))?;
+        Ok((roots, parent, leaf))
+    }
+
+    pub(in crate::storage) fn open_data(
+        evidence: &RepositoryRootEvidence,
+    ) -> Result<(Self, Dir, String), CapabilityFsError> {
+        let data_parent_path = evidence.path().parent().ok_or_else(|| {
+            CapabilityFsError::UnsafeTarget(evidence.path().display().to_string())
         })?;
         let data_parent = open_absolute_dir_nofollow(data_parent_path)?;
-        let data_leaf = layout
-            .data_root()
+        let data_leaf = evidence
+            .path()
             .file_name()
             .and_then(|name| name.to_str())
-            .ok_or_else(|| {
-                CapabilityFsError::UnsafeTarget(layout.data_root().display().to_string())
-            })?
+            .ok_or_else(|| CapabilityFsError::UnsafeTarget(evidence.path().display().to_string()))?
             .to_string();
         let data = match data_parent.symlink_metadata(&data_leaf) {
             Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {
                 let data = open_child_dir_nofollow(&data_parent, &data_leaf)?;
-                ensure_capability_identity(&data, layout.data_identity(), layout.data_root())?;
+                ensure_capability_identity(&data, evidence.identity(), evidence.path())?;
                 Some(DataRoot::from_dir(data))
             }
             Ok(_) => {
                 return Err(CapabilityFsError::UnsafeTarget(
-                    layout.data_root().display().to_string(),
+                    evidence.path().display().to_string(),
                 ))
             }
             Err(error) if error.kind() == ErrorKind::NotFound => None,
@@ -120,14 +123,63 @@ impl CapabilityRoots {
         if data.is_none() {
             if let Some(parent_identity) = capability_dir_identity(&data_parent) {
                 let expected = format!("absent:{parent_identity}:{data_leaf}");
-                if expected != layout.data_identity() {
+                if expected != evidence.identity() {
                     return Err(CapabilityFsError::RetryableConflict {
-                        path: layout.data_root().display().to_string(),
+                        path: evidence.path().display().to_string(),
                     });
                 }
             }
         }
-        Ok((Self { worktree, data }, data_parent, data_leaf))
+        Ok((
+            Self {
+                worktree: None,
+                data,
+            },
+            data_parent,
+            data_leaf,
+        ))
+    }
+
+    pub(in crate::storage) fn bind_worktree(
+        &mut self,
+        binding: &WorktreeRootBinding,
+    ) -> Result<(), CapabilityFsError> {
+        let directory = open_absolute_dir_nofollow(binding.path())?;
+        ensure_capability_identity(&directory, binding.identity(), binding.path())?;
+        self.worktree = Some((directory, binding.clone()));
+        Ok(())
+    }
+
+    pub(in crate::storage) fn validate_record_root(
+        &self,
+        record: &RedoRecord,
+    ) -> Result<(), crate::storage::RedoApplyError> {
+        let Some(binding) = record.worktree_binding() else {
+            return Ok(());
+        };
+        let failure = |source: anyhow::Error| crate::storage::RedoApplyError::OriginalWorktree {
+            path: binding.path().to_path_buf(),
+            source,
+        };
+        if self.worktree.as_ref().map(|(_, held)| held) != Some(binding) {
+            return Err(failure(anyhow::anyhow!(
+                "held worktree does not match the committed binding"
+            )));
+        }
+        let current =
+            open_absolute_dir_nofollow(binding.path()).map_err(|error| failure(error.into()))?;
+        ensure_capability_identity(&current, binding.identity(), binding.path())
+            .map_err(|error| failure(error.into()))
+    }
+
+    #[cfg(test)]
+    pub(in crate::storage) fn record_layout(&self) -> RepositoryLayout {
+        let binding = &self.worktree.as_ref().unwrap().1;
+        RepositoryLayout::new(
+            RepositoryRootEvidence::new(binding.path(), binding.identity(), true),
+            RepositoryRootEvidence::new(binding.path().join(".jit"), "fixture-data", true),
+        )
+        .unwrap()
     }
 
     pub(in crate::storage) fn data_root(&self) -> Option<&DataRoot> {
@@ -136,7 +188,7 @@ impl CapabilityRoots {
 
     pub(in crate::storage) fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
         match class {
-            RepositoryRootClass::Worktree => Some(&self.worktree),
+            RepositoryRootClass::Worktree => self.worktree.as_ref().map(|(directory, _)| directory),
             RepositoryRootClass::Data => self.data.as_ref().map(DataRoot::dir),
         }
     }

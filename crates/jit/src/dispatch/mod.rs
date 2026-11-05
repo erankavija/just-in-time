@@ -134,6 +134,7 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
     open_repository(RepositoryInvocation {
         current_dir: std::env::current_dir()?,
         data_dir_override: std::env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
+        worktree_root_override: std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from),
         is_init: false,
         opens_mutation_session: command.requires_recovery_dispatch(),
         coordinates_claims_first: command.coordinates_claims_first(),

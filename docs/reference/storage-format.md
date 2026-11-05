@@ -2,9 +2,9 @@
 
 > **Diátaxis Type:** Reference
 
-JIT stores its issue and configuration data in the `.jit/` directory at the
-repository root. Machine-local runtime state lives there too, gitignored, and
-multi-agent lease coordination lives under `.git/jit/` (see
+JIT stores its issue and configuration data in a data root, normally `.jit/`
+at the repository root. Machine-local runtime state lives there too, gitignored.
+Multi-agent lease coordination lives under `.git/jit/` (see
 [The `.git/jit/` Control Plane](#the-gitjit-control-plane)).
 
 Record fields and serialization are generated from the code that writes them
@@ -100,6 +100,16 @@ other file through the temp-file and rename pattern (`@/inv/atomic-writes`),
 removes the listed paths, extends the event log, and ends by removing the
 record.
 
+The [redo record implementation](../../crates/jit/src/storage/redo_record.rs)
+defines the canonical format version as 2. A record with worktree operations
+binds them to the committing session's absolute worktree-root path and
+filesystem identity; a data-only record has no worktree binding. Before any
+replay write, recovery verifies the original root without following symlinks.
+If it is missing, moved, replaced, inaccessible, or symlinked, recovery fails
+with a typed error and leaves the record intact without replaying any of its
+operations. Recovery never substitutes a newly configured root. Data-only
+records recover without a code root.
+
 A command that changes the repository, and `jit recover`, opens a mutation
 session, and a session that opens over a leftover record applies it before
 serving the command. `jit snapshot export` publishes, so it reads under that
@@ -108,9 +118,14 @@ converges on the same state when repeated. A leftover record that does not
 parse, including one whose own write was interrupted, is refused: the session
 open fails with an error naming the record. Repository discovery recognizes a
 pending record as well as an initialized `index.json`, so a repository whose
-index a crash left unwritten still reaches that session open.
+index a crash left unwritten still reaches recovery. Recovery completes the
+older committed record before selecting a new worktree root or applying the
+linked-checkout write policy to new work. It preserves the original event and
+override audit; it does not authorize a new mutation or create another override
+event. With no pending record, a policy refusal precedes mutation locks and
+writes; with a pending record, only completion of that record may precede it.
 
-A read through the read driver takes no repository write lock and does not apply
+A read through the read driver takes no writer lock and does not apply
 redo records (`@/charter/D-25`). It counts only when no redo record was present
 and the event log did not grow between its open and the end of its reads;
 otherwise it retries. After bounded attempts it returns `RETRYABLE_CONFLICT`:
@@ -265,6 +280,39 @@ never reached the milestone, or one predating these fields).
   always round-trips them.
 
 A lifecycle timestamp dropped by a writer lacking these fields stays unset.
+
+## Data and Worktree Roots
+
+The data root holds issues and configuration. `JIT_DATA_DIR` selects it when
+set; otherwise JIT discovers `.jit/` from the invocation. A separate worktree
+root can name the code checkout, including when the data root is a separate Git
+checkout or a `.jit/` directory with its own `.git`:
+
+```toml
+[worktree]
+root = ".."
+```
+
+`[worktree].root` and `JIT_WORKTREE_ROOT` accept absolute paths or paths relative
+to the selected data root. The environment variable takes precedence. With
+neither set, JIT uses the top level of the Git checkout containing the data
+root. If the data root is outside Git, it uses the discovered `.jit/` parent
+when that is the selected data root, or otherwise the invocation directory. A
+selected root must be an
+existing directory outside the data root and cannot contain symlinks in its
+ancestry. Invalid selections report the path and the setting that supplied it.
+
+Initialization scaffolds worktree merge attributes only when the nested data root
+and the code root belong to the same Git checkout. An independent data repository
+does not cause initialization to write attributes in the outer code checkout.
+
+Gate checkers run from the code worktree root (or their configured subdirectory),
+and gate runs record that checkout's commit and branch. Explicit branch-drift
+validation and worktree-relative documents also use the code checkout. The
+history guard for gate-registry mutations uses the data repository's history;
+an external data root outside Git does not inherit the code checkout's history.
+Claims coordination uses the data repository's Git common directory, as
+[the control-plane reference](#the-gitjit-control-plane) describes.
 
 ## Configuration File
 

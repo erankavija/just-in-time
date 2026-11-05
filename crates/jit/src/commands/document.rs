@@ -681,13 +681,23 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // Read content: try git first, fall back to filesystem if git unavailable
         let content = if at_commit.is_some() || doc.commit.is_some() {
             // Explicit version requested - require git
-            let repo = Repository::open(self.exec.require_layout()?.worktree_root())
-                .context("Git repository required when viewing specific commit version")?;
+            let repo = Repository::open(
+                self.exec
+                    .require_worktree_paths()?
+                    .code_checkout_top_level()
+                    .unwrap_or(self.exec.require_layout()?.worktree_root()),
+            )
+            .context("Git repository required when viewing specific commit version")?;
             self.read_file_from_git(&repo, &doc.path, reference)
                 .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
         } else {
             // No specific version - try git, fall back to filesystem
-            match Repository::open(self.exec.require_layout()?.worktree_root()) {
+            match Repository::open(
+                self.exec
+                    .require_worktree_paths()?
+                    .code_checkout_top_level()
+                    .unwrap_or(self.exec.require_layout()?.worktree_root()),
+            ) {
                 Ok(repo) => {
                     // Git available - read from git
                     self.read_file_from_git(&repo, &doc.path, "HEAD")
@@ -725,7 +735,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let checkout = self
             .exec
             .require_worktree_paths()?
-            .git()
+            .code_checkout()
             .ok_or_else(|| anyhow!("Not a git repository"))?;
         let commits = checkout
             .file_history(path)?
@@ -753,8 +763,13 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         self.require_issue_document(issue, path)?;
 
         let layout = self.exec.require_layout()?;
-        let repo = Repository::open(layout.worktree_root())
-            .map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        let repo = Repository::open(
+            self.exec
+                .require_worktree_paths()?
+                .code_checkout_top_level()
+                .unwrap_or(layout.worktree_root()),
+        )
+        .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
         let to_ref = to.unwrap_or("HEAD");
 
@@ -895,7 +910,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             .require_worktree_paths()
             .map_err(PathReadError::Other)?;
         Ok(paths
-            .git()
+            .code_checkout()
             .and_then(|checkout| checkout.file_history(path).ok())
             .unwrap_or_default()
             .into_iter()
@@ -929,7 +944,13 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let repo_root = layout.worktree_root();
 
         // Try to get diff from git, return error message if not available
-        if let Ok(repo) = Repository::open(repo_root) {
+        if let Ok(repo) = Repository::open(
+            self.exec
+                .require_worktree_paths()
+                .map_err(PathReadError::Other)?
+                .code_checkout_top_level()
+                .unwrap_or(repo_root),
+        ) {
             let to_ref = to.unwrap_or("HEAD");
 
             // Try to get content at both commits
@@ -1004,7 +1025,15 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let obj = repo.revparse_single(reference)?;
         let commit = obj.peel_to_commit()?;
         let tree = commit.tree()?;
-        let entry = tree.get_path(std::path::Path::new(path))?;
+        let layout = self.exec.require_layout()?;
+        let root = layout.worktree_root();
+        let top = self
+            .exec
+            .require_worktree_paths()?
+            .code_checkout_top_level()
+            .unwrap_or(root);
+        let relative_root = root.strip_prefix(top).unwrap_or(std::path::Path::new(""));
+        let entry = tree.get_path(&relative_root.join(path))?;
         let blob = repo.find_blob(entry.id())?;
 
         let content = std::str::from_utf8(blob.content())?;
@@ -1236,11 +1265,11 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             .filter_map(|asset| asset.resolved_path.as_ref())
             .filter(|path| !repo_root.join(path).exists())
             .collect::<std::collections::BTreeSet<_>>();
-        let committed_assets = match self.exec.require_worktree_paths()?.write_checkout() {
+        let committed_assets = match self.exec.require_worktree_paths()?.code_checkout() {
             Some(checkout) if !missing_worktree_assets.is_empty() => {
                 let names = missing_worktree_assets
                     .iter()
-                    .map(|path| format!("HEAD:{}", path.to_string_lossy()))
+                    .map(|path| format!("HEAD:./{}", path.to_string_lossy()))
                     .collect::<Vec<_>>();
                 missing_worktree_assets
                     .into_iter()

@@ -59,6 +59,17 @@ trait RecordBackend {
     type Published: Clone + std::fmt::Debug + PartialEq;
 
     fn seeded(initial: &InitialState) -> Self;
+    fn layout(&self) -> crate::repository_state::RepositoryLayout;
+    fn bound(&self, record: &RedoRecord) -> RedoRecord {
+        RedoRecord::for_layout(
+            &self.layout(),
+            record.make_directories().to_vec(),
+            record.puts().to_vec(),
+            record.deletes().to_vec(),
+            record.event_append().cloned(),
+        )
+        .unwrap()
+    }
     fn commit(&self, record: &RedoRecord);
     fn apply(
         &self,
@@ -92,7 +103,12 @@ impl RecordBackend for FileBackend {
         Self { worktree, roots }
     }
 
+    fn layout(&self) -> crate::repository_state::RepositoryLayout {
+        self.roots.record_layout()
+    }
+
     fn commit(&self, record: &RedoRecord) {
+        let record = &self.bound(record);
         commit_redo_record(&DataRoot::open(&data_root(&self.worktree)).unwrap(), record).unwrap();
     }
 
@@ -101,7 +117,7 @@ impl RecordBackend for FileBackend {
         injector: Arc<dyn RedoInterruptionInjector>,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
-        RedoApplier::new(injector).apply(&self.roots, record)
+        RedoApplier::new(injector).apply(&self.roots, &self.bound(record))
     }
 
     fn published(&self) -> Self::Published {
@@ -125,8 +141,12 @@ impl RecordBackend for MemoryBackend {
         Self(memory_fixtures::seeded(&initial.occupied, initial.residue))
     }
 
+    fn layout(&self) -> crate::repository_state::RepositoryLayout {
+        self.0.repository_layout()
+    }
+
     fn commit(&self, record: &RedoRecord) {
-        self.0.commit_record(record).unwrap();
+        self.0.commit_record(&self.bound(record)).unwrap();
     }
 
     fn apply(
@@ -134,7 +154,7 @@ impl RecordBackend for MemoryBackend {
         injector: Arc<dyn RedoInterruptionInjector>,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
-        MemoryRedoApplier::new(injector).apply(&self.0, record)
+        MemoryRedoApplier::new(injector).apply(&self.0, &self.bound(record))
     }
 
     fn published(&self) -> Self::Published {
@@ -201,7 +221,8 @@ fn full_record() -> RedoRecord {
         mode: FileMode::Regular,
     };
     let [directory, _] = directory_vocabulary_paths();
-    RedoRecord::new(
+    RedoRecord::for_layout(
+        &InMemoryStorage::new().repository_layout(),
         vec![directory],
         vec![
             published(VirtualPath::data("index.json").unwrap()),
@@ -377,7 +398,14 @@ fn test_a_non_directory_occupying_a_made_directory_is_refused_on_both_backends()
         occupied: vec![directory.clone()],
         residue: false,
     };
-    let record = RedoRecord::new(vec![directory], Vec::new(), Vec::new(), None).unwrap();
+    let record = RedoRecord::for_layout(
+        &InMemoryStorage::new().repository_layout(),
+        vec![directory],
+        Vec::new(),
+        Vec::new(),
+        None,
+    )
+    .unwrap();
     let file = committed::<FileBackend>(&initial, &record);
     let memory = committed::<MemoryBackend>(&initial, &record);
 

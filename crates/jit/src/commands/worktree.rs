@@ -9,7 +9,7 @@ use crate::storage::claim_coordinator::{read_active_leases, Lease};
 use crate::storage::git::BaseComparison;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{read_exact_store, IssueStore, StorageWarning, RECORD_FILE_NAME};
+use crate::storage::{IssueStore, StorageWarning, RECORD_FILE_NAME};
 use anyhow::{anyhow, ensure, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -118,7 +118,7 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
             WorktreeInfo {
                 worktree_id: identity.worktree_id,
                 branch,
-                root_path: paths.worktree_root.to_string_lossy().to_string(),
+                root_path: paths.checkout_top_level().to_string_lossy().to_string(),
                 data_root: self
                     .exec
                     .repository_layout()?
@@ -152,15 +152,8 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
             });
         };
 
-        let local_layout =
-            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-        let primary_worktree = paths
-            .primary_worktree_root()?
-            .ok_or_else(|| anyhow::anyhow!("primary worktree root is unavailable"))?;
-        let reference_layout =
-            crate::storage::discover_repository_layout(primary_worktree, &reference_root)?;
-        let local = read_exact_store(&local_layout)?;
-        let reference = read_exact_store(&reference_layout)?;
+        let local = crate::storage::json::read_exact_data_store(&paths.local_jit)?;
+        let reference = crate::storage::json::read_exact_data_store(&reference_root)?;
 
         Ok(StoreDivergenceReport {
             checkout_store,
@@ -297,6 +290,51 @@ mod tests {
         assert!(info.is_main_worktree);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_common_history_guard_uses_data_checkout_with_separate_code() {
+        use crate::test_harness::git::GitRepository;
+        let dir = tempfile::tempdir().unwrap();
+        let data = GitRepository::init(dir.path().join("data"));
+        let code = GitRepository::init(dir.path().join("code"));
+        for repo in [&data, &code] {
+            repo.write("base", "base").commit("base");
+        }
+        let advance_base = |repo: &GitRepository| {
+            repo.write("later", "later").commit("later");
+            repo.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+            repo.git(&["reset", "--hard", "HEAD^"]);
+        };
+        advance_base(&code);
+        let selected = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(selected);
+        assert!(executor.require_common_history_with_main().is_ok());
+        code.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        advance_base(&data);
+        let selected = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(selected);
+        assert!(executor.require_common_history_with_main().is_err());
+        let external = dir.path().join("external");
+        std::fs::create_dir(&external).unwrap();
+        let selected = crate::storage::WorktreePaths::detect_for_data_root(&external, code.root())
+            .unwrap()
+            .with_worktree_root(code.root())
+            .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(selected);
+        assert!(executor.require_common_history_with_main().is_ok());
     }
 
     #[test]
