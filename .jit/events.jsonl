@@ -25125,3 +25125,6 @@
 {"id":"6114dfec-a4ff-4d95-a18f-68df3d5660b1","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T02:14:36.024161872Z","type":"issue_completed"}
 {"id":"e1f90467-221e-4c54-bfb4-2e240800d469","paths":["AGENTS.md"],"timestamp":"2026-11-05T02:09:50.917579522Z","type":"files_published"}
 {"fields":["documents"],"id":"896cc626-0fea-4015-a331-8c122883781d","issue_id":"0f8efc37-8054-420d-9409-dde888ea0040","timestamp":"2026-11-05T02:15:55.919844314Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"cargo-ci","id":"dc61f08c-6644-47b7-ae74-22f8e01cddde","issue_id":"732f7afb-f1ee-4242-aa18-82b3b70ea96f","timestamp":"2026-11-05T02:20:19.995916340Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"9a513780-8196-4f83-b73d-a4f6dc4dc06b","issue_id":"732f7afb-f1ee-4242-aa18-82b3b70ea96f","timestamp":"2026-11-05T02:20:33.971498728Z","to":"done","type":"issue_state_changed"}
+{"id":"91964646-0606-43f4-a11d-422a169c9ee5","issue_id":"732f7afb-f1ee-4242-aa18-82b3b70ea96f","timestamp":"2026-11-05T02:20:33.971498728Z","type":"issue_completed"}

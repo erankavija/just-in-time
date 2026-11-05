@@ -186,9 +186,10 @@
           "short_id": "732f7afb",
           "title": "Init records the worktree branch through the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "79c3bb520dfc0cdd43a99243af88a58999121409"
         },
         {
           "id": "9de4c09c-207b-4ea1-9482-3846383cd3c7",
@@ -741,7 +742,8 @@
     "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "c5062e21 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "c506Done4a77db9f2 unlocks d681; dispatched against reviewed DEC27 plan. Preserve user D25 nonblocking read cutover from frontend632; do not touch its json admitted listing or commands with_read_session fallback. d48 initialCargocebc1568 Clippy failed only byte-char-array expression;4990+25 passed; actual failure4e725c25e preserved, one-line correction87281c148 fullgates running. Both e3/f649 stable reviewPASS ready. Base next after frontend D25 metadata boundary.",
-    "09974ad1 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "09974ad1 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "732f7afb Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -990,7 +992,7 @@
     "732f7afb": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "4c792cbc-fa99-4da8-9056-beff4a8a35e7",
+        "cargo-ci": "9ff4bb8c-a396-4447-97a5-d4e87fc292d3",
         "code-review": "337171b7-84b7-470d-ba03-606121c7fedf"
       },
       "reviewed_source": "0c92ce22ec14ad4703ecc96a562b9b5eddde839a",
@@ -1002,7 +1004,8 @@
       "prior_findings": "No failed independent review. Lead duplicate rendering finding closed by canonical branch_label.",
       "stale_narrative": "No live obsolete branch-subprocess prose; init guard and external-root semantics preserved.",
       "deferred_items": "No linked documents or in-scope deferrals.",
-      "holistic": "Shared HEAD operation and helper; no new discovery. Main integration pending."
+      "holistic": "Shared HEAD operation and helper; no new discovery. Main integration pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 9ff4bb8c-a396-4447-97a5-d4e87fc292d3 on 79c3bb520dfc0cdd43a99243af88a58999121409."
     },
     "f6eaba42": {
       "verdict": "PASS",
