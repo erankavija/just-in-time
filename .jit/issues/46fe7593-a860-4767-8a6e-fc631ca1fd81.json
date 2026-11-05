@@ -18,7 +18,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8b15acf2-8cfd-433a-9958-982c484cf6f4",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:50:13.365033516Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "552067d6-933c-436a-8062-8a1e13e4a7d5",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:55:45.572787603Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "46fe7593-a860-4767-8a6e-fc631ca1fd81",
   "labels": [
     "type:story",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One stated output and schema contract for the CLI",
-  "updated_at": "2026-11-05T01:45:34.510636940Z"
+  "updated_at": "2026-11-05T01:55:45.572787603Z"
 }
