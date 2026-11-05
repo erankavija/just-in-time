@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b7acb022-8e15-4373-b204-9adef6426e01",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:47:28.744897314Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Share version-scoped issue capture and projections",
-  "updated_at": "2026-11-05T01:08:26.791791439Z"
+  "updated_at": "2026-11-05T01:47:28.744897314Z"
 }
