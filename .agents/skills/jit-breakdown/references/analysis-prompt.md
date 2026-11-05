@@ -44,13 +44,15 @@ validation. Non-finest entries aggregate strictly finer descendants. If a sizing
 heuristic is genuinely indivisible, override only its stable code with a concrete
 `warning_overrides` reason; the override remains visible to review.
 
-Before returning, simulate assigning every finest-tier entry to one worker. Split
-horizontally until it has one outcome, one bounded consumer family, one observable
-test boundary, fits one focused implementation/review cycle, needs no internal
-decomposition, and does not mix independently testable foundation, migration,
-deletion, documentation, or release work. Broad quantifiers, independent verbs,
-several component families, three acceptance clusters, and implementation plus
-release are presumed oversized. A shared `landing_group` never combines tasks.
+Before returning, simulate assigning every finest-tier entry to one worker. Each
+is the largest coherent change one worker can implement and review in one
+focused cycle, with one consumer family and one observable test boundary.
+Adding a form, moving its callers, and deleting the old form within one module
+is one entry, with its tests and docs. Merge entries that are only chain links
+or bridge producer/remover pairs. Split only when one worker cannot deliver the
+entry in one cycle, or when it combines implementation with release. Stay within
+the validator's issue budget; when the criteria cannot fit, list criteria to
+defer. A shared `landing_group` never combines tasks.
 
 Self-check unique/known keys, total source coverage, acyclicity, real parallelism,
 and blank-workspace roots.
