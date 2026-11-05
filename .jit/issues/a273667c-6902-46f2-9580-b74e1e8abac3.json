@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3ac22ec9-0610-4beb-90e3-b1ebd1e823cd",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:11:23.097922393Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b9d20147-35e0-492d-acec-8ee0dcb04db2",
+      "status": "failed",
+      "updated_at": "2026-11-05T03:15:07.576717562Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Path reads at a commit go through the git module",
-  "updated_at": "2026-11-05T02:33:42.736646943Z"
+  "updated_at": "2026-11-05T03:15:07.576717562Z"
 }
