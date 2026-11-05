@@ -15,6 +15,13 @@
       "doc_type": null,
       "label": "Execution progress",
       "path": "dev/active/0f8efc37-frontends-share-core/progress.json"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Vision charter",
+      "path": "dev/vision/9db27a3a-charter.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:38.027010524Z",
@@ -38,5 +45,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Run the server and web UI on the core's shared mechanisms",
-  "updated_at": "2026-11-04T23:10:18.506603369Z"
+  "updated_at": "2026-11-05T02:15:55.919844314Z"
 }

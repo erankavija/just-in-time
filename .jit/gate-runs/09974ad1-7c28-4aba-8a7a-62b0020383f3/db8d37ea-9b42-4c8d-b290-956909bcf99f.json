@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-09974ad1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7164c39b45b999652e04238dea39d3fb0ec72a22",
+  "completed_at": "2026-11-05T00:13:20.683667975Z",
+  "duration_ms": 169093,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed base-comparison primitive meets both hard criteria and is covered by the recorded passing Rust CI run.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "09974ad1-7c28-4aba-8a7a-62b0020383f3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "db8d37ea-9b42-4c8d-b290-956909bcf99f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:10:31.590477328Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0b4f30cb, 72bb772d (`jit:09974ad1`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-03 (issue description); @/invariant/{convention-convergence,essential-code-prose,orthogonal-tests,architecture-dependency-direction,semantic-types} (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-05T00:08:38Z; supplied ancestry confirms both attributable commits are contained\nTruncation recovery: reread bounded current source and test ranges, individual patches, dependency issues, and policy-source ranges\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed base-comparison primitive meets both hard criteria and is covered by the recorded passing Rust CI run.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

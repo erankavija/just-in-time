@@ -292,7 +292,8 @@
       "crates/jit/src/commands/claim.rs",
       "crates/jit/src/test_utils.rs",
       "crates/jit/src/dispatch/hooks.rs",
-      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs"
+      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs",
+      "crates/jit/src/commands/profile.rs"
      ]
     }
    }
@@ -754,7 +755,7 @@
  {
   "key": "release-actor-through-module",
   "title": "Release actor reads git user.name through the module",
-  "description": "Make the claim-release actor fallback read `user.name` through the git module, removing the last git spawn from the claim commands.\n\n## Background\n\n- `resolve_release_actor` (`crates/jit/src/commands/claim.rs:298-316`) runs `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`) when no agent id resolves, and sanitizes the result with `sanitize_actor` (`crates/jit/src/commands/claim.rs:279`). Without either it fails with `errors::no_acting_identity`.\n- Its one caller is `execute_claim_release_by_issue` (`crates/jit/src/commands/claim.rs:354`).\n- `GitCheckout::user_name()` returns the configured name, or `None` when unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_release_actor` reads the name through the paths' git checkout and treats no checkout as an unset name, and `commands/claim.rs` starts no git process.\n- [hard] REQ-02: The release tests in `commands/claim.rs` pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the claim-release actor fallback read `user.name` through the git module, removing the last git spawn from the claim commands.\n\n## Background\n\n- `resolve_release_actor` (`crates/jit/src/commands/claim.rs:298-316`) runs `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`) when no agent id resolves, and sanitizes the result with `sanitize_actor` (`crates/jit/src/commands/claim.rs:279`). Without either it fails with `errors::no_acting_identity`.\n- The resolver is called by `ClaimOps::release_by_issue` through its actor callback and by `CommandExecutor::publish_captured_release` in `crates/jit/src/commands/mod.rs`. Both receive the existing supplied `WorktreePaths`; use its selected/relocated `write_checkout()` without another probe.\n- `GitCheckout::user_name()` returns the configured name, or `None` when unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_release_actor` reads the name through the paths' git checkout and treats no checkout as an unset name, and `commands/claim.rs` starts no git process.\n- [hard] REQ-02: The release tests in `commands/claim.rs` pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -788,14 +789,13 @@
    "terminal": {
     "consumer_family": "claim release actor",
     "test_boundary": "claims unit tests",
-    "worker_sized_reason": "One function in the claims family switches to the module query at its single call site.",
+    "worker_sized_reason": "One release-actor resolver and its existing callers use the supplied checkout; the release-output fixture supplies an explicit actor instead of host Git configuration.",
     "footprint": {
      "touches": [
-      "crates/jit/src/commands/claim.rs"
+      "crates/jit/src/commands/claim.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/tests/cli_issue/gate_field_contract_test.rs"
      ]
-    },
-    "warning_overrides": {
-     "chain-link": "The instantiated release-actor adapter owns fallback precedence in claim commands; it consumes the separately assigned config-query primitive. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }

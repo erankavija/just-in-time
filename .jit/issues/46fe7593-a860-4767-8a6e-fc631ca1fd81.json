@@ -13,12 +13,26 @@
   ],
   "description": "The CLI's machine and human output are produced by shared types and renderers in the output module, the generated schema derives from them, and the contract is stated once in the reference docs.\n\n## Background\n\n`crates/jit/src/output.rs` declares 33 hand-written `count` structs, eight of which (`ReadyQueryResponse` … `ClosedQueryResponse`) are dead, while `ProfileCollection<T>` in `profile/application.rs` is already a generic envelope with a fixed key. `CommandSchema::generate()` in `crates/jit/src/schema.rs` types output through the hand table in `get_output_schema_for_command`, which falls back to `CommandResponse` for 74 of 120 leaves and lists clap-hidden stubs and the hidden `validate --divergence` flag as ordinary surface. Human rendering of the issue list, the validation report, gate run status and archive execution is copied across dispatch arms in several diverging forms. The list envelope is stated only in `README.md` and `docs/concepts/design-philosophy.md`, and `docs/reference/cli-commands.md` documents behaviour this epic changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Every list payload is an instantiation of one canonical `ListEnvelope` type in `domain/list_envelope.rs`, consumed by output, no hand-written `count` struct remains, and each command keeps the `{\"count\": N, \"<collection>\": [...]}` wire shape.\n- [hard] REQ-02: The generated schema omits everything clap marks hidden and names a registered, typed success response for every visible executable command, with no hand-kept path-to-type table.\n- [hard] REQ-03: The issue list, validation report, gate run status and archive execution views each have one renderer in the output module that every printing command calls.\n- [hard] REQ-04: `docs/reference/cli-commands.md` states the list envelope, the global `--json`, the one-rendering-per-invocation stream rule, the findings envelope and the wrong-verb hint behaviour once, and other pages cite it.\n- [hard] REQ-05: Each deliberate change to human output, schema names or schema content has a test stating the new contract, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n\n## Decisions\n\n- D-01: Reconcile the envelope location with accepted inward ownership (plan D-59 and epic D-05): the canonical generic envelope lives in the pure domain layer and output consumes it. Steward approved this correction on 2026-11-04; the wire shape, shared-type requirement and gates remain unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:01:12.466035904Z",
   "first_ready_at": "2026-11-05T01:45:34.268736175Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8b15acf2-8cfd-433a-9958-982c484cf6f4",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:50:13.365033516Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "552067d6-933c-436a-8062-8a1e13e4a7d5",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:55:45.572787603Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "46fe7593-a860-4767-8a6e-fc631ca1fd81",
   "labels": [
     "type:story",
@@ -28,7 +42,7 @@
     "story:output-contract"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "One stated output and schema contract for the CLI",
-  "updated_at": "2026-11-05T01:45:34.510636940Z"
+  "updated_at": "2026-11-05T02:01:12.466035904Z"
 }
