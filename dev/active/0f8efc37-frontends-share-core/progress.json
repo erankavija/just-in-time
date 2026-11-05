@@ -11,35 +11,35 @@
           "short_id": "9c3eb2bf",
           "title": "Reject incompatible repository layout bindings",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "ready_to_land"
         },
         {
           "id": "1d2235b1-7a07-4428-842b-db338fd133c0",
           "short_id": "1d2235b1",
           "title": "Centralize watcher path selection",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "ready_to_land"
         },
         {
           "id": "0f302914-9ded-47e9-bea8-67af1e0e8452",
           "short_id": "0f302914",
           "title": "Offload executor work in server handlers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "ready_to_land"
         },
         {
           "id": "abf68973-3771-47cb-89d0-708290cb00ac",
           "short_id": "abf68973",
           "title": "Compile server modules through the library",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "ready_to_land"
         },
         {
           "id": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
           "short_id": "1cdf5965",
           "title": "Index graph layout and refresh passes",
           "classification": "implementation",
-          "status": "reviewing"
+          "status": "done"
         }
       ]
     },
@@ -141,11 +141,35 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "4858de06-b973-443a-b6fd-6641d8694617",
+      "reason": "Issue detail sequence reset discards first request and permits stale response collisions; discovered during bundle smoke.",
+      "dependencies": [
+        "32607213-7402-4c17-9889-7a6286e1959e",
+        "6d93ab14-4c72-4ec5-9c50-471cf0d95746"
+      ],
+      "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
+      "status": "backlog",
+      "reduction": "bb03df0a\u21926d93ab14 direct edge removed by transitive reduction; reachability through 0f8efc37\u21923a61ff16\u21924858de06 retained."
+    },
+    {
+      "id": "38df8a6c-1a33-48e1-95b0-bc816c354a5f",
+      "reason": "npm 12 blocks the reviewed esbuild install script during a clean web install.",
+      "dependencies": [
+        "32607213-7402-4c17-9889-7a6286e1959e"
+      ],
+      "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
+      "status": "awaiting_user_approval",
+      "approval": "Automatic approval review rejected the exact esbuild@0.25.12 allowScripts entry; no workaround authorized."
+    }
+  ],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "9c3eb2bf": 2
+  },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Three first-wave workers dispatched; independent server-modules is undispatched; external dependencies and exact graph remain in instantiation.json.",
+  "note": "1cdf landed; abf, watcher, binding and offload have passing stable gates in isolated branches. Source queue is paused pending 061 merge authorization; installer policy awaits separate user approval.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
