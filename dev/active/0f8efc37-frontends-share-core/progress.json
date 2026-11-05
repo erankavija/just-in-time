@@ -1,7 +1,7 @@
 {
   "epic_id": "0f8efc37-8054-420d-9409-dde888ea0040",
   "epic_short_id": "0f8efc37",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -105,7 +105,7 @@
           "short_id": "b067c2db",
           "title": "Use server search results in browser",
           "classification": "implementation",
-          "status": "in_review"
+          "status": "done"
         },
         {
           "id": "c8e79465-e28c-4dea-8c25-ad3fdc812e34",
@@ -124,7 +124,7 @@
           "short_id": "83b561ed",
           "title": "Use unfiltered graph summaries for browser metadata",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -172,7 +172,7 @@
     "6326532e": 3
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Foundation, semantic search, API cleanup, raw responses, D-25 convergence and browser fixes landed with merged gates; installed nonblocking reads verified. Browser search is in review. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
+  "note": "All currently actionable frontend leaves landed with merged gates. Browser convergence awaits user approval for 38df installer policy; document adapters await external Git issue 933ff852 and its prerequisites. D-25 installed verification is linked.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
