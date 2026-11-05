@@ -16,9 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "cc72ca26-54d8-4522-a013-bad541366005",
-      "status": "failed",
-      "updated_at": "2026-11-05T01:13:07.269339798Z",
+      "run_id": "848ee4a5-ad6a-494e-ba59-100774d485e0",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:31:12.462867921Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2682790f-a190-4bbd-8918-49cdc774952a",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:35:12.940216577Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Claims take their branch and git requirement from the module",
-  "updated_at": "2026-11-05T01:13:07.269339798Z"
+  "updated_at": "2026-11-05T01:35:12.940216577Z"
 }
