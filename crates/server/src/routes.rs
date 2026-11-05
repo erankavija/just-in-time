@@ -8,6 +8,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -548,60 +549,23 @@ async fn get_document_by_path<S: IssueStore + Send + Sync + 'static>(
     .await
 }
 
-/// Infer content type from file extension
+/// Infer content type from the path, with a binary-safe fallback.
 pub(crate) fn infer_content_type(path: &str) -> String {
-    if path.ends_with(".md") {
-        "text/markdown"
-    } else if path.ends_with(".csv") {
-        "text/csv"
-    } else if path.ends_with(".txt") {
-        "text/plain"
-    } else if path.ends_with(".json") {
-        "application/json"
-    } else if path.ends_with(".html") || path.ends_with(".htm") {
-        "text/html"
-    } else if path.ends_with(".svg") {
-        "image/svg+xml"
-    } else if path.ends_with(".png") {
-        "image/png"
-    } else if path.ends_with(".jpg") || path.ends_with(".jpeg") {
-        "image/jpeg"
-    } else if path.ends_with(".css") {
-        "text/css"
-    } else if path.ends_with(".js") {
-        "application/javascript"
-    } else {
-        "text/plain"
-    }
-    .to_string()
+    mime_guess::from_path(path)
+        .first_or_octet_stream()
+        .essence_str()
+        .to_string()
 }
 
-/// URL-encode a single path segment (percent-encode non-unreserved chars).
-///
-/// Unreserved characters per RFC 3986: ALPHA / DIGIT / "-" / "." / "_" / "~"
+const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
+/// Encode one URL path segment, including any slash in the input.
 fn percent_encode_segment(segment: &str) -> String {
-    let mut out = String::with_capacity(segment.len());
-    for byte in segment.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
-                out.push(byte as char)
-            }
-            other => {
-                out.push('%');
-                out.push(
-                    char::from_digit((other >> 4) as u32, 16)
-                        .unwrap()
-                        .to_ascii_uppercase(),
-                );
-                out.push(
-                    char::from_digit((other & 0xf) as u32, 16)
-                        .unwrap()
-                        .to_ascii_uppercase(),
-                );
-            }
-        }
-    }
-    out
+    utf8_percent_encode(segment, PATH_SEGMENT_ENCODE_SET).to_string()
 }
 
 /// Compute the `/api/raw/<parent-dir>/` base href for an HTML file at `html_path`.
@@ -781,6 +745,27 @@ async fn get_document_content<S: IssueStore + Send + Sync + 'static>(
     }))
 }
 
+fn raw_document_response(path: &str, bytes: Vec<u8>) -> Response<Body> {
+    let content_type = infer_content_type(path);
+    let body = if content_type == "text/html" {
+        inject_base_href(&String::from_utf8_lossy(&bytes), &compute_base_href(path)).into_bytes()
+    } else {
+        bytes
+    };
+
+    let mut response = Response::new(Body::from(body));
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
+    response.headers_mut().insert(
+        "content-security-policy",
+        HeaderValue::from_static(CSP_HEADER),
+    );
+    response
+}
+
 /// Get raw document bytes (issue-scoped variant)
 ///
 /// Verifies that `path` is a document of the requested issue, explicit or
@@ -804,30 +789,7 @@ async fn get_document_raw<S: IssueStore + Send + Sync + 'static>(
     })
     .await?;
 
-    let content_type = infer_content_type(&path);
-
-    // Inject <base href> into HTML responses so relative asset paths
-    // (e.g. figures/fig4.svg) resolve via the wildcard /api/raw route.
-    // Applied for both working-tree and commit-pinned reads.
-    let body_bytes = if content_type == "text/html" {
-        let html = String::from_utf8_lossy(&bytes);
-        let base_href = compute_base_href(&path);
-        inject_base_href(&html, &base_href).into_bytes()
-    } else {
-        bytes
-    };
-
-    let mut response = Response::new(Body::from(body_bytes));
-    response.headers_mut().insert(
-        axum::http::header::CONTENT_TYPE,
-        HeaderValue::from_str(&content_type)
-            .unwrap_or_else(|_| HeaderValue::from_static("text/plain")),
-    );
-    response.headers_mut().insert(
-        "content-security-policy",
-        HeaderValue::from_static(CSP_HEADER),
-    );
-    Ok(response)
+    Ok(raw_document_response(&path, bytes))
 }
 
 /// Get raw document bytes (path-only variant)
@@ -856,31 +818,7 @@ async fn get_document_raw_by_path<S: IssueStore + Send + Sync + 'static>(
         }
     })
     .await?;
-    let content_type = infer_content_type(&query.path);
-
-    // Inject <base href> into HTML responses.  The storage layer rejects
-    // absolute paths (`PathReadError::InvalidPath`) before we get here, so
-    // every path that reaches this point is repo-relative and re-servable
-    // through `/api/raw/*path`.
-    let body_bytes = if content_type == "text/html" {
-        let html = String::from_utf8_lossy(&bytes);
-        let base_href = compute_base_href(&query.path);
-        inject_base_href(&html, &base_href).into_bytes()
-    } else {
-        bytes
-    };
-
-    let mut response = Response::new(Body::from(body_bytes));
-    response.headers_mut().insert(
-        axum::http::header::CONTENT_TYPE,
-        HeaderValue::from_str(&content_type)
-            .unwrap_or_else(|_| HeaderValue::from_static("text/plain")),
-    );
-    response.headers_mut().insert(
-        "content-security-policy",
-        HeaderValue::from_static(CSP_HEADER),
-    );
-    Ok(response)
+    Ok(raw_document_response(&query.path, bytes))
 }
 
 /// Get raw bytes for any repo-relative path (wildcard variant).
@@ -911,29 +849,7 @@ async fn get_raw_wildcard<S: IssueStore + Send + Sync + 'static>(
     })
     .await?;
 
-    let content_type = infer_content_type(&path);
-
-    // Inject <base href> into HTML responses (both working-tree and
-    // commit-pinned) so relative asset paths resolve via /api/raw/*path.
-    let body_bytes = if content_type == "text/html" {
-        let html = String::from_utf8_lossy(&bytes);
-        let base_href = compute_base_href(&path);
-        inject_base_href(&html, &base_href).into_bytes()
-    } else {
-        bytes
-    };
-
-    let mut response = Response::new(Body::from(body_bytes));
-    response.headers_mut().insert(
-        axum::http::header::CONTENT_TYPE,
-        HeaderValue::from_str(&content_type)
-            .unwrap_or_else(|_| HeaderValue::from_static("text/plain")),
-    );
-    response.headers_mut().insert(
-        "content-security-policy",
-        HeaderValue::from_static(CSP_HEADER),
-    );
-    Ok(response)
+    Ok(raw_document_response(&path, bytes))
 }
 
 /// Response for document history
@@ -2365,13 +2281,20 @@ unique = false
         assert_eq!(infer_content_type("data.csv"), "text/csv");
         assert_eq!(infer_content_type("data.json"), "application/json");
         assert_eq!(infer_content_type("style.css"), "text/css");
-        assert_eq!(infer_content_type("app.js"), "application/javascript");
+        assert_eq!(infer_content_type("app.js"), "text/javascript");
         assert_eq!(infer_content_type("logo.svg"), "image/svg+xml");
         assert_eq!(infer_content_type("photo.png"), "image/png");
         assert_eq!(infer_content_type("photo.jpg"), "image/jpeg");
         assert_eq!(infer_content_type("photo.jpeg"), "image/jpeg");
         assert_eq!(infer_content_type("readme.txt"), "text/plain");
-        assert_eq!(infer_content_type("unknown.xyz"), "text/plain");
+    }
+
+    #[test]
+    fn test_infer_content_type_unknown_binary_extension_uses_octet_stream() {
+        assert_eq!(
+            infer_content_type("artifacts/model.unknown-binary-type"),
+            "application/octet-stream"
+        );
     }
 
     // ── /api/issues/:id/documents/:path/raw tests ────────────────────────────
@@ -2635,6 +2558,13 @@ unique = false
         assert_eq!(
             body_bytes, binary_fixture,
             "raw endpoint must return byte-identical content for non-UTF-8 artifacts"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .unwrap(),
+            "application/octet-stream"
         );
     }
 
@@ -3645,6 +3575,14 @@ unique = false
     #[test]
     fn test_compute_base_href_single_dir() {
         assert_eq!(compute_base_href("docs/index.html"), "/api/raw/docs/");
+    }
+
+    #[test]
+    fn test_compute_base_href_percent_encodes_unicode_and_reserved_characters() {
+        assert_eq!(
+            compute_base_href("docs/Café & notes/deck.html"),
+            "/api/raw/docs/Caf%C3%A9%20%26%20notes/"
+        );
     }
 
     /// Symlinks inside the repository that point outside the repo root must be
