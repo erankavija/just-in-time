@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9614c618-e38f-4cfa-9723-d9a313595956",
+      "status": "failed",
+      "updated_at": "2026-11-05T01:21:10.178492765Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9de4c09c-207b-4ea1-9482-3846383cd3c7",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktree info reads its branch through the module",
-  "updated_at": "2026-11-05T01:09:02.000930349Z"
+  "updated_at": "2026-11-05T01:21:10.178492765Z"
 }
