@@ -14,7 +14,8 @@
           "title": "Type labels have one exact extraction",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "landing"
+          "status": "done",
+          "landed": "ee9e410db"
         },
         {
           "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
