@@ -381,9 +381,10 @@
           "short_id": "dcf88b6f",
           "title": "Pinned target inspection reads blobs through the object reader",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "28f74142ead7cd6c6beee8a776abe544dee0c4c1"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -807,7 +808,8 @@
     "e3c38fea Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward approved d5cae9e3 stale registration footprint main.rs\u2192existing mod.rs, same two-test consolidated suite; manifest native validation passes. e3 Done/released33e9be6ed after actual mergedCargoa1d97e05, 63 focused composition checks and exact-byte proofs retained. d681 fully ready, all gates stable; next source because frontend632 explicitly not ready. dcf fullCargo7a74ef20 and review376ec987 stable PASS; lead audit finishing. a273 lead revision-expression concern under evidence-first audit before full gate.",
     "d68150e2 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "d681 actual merged Cargo b634207b PASS on084db8cc5, Done/lease released e375af7d8 before downstream claims. Steward approved83c8632f exact fourth file storage/git.rs solely removal of fulfilled history convergence comment when duplicate removed, no executable edit. 83 and3f8 actualReady claimed; source dcf next while632 remains unready. a273 lead audit confirmed :/message expression broken by appending peel suffix; worker now resolves original expression then peels canonical object ID in same reader, focused regression running. EA andd5 full pipelines running."
+    "d681 actual merged Cargo b634207b PASS on084db8cc5, Done/lease released e375af7d8 before downstream claims. Steward approved83c8632f exact fourth file storage/git.rs solely removal of fulfilled history convergence comment when duplicate removed, no executable edit. 83 and3f8 actualReady claimed; source dcf next while632 remains unready. a273 lead audit confirmed :/message expression broken by appending peel suffix; worker now resolves original expression then peels canonical object ID in same reader, focused regression running. EA andd5 full pipelines running.",
+    "dcf88b6f Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1218,10 +1220,11 @@
       "verdict": "PASS",
       "reviewed_source": "5e10c355a6eaf638ad26db8754bc342e69b5e463",
       "gates": {
-        "cargo-ci": "7a74ef20-acd1-442c-8134-0ba965366474",
+        "cargo-ci": "4b78c2a9-ca61-46a6-a5ab-0c687c71cf3e",
         "code-review": "376ec987-854b-41b8-9afd-63d701a6ae47"
       },
-      "criteria": "Both criteria verified: one incremental reader, removed old blob writer/parser; six existing pinned cases and all69 module cases retain results/process/subcommand/cache assertions. No linked docs or stale named parser references. Full gates stable PASS, no findings. Main refresh alters git.rs only by approved fulfilled listing comment removal; merged Cargo pending."
+      "criteria": "Both criteria verified: one incremental reader, removed old blob writer/parser; six existing pinned cases and all69 module cases retain results/process/subcommand/cache assertions. No linked docs or stale named parser references. Full gates stable PASS, no findings. Main refresh alters git.rs only by approved fulfilled listing comment removal; merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 4b78c2a9-ca61-46a6-a5ab-0c687c71cf3e on 28f74142ead7cd6c6beee8a776abe544dee0c4c1."
     }
   },
   "source_queue": [
