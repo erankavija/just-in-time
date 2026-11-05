@@ -316,9 +316,10 @@
           "short_id": "3f8da8c4",
           "title": "Gate runs take commit and branch evidence from the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "implementing"
+          "worker_status": "merged_and_gated",
+          "source_merge": "9df9fe2fc2161580f28aaf9f1f499e24aca49ffd"
         },
         {
           "id": "47d62472-731b-48a9-b27c-136cf86804ee",
@@ -335,9 +336,10 @@
           "short_id": "83c8632f",
           "title": "Document history comes from the module's path history",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "implementing"
+          "worker_status": "merged_and_gated",
+          "source_merge": "e0b02683af8da1b905a40e0f5922f65c6ea89a70"
         },
         {
           "id": "92afc5d8-ddeb-405b-a708-b4b97f19d024",
@@ -838,7 +840,11 @@
     "d5 actual mergedCargo172143f1 stable PASS, Done/released3181d2865. a273 corrected fullCargo passed, independent review running. Ready9ecde705 claimed/prepared for next available worker slot, exact document asset-presence function/tests independent of83 history functions; preserve landed7516 timed HTTP probe pool per recorded second-lander ruling. Source boundary remains unreserved while632 is unready.",
     "Steward approved EA seventh file only obsolete two-line Git comment; approved 9ec shared exact submodule-status parsing and owning test (four-file footprint). 83 second-parent merge regression and 3f actual old-code RED rework each counted once. Do not cancel queued checks; collect before edits. b067 frontend received idle source slot before EA.",
     "ea4b7363 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "Dependency-ready 47d62472 branch drift and92afc5d8 init classification claimed after EA closure; isolated Sol-high workers next. Initial issue-claim --ttl syntax rejected without mutation; separate claim acquire owns TTL."
+    "Dependency-ready 47d62472 branch drift and92afc5d8 init classification claimed after EA closure; isolated Sol-high workers next. Initial issue-claim --ttl syntax rejected without mutation; separate claim acquire owns TTL.",
+    "83c8632f Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "3f8da8c4 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward-approved factual correction47d62472: old validation already runs in layout.data_root. Actual baseline CLI filter ran3PASS4FAIL; literal selected-data-dir scenario passes and remains regressioncoverage. Missingcheckout/base/unrelatedmessages and externalstoreprovide genuineRED. Only obsolete REQ04 failure premise/background corrected; authority/messages/status4 and footprint unchanged.",
+    "Steward approved c140 second file git.rs solely fulfilled HEAD convergence comment deletion; primitive executable/test bytes must remain exact, no extra fullgate solelyprose."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1279,10 +1285,11 @@
       "verdict": "PASS",
       "reviewed_source": "bc43305db7a93bdc0fff8ee4847e41bf353d70b7",
       "gates": {
-        "cargo-ci": "598fc261-fd7d-4a19-b912-0bdfdaa8b0a5",
+        "cargo-ci": "de6c3c8e-f6b2-4998-8fb6-f1a7529bfb88",
         "code-review": "0da733bd-2324-4d8f-9c4d-482e16a3b912"
       },
-      "criteria": "REQ-01 both history paths use file_history and one converter preserving seven-character ID, author, UTC date and trimmed message; private walker removed. REQ-02 deletion and second-parent-identical merge regressions cover changed behavior, non-Git CLI failure/server empty mapping preserved. REQ-03 real-Git route fixture binds selected paths, assertions unchanged. No linked docs, in-scope deferrals or stale convergence comment. Mandatory merged Cargo pending."
+      "criteria": "REQ-01 both history paths use file_history and one converter preserving seven-character ID, author, UTC date and trimmed message; private walker removed. REQ-02 deletion and second-parent-identical merge regressions cover changed behavior, non-Git CLI failure/server empty mapping preserved. REQ-03 real-Git route fixture binds selected paths, assertions unchanged. No linked docs, in-scope deferrals or stale convergence comment. Mandatory merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS de6c3c8e-f6b2-4998-8fb6-f1a7529bfb88 on e0b02683af8da1b905a40e0f5922f65c6ea89a70."
     },
     "a273667c": {
       "verdict": "FAIL",
@@ -1292,6 +1299,16 @@
         "code-review": "b9d20147-35e0-492d-acec-8ee0dcb04db2"
       },
       "criteria": "F1 valid committed LF path rejected by shared line-framed protocol. Isolated six-file canonical -Z proposal and Git>=2.42/runtime Trixie proposal are under validation; explicit user decision required before landing minimum/runtime changes. No main authority change."
+    },
+    "3f8da8c4": {
+      "verdict": "PASS",
+      "reviewed_source": "53af83b6e6a522144b56cef4efba4c96fa855403",
+      "gates": {
+        "cargo-ci": "083bd832-a288-4fe6-a201-a243b31d72d6",
+        "code-review": "4c16f96a-c643-46c0-bc48-3cca022950b9"
+      },
+      "criteria": "All four criteria met: explicit Head argument, selected paths lookup before checker, actual baseline RED for nested and in-memory scenarios, argument-observing non-Git checker test. Private Git helpers/spawns removed. Two own files exact after refreshed reviewed branch; D25 test correction retained. No linked docs/deferrals. Head convergence comment still awaits c140 snapshot consumer, legitimately pending. Mandatory merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 083bd832-a288-4fe6-a201-a243b31d72d6 on 9df9fe2fc2161580f28aaf9f1f499e24aca49ffd."
     }
   },
   "source_queue": [

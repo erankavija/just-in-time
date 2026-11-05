@@ -1246,11 +1246,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         match checker {
             crate::declarations::GateChecker::Exec { .. } => {
+                let head = self
+                    .require_worktree_paths()?
+                    .git()
+                    .map(|git| git.head())
+                    .transpose()?
+                    .flatten();
                 self.storage.run_external_process(|| {
                     gate_execution::execute_gate_checker_with_context(
                         subject,
                         checker,
                         &working_dir,
+                        head.as_ref(),
                         context.as_ref(),
                         &documents,
                     )
@@ -1823,6 +1830,53 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             .get(&"test-gate".parse().unwrap())
             .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
+    }
+
+    #[test]
+    fn test_check_gate_records_selected_worktree_head_from_nested_checker_repository() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (temp, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let worktree = crate::test_harness::git::GitRepository::init(temp.path());
+        let selected_commit = worktree.commit("selected worktree");
+        let selected_branch = worktree.git(&["branch", "--show-current"]);
+        let nested = crate::test_harness::git::GitRepository::init(temp.path().join("nested"));
+        nested.write("seed.txt", "nested\n");
+        let nested_commit = nested.commit("nested checker repository");
+        assert_ne!(selected_commit, nested_commit);
+        let paths = crate::storage::WorktreePaths::detect_from(temp.path()).unwrap();
+        let executor = executor.with_worktree_paths(paths);
+        let gate_key: GateKey = "nested-check".parse().unwrap();
+        executor
+            .gates()
+            .define_gate(
+                &gate_key,
+                "Nested check".to_string(),
+                "Nested check".to_string(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::Exec {
+                    command: "true".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: Some("nested".to_string()),
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                100,
+            )
+            .unwrap();
+        let issue_id = seed_gate_issue(&executor, &taxonomy, &gate_key, "Test", "Test");
+
+        let run = executor.gates().check_gate(&issue_id, &gate_key).unwrap();
+
+        assert_eq!(run.status, GateRunStatus::Passed);
+        assert_eq!(run.commit.as_deref(), Some(selected_commit.as_str()));
+        assert_eq!(run.branch.as_deref(), Some(selected_branch.as_str()));
     }
 
     #[test]
