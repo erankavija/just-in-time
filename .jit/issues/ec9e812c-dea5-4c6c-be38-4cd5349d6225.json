@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "104bb4a6-98d7-4ceb-ba2d-686fba9f7839",
-      "status": "failed",
-      "updated_at": "2026-11-05T00:16:39.117211393Z",
+      "run_id": "ee5279b9-e853-48f4-990f-8e096f101412",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:28:29.839524220Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "52c1a8c0-2887-4b10-92f8-a154b33dc6a6",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:30:28.500940681Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Pinned-read behaviour suite moves into the git module suite",
-  "updated_at": "2026-11-05T00:16:39.117211393Z"
+  "updated_at": "2026-11-05T00:30:28.500940681Z"
 }
