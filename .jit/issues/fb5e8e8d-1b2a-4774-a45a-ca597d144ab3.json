@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e16ded35-0af9-42f9-879b-f8a3d3551297",
+      "status": "passed",
+      "updated_at": "2026-11-05T04:36:16.040229999Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "65c49afc-490a-4694-a01b-4bfc0f0f1622",
+      "status": "passed",
+      "updated_at": "2026-11-05T04:39:14.669144220Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Main-history guard runs against the selected worktree",
-  "updated_at": "2026-11-05T04:27:39.445025397Z"
+  "updated_at": "2026-11-05T04:39:14.669144220Z"
 }
