@@ -533,7 +533,9 @@
     "ea4b7363": 2,
     "a273667c": 1,
     "83c8632f": 1,
-    "3f8da8c4": 1
+    "3f8da8c4": 1,
+    "47d62472": 1,
+    "9ecde705": 1
   },
   "surfaced_pitfalls": [
     {
@@ -847,7 +849,8 @@
     "3f8da8c4 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward-approved factual correction47d62472: old validation already runs in layout.data_root. Actual baseline CLI filter ran3PASS4FAIL; literal selected-data-dir scenario passes and remains regressioncoverage. Missingcheckout/base/unrelatedmessages and externalstoreprovide genuineRED. Only obsolete REQ04 failure premise/background corrected; authority/messages/status4 and footprint unchanged.",
     "Steward approved c140 second file git.rs solely fulfilled HEAD convergence comment deletion; primitive executable/test bytes must remain exact, no extra fullgate solelyprose.",
-    "c140 snapshot migration claimed from actualReady after3fDone; stewardapprovedtwo-file scope includes only fulfilled HEAD convergence comment in git.rs. a273 proposal fullCargo/review running isolated; Gitfloorpublication remainsheld."
+    "c140 snapshot migration claimed from actualReady after3fDone; stewardapprovedtwo-file scope includes only fulfilled HEAD convergence comment in git.rs. a273 proposal fullCargo/review running isolated; Gitfloorpublication remainsheld.",
+    "47 rework1 consolidates literal selected-data-dir case into existing property owner without newfixture duplication. c140 stewardapproved deletion of both fulfilledHEAD andorigin convergence comments, exactgit.rs executable/testbytes preserved. 9ec landingheld for available-target gitlink consumerclassification; rawtwo-versionprobe preserved in lead scratch."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1312,13 +1315,23 @@
       },
       "criteria": "All four criteria met: explicit Head argument, selected paths lookup before checker, actual baseline RED for nested and in-memory scenarios, argument-observing non-Git checker test. Private Git helpers/spawns removed. Two own files exact after refreshed reviewed branch; D25 test correction retained. No linked docs/deferrals. Head convergence comment still awaits c140 snapshot consumer, legitimately pending. Mandatory merged Cargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 083bd832-a288-4fe6-a201-a243b31d72d6 on 9df9fe2fc2161580f28aaf9f1f499e24aca49ffd."
+    },
+    "9ecde705": {
+      "verdict": "FAIL",
+      "reviewed_source": "df106f2a10aec9b593d94b675a2d13466ff6d81c",
+      "gates": {
+        "cargo-ci": "5a7180dc-3924-4d23-b495-21a7ab7b86c2",
+        "code-review": "ce356156-738c-4af8-baf1-033a56ab4d6b"
+      },
+      "criteria": "Lead uncovered REQ02 defect after stable PASS gates: Git2.39.5 and2.56 return Commit for gitlink whose target exists in superproject; Some(anytype) incorrectly counts it present. Rework1 explicitly accepts onlyBlob/Tree and extends existing owning gitlink fixture; no producer/footprint expansion. History composition e3ee25799 preserves exact methods and HTTP pool,40focusedPASS."
     }
   },
   "source_queue": [
-    "83c8632f ready",
-    "3f8da8c4 review running",
-    "9ecde705 branch gates running",
-    "a273667c proposal only awaiting user decision"
+    "92afc5d8 branch gates running",
+    "47d62472 test-only rework checks running",
+    "9ecde705 consumer classification rework",
+    "c140921c implementation",
+    "a273667c isolated Git-floor proposal review; userdecision pending"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
