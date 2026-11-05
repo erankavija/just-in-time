@@ -37,14 +37,11 @@ mod tests {
     use tempfile::TempDir;
 
     fn paths(root: &std::path::Path, git_repository: bool) -> WorktreePaths {
-        WorktreePaths {
-            git_repository,
-            common_dir: root.to_path_buf(),
-            worktree_root: root.to_path_buf(),
-            local_jit: root.join(".jit"),
-            shared_jit: root.join("jit"),
-            relocated_worktree_checkout: None,
-        }
+        let mut paths = WorktreePaths::non_git(&root.join(".jit"), root);
+        paths.git_repository = git_repository;
+        paths.common_dir = root.to_path_buf();
+        paths.shared_jit = root.join("jit");
+        paths
     }
 
     fn executor(root: &std::path::Path, git_repository: bool) -> CommandExecutor<InMemoryStorage> {
