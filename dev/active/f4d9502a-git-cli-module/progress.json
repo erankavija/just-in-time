@@ -93,8 +93,9 @@
           "short_id": "09974ad1",
           "title": "Base comparison operation in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementation_checks"
         },
         {
           "id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
@@ -103,7 +104,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "cargo_passed_pinned_review_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
@@ -120,7 +121,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "integrated_runner_gates_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
@@ -139,7 +140,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "approved_protocol_implementation_checks"
+          "worker_status": "rework_full_gates_running"
         },
         {
           "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
@@ -148,7 +149,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "url_fidelity_rework"
+          "worker_status": "fidelity_rework_full_gates_running"
         },
         {
           "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
@@ -157,7 +158,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "integrated_runner_gates_running"
+          "worker_status": "reviewed_waiting_source_slot"
         }
       ]
     },
@@ -616,6 +617,13 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Consolidate layout and ownership constraints after planning-review failure without changing the approved graph or semantics."
+    },
+    {
+      "issue": "09974ad1",
+      "agent": "/root/base_comparison",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Bounded Git plumbing, canonical commit identities and typed comparison outcomes."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -647,16 +655,13 @@
     "Stable first437 review evidence preserved21f0df63c. Its integration merge b0d40b2e2 adapts runner by value and preserves pinned reads; configured gates rerun. History sourcec8a96596c/integration334429c1e passes focused29behavior+1parser tests and enters full gates.",
     "24 source2e96caae4 plus runner adaptationa7e4dc417 is frozen for gates; Cargo passed. Origin source74a85de5c passed focused25 tests, but lead requested a real-Git regression for newline-containing local remote URLs before final gates.",
     "Observed installed jit worktree info stale stored branch versus actual Git main belongs to existing9de4c09c: preserve stable worktree ID while reporting fresh branch, with an owning branch-switch regression. Do not use stored identity branch as source-landing authority.",
-    "Current source handoff:46 complete,8c dispatch guard/install owns next slot, then root061 and frontendabf as steward directs. Standalone web worker cannot receive direct app-server messages because it is a v2 subagent; relay through steward."
+    "Current source handoff:46 complete,8c dispatch guard/install owns next slot, then root061 and frontendabf as steward directs. Standalone web worker cannot receive direct app-server messages because it is a v2 subagent; relay through steward.",
+    "Planning refresh passed stable933f971b; plan/evidence merged45d1e8cd2 without product-source changes. c506 may implement after frontend9c3 layout API lands.",
+    "Steward source queue paused at061 after automatic approval rejection, explicitly no indirect retry. Independent branches/tests/reviews continue. 24 remains after frontendabf.",
+    "HEAD fixb8ec9ccbc passed31 integration and2 parser tests; refreshed branch enters full gates. Origin newline fidelity red/green passed25 tests, sourcea67e055e9 enters full gates.",
+    "437 evidence38fdf0b9a and historyf253efc8f preserve actual stable passes. 24 evidenceb8e3338bc ready for coordinated integration. History advisory disposition owner-approved; consumer83 removes tracked exception."
   ],
-  "planning_reviews_pending": [
-    {
-      "issue": "28ccf9a9",
-      "reason": "Shared-bootstrap and bounded-head contract reconciliation; native manifest validation passes with owner-approved DEC-24 policy. Refreshed independent review failed on append-only split-root reconciliation prose; isolated correction underway.",
-      "before_implementation": "c5062e21",
-      "failed_run": "308242b9-7e36-41c8-b4d1-b6878d8bd9a3"
-    }
-  ],
+  "planning_reviews_pending": [],
   "worker_limit": 3,
   "reviews": {
     "b4ca051c": {
@@ -722,6 +727,83 @@
       "stale_narrative": "Investigation and old handoff are historical evidence; current plan explicitly specifies producer/bridge and tracked removers.",
       "deferred_items": "No issue-linked design documents or in-scope deferrals. Object-reader evolution and consumer migration remain distinct declared tasks.",
       "holistic": "Single revision implementation and single process constructor; batch concurrent I/O preserved. Actual stable branch review evidence merged; integrated Cargo passed."
+    },
+    "28ccf9a9": {
+      "verdict": "PASS",
+      "gate": "933f971b-74fb-4d70-b00a-f56c5d4c1d86",
+      "reviewed_source": "9c3206881dc48ef2fcbd3ea42f22544c9543c80b",
+      "source_merge": "45d1e8cd2",
+      "prior_findings": [
+        {
+          "run": "d2a3c436",
+          "finding": "F1 oversized pinned-read leaf",
+          "status": "closed",
+          "evidence": "plan.md:113 focused producer, storage migration, suite migration and bridge cutover leaves retained"
+        },
+        {
+          "run": "308242b9",
+          "finding": "F1 append-only reconciliation prose",
+          "status": "closed",
+          "evidence": "plan.md:36 layout contract; DEC-04 and DEC-23 consolidated in existing ledger; appendix removed"
+        }
+      ],
+      "criteria": "Native manifest validate, generated overview check and native dry-run passed under approved DEC-24 existing-graph policy; independent stable review confirms all criteria.",
+      "stale_narrative": "No new appendix remains; historical handoff preserved as history.",
+      "deferred_items": "External split-root task5046408a is explicitly outside REQ credit but preserves layout contract and live sequencing. No in-scope deferral.",
+      "holistic": "DEC-23 Split roots, DEC-24 graph refresh, DEC-25 bounded HEAD each unique; existing identities retained."
+    },
+    "24d3b460": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "b1b6484c-e4f7-4a19-9867-08ecfd29871a",
+        "code-review": "d6cd0057-7076-47da-b055-f871eeb6379f"
+      },
+      "reviewed_source": "c159bf2e85b79a02b0b969839c5389863c3747f2",
+      "criteria": {
+        "REQ-01": "One config query; exit1 gives None; typed failures otherwise.",
+        "REQ-02": "Owning set/unset tests count one selected-root invocation; unset uses shared child-local config isolation."
+      },
+      "prior_findings": "No failed gate review.",
+      "stale_narrative": "No stale forward-looking references in crates/docs/dev; plan describes producer and explicit subsequent consumers.",
+      "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
+      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending."
+    },
+    "437907da": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "7c5b38ce-f0bb-4be4-bd8e-311f55bad81c",
+        "code-review": "2b28f5dd-f3a9-4f0f-982b-de016269c8f8"
+      },
+      "reviewed_source": "b0d40b2e2d0f6e18f77ff9db32c756c8d05b5cfd",
+      "criteria": {
+        "REQ-01": "One NUL-framed porcelain listing returns paths and optional branches.",
+        "REQ-02": "Primary, linked, slash branch, detached, bare and newline-path tests passed; process count asserted."
+      },
+      "prior_findings": "No failed gate review.",
+      "stale_narrative": "No stale forward-looking references in crates/docs/dev; plan describes producer and explicit subsequent consumers.",
+      "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
+      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending."
+    },
+    "cc9f213e": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "6675ac07-1d42-44f5-a245-52334a7778c3",
+        "code-review": "ca9e3b4f-a1b6-4679-a246-53ba61137320"
+      },
+      "reviewed_source": "334429c1e8ba6e5285fc907fbb3389f7849f2c57",
+      "criteria": {
+        "REQ-01": "One literal-path Git log; canonical OID, author, committer seconds and full message.",
+        "REQ-02": "Added, changed, deleted path, identical-parent merge omission, multiline message, count and literal path tests passed."
+      },
+      "prior_findings": "No failed gate review.",
+      "stale_narrative": "No stale forward-looking references in crates/docs/dev; plan describes producer and explicit subsequent consumers.",
+      "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
+      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending.",
+      "advisory_disposition": {
+        "finding": "F1 calls tracked83c8632f convergence issue a future commit identifier.",
+        "owner_ruling": "Steward inspected comment and issue; retain named exception until consumer83 removes duplicate. It records required convergence condition and allowed evidence pointer. No source change or rerun solely for mistaken commit-ID interpretation.",
+        "removal_owner": "83c8632f"
+      }
     }
   }
 }

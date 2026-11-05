@@ -269,7 +269,7 @@ fn invoke_expired_lock_wait(json: bool) -> Vec<Output> {
         .lock_exclusive(&cli.root().join(".jit-bootstrap.lock"))
         .unwrap();
     let mut command =
-        cli.command_with_env(["issue", "create", "Queued"], [("JIT_LOCK_TIMEOUT", "1")]);
+        cli.command_with_env(["issue", "create", "Queued"], [("JIT_LOCK_TIMEOUT", "0")]);
     if json {
         command.arg("--json");
     }
@@ -374,17 +374,127 @@ fn evaluate_many_output(checker_command: &str, target: Option<&str>, json: bool)
         Some(target) => target.to_owned(),
         None => id,
     };
-    output_in_form(
-        &cli,
+    evaluate_many_in(&cli, &target, json)
+}
+
+fn evaluate_many_in(cli: &JitCli, target: &str, json: bool) -> Output {
+    let output = output_in_form(
+        cli,
         &[
             "gate",
             "evaluate-many",
             "projection-gate",
-            &target,
+            target,
             "--force",
         ],
         json,
+    );
+    assert_batch_report(&output, json);
+    output
+}
+
+fn assert_batch_report(output: &Output, json: bool) {
+    if json {
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            envelope["error"]["details"]["results"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+    } else {
+        assert!(String::from_utf8_lossy(&output.stdout).contains("projection-gate"));
+    }
+}
+
+fn invoke_gate_evaluate_many_parse_error(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, "true");
+    fs::write(cli.root().join(".jit/gates.toml"), "gates = [").unwrap();
+    vec![evaluate_many_in(&cli, &id, json)]
+}
+
+#[cfg(unix)]
+fn invoke_gate_evaluate_many_permission_denied(json: bool) -> Vec<Output> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, "true");
+    let registry = cli.root().join(".jit/gates.toml");
+    let permissions = fs::metadata(&registry).unwrap().permissions();
+    fs::set_permissions(&registry, fs::Permissions::from_mode(0)).unwrap();
+    let output = evaluate_many_in(&cli, &id, json);
+    fs::set_permissions(&registry, permissions).unwrap();
+    vec![output]
+}
+
+#[cfg(unix)]
+fn invoke_gate_evaluate_many_mutation_lock_timeout(json: bool) -> Vec<Output> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    use std::time::Duration;
+
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, "true");
+    let record = cli.root().join(".jit/issues").join(format!("{id}.json"));
+    let bytes = fs::read(&record).unwrap();
+    fs::remove_file(&record).unwrap();
+    nix::unistd::mkfifo(
+        &record,
+        nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR,
     )
+    .unwrap();
+
+    // The FIFO read starts after bootstrap, before the gate's mutation session.
+    let (ready, reader_started) = std::sync::mpsc::channel();
+    let fifo = record.clone();
+    let writer = std::thread::spawn(move || {
+        ready
+            .send(fs::OpenOptions::new().write(true).open(fifo).unwrap())
+            .unwrap();
+    });
+    let mut command = cli.command_with_env(
+        ["gate", "evaluate-many", "projection-gate", &id, "--force"],
+        [("JIT_LOCK_TIMEOUT", "0")],
+    );
+    if json {
+        command.arg("--json");
+    }
+    let child = std::thread::spawn(move || {
+        assert_cmd::Command::from_std(command)
+            .timeout(Duration::from_secs(5))
+            .output()
+            .unwrap()
+    });
+    let mut pipe = match reader_started.recv_timeout(Duration::from_secs(5)) {
+        Ok(pipe) => pipe,
+        Err(error) => {
+            let _unblock = fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(nix::libc::O_NONBLOCK)
+                .open(&record)
+                .unwrap();
+            writer.join().unwrap();
+            let output = child.join().unwrap();
+            panic!("gate never read the fixture record: {error}; {output:?}");
+        }
+    };
+    writer.join().unwrap();
+    let _held = jit::storage::FileLocker::new(Duration::from_secs(1))
+        .lock_exclusive(
+            &cli.root()
+                .join(".jit")
+                .join(jit::repository_state::EVENTS_LOCK_FILE),
+        )
+        .unwrap();
+    fs::remove_file(&record).unwrap();
+    fs::write(&record, &bytes).unwrap();
+    pipe.write_all(&bytes).unwrap();
+    drop(pipe);
+    let output = child.join().unwrap();
+    assert_batch_report(&output, json);
+    vec![output]
 }
 
 /// `gate evaluate-many` over a target whose checker ran and failed.
@@ -879,6 +989,11 @@ row_bindings! {
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
     test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all", 4, false) => invoke_gate_evaluate_failure;
+    test_command_exit_codes_gate_evaluate_many_parse_error_emits_1: ("gate evaluate-many", 1, true) => invoke_gate_evaluate_many_parse_error;
+    #[cfg(unix)]
+    test_command_exit_codes_gate_evaluate_many_permission_denied_emits_5: ("gate evaluate-many", 5, true) => invoke_gate_evaluate_many_permission_denied;
+    #[cfg(unix)]
+    test_command_exit_codes_gate_evaluate_many_mutation_lock_timeout_emits_11: ("gate evaluate-many", 11, true) => invoke_gate_evaluate_many_mutation_lock_timeout;
     test_command_exit_codes_gate_evaluate_many_failure_emits_4: ("gate evaluate-many", 4, true) => invoke_gate_evaluate_many_failure;
     test_command_exit_codes_gate_evaluate_many_runner_error_emits_10: ("gate evaluate-many", 10, true) => invoke_gate_evaluate_many_runner_error;
     test_command_exit_codes_gate_evaluate_many_missing_target_emits_3: ("gate evaluate-many", 3, true) => invoke_gate_evaluate_many_missing_target;

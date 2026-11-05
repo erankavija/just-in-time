@@ -704,7 +704,7 @@
           "short_id": "0eca332a",
           "title": "Retire error codes that nothing produces",
           "classification": "implementation",
-          "status": "ready"
+          "status": "in_progress"
         },
         {
           "key": "schema-registry-derivation",
@@ -720,7 +720,7 @@
           "short_id": "c06daf50",
           "title": "Library-side command dispatch for crates/jit",
           "classification": "story",
-          "status": "ready"
+          "status": "done"
         },
         {
           "key": "test-speed-ci-lock",
@@ -741,7 +741,7 @@
           "short_id": "f9977efd",
           "title": "Enforce a main.rs production-line ceiling in the budget script",
           "classification": "implementation",
-          "status": "backlog"
+          "status": "in_progress"
         },
         {
           "key": "cli-contract-docs",
@@ -765,7 +765,15 @@
           "short_id": "f35c86de",
           "title": "Narrow executor surface and storage-free CLI entry",
           "classification": "story",
-          "status": "ready"
+          "status": "done"
+        },
+        {
+          "key": "issue-listing-renderer-regression",
+          "id": "ab168296-45d1-44cb-9ee1-6bdf53b9488c",
+          "short_id": "ab168296",
+          "title": "Issue listing renders directly through the shared output contract",
+          "classification": "implementation",
+          "status": "in_progress"
         }
       ]
     },
@@ -973,8 +981,9 @@
     "5f12265a": 1,
     "f35c86de": 1,
     "487f45a9": 3,
-    "0eca332a": 1,
-    "0546fc82": 1
+    "0eca332a": 2,
+    "0546fc82": 2,
+    "ab168296": 0
   },
   "surfaced_pitfalls": [
     {
@@ -1959,7 +1968,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "487 and c06 done;0eca configured review running;0546 doc-review passed, dependency/mechanical pending",
+    "status": "ab168 reviewed and ready; f997 final Cargo passed and review running;0eca rework2 focused checks passed, full validation next; primary source queue paused by steward pending separate merge approval.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1968,12 +1977,12 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "487f45a9 review",
-      "f35c86de rework1",
-      "0eca332a implementation",
-      "0546fc82 read-only documentation audit"
+      "0eca rework2 focused verification",
+      "ab168 full gate",
+      "f997 final current prose correction/gates",
+      "0546 final mechanical/review after0eca"
     ],
-    "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git.",
+    "parallelism": "Three isolated rework workers; no idle primary slot reservation. Root coordinates ready-only source merges; focused test/build operations share existing host locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
     "b22aabce": {
       "status": "done",
@@ -1984,7 +1993,7 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Default core ledger: inherited+171,fb38+37,487\u22121,f35\u22123,c06/build0=current+204. Prepared0eca\u221239 would yield+165; session core net\u22126, plus8server lines removed.",
+    "production_net": "Verified landed core ledger +204 (baseline +171; this session +33) over ten additional first-parent merges. Corrected pending0eca producer-backed declaration projects -21 core and -8 server, so projected epic core +183. ab168/f997 core0; no whole-epic net-negative claim.",
     "prepared_branches": {
       "f35c86de": {
         "commit": "c5b146e02",
@@ -2026,6 +2035,102 @@
       "status": "done",
       "production_delta": -1,
       "review_run": "2bc81399-c2e8-4f71-a467-7aeaefaaeccb"
+    },
+    "holistic_audit": {
+      "artifact": "/tmp/jit-df129d9e-session14/remaining-stories-audit.md",
+      "findings": {
+        "F1": "Fixed88c419187: positive15-code declaration; all35CLI bindings and21focused library tests pass; full validation/review pending.",
+        "F2": "ab168296 isolated repair in progress;46 depends on repair",
+        "F3": "0546 fixed32ab62d01; mechanical and affected review pending",
+        "F4": "active findings prose fixed6d61a3c78 with approved story contracts"
+      }
+    },
+    "scope_reconciliation_remaining": "Primary issue contracts ddca5488b; active plan/manifest6d61a3c78 on pending0eca branch. No gates weakened.",
+    "verified_landed_ledger": {
+      "baseline_epic_delta": 171,
+      "merges": [
+        {
+          "merge": "05b00219f",
+          "before": 73683,
+          "after": 73683,
+          "delta": 0
+        },
+        {
+          "merge": "6d471aa22",
+          "before": 73683,
+          "after": 73683,
+          "delta": 0
+        },
+        {
+          "merge": "6d9a1ed76",
+          "before": 73624,
+          "after": 73621,
+          "delta": -3
+        },
+        {
+          "merge": "7e86df856",
+          "before": 73668,
+          "after": 73667,
+          "delta": -1
+        },
+        {
+          "merge": "70457e502",
+          "before": 73631,
+          "after": 73668,
+          "delta": 37
+        },
+        {
+          "merge": "7620257ab",
+          "before": 73631,
+          "after": 73631,
+          "delta": 0
+        },
+        {
+          "merge": "649d398b3",
+          "before": 73631,
+          "after": 73631,
+          "delta": 0
+        },
+        {
+          "merge": "61cdc4ec4",
+          "before": 73631,
+          "after": 73631,
+          "delta": 0
+        },
+        {
+          "merge": "acabe5453",
+          "before": 73631,
+          "after": 73631,
+          "delta": 0
+        },
+        {
+          "merge": "437c7ccfd",
+          "before": 73631,
+          "after": 73631,
+          "delta": 0
+        }
+      ],
+      "current_epic_delta": 204,
+      "mode": "scripts/production-lines.py REV (no flags)"
+    },
+    "f9977efd": {
+      "status": "in_progress",
+      "dependency_ruling": "Steward approved removing only f997\u2192f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
+      "test_owner_ruling": "Steward approved existing shell self-test as canonical fixture owner, no recreated Rust suite.",
+      "scope_commit": "5595358f9",
+      "implementation": "16aada055",
+      "budget": "main.rs37/40",
+      "production_delta": 0,
+      "branch_cargo_run": "516644d5-5435-4b09-b64c-34a577600e63",
+      "final_prose": "current budget prose and canonical gate projection reconciled; final Cargo5049+25passed; pinned review running"
+    },
+    "ab168296": {
+      "status": "in_progress",
+      "implementation": "f9b680614",
+      "production_delta": 0,
+      "focused_tests": "14 passed",
+      "branch_cargo": "passed f88c56f3;5049+25",
+      "review": "stablePASS93f3da67, zero findings; evidence836992d50"
     }
   }
 }
