@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -269,7 +269,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "corrected_full_gates_running"
+          "worker_status": "reviewed_additive_integration"
         },
         {
           "id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
@@ -286,7 +286,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "implementation_running"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
@@ -743,7 +743,8 @@
     "c5062e21 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "c506Done4a77db9f2 unlocks d681; dispatched against reviewed DEC27 plan. Preserve user D25 nonblocking read cutover from frontend632; do not touch its json admitted listing or commands with_read_session fallback. d48 initialCargocebc1568 Clippy failed only byte-char-array expression;4990+25 passed; actual failure4e725c25e preserved, one-line correction87281c148 fullgates running. Both e3/f649 stable reviewPASS ready. Base next after frontend D25 metadata boundary.",
     "09974ad1 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "732f7afb Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "732f7afb Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Base099Donecbe2c0651 mergedCargo28900273; init732 next. D25 charter authority121816926 and link3db4377c5 landed by frontend, preserve nonblocking cutover632 on integration. d48 corrected full gatesab9c87a8/42705ea4 pass on d8d04ef4; ten new tests include NUL rejection; base additive test conflict being verified. Server/base worktrees reclaimed. d681 implementation owns only reviewed seven-file context/fallback footprint, excluding632 read admission/with_read_session."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1103,10 +1104,42 @@
       "stale_narrative": "Obsolete e3 convergence pointer removed; historical investigation retained. Final f649 pointer removed only after both migrations converge, per explicit steward ruling.",
       "deferred_items": "No linked documents or in-scope deferrals.",
       "holistic": "Module owns porcelain parser; consumer owns filtering/mapping. No new discovery/parser/cache. Main integration pending."
+    },
+    "d48e28bf": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "ab9c87a8-1fdd-4184-bb97-38038a2709e2",
+        "code-review": "42705ea4-66dd-4ccb-b9fa-f006bde39978"
+      },
+      "reviewed_source": "d8d04ef41469b562aa4c64c508bc258d9238c7bf",
+      "evidence_commit": "2f100b8f0",
+      "criteria": {
+        "REQ-01": "Incremental reader owns one configured cat-file process, canonical generic object ID/type/exact bytes; stderr drains, child closes/reaps on drop/error.",
+        "REQ-02": "One batch-check process preserves input order/absence and verifies EOF/status.",
+        "REQ-03": "All names prevalidate newline/NUL before send; presence validates all before spawn. Real Git NUL truncation reproduced, owning tests red/green.",
+        "REQ-04": "Ten new owning cases plus existing55passed; blob/tree/commit/tag/missing revision/path/binary/missing executable/counts and lifecycle/protocol edges covered."
+      },
+      "prior_findings": [
+        {
+          "run": "cebc1568",
+          "finding": "Clippy byte-char-array comparison",
+          "status": "closed",
+          "evidence": "87281c148 changes only frame separator comparison to separator[0]; full corrected Cargoab9c87a8 passes."
+        },
+        {
+          "finding": "Lead NUL-name truncation audit",
+          "status": "closed",
+          "evidence": "RealGit HEAD NUL suffix answered HEAD; shared validation now rejects NUL, both existing validation owners red/green, payload fidelity unchanged."
+        }
+      ],
+      "stale_narrative": "Named pinned-batch parser convergence exception remains explicitly owned by dcf88b6f; no untracked future implementation promises.",
+      "deferred_items": "No linked documents; pinned-inspection migration is distinct declared dcf88b6f task and remains mandatory for epic completion.",
+      "holistic": "Single new streaming process/header mechanism serves reader/presence; canonical runner/errors and shared fixtures used; two-file footprint. Additive base integration in progress, mandatory merged Cargo pending."
     }
   },
   "source_queue": [
-    "09974ad1",
+    "f6eaba42 if frontend unready",
+    "d48e28bf after composition ready",
     "ready interleave"
   ],
   "blocked_source_exclusions": [
