@@ -50,12 +50,14 @@ incomplete criterion coverage, stale generated output, or unresolved sizing
 warnings. Missing hierarchy config, invented sources, non-aggregating non-finest
 entries, and malformed/duplicate contract headings also fail. Every issue
 description is the final standalone body. Every finest-tier
-entry must pass the one-worker assignment simulation: one coherent change,
-observable test boundary, one focused implementation/review cycle, and not a
-mere chain link. Adding a form, moving its callers, and deleting the old form
-within one module is one entry. A manifest over the validator's issue budget
-fails. `landing_group` never changes that judgment. Per-code warning overrides and terminal footprints
-stay visible for review. Contract modes and producer reachability must be exact.
+entry is the largest coherent change one worker can implement and review in one
+focused cycle, with an observable test boundary. Adding a form, moving its
+callers, and deleting the old form within one module is one entry, with its
+tests and docs. Merge chain links and bridge producer/remover pairs; split only
+an entry one worker cannot deliver in one cycle, or one combining implementation
+with release. A manifest over the validator's issue budget fails.
+`landing_group` never changes that judgment. Per-code warning overrides and
+terminal footprints stay visible for review. Contract modes and producer reachability must be exact.
 
 ## 3. Create once
 
@@ -97,8 +99,8 @@ Compare the manifest with stored issues and graph before advancing:
 
 Run `jit validate`, then the configured coverage and breakdown-review gates on
 `B`. Review uses the manifest, not a reconstructed Markdown task list. On failure,
-edit the manifest first, replace superseded issues/prose, regenerate/revalidate,
-and reconcile the graph. Rerun plan-review if a shared architectural contract or
+edit the manifest first, replace or merge superseded issues/prose, report the
+issue-count change, regenerate/revalidate, and reconcile the graph. Rerun plan-review if a shared architectural contract or
 approved graph contract changed. Stop and escalate on the third recorded failure;
 never run a fourth review.
 

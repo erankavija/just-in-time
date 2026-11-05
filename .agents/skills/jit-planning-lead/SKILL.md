@@ -30,9 +30,10 @@ worker-sized. Never implement the planned work.
    defaults but must record them.
 3. Create or reconcile `C`. Its description must have atomic, observable marked
    criteria such as `[hard] REQ-NN`. Verify input claims against the live system.
-   Scope `C` before planning it. When its criteria span several areas, give each
-   area an entry of the configured intermediate tier under `C`, and group that
-   area's terminals beneath it. Drop criteria that neither change observable
+   Scope `C` before authoring the manifest. When `C` has many criteria or spans
+   several unrelated areas, split it: give each area an entry of the configured
+   intermediate tier under `C` with its terminals beneath it, or move unrelated
+   areas to separate containers. Drop criteria that neither change observable
    behaviour nor remove a real duplicate.
 4. Run `jit apply plan <C>` once. Record planning node `P`, breakdown node `B`,
    their configured gates, and P's plan path. Commit JIT state.
@@ -98,8 +99,10 @@ consumer; a plan-fixed contract has none.
 Every non-finest manifest entry must depend transitively on a strictly finer
 entry; relabeling executable work never suppresses terminal checks. The validator
 fails a manifest over its issue budget (`--max-issues`, default 50). Its oversize
-heuristics warn on broad quantifiers, independent verbs, multiple consumer
-families, three or more acceptance clusters, and implementation plus release. Its
+heuristics warn on broad quantifiers, independent clauses, multiple consumer
+families or test boundaries, three or more acceptance clusters, implementation
+plus release, and a weak `worker_sized_reason`. A serial add, move callers,
+delete list states one change. Its
 undersize heuristic warns on a terminal that is only a chain link. Resolve a
 warning by merging, splitting, or a reason under its stable `warning_overrides`
 code; an override may cite a recorded owner decision. Overrides remain visible
@@ -129,8 +132,9 @@ backfill. Plain breakdown analysis produces the same manifest before creation.
 
 After creation, require exact manifest-to-issue and manifest-to-edge fidelity,
 correct bracket/external wiring, and passing coverage and breakdown-review gates.
-Repeat the terminal assignment simulation. Correct the manifest first, reconcile
-the graph, regenerate, and re-review; a shared-contract change also reruns
+Repeat the terminal assignment simulation. Correct the manifest first by
+replacing or merging, report the issue-count change, reconcile the graph,
+regenerate, and re-review; a shared-contract change also reruns
 plan-review. Escalate after the third recorded breakdown-review failure.
 
 ## 6. Report
