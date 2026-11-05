@@ -17,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "12b19028-fa8a-4c96-b70f-5f41daeb97b7",
+      "run_id": "20e2c396-fa9a-4465-b573-da345fd3f6de",
       "status": "passed",
-      "updated_at": "2026-11-05T00:18:41.132980535Z",
+      "updated_at": "2026-11-05T00:50:01.105753392Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -35,15 +35,15 @@
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "run_id": "5fdec042-c3cf-4616-9d98-316525174536",
+      "run_id": "af3b230d-44ea-4683-add5-da5bd04c1ec4",
       "status": "passed",
-      "updated_at": "2026-11-05T00:17:07.554277298Z",
+      "updated_at": "2026-11-05T00:50:24.749285620Z",
       "updated_by": "auto:executor"
     },
     "worktree-cache-test": {
-      "run_id": "b5be2a61-1d9f-4be8-890b-cd936d9bbb9c",
+      "run_id": "2189223f-ec84-4013-b7c6-df64d3a411d1",
       "status": "passed",
-      "updated_at": "2026-11-05T00:17:04.485023843Z",
+      "updated_at": "2026-11-05T00:50:22.130513022Z",
       "updated_by": "auto:executor"
     }
   },
@@ -56,5 +56,5 @@
   "priority": "high",
   "state": "done",
   "title": "Remove the dispatcher JSON-processor dependency",
-  "updated_at": "2026-11-05T00:27:08.736803573Z"
+  "updated_at": "2026-11-05T00:50:24.749285620Z"
 }
