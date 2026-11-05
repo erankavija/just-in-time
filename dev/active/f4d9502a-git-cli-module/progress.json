@@ -226,9 +226,10 @@
           "short_id": "e3c38fea",
           "title": "Worktree list reads worktrees through the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "4aa3d7cf936b80365ad82b8e0911a0950ad31db5"
         },
         {
           "id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
@@ -280,8 +281,9 @@
           "short_id": "d5cae9e3",
           "title": "CLI tests for commands with no git executable",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementing"
         },
         {
           "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
@@ -290,7 +292,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "profile_fixture_rework"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
@@ -299,7 +301,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "approved_fixture_rework_queued"
+          "worker_status": "fixture_rework_running"
         }
       ]
     },
@@ -378,7 +380,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementing"
+          "worker_status": "gates_passed_lead_audit_pending"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -693,6 +695,27 @@
       "model": "gpt-6-sol",
       "effort": "high",
       "reason": "Preserve reviewed listing and user-name methods across additive merge conflict."
+    },
+    {
+      "issue": "dcf88b6f",
+      "agent": "/root/pinned_object_consumer",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Bounded shared object-reader adoption preserving pinned process contract."
+    },
+    {
+      "issue": "a273667c",
+      "agent": "/root/path_object_consumer",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Bounded object-reader path migration preserving typed errors and revision semantics."
+    },
+    {
+      "issue": "d5cae9e3",
+      "agent": "/root/no_git_cli",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Mechanical two-test CLI boundary coverage using shared fixtures."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -761,7 +784,10 @@
     "9de4c09c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "d68150e2 actual Cargo failure 9c02d30d exposed profile dirty-target fixture with bound layout but no explicit WorktreePaths. Steward approved exact eighth file commands/profile.rs to supply detected paths alongside existing layout, preserving assertions and production. Criteria unchanged; native manifest validation passed. Rework 1 dispatched. ea4b7363 actual Cargo c21d7c93 failed CLI release field fixture lacking actor in non-Git repository; fixture scope escalation pending. dcf88b6f and a273667c dispatched from 9e4fa52c5.",
     "Steward approved ea4b7363 exact third file tests/cli_issue/gate_field_contract_test.rs: explicit actor through existing child-only command_with_env on release, preserve all output assertions and production no-checkout semantics, audit same fixture family. Failed Cargo c21d7c93 preserved156b0115c; no prior review findings/linked docs. Rework1 queued. Native validator rejected now-unused chain-link override after footprint grew; removed obsolete override, validation passed.",
-    "f649c144 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "f649c144 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "f649c144 Done after actual merged Cargo5ac87f4a on833a71908 (5003 tests+25 doctests); closure97688a26d, tree reclaimed. e3 info/list composition pending focused check. d681 corrected fullCargo144a9cb4 stable PASS5016+25 on1f96b6ee, independent review running. dcf source264988e28 removes old blob batch/parser (69 module cases pass), full gates running. EA approved fixture rework dispatched. Ready d5cae9e3 claimed for next available worker slot.",
+    "e3c38fea Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward approved d5cae9e3 stale registration footprint main.rs\u2192existing mod.rs, same two-test consolidated suite; manifest native validation passes. e3 Done/released33e9be6ed after actual mergedCargoa1d97e05, 63 focused composition checks and exact-byte proofs retained. d681 fully ready, all gates stable; next source because frontend632 explicitly not ready. dcf fullCargo7a74ef20 and review376ec987 stable PASS; lead audit finishing. a273 lead revision-expression concern under evidence-first audit before full gate."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1110,7 +1136,7 @@
     "e3c38fea": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "59c4c2bb-ef58-44e7-8921-1cb7d748cb56",
+        "cargo-ci": "a1d97e05-fb4e-4687-ab89-21607dc4e925",
         "code-review": "d5c75795-96fa-4a34-90c2-1efd58116c6d"
       },
       "reviewed_source": "cf86f3cf6eabd6531eee70dd793a61cb2064458f",
@@ -1123,7 +1149,8 @@
       "prior_findings": "First independent review; no findings. Worker corrected initial zero-selected test and accessor compile failure, then all48focused checks passed before full gates.",
       "stale_narrative": "Obsolete e3 convergence pointer removed; historical investigation retained. Final f649 pointer removed only after both migrations converge, per explicit steward ruling.",
       "deferred_items": "No linked documents or in-scope deferrals.",
-      "holistic": "Module owns porcelain parser; consumer owns filtering/mapping. No new discovery/parser/cache. Main integration pending."
+      "holistic": "Module owns porcelain parser; consumer owns filtering/mapping. No new discovery/parser/cache. Main integration pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS a1d97e05-fb4e-4687-ab89-21607dc4e925 on 4aa3d7cf936b80365ad82b8e0911a0950ad31db5."
     },
     "d48e28bf": {
       "verdict": "PASS",
@@ -1156,6 +1183,23 @@
       "deferred_items": "No linked documents; pinned-inspection migration is distinct declared dcf88b6f task and remains mandatory for epic completion.",
       "holistic": "Single new streaming process/header mechanism serves reader/presence; canonical runner/errors and shared fixtures used; two-file footprint. Additive base integration in progress, mandatory merged Cargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS e91fc299-886a-4061-941f-7bb9272ccccc on 524e7b6f54c8d0839d7ceeee21f5ce3fe0d8065e."
+    },
+    "d68150e2": {
+      "verdict": "PASS",
+      "reviewed_source": "1f96b6ee63ef7a0ddfddcfdd28a290644020f1ce",
+      "gates": {
+        "cargo-ci": "144a9cb4-3c97-407e-b9d6-150cafc3a624",
+        "code-review": "c150dd0b-16b8-4727-9300-aa51ea853098"
+      },
+      "criteria": "REQ01-04 verified; invocation context caches only exact/canonical/top aliases, shares clones/projections, removes omission discovery, preserves authority/recovery and bounded process behavior. Approved profile fixture correction passes; no deferred items or stale narrative. All eight own files exact after refresh. Mandatory merged Cargo pending."
+    },
+    "dcf88b6f": {
+      "verdict": "gates_passed_lead_audit_pending",
+      "reviewed_source": "5e10c355a6eaf638ad26db8754bc342e69b5e463",
+      "gates": {
+        "cargo-ci": "7a74ef20-acd1-442c-8134-0ba965366474",
+        "code-review": "376ec987-854b-41b8-9afd-63d701a6ae47"
+      }
     }
   },
   "source_queue": [

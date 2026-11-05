@@ -1148,7 +1148,7 @@
       "crates/jit/tests/cli_repo_workflow/git_unavailable_tests.rs"
      ],
      "touches": [
-      "crates/jit/tests/cli_repo_workflow/main.rs"
+      "crates/jit/tests/cli_repo_workflow/mod.rs"
      ]
     }
    }
