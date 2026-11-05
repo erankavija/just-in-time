@@ -996,7 +996,7 @@
     "0eca332a": 3,
     "0546fc82": 3,
     "ab168296": 0,
-    "755964b2": 0
+    "755964b2": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1638,8 +1638,8 @@
       }
     },
     "0546fc82": {
-      "status": "backlog",
-      "note": "Final prepared docs gates97d93990/5f6275ebPASS, tipd4e03af46; awaits realdcDone thenclaim/integration."
+      "status": "in_progress",
+      "note": "Actual dc and0eca dependencies Done; final mechanical97d93990/docreview5f6275eb PASS; formalPASS, queued integration."
     },
     "083c9a91": {
       "status": "done"
@@ -1835,8 +1835,10 @@
       "status": "done"
     },
     "f9977efd": {
-      "status": "in_progress",
-      "note": "Ready231233d48 after finalCargo4eb950c8/review15c7cc86 and formalleadPASS; main37/40, zeroRustcoredelta."
+      "status": "done",
+      "note": "Merged Cargo15d42f63 stablePASS; configured review15c7cc86 retained; allgates passed; Done.",
+      "merge": "da2245869",
+      "production_delta": 0
     },
     "fb2dc5c3": {
       "status": "backlog"
@@ -1848,7 +1850,7 @@
       "status": "done"
     },
     "fe3ad1b0": {
-      "status": "ready"
+      "status": "in_progress"
     },
     "ab168296": {
       "status": "done",
@@ -1858,7 +1860,8 @@
     },
     "755964b2": {
       "status": "in_progress",
-      "model": "gpt-6-luna high"
+      "model": "gpt-6-luna high",
+      "note": "Final Cargo a123b6e4 and review59b5ca56 stablePASS; cumulativeF1F2 resolved; formalleadPASS; queued integration plus merged Rustdoc."
     }
   },
   "handoff": {
@@ -1992,7 +1995,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "ab168 and0eca completed on main with stable merged Cargo PASS. 0546 finalmechanical/docreview PASS awaiting realdcDone/mainintegration. f997 ready;755 finalcode-review running afterRustdoc/fullCargoPASS. fe3 newlyready.",
+    "status": "f997 Done on main; fe3 finalgatesPASS/formalaudit finishing;0546/755 ready for interleaved integration. Timing/trial held.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -2001,10 +2004,9 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "ab168 reserved merge slot after frontend watcher",
-      "0eca ready for later interleaved merge",
-      "f997 ready for later interleaved merge",
-      "0546 mechanical/review after0eca anddc048377"
+      "fe3 gate-record-only acceptance",
+      "0546 queued after cc9/4858",
+      "755 queued after cc9/4858"
     ],
     "parallelism": "Pinned isolated reviews completed concurrently; read-only Rustdoc criterion audit runs while ready source merges interleave across leads. Full merged Cargo checks remain serial; cheap checks and AI reviews hold no Cargo locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
@@ -2065,7 +2067,7 @@
       "findings": {
         "F1": "Fixed88c419187; exact CLI row census and reports pass in final5052+25 Cargo bad751b7; finalreview766aceb2 stablePASS.",
         "F2": "Closed: ab168 merge67f4514c3, actualmergedCargo244d875e PASS, Done85e56e0cd, worktree reclaimed.",
-        "F3": "0546 fixed32ab62d01; mechanical and affected review pending",
+        "F3": "Fixed32ab62d01; finalmechanical97d93990/docreview5f6275eb PASS; integration pending.",
         "F4": "active findings prose fixed6d61a3c78 with approved story contracts"
       }
     },
@@ -2142,13 +2144,17 @@
           "before": 73840,
           "after": 73819,
           "delta": -21
+        },
+        {
+          "merge": "da2245869",
+          "delta": 0
         }
       ],
       "current_epic_delta": 183,
       "mode": "scripts/production-lines.py REV (no flags)"
     },
     "f9977efd": {
-      "status": "in_progress",
+      "status": "done",
       "dependency_ruling": "Steward approved removing only f997\u2192f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
       "test_owner_ruling": "Steward approved existing shell self-test as canonical fixture owner, no recreated Rust suite.",
       "scope_commit": "5595358f9",
@@ -2157,7 +2163,9 @@
       "production_delta": 0,
       "branch_cargo_run": "4eb950c8-0357-4698-9f80-eaa8c7c3740d",
       "final_prose": "All current prose and both transitive gate input roots reconciled; final Cargo5049+25 and review15c7cc86 stablePASS; evidence231233d48.",
-      "review_run": "15c7cc86-2177-42fd-a132-8d0c82dc2c49"
+      "review_run": "15c7cc86-2177-42fd-a132-8d0c82dc2c49",
+      "merge": "da2245869",
+      "merged_cargo": "15d42f63-28a7-46d9-97d8-4c2bebde827b"
     },
     "ab168296": {
       "status": "done",
@@ -2172,7 +2180,7 @@
       "reclaimed": true
     },
     "0eca_extra_rework": "Approved extra mechanical round complete43d8ad971 (0o000); finalCargo bad751b7 stablePASS5052+25 and cleanClippy; review766aceb2 stablePASS; actualrecords59e3ba681. No behavior change.",
-    "0546_mechanical_blocker": "Actual failedrun ecc372aa preserved a307e3010: M8 rejects installed jq dependency. External dc048377 owns native projection repair; primary dependency0546->dc048 recordedfd05b3281 with approved reduction of redundant milestone edge. No waiver; await repairDone and finalchecks.",
+    "0546_mechanical_blocker": "Resolved: dcDone andinstalled, finalmechanical97d93990/docreview5f6275eb stablePASS. ActualdependenciesDone, nativeclaimb0ece0d54.",
     "f997_transitive_input": "Approved counter root in cargo-ci-selftest52c2ec0fb; finalCargo4eb950c8 and review15c7cc86 stablePASS. Earlier actualrecords preserved.",
     "rustdoc_repair": {
       "id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
@@ -2181,10 +2189,12 @@
       "audit": "/tmp/jit-df129d9e-session14/rustdoc-criterion-audit.md",
       "scope": "Comment references only; actual facade REQ03 regression plus compiler-confirmed residual links; existing private-items Rustdoc command, no newchecker/runtime/import/API.",
       "source": "e2343f56e",
-      "branch_cargo": "cb9149c8",
+      "branch_cargo": "a123b6e4-771f-40c9-8b31-cb01ea88bf44",
       "production_delta": 0,
-      "review": "running at15097fbfd",
-      "diagnostics": "111 actual blockingRustdoc diagnostics:35unresolved,41private,24redundant,11malformedHTML;52files,211changedlines allRustdoc; refreshed private-items docsPASS."
+      "review": "59b5ca56-d680-4d80-8970-3c9e96908f79 stablePASS, records7b916541b; formalPASS",
+      "diagnostics": "111 actual blockingRustdoc diagnostics:35unresolved,41private,24redundant,11malformedHTML;52files,211changedlines allRustdoc; refreshed private-items docsPASS.",
+      "rework": 1,
+      "verification": "dev/active/755964b2/verification.md in755 branch"
     },
     "docs_preparation_exception": "Approved combined7052b1fb3/final0eca preparation; finalsource291d665d2, mechanical97d93990 and docreview5f6275eb stablePASS, evidence d4e03af46 and formalleadPASS. Realprimary deps still governclaim/Done.",
     "0eca332a": {
