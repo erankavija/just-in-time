@@ -7,6 +7,7 @@
   ],
   "description": "One server response builder owns MIME and percent codec consolidation.\n\n## Success Criteria\n\n- [hard] REQ-01: Raw documents use one response builder, mime_guess and one percent codec while preserving HTML base injection, CSP and traversal rejection; tests cover binary MIME, HTML and invalid paths.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T00:09:15.356213422Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Unify raw document response construction",
-  "updated_at": "2026-11-04T22:24:54.946576604Z"
+  "updated_at": "2026-11-05T00:09:15.356213422Z"
 }

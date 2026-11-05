@@ -58,6 +58,7 @@
       "path": "dev/active/f4d9502a-git-cli-module/head-lookup-experiment.md"
     }
   ],
+  "done_at": "2026-11-05T00:39:42.448608679Z",
   "first_ready_at": "2026-11-01T14:05:18.430019023Z",
   "gates_required": [
     "cargo-ci",
@@ -65,15 +66,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "b90299c6-4567-48ac-a459-ddb2a79d24b0",
+      "run_id": "dd02d9b5-fdb2-4cd5-868d-70c3381a63da",
       "status": "passed",
-      "updated_at": "2026-11-04T22:47:26.900432705Z",
+      "updated_at": "2026-11-05T00:38:10.141319192Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "008c2ae3-d632-448a-85d4-982b9490c59e",
-      "status": "failed",
-      "updated_at": "2026-11-04T22:52:15.540307289Z",
+      "run_id": "eeb77a1a-4f39-4850-a376-a972f0825405",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:29:43.938019750Z",
       "updated_by": "auto:executor"
     }
   },
@@ -88,7 +89,7 @@
     "satisfies:f4d9502a/REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "One head lookup in the git module",
-  "updated_at": "2026-11-04T23:26:30.796310009Z"
+  "updated_at": "2026-11-05T00:39:42.448608679Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-6d93ab14",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7e9d7fc802049bc9a3e8b40d0552272254f7f9f9",
+  "completed_at": "2026-11-04T23:52:37.151900174Z",
+  "duration_ms": 197591,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met by the attributable current implementation; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6d93ab14-4c72-4ec5-9c50-471cf0d95746",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "96be1f4c-cf42-466c-ac88-486ba47b1364",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:49:19.560571211Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c20b11d6, 84f5ff7b, 93b62625b, 7e9d7fc8 (`jit:6d93ab14`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/gate/npm-ci (.jit/gates.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: npm-ci passed (exit 0) at 93b62625, covering the implementation commit; code-review none\nTruncation recovery: narrowed historical gate-record reads to metadata; omitted historical stdout as record-only evidence\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met by the attributable current implementation; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
