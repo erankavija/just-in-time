@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-fe3ad1b0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9a5f5c8bac07fffbcd748e2651aea895b0f69fdf",
+  "completed_at": "2026-11-05T01:24:04.128481080Z",
+  "duration_ms": 226215,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No blocking or advisory findings in the attributable footprint.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fe3ad1b0-6d71-4cc7-a02f-a43b36f94548",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6c6439db-00f5-4742-b4f5-642efdba5422",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:20:17.913231068Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6d61a3c7, 3b54b2f2, b483a7b8, 746b8db6, e08e2873, 9a5f5c8b (`jit:fe3ad1b0`)\nPolicy sources: AGENTS.md; dev/active/df129d9e-rust-code-quality/plan.md\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/df129d9e/requirement/REQ-02, REQ-09, REQ-11–REQ-14, REQ-19; @/issue/fe3ad1b0/decision/D-01\nGate evidence: cargo-ci passed (exit 0; e08e2873 covers substantive tagged changes); prior code-review passed (exit 0)\nTruncation recovery: inspected each tagged patch individually and used bounded reads of current classifier, emitter, dispatch, server routes, and owning tests\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No blocking or advisory findings in the attributable footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
