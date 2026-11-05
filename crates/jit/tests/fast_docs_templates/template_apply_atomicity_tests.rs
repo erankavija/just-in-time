@@ -129,8 +129,11 @@ impl<S: IssueStore> PublicationProbeStore<S> {
 }
 
 impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
-    fn configure_repository_layout(&self, layout: &jit::repository_state::RepositoryLayout) {
-        self.inner.configure_repository_layout(layout);
+    fn configure_repository_layout(
+        &self,
+        layout: &jit::repository_state::RepositoryLayout,
+    ) -> std::result::Result<(), jit::storage::RepositoryStateStoreError> {
+        self.inner.configure_repository_layout(layout)
     }
 
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
@@ -553,7 +556,9 @@ fn test_failed_publication_preserves_memory_preimage_and_retry_succeeds() {
 fn test_failed_publication_preserves_file_preimage_and_retry_succeeds() {
     let (temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
     let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(PublicationProbeStore::new(storage)).with_layout(layout);
+    let executor = CommandExecutor::new(PublicationProbeStore::new(storage))
+        .with_layout(layout)
+        .unwrap();
     assert_publication_failure_is_atomic(executor, &taxonomy);
 }
 
@@ -619,7 +624,9 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
     let jit_root = temp.path().join(".jit");
     let store = PublicationProbeStore::with_stall(storage, stall);
     let layout = jit::storage::discover_repository_layout(temp.path(), store.root()).unwrap();
-    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
+    let executor = CommandExecutor::new(store.clone())
+        .with_layout(layout)
+        .unwrap();
     let (executor, container, upstream) = fixture(executor, &taxonomy);
     let original_container = executor.storage().load_issue(&container).unwrap();
     store.arm();
@@ -635,7 +642,7 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
                 storage.root(),
             )
             .unwrap();
-            let executor = CommandExecutor::new(storage).with_layout(layout);
+            let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
             let started = Instant::now();
             let id = executor
                 .issues()
@@ -796,7 +803,9 @@ target = "docs/closure.md"
         changed_config.to_string(),
     );
     let layout = jit::storage::discover_repository_layout(temp.path(), store.root()).unwrap();
-    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
+    let executor = CommandExecutor::new(store.clone())
+        .with_layout(layout)
+        .unwrap();
     let (executor, container, _) = fixture(executor, &taxonomy);
     let calls_before = store.apply_calls();
     store.arm();

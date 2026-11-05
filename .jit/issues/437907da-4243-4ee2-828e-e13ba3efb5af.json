@@ -8,6 +8,7 @@
   ],
   "description": "Add the module's single listing of a repository's worktrees, parsed once, so worktree commands and lease validation read one listing.\n\n## Background\n\n- Two parsers read `git worktree list --porcelain`. `parse_git_worktree_porcelain` (`crates/jit/src/commands/worktree.rs:90-123`) keeps paths and branch names and drops entries without a `branch` line; `jit worktree list` uses it (`crates/jit/src/commands/worktree.rs:232`). `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2422-2463`) reads only the `worktree` lines, once per lease.\n- The porcelain format is blank-line-separated blocks of `worktree <path>`, `HEAD <oid>`, and `branch refs/heads/<name>`, `detached` or `bare`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::list_worktrees()` starts one `git worktree list --porcelain` process and returns each worktree's path and branch name, the branch absent when the worktree is detached or bare.\n- [hard] REQ-02: The behaviour suite covers a primary checkout with linked, detached and slash-named-branch worktrees and counts one process per listing.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T01:05:34.432147653Z",
   "first_ready_at": "2026-11-01T14:05:18.237442968Z",
   "gates_required": [
     "cargo-ci",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "5dd13d62-baa7-4c92-b6ad-ae47b7b9eb8c",
+      "run_id": "c23e078c-3240-4c3b-8fa2-ab1d3e361a44",
       "status": "passed",
-      "updated_at": "2026-11-05T00:26:58.943851312Z",
+      "updated_at": "2026-11-05T00:59:44.336325301Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -38,7 +39,7 @@
     "satisfies:f4d9502a/REQ-08"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "One worktree listing in the git module",
-  "updated_at": "2026-11-05T00:31:17.746987935Z"
+  "updated_at": "2026-11-05T01:05:34.432147653Z"
 }

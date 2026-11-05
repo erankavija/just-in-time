@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-9c3eb2bf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5398819d252aa246829b882c4e26a9341ca3d3f8",
+  "completed_at": "2026-11-05T00:05:54.351394521Z",
+  "duration_ms": 195503,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0d50a4d4-a777-48ce-ad81-c10deb2da691",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:02:38.848312698Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1d81910d, 552ccd36, b9540609 (implementation); 5685595a, a19eec49, 7987942c, 5398819d (gate records)\nPolicy sources: AGENTS.md\nResolved items: @/issue/9c3eb2bf/requirement/REQ-01, @/issue/0f8efc37/requirement/REQ-02, @/issue/a236e81e/requirement/REQ-01 (issue Markdown); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, latest); code-review failed (exit 1, prior F1), addressed by b9540609 and verified in the current tree\nTruncation recovery: per-path implementation patches, current line reads, item resolutions, and narrow gate-record metadata reads; historical stored stdout was outside the current behavior cone\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
