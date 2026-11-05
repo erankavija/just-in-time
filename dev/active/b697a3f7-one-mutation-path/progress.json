@@ -31,7 +31,7 @@
           "title": "Gate registry edits keep the authored file",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
@@ -135,7 +135,8 @@
   ],
   "rework_counts": {
     "f6477007": 1,
-    "4334df62": 1
+    "4334df62": 1,
+    "9a2563fd": 1
   },
   "surfaced_pitfalls": [
     {
