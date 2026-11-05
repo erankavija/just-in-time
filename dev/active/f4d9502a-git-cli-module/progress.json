@@ -358,9 +358,10 @@
           "short_id": "9ecde705",
           "title": "Link checks test asset presence through one git process",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "merged_and_gated",
+          "source_merge": "270f4894b8aa78ba6dfc696ec0bf6cd8bbd30c02"
         },
         {
           "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
@@ -860,7 +861,8 @@
     "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate.",
     "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision.",
-    "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect."
+    "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect.",
+    "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1330,10 +1332,11 @@
       "verdict": "PASS",
       "reviewed_source": "1ab12740c573c8d6e6cb8a043cd2cf65a60c7760",
       "gates": {
-        "cargo-ci": "86c62420-2745-4f04-b9da-3068d5f85d77",
+        "cargo-ci": "fa6ff02f-7e84-4731-9313-5011c673bd61",
         "code-review": "c85fcdaa-9f4f-4d4e-8e9f-f306f1906f3c"
       },
-      "criteria": "All4criteria met afterleadrework1: one selectedwrite_checkout batch; workingtree/pinned/HTTP behavior retained; onlyBlob/Tree count ascommittedassets; owninggitlink matrix coversmissing andavailabletarget, actualREDthenGREEN; oneprocess test. LeadF1availabletarget closed in03269c2d6, producer bytes unchanged, previous reviews preserved. No linked docs/deferrals/stale narrative. Historycomposition exactparentproof+40PASS. MandatorymergedCargo pending."
+      "criteria": "All4criteria met afterleadrework1: one selectedwrite_checkout batch; workingtree/pinned/HTTP behavior retained; onlyBlob/Tree count ascommittedassets; owninggitlink matrix coversmissing andavailabletarget, actualREDthenGREEN; oneprocess test. LeadF1availabletarget closed in03269c2d6, producer bytes unchanged, previous reviews preserved. No linked docs/deferrals/stale narrative. Historycomposition exactparentproof+40PASS. MandatorymergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS fa6ff02f-7e84-4731-9313-5011c673bd61 on 270f4894b8aa78ba6dfc696ec0bf6cd8bbd30c02."
     },
     "92afc5d8": {
       "verdict": "PASS",
