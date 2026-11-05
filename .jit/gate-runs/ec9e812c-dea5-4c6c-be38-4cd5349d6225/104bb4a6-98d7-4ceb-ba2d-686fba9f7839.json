@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-ec9e812c",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "40b0a0a22d74946cb0af6f91a8e50ddd3eea5a3f",
+  "completed_at": "2026-11-05T00:16:39.111289413Z",
+  "duration_ms": 113222,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "da9763798eba303c18aefe6594d99d4cb14e89d317cb2dca97b42709eb8765ee",
+  "issue_id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "104bb4a6-98d7-4ceb-ba2d-686fba9f7839",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:14:45.888877719Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nwarning: jit-server@1.0.0: web/dist/ not found — the jit-server binary will not include embedded web assets. Run 'cd web && npm run build' first, then rebuild.\nerror: the borrowed expression implements the required traits\nerror: the borrowed expression implements the required traits\nerror: could not compile `jit` (test \"contracts\") due to 2 previous errors\nwarning: build failed, waiting for other jobs to finish...\n  ✓ fmt: ok (1620 ms)\n  ✗ clippy: FAILED (exit 101) (41348 ms)\n  ✓ suite-build: built in 55148 ms, warmed 11 executables (947372704 bytes) in 42 ms (55193 ms)\n  ✓ test: 5049 passed, 0 failed, 0 skipped (12077 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2701 ms)\n  ✓ suite-clock: 14797 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (9 ms)\n  ✓ budget: integration-targets=3/3 active-executables=7 bytes=674059176/740294656 profile=line-tables-only dep-features=pruned suite-duration=14797ms (95 ms)\n\ncargo-ci: verdict (exit 1): step 'clippy' failed on repository content\n"
+}

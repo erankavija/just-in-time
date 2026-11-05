@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f14a2f36-a00e-4150-b4a4-b380f065656c",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:18:59.042893988Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6c6439db-00f5-4742-b4f5-642efdba5422",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:24:04.130730972Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fe3ad1b0-6d71-4cc7-a02f-a43b36f94548",
   "labels": [
     "type:story",
@@ -28,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One library error boundary for the CLI and the server",
-  "updated_at": "2026-11-05T00:46:29.305559024Z"
+  "updated_at": "2026-11-05T01:24:04.130730972Z"
 }
