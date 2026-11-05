@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-cd0ac0f7",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2c6c6e767913f2643c1a19b919ef5ca42350a37b",
+  "completed_at": "2026-11-05T00:32:56.882504672Z",
+  "duration_ms": 200952,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "web/src/components/Graph/__tests__/GraphView.test.tsx",
+        "id": "F1",
+        "line": 151,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "The event test stubs EventSource without restoring it, leaking process-wide state to later tests."
+      }
+    ],
+    "summary": "The new browser event test leaks its EventSource global stub into later tests.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a4809918-52e7-4121-bb6d-b3e81432ab32",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:29:35.929572009Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4370 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-cd0ac0f7\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a91c-71e4-7ce3-b847-8b5fba85ab41\n--------\nuser\n--- 4357 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 571e16bba, 0dc4b242, 2c6c6e7 (jit:cd0ac0f7)\nPolicy sources: AGENTS.md\nResolved items: @/issue/0f8efc37/requirement/REQ-04 and @/issue/3a61ff16/requirement/REQ-01 (issue descriptions); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: npm-ci passed, exit 0; its run contains 571e16bba and 0dc4b242, not 2c6c6e7\nTruncation recovery: narrowed reads of plan contract, affected component/tests, App/event hook, configuration, and invariant registry; abandoned historical inventories and gate stdout as outside the current behavior impact cone.\n\n1. [blocking][issue-impact] The new event test replaces the process-wide `EventSource` global but never restores it. With no `unstubGlobals` setting or local cleanup, later tests in this file inherit `TestEventSource`, making results order-dependent. Add scoped restoration. `web/src/components/Graph/__tests__/GraphView.test.tsx:151`. References: @/invariant/orthogonal-tests.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new browser event test leaks its EventSource global stub into later tests.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The event test stubs EventSource without restoring it, leaking process-wide state to later tests.\",\"file\":\"web/src/components/Graph/__tests__/GraphView.test.tsx\",\"line\":151,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

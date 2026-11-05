@@ -23,7 +23,7 @@ REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
 version = 1
 key = "cargo-ci"
 title = "Cargo CI (fmt + clippy + tests + build policy)"
-description = "Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite compiled in its own step and then measured by the named suite clock, the excluded-tests check that fails the run when the suite reports a skipped test or the doctest step reports an ignored one (@/invariant/no-ignored-tests), and the build-footprint budget checker (integration-target, active-executable, and measured suite-duration budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh) must all pass (@/invariant/bounded-rust-build-footprint). The run owns and removes its temporary directory: every step runs with TMPDIR set to a directory made inside the caller's temporary directory, a compiler-cache server keeps the caller's TMPDIR, and the directory is removed when the run exits, whether it passes, fails or is interrupted by a signal the script traps. The checker exits 1 for a verdict on repository content and 75 (recorded as an `error` run, never reused through digest reuse) when every failing step is environment-sensitive: a step whose output reports ENOSPC (`No space left on device` or os error 28) with no other failure, whatever the load, or test TIMEOUT results with no FAIL, or a suite-duration-only budget overrun, with the host load average at or above the threshold printed in the run output; the header of scripts/cargo-ci.sh defines the convention. A persistent budget overrun or timeout at low load exits 1 and is a real regression to investigate, not to retry."
+description = "Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite compiled in its own step and then measured by the named suite clock, the excluded-tests check that fails the run when the suite reports a skipped test or the doctest step reports an ignored one (@/invariant/no-ignored-tests), and the build-footprint budget checker (integration-target, active-executable, measured suite-duration, and main.rs production-line budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh) must all pass (@/invariant/bounded-rust-build-footprint). The run owns and removes its temporary directory: every step runs with TMPDIR set to a directory made inside the caller's temporary directory, a compiler-cache server keeps the caller's TMPDIR, and the directory is removed when the run exits, whether it passes, fails or is interrupted by a signal the script traps. The checker exits 1 for a verdict on repository content and 75 (recorded as an `error` run, never reused through digest reuse) when every failing step is environment-sensitive: a step whose output reports ENOSPC (`No space left on device` or os error 28) with no other failure, whatever the load, or test TIMEOUT results with no FAIL, or a suite-duration-only budget overrun, with the host load average at or above the threshold printed in the run output; the header of scripts/cargo-ci.sh defines the convention. A persistent budget overrun or timeout at low load exits 1 and is a real regression to investigate, not to retry."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -392,6 +392,7 @@ roots = [
   "scripts/cargo-ci-selftest.sh",
   "scripts/cargo-ci.sh",
   "scripts/profile-test-suite.sh",
+  "scripts/production-lines.py",
   "scripts/rust-build-budget.sh",
 ]
 
@@ -441,6 +442,7 @@ pass_context = false
 [gates.inputs]
 roots = [
   "scripts/rust-build-budget.sh",
+  "scripts/production-lines.py",
 ]
 
 [gates.reserved]
