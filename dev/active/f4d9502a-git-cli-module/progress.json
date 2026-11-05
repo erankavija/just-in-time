@@ -1295,6 +1295,15 @@
         "code-review": "b9d20147-35e0-492d-acec-8ee0dcb04db2"
       },
       "criteria": "F1 valid committed LF path rejected by shared line-framed protocol. Isolated six-file canonical -Z proposal and Git>=2.42/runtime Trixie proposal are under validation; explicit user decision required before landing minimum/runtime changes. No main authority change."
+    },
+    "3f8da8c4": {
+      "verdict": "PASS",
+      "reviewed_source": "53af83b6e6a522144b56cef4efba4c96fa855403",
+      "gates": {
+        "cargo-ci": "3c1b0cc1-ab9b-4179-a9c8-89feea8967e7",
+        "code-review": "4c16f96a-c643-46c0-bc48-3cca022950b9"
+      },
+      "criteria": "All four criteria met: explicit Head argument, selected paths lookup before checker, actual baseline RED for nested and in-memory scenarios, argument-observing non-Git checker test. Private Git helpers/spawns removed. Two own files exact after refreshed reviewed branch; D25 test correction retained. No linked docs/deferrals. Head convergence comment still awaits c140 snapshot consumer, legitimately pending. Mandatory merged Cargo pending."
     }
   },
   "source_queue": [
