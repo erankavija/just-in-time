@@ -542,9 +542,9 @@
     },
     {
       "issue": "5046408a",
-      "status": "parked_boundary_R1_unresolved",
+      "status": "boundary_design_R2_pass_awaiting_783_landing",
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
-      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate.",
+      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md.",
       "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch."
     },
     {
@@ -833,6 +833,21 @@
       "effort": "high",
       "reason": "Steward-approved four-file actor facade; resumed after user lifted wind-down park 2026-11-06.",
       "base": "5d4dc48a7"
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "anthropic",
+      "model": "opus",
+      "classification": "design",
+      "reason": "Amend selected-A for R1 retained root/lock handoff; read-only."
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "classification": "independent design review R2",
+      "reason": "Fresh bounded review of amended selected-A; PASS."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
