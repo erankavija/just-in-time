@@ -24959,3 +24959,4 @@
 {"from":"ready","id":"ae1ddcde-8c10-4aab-8d85-1dba432c491e","issue_id":"fe3ad1b0-6d71-4cc7-a02f-a43b36f94548","timestamp":"2026-11-05T00:46:29.305559024Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"d3e110d7-0334-4750-b899-b0f61084522d","issue_id":"fe3ad1b0-6d71-4cc7-a02f-a43b36f94548","timestamp":"2026-11-05T00:46:29.305559024Z","type":"issue_claimed"}
 {"fields":["documents"],"id":"7cfcc639-1805-496e-98a8-596ed71a4047","issue_id":"755964b2-ee96-4fee-aa80-8f782c94dd47","timestamp":"2026-11-05T00:54:17.558957033Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"cargo-ci","id":"4bb8e823-8e9e-4484-bc58-a7cffb7708ce","issue_id":"755964b2-ee96-4fee-aa80-8f782c94dd47","timestamp":"2026-11-05T00:58:14.437741495Z","type":"gate_passed","updated_by":"auto:executor"}

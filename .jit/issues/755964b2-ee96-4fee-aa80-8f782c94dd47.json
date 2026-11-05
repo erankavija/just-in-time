@@ -21,9 +21,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "cb9149c8-826b-4a13-9595-fb0f05a87a4d",
+      "run_id": "a123b6e4-771f-40c9-8b31-cb01ea88bf44",
       "status": "passed",
-      "updated_at": "2026-11-05T00:40:09.751456366Z",
+      "updated_at": "2026-11-05T00:58:14.437741495Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rust API links name the owners after facade extraction",
-  "updated_at": "2026-11-05T00:54:17.558957033Z"
+  "updated_at": "2026-11-05T00:58:14.437741495Z"
 }
