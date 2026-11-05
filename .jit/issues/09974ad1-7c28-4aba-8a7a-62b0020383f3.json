@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "05be4b61-11dd-45b0-9fa7-c4332ed768fd",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:10:31.429704603Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "db8d37ea-9b42-4c8d-b290-956909bcf99f",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:13:20.685286903Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "09974ad1-7c28-4aba-8a7a-62b0020383f3",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Base comparison operation in the git module",
-  "updated_at": "2026-11-04T23:52:29.474333037Z"
+  "updated_at": "2026-11-05T00:13:20.685286903Z"
 }

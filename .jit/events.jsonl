@@ -24901,6 +24901,8 @@
 {"fields":["dependencies"],"id":"00a59db4-5d6d-440b-8f14-26bb85f20727","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-05T00:01:34.702986595Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"0c8ab1aa-f7ea-4ec7-8bdd-f8b112a392e0","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","timestamp":"2026-11-05T00:01:34.918700893Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:frontend-install-policy","id":"b34d9f10-396e-480d-850b-476d4009ac34","issue_id":"38df8a6c-1a33-48e1-95b0-bc816c354a5f","timestamp":"2026-11-05T00:01:34.918700893Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"22ce5d74-127d-4489-bb03-cc04d5bf26b7","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T00:10:31.429704603Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"8b79be56-f742-459b-87d6-5cf3a34361ec","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-05T00:13:20.685286903Z","type":"gate_passed","updated_by":"auto:executor"}
 {"id":"e862ebea-4377-4d42-9dff-46437bc5579c","issue_id":"dc048377-19b5-425d-90e6-11d4a7427e34","priority":"high","timestamp":"2026-11-05T00:08:14.312789221Z","title":"Remove the dispatcher JSON-processor dependency","type":"issue_created"}
 {"fields":["dependencies"],"id":"40239fb4-9139-464a-9640-8a317d6f8c2e","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-05T00:08:14.746537954Z","type":"issue_updated","updated_by":"dependency-add"}
 {"gate_key":"cargo-ci","id":"7faa00a3-f83b-46b0-a676-b93a0838b94a","issue_id":"c16c834c-f134-4af8-ab20-40c6a120e836","timestamp":"2026-11-05T00:12:28.194244990Z","type":"gate_passed","updated_by":"auto:executor"}
