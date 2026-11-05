@@ -10,7 +10,14 @@
   "gates_required": [
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "6f4ea264-a5b5-4746-a677-81c003199ee6",
+      "status": "failed",
+      "updated_at": "2026-11-05T23:34:02.777135830Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a68eb999-3cdf-437e-9e5a-d1e0f3e9550a",
   "labels": [
     "component:docs",
@@ -19,5 +26,5 @@
   "priority": "low",
   "state": "in_progress",
   "title": "State that a template names gates rather than carrying them",
-  "updated_at": "2026-11-05T23:22:32.148678324Z"
+  "updated_at": "2026-11-05T23:34:02.777135830Z"
 }
