@@ -557,7 +557,8 @@
     "3f8da8c4": 1,
     "47d62472": 1,
     "9ecde705": 1,
-    "fb5e8e8d": 1
+    "fb5e8e8d": 1,
+    "5046408a": 1
   },
   "surfaced_pitfalls": [
     {
@@ -893,7 +894,8 @@
     "Live checkpoint handoff-2.md records current holds, active504 source/docs ownership, completedfb/c0ea gates, D26/D27 design acceptance and tool traps. Work continues; no stop or pause requested.",
     "504 pinned APIs code_checkout (code), git (data), write_checkout/checkout_top_level (data or relocated coordination), with_worktree_root (code selection only, shared context). Primary reported44redo testsPASS +originalA/newB recoveryRED\u2192PASS. Consumer slice transferred after no-edit/current-check confirmation; docs complete. Ownership in design_acceptances supersedes live handoff2 worker snapshot.",
     "Steward-approved code-authority reconciliation: native c140921c -> 5046408a dependency added with cycle checking and transitive reduction of direct 4ba18af4/d68150e2 edges. The external 504 issue remains outside the 53-node manifest; its internal contract prerequisites remain represented there. c140 source/metadata, d9 pinned evidence and 933 diff explicitly use code_checkout, preserving existing worktree-root authority. Source footprint and producer semantics unchanged. c140 remains held until explicit floor approval, a273 Done and 504 Done. Native reduction also removes 34851181 -> 5046408a because surface trim now reaches split-root selection through its existing downstream chain; reachability is preserved.",
-    "Steward approved removal of obsolete committed-HEAD issue fallback note from 504: the tier was already retired. Local/primary behavior and absence of the HEAD tier remain required; no criterion or source-scope change. Historical issue/event records preserved."
+    "Steward approved removal of obsolete committed-HEAD issue fallback note from 504: the tier was already retired. Local/primary behavior and absence of the HEAD tier remain required; no criterion or source-scope change. Historical issue/event records preserved.",
+    "504 source0ecd649ce refreshed36f2ea3c1 preserving35files; actual fullCargo35fd9abc FAIL after191pass/4fail and22pass/3doctestfail, fmt/clippy/buildbudgetPASS. Failed evidence preserved2fb068c61. Existing dependency/document workflows report absent .jit/config.toml; primary rework1 dispatched to repair shared configuration owner, preserve assertions/D25 and run non-fail-fast library+doctests before full gate rerun. Independent implementation reviews not started. Main remains free; held floor/runtime proposal unchanged."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1440,7 +1442,7 @@
       "independent_implementation_review": "Fresh Astra/high after full configured Cargo gate",
       "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic",
       "active_ownership": {
-        "split_root_impl": "Astra/xhigh: sole owner of all accepted source/tests/docs; consumer and documentation slices complete and returned. Final focused checks running before full gate and independent reviews.",
+        "split_root_impl": "Astra/xhigh: bounded rework1 after full Cargo35fd9abc exposed absent/synthetic-config regressions; source/tests/docs owned in isolated branch.",
         "split_root_consumers": "Complete; ownership returned to primary.",
         "split_root_design": "Docs slice complete and lead reviewed; ownership returned to primary."
       },
