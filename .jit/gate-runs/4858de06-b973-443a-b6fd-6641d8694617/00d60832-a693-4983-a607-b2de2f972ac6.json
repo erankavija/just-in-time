@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-4858de06",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "11166452bdd59889297e85d7758f515d9a9b985e",
+  "completed_at": "2026-11-05T00:44:08.154328966Z",
+  "duration_ms": 183100,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Monotonic request invalidation and focused component tests satisfy REQ-01 through REQ-03.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4858de06-b973-443a-b6fd-6641d8694617",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "00d60832-a693-4983-a607-b2de2f972ac6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:41:05.054323446Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 72b012b33, 8403c9e1d, 058c0e5dd, 11166452b\nPolicy sources: AGENTS.md\nResolved items: @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate and @/gate/npm-ci (.jit/gates.toml)\nGate evidence: npm-ci passed (exit 0, run commit 058c0e5dd); ancestry contains 72b012b33, 8403c9e1d, and 058c0e5dd, but not post-run record 11166452b\nTruncation recovery: narrow reads of IssueDetail.tsx:100-220, IssueDetail.test.tsx:1-125, App.tsx:275-310, and relevant registry sections; historical gate stdout was outside the behavior impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Monotonic request invalidation and focused component tests satisfy REQ-01 through REQ-03.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
