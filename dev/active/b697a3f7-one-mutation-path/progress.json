@@ -1,0 +1,130 @@
+{
+  "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+  "epic_short_id": "b697a3f7",
+  "lead_agent_id": "agent:b697a3f7-lead",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "label": "1a",
+      "issues": [
+        {
+          "id": "12064c7b-9429-4f58-b739-4143cb9d399f",
+          "short_id": "12064c7b",
+          "title": "Type labels have one exact extraction",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "pending"
+        },
+        {
+          "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
+          "short_id": "f6477007",
+          "title": "Process liveness and signalling go through one PID guard",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "pending"
+        },
+        {
+          "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
+          "short_id": "9a2563fd",
+          "title": "Gate registry edits keep the authored file",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "pending"
+        },
+        {
+          "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
+          "short_id": "4334df62",
+          "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
+          "classification": "implementation",
+          "worker": "codex gpt-6.1-sol high",
+          "status": "pending"
+        },
+        {
+          "id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
+          "short_id": "c2b3cefa",
+          "title": "Dedicated, gate and template writes check their leases in their publishing session",
+          "classification": "implementation",
+          "worker": "claude opus (lock order and lease contract)",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "label": "1b",
+      "issues": [
+        {
+          "id": "4d834432-bb39-4ffc-9683-7dba55c3d06e",
+          "short_id": "4d834432",
+          "title": "Redo apply opens and syncs each parent once per record",
+          "classification": "implementation",
+          "worker": "claude opus (durability proof)",
+          "status": "pending",
+          "note": "shares capability_fs.rs with 4334df62"
+        },
+        {
+          "id": "1a737bb4-f063-4737-a796-d137dc34f28b",
+          "short_id": "1a737bb4",
+          "title": "One pure gate-preset catalog serves every preset reader",
+          "classification": "implementation",
+          "worker": "codex gpt-6.1-sol high",
+          "status": "pending",
+          "note": "shares gate.rs/template.rs with c2b3cefa"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "label": "held",
+      "issues": [
+        {
+          "id": "cfc87a55-063d-4080-8305-ffdfbcae21a8",
+          "short_id": "cfc87a55",
+          "title": "Storage reads configuration files and the registry file loaders are gone",
+          "classification": "implementation",
+          "worker": "tbd",
+          "status": "pending",
+          "note": "held: rewrites JitConfig::load/config validate, which the frozen f4d9502a 5046408a patch also rewrites"
+        },
+        {
+          "id": "bb596228-fad0-4415-a131-54db05df0ddd",
+          "short_id": "bb596228",
+          "title": "Benchmark: concurrent readers beside a continuous writer",
+          "classification": "research",
+          "worker": "tbd",
+          "status": "pending",
+          "note": "needs a quiet host (load < 2.0); run when no builds are active"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "label": "2",
+      "issues": [
+        {
+          "id": "d2acb105-cf3c-4278-ae86-9d3207ce7dd6",
+          "short_id": "d2acb105",
+          "title": "One state derivation for update and lifecycle transitions",
+          "classification": "implementation",
+          "worker": "tbd",
+          "status": "pending"
+        },
+        {
+          "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
+          "short_id": "7fefd776",
+          "title": "One atomic file publication with a durability argument serves the redo put and external exports",
+          "classification": "implementation",
+          "worker": "tbd",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "started_at": "2026-11-06T01:20:00+02:00"
+}
