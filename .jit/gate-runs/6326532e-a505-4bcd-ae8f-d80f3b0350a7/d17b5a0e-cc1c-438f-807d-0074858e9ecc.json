@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-6326532e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "949ae79b5908651bd5821dfa9d8dcc7aed8c465e",
+  "completed_at": "2026-11-05T03:26:56.973418446Z",
+  "duration_ms": 357961,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d17b5a0e-cc1c-438f-807d-0074858e9ecc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:20:59.012401132Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7b834e9, 798e62e, e8ddc03, 58be52e, e7a7565, 59653c4, b4fbee6, 1218169, 93ae393, e4184f3, f49a692, 9263ddf, bceaf4d, 5a90e30, 949ae79\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/6326532e/requirement/REQ-01..REQ-05, @/issue/0f8efc37/requirement/REQ-06, @/issue/c8e79465/requirement/REQ-01 (issue descriptions); @/charter/D-17, D-18, D-20, D-22, D-25 (charter); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (registry)\nGate evidence: cargo-ci passed (exit 0; run 5a90e30 covers all implementation commits; 949ae79 is metadata-only); prior code-review failed (exit 1) and its fallback finding is superseded by D-25\nTruncation recovery: re-read bounded per-path patches and current cache, route, storage, classifier, test, and documentation sections\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

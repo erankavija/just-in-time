@@ -133,12 +133,13 @@ command_group! {
     leaves: {
         "profile_show" => ProfileCommands::Show { profile } => show(profile) -> ProfileShowResult,
         "profile_diff" => ProfileCommands::Diff { profile, values_file, set } => diff(profile, values_file, set)
+            raises [RetryableConflict]
             findings ValidationFailed "The difference report found targets or final validation that prevent publication." -> ProfileComposedApplyResult,
         "profile_apply" => ProfileCommands::Apply { profile, values_file, set, dry_run } => apply(profile, values_file, set, dry_run)
-            raises [ProfileConflict, ProfileUncommittedTargets] -> ProfileComposedApplyResult,
+            raises [ProfileConflict, ProfileUncommittedTargets, RetryableConflict] -> ProfileComposedApplyResult,
         "profile_pack" => ProfileCommands::Pack { source, output, dry_run } => pack(source, output, dry_run)
-            raises [AlreadyExists] -> ProfilePackResult,
+            raises [AlreadyExists, RetryableConflict] -> ProfilePackResult,
         "profile_add" => ProfileCommands::Add { archive, destination, dry_run } => add(archive, destination, dry_run)
-            raises [ProfileConflict] -> ProfileAddResult,
+            raises [ProfileConflict, RetryableConflict] -> ProfileAddResult,
     }
 }

@@ -198,7 +198,7 @@ fn test_schema_flag_documents_json_shapes_and_exit_codes() {
 
 // ============================================================================
 // REQ-02 (jit:1a63ef75): `jit --schema`'s `exit_codes` array describes the
-// complete (`crate::output::ExitCode`, 0 through 6, 10, 11, and 141) taxonomy.
+// complete (`crate::output::ExitCode`, 0 through 6, 10 through 12, and 141) taxonomy.
 // Pins the full set so a code added to the enum without a matching schema update
 // fails this test instead of silently drifting.
 // ============================================================================
@@ -215,7 +215,7 @@ fn test_schema_exit_codes_match_full_taxonomy() {
         .map(|entry| entry["code"].as_i64().expect("code should be an integer"))
         .collect();
 
-    let expected = [0, 1, 2, 3, 4, 5, 6, 10, 11, 141];
+    let expected = [0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 141];
     for code in expected {
         assert!(
             codes.contains(&code),

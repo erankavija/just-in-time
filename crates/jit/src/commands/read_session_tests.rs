@@ -1,8 +1,7 @@
-//! The read driver over both backends: what it surfaces, when it falls back to
-//! the mutation session, and that its attempts never wait on a writer.
+//! The read driver over both backends: admission, bounded conflicts, and recovery isolation.
 
+use super::with_read_session;
 use super::{capture_discovering, READ_OPTIMISTIC_ATTEMPTS};
-use super::{with_read_session, MutationSessionExhausted, MUTATION_SESSION_RETRY_LIMIT};
 use crate::repository_state::{CaptureBudget, CaptureSpec};
 use crate::storage::repository_state_store::test_fixtures::{
     leftover_record, leftover_target, FileSessionBackend, MemorySessionBackend,
@@ -115,25 +114,62 @@ fn test_with_read_session_discards_the_error_of_an_attempt_a_commit_crossed() {
 }
 
 #[test]
-fn test_with_read_session_falls_back_to_one_mutation_session_drive_after_failed_attempts() {
+fn test_with_read_session_returns_conflict_after_bounded_attempts() {
     let backend = MemorySessionBackend::seeded();
     let mut calls = 0;
-
     let outcome: Result<()> =
         with_read_session(backend.store(), &backend.layout(), "unsettled", |_| {
             calls += 1;
             Ok(None)
         });
+    assert!(matches!(
+        outcome
+            .unwrap_err()
+            .downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    assert_eq!(calls, READ_OPTIMISTIC_ATTEMPTS as usize);
+}
 
-    assert!(outcome
-        .unwrap_err()
-        .downcast_ref::<MutationSessionExhausted>()
-        .is_some());
-    assert_eq!(
-        calls,
-        READ_OPTIMISTIC_ATTEMPTS as usize + MUTATION_SESSION_RETRY_LIMIT,
-        "each optimistic attempt runs once, then the mutation session's own bound"
-    );
+#[test]
+fn test_with_read_session_refuses_contended_memory_state_without_waiting() {
+    let backend = MemorySessionBackend::seeded();
+    let store = backend.0.clone();
+    let layout = backend.layout();
+    let held = backend.0.repository_state();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let thread = std::thread::spawn(move || {
+        let result: Result<()> = with_read_session(&store, &layout, "contended", |_| Ok(Some(())));
+        tx.send(result).unwrap();
+    });
+    let result = rx.recv_timeout(Duration::from_secs(2));
+    drop(held);
+    thread.join().unwrap();
+    let error = result.unwrap().unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+}
+
+#[test]
+fn test_resolve_issue_id_propagates_contended_memory_conflict() {
+    let store = crate::storage::InMemoryStorage::new();
+    let executor = super::test_helpers::memory_executor(store.clone());
+    let held = store.repository_state();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let thread = std::thread::spawn(move || {
+        tx.send(executor.issues().resolve_issue_id(&"0000".parse().unwrap()))
+            .unwrap();
+    });
+    let result = rx.recv_timeout(Duration::from_secs(2));
+    drop(held);
+    thread.join().unwrap();
+    let error = result.unwrap().unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+    ));
 }
 
 /// Every reader holds its read session open at the barrier, so all of them
@@ -174,24 +210,30 @@ fn test_with_read_session_reads_beside_a_held_mutation_session_on_both_backends(
     assert_reads_proceed_beside_a_held_mutation_session::<MemorySessionBackend>();
 }
 
-fn assert_a_read_completes_a_leftover_record<B: SessionRecordBackend>() {
+fn assert_a_read_leaves_a_leftover_record<B: SessionRecordBackend>() {
     let backend = B::seeded();
     backend.commit(&leftover_record());
-
-    let read = with_read_session(
+    let error = with_read_session(
         backend.store(),
         &backend.layout(),
         "leftover",
         read_leftover,
     )
-    .unwrap();
-
-    assert_eq!(read.as_deref(), Some(LEFTOVER_BYTES));
-    assert!(!backend.holds_record(), "the locked attempt applied it");
+    .unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    assert!(backend.holds_record(), "a read must not apply the record");
+    drop(backend.open().unwrap());
+    assert!(
+        !backend.holds_record(),
+        "an explicit mutation session applies it"
+    );
 }
 
 #[test]
-fn test_with_read_session_completes_a_leftover_record_on_both_backends() {
-    assert_a_read_completes_a_leftover_record::<FileSessionBackend>();
-    assert_a_read_completes_a_leftover_record::<MemorySessionBackend>();
+fn test_with_read_session_leaves_a_leftover_record_on_both_backends() {
+    assert_a_read_leaves_a_leftover_record::<FileSessionBackend>();
+    assert_a_read_leaves_a_leftover_record::<MemorySessionBackend>();
 }
