@@ -628,6 +628,11 @@ fn test_git_guards_act_on_the_repository_they_serve_rather_than_the_working_dire
         .command_with_env(define("wrong-refusal"), data_root(&up_to_date))
         .assert()
         .success();
+    up_to_date
+        .command_with_env(define("selected-divergence"), data_root(&diverged))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("origin/main"));
     // A working directory outside git must not bypass the guard of a diverged repository.
     outside_git
         .command_with_env(define("bypass"), data_root(&diverged))
