@@ -123,7 +123,14 @@
   ],
   "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "to": "steward just-in-time-9b",
+      "category": "blocker outside scope (f4d9502a chain)",
+      "decision": "option 1: accept the wait; re-escalate when the last dispatchable wave is in flight, with remaining reachable count, blocked IDs, and any proposal to decouple a blocked issue; do not reshape the graph unilaterally",
+      "status": "resolved"
+    }
+  ],
   "rework_counts": {},
   "surfaced_pitfalls": [],
   "started_at": "2026-11-06T01:20:00+02:00",
