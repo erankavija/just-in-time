@@ -733,7 +733,7 @@ pub enum IssueCommands {
 
         /// Content format of the description body, selecting the parser used to
         /// extract sections during validation (markdown, html, or xml). When
-        /// omitted the repo default ([validation].content_format) applies, falling
+        /// omitted the repo default (`[validation].content_format`) applies, falling
         /// back to the built-in default content format. html/xml require the
         /// matching cargo feature.
         #[arg(long, value_name = "FORMAT")]
@@ -827,9 +827,9 @@ pub enum IssueCommands {
     /// run history).
     ///
     /// Field projection (single id only):
-    ///   --field <name>   print one top-level field as plain text (arrays/objects
+    ///   --field `<name>`   print one top-level field as plain text (arrays/objects
     ///                    fall back to compact JSON for that field)
-    ///   --fields <name>  (repeatable) print those fields as one compact JSON object
+    ///   --fields `<name>`  (repeatable) print those fields as one compact JSON object
     ///
     /// Pass two or more ids with `--json` to get the list envelope
     /// `{"count": N, "issues": [...]}` with issue objects in argument order.
@@ -873,7 +873,7 @@ pub enum IssueCommands {
     /// reads `none` when nothing is blocking.
     ///
     /// Text form (default), one line per id:
-    ///   <short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>
+    ///   `<short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>`
     ///
     /// `--json` emits the compact object
     /// `{short_id, state, gates:[{key,status}], unmet_dependencies:[short_id,...], title}`;
@@ -881,7 +881,7 @@ pub enum IssueCommands {
     /// `{"count": N, "issues": [...]}` in argument order.
     ///
     /// Examples:
-    ///   jit issue status abc123                 # -> abc12345 [ready] gates: ... unmet: none title: ...
+    ///   `jit issue status abc123                 # -> abc12345 [ready] gates: ... unmet: none title: ...`
     ///   jit issue status abc123 def456 --json    # -> {"count":2,"issues":[...]}
     Status {
         /// Issue id(s). One object/line per id, in argument order.
@@ -1400,7 +1400,7 @@ pub enum GateCommands {
         id: String,
 
         /// Gate key(s) from registry (e.g., 'tests', 'code-review', 'clippy')
-        /// Can specify multiple: jit gate add <issue> gate1 gate2 gate3
+        /// Can specify multiple: `jit gate add <issue> gate1 gate2 gate3`
         #[arg(required = true)]
         gate_keys: Vec<String>,
     },
