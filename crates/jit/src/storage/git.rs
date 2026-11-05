@@ -503,7 +503,7 @@ impl GitObjectReader {
             output.take(header.size).read_to_end(&mut bytes)?;
             let mut separator = [0];
             output.read_exact(&mut separator)?;
-            if bytes.len() as u64 != header.size || separator != [b'\n'] {
+            if bytes.len() as u64 != header.size || separator[0] != b'\n' {
                 return Err(invalid_object_output("invalid object body framing"));
             }
             Ok(bytes)
