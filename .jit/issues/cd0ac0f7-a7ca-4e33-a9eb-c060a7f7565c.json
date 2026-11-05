@@ -8,6 +8,7 @@
   ],
   "description": "One event-triggered hierarchy reload and its browser test form one behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: A configuration change reloads hierarchy from the fresh configuration path; browser tests cover changed hierarchy after an event.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-05T00:38:25.079524236Z",
   "first_ready_at": "2026-11-04T23:38:19.632457107Z",
   "gates_required": [
     "npm-ci",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "a4809918-52e7-4121-bb6d-b3e81432ab32",
-      "status": "failed",
-      "updated_at": "2026-11-05T00:32:56.884211891Z",
+      "run_id": "b20229ee-a4cc-4b3f-826e-8ac292d168ce",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:37:53.673758523Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
@@ -37,7 +38,7 @@
     "satisfies:3a61ff16/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Reload browser hierarchy on configuration events",
-  "updated_at": "2026-11-05T00:35:23.557837380Z"
+  "updated_at": "2026-11-05T00:38:25.079524236Z"
 }
