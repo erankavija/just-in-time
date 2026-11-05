@@ -253,9 +253,10 @@
           "short_id": "f6eaba42",
           "title": "Claims take their branch and git requirement from the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "b946e7187c9a1d44821a970da238687b7c43fb3c"
         }
       ]
     },
@@ -744,7 +745,8 @@
     "c506Done4a77db9f2 unlocks d681; dispatched against reviewed DEC27 plan. Preserve user D25 nonblocking read cutover from frontend632; do not touch its json admitted listing or commands with_read_session fallback. d48 initialCargocebc1568 Clippy failed only byte-char-array expression;4990+25 passed; actual failure4e725c25e preserved, one-line correction87281c148 fullgates running. Both e3/f649 stable reviewPASS ready. Base next after frontend D25 metadata boundary.",
     "09974ad1 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "732f7afb Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "Base099Donecbe2c0651 mergedCargo28900273; init732 next. D25 charter authority121816926 and link3db4377c5 landed by frontend, preserve nonblocking cutover632 on integration. d48 corrected full gatesab9c87a8/42705ea4 pass on d8d04ef4; ten new tests include NUL rejection; base additive test conflict being verified. Server/base worktrees reclaimed. d681 implementation owns only reviewed seven-file context/fallback footprint, excluding632 read admission/with_read_session."
+    "Base099Donecbe2c0651 mergedCargo28900273; init732 next. D25 charter authority121816926 and link3db4377c5 landed by frontend, preserve nonblocking cutover632 on integration. d48 corrected full gatesab9c87a8/42705ea4 pass on d8d04ef4; ten new tests include NUL rejection; base additive test conflict being verified. Server/base worktrees reclaimed. d681 implementation owns only reviewed seven-file context/fallback footprint, excluding632 read admission/with_read_session.",
+    "f6eaba42 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1011,7 +1013,7 @@
     "f6eaba42": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "848ee4a5-ad6a-494e-ba59-100774d485e0",
+        "cargo-ci": "fef04575-6bfa-45ba-ab65-4fcdc5236fe5",
         "code-review": "2682790f-a190-4bbd-8918-49cdc774952a"
       },
       "reviewed_source": "4ed5e7cf9c69b2ef5fd4c3fb8b61469298ee6086",
@@ -1030,7 +1032,8 @@
       },
       "stale_narrative": "No obsolete branch-helper narrative in live source; original background is historical.",
       "deferred_items": "No linked documents; release actor has explicit separate implementation owner.",
-      "holistic": "Canonical Git/RequiresGit types and child-only fixture isolation; main integration pending."
+      "holistic": "Canonical Git/RequiresGit types and child-only fixture isolation; main integration pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS fef04575-6bfa-45ba-ab65-4fcdc5236fe5 on b946e7187c9a1d44821a970da238687b7c43fb3c."
     },
     "9de4c09c": {
       "verdict": "PASS",
