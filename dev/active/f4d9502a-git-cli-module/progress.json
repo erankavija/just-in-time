@@ -842,7 +842,9 @@
     "ea4b7363 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Dependency-ready 47d62472 branch drift and92afc5d8 init classification claimed after EA closure; isolated Sol-high workers next. Initial issue-claim --ttl syntax rejected without mutation; separate claim acquire owns TTL.",
     "83c8632f Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "3f8da8c4 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "3f8da8c4 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward-approved factual correction47d62472: old validation already runs in layout.data_root. Actual baseline CLI filter ran3PASS4FAIL; literal selected-data-dir scenario passes and remains regressioncoverage. Missingcheckout/base/unrelatedmessages and externalstoreprovide genuineRED. Only obsolete REQ04 failure premise/background corrected; authority/messages/status4 and footprint unchanged.",
+    "Steward approved c140 second file git.rs solely fulfilled HEAD convergence comment deletion; primitive executable/test bytes must remain exact, no extra fullgate solelyprose."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
