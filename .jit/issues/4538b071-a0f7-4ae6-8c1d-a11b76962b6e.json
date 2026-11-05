@@ -9,13 +9,33 @@
   ],
   "description": "One bounded HTTP and web client removal includes matching result type reuse.\n\n## Success Criteria\n\n- [hard] REQ-01: Remove /status, /config/strategic-types, /changes and /gates/:key and the currently unused `getStatus`, `getGateDefinition` and `getDocumentDiff` web methods; preserve /issues, /health and HTTP document diff. Keep `listIssues` while App still calls it; its removal belongs to the graph-summary cutover.\n- [hard] REQ-02: Reuse matching core response types and cover route presence and removal.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-05T01:55:04.503669476Z",
   "first_ready_at": "2026-11-05T00:09:15.356213422Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4ffd33f4-3a60-4a5c-8055-58cf940048a9",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:50:58.164532362Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b78d48a0-92ae-4e12-b845-5976b3d94991",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:54:29.140931115Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "4263c498-7a75-48d8-854a-62fb2029c101",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:51:34.876535223Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
   "labels": [
     "type:task",
@@ -26,7 +46,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove explicitly unused API routes and client methods",
-  "updated_at": "2026-11-05T01:17:50.170016349Z"
+  "updated_at": "2026-11-05T01:55:04.503669476Z"
 }
