@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -358,9 +358,10 @@
           "short_id": "9ecde705",
           "title": "Link checks test asset presence through one git process",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "merged_and_gated",
+          "source_merge": "270f4894b8aa78ba6dfc696ec0bf6cd8bbd30c02"
         },
         {
           "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
@@ -427,8 +428,10 @@
           "short_id": "5046408a",
           "title": "Configurable worktree root independent of the data root",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "planning",
+          "worker": "agent:f4d9502a-lead"
         },
         {
           "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
@@ -521,7 +524,20 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "a273667c",
+      "status": "awaiting_user_decision",
+      "subject": "Git>=2.42 andDocker runtimeTrixie proposal",
+      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred"
+    },
+    {
+      "issue": "c140921c",
+      "status": "shared_producer_research",
+      "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
+      "ruling": "Stewardrequires sharedproducerfix; no privateconsumerworkaround orintentionalregression. Mapcallers/tests/options/processbudgets andproposeboundedfootprintbeforeexpansion."
+    }
+  ],
   "rework_counts": {
     "7aafec83": 1,
     "81664a6a": 1,
@@ -859,7 +875,11 @@
     "Steward-approved fb factual reconciliation: current worktree.rs255/303 accepts repository/layout and executes Git at data_root; no test-mode bypass or namedemptytests remain, gate.rs has3currentcalls. Preserve existing selectedrepositoryowner, allow/refuse semantics andliteralcase; do not restoreobsoletebypass. Actualexternalstoreauthority supplies missingbehavior forRED. Sameconsumer scope.",
     "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate.",
     "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision."
+    "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision.",
+    "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect.",
+    "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done.",
+    "Stewardfbpolicyruling: mutationguard uses supplied data-history paths.git(); relocatedcodecheckout mustnotlendhistory to externalnonGitstore. Existingownerassertion preserved, rootwrite_checkoutinferencewithdrawn.504planner mustpreserveseparatedatahistory/codeevidenceauthorities. 504claimedplanningonly perDEC04/23 outside53manifest/REQcredit, Terrahighdesignthenindependentreview/stewardacceptance. c0ea checkpointclaimed forcriteriaaudit+cargo/holisticgatesin isolation, no source-slotreservation."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1307,13 +1327,13 @@
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS de6c3c8e-f6b2-4998-8fb6-f1a7529bfb88 on e0b02683af8da1b905a40e0f5922f65c6ea89a70."
     },
     "a273667c": {
-      "verdict": "FAIL",
-      "reviewed_source": "291d90d2f398fc2d1f215329fc9214dc0d4524f4",
+      "verdict": "PASS",
+      "reviewed_source": "2e51395b46f00cf0ac77815300fd2651eba77d6d",
       "gates": {
-        "cargo-ci": "3ac22ec9-0610-4beb-90e3-b1ebd1e823cd",
-        "code-review": "b9d20147-35e0-492d-acec-8ee0dcb04db2"
+        "cargo-ci": "dfc80720-8f01-452a-a02f-594efd8d9d05",
+        "code-review": "9c0cec8f-58a6-4f86-b853-3f81672959c8"
       },
-      "criteria": "F1 valid committed LF path rejected by shared line-framed protocol. Isolated six-file canonical -Z proposal and Git>=2.42/runtime Trixie proposal are under validation; explicit user decision required before landing minimum/runtime changes. No main authority change."
+      "criteria": "PriorF1validLFpathclosed bycanonicalNULframing. Originalrevisionresolvedbeforecanonicalpeel, typederrors/binarybytes/onechildretained. Allsixproposalfiles exactafterreviewed9eccomposition43706d377;28assetcompositiontestsPASS. Dockerbuild/healthPASS and actualGit2.47.3 12incrementalprotocolassertionsPASS. Explicituserdecision stillrequired forGit>=2.42 andruntimeTrixie; no landing/Done untilanswer. MandatorymergedCargo pendingapproval."
     },
     "3f8da8c4": {
       "verdict": "PASS",
@@ -1326,13 +1346,14 @@
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 083bd832-a288-4fe6-a201-a243b31d72d6 on 9df9fe2fc2161580f28aaf9f1f499e24aca49ffd."
     },
     "9ecde705": {
-      "verdict": "FAIL",
-      "reviewed_source": "df106f2a10aec9b593d94b675a2d13466ff6d81c",
+      "verdict": "PASS",
+      "reviewed_source": "1ab12740c573c8d6e6cb8a043cd2cf65a60c7760",
       "gates": {
-        "cargo-ci": "5a7180dc-3924-4d23-b495-21a7ab7b86c2",
-        "code-review": "ce356156-738c-4af8-baf1-033a56ab4d6b"
+        "cargo-ci": "fa6ff02f-7e84-4731-9313-5011c673bd61",
+        "code-review": "c85fcdaa-9f4f-4d4e-8e9f-f306f1906f3c"
       },
-      "criteria": "Lead uncovered REQ02 defect after stable PASS gates: Git2.39.5 and2.56 return Commit for gitlink whose target exists in superproject; Some(anytype) incorrectly counts it present. Rework1 explicitly accepts onlyBlob/Tree and extends existing owning gitlink fixture; no producer/footprint expansion. History composition e3ee25799 preserves exact methods and HTTP pool,40focusedPASS."
+      "criteria": "All4criteria met afterleadrework1: one selectedwrite_checkout batch; workingtree/pinned/HTTP behavior retained; onlyBlob/Tree count ascommittedassets; owninggitlink matrix coversmissing andavailabletarget, actualREDthenGREEN; oneprocess test. LeadF1availabletarget closed in03269c2d6, producer bytes unchanged, previous reviews preserved. No linked docs/deferrals/stale narrative. Historycomposition exactparentproof+40PASS. MandatorymergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS fa6ff02f-7e84-4731-9313-5011c673bd61 on 270f4894b8aa78ba6dfc696ec0bf6cd8bbd30c02."
     },
     "92afc5d8": {
       "verdict": "PASS",
@@ -1356,11 +1377,9 @@
     }
   },
   "source_queue": [
-    "92afc5d8 branch gates running",
-    "47d62472 test-only rework checks running",
-    "9ecde705 consumer classification rework",
-    "c140921c implementation",
-    "a273667c isolated Git-floor proposal review; userdecision pending"
+    "fb5e8e8d implementation",
+    "c140921c held forsharedproducerproposal",
+    "a273667c reviewed; explicituserdecision pending"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
