@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-0eca332a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "19c00c53e79e60dc6ae209283a9e92bda8fc8657",
+  "completed_at": "2026-11-05T00:13:51.314873946Z",
+  "duration_ms": 243174,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable changes remove unproduced error-code vocabulary while preserving typed classification, registered findings, worktree passthrough, generated references, and tested exit-code projections.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0eca332a-76ac-4ae8-951b-043f1d5c3dd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "766aceb2-550f-42dd-8704-232525a5036c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:09:48.140710014Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6b563b36, c165cc76, b4676f11, c76adc6b, 4892d650, 88c41918, f49f127f, 43d8ad97, 19c00c53\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; dev/active/df129d9e-rust-code-quality/plan.md\nResolved items: @/issue/df129d9e/requirement/REQ-09 and REQ-13; @/issue/0eca332a/decision/D-01 and D-02; @/charter/D-18; @/invariant/{semantic-types,canonical-cutover,architecture-dependency-direction,semantic-test-assertions,orthogonal-tests,essential-code-prose,no-ignored-tests,bounded-rust-build-footprint}; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, run 43d8ad97; covers eight attributable commits and excludes 19c00c53); code-review passed (exit 0, prior run a0e102d7; no ancestry relation supplied)\nTruncation recovery: narrowed reads of the typed-error contract, gate evaluation path, outcome admission/schema projection, worktree passthrough, and generated-reference drift assertions after truncated broad searches\n\n1. No findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable changes remove unproduced error-code vocabulary while preserving typed classification, registered findings, worktree passthrough, generated references, and tested exit-code projections.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

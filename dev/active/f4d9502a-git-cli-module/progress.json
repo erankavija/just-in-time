@@ -139,9 +139,10 @@
           "short_id": "4ba18af4",
           "title": "One head lookup in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "74d539f68af210ac2a12c02031caf50182649702"
         },
         {
           "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
@@ -181,7 +182,7 @@
           "short_id": "732f7afb",
           "title": "Init records the worktree branch through the module",
           "classification": "implementation",
-          "status": "backlog",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -189,7 +190,7 @@
           "short_id": "9de4c09c",
           "title": "Worktree info reads its branch through the module",
           "classification": "implementation",
-          "status": "backlog",
+          "status": "ready",
           "external_blockers": []
         },
         {
@@ -239,7 +240,7 @@
           "short_id": "f6eaba42",
           "title": "Claims take their branch and git requirement from the module",
           "classification": "implementation",
-          "status": "backlog",
+          "status": "ready",
           "external_blockers": []
         }
       ]
@@ -700,7 +701,8 @@
     "24d3b460 completed after merged Cargo2071d95d onad4a28ae7; source slot releases directly tofrontendwatcher. HEAD and437 refreshes resolving additive conflicts in isolated trees. ec9 narrow borrow rework verified, full gates to rerun.",
     "24 worktree reclaimed; branch retained. HEAD/listing refreshed stable approvals preserveddd9335368/56fbb0c72; ec9 corrected approvaldc9741d27. All implemented branch gates pass, awaiting coordinated source integration.",
     "Listing old wrapper reused owned fixed TMPDIR; finished successfully. Empty-directory removal refused because a zero-byte Codex synthetic-mount marker remains, left untouched. Future wrapper replaced with unique mktemp and cleanup trap.",
-    "Await explicit6d93 merged web/smoke release before HEAD canonical merge; ready branchdd9335368 contains only HEAD source plus actual evidence. Verify blocked061/policy ancestry and delta again immediately before landing."
+    "Await explicit6d93 merged web/smoke release before HEAD canonical merge; ready branchdd9335368 contains only HEAD source plus actual evidence. Verify blocked061/policy ancestry and delta again immediately before landing.",
+    "HEAD Done after main74d539f68 and mergedCargodd02d9b5; release directly tofrontendoffload. 9de/732/f6 now ready. History/origin isolated additive conflicts delegated to Sol; base auto-merged main5469c7bf with its own62-line operation and91-line tests unchanged, retains prior stable review pending merged checks."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -723,7 +725,7 @@
     "4ba18af4": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "95beac63-76a0-407c-810e-f5e2ef961a9d",
+        "cargo-ci": "dd02d9b5-fdb2-4cd5-868d-70c3381a63da",
         "code-review": "eeb77a1a-4f39-4850-a376-a972f0825405"
       },
       "reviewed_source": "90c7113262d06347ce4486a88699af9327cabee0",
@@ -745,7 +747,7 @@
       "stale_narrative": "No one-process HEAD budget remains in live code/tests/plan; experiment explicitly preserves rejected historical approach.",
       "deferred_items": "Linked head-lookup-experiment.md has no in-scope deferred markers. Git minimum/Docker change and WorktreePaths redesign explicitly excluded from approved decision.",
       "holistic": "Shared environment fixture from24 reused exactly. Canonical Git runner/error behavior retained. Direct-main integration and merged Cargo remain pending.",
-      "integration": "Refreshed against landed user-name primitive; both implementations and owning tests preserved; configured Cargo and independent review stable PASS. Main merge and merged Cargo remain pending."
+      "integration": "Main74d539f68 preserves approved protocol and user-name integration; merged Cargo stable PASSdd02d9b5. Lease released and downstream consumers ready."
     },
     "7297f922": {
       "verdict": "PASS",
@@ -939,8 +941,6 @@
     }
   },
   "source_queue": [
-    "6d93ab14 current",
-    "4ba18af4",
     "frontend offload",
     "df0eca",
     "dc048377",

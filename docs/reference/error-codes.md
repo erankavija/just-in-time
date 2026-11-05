@@ -17,7 +17,6 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `INVALID_LABEL_PATTERN` | A label query filter is not in the accepted namespace/value form. | `2` |
 | `VALIDATION_FAILED` | Repository or domain validation failed. | `4` |
 | `ALREADY_EXISTS` | The requested resource already exists. | `6` |
-| `INVALID_STATE` | A lifecycle state or transition is invalid. | `2` |
 | `BLOCKED` | Unfinished dependencies block the operation. | `4` |
 | `GATE_FAILED` | A quality-gate checker did not pass. | `4` |
 | `IO_ERROR` | An input/output or external-system operation failed. | `10` |
@@ -33,18 +32,11 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `LINKED_CHECKOUT_WRITE_REFUSED` | The linked checkout's write stance refuses state-mutating commands. | `2` |
 | `PROFILE_CONFLICT` | Profile planning found packages being applied that define one target or declaration differently. | `4` |
 | `PROFILE_UNCOMMITTED_TARGETS` | A profile application would overwrite paths that differ from HEAD; committing or discarding those changes lets it proceed. | `4` |
-| `DEPENDENCY_ERROR` | A dependency command failed. | `3` |
-| `GATE_ERROR` | A gate command failed. | `6` |
-| `GATE_CHECK_ERROR` | A gate-status check failed. | `3` |
 | `PRESET_ERROR` | A gate-preset command failed. | `3` |
 | `ITEM_NOT_FOUND` | An issue item-address lookup did not resolve an item. | `1` |
-| `INVARIANT_COMMAND_FAILED` | An invariant command failed without a more specific classification. | `1` |
 | `PROFILE_ERROR` | A profile command failed without a more specific classification. | `1` |
 | `SEARCH_FAILED` | The search backend failed while executing a query. | `1` |
 | `RIPGREP_NOT_FOUND` | The external ripgrep search tool was not found. | `1` |
-| `WORKTREE_INFO_ERROR` | Worktree identity inspection failed. | `1` |
-| `WORKTREE_LIST_ERROR` | Worktree enumeration failed. | `1` |
-| `WORKTREE_STORE_DIVERGENCE_ERROR` | Cross-checkout store comparison failed. | `1` |
 | `GENERIC_ERROR` | A command failed without a more specific public classification. | `1` |
 | `recovery_failed` | Applying a leftover redo record, or a recovery routine, failed. | `1` |
 | `SERVER_EXITED` | The foreground server process exited with a failure status. | `1` |

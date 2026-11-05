@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T00:44:43.898856483Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -8,6 +9,7 @@
   ],
   "description": "Make claim commands and the claim coordinator read the branch through the git module's head lookup, and turn every way git can be missing into the typed git-requirement error.\n\n## Background\n\n- `get_current_branch` (`crates/jit/src/commands/claim.rs:46-64`) runs `git rev-parse --abbrev-ref HEAD`. On a nonzero exit it calls `is_inside_git_work_tree` (`crates/jit/src/commands/claim.rs:25-33`), a second process, to choose between `GitRequirementGap::NoCommits` and `NoRepository` (`crates/jit/src/errors.rs:428`). A failure to start git goes through `.context(..)` and stays untyped.\n- Measured: `jit claim list --json` with no git on `PATH` fails with `REPOSITORY_NOT_FOUND` and exit 3. Outside a repository with git present it fails with `REQUIRES_GIT` and exit 10, the documented contract (`docs/concepts/guarantees.md`, `docs/reference/error-codes.md`).\n- Callers in `crates/jit/src/commands/claim.rs` at lines 100, 236, 346, 430, 485, 532, 573, 641, covering acquire, heartbeat, release by issue, renew, status, list, force-evict and recovery.\n- The coordinator has its own lookup, `get_current_branch` (`crates/jit/src/storage/claim_coordinator.rs:974-993`), used where it writes a lease's branch (`crates/jit/src/storage/claim_coordinator.rs:480`, `:613`, `:775`).\n- Tests: `test_get_current_branch_errors_when_git_fails` (`crates/jit/src/commands/claim.rs:1599`); CLI tests outside a repository (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1189` onwards) and without commits (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1364`, `:1392`).\n- Kept as one change for a build reason: both `get_current_branch` functions and `is_inside_git_work_tree` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: One claims function derives the branch from the paths. No git checkout, or an executable that cannot start, gives `RequiresGitError` with `NoRepository`; an unborn branch gives `NoCommits`; otherwise it returns the head's branch label. `is_inside_git_work_tree` and both `get_current_branch` functions no longer exist.\n- [hard] REQ-02: The coordinator records a lease's branch from the head lookup of its paths' git checkout and starts no git process of its own.\n- [hard] REQ-03: A unit test with a checkout whose executable does not exist asserts `RequiresGitError` with `NoRepository`; today's code returns an untyped error, so it fails. The CLI tests outside a repository and without commits pass unchanged.\n- [hard] REQ-04: Branch lookup in `commands/claim.rs` and `storage/claim_coordinator.rs` starts no git process outside the module.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T00:39:42.448608679Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -28,7 +30,7 @@
     "satisfies:f4d9502a/REQ-12"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Claims take their branch and git requirement from the module",
-  "updated_at": "2026-11-04T23:02:06.041894831Z"
+  "updated_at": "2026-11-05T00:44:43.898856483Z"
 }
