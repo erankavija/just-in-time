@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8306e6e6-1cbe-46da-8a9f-450bfcd82236",
+      "status": "failed",
+      "updated_at": "2026-11-04T23:49:39.964948653Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0f302914-9ded-47e9-bea8-67af1e0e8452",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Offload executor work in server handlers",
-  "updated_at": "2026-11-04T23:28:21.064982608Z"
+  "updated_at": "2026-11-04T23:49:39.964948653Z"
 }
