@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCH="$SCRIPT_DIR/dispatch-worker-worktree.sh"
 RECLAIM="$SCRIPT_DIR/reclaim-worker-worktree.sh"
 
-for tool in git jit jq rsync stat diff tar; do
+for tool in git jit rsync stat diff tar; do
     command -v "$tool" > /dev/null 2>&1 || { echo "ERROR: '$tool' not on PATH"; exit 2; }
 done
 
@@ -83,6 +83,9 @@ new_pool() { # dir
 is_mutable_state() { [[ "/$1" == */.* || "/$1" == */build/* || "$1" == *.d ]]; }
 
 # --- Dispatch guard -------------------------------------------------------
+mkdir -p "$FIX/no-json-bin"
+printf '#!/usr/bin/env bash\nexit 127\n' > "$FIX/no-json-bin/jq"
+chmod +x "$FIX/no-json-bin/jq"
 check_dispatch_guard() { # staged/unstaged, selected data root
     local mode="$1" selection="$2" repo="$FIX/guard-$1-$2" out status
     local snapshots="$FIX/guard-$1-$2-snapshots"
@@ -98,7 +101,7 @@ check_dispatch_guard() { # staged/unstaged, selected data root
     [[ "$mode" == staged ]] && git -C "$repo" add 'tracker space[1]/tracked'
     local data_root="$repo/tracker space[1]"
     [[ "$selection" == relative ]] && data_root='tracker space[1]'
-    out="$(cd "$repo" && JIT_DATA_DIR="$data_root" LEAD_CACHE_POOL="$FIX/absent-pool" \
+    out="$(cd "$repo" && JIT_DATA_DIR="$data_root" PATH="$FIX/no-json-bin:$PATH" LEAD_CACHE_POOL="$FIX/absent-pool" \
         LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" tracker 2>&1)"
     status=$?
     assert "$mode/$selection tracker changes dispatch" test "$status" -eq 0
@@ -108,7 +111,7 @@ check_dispatch_guard() { # staged/unstaged, selected data root
         has_content "$repo/.agents/worktrees/agent-tracker/tracker space[1]/tracked" baseline
     put "$repo/source file" changed
     [[ "$mode" == staged ]] && git -C "$repo" add 'source file'
-    out="$(cd "$repo" && JIT_DATA_DIR="$data_root" LEAD_CACHE_POOL="$FIX/absent-pool" \
+    out="$(cd "$repo" && JIT_DATA_DIR="$data_root" PATH="$FIX/no-json-bin:$PATH" LEAD_CACHE_POOL="$FIX/absent-pool" \
         LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" source 2>&1)"
     status=$?
     assert "$mode/$selection source changes refuse" test "$status" -eq 1
@@ -135,6 +138,15 @@ printf '#!/usr/bin/env bash\nexit 1\n' > "$shim/jit"; chmod +x "$shim/jit"
 out="$(cd "$repo" && PATH="$shim:$PATH" "$DISPATCH" unresolved 2>&1)"
 assert "unresolved data root fails closed" test "$?" -eq 1
 assert "unresolved data root explains refusal" grep -Fq 'cannot resolve the data root' <<<"$out"
+
+# Resolve failure responses without depending on a processor being installed.
+for response in '' relative/path null '{}'; do
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$DISPATCH_ROOT_RESPONSE"\n' > "$shim/jit"
+    out="$(cd "$repo" && DISPATCH_ROOT_RESPONSE="$response" PATH="$shim:$PATH" "$DISPATCH" invalid 2>&1)"
+    assert "invalid root [$response] fails closed" test "$?" -eq 1
+    assert "invalid root [$response] explains refusal" grep -Fq 'cannot resolve the data root' <<<"$out"
+    assert "invalid root [$response] creates no worktree" test ! -e "$repo/.agents/worktrees/agent-invalid"
+done
 
 # --- Hardlink seed --------------------------------------------------------
 repo="$FIX/seed"; pool="$FIX/seed-pool"; snapshots="$FIX/seed-snapshots"

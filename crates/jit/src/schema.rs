@@ -650,11 +650,9 @@ fn declared_exit_codes<'a>(
             leaf.raises
                 .iter()
                 .map(|code| (*code, code.description(), false))
-                .chain(
-                    leaf.findings
-                        .iter()
-                        .map(|(code, condition)| (*code, *condition, true)),
-                )
+                .chain(leaf.findings.iter().flat_map(|(codes, condition)| {
+                    codes.iter().map(move |code| (*code, *condition, true))
+                }))
                 .map(move |(code, condition, exception)| CommandExitCode {
                     command: command.clone(),
                     code: code.exit_code().code(),
@@ -666,7 +664,11 @@ fn declared_exit_codes<'a>(
                         rows,
                         row,
                         |a, b| a.code == b.code && a.exception == b.exception,
-                        |a, b| a.condition = format!("{} {}", a.condition, b.condition),
+                        |a, b| {
+                            if a.condition != b.condition {
+                                a.condition = format!("{} {}", a.condition, b.condition);
+                            }
+                        },
                     )
                 })
         })
@@ -1349,7 +1351,7 @@ mod tests {
     fn leaf(
         path: &'static str,
         raises: &'static [ErrorCode],
-        findings: &'static [(ErrorCode, &'static str)],
+        findings: &'static [(&'static [ErrorCode], &'static str)],
     ) -> crate::dispatch::LeafCodes {
         crate::dispatch::LeafCodes {
             path,
@@ -1392,7 +1394,7 @@ mod tests {
         let rows = declared_exit_codes(&[leaf(
             "check",
             &[ErrorCode::ValidationFailed],
-            &[(ErrorCode::ValidationFailed, CONDITION)],
+            &[(&[ErrorCode::ValidationFailed], CONDITION)],
         )]);
 
         let flagged: Vec<_> = rows
@@ -1406,6 +1408,27 @@ mod tests {
                 (CONDITION, true)
             ]
         );
+    }
+
+    #[test]
+    fn test_declared_exit_codes_expand_findings_sets_without_repeating_conditions() {
+        const CONDITION: &str = "the first failure determines the classified status";
+        let rows = declared_exit_codes(&[leaf("batch", &[], &[(&ErrorCode::ALL, CONDITION)])]);
+        let expected: std::collections::BTreeSet<_> = ErrorCode::ALL
+            .iter()
+            .map(|code| code.exit_code().code())
+            .collect();
+
+        assert_eq!(rows.len(), expected.len());
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.code)
+                .collect::<std::collections::BTreeSet<_>>(),
+            expected
+        );
+        assert!(rows
+            .iter()
+            .all(|row| row.exception && row.condition == CONDITION));
     }
 
     #[test]
