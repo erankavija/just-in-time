@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T04:15:36.248927580Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,7 +8,7 @@
     "417be079-1de3-43e3-816a-03f4a70e2f63",
     "d68150e2-d10c-4213-9056-9ce6b80f7d11"
   ],
-  "description": "Make the guard on gate-registry changes compare through the git module in the selected worktree, instead of probing and comparing in the process working directory.\n\n## Background\n\n- `enforce_main_only_operations` (`crates/jit/src/commands/worktree.rs:448-477`) skips in test mode, runs `git rev-parse --git-dir` in the process directory to decide whether git applies, and then calls `check_branch_divergence` (`crates/jit/src/commands/worktree.rs:388-420`), which also runs in the process directory and reads a failing merge base or a missing `origin/main` as \"not diverged\".\n- The executor methods `add_gate_definition`, `define_gate`, `update_gate` and `remove_gate_definition` call it (`crates/jit/src/commands/gate.rs:1108`, `:1157`, `:1253`, `:1268`).\n- Its unit tests `test_check_branch_divergence_on_main` (`crates/jit/src/commands/worktree.rs:1073-1081`) and `test_enforce_main_only_operations_when_diverged` (`crates/jit/src/commands/worktree.rs:1084-1087`) assert nothing.\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- The two free functions become one executor method in the same change; keeping them beside it would leave two guard implementations (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: The guard is an executor method comparing through the module's base comparison of the executor's paths with base `origin/main`. It refuses only on a `Compared` outcome whose merge base differs from the base's commit, with today's message; without a git checkout, on `BaseUnresolved` and on `NoMergeBase` it allows the operation as today, and test mode still skips it.\n- [hard] REQ-02: `check_branch_divergence`, `enforce_main_only_operations` and their two empty tests no longer exist, and neither `commands/worktree.rs` nor `commands/gate.rs` starts a git process for the guard.\n- [hard] REQ-03: A CLI test runs `jit gate define` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a repository whose branch diverged, and asserts the guard's refusal; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Whether the guard runs at all, and against which remote branch, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the guard on gate-registry changes compare through the git module in the selected worktree, instead of probing and comparing in the process working directory.\n\n## Background\n\n- `enforce_main_only_operations` in `commands/worktree.rs` takes an optional repository layout and probes/comparisons run at its selected data root. Ordinary `JIT_DATA_DIR` selection already works; an external data root is not the selected checkout. The current code has no test-mode bypass.\n- Gate-registry operations in `commands/gate.rs` call the free guard through their real repository layout; migrate every current caller to the canonical method.\n- The formerly empty guard unit tests are already absent. The selected-repository CLI property has an existing owner in `worktree_cli_tests.rs`; extend that scenario rather than duplicating it.\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- The two free functions become one executor method in the same change; keeping them beside it would leave two guard implementations (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: The guard is an executor method comparing through the module's base comparison of the executor's paths with base `origin/main`. It refuses only on a `Compared` outcome whose merge base differs from the base's commit, with today's message; without a git checkout, on `BaseUnresolved` and on `NoMergeBase` it allows the operation as today.\n- [hard] REQ-02: `check_branch_divergence`, `enforce_main_only_operations` no longer exist, and neither `commands/worktree.rs` nor `commands/gate.rs` starts a git process for the guard.\n- [hard] REQ-03: A CLI test runs `jit gate define` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a repository whose branch diverged, and asserts the guard's refusal. Preserve this ordinary selected-repository behavior at its existing test owner; the current implementation already selects the data root.\n\n## Notes\n\n- Whether the guard runs at all, and against which remote branch, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
@@ -30,7 +31,7 @@
     "satisfies:f4d9502a/REQ-04"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Main-history guard runs against the selected worktree",
-  "updated_at": "2026-11-05T03:02:23.946863524Z"
+  "updated_at": "2026-11-05T04:15:36.248927580Z"
 }
