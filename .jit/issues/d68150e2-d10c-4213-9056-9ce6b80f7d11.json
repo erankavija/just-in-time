@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9c02d30d-6ed2-4bf8-ab25-4374374dfc24",
+      "status": "failed",
+      "updated_at": "2026-11-05T02:31:37.153768179Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Layout consumers share invocation-owned checkout facts",
-  "updated_at": "2026-11-05T02:11:51.604834409Z"
+  "updated_at": "2026-11-05T02:31:37.153768179Z"
 }
