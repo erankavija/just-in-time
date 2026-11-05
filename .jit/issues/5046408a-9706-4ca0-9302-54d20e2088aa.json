@@ -13,6 +13,14 @@
       "assets": [
         {
           "asset_type": "local",
+          "content_hash": "6a84be3b84ff2e9c85f90cb856d7f7333155fe56400f7654a55b12c69dfb11a9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "diagnostics-design-review-r2.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-design-review-r2.md"
+        },
+        {
+          "asset_type": "local",
           "content_hash": "b359bdf6a7ffb0b3d50bc35b86b351eaeadc6f2070b45c429e4a77a928f242af",
           "is_shared": false,
           "mime_type": "text/markdown",
@@ -21,17 +29,33 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "497e6578a1b39ee027f01bc2bcb5430c8424c7b01af2a8fba0ca1c5925107f68",
+          "content_hash": "953f1c3bc181f3cbee23268d63d03e0c616439bb5a6ad5275862201625fd7b9f",
           "is_shared": false,
           "mime_type": null,
           "original_path": "../f4d9502a-git-cli-module/progress.json",
           "resolved_path": "dev/active/f4d9502a-git-cli-module/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "4e83dfa505d3de1b3c012cd55eb7b6b9fccf9b31ca785e67cb927aba8c32cafe",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "diagnostics-proposal.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-proposal.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3be13174d26d8c4eed477a341760134f565863c46aad925a11be3c198edb538c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "diagnostics-design-review-r1.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-design-review-r1.md"
         }
       ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
-      "label": "Accepted split-root recovery design",
+      "label": "Accepted split-root recovery and diagnostics design",
       "path": "dev/active/5046408a/design.md"
     },
     {
@@ -95,5 +119,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-05T06:34:48.292593495Z"
+  "updated_at": "2026-11-05T06:35:44.167891470Z"
 }
