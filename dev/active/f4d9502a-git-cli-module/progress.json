@@ -102,9 +102,10 @@
           "short_id": "24d3b460",
           "title": "User name query in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "ad4a28ae7d4663690de452d0e9d5a2133721f9a2"
         },
         {
           "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
@@ -681,7 +682,8 @@
     "HEAD gate approvalccc20a3ae closes historicalF1; branch remains isolated. Origin Cargo passed, review running.",
     "Brief corrections: for_test exists only pending HEAD branch, so new tests use existing checkout helper; storage new stays storage-visible. RUSTC_WRAPPER must be empty, not punctuation period. Cargo integration target is contracts, not fast_docs_templates. Workers retain queued failed invocations and collect corrected checks.",
     "Steward narrowed source pause: unaffected queue resumes abf then24 thenwatcher thenab168 then6d93 thenHEAD thenfrontendoffload then437 thenfrontendbinding. Blocked061/38df source must never be included or retried indirectly. Verify actual delta/ancestry; own auto-review rejection stops action.",
-    "Seven isolated Git changes have stable full-gate approval. ec9 rework is two Clippy needless borrows only; all behavior assertions retained. c506 waits actual frontend9c API landing despite candidate already reviewed."
+    "Seven isolated Git changes have stable full-gate approval. ec9 rework is two Clippy needless borrows only; all behavior assertions retained. c506 waits actual frontend9c API landing despite candidate already reviewed.",
+    "24d3b460 completed after merged Cargo2071d95d onad4a28ae7; source slot releases directly tofrontendwatcher. HEAD and437 refreshes resolving additive conflicts in isolated trees. ec9 narrow borrow rework verified, full gates to rerun."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -789,7 +791,7 @@
     "24d3b460": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "b1b6484c-e4f7-4a19-9867-08ecfd29871a",
+        "cargo-ci": "2071d95d-f455-4be8-8065-27a464e754a1",
         "code-review": "d6cd0057-7076-47da-b055-f871eeb6379f"
       },
       "reviewed_source": "c159bf2e85b79a02b0b969839c5389863c3747f2",
@@ -800,7 +802,8 @@
       "prior_findings": "No failed gate review.",
       "stale_narrative": "No stale forward-looking references in crates/docs/dev; plan describes producer and explicit subsequent consumers.",
       "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
-      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending."
+      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending.",
+      "integration": "Main sourcead4a28ae7 preserves reviewed delta; merged Cargo passed stable2071d95d. Blocked061 and installer policy source excluded. Lease released."
     },
     "437907da": {
       "verdict": "PASS",
