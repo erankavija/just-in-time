@@ -22,7 +22,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Load issue details safely across selection changes",
-  "updated_at": "2026-11-04T23:46:41.091894074Z"
+  "updated_at": "2026-11-05T00:33:13.166483886Z"
 }
