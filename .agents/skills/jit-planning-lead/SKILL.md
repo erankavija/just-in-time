@@ -35,7 +35,10 @@ worker-sized. Never implement the planned work.
    area's terminals beneath it. Drop criteria that neither change observable
    behaviour nor remove a real duplicate.
 4. Run `jit apply plan <C>` once. Record planning node `P`, breakdown node `B`,
-   their configured gates, and P's plan path. Commit JIT state.
+   their configured gates, and P's plan path; those gates are declared outside
+   the template
+   ([Graph Template Registry](https://github.com/erankavija/just-in-time/blob/main/docs/reference/storage-format.md#graph-template-registry)).
+   Commit JIT state.
 
 Read [interview-protocol.md](references/interview-protocol.md) when eliciting intent.
 

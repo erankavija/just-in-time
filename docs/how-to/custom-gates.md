@@ -768,8 +768,9 @@ resolving each name against the project's presets and then its gate registry.
 The template itself is optional, project-declared configuration: `jit init` does
 not scaffold `templates.toml`. A project that wants the
 [planning bracket](../concepts/planning-bracket.md) declares its own `plan`
-template in `.jit/templates.toml`, along with the gate keys that template names
-(this repository does so).
+template in `.jit/templates.toml`, along with the gates that template names and
+the rules those gates evaluate ([Graph Template Registry](../reference/storage-format.md#graph-template-registry));
+this repository does so.
 
 **List available presets:**
 ```bash
