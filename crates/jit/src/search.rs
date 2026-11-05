@@ -109,6 +109,48 @@ pub struct SearchOptions {
 /// - Invalid regex pattern
 /// - Search execution fails
 pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Vec<SearchResult>> {
+    search_selected(data_dir, query, options, None)
+}
+
+/// Search only explicit repository-relative files; an empty list searches nothing.
+pub fn search_files(
+    data_dir: &Path,
+    query: &str,
+    options: SearchOptions,
+    files: &[String],
+) -> Result<Vec<SearchResult>> {
+    if files.is_empty() {
+        return Ok(Vec::new());
+    }
+    let root = data_dir.canonicalize()?;
+    let mut paths = Vec::new();
+    for file in files {
+        crate::storage::validate_repo_relative_path(file)?;
+        let candidate = root.join(file);
+        let resolved = match candidate.canonicalize() {
+            Ok(path) => path,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        };
+        if !resolved.starts_with(&root) {
+            anyhow::bail!("search path escapes repository: {file}");
+        }
+        if resolved.is_file() {
+            paths.push(resolved);
+        }
+    }
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+    search_selected(data_dir, query, options, Some(&paths))
+}
+
+fn search_selected(
+    data_dir: &Path,
+    query: &str,
+    options: SearchOptions,
+    paths: Option<&[std::path::PathBuf]>,
+) -> Result<Vec<SearchResult>> {
     // Check if ripgrep is available
     if which::which("rg").is_err() {
         return Err(SearchError::RipgrepNotInstalled.into());
@@ -130,26 +172,30 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         cmd.arg(format!("--context={}", options.context_lines));
     }
 
-    // Use file_patterns if provided, otherwise fall back to file_pattern
-    if !options.file_patterns.is_empty() {
-        for pattern in &options.file_patterns {
+    if paths.is_none() {
+        if !options.file_patterns.is_empty() {
+            for pattern in &options.file_patterns {
+                cmd.arg("--glob").arg(pattern);
+            }
+        } else if let Some(pattern) = &options.file_pattern {
             cmd.arg("--glob").arg(pattern);
+        } else {
+            // Anchored, so a same-named path nested elsewhere stays searchable.
+            VirtualPath::history_paths().iter().for_each(|path| {
+                cmd.arg("--glob").arg(format!("!/{path}"));
+            });
         }
-    } else if let Some(pattern) = &options.file_pattern {
-        cmd.arg("--glob").arg(pattern);
-    } else {
-        // Anchored, so a same-named path nested elsewhere stays searchable.
-        VirtualPath::history_paths().iter().for_each(|path| {
-            cmd.arg("--glob").arg(format!("!/{path}"));
-        });
     }
 
     // ripgrep matches globs relative to its working directory, so run it in the search root.
     // The pattern is the value of `--regexp=`, so a leading `-` is never read as a flag.
-    cmd.arg(format!("--regexp={query}"))
-        .arg("--")
-        .arg(std::path::absolute(data_dir)?)
-        .current_dir(data_dir)
+    cmd.arg(format!("--regexp={query}")).arg("--");
+    if let Some(paths) = paths {
+        cmd.args(paths);
+    } else {
+        cmd.arg(std::path::absolute(data_dir)?);
+    }
+    cmd.current_dir(data_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -488,6 +534,57 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_search_files_empty_selection_never_searches_root() {
+        let dir = corpus();
+        assert!(
+            search_files(dir.path(), "Flag", SearchOptions::default(), &[])
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn test_search_files_rejects_paths_outside_repository() {
+        let dir = corpus();
+        assert!(search_files(
+            dir.path(),
+            "Flag",
+            SearchOptions::default(),
+            &["../outside".into()]
+        )
+        .is_err());
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            std::fs::write(outside.path().join("secret"), "Flag").unwrap();
+            std::os::unix::fs::symlink(outside.path(), dir.path().join("link")).unwrap();
+            assert!(search_files(
+                dir.path(),
+                "Flag",
+                SearchOptions::default(),
+                &["link/secret".into()]
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn test_search_files_treats_metacharacters_as_literal_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("[a].md"), "needle\n").unwrap();
+        std::fs::write(dir.path().join("a.md"), "needle\n").unwrap();
+        let matches = search_files(
+            dir.path(),
+            "needle",
+            SearchOptions::default(),
+            &["[a].md".into()],
+        )
+        .unwrap();
+        assert_eq!(matches.len(), 1);
+        assert!(matches[0].path.ends_with("[a].md"));
     }
 
     #[test]

@@ -10,12 +10,26 @@
   ],
   "description": "Failures in `crates/jit` are classified once, in the library, by error type, and both the CLI and the HTTP server project that one classification into their own surface.\n\n## Background\n\nThe classifier `error_to_error_code` and its exit-code projection live in `crates/jit/src/main.rs`, where the server cannot reach them. Around it, `main.rs` holds at least fifteen parallel JSON-error emitters (`command_json_error`, `claim_json_error`, `profile_json_error`, `gate_pass_json_error`, `dep_add_batch_json_error`, `handle_json_error!` and others) and more than fifty call sites that substitute their own fallback code, so the human and `--json` paths can exit with different codes for the same error. `std::process::exit` is called about 75 times, which skips `Drop` for the retained mutation session. `main()` prints an `Error:` line to stderr even when it also prints the `--json` envelope. `crates/server/src/routes.rs` keeps its own `path_read_error_status` map and blanket `map_err(|_| StatusCode::…)` conversions that disagree with the CLI.\n\n## Success Criteria\n\n- [hard] REQ-01: One library function, `jit::output::failure::classify`, derives each error's code, message, details and suggestions from the error's type, and `crates/jit/src/main.rs` contains no classifier, per-command JSON-error helper or error macro.\n- [hard] REQ-02: Ordinary command errors derive codes and statuses through canonical typed classification without call-site fallback substitution; human and `--json` paths exit with the same code for the same error. Every `ErrorCode` is produced by typed classification or registered findings.\n- [hard] REQ-03: After argument parsing, ordinary command errors write one envelope to stdout and nothing to stderr under `--json`, or one `Error:` diagnostic to stderr in human mode. Registered findings use the shared JSON envelope with their report in `error.details`; in human mode their report goes to stdout and an unprefixed summary to stderr. Worktree execution retains child-stream and child-status passthrough, including exit 1 when no numeric status exists; wrapper errors and foreground-serve failures remain typed command errors.\n- [hard] REQ-04: `run()` owns argument parsing, repository bootstrap, dispatch and propagated-failure rendering; shared group dispatch emits outcomes, and `main()` owns the crate's sole production `std::process::exit` call.\n- [hard] REQ-05: The server derives every failure's HTTP status from the library classification through one exhaustive code-to-status projection.\n- [hard] REQ-06: Each deliberate change to an exit code, error code, stderr content or HTTP status has a test stating the new contract, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n\n## Decisions\n\n- D-01: Reconcile the boundary wording with the accepted findings rule (epic D-03), ordinary-error and worktree passthrough contract (0eca332a D-02), and final run/main ownership (c06daf50 D-02 and active plan). Steward approved this correction on 2026-11-04; no new exception, behavior or gate change.\n",
   "documents": [],
+  "done_at": "2026-11-05T01:55:25.399534273Z",
   "first_ready_at": "2026-11-05T00:45:14.721585354Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b59bcca8-153a-407f-ac20-5e40113ae9dd",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:54:37.468544923Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6c6439db-00f5-4742-b4f5-642efdba5422",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:24:04.130730972Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fe3ad1b0-6d71-4cc7-a02f-a43b36f94548",
   "labels": [
     "type:story",
@@ -26,7 +40,7 @@
     "story:error-boundary"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "One library error boundary for the CLI and the server",
-  "updated_at": "2026-11-05T00:46:29.305559024Z"
+  "updated_at": "2026-11-05T01:55:25.399534273Z"
 }
