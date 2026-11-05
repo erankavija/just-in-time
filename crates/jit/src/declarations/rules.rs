@@ -361,7 +361,7 @@ fn valid_state_tokens() -> String {
 /// [`State::from_str`](std::str::FromStr)); `matches` is then a direct set lookup with no per-call
 /// string round-trip. The authored strings are retained for diagnostics and
 /// validated against the canonical tokens at config load via
-/// [`StatePredicate::validate`].
+/// `StatePredicate::validate`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(from = "AuthoredStates")]
 pub struct StatePredicate {
@@ -569,7 +569,7 @@ pub enum Assertion {
     /// kind; the workflow profile contributes the standard instances.
     /// Evaluation reuses the existing [`crate::domain::type_taxonomy`] domain functions
     /// rather than reimplementing the hierarchy logic; the repo's
-    /// [`HierarchyConfig`] is NOT stored in the parsed rule — it is injected by
+    /// [`crate::domain::type_taxonomy::HierarchyConfig`] is NOT stored in the parsed rule — it is injected by
     /// the graph evaluator at evaluation time (see
     /// [`evaluate_graph`](crate::validation::graph::evaluate_graph)).
     TypeHierarchy {

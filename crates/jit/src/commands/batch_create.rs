@@ -636,7 +636,7 @@ fn resolve_labels(
 /// Detect a cycle in the symbolic `depends_on` graph over the given entries.
 ///
 /// Projects the entries onto a keyed adjacency and hands it to
-/// [`find_keyed_cycle`], which ignores edges to keys the batch never defines, so
+/// [`crate::graph::find_keyed_cycle`], which ignores edges to keys the batch never defines, so
 /// an unknown-reference problem is not double-reported as a cycle. Returns the
 /// keys forming one detected cycle (in traversal order, closing back to the
 /// start), or `None` when the graph is acyclic.

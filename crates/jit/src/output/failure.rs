@@ -686,7 +686,7 @@ fn dependency_batch_error_code(batch: &crate::errors::DependencyBatchRejectedErr
 ///
 /// Every rejected edge is named under `details.rejected`, each carrying its own
 /// classified `code`. The top-level `code`, `message`, and `suggestions` mirror
-/// the batch's dominant edge, the one [`classify_code`] picks, so the JSON and
+/// the batch's dominant edge, the one `classify_code` picks, so the JSON and
 /// non-JSON paths agree on the exit code. That edge's kind-specific details are
 /// kept and the batch-wide listing merged beside them.
 pub fn dependency_batch_json_error(

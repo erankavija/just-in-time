@@ -18,7 +18,7 @@
 //! the package author's and is carried as written.
 //!
 //! Every source is read through one no-follow open beneath a handle on the
-//! worktree root ([`super::nofollow`]), so that open is where containment is
+//! worktree root (`nofollow`), so that open is where containment is
 //! established rather than checked: a resolution leaving the worktree is
 //! refused, a link at the name itself is refused, and the bytes and the mode a
 //! source is judged against both come from the handle it returns. Whether a

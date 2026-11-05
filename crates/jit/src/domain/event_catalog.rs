@@ -1,7 +1,7 @@
 //! Catalog of the event-log tags and their issue association scope.
 //!
 //! [`EventTag`] and [`EventScope`] declare wire tokens once via
-//! [`wire_vocabulary!`]. A wildcard-free [`EventBody::tag`] map and per-tag
+//! `wire_vocabulary!`. A wildcard-free [`EventBody::tag`] map and per-tag
 //! samples bind the catalog to the event variants; tests compare its scope and
 //! `issue_id` claims with serialized events and `Event`, then compare the
 //! committed reference with the projection (`@/inv/single-source-prose`).
