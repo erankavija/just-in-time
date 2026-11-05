@@ -213,9 +213,10 @@
           "short_id": "c5062e21",
           "title": "Server detects its layout once from the selected data root",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "78f23433f54a731bea39ae6b6a9c22eed1956a00"
         },
         {
           "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
@@ -734,7 +735,8 @@
     "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge.",
     "ec9 relocation Done after actual stable merged Cargo; source released immediately to df fe3. Object-reader producer is unblocked.",
     "ec9 closure script corrected raw gate_key vs CLI key before mutation, actual closure42664758e. d48 claimed922c1664d and dispatched Astra high; e3 focused checks, f649 stable Cargo/review PASS on07ffda330; retained evidence7b8320175. Base final relocated suite integration preserves55incoming+4base tests,59PASS; origin tree reclaimed. c506 fullgatesPASS and exact source preserved. Source sequence c16\u2192frontend4538\u2192c506 per steward; after both listing consumers converge, obsolete two-line exception may be deleted with executable/test byte proof and merged check, retaining actual reviews under explicit steward ruling.",
-    "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "c5062e21 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1041,7 +1043,7 @@
     "c5062e21": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "82093768-2d32-4f26-97a0-9f657b3d0888",
+        "cargo-ci": "b6b2d6ad-0f6f-4cba-bee1-24e67266686f",
         "code-review": "149faf22-3f88-438c-a7f3-d29fefc5e66d"
       },
       "reviewed_source": "b1515873e3280ebedf4cce9f746a987cfe71b2f0",
@@ -1053,7 +1055,8 @@
       "prior_findings": "First independent review; no findings.",
       "stale_narrative": "Old helper name only in dated frontend investigation evidence; no live code/docs retain removed API.",
       "deferred_items": "No issue-linked documents; invocation cache implementation is approved separate d681 leaf.",
-      "holistic": "Two-file server footprint; no private discovery or duplicated recovery mechanism; main integration pending."
+      "holistic": "Two-file server footprint; no private discovery or duplicated recovery mechanism; main integration pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS b6b2d6ad-0f6f-4cba-bee1-24e67266686f on 78f23433f54a731bea39ae6b6a9c22eed1956a00."
     },
     "f649c144": {
       "verdict": "PASS",
