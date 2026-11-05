@@ -292,7 +292,8 @@
       "crates/jit/src/commands/claim.rs",
       "crates/jit/src/test_utils.rs",
       "crates/jit/src/dispatch/hooks.rs",
-      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs"
+      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs",
+      "crates/jit/src/commands/profile.rs"
      ]
     }
    }
@@ -788,15 +789,13 @@
    "terminal": {
     "consumer_family": "claim release actor",
     "test_boundary": "claims unit tests",
-    "worker_sized_reason": "One release-actor resolver switches to the module query; its existing claim-release callback and captured-release caller supply the same paths.",
+    "worker_sized_reason": "One release-actor resolver and its existing callers use the supplied checkout; the release-output fixture supplies an explicit actor instead of host Git configuration.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/claim.rs",
-      "crates/jit/src/commands/mod.rs"
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/tests/cli_issue/gate_field_contract_test.rs"
      ]
-    },
-    "warning_overrides": {
-     "chain-link": "The instantiated release-actor adapter owns fallback precedence in claim commands; it consumes the separately assigned config-query primitive. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1149,7 +1148,7 @@
       "crates/jit/tests/cli_repo_workflow/git_unavailable_tests.rs"
      ],
      "touches": [
-      "crates/jit/tests/cli_repo_workflow/main.rs"
+      "crates/jit/tests/cli_repo_workflow/mod.rs"
      ]
     }
    }

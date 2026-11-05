@@ -242,3 +242,90 @@ fn test_validate_leases_json_output_on_failure() {
         "Message should mention expiration"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn test_validate_leases_lists_worktrees_once_for_multiple_leases() {
+    use jit::test_harness::git::GitStandIn;
+
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let worktree_id = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    for index in 1..=3 {
+        let issue_id = primary.create_issue(["-t", "Leased issue"]).unwrap();
+        let lease = create_test_lease(
+            &format!("00000000-0000-4000-8000-{index:012}"),
+            &issue_id,
+            &worktree_id,
+            7200,
+            Utc::now(),
+        );
+        plant_lease(&paths.shared_jit, &lease).unwrap();
+    }
+    let stand_in = GitStandIn::new();
+
+    let output = primary
+        .command(["validate", "--leases"])
+        .env("PATH", stand_in.search_path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let listings = stand_in
+        .invocations()
+        .into_iter()
+        .filter(|invocation| {
+            invocation
+                .args()
+                .get(..2)
+                .is_some_and(|args| args == ["worktree", "list"])
+        })
+        .count();
+    assert_eq!(listings, 1);
+}
+
+#[test]
+fn test_validate_leases_without_git_requires_checkout_only_with_stored_leases() {
+    let primary = JitCli::initialised().unwrap();
+    let issue_id = primary.create_issue(["-t", "Leased issue"]).unwrap();
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    let empty_path = tempfile::tempdir().unwrap();
+    let validate = || {
+        primary
+            .command(["validate", "--leases", "--json"])
+            .env("PATH", empty_path.path())
+            .output()
+            .unwrap()
+    };
+    assert!(validate().status.success());
+    let lease = create_test_lease(
+        "00000000-0000-4000-8000-000000000001",
+        &issue_id,
+        "missing-worktree",
+        7200,
+        Utc::now(),
+    );
+    plant_lease(&paths.shared_jit, &lease).unwrap();
+
+    let output = validate();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let validations = json["error"]["details"]["validations"].as_array().unwrap();
+    let lease_validation = validations
+        .iter()
+        .find(|validation| validation["validation"] == "leases")
+        .unwrap();
+    assert!(
+        lease_validation["message"]
+            .as_str()
+            .unwrap()
+            .contains("lease validation requires a git repository to check lease worktrees"),
+        "{json}"
+    );
+}
