@@ -1311,6 +1311,59 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
 }
 
 #[test]
+fn test_apply_reports_each_dependency_moved_off_a_populated_container() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Populated epic");
+    let children = ["Child 1", "Child 2", "Child 3"]
+        .map(|title| {
+            let child = h.create_issue(title);
+            add_reducing_edge(&h.executor, &epic, &child).unwrap();
+            h.get_issue(&child).id
+        })
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    let (result, _w) = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let report = result
+        .upstream_move
+        .expect("a populated container reports its moved dependencies");
+    let planning_id = &result.created_node_ids_by_role["planning"];
+    assert_eq!(report.container, h.get_issue(&epic).id);
+    let moved: std::collections::BTreeSet<_> =
+        report.moves.iter().map(|m| m.dependency.clone()).collect();
+    assert_eq!(report.moves.len(), children.len());
+    assert_eq!(moved, children);
+    assert!(report
+        .moves
+        .iter()
+        .all(|m| m.role == "planning" && &m.node == planning_id));
+    // Each reported edge is one the receiving node now carries.
+    let planning = h.get_issue(planning_id);
+    assert!(moved.iter().all(|dep| planning.dependencies.contains(dep)));
+}
+
+#[test]
+fn test_apply_reports_no_upstream_move_for_an_empty_container() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Empty epic");
+
+    let (result, _w) = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    assert_eq!(result.upstream_move, None);
+}
+
+#[test]
 fn test_template_registry_rejects_unknown_transform_kind_at_load() {
     // The kind is a static config error: `jit` fails at registry load, naming the
     // template and the offending kind, so `jit apply` never sees it.
@@ -1789,7 +1842,21 @@ fn test_apply_result_serializes_to_expected_json_shape() {
         serde_json::json!([upstream_full])
     );
 
-    // The serialized shape has exactly the four documented top-level keys — no
+    // The advisory move report names the container and each moved edge with the
+    // role and node that received it.
+    assert_eq!(
+        json["upstream_move"],
+        serde_json::json!({
+            "container": epic_full,
+            "moves": [{
+                "dependency": upstream_full,
+                "role": "planning",
+                "node": planning_id,
+            }],
+        })
+    );
+
+    // The serialized shape has exactly the documented top-level keys — no
     // stray or missing field leaks into the machine-readable contract.
     let obj = json
         .as_object()
@@ -1803,6 +1870,7 @@ fn test_apply_result_serializes_to_expected_json_shape() {
             "anchor_dependency_snapshots",
             "created_node_ids_by_role",
             "template",
+            "upstream_move",
         ]
     );
 }

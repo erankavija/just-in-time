@@ -38,6 +38,7 @@ fn apply<S: HandlerStore>(
         created_node_ids_by_role: result.created_node_ids_by_role,
         anchor_dependency_snapshots: result.anchor_dependency_snapshots,
         created_issues: result.created_issues,
+        upstream_move: result.upstream_move,
     };
     let message = response.message();
     Ok(Outcome::success_with(response, message).with_warnings(warnings))

@@ -404,6 +404,15 @@ with anchors, roles, dependency edges, and optional document/label transforms.
 Nothing in the mechanism is hardcoded; templates are entirely repository
 configuration.
 
+A template names gates rather than carrying them. Each name in a node's or
+anchor's `gates` resolves, when the template is applied, to a gate preset or a
+key in the [gate registry](#gate-registry). A `rule_validation` gate in turn
+names a rule in the [rules registry](#validation-rules-registry), so a gate
+evaluating a configured rule runs only where that rule is declared. A
+`templates.toml` is therefore one file of a configuration set rather than a
+distribution unit: it travels with the gates and rules it names, in a
+[profile package](profiles.md) or copied together with them by hand.
+
 The template anatomy and a worked example are documented in
 [Adopt the Planning Bracket](../how-to/adopt-planning-bracket.md); the
 plan-before-fan-out concept it typically encodes is introduced in

@@ -1,16 +1,31 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker-fc2403fb",
+  "claimed_at": "2026-11-05T23:22:31.963653352Z",
   "context": {},
   "created_at": "2026-09-03T04:25:10.905148530Z",
   "dependencies": [],
-  "description": "Applying a container template to a container that already has dependents moves those edges onto the template's planning node without saying so, leaving the planning node blocked by the work it exists to plan.\n\n## Background\n\nThe `plan` template declares a `move-upstream-to-role` transform. On an empty container that is correct: the container's upstream edges are genuine prerequisites and should gate planning. On a populated container, containment edges are structurally identical to prerequisite edges, so the transform moves the children too.\n\nApplying the template to an epic with three children produces:\n\n```mermaid\ngraph TD\n    E[epic] --> B[breakdown]\n    B --> P[planning]\n    P --> C1[Child 1 ready]\n    P --> C2[Child 2 ready]\n    P --> C3[Child 3 ready]\n```\n\nThe planning node sits in `backlog` while all three children are `ready`, so available-work queries offer the implementation issues while the plan meant to shape them cannot start. That inverts the sequencing the bracket exists to impose. The command exits 0 and prints only the applied node ids.\n\nThe transform is doing what it declares; the defect is silence. At apply time the number of dependents the container already had is known, and so is the role the edges are about to move to.\n\n## Success Criteria\n\n- [hard] REQ-01: Applying a template whose transform moves edges from a container that already has dependents reports each moved edge and the role it moved to.\n- [hard] REQ-02: The report names the container, the moved dependencies, and that they now block the receiving node.\n- [hard] REQ-03: Application still succeeds; the report is advisory and does not change the resulting graph.\n- [hard] REQ-04: Applying a template to a container with no dependents produces no such report.\n- [hard] REQ-05: The report is available structurally in `--json` output rather than only as prose.\n- [hard] REQ-06: Tests cover a populated container, an empty container, and the JSON shape of the report.\n\n## Notes\n\nReported from an adopter bracketing an existing container, and reproduced here on a repository bootstrapped from the shipped dogfood profile. In the reported case every moved edge was implementation work and none was a planning prerequisite, which is the expected shape when bracketing a container that already holds children rather than a fresh one.\n\nThe transform site builds one add-edge and one remove-edge per upstream dependency in `crates/jit/src/commands/template_expand.rs`, with no branch on how many dependents the container had.\n\nThe planning-lead skill already anticipates the correction, instructing an audit of edges moved from the container to the planning node. That audit runs several steps after the apply, so the graph stays inverted through the intervening work.\n",
+  "description": "Applying a container template to a container that already has dependents moves those edges onto the template's planning node without saying so, leaving the planning node blocked by the work it exists to plan.\n\n## Background\n\nThe `plan` template declares a `move-upstream-to-role` transform. On an empty container that is correct: the container's upstream edges are genuine prerequisites and should gate planning. On a populated container, containment edges are structurally identical to prerequisite edges, so the transform moves the children too.\n\nApplying the template to an epic with three children produces:\n\n```mermaid\ngraph TD\n    E[epic] --> B[breakdown]\n    B --> P[planning]\n    P --> C1[Child 1 ready]\n    P --> C2[Child 2 ready]\n    P --> C3[Child 3 ready]\n```\n\nThe planning node sits in `backlog` while all three children are `ready`, so available-work queries offer the implementation issues while the plan meant to shape them cannot start. That inverts the sequencing the bracket exists to impose. The command exits 0 and prints only the applied node ids.\n\nThe transform is doing what it declares; the defect is silence. At apply time the number of dependents the container already had is known, and so is the role the edges are about to move to.\n\n## Success Criteria\n\n- [hard] REQ-01: Applying a template whose transform moves edges from a container that already has dependents reports each moved edge and the role it moved to.\n- [hard] REQ-02: The report names the container, the moved dependencies, and that they now block the receiving node.\n- [hard] REQ-03: Application still succeeds; the report is advisory and does not change the resulting graph.\n- [hard] REQ-04: Applying a template to a container with no dependents produces no such report.\n- [hard] REQ-05: The report is available structurally in `--json` output rather than only as prose.\n- [hard] REQ-06: Tests cover a populated container, an empty container, and the JSON shape of the report.\n\n## Notes\n\nReported from an adopter bracketing an existing container, and reproduced here on a repository bootstrapped from the shipped dogfood profile. In the reported case every moved edge was implementation work and none was a planning prerequisite, which is the expected shape when bracketing a container that already holds children rather than a fresh one.\n\nThe transform site builds one add-edge and one remove-edge per upstream dependency in `crates/jit/src/commands/template_expand.rs`, with no branch on how many dependents the container had.\n\nThe planning-lead skill already anticipates the correction, instructing an audit of edges moved from the container to the planning node. That audit runs several steps after the apply, so the graph stays inverted through the intervening work.\n\n\nCompletion evidence (2026-11-06): merged at 81965e397; forced cargo-ci on the merged result passed with JIT_AGENT_ID set, which only works around the pre-existing main failure 783b33fa owns; this change does not touch release identity.",
   "documents": [],
+  "done_at": "2026-11-05T23:52:23.488966057Z",
   "first_ready_at": "2026-09-03T04:25:10.905148530Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1e7202f5-01e9-4e88-b4ee-f22fd3a4bde8",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:47:25.993019037Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9c0db8c2-f0bc-44da-8323-d7de9f095c49",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:52:15.677126213Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fc2403fb-74d3-471e-b6aa-e3a743fb22e1",
   "labels": [
     "component:cli",
@@ -18,7 +33,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Applying a container template silently moves a populated container's children onto the planning node",
-  "updated_at": "2026-09-03T04:25:10.905148530Z"
+  "updated_at": "2026-11-05T23:52:23.488966057Z"
 }
