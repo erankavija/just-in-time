@@ -25184,3 +25184,4 @@
 {"gate_key":"cargo-ci","id":"af8d9106-9409-4ba2-9909-785bd94de263","issue_id":"e3c38fea-fb76-4c32-85ac-f45ba7f1036c","timestamp":"2026-11-05T02:57:32.773552429Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"71c24ba1-08e0-4f4e-bf73-3f48ea4804f6","issue_id":"e3c38fea-fb76-4c32-85ac-f45ba7f1036c","timestamp":"2026-11-05T02:57:45.246765338Z","to":"done","type":"issue_state_changed"}
 {"id":"cf109fba-7ee4-4227-b178-75e1d633787d","issue_id":"e3c38fea-fb76-4c32-85ac-f45ba7f1036c","timestamp":"2026-11-05T02:57:45.246765338Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"a4f315ca-ab5f-4052-878c-b28b8e44524d","issue_id":"ea4b7363-acd6-4c0d-913f-beca27afcd4b","timestamp":"2026-11-05T03:06:04.266537110Z","type":"gate_failed","updated_by":"auto:executor"}
