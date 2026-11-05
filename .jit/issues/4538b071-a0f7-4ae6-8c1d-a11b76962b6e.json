@@ -17,15 +17,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ec3380bd-1314-4df2-947a-05eb681aa8bb",
+      "run_id": "4ffd33f4-3a60-4a5c-8055-58cf940048a9",
       "status": "passed",
-      "updated_at": "2026-11-05T01:34:42.688611434Z",
+      "updated_at": "2026-11-05T01:50:58.164532362Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7f87a82e-ef59-40eb-9074-18d17cdda5bf",
+      "status": "failed",
+      "updated_at": "2026-11-05T01:39:43.784545144Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
-      "run_id": "a76ad9b1-8c6d-496f-88f1-7c2df0d14a0e",
+      "run_id": "4263c498-7a75-48d8-854a-62fb2029c101",
       "status": "passed",
-      "updated_at": "2026-11-05T01:28:32.610895257Z",
+      "updated_at": "2026-11-05T01:51:34.876535223Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove explicitly unused API routes and client methods",
-  "updated_at": "2026-11-05T01:34:42.688611434Z"
+  "updated_at": "2026-11-05T01:51:34.876535223Z"
 }
