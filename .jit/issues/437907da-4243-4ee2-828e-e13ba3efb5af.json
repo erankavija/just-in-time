@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5dd13d62-baa7-4c92-b6ad-ae47b7b9eb8c",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:26:58.943851312Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "12612785-0367-4000-b6e9-bd10587f82d9",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:31:17.746987935Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "437907da-4243-4ee2-828e-e13ba3efb5af",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One worktree listing in the git module",
-  "updated_at": "2026-11-04T22:53:53.376441446Z"
+  "updated_at": "2026-11-05T00:31:17.746987935Z"
 }
