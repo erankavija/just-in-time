@@ -116,6 +116,12 @@ flowchart LR
 | Browser hierarchy | Keep existing container selection policy; indexing adds no new policy. |
 | Scope and source universe | Known and required source universe is REQ-01 through REQ-12 and REQ-15. REQ-01 is contributed by the core story and externally satisfied by c5062e21; all 13 criteria require coverage labels. No finding or design identifiers are claimed as additional sources. |
 
+## Execution decision: nonblocking reads
+
+On 2026-11-05 the user chose nonblocking reads after review identified a conflict between D-22's summary and its lock-taking fallback. The steward authorized @/charter/D-25 and expanded issue 6326532e with REQ-04 and REQ-05. The canonical read driver returns a typed retryable conflict after bounded admission attempts; it does not acquire a repository writer/session lock or perform implicit recovery. Multi-root captures retain selected and primary membership and tombstones; in-memory admission does not wait for writer-held state. Explicit recovery and mutation recovery retain D-17 semantics. The shared classifier maps RETRYABLE_CONFLICT to CLI exit 12 and HTTP 503.
+
+The work belongs to 6326532e: canonical storage/read admission, memory contention, shared error classification, charter source and projection, adopter documentation, and owning conformance tests. Review run 713a548e remains recorded: it required the D-22 fallback that D-25 supersedes. Review run e16df9af remains recorded and its deterministic concurrency finding was repaired.
+
 ## Investigation sources
 
 - [Investigation](investigation.md) — current evidence and exhaustive consumer inventories.
