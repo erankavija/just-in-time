@@ -9,12 +9,26 @@
   ],
   "description": "Keep issue details responsive on first selection and when selections or refreshes overlap.\n\n## Background\n\nThe load effect starts a request before a later issue-change effect resets its sequence counter. The resulting response no longer matches the counter, leaving the first selection loading. Resetting a reused counter can also let an older request match a later selection.\n\n## Success Criteria\n\n- [hard] REQ-01: Selecting an issue displays its returned details or error and clears loading, including the first selection.\n- [hard] REQ-02: Out-of-order responses from earlier selections, clearing the selection, or older refreshes cannot replace the current selection; fresh version updates still refresh it.\n- [hard] REQ-03: Automated component tests exercise first selection, overlapping selections and version refreshes, and clearing and reselecting an issue.\n",
   "documents": [],
+  "done_at": "2026-11-05T00:44:27.702517977Z",
   "first_ready_at": "2026-11-04T23:46:36.731240824Z",
   "gates_required": [
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "00d60832-a693-4983-a607-b2de2f972ac6",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:44:08.155893555Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "5c7b346c-d3ea-4aa3-bcbd-c1361717aedb",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:40:56.130681761Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4858de06-b973-443a-b6fd-6641d8694617",
   "labels": [
     "epic:frontends-share-core",
@@ -23,7 +37,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Load issue details safely across selection changes",
-  "updated_at": "2026-11-05T00:34:44.649782831Z"
+  "updated_at": "2026-11-05T00:44:27.702517977Z"
 }
