@@ -71,7 +71,9 @@ impl Backend for JsonFileStorage {
         seed.iter()
             .for_each(|(path, content)| write_json_file(worktree, path, content.as_bytes()));
         let store = JsonFileStorage::new(&data);
-        store.configure_repository_layout(&discover_repository_layout(worktree, &data).unwrap());
+        store
+            .configure_repository_layout(&discover_repository_layout(worktree, &data).unwrap())
+            .unwrap();
         store
     }
 
@@ -340,7 +342,10 @@ fn test_configure_repository_layout_never_redirects_a_bound_store<B: Backend>() 
         discover_repository_layout(other.path(), other.path().join(".jit")).unwrap(),
         discover_repository_layout(other.path(), bound.data_root()).unwrap(),
     ] {
-        repository.store.configure_repository_layout(&foreign);
+        assert!(repository
+            .store
+            .configure_repository_layout(&foreign)
+            .is_err());
         let current = repository.store.clone().repository_layout().unwrap();
         assert_eq!(
             (current.worktree_root(), current.data_root()),

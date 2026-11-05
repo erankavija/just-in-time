@@ -1034,8 +1034,11 @@ impl jit::storage::RepositoryStateStore for FailingMutationStorage {
 }
 
 impl IssueStore for FailingMutationStorage {
-    fn configure_repository_layout(&self, layout: &jit::repository_state::RepositoryLayout) {
-        self.inner.configure_repository_layout(layout);
+    fn configure_repository_layout(
+        &self,
+        layout: &jit::repository_state::RepositoryLayout,
+    ) -> std::result::Result<(), jit::storage::RepositoryStateStoreError> {
+        self.inner.configure_repository_layout(layout)
     }
 
     fn acquire_repo_write_lock(&self) -> anyhow::Result<jit::storage::RepoWriteGuard> {

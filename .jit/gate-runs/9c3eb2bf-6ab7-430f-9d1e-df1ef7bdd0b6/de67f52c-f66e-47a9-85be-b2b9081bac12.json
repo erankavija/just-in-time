@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-9c3eb2bf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a19eec4964cf837cc816d2a03031da084f1011b2",
+  "completed_at": "2026-11-04T23:42:28.001986466Z",
+  "duration_ms": 237734,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/claim.rs",
+        "id": "F1",
+        "line": 731,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9c3eb2bf/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "Claim recovery unwraps the fallible layout binding instead of propagating its error."
+      }
+    ],
+    "summary": "Claim recovery panics instead of propagating a layout-binding mismatch.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "de67f52c-f66e-47a9-85be-b2b9081bac12",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:38:30.267620085Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10929 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-9c3eb2bf\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8ed-aab3-71a2-ac33-52f9b2624b1e\n--------\nuser\n--- 10916 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 1d81910d, 552ccd36 (code); 5685595a, a19eec49 (gate records only)\nPolicy sources: AGENTS.md\nResolved items: @/issue/9c3eb2bf/requirement/REQ-01 (issue description); @/issue/0f8efc37/requirement/REQ-02, @/issue/a236e81e/requirement/REQ-01 (issue descriptions); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review failed (exit 1, prior F1 addressed by 552ccd36)\nTruncation recovery: per-path patches and current line reads for storage, executors, callers, conformance adapters, and regression tests\n1. [blocking][issue-impact] `crates/jit/src/commands/claim.rs:729-731` turns the new fallible `with_layout` result into a panic with `.unwrap()`. `ClaimOps::recover` already returns `Result` and can propagate this mismatch error, as CLI bootstrap and server startup now do. This leaves a production caller outside REQ-01’s required error propagation. References: @/issue/9c3eb2bf/requirement/REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Claim recovery panics instead of propagating a layout-binding mismatch.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Claim recovery unwraps the fallible layout binding instead of propagating its error.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":731,\"references\":[\"@/issue/9c3eb2bf/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

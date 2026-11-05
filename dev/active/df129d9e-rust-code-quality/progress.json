@@ -704,7 +704,7 @@
           "short_id": "0eca332a",
           "title": "Retire error codes that nothing produces",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "key": "schema-registry-derivation",
@@ -757,7 +757,7 @@
           "short_id": "fe3ad1b0",
           "title": "One library error boundary for the CLI and the server",
           "classification": "story",
-          "status": "backlog"
+          "status": "ready"
         },
         {
           "key": "executor-surface",
@@ -994,7 +994,7 @@
     "f35c86de": 1,
     "487f45a9": 3,
     "0eca332a": 3,
-    "0546fc82": 2,
+    "0546fc82": 3,
     "ab168296": 0,
     "755964b2": 0
   },
@@ -1639,7 +1639,7 @@
     },
     "0546fc82": {
       "status": "backlog",
-      "note": "Search prose repair32ab62d01 included. Mechanical failureecc372aa preserveda307e3010; actual deps0eca+dc048377. Prior docreview predates latestfix; finalmechanical/docreview pending."
+      "note": "Final prepared docs gates97d93990/5f6275ebPASS, tipd4e03af46; awaits realdcDone thenclaim/integration."
     },
     "083c9a91": {
       "status": "done"
@@ -1648,9 +1648,9 @@
       "status": "done"
     },
     "0eca332a": {
-      "status": "in_progress",
+      "status": "done",
       "model": "gpt-6-astra high (substantive rework)",
-      "note": "Final positive producer set and real CLI bindings pass5052+25/fullClippy; finalreview766aceb2 stablePASS. FormalleadPASS, ready59e3ba681. -21core/-8server; integration pending."
+      "note": "Merged97d00504e; mergedCargo5d29627b and review766aceb2 stablePASS; -21core/-8server."
     },
     "1002524a": {
       "status": "done"
@@ -1848,7 +1848,7 @@
       "status": "done"
     },
     "fe3ad1b0": {
-      "status": "backlog"
+      "status": "ready"
     },
     "ab168296": {
       "status": "done",
@@ -1992,7 +1992,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "ab168 completed on main with merged Cargo PASS; 0eca/f997 ready for their interleaved slots; 0546 combined preparation includes final reviewed dc048377 under explicit exception; bounded Rustdoc repair755964b2 active.",
+    "status": "ab168 and0eca completed on main with stable merged Cargo PASS. 0546 finalmechanical/docreview PASS awaiting realdcDone/mainintegration. f997 ready;755 finalcode-review running afterRustdoc/fullCargoPASS. fe3 newlyready.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -2017,7 +2017,7 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Verified landed core ledger +204 (baseline +171; this session +33) over ten additional first-parent merges. Corrected pending0eca producer-backed declaration projects -21 core and -8 server, so projected epic core +183. ab168/f997 core0; no whole-epic net-negative claim.",
+    "production_net": "Verified epic core +183: inherited+171, ten earlier sessionmerges+33, ab168 zero,0eca -21. Server -8 separately. Under approved+375; not whole-epic net-negative.",
     "prepared_branches": {
       "f35c86de": {
         "commit": "c5b146e02",
@@ -2132,9 +2132,19 @@
           "before": 73631,
           "after": 73631,
           "delta": 0
+        },
+        {
+          "merge": "67f4514c3",
+          "delta": 0
+        },
+        {
+          "merge": "97d00504e",
+          "before": 73840,
+          "after": 73819,
+          "delta": -21
         }
       ],
-      "current_epic_delta": 204,
+      "current_epic_delta": 183,
       "mode": "scripts/production-lines.py REV (no flags)"
     },
     "f9977efd": {
@@ -2169,8 +2179,22 @@
       "status": "in_progress",
       "model": "gpt-6-luna high",
       "audit": "/tmp/jit-df129d9e-session14/rustdoc-criterion-audit.md",
-      "scope": "Comment references only; actual facade REQ03 regression plus compiler-confirmed residual links; existing private-items Rustdoc command, no newchecker/runtime/import/API."
+      "scope": "Comment references only; actual facade REQ03 regression plus compiler-confirmed residual links; existing private-items Rustdoc command, no newchecker/runtime/import/API.",
+      "source": "e2343f56e",
+      "branch_cargo": "cb9149c8",
+      "production_delta": 0,
+      "review": "running at15097fbfd",
+      "diagnostics": "111 actual blockingRustdoc diagnostics:35unresolved,41private,24redundant,11malformedHTML;52files,211changedlines allRustdoc; refreshed private-items docsPASS."
     },
-    "docs_preparation_exception": "Steward explicitly approved final reviewed dc048377 branch7052b1fb3 plus final0eca in isolated0546; mainclaim/Done still wait realdepsDone. Frozen combinedsource1bd0afa7b; timestamp conflict resolved preservingactualrecords andnewdependency. docs-mechanical running."
+    "docs_preparation_exception": "Approved combined7052b1fb3/final0eca preparation; finalsource291d665d2, mechanical97d93990 and docreview5f6275eb stablePASS, evidence d4e03af46 and formalleadPASS. Realprimary deps still governclaim/Done.",
+    "0eca332a": {
+      "status": "done",
+      "merge": "97d00504e",
+      "production_delta": -21,
+      "server_delta": -8,
+      "merged_cargo": "5d29627b-18b0-4d8f-8bd2-f84014e96913",
+      "code_review": "766aceb2-550f-42dd-8704-232525a5036c"
+    },
+    "0546_extra_rework": "One extra boundedround approved: sole lowclarity findingab76b35e; inserted that in one sentence, source291d665d2; finalgatesPASS. Both original/final phrasing grammatical persteward; no newcontract requirement."
   }
 }
