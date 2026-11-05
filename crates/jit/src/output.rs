@@ -35,6 +35,7 @@ mod issue;
 mod item;
 mod profile;
 mod project;
+mod projection;
 mod search;
 mod serve;
 pub mod snapshot;
@@ -43,6 +44,7 @@ mod version;
 mod worktree;
 
 pub use validate::*;
+pub use worktree::WorktreeInfoOutput;
 
 pub use archive::ArchiveTargetResponse;
 pub use claim::{
@@ -54,9 +56,10 @@ pub(crate) use emit::status_after;
 pub use emit::{emit_failure, emit_outcome, HumanRender, Report, Response};
 pub use issue::{
     BatchCreateResponse, BlockedListing, IssueBatchCreateOutput, IssueDeleteResponse,
-    IssueLifecycleResponse, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
-    IssueStatusOutput, IssueUpdateOutput, QuerySubset, SubsetListing,
+    IssueLifecycleResponse, IssueListing, IssueSearchResults, IssueShowOutput, IssueStatusOutput,
+    IssueUpdateOutput, QuerySubset, SubsetListing,
 };
+pub use projection::FieldProjection;
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};
 
@@ -1538,16 +1541,15 @@ pub fn project_field(value: &Value, name: &str) -> Option<String> {
 }
 
 /// Error returned when a requested projection field is not a known top-level
-/// field of the serialized issue. Carries the offending field name.
+/// field of the serialized response. Carries the offending field name.
 #[derive(Debug, Error, PartialEq)]
 #[error("unknown field '{0}'")]
 pub struct UnknownFieldError(pub String);
 
-/// Render the named top-level fields of a serialized issue value as a single
+/// Render the named top-level fields of a serialized response as a single
 /// compact JSON object, preserving the requested order.
 ///
-/// `value` must be the JSON object produced by serializing an
-/// [`IssueShowResponse`]. Each name is looked up by its serialized key. The
+/// `value` must be a serialized JSON object. Each name is looked up by its key. The
 /// first unknown key is returned as `Err(UnknownFieldError(name))` so callers
 /// can signal a usage error; otherwise the result is a compact object
 /// `{"a":...,"b":...}` whose keys keep the requested order (so the output is
