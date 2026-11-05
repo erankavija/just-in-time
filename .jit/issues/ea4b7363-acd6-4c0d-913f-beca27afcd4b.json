@@ -9,6 +9,7 @@
   ],
   "description": "Make the claim-release actor fallback read `user.name` through the git module, removing the last git spawn from the claim commands.\n\n## Background\n\n- `resolve_release_actor` (`crates/jit/src/commands/claim.rs:298-316`) runs `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`) when no agent id resolves, and sanitizes the result with `sanitize_actor` (`crates/jit/src/commands/claim.rs:279`). Without either it fails with `errors::no_acting_identity`.\n- The resolver is called by `ClaimOps::release_by_issue` through its actor callback and by `CommandExecutor::publish_captured_release` in `crates/jit/src/commands/mod.rs`. Both receive the existing supplied `WorktreePaths`; use its selected/relocated `write_checkout()` without another probe.\n- `GitCheckout::user_name()` returns the configured name, or `None` when unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_release_actor` reads the name through the paths' git checkout and treats no checkout as an unset name, and `commands/claim.rs` starts no git process.\n- [hard] REQ-02: The release tests in `commands/claim.rs` pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T03:49:29.447444488Z",
   "first_ready_at": "2026-11-05T02:24:22.312905070Z",
   "gates_required": [
     "cargo-ci",
@@ -16,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "38d0796c-dc72-4d2e-9470-f9affe52fef0",
+      "run_id": "054a73f3-a91a-480e-9d3f-600c85db7241",
       "status": "passed",
-      "updated_at": "2026-11-05T03:21:59.026711738Z",
+      "updated_at": "2026-11-05T03:48:58.453365107Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,7 +41,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Release actor reads git user.name through the module",
-  "updated_at": "2026-11-05T03:25:59.202295977Z"
+  "updated_at": "2026-11-05T03:49:29.447444488Z"
 }
