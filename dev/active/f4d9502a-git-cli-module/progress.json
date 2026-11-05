@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -522,7 +522,20 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "a273667c",
+      "status": "awaiting_user_decision",
+      "subject": "Git>=2.42 andDocker runtimeTrixie proposal",
+      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred"
+    },
+    {
+      "issue": "c140921c",
+      "status": "shared_producer_research",
+      "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
+      "ruling": "Stewardrequires sharedproducerfix; no privateconsumerworkaround orintentionalregression. Mapcallers/tests/options/processbudgets andproposeboundedfootprintbeforeexpansion."
+    }
+  ],
   "rework_counts": {
     "7aafec83": 1,
     "81664a6a": 1,
@@ -862,7 +875,8 @@
     "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision.",
     "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect.",
-    "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1310,13 +1324,13 @@
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS de6c3c8e-f6b2-4998-8fb6-f1a7529bfb88 on e0b02683af8da1b905a40e0f5922f65c6ea89a70."
     },
     "a273667c": {
-      "verdict": "FAIL",
-      "reviewed_source": "291d90d2f398fc2d1f215329fc9214dc0d4524f4",
+      "verdict": "PASS",
+      "reviewed_source": "2e51395b46f00cf0ac77815300fd2651eba77d6d",
       "gates": {
-        "cargo-ci": "3ac22ec9-0610-4beb-90e3-b1ebd1e823cd",
-        "code-review": "b9d20147-35e0-492d-acec-8ee0dcb04db2"
+        "cargo-ci": "dfc80720-8f01-452a-a02f-594efd8d9d05",
+        "code-review": "9c0cec8f-58a6-4f86-b853-3f81672959c8"
       },
-      "criteria": "F1 valid committed LF path rejected by shared line-framed protocol. Isolated six-file canonical -Z proposal and Git>=2.42/runtime Trixie proposal are under validation; explicit user decision required before landing minimum/runtime changes. No main authority change."
+      "criteria": "PriorF1validLFpathclosed bycanonicalNULframing. Originalrevisionresolvedbeforecanonicalpeel, typederrors/binarybytes/onechildretained. Allsixproposalfiles exactafterreviewed9eccomposition43706d377;28assetcompositiontestsPASS. Dockerbuild/healthPASS and actualGit2.47.3 12incrementalprotocolassertionsPASS. Explicituserdecision stillrequired forGit>=2.42 andruntimeTrixie; no landing/Done untilanswer. MandatorymergedCargo pendingapproval."
     },
     "3f8da8c4": {
       "verdict": "PASS",
@@ -1360,11 +1374,9 @@
     }
   },
   "source_queue": [
-    "92afc5d8 branch gates running",
-    "47d62472 test-only rework checks running",
-    "9ecde705 consumer classification rework",
-    "c140921c implementation",
-    "a273667c isolated Git-floor proposal review; userdecision pending"
+    "fb5e8e8d implementation",
+    "c140921c held forsharedproducerproposal",
+    "a273667c reviewed; explicituserdecision pending"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
