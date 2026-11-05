@@ -230,9 +230,10 @@
           "short_id": "ec9e812c",
           "title": "Pinned-read behaviour suite moves into the git module suite",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "f76ab00b4b22f91feb9ddc8d0a8db44b6d4af92e"
         },
         {
           "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
@@ -727,7 +728,8 @@
     "f6 Cargo cc72ca26 failed four shared corpus setups because child Git ceiling excludes own root from .jit discovery. Steward authorized parent-ceiling fix preserving host isolation, child-only environment and existing test owners; failed evidence86cb8402c retained, red/green rework in progress.",
     "Do not nest tracker commands under jit worktree exec: repository lock is non-reentrant and times out. Tracker commands take own locks; use exec only around short Git commit/file updates.",
     "Origin Done after merged stable Cargo4e0b64b4. Corrected claims fullgates848ee4a5/2682790f and info1ee8a09a/38f4141a pass; shared fixture fix0f144b98d reused exactly in11871fa14. Final DEC26-28 plan review97a30f16 passes on21cd8fb9; pending metadata integration. Completed HEAD/list/history trees reclaimed canonically.",
-    "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge."
+    "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge.",
+    "ec9 relocation Done after actual stable merged Cargo; source released immediately to df fe3. Object-reader producer is unblocked."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -949,7 +951,7 @@
     "ec9e812c": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "ee5279b9-e853-48f4-990f-8e096f101412",
+        "cargo-ci": "f635018d-15df-4fee-9d45-87c9aadcce49",
         "code-review": "52c1a8c0-2887-4b10-92f8-a154b33dc6a6"
       },
       "reviewed_source": "23894b96c90ee007abd5a4e305f9e32b66110109",
@@ -968,7 +970,8 @@
       },
       "stale_narrative": "Old file references only in historical investigations and archived evidence; no current code/user docs reference removed suite.",
       "deferred_items": "No issue-linked design docs or in-scope deferrals.",
-      "holistic": "One owning suite; shared GitRepository/GitStandIn/checkout helpers; no production changes. Main integration pending."
+      "holistic": "One owning suite; shared GitRepository/GitStandIn/checkout helpers; no production changes. Main integration pending.",
+      "integration": "Reviewed nine cases and forty assertions preserved byte-for-byte alongside incoming tests; focused composition passed. Main f76ab00b4b22f91feb9ddc8d0a8db44b6d4af92e merged Cargo stable PASS f635018d-15df-4fee-9d45-87c9aadcce49."
     },
     "732f7afb": {
       "verdict": "PASS",
@@ -989,8 +992,6 @@
     }
   },
   "source_queue": [
-    "df0546",
-    "ec9e812c",
     "df fe3",
     "ready interleave"
   ],
