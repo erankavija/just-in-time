@@ -14,7 +14,14 @@
     "repo-validate",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "134bf0dc-5617-47e7-b455-ed223e8151b1",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:30:52.721634639Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a236e81e-4890-4607-931a-e3d3612c3899",
   "labels": [
     "type:story",
@@ -25,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Repository foundations",
-  "updated_at": "2026-11-05T02:30:27.900463186Z"
+  "updated_at": "2026-11-05T02:30:52.721634639Z"
 }
