@@ -392,6 +392,7 @@ roots = [
   "scripts/cargo-ci-selftest.sh",
   "scripts/cargo-ci.sh",
   "scripts/profile-test-suite.sh",
+  "scripts/production-lines.py",
   "scripts/rust-build-budget.sh",
 ]
 
