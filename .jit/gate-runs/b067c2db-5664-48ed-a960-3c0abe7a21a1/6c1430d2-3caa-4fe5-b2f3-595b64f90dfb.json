@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-b067c2db",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "476463a248eef54ebd0dc545f2a2c6c1e90a2db4",
+  "completed_at": "2026-11-05T03:31:09.023792522Z",
+  "duration_ms": 266203,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "web/src/App.tsx",
+        "id": "F1",
+        "line": 89,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Stale comment says the all-issues refresh supports client-side search."
+      }
+    ],
+    "summary": "The hard criterion is met; one advisory stale comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b067c2db-5664-48ed-a960-3c0abe7a21a1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6c1430d2-3caa-4fe5-b2f3-595b64f90dfb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:26:42.820775962Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 11314f3c, 6c693408c, 476463a2\nPolicy sources: AGENTS.md\nResolved items: @/issue/0f8efc37/requirement/REQ-08, @/issue/3a61ff16/requirement/REQ-01, @/issue/c8e79465/requirement/REQ-01 (.jit issue Markdown); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: npm-ci passed (exit 0; run 6c693408c contains 11314f3c and 6c693408c, not 476463a2); code-review pending\nTruncation recovery: partitioned implementation patches by path and reread claim/gate metadata; omitted truncated historical gate stdout as outside the current behavior cone\n\n1. F1 — advisory, issue-impact, low: [web/src/App.tsx:89](/mnt/nvme/jit/agents/worktrees/agent-b067c2db/web/src/App.tsx:89) still says the refresh supports “client-side search,” but search now exclusively uses server results. Update or remove the stale comment. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The hard criterion is met; one advisory stale comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Stale comment says the all-issues refresh supports client-side search.\",\"file\":\"web/src/App.tsx\",\"line\":89,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

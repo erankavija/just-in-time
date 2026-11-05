@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-b067c2db",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a14fa877b8f6e2f4d85ca563597b62a5c3d36a41",
+  "completed_at": "2026-11-05T03:37:18.674711563Z",
+  "duration_ms": 219146,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied; no unresolved findings remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b067c2db-5664-48ed-a960-3c0abe7a21a1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "774c4535-e33d-43ea-9d38-820ba7138663",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:33:39.528107183Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 11314f3c, 6c693408c, 476463a2, 89229b32, a14fa877  \nPolicy sources: AGENTS.md  \nResolved items: @/issue/0f8efc37/requirement/REQ-08, @/issue/3a61ff16/requirement/REQ-01, @/issue/c8e79465/requirement/REQ-01 (issue Markdown); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/npm-ci (.jit/gates.toml)  \nGate evidence: npm-ci passed (exit 0; run 89229b32 covers implementation and cleanup commits; a14fa877 is record-only); prior code-review passed (exit 0; its advisory was fixed in 89229b32)  \nTruncation recovery: narrowed reads of plan/investigation, current implementation, deleted scorer, and record metadata; generated asset inventories and historical gate stdout were outside the behavior cone  \n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied; no unresolved findings remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
