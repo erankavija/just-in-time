@@ -280,8 +280,9 @@
           "short_id": "d5cae9e3",
           "title": "CLI tests for commands with no git executable",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
@@ -290,7 +291,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "profile_fixture_rework"
+          "worker_status": "cargo_passed_independent_review_running"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
@@ -299,7 +300,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "approved_fixture_rework_queued"
+          "worker_status": "fixture_rework_running"
         }
       ]
     },
@@ -378,7 +379,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementing"
+          "worker_status": "full_gates_running"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -761,7 +762,8 @@
     "9de4c09c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "d68150e2 actual Cargo failure 9c02d30d exposed profile dirty-target fixture with bound layout but no explicit WorktreePaths. Steward approved exact eighth file commands/profile.rs to supply detected paths alongside existing layout, preserving assertions and production. Criteria unchanged; native manifest validation passed. Rework 1 dispatched. ea4b7363 actual Cargo c21d7c93 failed CLI release field fixture lacking actor in non-Git repository; fixture scope escalation pending. dcf88b6f and a273667c dispatched from 9e4fa52c5.",
     "Steward approved ea4b7363 exact third file tests/cli_issue/gate_field_contract_test.rs: explicit actor through existing child-only command_with_env on release, preserve all output assertions and production no-checkout semantics, audit same fixture family. Failed Cargo c21d7c93 preserved156b0115c; no prior review findings/linked docs. Rework1 queued. Native validator rejected now-unused chain-link override after footprint grew; removed obsolete override, validation passed.",
-    "f649c144 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "f649c144 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "f649c144 Done after actual merged Cargo5ac87f4a on833a71908 (5003 tests+25 doctests); closure97688a26d, tree reclaimed. e3 info/list composition pending focused check. d681 corrected fullCargo144a9cb4 stable PASS5016+25 on1f96b6ee, independent review running. dcf source264988e28 removes old blob batch/parser (69 module cases pass), full gates running. EA approved fixture rework dispatched. Ready d5cae9e3 claimed for next available worker slot."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
