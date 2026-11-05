@@ -428,8 +428,10 @@
           "short_id": "5046408a",
           "title": "Configurable worktree root independent of the data root",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "planning",
+          "worker": "agent:f4d9502a-lead"
         },
         {
           "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
@@ -876,7 +878,8 @@
     "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision.",
     "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect.",
     "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done."
+    "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done.",
+    "Stewardfbpolicyruling: mutationguard uses supplied data-history paths.git(); relocatedcodecheckout mustnotlendhistory to externalnonGitstore. Existingownerassertion preserved, rootwrite_checkoutinferencewithdrawn.504planner mustpreserveseparatedatahistory/codeevidenceauthorities. 504claimedplanningonly perDEC04/23 outside53manifest/REQcredit, Terrahighdesignthenindependentreview/stewardacceptance. c0ea checkpointclaimed forcriteriaaudit+cargo/holisticgatesin isolation, no source-slotreservation."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,

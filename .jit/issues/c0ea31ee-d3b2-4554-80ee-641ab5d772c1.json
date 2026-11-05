@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T04:27:39.244025307Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "per:@/charter/D-21"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Layout facts are detected once and reach every consumer",
-  "updated_at": "2026-11-05T04:10:24.698088620Z"
+  "updated_at": "2026-11-05T04:27:39.244025307Z"
 }
