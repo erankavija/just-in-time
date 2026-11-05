@@ -3,9 +3,9 @@
 //! working directory.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, ChildStdout, Command, Output, Stdio};
 use std::sync::Arc;
 use std::thread;
 use thiserror::Error;
@@ -47,7 +47,7 @@ pub enum GitError {
         path: String,
         stderr: String,
     },
-    /// The artifact path violates the repository-relative storage contract.
+    /// A path or object name violates its input contract.
     #[error("{0}")]
     InvalidPath(String),
 }
@@ -421,6 +421,334 @@ impl GitCheckout {
         }
         Ok(paths)
     }
+}
+
+/// A full lowercase SHA-1 or SHA-256 identity for any Git object.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct GitObjectId(String);
+
+impl GitObjectId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        (matches!(value.len(), 40 | 64)
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+        .then(|| Self(value.to_owned()))
+    }
+}
+
+/// Git's stored object kinds; tree entries such as symlinks remain blobs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitObjectType {
+    Blob,
+    Tree,
+    Commit,
+    Tag,
+}
+
+impl GitObjectType {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "blob" => Some(Self::Blob),
+            "tree" => Some(Self::Tree),
+            "commit" => Some(Self::Commit),
+            "tag" => Some(Self::Tag),
+            _ => None,
+        }
+    }
+}
+
+/// An object and its exact uncompressed contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitObject {
+    id: GitObjectId,
+    object_type: GitObjectType,
+    bytes: Vec<u8>,
+}
+
+impl GitObject {
+    pub fn id(&self) -> &GitObjectId {
+        &self.id
+    }
+
+    pub fn object_type(&self) -> GitObjectType {
+        self.object_type
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+/// An incremental reader owning one Git child, reaped on drop or protocol failure.
+pub struct GitObjectReader {
+    process: CatFileProcess,
+}
+
+impl GitObjectReader {
+    /// Read another name, including names discovered from an earlier answer.
+    /// Missing names return `None`; newline or NUL input is rejected before sending.
+    /// I/O or protocol errors end the session and return [`GitError::UnexpectedOutput`].
+    pub fn read(&mut self, name: &str) -> Result<Option<GitObject>, GitError> {
+        let Some(header) = self.process.request(name)? else {
+            return Ok(None);
+        };
+        let contents = (|| {
+            let output = self.process.output()?;
+            let mut bytes = Vec::new();
+            output.take(header.size).read_to_end(&mut bytes)?;
+            let mut separator = [0];
+            output.read_exact(&mut separator)?;
+            if bytes.len() as u64 != header.size || separator != [b'\n'] {
+                return Err(invalid_object_output("invalid object body framing"));
+            }
+            Ok(bytes)
+        })();
+        let bytes = contents.map_err(|error| self.process.fail(error))?;
+        Ok(Some(GitObject {
+            id: header.id,
+            object_type: header.object_type,
+            bytes,
+        }))
+    }
+}
+
+impl GitCheckout {
+    /// Start one `cat-file --batch` process for any number of incremental reads.
+    /// Returns [`GitError::GitUnavailable`] when the executable cannot start.
+    pub fn object_reader(&self) -> Result<GitObjectReader, GitError> {
+        Ok(GitObjectReader {
+            process: CatFileProcess::start(self, CatFileMode::Contents)?,
+        })
+    }
+
+    /// Look up object kinds in input order through one `cat-file --batch-check`.
+    /// Missing names return `None`. Every name is validated before starting Git.
+    /// Startup, I/O and protocol failures use the module's typed errors.
+    pub fn object_types(
+        &self,
+        names: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Result<Vec<Option<GitObjectType>>, GitError> {
+        let names = names
+            .into_iter()
+            .map(|name| {
+                validate_object_name(name.as_ref())?;
+                Ok(name.as_ref().to_owned())
+            })
+            .collect::<Result<Vec<_>, GitError>>()?;
+        let mut process = CatFileProcess::start(self, CatFileMode::Types)?;
+        let types = names
+            .iter()
+            .map(|name| {
+                process
+                    .request(name)
+                    .map(|header| header.map(|header| header.object_type))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        process.finish()?;
+        Ok(types)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CatFileMode {
+    Contents,
+    Types,
+}
+
+impl CatFileMode {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Contents => "--batch",
+            Self::Types => "--batch-check",
+        }
+    }
+}
+
+struct ObjectHeader {
+    id: GitObjectId,
+    object_type: GitObjectType,
+    size: u64,
+}
+
+struct CatFileProcess {
+    child: Child,
+    stdout: Option<BufReader<ChildStdout>>,
+    stderr_reader: Option<thread::JoinHandle<io::Result<Vec<u8>>>>,
+    mode: CatFileMode,
+    reaped: bool,
+}
+
+impl CatFileProcess {
+    fn start(checkout: &GitCheckout, mode: CatFileMode) -> Result<Self, GitError> {
+        let mut child = checkout
+            .git
+            .command(&checkout.worktree_root, ["cat-file", mode.argument()])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|source| checkout.git.unavailable(source))?;
+        let stdout = child.stdout.take().map(BufReader::new);
+        let mut process = Self {
+            child,
+            stdout,
+            stderr_reader: None,
+            mode,
+            reaped: false,
+        };
+        let setup = (|| {
+            let mut stderr = process
+                .child
+                .stderr
+                .take()
+                .ok_or_else(|| io::Error::other("git did not expose stderr"))?;
+            thread::Builder::new().spawn(move || {
+                // Drain continuously; retain only bounded diagnostic text.
+                let mut bytes = Vec::new();
+                stderr.by_ref().take(64 * 1024).read_to_end(&mut bytes)?;
+                io::copy(&mut stderr, &mut io::sink())?;
+                Ok(bytes)
+            })
+        })();
+        process.stderr_reader = Some(setup.map_err(|error| process.fail(error))?);
+        Ok(process)
+    }
+
+    fn output(&mut self) -> io::Result<&mut BufReader<ChildStdout>> {
+        self.stdout
+            .as_mut()
+            .ok_or_else(|| io::Error::other("git object session is closed"))
+    }
+
+    fn request(&mut self, name: &str) -> Result<Option<ObjectHeader>, GitError> {
+        validate_object_name(name)?;
+        let answer = (|| {
+            let input = self
+                .child
+                .stdin
+                .as_mut()
+                .ok_or_else(|| io::Error::other("git object session is closed"))?;
+            writeln!(input, "{name}")?;
+            input.flush()?;
+            let mut header = Vec::new();
+            self.output()?.read_until(b'\n', &mut header)?;
+            parse_object_header(name, &header)
+        })();
+        answer.map_err(|error| self.fail(error))
+    }
+
+    fn finish(&mut self) -> Result<(), GitError> {
+        self.child.stdin.take();
+        let finished = (|| {
+            if !self.output()?.fill_buf()?.is_empty() {
+                return Err(invalid_object_output("unexpected trailing response"));
+            }
+            let status = self.child.wait()?;
+            self.reaped = true;
+            if !status.success() {
+                return Err(io::Error::other(format!("git exited with {status}")));
+            }
+            self.stderr().map(|_| ())
+        })();
+        finished.map_err(|error| self.fail(error))
+    }
+
+    fn stderr(&mut self) -> io::Result<Vec<u8>> {
+        self.stderr_reader
+            .take()
+            .map(|reader| {
+                reader
+                    .join()
+                    .map_err(|_| io::Error::other("git stderr reader panicked"))?
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+    }
+
+    fn stop(&mut self) {
+        self.child.stdin.take();
+        self.stdout.take();
+        if !self.reaped {
+            let _ = self.child.kill();
+            self.reaped = self.child.wait().is_ok();
+        }
+    }
+
+    fn fail(&mut self, error: io::Error) -> GitError {
+        self.stop();
+        let diagnostic = match self.stderr() {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Err(error) => error.to_string(),
+        };
+        GitError::UnexpectedOutput {
+            command: format!("cat-file {}", self.mode.argument()),
+            output: format!("{error}: {diagnostic}"),
+        }
+    }
+}
+
+impl Drop for CatFileProcess {
+    fn drop(&mut self) {
+        self.stop();
+        let _ = self.stderr();
+    }
+}
+
+fn validate_object_name(name: &str) -> Result<(), GitError> {
+    if name.contains(['\n', '\0']) {
+        Err(GitError::InvalidPath(
+            "git object names cannot contain a newline or NUL".into(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn invalid_object_output(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message.into())
+}
+
+fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHeader>> {
+    let malformed = || {
+        invalid_object_output(format!(
+            "invalid object header: {:?}",
+            String::from_utf8_lossy(bytes)
+        ))
+    };
+    let line = std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|header| header.strip_suffix('\n'))
+        .ok_or_else(malformed)?;
+    if line.strip_suffix(" missing") == Some(name) {
+        return Ok(None);
+    }
+    let mut fields = line.split(' ');
+    let id = fields
+        .next()
+        .and_then(GitObjectId::parse)
+        .ok_or_else(malformed)?;
+    let object_type = fields
+        .next()
+        .and_then(GitObjectType::parse)
+        .ok_or_else(malformed)?;
+    let size = fields
+        .next()
+        .filter(|size| !size.is_empty() && size.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|size| size.parse().ok())
+        .ok_or_else(malformed)?;
+    if fields.next().is_some() {
+        return Err(malformed());
+    }
+    Ok(Some(ObjectHeader {
+        id,
+        object_type,
+        size,
+    }))
 }
 
 /// A repository worktree and its checked-out branch, if any.
@@ -991,6 +1319,8 @@ impl GitCheckout {
             .collect()
     }
 
+    // Temporary @/inv/convention-convergence exception: dcf88b6f moves
+    // pinned inspection onto object_reader and removes this batch parser.
     fn read_blob_batch(
         &self,
         oids: &BTreeSet<String>,
