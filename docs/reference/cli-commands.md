@@ -4,10 +4,17 @@
 
 ## CLI JSON contracts
 
-CLI commands that accept `--json` print machine-readable JSON to stdout. Success
-responses are the command payload itself, not a `{ "success": true, "data": ... }`
-envelope. Commands that return objects may include a top-level `message` field
-for human-readable context.
+The global `--json` flag selects machine-readable output and is accepted after
+any command segment; for example, `jit query --json available` and
+`jit query available --json` are equivalent. Successful JSON responses contain
+the command payload rather than a `{ "success": true, "data": ... }` wrapper.
+List payloads use a top-level numeric `count` equal to the collection array's
+length and a command-specific key for that array, with command-specific fields
+alongside them. Object responses may include a top-level `message` field. See
+[Collection keys by command](#collection-keys-by-command) for the mapping.
+
+Successful JSON responses carry warnings in a top-level `warnings` array. In
+non-quiet human mode, warnings go to stderr; `--quiet` suppresses them.
 
 Example successful issue update — a lightweight confirmation, not the full
 issue (fetch the body with `jit issue show`):
@@ -22,16 +29,24 @@ issue (fetch the body with `jit issue show`):
 }
 ```
 
-For failures reached after successful argument parsing and command dispatch, a
-`--json` invocation emits exactly one error envelope on stdout, the command's
-payload stream. Its reported `error.code` is a registered
-[machine-readable error code](error-codes.md), and that code determines the
-process exit status in the [Exit Codes reference](exit-codes.md). Those generated
-references are the canonical vocabulary and status taxonomy; this section is the
-canonical statement of the machine-readable failure contract.
+After arguments are parsed, a command failure under `--json` emits
+exactly one error envelope on stdout and nothing on stderr. A findings outcome
+places its report in `error.details` in that envelope, and the envelope's code
+determines the process exit status. The reported `error.code` is a registered
+[machine-readable error code](error-codes.md); the [Exit Codes reference](exit-codes.md)
+maps it to the process status. Those generated references are the canonical
+vocabulary and status taxonomy; this section is the canonical statement of the
+machine-readable failure contract.
 
-Clap parser diagnostics raised before dispatch remain outside this envelope
-guarantee.
+In human mode, a propagated error writes one `Error:` line to stderr. A findings
+outcome writes its report to stdout and its unprefixed summary to stderr.
+
+`jit worktree exec` is a child-process passthrough: child stdout and stderr flow
+through directly, and jit returns the child's status. Its `--json` option shapes
+only wrapper failures; see [worktree exec](worktree-validate.md#jit-worktree-exec).
+
+Parser failures do not use the JSON envelope. A wrong verb prints its hint and
+the parser's diagnostic to stderr and exits 2, with or without `--json`.
 
 Error responses use a stable top-level `error` object:
 
@@ -163,8 +178,8 @@ Each command group has exactly one canonical spelling for removal: `jit issue
 delete`, `jit dep rm`, `jit gate remove`, `jit doc remove`. Other groups'
 spellings are NOT aliased onto each other — `dep remove`, `dep delete`, `issue
 rm`, `issue remove`, `gate rm`, `gate delete`, `doc rm`, and `doc delete` all
-fail (exit code 2). The parser prints a hint naming the group's canonical
-command on stderr ahead of clap's diagnostic, e.g.:
+fail (exit code 2). See [CLI JSON contracts](#cli-json-contracts) for parser
+output; for example:
 
 ```
 $ jit dep remove abc123 def456
@@ -193,9 +208,6 @@ Error: `--divergence` is not a `jit validate` flag. Use `jit validate --branch-d
 `jit label` itself only inspects the namespace registry (`jit label
 namespaces`, `jit label values`) — it never touches an issue's labels. See
 `jit label --help`.
-
-A wrong verb is a parse failure: with or without `--json`, stdout stays empty
-and the hint and diagnostic go to stderr, outside the JSON failure envelope.
 
 ## Archive planning and execution
 
@@ -455,23 +467,22 @@ jit gate add abc123 tests,clippy,fmt  ❌
 
 This follows industry standard (cargo, kubectl, git).
 
-### `--json`
-Output data in JSON format for machine consumption. The flag is global: it is accepted after any command segment, so `jit query --json available` and `jit query available --json` are equivalent.
-
 ### `--quiet` / `-q`
-Suppress non-essential output (success messages, headers, warnings). Preserves data output and errors.
+Suppress non-essential human output (success messages, headers, warnings). It
+does not change JSON payloads.
 
 **What --quiet suppresses:**
-- Success messages ("Created issue...", "Updated...")
-- Informational headers ("Ready issues:", "Total: 5")
-- Warnings and validation hints
+- Human success messages ("Created issue...", "Updated...")
+- Human informational headers ("Ready issues:", "Total: 5")
+- Human warnings and validation hints
 - Progress indicators
 
 **What --quiet preserves:**
 - Issue lists and query results
 - Issue IDs (from `issue create`)
 - Essential data output
-- Errors (shown to stderr in human mode; under `--json`, failures are emitted as JSON envelopes to stdout)
+- JSON payloads, including their `warnings` array
+- Errors (see [CLI JSON contracts](#cli-json-contracts))
 
 ### `--version`
 Print the CLI package version and build profile:
@@ -500,7 +511,7 @@ canonicalize unusual-but-valid TOML syntax spellings elsewhere in the file —
 semantically lossless, with every rule, comment, and unrelated table preserved.
 
 ```bash
-jit init [--profile <SELECTOR>]... [--values-file <PATH>] [--set NAME=VALUE]... [--json]
+jit init [--profile <SELECTOR>]... [--values-file <PATH>] [--set NAME=VALUE]...
 ```
 
 A plain `jit init` writes the structural minimum: `config.toml` carries the
@@ -615,7 +626,7 @@ consulted. Multiple selectors are resolved and applied in their occurrence order
 Show one or more profile manifests and package identities from repository packages:
 
 ```bash
-jit profile show --profile <DIR>... [--json]
+jit profile show --profile <DIR>...
 ```
 
 Each repeatable `--profile` selector is a package directory path.
@@ -638,7 +649,7 @@ Report what applying a selection would change in this repository, before
 anything is published:
 
 ```bash
-jit profile diff --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--json]
+jit profile diff --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]...
 ```
 
 The selection is resolved, closed over the packages it depends on, and planned
@@ -694,7 +705,7 @@ Apply a profile package read from a repository location through one redo
 record:
 
 ```bash
-jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
+jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run]
 ```
 
 `--values-file` and `--set` use the same variable inputs as profiled init.
@@ -753,7 +764,7 @@ application may change.
 Pack a package directory into one portable archive file:
 
 ```bash
-jit profile pack --source <DIR> --output <FILE> [--dry-run] [--json]
+jit profile pack --source <DIR> --output <FILE> [--dry-run]
 ```
 
 `--source` names the package directory and must classify as worktree content.
@@ -794,7 +805,7 @@ decision. Human output presents the same identity, origin, status, and decision.
 Place the package an archive carries into the worktree:
 
 ```bash
-jit profile add --archive <FILE> --destination <DIR> [--dry-run] [--json]
+jit profile add --archive <FILE> --destination <DIR> [--dry-run]
 ```
 
 `--archive` names the archive to read, which may live anywhere. `--destination`
@@ -1698,7 +1709,7 @@ List all gates defined in the registry.
 
 **Usage:**
 ```bash
-jit gate list [--json] [--quiet]
+jit gate list [--quiet]
 ```
 
 **Output:**
@@ -1734,7 +1745,7 @@ Show detailed information about a specific gate definition.
 
 **Usage:**
 ```bash
-jit gate show <GATE_KEY> [--json] [--quiet]
+jit gate show <GATE_KEY> [--quiet]
 ```
 
 **Example:**
@@ -1767,19 +1778,19 @@ on a pending or failed gate — it is pure inspection.
 **Usage:**
 ```bash
 # Latest-run view (default): one gate, its most recent recorded run
-jit gate status <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
-jit gate status <ISSUE_ID> --gate <GATE_KEY> [--json] [--quiet]
+jit gate status <ISSUE_ID> <GATE_KEY> [--quiet]
+jit gate status <ISSUE_ID> --gate <GATE_KEY> [--quiet]
 
 # History view: prior runs newest-first, gate key OPTIONAL (acts as a filter)
-jit gate status <ISSUE_ID> --all [--gate <GATE_KEY>] [--status <STATUS>] [--json]
-jit gate status <ISSUE_ID> --limit <N> [--gate <GATE_KEY>] [--status <STATUS>] [--json]
+jit gate status <ISSUE_ID> --all [--gate <GATE_KEY>] [--status <STATUS>]
+jit gate status <ISSUE_ID> --limit <N> [--gate <GATE_KEY>] [--status <STATUS>]
 
 # Flat view: the latest run's stored report text, verbatim
-jit gate status <ISSUE_ID> <GATE_KEY> --stdout [--tail <N>] [--json]
-jit gate status <ISSUE_ID> <GATE_KEY> --stderr [--tail <N>] [--json]
+jit gate status <ISSUE_ID> <GATE_KEY> --stdout [--tail <N>]
+jit gate status <ISSUE_ID> <GATE_KEY> --stderr [--tail <N>]
 
 # Findings view: the latest run's structured findings + verdict, one per line
-jit gate status <ISSUE_ID> <GATE_KEY> --findings [--json]
+jit gate status <ISSUE_ID> <GATE_KEY> --findings
 ```
 
 For the latest-run and flat views the gate key may be supplied as a positional
@@ -1800,7 +1811,6 @@ present, filters the listing to that gate.
 - `--tail <N>` - Flat view: keep only the last `N` lines of the printed text.
 - `--findings` - Findings view: print only the latest run's structured findings
   and verdict (requires a gate key).
-- `--json` - Machine-readable output (supported by every view).
 
 The history view (`--all` / `--limit`) emits the list envelope
 `{"count": N, "results": [...]}`, where `count` is the number of runs returned
@@ -1861,7 +1871,7 @@ non-mutating).
 
 **Usage:**
 ```bash
-jit gate status-all <ISSUE_ID> [--json] [--full]
+jit gate status-all <ISSUE_ID> [--full]
 ```
 
 **Behavior:**
@@ -2183,7 +2193,7 @@ List the gate presets this project declares.
 
 **Usage:**
 ```bash
-jit gate preset list [--json]
+jit gate preset list
 ```
 
 **Output** (line format only — run `jit gate preset list` for the project's own
@@ -2209,7 +2219,7 @@ Display detailed information about a specific preset, including all gates and th
 
 **Usage:**
 ```bash
-jit gate preset show <NAME> [--json]
+jit gate preset show <NAME>
 ```
 
 **Arguments:**
@@ -2257,7 +2267,6 @@ jit gate preset apply <NAME> [ISSUE_ID]... [OPTIONS]
 - `--no-precheck` - Skip precheck gates from preset
 - `--no-postcheck` - Skip postcheck gates from preset
 - `--except <GATE>` - Exclude specific gates (repeatable)
-- `--json` - Output JSON format
 - `--quiet` - Suppress non-essential output
 
 **Examples:**
@@ -2307,7 +2316,7 @@ Create a custom preset from an issue's current gates. Captures all gates require
 
 **Usage:**
 ```bash
-jit gate preset create <ISSUE_ID> <NAME> [--json]
+jit gate preset create <ISSUE_ID> <NAME>
 ```
 
 **Arguments:**
@@ -2315,7 +2324,6 @@ jit gate preset create <ISSUE_ID> <NAME> [--json]
 - `NAME` - Name for the new preset
 
 **Options:**
-- `--json` - Output JSON format
 - `--quiet` - Suppress non-essential output
 
 **Output:**
@@ -2436,7 +2444,7 @@ depend on each other.
 
 **Usage:**
 ```bash
-jit dep add <FROM_ID> <TO_ID>... [--reduce] [--json]
+jit dep add <FROM_ID> <TO_ID>... [--reduce]
 ```
 
 **Arguments:**
@@ -2508,7 +2516,7 @@ this keeps a dangling edge (whose target issue was deleted) removable.
 
 **Usage:**
 ```bash
-jit dep rm <FROM_ID> <TO_ID>... [--json]
+jit dep rm <FROM_ID> <TO_ID>...
 ```
 
 **Examples:**
@@ -2618,7 +2626,7 @@ header:
 
 ### Membership divergence (`jit query divergence`)
 
-`jit query divergence [--json]` reports each issue that carries a membership
+`jit query divergence` reports each issue that carries a membership
 label (`epic:foo`, `milestone:v1.0`, …) while the dependency DAG does **not**
 place it inside the container that owns that label — i.e. the label claims a
 membership the [authoritative DAG](../concepts/hierarchy-resolution.md) does not
@@ -2672,8 +2680,8 @@ in the log's stored (append) order. The event object shape is documented under
 [Event Log Tags reference](events.md).
 
 Human output prints one JSON event object per line (JSONL, the same encoding the
-log stores); `--json` wraps the same events in the list envelope
-`{"count": N, "events": [...]}` with a `message` field.
+log stores). JSON output uses the shared [CLI JSON contracts](#cli-json-contracts)
+shape with an `events` collection and a `message` field.
 
 ### `jit events tail`
 
@@ -2686,7 +2694,6 @@ jit events tail [OPTIONS]
 | Flag | Description |
 |------|-------------|
 | `-n <N>` | Number of most recent events to print (default `10`). |
-| `--json` | Emit the list envelope `{"count": N, "events": [...]}`. |
 
 ```bash
 jit events tail
@@ -2707,7 +2714,6 @@ jit events query [OPTIONS]
 | `-e`, `--event-type <TYPE>` | Keep only events whose `type` tag equals `<TYPE>` (e.g. `issue_state_changed`). |
 | `-i`, `--issue-id <ID>` | Keep only events carrying this `issue_id`. |
 | `-l`, `--limit <N>` | Return at most `N` events (default `50`). |
-| `--json` | Emit the list envelope `{"count": N, "events": [...]}`. |
 
 ```bash
 # Every state change recorded for one issue
@@ -2748,7 +2754,7 @@ for a genuinely new reference; the appended `issue_updated` event records the
 refresh under the `doc-update` tag rather than `doc-add`.
 
 ```bash
-jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_TYPE>] [--skip-scan] [--json]
+jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_TYPE>] [--skip-scan]
 ```
 
 | Argument / flag | Description |
@@ -2774,7 +2780,7 @@ directories it owns in the declared issue-scoped areas ([derived
 documents](configuration.md#issue-artifact-directories)).
 
 ```bash
-jit doc list <ID> [--json]
+jit doc list <ID>
 ```
 
 JSON returns the list envelope with the issue id alongside it:
@@ -2786,7 +2792,7 @@ Print one of an issue's documents: an explicit reference or a [derived
 document](configuration.md#issue-artifact-directories).
 
 ```bash
-jit doc show <ID> <PATH> [--at <COMMIT>] [--json]
+jit doc show <ID> <PATH> [--at <COMMIT>]
 ```
 
 `--at <COMMIT>` reads the document as it stood at that commit. Without it, a
@@ -2801,7 +2807,7 @@ List the commits that touched one of an issue's documents, explicit or derived.
 It reads Git history, so an uncommitted file has none.
 
 ```bash
-jit doc history <ID> <PATH> [--json]
+jit doc history <ID> <PATH>
 ```
 
 ### `jit doc diff`
@@ -2809,7 +2815,7 @@ jit doc history <ID> <PATH> [--json]
 Diff one of an issue's documents, explicit or derived, between two commits.
 
 ```bash
-jit doc diff <ID> <PATH> --from <COMMIT> [--to <COMMIT>] [--json]
+jit doc diff <ID> <PATH> --from <COMMIT> [--to <COMMIT>]
 ```
 
 `--from` is required; `--to` defaults to `HEAD`.
@@ -2819,7 +2825,7 @@ jit doc diff <ID> <PATH> --from <COMMIT> [--to <COMMIT>] [--json]
 Detach a document reference from an issue. The file on disk is untouched.
 
 ```bash
-jit doc remove <ID> <PATH> [--json]
+jit doc remove <ID> <PATH>
 ```
 
 `remove` is this group's canonical spelling: `doc rm` and `doc delete` exit `2`
@@ -2830,7 +2836,7 @@ with a hint (see **Wrong-verb hints** above).
 List the assets (images, diagrams) a document references.
 
 ```bash
-jit doc assets list <ID> <PATH> [--rescan] [--json]
+jit doc assets list <ID> <PATH> [--rescan]
 ```
 
 `--rescan` re-reads the document to refresh the stored asset metadata instead of
@@ -2841,7 +2847,7 @@ reporting what was recorded when the reference was added.
 Validate the links and asset references of the documents in scope.
 
 ```bash
-jit doc check-links [--scope all|issue:<ID>] [--json]
+jit doc check-links [--scope all|issue:<ID>]
 ```
 
 `--scope` defaults to `all`. The exit code carries the verdict per the
@@ -2872,7 +2878,7 @@ Print the repository-relative directory an issue owns in a declared
 issue-scoped area.
 
 ```bash
-jit doc dir <ID> <AREA> [--json]
+jit doc dir <ID> <AREA>
 ```
 
 `<AREA>` is one of the issue-scoped areas the repository declares under
@@ -2901,7 +2907,7 @@ An id naming no issue is `ISSUE_NOT_FOUND`, exit code `3`.
 Report the artifacts sitting outside the directory their owning issue owns.
 
 ```bash
-jit doc conformance [--json]
+jit doc conformance
 ```
 
 The report walks every declared issue-scoped area and resolves each artifact's
@@ -2963,7 +2969,7 @@ whether the archived dependency still satisfies: a terminal origin satisfies,
 and a non-terminal origin blocks.
 
 ```bash
-jit graph deps <ID> [--depth <N>] [--json]
+jit graph deps <ID> [--depth <N>]
 ```
 
 `--depth` defaults to `1` (immediate dependencies). `--depth 0` is the opt-in
@@ -2975,7 +2981,7 @@ JSON uses the list envelope over `nodes`:
 {
   "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
   "depth": 1,
-  "count": 2,
+  "count": 1,
   "nodes": [
     {
       "id": "<dep-uuid>",
@@ -2987,7 +2993,7 @@ JSON uses the list envelope over `nodes`:
       "children": []
     }
   ],
-  "summary": { "total": 2, "by_state": { "done": 1, "ready": 1 } }
+  "summary": { "total": 1, "by_state": { "done": 1 } }
 }
 ```
 
@@ -3009,8 +3015,8 @@ Show the issues that depend on this one. Symmetric to `deps`, with the same
 `--depth` semantics.
 
 ```bash
-jit graph rdeps <ID> [--depth <N>] [--json]
-jit rdeps <ID> [--depth <N>] [--json]        # top-level spelling
+jit graph rdeps <ID> [--depth <N>]
+jit rdeps <ID> [--depth <N>]        # top-level spelling
 ```
 
 JSON uses the list envelope `{"count": N, "dependents": [...]}` over compact
@@ -3023,7 +3029,7 @@ List the issues that have no dependencies of their own: the entry points of the
 DAG.
 
 ```bash
-jit graph roots [--json]
+jit graph roots
 ```
 
 JSON uses the list envelope `{"count": N, "roots": [...]}`.
@@ -3033,7 +3039,7 @@ JSON uses the list envelope `{"count": N, "roots": [...]}`.
 Export the dependency graph, optionally scoped to one container's subtree.
 
 ```
-jit graph export [--format dot|mermaid|json|batch] [--json] [--full] [--scope <container>] [--output <file>]
+jit graph export [--format dot|mermaid|json|batch] [--full] [--scope <container>] [--output <file>]
 ```
 
 | Flag | Description |
@@ -3172,7 +3178,7 @@ rank of each node — as computed by the canonical
 authoritative; membership labels are advisory and are not consulted.
 
 ```
-jit graph tree [<root-id>] [--json]
+jit graph tree [<root-id>]
 ```
 
 With no id the whole repository is resolved; with a root id the view is the root
@@ -3216,7 +3222,7 @@ where each node is:
 Print the repository-wide state rollup.
 
 ```bash
-jit status [--json]
+jit status
 ```
 
 ```text
@@ -3256,12 +3262,12 @@ scoped to a container or a label bucket, use
 Check repository integrity and run the declarative rule set from `.jit/rules.toml`.
 
 ```bash
-jit validate [<ID>] [--json]
-jit validate <ID> --explain [--json]
-jit validate <ID> --rule <RULE> [--json]
-jit validate --scope <ID> [--json]
-jit validate --fix [--dry-run] [--json]
-jit validate --branch-drift [--leases] [--json]
+jit validate [<ID>]
+jit validate <ID> --explain
+jit validate <ID> --rule <RULE>
+jit validate --scope <ID>
+jit validate --fix [--dry-run]
+jit validate --branch-drift [--leases]
 ```
 
 | Mode | What it does |
@@ -3353,7 +3359,7 @@ operations' stage files; and remove orphaned `*.tmp` files under `.jit/` and
 under `.git/jit/leases/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
-jit recover [--json]
+jit recover
 ```
 
 The report counts the leftover redo records the session open applied
@@ -3373,7 +3379,7 @@ descriptions, wire the declared dependency edges, and run its transforms (such a
 moving the container's upstream dependencies onto a planning node).
 
 ```bash
-jit apply <TEMPLATE> <CONTAINER> [--anchor <ROLE=ID>] [--force] [--json]
+jit apply <TEMPLATE> <CONTAINER> [--anchor <ROLE=ID>] [--force]
 ```
 
 | Argument / flag | Description |
@@ -3433,7 +3439,7 @@ kinds.
 ### `jit item list`
 
 ```bash
-jit item list [--kind <KIND>] [--json]
+jit item list [--kind <KIND>]
 ```
 
 `--kind` filters to one kind, named by its registry name or a declared alias.
@@ -3445,8 +3451,8 @@ issue's short id, or `@` for a project item.
 ### `jit item show` / `jit item resolve`
 
 ```bash
-jit item show <QUALIFIED_ID> [--json]
-jit item resolve <QUALIFIED_ID> [--json]
+jit item show <QUALIFIED_ID>
+jit item resolve <QUALIFIED_ID>
 ```
 
 `resolve` is a distinct verb with identical behavior, for orchestrators that
@@ -3464,7 +3470,7 @@ jit item show <short-id>/REQ-01 --json
 ### `jit item search`
 
 ```bash
-jit item search [<QUERY>] [--kind <KIND>] [--json]
+jit item search [<QUERY>] [--kind <KIND>]
 ```
 
 The query matches self-id, qualified id, and item text. It defaults to the empty
@@ -3493,7 +3499,7 @@ preserved; in `separate-file` mode the whole file is written.
 ### `jit project render`
 
 ```bash
-jit project render [--name <name>] [--json]
+jit project render [--name <name>]
 ```
 
 Renders every declared `[projection.*]` into its configured target, or the single
@@ -3519,7 +3525,7 @@ mode, style, kinds, count}`. Under `--json` the pre-write guards above surface t
 ### `jit invariant check`
 
 ```bash
-jit invariant check [--json]
+jit invariant check
 ```
 
 Reports enforcement drift in the declared-but-unenforced direction: an invariant
@@ -3580,10 +3586,11 @@ JSON uses the list envelope, with the query echoed back:
 
 `path` is the file's path as the matcher reports it, and `issue_id` is the issue
 the file belongs to, or `null` for a file that is not an issue record. `matches`
-gives each match's byte offsets within `line_text`. A missing ripgrep
-returns the error envelope with code `RIPGREP_NOT_FOUND`; any other matcher
-failure returns `SEARCH_FAILED`. Both exit `10` (external dependency failed; see
-the [exit-code reference](exit-codes.md)).
+gives each match's byte offsets within `line_text`. Missing ripgrep and other
+matcher failures use `RIPGREP_NOT_FOUND` and `SEARCH_FAILED`, respectively; see
+the generated [error-code reference](error-codes.md) and
+[command-specific exit-code mappings](exit-codes.md#command-specific-mappings)
+for their canonical meanings and statuses.
 
 To search issue fields rather than raw storage lines, use
 [`jit issue search`](#searching-issues-jit-issue-search); to search addressable
@@ -3654,7 +3661,6 @@ jit serve [OPTIONS]
 | `--fg` | Run in the foreground instead of daemonizing (useful for debugging; Ctrl+C stops it). |
 | `--log <FILE>` | Where the daemonized server writes its output. A relative path resolves under `.jit/` (default `server.log` there); an absolute path is used as given. It governs daemon mode only — under `--fg` the server's output stays attached to the terminal and `--log` is not used. |
 | `--web-dir <DIR>` | Directory of built web UI static files (auto-detected when omitted). |
-| `--json` | Emit machine-readable output. |
 
 `--stop`, `--status`, and `--fg` are mutually exclusive.
 
@@ -3703,7 +3709,7 @@ served from.
 Copy the hook templates into the `hooks/` directory of the selected repository's common git directory and make them executable.
 
 ```bash
-jit hooks install [--json]
+jit hooks install
 ```
 
 One hook is installed: `pre-commit` validates branch divergence before a commit.
@@ -3733,7 +3739,7 @@ coordination settings — via a generic path walk over the repository
 
 **Usage:**
 ```bash
-jit config get <DOTTED.KEY> [--json]
+jit config get <DOTTED.KEY>
 ```
 
 A dotted path mirrors `config.toml`'s own structure, including a section's
@@ -3806,7 +3812,7 @@ keys against: the repository's default-filled `worktree` and `coordination`
 settings and its other sections.
 
 ```bash
-jit config show [--json]
+jit config show
 ```
 
 ### `jit config set`
@@ -3817,7 +3823,7 @@ registry also synchronizes the default `namespace-unique-*` rows in
 untouched).
 
 ```bash
-jit config set <KEY> <VALUE> [--json]
+jit config set <KEY> <VALUE>
 
 jit config set coordination.max_indefinite_leases_per_agent 3
 ```
@@ -3828,7 +3834,7 @@ Validate the repository configuration and environment-variable overrides for
 syntax errors and invalid values.
 
 ```bash
-jit config validate [--json]
+jit config validate
 ```
 
 See the [command-specific `config validate` mapping in the generated exit-code
@@ -3840,7 +3846,7 @@ Prints the effective type→level map the repository's `[type_hierarchy]`
 declaration resolves to. A repository that declares none has an empty map.
 
 ```bash
-jit config show-hierarchy [--json]
+jit config show-hierarchy
 ```
 
 ## Scripting and Automation
@@ -3886,22 +3892,10 @@ jit query available --json --quiet | jq -r '.issues[0].id'
 jit status --json --quiet | jq '{ready, in_progress, blocked, gated, done, rejected}'
 ```
 
-### List envelope
+### Collection keys by command
 
-Every list- and query-family command wraps its collection in a uniform
-envelope: a numeric top-level `count` and a plural, collection-typed key holding
-the array. `count` always equals the length of that array, so a single parse
-path works for every command — no bare-array or dual-shape fallback is needed.
-
-```json
-{
-  "count": 0,
-  "issues": [],
-  "message": "Found 0 issue(s)"
-}
-```
-
-The collection key is command-specific:
+See [CLI JSON contracts](#cli-json-contracts) for the shared list payload
+shape. The collection key is command-specific:
 
 | Command | Collection key |
 | --- | --- |
@@ -3926,12 +3920,10 @@ The collection key is command-specific:
 | `query divergence`, `worktree store-divergence` | `divergences` |
 | `invariant check` (when no drift is found) | `findings` |
 
-Some envelopes carry additional metadata keys alongside `count` and the
-collection (for example `query`/`namespace` context, `issue_id`, or a `warnings`
-array), but `count` and the collection key are always present. Top-level
-`search` uses `count` rather than `total`, and `label namespaces --json` returns
-only `namespaces`, `count`, and the optional `message` field instead of internal
-configuration details.
+Some commands add metadata beside `count` and the collection. Top-level `search`
+uses `count` rather than `total`, and `label namespaces` returns only
+`namespaces`, `count`, and an optional `message` instead of internal configuration
+details.
 
 For a few commands `count` is the size of the named collection while a separate
 aggregate lives elsewhere: `graph deps` counts the top-level `nodes` (whereas

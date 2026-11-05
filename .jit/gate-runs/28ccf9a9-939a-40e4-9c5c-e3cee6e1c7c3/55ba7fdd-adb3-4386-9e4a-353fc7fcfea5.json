@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-review-f4-plan",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ee983ab4b5c3321c505c3566254876e170192a45",
+  "completed_at": "2026-11-05T01:26:41.842830721Z",
+  "duration_ms": 258361,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All linked artifacts and required validation checks passed; no unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "55ba7fdd-adb3-4386-9e4a-353fc7fcfea5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:22:23.481203968Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings. Manifest validation (warnings denied), render check, native dry run, and issue validation passed.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All linked artifacts and required validation checks passed; no unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
