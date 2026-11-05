@@ -5,20 +5,42 @@
   "created_at": "2026-11-04T23:33:27.949036691Z",
   "dependencies": [],
   "description": "Split expensive document-rendering dependencies so the web production build produces bounded JavaScript chunks while retaining all supported document and diagram features.\n\n## Background\n\nThe production entry chunk exceeds Vite's default 500 kB warning limit. Full syntax-language registration and diagram rendering are imported into the initial application even when their content is not displayed.\n\n## Success Criteria\n\n- [hard] REQ-01: The production build emits no oversized-chunk warning at the existing default limit, and no generated JavaScript chunk exceeds 500 kB after minification.\n- [hard] REQ-02: Syntax highlighting retains its existing supported language coverage, and Mermaid retains its supported diagram types through feature-scoped loading.\n- [hard] REQ-03: Existing web tests, lint, and production build pass, with focused coverage proving any changed asynchronous rendering contract.\n\n## Notes\n\nDo not raise or suppress the size warning, publish equivalent oversized payloads outside the bundle, or remove supported features to meet the limit. Prefer current dependencies and bounded changes at existing rendering boundaries.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Bundle and production rendering verification",
+      "path": "dev/active/6d93ab14/verification.md"
+    }
+  ],
+  "done_at": "2026-11-04T23:53:08.097570494Z",
   "first_ready_at": "2026-11-04T23:33:27.949036691Z",
   "gates_required": [
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "96be1f4c-cf42-466c-ac88-486ba47b1364",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:52:37.155429143Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "4a1a7523-f7b5-49c9-be23-97e3a51b6bfb",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:31:59.001633139Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6d93ab14-4c72-4ec5-9c50-471cf0d95746",
   "labels": [
     "component:web",
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Split oversized web rendering chunks",
-  "updated_at": "2026-11-04T23:33:37.946874373Z"
+  "updated_at": "2026-11-05T00:31:59.001633139Z"
 }

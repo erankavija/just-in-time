@@ -13,18 +13,19 @@ fn probe(dir: &Path) -> Option<ProbedCheckout> {
 }
 
 fn checkout(git: Git, root: &Path) -> GitCheckout {
-    GitCheckout::new(git, root.to_path_buf())
+    GitCheckout::for_test(git, root.to_path_buf())
 }
 
 #[cfg(unix)]
-fn assert_one_head_lookup(stand_in: &jit::test_harness::git::GitStandIn, root: &Path) {
+fn assert_bounded_head_lookup(stand_in: &jit::test_harness::git::GitStandIn, root: &Path) {
     let invocations = stand_in.invocations();
-    assert_eq!(invocations.len(), 1);
-    assert_eq!(invocations[0].directory(), Some(root));
-    assert_eq!(
-        invocations[0].args(),
-        ["rev-parse", "HEAD", "--abbrev-ref", "HEAD"]
+    assert!(
+        !invocations.is_empty() && invocations.len() <= 2,
+        "{invocations:?}"
     );
+    assert!(invocations
+        .iter()
+        .all(|call| call.directory() == Some(root)));
 }
 
 fn committed_repository(dir: &TempDir) -> GitRepository {
@@ -154,29 +155,47 @@ fn test_probe_runs_one_git_process_in_the_probed_directory() {
 
 #[cfg(unix)]
 #[test]
-fn test_head_branch_checkout_yields_commit_and_branch_with_one_git_process() {
+fn test_head_branch_checkout_yields_commit_and_branch_with_bounded_git_processes() {
     use jit::test_harness::git::GitStandIn;
 
     let dir = TempDir::new().unwrap();
     let repository = committed_repository(&dir);
     let commit = repository.git(&["rev-parse", "HEAD"]);
-    let branch = repository.git(&["branch", "--show-current"]);
-    let stand_in = GitStandIn::new();
+    let branch = "feature/head";
+    repository.git(&["checkout", "--quiet", "-b", branch]);
+    let linked = dir.path().join("linked");
+    let linked_branch = "feature/linked";
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        linked_branch,
+        linked.to_str().unwrap(),
+    ]);
 
-    let head = checkout(Git::with_program(stand_in.program()), repository.root())
-        .head()
-        .unwrap()
-        .unwrap();
+    [
+        (repository.root(), branch),
+        (linked.as_path(), linked_branch),
+    ]
+    .into_iter()
+    .for_each(|(root, branch)| {
+        let stand_in = GitStandIn::new();
+        let head = checkout(Git::with_program(stand_in.program()), root)
+            .head()
+            .unwrap()
+            .unwrap();
 
-    assert_eq!(head.commit().as_str(), commit);
-    assert_eq!(head.branch(), Some(branch.as_str()));
-    assert_eq!(head.branch_label(), branch);
-    assert_one_head_lookup(&stand_in, repository.root());
+        assert_eq!(head.commit().as_str(), commit);
+        assert_eq!(head.branch(), Some(branch));
+        assert_eq!(head.branch_label(), branch);
+        assert_bounded_head_lookup(&stand_in, root);
+    });
 }
 
 #[cfg(unix)]
 #[test]
-fn test_head_detached_checkout_yields_commit_and_head_label_with_one_git_process() {
+fn test_head_detached_checkout_yields_commit_and_head_label_with_bounded_git_processes() {
     use jit::test_harness::git::GitStandIn;
 
     let dir = TempDir::new().unwrap();
@@ -193,12 +212,12 @@ fn test_head_detached_checkout_yields_commit_and_head_label_with_one_git_process
     assert_eq!(head.commit().as_str(), commit);
     assert_eq!(head.branch(), None);
     assert_eq!(head.branch_label(), "HEAD");
-    assert_one_head_lookup(&stand_in, repository.root());
+    assert_bounded_head_lookup(&stand_in, repository.root());
 }
 
 #[cfg(unix)]
 #[test]
-fn test_head_unborn_checkout_yields_none_with_one_git_process() {
+fn test_head_unborn_checkout_yields_none_with_bounded_git_processes() {
     use jit::test_harness::git::GitStandIn;
 
     let dir = TempDir::new().unwrap();
@@ -210,7 +229,7 @@ fn test_head_unborn_checkout_yields_none_with_one_git_process() {
         .unwrap();
 
     assert_eq!(head, None);
-    assert_one_head_lookup(&stand_in, repository.root());
+    assert_bounded_head_lookup(&stand_in, repository.root());
 }
 
 #[test]
@@ -224,6 +243,262 @@ fn test_head_unstartable_program_returns_unavailable_error() {
         .unwrap_err();
 
     assert!(matches!(error, GitError::GitUnavailable { program: named, .. } if named == program));
+}
+
+#[cfg(unix)]
+fn assert_head_failure(root: &Path) {
+    let stand_in = jit::test_harness::git::GitStandIn::new();
+    let error = checkout(Git::with_program(stand_in.program()), root)
+        .head()
+        .unwrap_err();
+    assert!(
+        matches!(error, GitError::UnexpectedOutput { .. }),
+        "{error}"
+    );
+    assert_bounded_head_lookup(&stand_in, root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_invalid_checkout_returns_an_error() {
+    let dir = TempDir::new().unwrap();
+    [dir.path().to_path_buf(), dir.path().join("missing")]
+        .iter()
+        .for_each(|root| assert_head_failure(root));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_previously_recognized_checkout_becoming_invalid_returns_an_error() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let stand_in = jit::test_harness::git::GitStandIn::new();
+    let recognized = Git::default().probe(repository.root()).unwrap().unwrap();
+    let handle = checkout(
+        Git::with_program(stand_in.program()),
+        &recognized.worktree_root,
+    );
+    std::fs::remove_dir_all(repository.root().join(".git")).unwrap();
+
+    assert!(matches!(
+        handle.head(),
+        Err(GitError::UnexpectedOutput { .. })
+    ));
+    assert_bounded_head_lookup(&stand_in, repository.root());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_malformed_refs_are_not_classified_as_unborn() {
+    [
+        (".git/HEAD", "nonsense\n"),
+        (".git/HEAD", ""),
+        (".git/HEAD", "ref: refs/heads/a..b\n"),
+        (".git/HEAD", "ref: refs/tags/missing\n"),
+        (".git/refs/heads/feature/head", "nonsense\n"),
+        (
+            ".git/refs/heads/feature/head",
+            "ref: refs/heads/feature/head\n",
+        ),
+    ]
+    .iter()
+    .for_each(|(path, contents)| {
+        let dir = TempDir::new().unwrap();
+        let repository = committed_repository(&dir);
+        repository.git(&["branch", "-m", "feature/head"]);
+        repository.write(path, contents);
+        assert_head_failure(repository.root());
+    });
+}
+
+#[cfg(unix)]
+fn loose_object(repository: &GitRepository, oid: &str) -> PathBuf {
+    repository
+        .root()
+        .join(".git/objects")
+        .join(&oid[..2])
+        .join(&oid[2..])
+}
+
+#[cfg(unix)]
+fn damage_object(repository: &GitRepository, oid: &str, corrupt: bool) {
+    let path = loose_object(repository, oid);
+    std::fs::remove_file(&path).unwrap();
+    if corrupt {
+        std::fs::write(path, b"invalid compressed object").unwrap();
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_missing_or_corrupt_commit_returns_an_error() {
+    [false, true].into_iter().for_each(|corrupt| {
+        let dir = TempDir::new().unwrap();
+        let repository = committed_repository(&dir);
+        let oid = repository.git(&["rev-parse", "HEAD"]);
+        damage_object(&repository, &oid, corrupt);
+        assert_head_failure(repository.root());
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_non_commit_object_returns_an_error() {
+    [false, true].into_iter().for_each(|tag| {
+        let dir = TempDir::new().unwrap();
+        let repository = committed_repository(&dir);
+        let oid = if tag {
+            repository.git(&["-c", "tag.gpgSign=false", "tag", "-a", "-m", "tag", "named"]);
+            repository.git(&["rev-parse", "refs/tags/named"])
+        } else {
+            repository.git(&["hash-object", "-w", "README.md"])
+        };
+        repository.write(".git/HEAD", format!("{oid}\n"));
+        assert_head_failure(repository.root());
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_cached_or_replaced_commit_cannot_mask_object_damage() {
+    [false, true].into_iter().for_each(|replace| {
+        [false, true].into_iter().for_each(|corrupt| {
+            let dir = TempDir::new().unwrap();
+            let repository = committed_repository(&dir);
+            let original = repository.git(&["rev-parse", "HEAD"]);
+            if replace {
+                repository.write("README.md", "replacement");
+                let replacement = repository.commit("replacement");
+                repository.git(&["replace", &original, &replacement]);
+                repository.git(&["update-ref", "HEAD", &original]);
+            } else {
+                repository.git(&["commit-graph", "write", "--reachable"]);
+            }
+            damage_object(&repository, &original, corrupt);
+            assert_head_failure(repository.root());
+        });
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_does_not_traverse_commit_ancestors() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let parent = repository.git(&["rev-parse", "HEAD"]);
+    repository.write("README.md", "second");
+    let tip = repository.commit("second");
+    damage_object(&repository, &parent, false);
+    let stand_in = jit::test_harness::git::GitStandIn::new();
+
+    let head = checkout(Git::with_program(stand_in.program()), repository.root())
+        .head()
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(head.commit().as_str(), tip);
+    assert_bounded_head_lookup(&stand_in, repository.root());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_missing_promisor_commit_does_not_start_a_fetch() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let oid = repository.git(&["rev-parse", "HEAD"]);
+    repository.git(&[
+        "config",
+        "remote.origin.url",
+        dir.path().join("absent-remote").to_str().unwrap(),
+    ]);
+    repository.git(&["config", "remote.origin.promisor", "true"]);
+    damage_object(&repository, &oid, false);
+    let trace = dir.path().join("trace.json");
+    let stand_in = jit::test_harness::git::GitStandIn::with_environment(&[(
+        "GIT_TRACE2_EVENT",
+        trace.to_str().unwrap(),
+    )]);
+
+    assert!(
+        checkout(Git::with_program(stand_in.program()), repository.root())
+            .head()
+            .is_err()
+    );
+
+    let events: Vec<serde_json::Value> = std::fs::read_to_string(trace)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert!(
+        !events.iter().any(|event| event["event"] == "child_start"),
+        "{events:?}"
+    );
+    assert_bounded_head_lookup(&stand_in, repository.root());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_does_not_read_unrelated_refs_reflog_index_or_worktree_files() {
+    use std::os::unix::fs::OpenOptionsExt;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::time::Duration;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    repository.git(&["checkout", "--quiet", "--detach"]);
+    let traps: Vec<PathBuf> = [
+        ".git/logs/HEAD",
+        ".git/refs/heads/unrelated",
+        ".git/index",
+        "untracked",
+    ]
+    .iter()
+    .map(|path| repository.root().join(path))
+    .collect();
+    traps.iter().for_each(|path| {
+        if path.exists() {
+            std::fs::remove_file(path).unwrap();
+        }
+        nix::unistd::mkfifo(
+            path,
+            nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR,
+        )
+        .unwrap();
+    });
+    let stand_in = jit::test_harness::git::GitStandIn::new();
+    let handle = checkout(Git::with_program(stand_in.program()), repository.root());
+
+    let (result, accessed) = std::thread::scope(|scope| {
+        let (stop, stopped) = mpsc::channel::<()>();
+        // A forbidden reader receives EOF, so a regression fails instead of hanging.
+        let monitor = scope.spawn(move || {
+            let mut accessed = BTreeSet::new();
+            loop {
+                traps.iter().for_each(|path| {
+                    if std::fs::OpenOptions::new()
+                        .write(true)
+                        .custom_flags(nix::fcntl::OFlag::O_NONBLOCK.bits())
+                        .open(path)
+                        .is_ok()
+                    {
+                        accessed.insert(path.clone());
+                    }
+                });
+                match stopped.recv_timeout(Duration::from_millis(1)) {
+                    Err(RecvTimeoutError::Timeout) => {}
+                    _ => return accessed,
+                }
+            }
+        });
+        let result = handle.head();
+        drop(stop);
+        (result, monitor.join().unwrap())
+    });
+
+    assert!(result.is_ok(), "{result:?}");
+    assert!(accessed.is_empty(), "unexpected reads: {accessed:?}");
+    assert_bounded_head_lookup(&stand_in, repository.root());
 }
 
 #[cfg(unix)]
@@ -273,7 +548,7 @@ fn test_user_name_returns_none_when_unset_with_one_git_process() {
 }
 
 fn dirty_paths(repository: &GitRepository) -> BTreeSet<PathBuf> {
-    GitCheckout::new(Git::default(), repository.root().to_path_buf())
+    GitCheckout::for_test(Git::default(), repository.root().to_path_buf())
         .dirty_paths()
         .unwrap()
         .into_iter()
@@ -371,7 +646,7 @@ fn test_dirty_paths_runs_one_git_process_in_the_checkout() {
     repository.write("README.md", "changed");
     let stand_in = GitStandIn::new();
 
-    GitCheckout::new(
+    GitCheckout::for_test(
         Git::with_program(stand_in.program()),
         repository.root().to_path_buf(),
     )
