@@ -247,7 +247,7 @@ pub enum ArtifactDiscoveryError {
 /// relocation and their live sources are deleted while another issue's document
 /// still reaches them (`@/issue/8e071e18/decision/D-14`).
 /// `test_document_preview_copies_an_artifact_whose_only_outside_owner_arrives_through_an_out_of_root_hub`
-/// in [`crate::commands::archive`] fails if this walk is bounded.
+/// in the archive command fails if this walk is bounded.
 pub fn expand_artifact_closure(
     mut state: ArtifactClosureState,
     evidence: &ArtifactEvidenceMap,
@@ -323,11 +323,11 @@ fn followed_references<'a>(
 
 /// Derive selected inventory and repository-wide embedded owners from the same closed evidence.
 ///
-/// Link targets that [`is_navigation_target`] identifies are skipped: they
+/// Link targets that `is_navigation_target` identifies are skipped: they
 /// contribute no edge, no artifact entry, and no traversal. An explicitly
 /// selected root is inventoried whatever its filesystem kind, so a directory
 /// named as a root still reaches classification and blocks there. `policy`
-/// bounds this walk through [`followed_references`].
+/// bounds this walk through `followed_references`.
 pub fn discover_archive_artifacts(
     inventory: ExplicitRootInventory,
     issues: &[Issue],

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-bb5040a8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a5b532cf031c8ac138f643fa0825b0c1037e4ebe",
+  "completed_at": "2026-11-05T00:48:22.862239151Z",
+  "duration_ms": 190793,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are met by the attributable implementation and focused tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bc67bc3d-d4d7-433d-ba92-b8be3a334e90",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:45:12.068692827Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 74a85de5, a67e055e, 33d19b2, 33616e5, a5b532cf\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-10 (issue source); @/inv/convention-convergence (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); supplied ancestry confirms all tagged commits are contained\nTruncation recovery: focused implementation patches, merge parent-specific diffs, and current code/test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are met by the attributable implementation and focused tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

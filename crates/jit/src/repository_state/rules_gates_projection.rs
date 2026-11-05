@@ -5,9 +5,9 @@
 //! [`RuleSet`] and the [`GateRegistry`] into one reference document and writes it
 //! into a config-selected target, reusing the SAME projection primitives:
 //!
-//! - the [`ProjectionMode`] / [`ProjectionStyle`] configuration knobs,
+//! - the [`crate::config::ProjectionMode`] / [`crate::config::ProjectionStyle`] configuration knobs,
 //! - the strict managed-document engine, and
-//! - the shared, typed [`ProjectionError`] plus the storage publication boundary.
+//! - the shared, typed [`crate::repository_state::ProjectionError`] plus the storage publication boundary.
 //!
 //! [`render_rules_and_gates_markdown`] is the built-in `full`-style render for the
 //! `rule` + `gate` registry-first kinds: it takes the two registries directly,

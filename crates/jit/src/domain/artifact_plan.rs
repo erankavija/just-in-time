@@ -935,7 +935,7 @@ impl ActionCounts {
 }
 
 /// Schema-v1 archive plan shared by preview rendering and execution: its
-/// artifacts beside the target-level fields of [`PlanHeader`].
+/// artifacts beside the target-level fields of `PlanHeader`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct ArtifactPlan(ListEnvelope<ArtifactsKey, ArtifactPlanEntry, PlanHeader>);

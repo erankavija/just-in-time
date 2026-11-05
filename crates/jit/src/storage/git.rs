@@ -169,6 +169,22 @@ pub struct GitCheckout {
     worktree_root: PathBuf,
 }
 
+/// The relationship between a checkout's HEAD and a requested base commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BaseComparison {
+    /// Both commits resolve and share history.
+    Compared {
+        /// The nearest shared ancestor of HEAD and the base commit.
+        merge_base: CanonicalCommitOid,
+        /// The base revision peeled to a full commit OID.
+        base_commit: CanonicalCommitOid,
+    },
+    /// The base revision cannot be peeled to a commit.
+    BaseUnresolved,
+    /// Both commits resolve but share no history.
+    NoMergeBase,
+}
+
 impl GitCheckout {
     /// Construct operations for a checkout already recognized by Git.
     pub(super) fn new(git: Git, worktree_root: PathBuf) -> Self {
@@ -311,6 +327,117 @@ impl GitCheckout {
         Ok(Some(name.strip_suffix('\n').unwrap_or(name).to_owned()))
     }
 
+    // Temporary @/inv/convention-convergence exception: document history
+    // converges here when 83c8632f lands.
+    /// List commits touching a literal worktree-relative path, newest first,
+    /// with git's default history simplification. One git process.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails, or reports malformed
+    /// commit metadata.
+    pub fn file_history(&self, path: &str) -> Result<Vec<FileHistoryCommit>, GitError> {
+        let args = [
+            "--literal-pathspecs",
+            "log",
+            "-z",
+            "--no-show-signature",
+            "--no-notes",
+            "--encoding=UTF-8",
+            "--format=%H%x00%an%x00%ct%x00%B",
+            "--",
+            path,
+        ];
+        let output = self.git.run(&self.worktree_root, args)?;
+        let unexpected = |bytes: &[u8]| GitError::UnexpectedOutput {
+            command: args.join(" "),
+            output: String::from_utf8_lossy(bytes).into_owned(),
+        };
+        if !output.status.success() {
+            return Err(unexpected(&output.stderr));
+        }
+        parse_file_history(&output.stdout).ok_or_else(|| unexpected(&output.stdout))
+    }
+
+    // Temporary @/inv/convention-convergence exception: snapshot migration
+    // c140921c moves its origin lookup here.
+    /// Read the `origin` remote URL with one git process.
+    ///
+    /// Returns `None` when the checkout has no `origin` remote.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GitError::GitUnavailable`] if git cannot start, or
+    /// [`GitError::UnexpectedOutput`] if git fails for another reason or its
+    /// successful output is not one UTF-8 URL.
+    pub fn origin_url(&self) -> Result<Option<String>, GitError> {
+        const ARGS: [&str; 3] = ["remote", "get-url", "origin"];
+        let output = self.git.run(&self.worktree_root, ARGS)?;
+        if !output.status.success() {
+            if output.status.code() == Some(2) {
+                return Ok(None);
+            }
+            return Err(GitError::UnexpectedOutput {
+                command: ARGS.join(" "),
+                output: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+
+        let unexpected = || GitError::UnexpectedOutput {
+            command: ARGS.join(" "),
+            output: String::from_utf8_lossy(&output.stdout).into_owned(),
+        };
+        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
+        let url = stdout.strip_suffix('\n').ok_or_else(unexpected)?;
+        Ok(Some(url.to_owned()))
+    }
+
+    // Temporary @/inv/convention-convergence exception: branch comparisons
+    // converge here when fb5e8e8d (check_branch_divergence) and 47d62472
+    // (validate_branch_drift) migrate their consumers.
+    /// Compare this checkout's HEAD with a caller-selected base revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if git cannot start, produces a non-canonical OID, or
+    /// fails to compare two resolved commits for a reason other than unrelated
+    /// histories.
+    pub fn compare_with_base(&self, base: &str) -> Result<BaseComparison, GitError> {
+        let base_commit = match self.resolve_commit(base) {
+            Ok(ArtifactVersion::Pinned(oid)) => oid,
+            Ok(version) => {
+                return Err(GitError::UnexpectedOutput {
+                    command: format!("rev-parse --verify {base}^{{commit}}"),
+                    output: version.as_str().to_owned(),
+                });
+            }
+            Err(GitError::RevisionNotFound { .. }) => return Ok(BaseComparison::BaseUnresolved),
+            Err(error) => return Err(error),
+        };
+        let args = ["merge-base", "HEAD", base_commit.as_str()];
+        let output = self.git.run(&self.worktree_root, args)?;
+        match output.status.code() {
+            Some(0) => {
+                let oid = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+                let merge_base = CanonicalCommitOid::parse(oid.clone()).map_err(|_| {
+                    GitError::NonCanonicalOid {
+                        revision: "HEAD".to_owned(),
+                        output: oid,
+                    }
+                })?;
+                Ok(BaseComparison::Compared {
+                    merge_base,
+                    base_commit,
+                })
+            }
+            Some(1) => Ok(BaseComparison::NoMergeBase),
+            _ => Err(GitError::UnexpectedOutput {
+                command: args.join(" "),
+                output: stderr(&output),
+            }),
+        }
+    }
+
     /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.
     pub fn worktree_root(&self) -> &Path {
         &self.worktree_root
@@ -375,6 +502,56 @@ impl Worktree {
     pub fn branch(&self) -> Option<&str> {
         self.branch.as_deref()
     }
+}
+
+/// A commit in a path's history; the message retains its whitespace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileHistoryCommit {
+    commit: CanonicalCommitOid,
+    author: String,
+    commit_time: i64,
+    message: String,
+}
+
+impl FileHistoryCommit {
+    pub fn commit(&self) -> &CanonicalCommitOid {
+        &self.commit
+    }
+
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+
+    /// Committer time as Unix seconds.
+    pub fn commit_time(&self) -> i64 {
+        self.commit_time
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+fn parse_file_history(output: &[u8]) -> Option<Vec<FileHistoryCommit>> {
+    if output.is_empty() {
+        return Some(Vec::new());
+    }
+    let stdout = std::str::from_utf8(output).ok()?.strip_suffix('\0')?;
+    let fields: Vec<_> = stdout.split('\0').collect();
+    let records = fields.chunks_exact(4);
+    if !records.remainder().is_empty() {
+        return None;
+    }
+    records
+        .map(|record| {
+            Some(FileHistoryCommit {
+                commit: CanonicalCommitOid::parse(record[0]).ok()?,
+                author: record[1].to_owned(),
+                commit_time: record[2].parse().ok()?,
+                message: record[3].to_owned(),
+            })
+        })
+        .collect()
 }
 
 fn parse_head_output<T>(
@@ -1101,6 +1278,25 @@ impl Head {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_file_history_rejects_malformed_records() {
+        let oid = "a".repeat(40);
+        let record = format!("{oid}\0author\x00123\0message\n\0");
+        let malformed = [
+            record.trim_end_matches('\0').as_bytes().to_vec(),
+            format!("{oid}\0author\x00123\0").into_bytes(),
+            format!("{record}extra\0").into_bytes(),
+            b"short-oid\0author\x00123\0message\0".to_vec(),
+            format!("{oid}\0author\0invalid-time\0message\0").into_bytes(),
+            format!("{oid}\0author\x009223372036854775808\0message\0").into_bytes(),
+            [record.as_bytes(), &[0xff]].concat(),
+        ];
+
+        for output in malformed {
+            assert!(parse_file_history(&output).is_none(), "{output:?}");
+        }
+    }
 
     #[test]
     fn test_run_unstartable_program_is_unavailable_naming_program() {

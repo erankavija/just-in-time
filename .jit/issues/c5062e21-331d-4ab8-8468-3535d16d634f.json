@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-05T01:12:01.086681605Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Make `jit-server` consume the shared repository bootstrap so the checkout selected by `--data-dir` supplies one layout and worktree classification to storage and the executor.\n\n## Background\n\nThe CLI already opens repositories through `commands/bootstrap::open_repository`. That constructor resolves the selected data root, detects worktree paths once, configures storage and executor, and controls startup recovery before validation. Server startup still calls `WorktreePaths::detect()` from its process directory and builds a separate layout and storage path.\n\n## Success Criteria\n\n- [hard] REQ-01: Server startup consumes `commands/bootstrap::open_repository` for storage, executor, layout and worktree paths. It passes the selected `--data-dir` and the process directory as the non-Git fallback, performs no server-owned layout/worktree discovery, preserves recovery before validation, and releases startup serialization before serving requests.\n- [hard] REQ-02: A test starts the derivation from a directory outside the repository with the data directory inside a Git checkout and asserts that the worktree root is that checkout's root and that the paths classify it as a Git checkout. The non-Git case preserves the explicit process-directory fallback.\n\n## Notes\n\nThe Git epic owns this combined startup migration, including the server/web epic's shared-bootstrap requirement. The steward reconciled the formerly competing discovery contracts on 2026-11-04; no second server constructor or discovery path is introduced.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:11:08.421679524Z",
   "first_ready_at": "2026-11-01T14:05:43.239550705Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b6b2d6ad-0f6f-4cba-bee1-24e67266686f",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:10:46.054290911Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "149faf22-3f88-438c-a7f3-d29fefc5e66d",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:42:44.447966719Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "satisfies:0f8efc37/REQ-01"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Server detects its layout once from the selected data root",
-  "updated_at": "2026-11-04T22:01:13.854689356Z"
+  "updated_at": "2026-11-05T02:11:08.421679524Z"
 }

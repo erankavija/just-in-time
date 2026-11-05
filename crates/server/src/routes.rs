@@ -137,7 +137,6 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) 
         .route("/issues", get(list_issues))
         .route("/issues/:id", get(get_issue))
         .route("/graph", get(get_graph))
-        .route("/status", get(get_status))
         .route("/search", get(search_issues))
         .route("/documents", get(get_document_by_path))
         .route("/documents/raw", get(get_document_raw_by_path))
@@ -153,13 +152,10 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) 
         )
         .route("/issues/:id/documents/:path/diff", get(get_document_diff))
         .route("/gates", get(list_gates))
-        .route("/gates/:key", get(get_gate_definition))
         .route("/issues/:id/gate-runs", get(list_gate_runs))
         .route("/issues/:id/gate-runs/:run_id", get(get_gate_run))
-        .route("/config/strategic-types", get(get_strategic_types))
         .route("/config/hierarchy", get(get_hierarchy))
         .route("/config/namespaces", get(get_namespaces))
-        .route("/changes", get(get_changes))
         .route("/events/stream", get(events_stream))
         .with_state(state)
 }
@@ -375,35 +371,6 @@ async fn get_graph<S: IssueStore + Send + Sync + 'static>(
     .await
 }
 
-/// Status summary
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StatusResponse {
-    pub backlog: usize,
-    pub ready: usize,
-    pub in_progress: usize,
-    pub done: usize,
-    pub blocked: usize,
-    pub total: usize,
-}
-
-/// Get repository status
-async fn get_status<S: IssueStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
-) -> Result<Json<StatusResponse>, StatusCode> {
-    execute_blocking(&state, |executor| {
-        let summary = executor.validation().get_status()?;
-        Ok(Json(StatusResponse {
-            backlog: summary.backlog,
-            ready: summary.ready,
-            in_progress: summary.in_progress,
-            done: summary.done,
-            blocked: summary.blocked,
-            total: summary.total,
-        }))
-    })
-    .await
-}
-
 /// Search query parameters
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
@@ -441,37 +408,65 @@ async fn search_issues<S: IssueStore + Send + Sync + 'static>(
     execute_blocking(&state, move |executor| {
         let start = std::time::Instant::now();
 
-        // Restrict search to issue documents, explicit or derived
-        let document_paths = executor.documents().get_issue_document_paths()?;
-
+        let semantic = executor.queries().search_issue_matches(
+            &params.q,
+            jit::commands::SemanticSearchOptions {
+                case_sensitive: params.case_sensitive,
+                regex: params.regex,
+            },
+        )?;
         let config = executor.config();
         let layout = config.repository_layout()?;
-        // An empty glob list would search every worktree file, so documents are searched only when linked.
-        let mut results = if document_paths.is_empty() {
+        let data_root = match layout.data_root().canonicalize() {
+            Ok(root) => Some(root),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
+        let document_paths = executor
+            .documents()
+            .get_issue_document_paths()?
+            .into_iter()
+            .filter(|path| {
+                let candidate = layout.worktree_root().join(path);
+                !candidate.starts_with(layout.data_root())
+                    && !candidate
+                        .canonicalize()
+                        .ok()
+                        .zip(data_root.as_ref())
+                        .is_some_and(|(resolved, root)| resolved.starts_with(root))
+            })
+            .collect::<Vec<_>>();
+        let mut results = if params.limit == 0 {
             Vec::new()
         } else {
-            let options = SearchOptions {
-                case_sensitive: params.case_sensitive,
-                regex: params.regex,
-                max_results: Some(params.limit),
-                file_patterns: document_paths,
-                ..Default::default()
-            };
-            jit::search::search(layout.worktree_root(), &params.q, options)?
+            jit::search::search_files(
+                layout.worktree_root(),
+                &params.q,
+                SearchOptions {
+                    case_sensitive: params.case_sensitive,
+                    regex: params.regex,
+                    max_results: Some(params.limit),
+                    ..Default::default()
+                },
+                &document_paths,
+            )?
         };
-        if results.len() < params.limit {
-            let remaining = params.limit - results.len();
-            let data_options = SearchOptions {
-                case_sensitive: params.case_sensitive,
-                regex: params.regex,
-                max_results: Some(remaining),
-                file_patterns: vec!["issues/*.json".to_string()],
-                ..Default::default()
-            };
-            let mut data_results =
-                jit::search::search(layout.data_root(), &params.q, data_options)?;
-            results.append(&mut data_results);
+        for result in &mut results {
+            result.issue_id = None;
         }
+        results.extend(
+            semantic
+                .into_iter()
+                .take(params.limit.saturating_sub(results.len()))
+                .map(|item| SearchResult {
+                    // Semantic matches have no source line or byte offsets.
+                    path: format!("issues/{}.json", item.issue.id),
+                    issue_id: Some(item.issue.id),
+                    line_number: 0,
+                    line_text: item.text,
+                    matches: Vec::new(),
+                }),
+        );
 
         let duration_ms = start.elapsed().as_millis();
 
@@ -999,18 +994,6 @@ async fn list_gates<S: IssueStore + Send + Sync + 'static>(
     execute_blocking(&state, |executor| Ok(Json(executor.gates().list_gates()?))).await
 }
 
-/// Get a single gate definition by key
-async fn get_gate_definition<S: IssueStore + Send + Sync + 'static>(
-    Path(key): Path<String>,
-    State(state): State<AppState<S>>,
-) -> Result<Json<GateDefinition>, StatusCode> {
-    let key = key.parse::<GateKey>().map_err(reject)?;
-    execute_blocking(&state, move |executor| {
-        Ok(Json(executor.gates().show_gate_definition(&key)?))
-    })
-    .await
-}
-
 /// Query parameters for gate runs
 #[derive(Debug, Deserialize)]
 struct GateRunsQuery {
@@ -1047,24 +1030,6 @@ async fn get_gate_run<S: IssueStore + Send + Sync + 'static>(
         Ok(Json(GateRunSummary::full(&run)))
     })
     .await
-}
-
-/// Response for strategic types
-#[derive(Debug, Serialize, Deserialize)]
-struct StrategicTypesResponse {
-    strategic_types: Vec<String>,
-}
-
-/// Get strategic types from configuration
-async fn get_strategic_types<S: IssueStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
-) -> Result<Json<StrategicTypesResponse>, StatusCode> {
-    let namespaces =
-        execute_blocking(&state, |executor| executor.config().get_namespaces()).await?;
-
-    let strategic_types = namespaces.strategic_types.unwrap_or_default();
-
-    Ok(Json(StrategicTypesResponse { strategic_types }))
 }
 
 /// Response for type hierarchy
@@ -1130,19 +1095,6 @@ async fn get_namespaces<S: IssueStore + Send + Sync + 'static>(
         .collect();
 
     Ok(Json(NamespacesResponse { namespaces }))
-}
-
-/// Response for current change version
-#[derive(Debug, Serialize, Deserialize)]
-struct ChangesResponse {
-    version: u64,
-}
-
-/// Get current change version
-async fn get_changes<S: IssueStore>(State(state): State<AppState<S>>) -> Json<ChangesResponse> {
-    Json(ChangesResponse {
-        version: state.tracker.current_version(),
-    })
 }
 
 /// SSE stream of change events
@@ -1361,25 +1313,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_gate_definition_reports_an_unreadable_registry_as_a_server_error() {
-        let executor = memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                gates: Some("= [ not toml"),
-                after_initialization: true,
-                ..MemoryDeclarations::default()
-            },
-        );
-        let key = "review".parse().unwrap();
-        let expected = status_of_error(executor.gates().show_gate_definition(&key).unwrap_err());
-
-        let response = test_app(executor).get("/gates/review").await;
-
-        response.assert_status(expected);
-        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
-    }
-
-    #[tokio::test]
     async fn test_get_issue_reports_an_ambiguous_prefix_as_a_bad_request() {
         let harness = jit::test_harness::TestHarness::new();
         for seed in [1, 2] {
@@ -1462,6 +1395,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_create_routes_omits_retired_paths_and_keeps_retained_paths() {
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations::default(),
+        ));
+
+        for path in [
+            "/status",
+            "/config/strategic-types",
+            "/changes",
+            "/gates/Bad_Key",
+        ] {
+            server.get(path).await.assert_status(StatusCode::NOT_FOUND);
+        }
+        server.get("/gates").await.assert_status_ok();
+        server
+            .get("/issues/nonexistent/documents/README.md/diff")
+            .await
+            .assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
     async fn test_list_issues_empty() {
         let server = test_app(memory_executor_declaring(
             InMemoryStorage::new(),
@@ -1538,15 +1493,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_gate_key_routes_reject_malformed_tokens_at_extraction() {
+    async fn test_gate_run_list_rejects_malformed_gate_key_at_extraction() {
         let (server, id, _) = dependent_pair_server();
         let malformed = status_of_error("Bad_Key".parse::<GateKey>().unwrap_err());
         assert_eq!(malformed, StatusCode::BAD_REQUEST);
-        server.get("/gates/Bad_Key").await.assert_status(malformed);
-        server
-            .get("/gates/unknown-gate")
-            .await
-            .assert_status(StatusCode::NOT_FOUND);
         server
             .get(&format!("/issues/{id}/gate-runs"))
             .add_query_param("gate_key", "Bad_Key")
@@ -2009,49 +1959,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_status() {
-        let executor = Arc::new(memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&taxonomy_config()),
-                ..MemoryDeclarations::default()
-            },
-        ));
-
-        let _id = executor
-            .issues()
-            .create_issue(
-                "Issue 1".to_string(),
-                "Description".to_string(),
-                Priority::Normal,
-                vec![],
-                vec![],
-                None,
-                None,
-                false,
-            )
-            .unwrap()
-            .issue
-            .id;
-
-        let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let app = create_routes(state);
-        let server = TestServer::new(app).unwrap();
-
-        let response = server.get("/status").await;
-        response.assert_status_ok();
-        let status: StatusResponse = response.json();
-        assert_eq!(status.total, 1);
-        assert_eq!(status.ready, 1); // New issue with no deps is ready
-    }
-
-    #[tokio::test]
     async fn test_search_endpoint_requires_query() {
         let server = test_app(memory_executor_declaring(
             InMemoryStorage::new(),
@@ -2120,22 +2027,6 @@ mod tests {
         ));
         let _response = server.get("/search?q=test").await;
         // If it doesn't panic or error, the issue-document logic is being used
-    }
-
-    #[tokio::test]
-    async fn test_get_strategic_types() {
-        let server = test_app(memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&taxonomy_config()),
-                ..MemoryDeclarations::default()
-            },
-        ));
-        let response = server.get("/config/strategic-types").await;
-        response.assert_status_ok();
-        let data: StrategicTypesResponse = response.json();
-        // Should return default or configured strategic types
-        assert!(data.strategic_types.is_empty() || !data.strategic_types.is_empty());
     }
 
     #[tokio::test]
@@ -2393,6 +2284,60 @@ unique = false
     }
 
     #[tokio::test]
+    async fn test_search_options_apply_to_issue_fields_and_linked_documents() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let issue_path = format!(".jit/issues/{id}.json");
+        executor
+            .documents()
+            .add_document_reference(&id, &issue_path, None, None, None, true)
+            .unwrap();
+        let server = test_app(executor);
+        let response = server
+            .get("/search")
+            .add_query_param("q", "^Test iss.e$")
+            .add_query_param("regex", "true")
+            .add_query_param("case_sensitive", "true")
+            .await;
+        response.assert_status_ok();
+        let hits = response.json::<SearchResponse>().results;
+        assert!(hits.iter().any(|hit| hit.issue_id.as_ref() == Some(&id)));
+        let response = server
+            .get("/search")
+            .add_query_param("q", "^test iss.e$")
+            .add_query_param("regex", "true")
+            .add_query_param("case_sensitive", "true")
+            .await;
+        assert!(response.json::<SearchResponse>().results.is_empty());
+        let response = server
+            .get("/search")
+            .add_query_param("q", "h.llo")
+            .add_query_param("regex", "true")
+            .await;
+        assert!(response
+            .json::<SearchResponse>()
+            .results
+            .iter()
+            .any(|hit| hit.path.ends_with(HTML_DOC)));
+        assert!(search_hits(&server, "enforce_leases").await.is_empty());
+        assert!(search_hits(&server, "normal").await.is_empty());
+        assert!(search_hits(&server, "desc")
+            .await
+            .iter()
+            .any(|hit| hit.issue_id.as_ref() == Some(&id)));
+    }
+
+    #[tokio::test]
+    async fn test_search_without_linked_documents_does_not_search_worktree() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        std::fs::write(temp.path().join("unlinked.md"), "unlinked-needle").unwrap();
+        let server = test_app(executor);
+        assert!(search_hits(&server, "unlinked-needle").await.is_empty());
+    }
+
+    #[tokio::test]
     async fn test_search_nested_data_root_returns_issue_record_match() {
         let (temp, executor) =
             setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
@@ -2626,51 +2571,6 @@ unique = false
             response.status_code(),
             status_of_error(PathReadError::NotFound(String::new()))
         );
-    }
-
-    #[tokio::test]
-    async fn test_get_changes_returns_version() {
-        let server = test_app(memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&taxonomy_config()),
-                ..MemoryDeclarations::default()
-            },
-        ));
-        let response = server.get("/changes").await;
-        response.assert_status_ok();
-        let data: ChangesResponse = response.json();
-        assert_eq!(data.version, 0);
-    }
-
-    #[tokio::test]
-    async fn test_get_changes_reflects_tracker_state() {
-        let executor = Arc::new(memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&taxonomy_config()),
-                ..MemoryDeclarations::default()
-            },
-        ));
-        let tracker = Arc::new(ChangeTracker::new(16));
-
-        // Simulate a change
-        tracker.notify_change();
-        tracker.notify_change();
-
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let app = create_routes(state);
-        let server = TestServer::new(app).unwrap();
-
-        let response = server.get("/changes").await;
-        response.assert_status_ok();
-        let data: ChangesResponse = response.json();
-        assert_eq!(data.version, 2);
     }
 
     /// Verify that the `get_document_by_path` endpoint returns 404 for a

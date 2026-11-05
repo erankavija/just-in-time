@@ -12,7 +12,7 @@
 # The inputs are injectable so every failure mode has an independent
 # regression fixture that needs no compilation (REQ-04):
 #   --root DIR           workspace root holding Cargo.toml and
-#                        crates/jit/Cargo.toml (policy sources); default: the
+#                        crates/jit/Cargo.toml and crates/jit/src/main.rs; default: the
 #                        directory above this script.
 #   --metadata-json FILE pre-captured `cargo metadata --no-deps
 #                        --format-version=1`; default: run it live under --root.
@@ -43,6 +43,7 @@ set -euo pipefail
 readonly MAX_INTEGRATION_TARGETS=3
 readonly MAX_EXECUTABLE_BYTES=$((706 * 1024 * 1024)) # MiB; derivation in README
 readonly MAX_TEST_SUITE_SECONDS=30
+readonly MAX_MAIN_RS_CODE_LINES=40
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(dirname "$SCRIPT_DIR")
@@ -58,7 +59,7 @@ usage() {
 # Exercise the shipped checker against owned synthetic inputs, never Cargo.
 self_test() (
   local tool work fixture script expected actual token value
-  for tool in jq mktemp mkdir rm truncate cat awk grep head sort stat dirname sed ln; do
+  for tool in jq python3 mktemp mkdir rm truncate cat awk grep head sort stat dirname sed ln; do
     command -v "$tool" >/dev/null 2>&1 || {
       echo "rust-build-budget: self-test requires '$tool' on PATH" >&2
       exit 2
@@ -70,7 +71,8 @@ self_test() (
 
   seed_fixture() {
     fixture="$work/$1"
-    mkdir -p "$fixture/crates/jit"
+    mkdir -p "$fixture/crates/jit/src"
+    echo 'fn main() {}' >"$fixture/crates/jit/src/main.rs"
     cat >"$fixture/Cargo.toml" <<'EOF'
 [profile.dev]
 debug = "line-tables-only"
@@ -136,9 +138,37 @@ EOF
   jq -nc --arg bin "$fixture/bin" \
     '{reason:"compiler-artifact",profile:{test:false},executable:$bin},
      {reason:"build-script-executed",package_id:"x"}' >>"$fixture/artifacts.jsonl"
+  awk -v count="$MAX_MAIN_RS_CODE_LINES" 'BEGIN {for (i=0; i<count; i++) print "// production"}' \
+    >"$fixture/crates/jit/src/main.rs"
   run_checker 0
-  assert_report stdout "integration-targets=$MAX_INTEGRATION_TARGETS/$MAX_INTEGRATION_TARGETS" \
+  assert_report stdout "main-rs-lines=$MAX_MAIN_RS_CODE_LINES/$MAX_MAIN_RS_CODE_LINES" \
+    "integration-targets=$MAX_INTEGRATION_TARGETS/$MAX_INTEGRATION_TARGETS" \
     "bytes=$MAX_EXECUTABLE_BYTES/$MAX_EXECUTABLE_BYTES" "active-executables=2"
+
+  seed_fixture main-rs-under-limit
+  cat >"$fixture/crates/jit/src/main.rs" <<'EOF'
+//! Module docs do not count.
+/** Block docs
+ * do not count either. */
+
+// Ordinary comments count.
+#[cfg(feature = "test-support")]
+fn support() {}
+fn main() {}
+#[cfg(test)]
+mod tests {
+    fn ignored() {}
+}
+EOF
+  run_checker 0
+  assert_report stdout "main-rs-lines=4/$MAX_MAIN_RS_CODE_LINES"
+
+  seed_fixture main-rs-over-limit
+  awk -v count="$((MAX_MAIN_RS_CODE_LINES + 1))" 'BEGIN {for (i=0; i<count; i++) print "// production"}' \
+    >"$fixture/crates/jit/src/main.rs"
+  run_checker 1
+  assert_report stderr "main.rs production lines" "observed $((MAX_MAIN_RS_CODE_LINES + 1))" \
+    "limit $MAX_MAIN_RS_CODE_LINES"
 
   seed_fixture targets-over-limit
   write_metadata "$((MAX_INTEGRATION_TARGETS + 1))"
@@ -236,10 +266,12 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-command -v jq >/dev/null 2>&1 || {
-  echo "rust-build-budget: 'jq' not found on PATH" >&2
-  exit 2
-}
+for tool in jq python3; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "rust-build-budget: '$tool' not found on PATH" >&2
+    exit 2
+  }
+done
 
 # --- Input sourcing ---------------------------------------------------------
 # Each input is either read from the injected fixture file or produced live by
@@ -340,6 +372,11 @@ if [ "$TEST_SUITE_MS_PROVIDED" = true ]; then
   fi
 fi
 
+main_rs_lines=$(python3 "$SCRIPT_DIR/production-lines.py" --file "$ROOT/crates/jit/src/main.rs") || exit 2
+if [ "$main_rs_lines" -gt "$MAX_MAIN_RS_CODE_LINES" ]; then
+  errors+=("main.rs production lines: observed ${main_rs_lines}, limit ${MAX_MAIN_RS_CODE_LINES}. Corrective area: keep crates/jit/src/main.rs limited to parsing, bootstrap, dispatch, rendering and exit (dev/benchmarks/rust-build-budgets/README.md).")
+fi
+
 # REQ-01: integration-test target count from `cargo metadata`.
 metadata=$(read_metadata)
 target_count=$(printf '%s' "$metadata" \
@@ -423,4 +460,4 @@ fi
 
 # REQ-06: one concise, parseable success line. cargo-ci.sh's summarize_pass
 # folds it into the persisted gate summary.
-echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} suite-duration=${suite_duration_status}"
+echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} suite-duration=${suite_duration_status} main-rs-lines=${main_rs_lines}/${MAX_MAIN_RS_CODE_LINES}"
