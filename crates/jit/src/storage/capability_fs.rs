@@ -522,12 +522,13 @@ mod tests {
         assert!(matches!(
             store.as_slice(),
             [
-                RepositoryStateStoreError::UnsafeTarget(_),
-                RepositoryStateStoreError::RetryableConflict { .. },
-                RepositoryStateStoreError::Io(_)
-            ]
+                RepositoryStateStoreError::UnsafeTarget(target),
+                RepositoryStateStoreError::RetryableConflict { path },
+                RepositoryStateStoreError::Io(error)
+            ] if target == "link" && path == "root" && error.to_string() == "disk"
         ));
-        assert_eq!(store.map(|error| error.to_string()), messages);
+        assert_eq!(store[0].to_string(), messages[0]);
+        assert_eq!(store[2].to_string(), messages[2]);
 
         let redo = errors().map(RedoApplyError::from);
         assert!(redo

@@ -596,10 +596,10 @@ command_group! {
         "issue_show" => IssueCommands::Show { ids, summary, field, fields } => show(ids, summary, field, fields) -> IssueShowOutput
             as union [IssueShowResponse, IssueShowSummaryResponse, IssueShowListResponse, ItemShowResult, FieldProjection]
             "Single id: a bare IssueShowResponse (IssueShowSummaryResponse with --summary; the addressed item for an <issue>/<self-id> argument; the projected value with --field/--fields). Multiple ids: the {count, issues} envelope of full IssueShowResponse objects in argument order.",
-        "issue_list" => IssueCommands::List { filters, full } => list(filters, full) -> IssueListing
+        "issue_list" => IssueCommands::List { filters, full } => list(filters, full) raises [RetryableConflict] -> IssueListing
             as union [IssueListResponse, IssueListFullResponse]
             ISSUE_LISTING,
-        "issue_search" => IssueCommands::Search { query, filters, full } => search(query, filters, full) -> IssueSearchResults
+        "issue_search" => IssueCommands::Search { query, filters, full } => search(query, filters, full) raises [RetryableConflict] -> IssueSearchResults
             as union [IssueSearchResponse, IssueSearchFullResponse]
             "Default shape: lean MinimalIssue entries with no gate fields, plus the echoed query. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status.",
         "issue_status" => IssueCommands::Status { ids } => status(ids) -> IssueStatusOutput
@@ -609,11 +609,11 @@ command_group! {
         "issue_progress" => IssueCommands::Progress { id } => progress(id) -> ContainerProgressResponse,
         "issue_create" => IssueCommands::Create { positional_title, title, description, description_file, priority, issue_type, gate, label, content_format, force } => create(positional_title.or(title).unwrap_or_default(), description, description_file, priority, issue_type, gate, label, content_format, force)
             raises [ValidationFailed] -> IssueCreateResponse,
-        "issue_batch-create" => IssueCommands::BatchCreate { from_json, dry_run } => batch_create(from_json, dry_run) -> IssueBatchCreateOutput
+        "issue_batch-create" => IssueCommands::BatchCreate { from_json, dry_run } => batch_create(from_json, dry_run) raises [RetryableConflict] -> IssueBatchCreateOutput
             as union [BatchCreateResponse, BatchDryRunOutcome]
             "Default shape: the ids map from each entry's symbolic key to its created issue's full id. With --dry-run: the validation result; nothing is created.",
         "issue_update" => IssueCommands::Update { id, filter, title, description, description_file, append_description, append_description_file, priority, state, issue_type, label, remove_label, add_gate, remove_gate, assignee, unassign, content_format, force } => update(id, filter, title, description, description_file, append_description, append_description_file, priority, state, issue_type, label, remove_label, add_gate, remove_gate, assignee, unassign, content_format, force)
-            raises [Blocked, ValidationFailed] -> IssueUpdateOutput
+            raises [Blocked, ValidationFailed, RetryableConflict] -> IssueUpdateOutput
             as union [IssueUpdateResponse, crate::commands::BulkUpdateResult]
             "With an issue id: the updated issue's lean confirmation. With --filter: the batch result (matched, modified, skipped and failed ids with a summary).",
         "issue_delete" => IssueCommands::Delete { id } => delete(id)
@@ -625,7 +625,7 @@ command_group! {
         "issue_reject" => IssueCommands::Reject { id, reason } => reject(id, reason) -> IssueLifecycleResponse,
         "issue_release" => IssueCommands::Release { id, reason } => release(id, reason) -> IssueLifecycleResponse,
         "issue_claim-next" => IssueCommands::ClaimNext { assignee, filter } => claim_next(assignee, filter)
-            raises [Blocked, ValidationFailed] -> IssueLifecycleResponse,
+            raises [Blocked, ValidationFailed, RetryableConflict] -> IssueLifecycleResponse,
     }
 }
 

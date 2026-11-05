@@ -6,14 +6,28 @@
   "dependencies": [
     "0f302914-9ded-47e9-bea8-67af1e0e8452"
   ],
-  "description": "Share one issue snapshot across graph and base issue projections for each tracker version, while retaining live derived-document visibility.\n\n## Background\n\nThe list and graph handlers each load all issues today. The list also calls `DocumentOps::with_reported_documents`, which discovers artifact paths outside the watched data directory; caching that complete response would hide artifact changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Concurrent list and graph requests share one captured issue snapshot and cached base projections per version; failed attempts remain retryable and stale completion cannot replace a newer generation.\n- [hard] REQ-02: The list applies fresh derived-document discovery over captured issue records without another issue listing, so adding, deleting or renaming an artifact after cache warm updates its reported documents at the same tracker version.\n- [hard] REQ-03: Configuration invalidation rebuilds projections with current declarations. Deterministic tests cover concurrent admission, version crossings, failure/retry and live artifact changes; tracker versions remain invalidation hints, not transaction revisions.\n\n## Notes\n\nUse the shared executor helper and existing lock-free repository read behavior; do not hold a writer lock across async work.\n",
+  "description": "Share one issue snapshot across graph and base issue projections for each tracker version, while retaining live derived-document visibility.\n\n## Background\n\nThe list and graph handlers each load all issues today. The list also calls `DocumentOps::with_reported_documents`, which discovers artifact paths outside the watched data directory; caching that complete response would hide artifact changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Concurrent list and graph requests share one captured issue snapshot and cached base projections per version; failed attempts remain retryable and stale completion cannot replace a newer generation.\n- [hard] REQ-02: The list applies fresh derived-document discovery over captured issue records without another issue listing, so adding, deleting or renaming an artifact after cache warm updates its reported documents at the same tracker version.\n- [hard] REQ-03: Configuration invalidation rebuilds projections with current declarations. Deterministic tests cover concurrent admission, version crossings, failure/retry and live artifact changes; tracker versions remain invalidation hints, not transaction revisions.\n\n- [hard] REQ-04: Apply @/charter/D-25 through the canonical shared read path: after bounded optimistic retries, return a typed retryable conflict without acquiring a repository writer/session lock or performing implicit recovery. Admit the entire selected+primary issue capture, preserving membership and tombstones; in-memory read admission must not wait for writer-held state.\n- [hard] REQ-05: Expose RETRYABLE_CONFLICT with CLI exit 12 and HTTP 503 through the shared classifier; keep stable data errors distinct. Align charter projections and adopter documentation with D-25. Explicit recovery and mutation recovery retain D-17 semantics.\n\n## Notes\n\nUse the shared executor helper and existing lock-free repository read behavior; do not hold a writer lock across async work.\n\n",
   "documents": [],
+  "done_at": "2026-11-05T03:27:13.636251908Z",
   "first_ready_at": "2026-11-05T00:09:15.356213422Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c5f2d980-16d3-4cac-86f6-8d771622d5a3",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:19:59.872253882Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d17b5a0e-cc1c-438f-807d-0074858e9ecc",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:26:56.975008586Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Share version-scoped issue capture and projections",
-  "updated_at": "2026-11-05T01:08:26.791791439Z"
+  "updated_at": "2026-11-05T03:27:13.636251908Z"
 }

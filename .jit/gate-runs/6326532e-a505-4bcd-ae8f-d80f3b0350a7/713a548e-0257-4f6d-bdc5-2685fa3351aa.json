@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-6326532e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e7a7565337d1a3043de68bb5396794e1d723e78f",
+  "completed_at": "2026-11-05T02:01:09.356615917Z",
+  "duration_ms": 299925,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/json.rs",
+        "id": "F1",
+        "line": 1220,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-22",
+          "@/issue/6326532e/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "list_issues returns RetryableConflict after exhausted optimistic attempts instead of performing the required repository-lock fallback."
+      }
+    ],
+    "summary": "Issue listing lacks the required repository-lock fallback after optimistic read retries exhaust.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "713a548e-0257-4f6d-bdc5-2685fa3351aa",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:56:09.431331982Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10005 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-6326532e\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a96b-b111-7841-8762-e595f451a3a2\n--------\nuser\n--- 9992 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7b834e9, 798e62e, e8ddc03, 58be52e, e7a7565 (`jit:6326532e`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/6326532e/requirement/REQ-01, REQ-02, REQ-03; @/issue/0f8efc37/requirement/REQ-06; @/issue/c8e79465/requirement/REQ-01 (issue descriptions); @/charter/D-22 (charter); @/invariant/architecture-dependency-direction, orthogonal-tests, essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0; run 58be52e covers implementation commits); prior code-review failed (exit 1; its concurrency-admission finding was addressed by 58be52e)\nTruncation recovery: re-read bounded patches and current ranges for capture_cache.rs, routes.rs, json.rs, commands/mod.rs, repository_state_store.rs, and affected tests after aggregated output truncation\n\n1. **F1 — blocking, issue-impact (medium):** `JsonFileStorage::list_issues` retries four refused optimistic captures, then returns `RetryableConflict` rather than completing the read under the repository lock (`crates/jit/src/storage/json.rs:1170-1221`). Under sustained writes this makes list/graph requests fail despite the canonical read policy requiring a bounded retry followed by a repository-lock read (`@/charter/D-22`). The shared `with_read_session` still implements that fallback; this new direct path does not.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Issue listing lacks the required repository-lock fallback after optimistic read retries exhaust.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"list_issues returns RetryableConflict after exhausted optimistic attempts instead of performing the required repository-lock fallback.\",\"file\":\"crates/jit/src/storage/json.rs\",\"line\":1220,\"references\":[\"@/charter/D-22\",\"@/issue/6326532e/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
