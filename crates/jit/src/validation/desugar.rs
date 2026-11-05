@@ -15,7 +15,7 @@
 //!
 //! # Target shape
 //!
-//! Generated schemas validate against the [`Projection`] contract
+//! Generated schemas validate against the [`crate::domain::projection::Projection`] contract
 //! (`type`/`state`/`priority`/`labels.<ns>`/`doc_types`/`sections.<slug>.items`).
 //! Each desugaring constrains exactly the slice of that shape its shorthand
 //! addresses and leaves the rest unconstrained (`type: object`), so unrelated
@@ -196,7 +196,7 @@ fn desugar_label_value_pattern(namespace: &str, regex: &str) -> Value {
 /// `sections.<slug>` exists and is non-empty.
 ///
 /// The heading is normalized to its slug with
-/// [`slugify_heading`](crate::document::slugify_heading) so it matches the slug
+/// [`slugify_heading`] so it matches the slug
 /// key the [`Projection`](crate::domain::projection::Projection) uses for the section. The
 /// section is required to exist and to carry at least one `items` entry
 /// (`minItems: 1`), which is what "the section is present" means for a parsed

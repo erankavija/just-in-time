@@ -13,7 +13,7 @@
 //! `Outcome::with_warnings` and the `recover` command's JSON/text output).
 //!
 //! [`StorageWarning`] implements [`Display`](std::fmt::Display) so it plugs
-//! straight into the output layer, and [`Serialize`](serde::Serialize) so it
+//! straight into the output layer, and [`Serialize`] so it
 //! can be embedded in `--json` payloads as structured data.
 
 use schemars::JsonSchema;

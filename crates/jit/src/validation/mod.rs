@@ -25,7 +25,7 @@
 //! - [`drift`] — the enforcement-drift check (declaration consistency between
 //!   invariants and loadable rules/gates), reporting the sole
 //!   declared-but-unenforced direction;
-//! - [`record_fidelity`] — whether stored records decode and reproduce what the
+//! - `record_fidelity` — whether stored records decode and reproduce what the
 //!   writer would publish, a verdict of whole-repository validation only;
 //! - [`mod@report`] — report findings with provenance, their wire reports, and
 //!   the selections every validation view computes;

@@ -397,7 +397,7 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
 /// The sugar form omits the kind segment [`parse_kind_segmented_address`]
 /// requires explicit; this recovers it by matching `self_id` against every
 /// ISSUE-scoped kind's `id-pattern` in `kinds` (the same `IdPattern::regex().find`
-/// mechanism [`extract_raw_items`] uses to mint items). PROJECT-scoped kinds
+/// mechanism `extract_raw_items` uses to mint items). PROJECT-scoped kinds
 /// (`scope = "project"`, e.g. `invariant`, `definition`) are excluded from
 /// candidate matching regardless of whether their pattern would otherwise
 /// match: their self-ids are free-form slugs with no distinguishing shape, so
@@ -1209,7 +1209,7 @@ fn extract_raw_items(
 /// Project-scoped kinds are markdown-first, sourced from a repository-local file
 /// declared in config (the path comes only from config — no filename is
 /// hardcoded). This parses `markdown` with the SAME [`ContentParser`] and
-/// section-scanning path ([`extract_raw_items`]) as issue descriptions, then runs
+/// section-scanning path (`extract_raw_items`) as issue descriptions, then runs
 /// the candidates through the SAME [`derive_scope_items`] derivation, so
 /// qualified-id derivation and per-(scope, kind) uniqueness (REQ-03, REQ-04,
 /// REQ-05) are identical across substrates. With `scope = Scope::Project` each item's
@@ -1264,7 +1264,7 @@ pub struct ProjectSource {
 /// qualified-id derivation are identical across them (REQ-03, REQ-04, REQ-05):
 ///
 /// 1. **Markdown-first** kinds (each a [`ProjectSource`]) are parsed and scanned
-///    via the same [`extract_raw_items`] path as issue descriptions.
+///    via the same `extract_raw_items` path as issue descriptions.
 /// 2. **Registry-first** kinds supply their candidates directly as
 ///    `registry_items` — already projected from a structured registry, NOT a
 ///    markdown section, since the registry is their authoritative source (REQ-02).

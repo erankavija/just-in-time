@@ -282,7 +282,7 @@ pub enum PackageArchiveError {
 /// Build the portable archive carrying `package`.
 ///
 /// The bytes are a function of the package alone: entries are written in
-/// canonical package order through [`reproducible_tar_header`], so packing the
+/// canonical package order through `reproducible_tar_header`, so packing the
 /// same package twice produces the same file, and packing it on another machine
 /// produces that same file again.
 ///

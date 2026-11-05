@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for RegionId {
 /// The single runtime package model produced by every supported manifest wire.
 ///
 /// This type intentionally contains no manifest-version discriminator. Wire
-/// versions are an input concern owned by [`crate::profile::wire`]; lifecycle
+/// versions are an input concern owned by the profile wire module; lifecycle
 /// readers consume this source-neutral model instead.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
