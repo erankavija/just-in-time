@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Issue listing and query subset rendering use the shared issue-list renderer directly, removing the intermediate method reintroduced during query dispatch migration.\n\n## Background\n\n`IssueListing::render` duplicates the rendering entry point beside `HumanRender`. It was removed during output consolidation and returned when query subset headings were added. The final output contract requires rendering through `HumanRender` and one shared issue-list helper.\n\n## Success Criteria\n\n- [hard] REQ-01: Issue listing and search results have no separate intermediate `render` method; their human rendering enters through `HumanRender` and uses the shared issue-list helper.\n- [hard] REQ-02: Issue-list and query-subset JSON, human text, quiet output and exit statuses are unchanged, with existing semantic rendering coverage preserved.\n- [hard] REQ-03: The repair introduces no parallel renderer abstraction and has a nonpositive production-line delta under the default production-line counter.\n",
   "documents": [],
+  "done_at": "2026-11-05T00:30:31.178019944Z",
   "first_ready_at": "2026-11-04T23:26:00.051673379Z",
   "gates_required": [
     "cargo-ci",
@@ -13,9 +14,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f88c56f3-29de-4266-a914-833d4190ef51",
+      "run_id": "244d875e-3f16-4841-b280-3679c73d4535",
       "status": "passed",
-      "updated_at": "2026-11-04T23:47:16.521249969Z",
+      "updated_at": "2026-11-05T00:30:02.202555030Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,7 +35,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Issue listing renders directly through the shared output contract",
-  "updated_at": "2026-11-04T23:50:59.794633001Z"
+  "updated_at": "2026-11-05T00:30:31.178019944Z"
 }
