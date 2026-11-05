@@ -19,7 +19,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fb66181a-e53a-45fc-9c08-1b77906aca55",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:56:24.589075791Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cb1c768f-c99b-41ff-9eec-ca29adf04549",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:58:41.474211447Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "783b33fa-6fdf-4cf4-a9f2-323a90c27734",
   "labels": [
     "epic:git-cli-module",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Allow an explicit acting identity for issue release",
-  "updated_at": "2026-11-05T07:42:15.562898809Z"
+  "updated_at": "2026-11-05T23:58:41.474211447Z"
 }

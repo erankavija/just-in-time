@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-783b33fa",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "08f374b0ea7c875f9fb4667d22dcdac8308fde4b",
+  "completed_at": "2026-11-05T23:58:41.470891729Z",
+  "duration_ms": 120010,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The explicit typed release actor uses the existing captured lifecycle producer, preserves convenience lookup ordering, and has adequate focused coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "783b33fa-6fdf-4cf4-a9f2-323a90c27734",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cb1c768f-c99b-41ff-9eec-ca29adf04549",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T23:56:41.459909387Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:783b33fa commits 2e1692cffc3eb439ccbeabe779086a74a60b2d6a, 08f374b0ea7c875f9fb4667d22dcdac8308fde4b\nPolicy sources: AGENTS.md\nResolved items: @/issue/783b33fa/requirement/REQ-01–REQ-04 (issue description); @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/derived-state-coherence, @/invariant/event-log (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T23:55:10Z; covers both tagged commits); code-review pending/current\nTruncation recovery: reread AGENTS.md remainder and bounded plan, registry, lifecycle, and patch slices\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The explicit typed release actor uses the existing captured lifecycle producer, preserves convenience lookup ordering, and has adequate focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
