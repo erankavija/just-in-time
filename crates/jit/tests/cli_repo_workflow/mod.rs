@@ -18,6 +18,7 @@ mod gate_preset_tests;
 mod git_hook_tests;
 #[cfg(unix)]
 mod git_process_budget_tests;
+mod git_unavailable_tests;
 mod help_cross_reference_tests;
 mod history_isolation_tests;
 mod init_item_kinds_golden;
