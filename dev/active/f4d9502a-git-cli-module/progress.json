@@ -140,7 +140,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "rework_full_gates_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
@@ -196,8 +196,9 @@
           "short_id": "c16c834c",
           "title": "Storage pinned inspection runs on a module checkout",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "migration_checks_queued"
         },
         {
           "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
@@ -220,8 +221,9 @@
           "short_id": "ec9e812c",
           "title": "Pinned-read behaviour suite moves into the git module suite",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "migration_checks_queued"
         },
         {
           "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
@@ -624,6 +626,20 @@
       "model": "gpt-6-sol",
       "effort": "high",
       "reason": "Bounded Git plumbing, canonical commit identities and typed comparison outcomes."
+    },
+    {
+      "issue": "c16c834c",
+      "agent": "/root/storage_pinned",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Bounded field/constructor migration and existing capture tests."
+    },
+    {
+      "issue": "ec9e812c",
+      "agent": "/root/pinned_suite",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Mechanical suite relocation preserving every existing assertion."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -659,7 +675,10 @@
     "Planning refresh passed stable933f971b; plan/evidence merged45d1e8cd2 without product-source changes. c506 may implement after frontend9c3 layout API lands.",
     "Steward source queue paused at061 after automatic approval rejection, explicitly no indirect retry. Independent branches/tests/reviews continue. 24 remains after frontendabf.",
     "HEAD fixb8ec9ccbc passed31 integration and2 parser tests; refreshed branch enters full gates. Origin newline fidelity red/green passed25 tests, sourcea67e055e9 enters full gates.",
-    "437 evidence38fdf0b9a and historyf253efc8f preserve actual stable passes. 24 evidenceb8e3338bc ready for coordinated integration. History advisory disposition owner-approved; consumer83 removes tracked exception."
+    "437 evidence38fdf0b9a and historyf253efc8f preserve actual stable passes. 24 evidenceb8e3338bc ready for coordinated integration. History advisory disposition owner-approved; consumer83 removes tracked exception.",
+    "Source queue still paused per steward:061 thenabf then24 thenwatcher thenab168 then6d93; further Git primitives interleave by readiness. No indirect retry.",
+    "HEAD gate approvalccc20a3ae closes historicalF1; branch remains isolated. Origin Cargo passed, review running.",
+    "Brief corrections: for_test exists only pending HEAD branch, so new tests use existing checkout helper; storage new stays storage-visible. RUSTC_WRAPPER must be empty, not punctuation period. Cargo integration target is contracts, not fast_docs_templates. Workers retain queued failed invocations and collect corrected checks."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -680,18 +699,30 @@
       "holistic": "Current docs agree with storage read behavior; no unnecessary edits."
     },
     "4ba18af4": {
-      "verdict": "FAIL",
-      "cargo_ci": "passed",
-      "code_review": "008c2ae3-d632-448a-85d4-982b9490c59e",
-      "findings": [
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "efe556af-9584-46bc-a85f-8cad3f0748ac",
+        "code-review": "b3e1a579-b6a9-4152-b77d-0869a4d10aad"
+      },
+      "reviewed_source": "8336a1af28e870c916b297ca96473e0ade4dacbf",
+      "evidence_commit": "ccc20a3ae",
+      "prior_findings": [
         {
+          "run": "008c2ae3",
           "id": "F1",
-          "status": "open",
-          "summary": "A public unvalidated GitCheckout constructor makes head() classify arbitrary nonzero Git failures as an unborn branch."
+          "status": "closed",
+          "evidence": "git.rs:195/291 validates successful protocol and captured commit; git_module_tests.rs:263/272 reject invalid and stale recognized checkouts. Constructor visibility also restricted; correctness does not depend on visibility."
         }
       ],
-      "deferred_items": "No linked design artifacts or deferred items in issue audit.",
-      "required_changes": "Experimentally prove reliable unborn versus genuine-error semantics before rework; no constructor-only waiver."
+      "criteria": {
+        "REQ-01": "At most two configured processes, identity capture followed by captured commit/unborn target validation; no unrelated walk or lazy fetch.",
+        "REQ-02": "Branch and detached HEAD label preserved.",
+        "REQ-03": "Only validated unborn state yields None; missing executable and failed/malformed/damaged object evidence typed errors.",
+        "REQ-04": "Owning real-Git boundary tests and private malformed-parser tests pass; full Cargo 5061 tests and25 doctests, none skipped."
+      },
+      "stale_narrative": "No one-process HEAD budget remains in live code/tests/plan; experiment explicitly preserves rejected historical approach.",
+      "deferred_items": "Linked head-lookup-experiment.md has no in-scope deferred markers. Git minimum/Docker change and WorktreePaths redesign explicitly excluded from approved decision.",
+      "holistic": "Shared environment fixture from24 reused exactly. Canonical Git runner/error behavior retained. Direct-main integration and merged Cargo remain pending."
     },
     "7297f922": {
       "verdict": "PASS",
