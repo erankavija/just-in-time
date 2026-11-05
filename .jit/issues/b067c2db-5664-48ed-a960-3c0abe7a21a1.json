@@ -8,6 +8,7 @@
   ],
   "description": "One search hook replaces the local scorer and guards stale responses.\n\n## Success Criteria\n\n- [hard] REQ-01: Browser uses server issue and linked-document matches, preserves navigation, and ignores stale in-flight results after query or version changes; the App passes its SSE version to the hook and routes issue matches to issue details and document matches to the viewer. Actual asynchronous hook tests cover out-of-order completion; obsolete scorer-only tests are removed or replaced.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-05T03:37:33.871492581Z",
   "first_ready_at": "2026-11-05T01:47:09.926235978Z",
   "gates_required": [
     "npm-ci",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "6c1430d2-3caa-4fe5-b2f3-595b64f90dfb",
+      "run_id": "774c4535-e33d-43ea-9d38-820ba7138663",
       "status": "passed",
-      "updated_at": "2026-11-05T03:31:09.026178517Z",
+      "updated_at": "2026-11-05T03:37:18.676524185Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
@@ -37,7 +38,7 @@
     "satisfies:3a61ff16/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Use server search results in browser",
-  "updated_at": "2026-11-05T03:33:04.315833832Z"
+  "updated_at": "2026-11-05T03:37:33.871492581Z"
 }
