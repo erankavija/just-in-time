@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-4ba18af4",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "90c7113262d06347ce4486a88699af9327cabee0",
+  "completed_at": "2026-11-05T00:29:43.934493342Z",
+  "duration_ms": 253650,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable head lookup satisfies the issue criteria and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "eeb77a1a-4f39-4850-a376-a972f0825405",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:25:30.284184795Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f97d6eb3, 5bce3267, b0a1e110, 5efc05db, 8e62d9be, b8ec9ccb, ccc20a3a, 90c71132\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-19, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-types (.jit/invariants.toml); @/issue/f4d9502a/requirement/REQ-05 (issue success criteria)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T00:24:00Z); its recorded commit contains every tagged commit\nTruncation recovery: path-scoped reads of each relevant code/test/doc patch and both merge parents; unrelated merge-parent paths excluded from the head-lookup impact cone\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable head lookup satisfies the issue criteria and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -36,7 +36,6 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::ItemNotFound => StatusCode::NOT_FOUND,
         ErrorCode::InvalidArgument
         | ErrorCode::InvalidLabelPattern
-        | ErrorCode::InvalidState
         | ErrorCode::AmbiguousId
         | ErrorCode::InvalidIdPrefix
         | ErrorCode::DeletionNotConfirmed => StatusCode::BAD_REQUEST,
@@ -53,17 +52,10 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::ParseError
         | ErrorCode::RequiresGit
         | ErrorCode::RepositoryFormatUnsupported
-        | ErrorCode::DependencyError
-        | ErrorCode::GateError
-        | ErrorCode::GateCheckError
         | ErrorCode::PresetError
-        | ErrorCode::InvariantCommandFailed
         | ErrorCode::ProfileError
         | ErrorCode::SearchFailed
         | ErrorCode::RipgrepNotFound
-        | ErrorCode::WorktreeInfoError
-        | ErrorCode::WorktreeListError
-        | ErrorCode::WorktreeStoreDivergenceError
         | ErrorCode::GenericError
         | ErrorCode::RecoveryFailed
         | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,
@@ -81,6 +73,22 @@ fn reject(error: impl Into<anyhow::Error>) -> StatusCode {
     let status = status_of_failure(&error);
     tracing::warn!(%status, "request failed: {error:#}");
     status
+}
+
+/// Run synchronous executor work outside Tokio's async workers.
+async fn execute_blocking<S, T>(
+    state: &AppState<S>,
+    work: impl FnOnce(&CommandExecutor<S>) -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, StatusCode>
+where
+    S: IssueStore + Send + Sync + 'static,
+    T: Send + 'static,
+{
+    let executor = Arc::clone(&state.executor);
+    tokio::task::spawn_blocking(move || work(&executor))
+        .await
+        .map_err(reject)?
+        .map_err(reject)
 }
 
 /// Declares an extractor that reports a malformed request through [`reject`],
@@ -223,39 +231,37 @@ impl Serialize for IssueBody {
 }
 
 /// List all issues, each `documents` explicit and derived from one shared listing of the declared areas.
-async fn list_issues<S: IssueStore>(
+async fn list_issues<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
-    state
-        .executor
-        .issues()
-        .list_issues(None, None, None)
-        .and_then(|issues| state.executor.documents().with_reported_documents(issues))
-        .map(|issues| Json(issues.into_iter().map(IssueResponse::from).collect()))
-        .map_err(reject)
+    execute_blocking(&state, |executor| {
+        let issues = executor.issues().list_issues(None, None, None)?;
+        let issues = executor.documents().with_reported_documents(issues)?;
+        Ok(Json(issues.into_iter().map(IssueResponse::from).collect()))
+    })
+    .await
 }
 
 fn resolve_issue_path_id<S: IssueStore>(
     executor: &CommandExecutor<S>,
     requested: &str,
-) -> Result<IssueId, StatusCode> {
-    let prefix = requested.parse::<IssueIdPrefix>().map_err(reject)?;
-    executor.issues().resolve_issue_id(&prefix).map_err(reject)
+) -> anyhow::Result<IssueId> {
+    let prefix = requested.parse::<IssueIdPrefix>()?;
+    executor.issues().resolve_issue_id(&prefix)
 }
 
 /// Get single issue by ID, its `documents` explicit and derived.
-async fn get_issue<S: IssueStore>(
+async fn get_issue<S: IssueStore + Send + Sync + 'static>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<IssueResponse>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let mut issue = state.executor.issues().show_issue(&id).map_err(reject)?;
-    issue.documents = state
-        .executor
-        .documents()
-        .issue_documents(&issue)
-        .map_err(reject)?;
-    Ok(Json(IssueResponse::from(issue)))
+    execute_blocking(&state, move |executor| {
+        let id = resolve_issue_path_id(executor, &id)?;
+        let mut issue = executor.issues().show_issue(&id)?;
+        issue.documents = executor.documents().issue_documents(&issue)?;
+        Ok(Json(IssueResponse::from(issue)))
+    })
+    .await
 }
 
 /// Graph data for visualization: one node per issue, one edge per dependency.
@@ -317,61 +323,56 @@ pub struct GraphEdge {
 /// (`jit::graph::hierarchy::resolve_hierarchy`) over the repository's configured
 /// type levels. Resolution is repository-wide, matching `jit graph tree` with no
 /// root.
-async fn get_graph<S: IssueStore>(
+async fn get_graph<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
-    let issues = state
-        .executor
-        .issues()
-        .list_issues(None, None, None)
-        .map_err(reject)?;
+    execute_blocking(&state, |executor| {
+        let issues = executor.issues().list_issues(None, None, None)?;
 
-    // Build node lookup for blocked state calculation
-    let issue_map: std::collections::HashMap<IssueId, &Issue> =
-        issues.iter().map(|i| (i.id.clone(), i)).collect();
+        // Build node lookup for blocked state calculation
+        let issue_map: std::collections::HashMap<IssueId, &Issue> =
+            issues.iter().map(|i| (i.id.clone(), i)).collect();
 
-    // Resolve the hierarchy with the core resolver, over the repo's type levels.
-    let issue_refs: Vec<&Issue> = issues.iter().collect();
-    let config = state
-        .executor
-        .config()
-        .get_hierarchy_config()
-        .map_err(reject)?;
-    let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
+        // Resolve the hierarchy with the core resolver, over the repo's type levels.
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let config = executor.config().get_hierarchy_config()?;
+        let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
-    // Create nodes
-    let nodes: Vec<GraphNode> = issues
-        .iter()
-        .map(|issue| GraphNode {
-            id: issue.id.clone(),
-            short_id: issue.id.short_id().to_string(),
-            label: issue.title.clone(),
-            state: issue.state,
-            priority: issue.priority,
-            assignee: issue.assignee.as_ref().map(|a| a.to_string()),
-            labels: issue.labels.clone(),
-            blocked: issue.is_blocked(&issue_map),
-            type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
-            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
-        })
-        .collect();
+        // Create nodes
+        let nodes: Vec<GraphNode> = issues
+            .iter()
+            .map(|issue| GraphNode {
+                id: issue.id.clone(),
+                short_id: issue.id.short_id().to_string(),
+                label: issue.title.clone(),
+                state: issue.state,
+                priority: issue.priority,
+                assignee: issue.assignee.as_ref().map(|a| a.to_string()),
+                labels: issue.labels.clone(),
+                blocked: issue.is_blocked(&issue_map),
+                type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
+                hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
+            })
+            .collect();
 
-    // Create edges
-    let mut edges = Vec::new();
-    for issue in &issues {
-        for dep in &issue.dependencies {
-            edges.push(GraphEdge {
-                from: issue.id.clone(),
-                to: dep.clone(),
-            });
+        // Create edges
+        let mut edges = Vec::new();
+        for issue in &issues {
+            for dep in &issue.dependencies {
+                edges.push(GraphEdge {
+                    from: issue.id.clone(),
+                    to: dep.clone(),
+                });
+            }
         }
-    }
 
-    Ok(Json(GraphData {
-        count: nodes.len(),
-        nodes,
-        edges,
-    }))
+        Ok(Json(GraphData {
+            count: nodes.len(),
+            nodes,
+            edges,
+        }))
+    })
+    .await
 }
 
 /// Status summary
@@ -386,19 +387,21 @@ pub struct StatusResponse {
 }
 
 /// Get repository status
-async fn get_status<S: IssueStore>(
+async fn get_status<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = state.executor.validation().get_status().map_err(reject)?;
-
-    Ok(Json(StatusResponse {
-        backlog: summary.backlog,
-        ready: summary.ready,
-        in_progress: summary.in_progress,
-        done: summary.done,
-        blocked: summary.blocked,
-        total: summary.total,
-    }))
+    execute_blocking(&state, |executor| {
+        let summary = executor.validation().get_status()?;
+        Ok(Json(StatusResponse {
+            backlog: summary.backlog,
+            ready: summary.ready,
+            in_progress: summary.in_progress,
+            done: summary.done,
+            blocked: summary.blocked,
+            total: summary.total,
+        }))
+    })
+    .await
 }
 
 /// Search query parameters
@@ -431,56 +434,55 @@ pub struct SearchResponse {
 }
 
 /// Search issues and documents
-async fn search_issues<S: IssueStore>(
+async fn search_issues<S: IssueStore + Send + Sync + 'static>(
     Query(params): Query<SearchQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<SearchResponse>, StatusCode> {
-    let start = std::time::Instant::now();
+    execute_blocking(&state, move |executor| {
+        let start = std::time::Instant::now();
 
-    // Restrict search to issue documents, explicit or derived
-    let document_paths = state
-        .executor
-        .documents()
-        .get_issue_document_paths()
-        .map_err(reject)?;
+        // Restrict search to issue documents, explicit or derived
+        let document_paths = executor.documents().get_issue_document_paths()?;
 
-    let config = state.executor.config();
-    let layout = config.repository_layout().map_err(reject)?;
-    // An empty glob list would search every worktree file, so documents are searched only when linked.
-    let mut results = if document_paths.is_empty() {
-        Vec::new()
-    } else {
-        let options = SearchOptions {
-            case_sensitive: params.case_sensitive,
-            regex: params.regex,
-            max_results: Some(params.limit),
-            file_patterns: document_paths,
-            ..Default::default()
+        let config = executor.config();
+        let layout = config.repository_layout()?;
+        // An empty glob list would search every worktree file, so documents are searched only when linked.
+        let mut results = if document_paths.is_empty() {
+            Vec::new()
+        } else {
+            let options = SearchOptions {
+                case_sensitive: params.case_sensitive,
+                regex: params.regex,
+                max_results: Some(params.limit),
+                file_patterns: document_paths,
+                ..Default::default()
+            };
+            jit::search::search(layout.worktree_root(), &params.q, options)?
         };
-        jit::search::search(layout.worktree_root(), &params.q, options).map_err(reject)?
-    };
-    if results.len() < params.limit {
-        let remaining = params.limit - results.len();
-        let data_options = SearchOptions {
-            case_sensitive: params.case_sensitive,
-            regex: params.regex,
-            max_results: Some(remaining),
-            file_patterns: vec!["issues/*.json".to_string()],
-            ..Default::default()
-        };
-        let mut data_results =
-            jit::search::search(layout.data_root(), &params.q, data_options).map_err(reject)?;
-        results.append(&mut data_results);
-    }
+        if results.len() < params.limit {
+            let remaining = params.limit - results.len();
+            let data_options = SearchOptions {
+                case_sensitive: params.case_sensitive,
+                regex: params.regex,
+                max_results: Some(remaining),
+                file_patterns: vec!["issues/*.json".to_string()],
+                ..Default::default()
+            };
+            let mut data_results =
+                jit::search::search(layout.data_root(), &params.q, data_options)?;
+            results.append(&mut data_results);
+        }
 
-    let duration_ms = start.elapsed().as_millis();
+        let duration_ms = start.elapsed().as_millis();
 
-    Ok(Json(SearchResponse {
-        query: params.q,
-        total: results.len(),
-        results,
-        duration_ms,
-    }))
+        Ok(Json(SearchResponse {
+            query: params.q,
+            total: results.len(),
+            results,
+            duration_ms,
+        }))
+    })
+    .await
 }
 
 /// Query parameters for standalone document access
@@ -498,23 +500,24 @@ struct DocumentByPathQuery {
 ///
 /// Delegates I/O to `DocumentOps::read_path_bytes` so that filesystem/git
 /// reads remain in the domain layer, not in the route handler.
-async fn get_document_by_path<S: IssueStore>(
+async fn get_document_by_path<S: IssueStore + Send + Sync + 'static>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
-    let (bytes, commit_hash) = state
-        .executor
-        .documents()
-        .read_path_bytes(&query.path, query.commit.as_deref())
-        .map_err(reject)?;
-    // Convert bytes to String for the JSON response (lossy for binary files).
-    let content = String::from_utf8_lossy(&bytes).into_owned();
-    Ok(Json(DocumentContentResponse {
-        path: query.path.clone(),
-        commit: commit_hash,
-        content,
-        content_type: infer_content_type(&query.path),
-    }))
+    execute_blocking(&state, move |executor| {
+        let (bytes, commit_hash) = executor
+            .documents()
+            .read_path_bytes(&query.path, query.commit.as_deref())?;
+        // Convert bytes to String for the JSON response (lossy for binary files).
+        let content = String::from_utf8_lossy(&bytes).into_owned();
+        Ok(Json(DocumentContentResponse {
+            path: query.path.clone(),
+            commit: commit_hash,
+            content,
+            content_type: infer_content_type(&query.path),
+        }))
+    })
+    .await
 }
 
 /// Infer content type from file extension
@@ -726,19 +729,21 @@ struct DocumentContentResponse {
 }
 
 /// Get document content
-async fn get_document_content<S: IssueStore>(
+async fn get_document_content<S: IssueStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let at_commit = query.commit.as_deref();
-
-    let (content, commit_hash) = state
-        .executor
-        .documents()
-        .read_document_content(&id, &path, at_commit)
-        .map_err(reject)?;
+    let (content, commit_hash) = execute_blocking(&state, {
+        let path = path.clone();
+        move |executor| {
+            let id = resolve_issue_path_id(executor, &id)?;
+            Ok(executor
+                .documents()
+                .read_document_content(&id, &path, query.commit.as_deref())?)
+        }
+    })
+    .await?;
 
     Ok(Json(DocumentContentResponse {
         path: path.clone(),
@@ -755,19 +760,21 @@ async fn get_document_content<S: IssueStore>(
 /// delegates to `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
 /// without any UTF-8 conversion.  HTML responses for working-tree reads get a
 /// `<base href>` injected so sibling assets resolve via `/api/raw/*path`.
-async fn get_document_raw<S: IssueStore>(
+async fn get_document_raw<S: IssueStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let at_commit = query.commit.as_deref();
-
-    let (bytes, _commit_hash) = state
-        .executor
-        .documents()
-        .read_document_bytes(&id, &path, at_commit)
-        .map_err(reject)?;
+    let (bytes, _commit_hash) = execute_blocking(&state, {
+        let path = path.clone();
+        move |executor| {
+            let id = resolve_issue_path_id(executor, &id)?;
+            Ok(executor
+                .documents()
+                .read_document_bytes(&id, &path, query.commit.as_deref())?)
+        }
+    })
+    .await?;
 
     let content_type = infer_content_type(&path);
 
@@ -808,17 +815,19 @@ async fn get_document_raw<S: IssueStore>(
 /// invariant-owning for this concern.  Invalid paths and out-of-repo escapes
 /// surface as `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`,
 /// both classified as invalid arguments.
-async fn get_document_raw_by_path<S: IssueStore>(
+async fn get_document_raw_by_path<S: IssueStore + Send + Sync + 'static>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    let at_commit = query.commit.as_deref();
-
-    let (bytes, _commit_hash) = state
-        .executor
-        .documents()
-        .read_path_bytes(&query.path, at_commit)
-        .map_err(reject)?;
+    let (bytes, _commit_hash) = execute_blocking(&state, {
+        let path = query.path.clone();
+        move |executor| {
+            Ok(executor
+                .documents()
+                .read_path_bytes(&path, query.commit.as_deref())?)
+        }
+    })
+    .await?;
     let content_type = infer_content_type(&query.path);
 
     // Inject <base href> into HTML responses.  The storage layer rejects
@@ -859,18 +868,20 @@ async fn get_document_raw_by_path<S: IssueStore>(
 /// symlink escapes) is enforced by `JsonFileStorage::read_path_bytes`.  The
 /// resulting `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`
 /// variants classify as invalid arguments.
-async fn get_raw_wildcard<S: IssueStore>(
+async fn get_raw_wildcard<S: IssueStore + Send + Sync + 'static>(
     Path(path): Path<String>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    let at_commit = query.commit.as_deref();
-
-    let (bytes, _commit_hash) = state
-        .executor
-        .documents()
-        .read_path_bytes(&path, at_commit)
-        .map_err(reject)?;
+    let (bytes, _commit_hash) = execute_blocking(&state, {
+        let path = path.clone();
+        move |executor| {
+            Ok(executor
+                .documents()
+                .read_path_bytes(&path, query.commit.as_deref())?)
+        }
+    })
+    .await?;
 
     let content_type = infer_content_type(&path);
 
@@ -914,16 +925,18 @@ struct CommitInfoResponse {
 }
 
 /// Get document history
-async fn get_document_history<S: IssueStore>(
+async fn get_document_history<S: IssueStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let commits = state
-        .executor
-        .documents()
-        .get_document_history(&id, &path)
-        .map_err(reject)?;
+    let commits = execute_blocking(&state, {
+        let path = path.clone();
+        move |executor| {
+            let id = resolve_issue_path_id(executor, &id)?;
+            Ok(executor.documents().get_document_history(&id, &path)?)
+        }
+    })
+    .await?;
 
     let commits_response = commits
         .into_iter()
@@ -958,54 +971,44 @@ struct DocumentDiffResponse {
 }
 
 /// Get document diff
-async fn get_document_diff<S: IssueStore>(
+async fn get_document_diff<S: IssueStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentDiffQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentDiffResponse>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let to = query.to.as_deref();
-
-    let diff = state
-        .executor
-        .documents()
-        .get_document_diff(&id, &path, &query.from, to)
-        .map_err(reject)?;
-
-    let to_ref = to.unwrap_or("HEAD");
-
-    Ok(Json(DocumentDiffResponse {
-        path: path.clone(),
-        from: query.from.clone(),
-        to: to_ref.to_string(),
-        diff,
-    }))
+    execute_blocking(&state, move |executor| {
+        let id = resolve_issue_path_id(executor, &id)?;
+        let diff =
+            executor
+                .documents()
+                .get_document_diff(&id, &path, &query.from, query.to.as_deref())?;
+        Ok(Json(DocumentDiffResponse {
+            path,
+            from: query.from,
+            to: query.to.unwrap_or_else(|| "HEAD".to_string()),
+            diff,
+        }))
+    })
+    .await
 }
 
 /// List all gate definitions from the registry
-async fn list_gates<S: IssueStore>(
+async fn list_gates<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
-    state
-        .executor
-        .gates()
-        .list_gates()
-        .map(Json)
-        .map_err(reject)
+    execute_blocking(&state, |executor| Ok(Json(executor.gates().list_gates()?))).await
 }
 
 /// Get a single gate definition by key
-async fn get_gate_definition<S: IssueStore>(
+async fn get_gate_definition<S: IssueStore + Send + Sync + 'static>(
     Path(key): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateDefinition>, StatusCode> {
     let key = key.parse::<GateKey>().map_err(reject)?;
-    state
-        .executor
-        .gates()
-        .show_gate_definition(&key)
-        .map(Json)
-        .map_err(reject)
+    execute_blocking(&state, move |executor| {
+        Ok(Json(executor.gates().show_gate_definition(&key)?))
+    })
+    .await
 }
 
 /// Query parameters for gate runs
@@ -1015,39 +1018,35 @@ struct GateRunsQuery {
 }
 
 /// List gate run results for an issue (summaries without stdout/stderr for passing runs).
-async fn list_gate_runs<S: IssueStore>(
+async fn list_gate_runs<S: IssueStore + Send + Sync + 'static>(
     Path(id): Path<String>,
     Query(params): Query<GateRunsQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let gate_key = params
-        .gate_key
-        .map(|key| key.parse::<GateKey>())
-        .transpose()
-        .map_err(reject)?;
-    let runs = state
-        .executor
-        .gates()
-        .list_gate_runs(&id, gate_key.as_ref())
-        .map_err(reject)?;
-
+    let runs = execute_blocking(&state, move |executor| {
+        let id = resolve_issue_path_id(executor, &id)?;
+        let gate_key = params
+            .gate_key
+            .map(|key| key.parse::<GateKey>())
+            .transpose()?;
+        executor.gates().list_gate_runs(&id, gate_key.as_ref())
+    })
+    .await?;
     Ok(Json(runs.iter().map(GateRunSummary::lean).collect()))
 }
 
 /// Get a single gate run result with full stdout/stderr
-async fn get_gate_run<S: IssueStore>(
+async fn get_gate_run<S: IssueStore + Send + Sync + 'static>(
     Path((id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
-    let id = resolve_issue_path_id(&state.executor, &id)?;
-    let run_id = run_id.parse::<GateRunId>().map_err(reject)?;
-    state
-        .executor
-        .gates()
-        .get_gate_run_result(&id, &run_id)
-        .map(|r| Json(GateRunSummary::full(&r)))
-        .map_err(reject)
+    execute_blocking(&state, move |executor| {
+        let id = resolve_issue_path_id(executor, &id)?;
+        let run_id = run_id.parse::<GateRunId>()?;
+        let run = executor.gates().get_gate_run_result(&id, &run_id)?;
+        Ok(Json(GateRunSummary::full(&run)))
+    })
+    .await
 }
 
 /// Response for strategic types
@@ -1057,10 +1056,11 @@ struct StrategicTypesResponse {
 }
 
 /// Get strategic types from configuration
-async fn get_strategic_types<S: IssueStore>(
+async fn get_strategic_types<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StrategicTypesResponse>, StatusCode> {
-    let namespaces = state.executor.config().get_namespaces().map_err(reject)?;
+    let namespaces =
+        execute_blocking(&state, |executor| executor.config().get_namespaces()).await?;
 
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
@@ -1076,20 +1076,18 @@ struct HierarchyResponse {
 }
 
 /// Get type hierarchy configuration
-async fn get_hierarchy<S: IssueStore>(
+async fn get_hierarchy<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<HierarchyResponse>, StatusCode> {
-    let namespaces = state.executor.config().get_namespaces().map_err(reject)?;
+    let (namespaces, icons) = execute_blocking(&state, |executor| {
+        let namespaces = executor.config().get_namespaces()?;
+        let icons = executor.config().get_hierarchy_icons()?;
+        Ok((namespaces, icons))
+    })
+    .await?;
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
-
-    // Get resolved icons
-    let icons = state
-        .executor
-        .config()
-        .get_hierarchy_icons()
-        .map_err(reject)?;
 
     Ok(Json(HierarchyResponse {
         types,
@@ -1111,10 +1109,11 @@ struct NamespaceInfo {
 }
 
 /// Get namespace registry from configuration
-async fn get_namespaces<S: IssueStore>(
+async fn get_namespaces<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
-    let label_namespaces = state.executor.config().get_namespaces().map_err(reject)?;
+    let label_namespaces =
+        execute_blocking(&state, |executor| executor.config().get_namespaces()).await?;
 
     let namespaces = label_namespaces
         .namespaces
@@ -1181,6 +1180,44 @@ mod tests {
             shutdown: CancellationToken::new(),
         };
         TestServer::new(create_routes(state)).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_execute_blocking_runs_executor_work_outside_async_worker() {
+        let state = AppState {
+            executor: Arc::new(memory_executor_declaring(
+                InMemoryStorage::new(),
+                MemoryDeclarations::default(),
+            )),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let async_thread = std::thread::current().id();
+        let blocking_thread = execute_blocking(&state, |_| {
+            Ok::<_, anyhow::Error>(std::thread::current().id())
+        })
+        .await
+        .unwrap();
+        assert_ne!(blocking_thread, async_thread);
+    }
+
+    #[tokio::test]
+    async fn test_execute_blocking_classifies_executor_failure() {
+        let state = AppState {
+            executor: Arc::new(memory_executor_declaring(
+                InMemoryStorage::new(),
+                MemoryDeclarations::default(),
+            )),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let result = execute_blocking(&state, |_| {
+            Err::<(), _>(InvalidArgumentError::new("invalid input").into())
+        })
+        .await;
+        assert_eq!(result, Err(StatusCode::BAD_REQUEST));
     }
 
     /// The status the server reports for `error`, derived from its classification.
