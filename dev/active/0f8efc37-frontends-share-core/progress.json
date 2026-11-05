@@ -18,21 +18,21 @@
           "short_id": "1d2235b1",
           "title": "Centralize watcher path selection",
           "classification": "implementation",
-          "status": "ready_to_land"
+          "status": "done"
         },
         {
           "id": "0f302914-9ded-47e9-bea8-67af1e0e8452",
           "short_id": "0f302914",
           "title": "Offload executor work in server handlers",
           "classification": "implementation",
-          "status": "ready_to_land"
+          "status": "done"
         },
         {
           "id": "abf68973-3771-47cb-89d0-708290cb00ac",
           "short_id": "abf68973",
           "title": "Compile server modules through the library",
           "classification": "implementation",
-          "status": "ready_to_land"
+          "status": "done"
         },
         {
           "id": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
@@ -51,7 +51,7 @@
           "short_id": "cd0ac0f7",
           "title": "Reload browser hierarchy on configuration events",
           "classification": "implementation",
-          "status": "pending"
+          "status": "ready_to_land"
         },
         {
           "id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
@@ -150,7 +150,7 @@
         "6d93ab14-4c72-4ec5-9c50-471cf0d95746"
       ],
       "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
-      "status": "backlog",
+      "status": "ready_to_land",
       "reduction": "bb03df0a\u21926d93ab14 direct edge removed by transitive reduction; reachability through 0f8efc37\u21923a61ff16\u21924858de06 retained."
     },
     {
@@ -166,10 +166,11 @@
   ],
   "escalations": [],
   "rework_counts": {
-    "9c3eb2bf": 2
+    "9c3eb2bf": 2,
+    "cd0ac0f7": 1
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "1cdf landed; abf, watcher, binding and offload have passing stable gates in isolated branches. Source queue is paused pending 061 merge authorization; installer policy awaits separate user approval.",
+  "note": "Watcher, server library, and offload landed and passed merged Cargo. Binding awaits its coordinated source slot; browser config refresh and issue-detail repair passed review and await their slots. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",

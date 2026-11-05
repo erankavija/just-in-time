@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-05T00:52:31.399966633Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -8,6 +9,7 @@
   ],
   "description": "The adopter-facing CLI contract for machine output gets one canonical statement in `docs/reference/cli-commands.md` that matches the refactored behaviour, and other pages cite it.\n\n## Background\n\n`docs/reference/cli-commands.md` §\"CLI JSON contracts\" states the success payload, the failure envelope and the clap-diagnostic exemption, but not the list envelope, which appears only in `README.md` and `docs/concepts/design-philosophy.md` and per command. The page mentions `[--json]` per command although `--json` is now one global flag. Its wrong-verb section says the hint arrives in `error.message` under `--json`. The CLI now behaves as follows. List payloads are `{\"count\": N, \"<collection>\": [...]}` plus command-specific fields. Once clap has accepted the arguments, a failing `--json` invocation writes exactly one envelope to stdout and nothing to stderr; successful JSON responses carry warnings in a top-level `warnings` array, while human-mode warnings go to stderr; human-mode failures print one `Error:` line. A command whose findings make it exit non-zero (`validate`, `gate status-all`, `gate evaluate-many`, `doc check-links`, `invariant check`) renders the failure envelope with its report in `error.details`, and the exit code is that envelope's code. A wrong verb prints its hint and clap's diagnostic to stderr and exits 2, with or without `--json`.\n\n## Success Criteria\n\n- [hard] REQ-01: The \"CLI JSON contracts\" section states the list envelope, the global `--json` option, the stream rule for failures after a successful parse (one envelope on stdout, nothing on stderr, successful JSON warnings in a top-level `warnings` array and human-mode warnings on stderr), the findings envelope, and the parser-level wrong-verb hint, each once.\n- [hard] REQ-02: Per-command entries carry no `[--json]` option mention, and `README.md` and `docs/concepts/design-philosophy.md` cite the reference section for the list envelope instead of restating it.\n- [hard] REQ-03: No statement in `docs/` contradicts the contract, including the hint-in-envelope and errors-always-on-stderr wording.\n- [hard] REQ-04: The documentation link and citation checks pass.\n\n## Notes\n\n`docs/reference/error-codes.md` and `exit-codes.md` are generated and are cited, not edited. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n\n## Decisions\n\n- D-01: Correct the stream wording to the existing epic D-04 and 9529b9ac contract: successful JSON carries warnings in its top-level `warnings` array; human-mode warnings go to stderr. Steward approved this reconciliation on 2026-11-04; no output-policy or gate change.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T00:52:31.185963338Z",
   "gates_required": [
     "docs-mechanical",
     "doc-review"
@@ -36,7 +38,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "State the CLI output contract once in the command reference",
-  "updated_at": "2026-11-05T00:39:48.366222424Z"
+  "updated_at": "2026-11-05T00:52:31.399966633Z"
 }
