@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "651231e7-be6f-44d8-8ab6-be6b1dfdc278",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:12:28.194244990Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "16162d47-5745-47a4-883d-3d027a097051",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:14:42.805222485Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c16c834c-f134-4af8-ab20-40c6a120e836",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Storage pinned inspection runs on a module checkout",
-  "updated_at": "2026-11-04T23:59:18.233643240Z"
+  "updated_at": "2026-11-05T00:14:42.805222485Z"
 }
