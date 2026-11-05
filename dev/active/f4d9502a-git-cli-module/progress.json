@@ -404,8 +404,10 @@
           "short_id": "fb5e8e8d",
           "title": "Main-history guard runs against the selected worktree",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared",
+          "worker": "agent:f4d9502a-lead"
         }
       ]
     },
@@ -856,7 +858,8 @@
     "92afc5d8 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward-approved fb factual reconciliation: current worktree.rs255/303 accepts repository/layout and executes Git at data_root; no test-mode bypass or namedemptytests remain, gate.rs has3currentcalls. Preserve existing selectedrepositoryowner, allow/refuse semantics andliteralcase; do not restoreobsoletebypass. Actualexternalstoreauthority supplies missingbehavior forRED. Sameconsumer scope.",
     "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate.",
-    "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
