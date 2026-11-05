@@ -165,6 +165,55 @@
       "format": "markdown",
       "label": "Live execution checkpoint: reviewed Git work and split-root implementation",
       "path": "dev/active/f4d9502a-git-cli-module/handoff-2.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "be14e3775daceb625e97fff2ca493dd9e9b586757026df403ceb0fcd71b3105a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "efab36ce49a7cee1eddc5e907cf6a4266e6febec8e3cb6b602422945f19d6395",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/design.md",
+          "resolved_path": "dev/active/5046408a/design.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "a37fbc69fde2002e369d14966d54b1c0761a23d95c3a4a924210ec981664aa43",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "progress.json",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "19abf767c6e90dae60c156b70beb6af0c0043f10411d8d1965f681371be95ab6",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../c140921c/revision-producer-plan.md",
+          "resolved_path": "dev/active/c140921c/revision-producer-plan.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d40457b12dbfbeed22b345982002668878654d5eac18abb46a3d8d9f341ea93f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-2.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff-2.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Live split-root gate and diagnostic-design checkpoint",
+      "path": "dev/active/f4d9502a-git-cli-module/handoff-3.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:37.009914436Z",
@@ -188,5 +237,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-05T04:57:00.691792621Z"
+  "updated_at": "2026-11-05T06:16:06.102965735Z"
 }
