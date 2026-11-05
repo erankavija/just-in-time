@@ -17,7 +17,6 @@ use anyhow::{Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::path::Path;
-use std::process::Command;
 
 /// Read the selected checkout's branch, requiring Git and a committed HEAD.
 fn claim_branch(checkout: Option<GitCheckout>) -> Result<String> {
@@ -261,30 +260,25 @@ fn sanitize_actor(name: Option<&str>) -> Option<String> {
 /// Resolve the acting identity for an owner-bypass release.
 ///
 /// Prefers the configured agent id (`JIT_AGENT_ID` > `~/.config/jit/agent.toml`,
-/// already validated), falling back to the git `user.name` (sanitized via
-/// [`sanitize_actor`]). The returned assignee is valid and can be used by the
-/// `ClaimCoordinator` and recorded in the eviction audit trail.
+/// already validated), falling back to the selected checkout's git `user.name`
+/// (sanitized via [`sanitize_actor`]). The returned assignee is valid and can
+/// be used by the `ClaimCoordinator` and recorded in the eviction audit trail.
 ///
 /// # Errors
 ///
 /// Returns an error (see [`crate::errors::no_acting_identity`]) when neither a
 /// configured agent id nor a git `user.name` is available. A release must be
 /// attributable, so no placeholder identity is invented.
-pub(super) fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domain::Assignee> {
+pub(super) fn resolve_release_actor(paths: &WorktreePaths) -> Result<crate::domain::Assignee> {
     use crate::agent_config::resolve_agent_id;
 
     if let Ok(agent) = resolve_agent_id(None) {
         return Ok(agent);
     }
 
-    let git_name = Command::new("git")
-        .arg("-C")
-        .arg(worktree_root)
-        .args(["config", "user.name"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
+    let git_name = paths
+        .write_checkout()
+        .and_then(|checkout| checkout.user_name().ok().flatten());
 
     sanitize_actor(git_name.as_deref())
         .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()))?
@@ -312,11 +306,11 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     }
 
     /// [`Self::release_by_issue`] with the acting identity resolved by
-    /// `resolve_actor`, which receives the worktree root.
+    /// `resolve_actor`, which receives the selected worktree paths.
     fn release_by_issue_with_actor(
         &self,
         issue_id: &IssueId,
-        resolve_actor: impl FnOnce(&Path) -> Result<crate::domain::Assignee>,
+        resolve_actor: impl FnOnce(&WorktreePaths) -> Result<crate::domain::Assignee>,
     ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
         let storage = self.exec.storage();
@@ -332,7 +326,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         // Resolve the acting identity for the audit trail BEFORE evicting anything,
         // so a release never happens without an attributable actor. This is
         // independent of lease ownership: any identified actor may release by issue id.
-        let actor = resolve_actor(&paths.worktree_root)
+        let actor = resolve_actor(paths)
             .context("Cannot release lease without an attributable acting identity")?;
 
         // Create file locker and coordinator using the actor as the agent id.

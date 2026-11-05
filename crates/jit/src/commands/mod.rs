@@ -3086,7 +3086,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let released_by = claim::resolve_release_actor(self.require_layout()?.worktree_root())?;
+        let released_by = claim::resolve_release_actor(self.require_worktree_paths()?)?;
         let outcome =
             self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
                 issue_id: issue_id.clone(),
