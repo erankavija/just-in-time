@@ -9,6 +9,7 @@
   ],
   "description": "Read worktree listings through the shared Git module and remove the command's private porcelain parser.\n\n## Background\n\nThe worktree command currently starts Git itself and parses entries into a private `GitWorktreeEntry`, omitting detached and bare entries without branches. The module already owns porcelain parsing. An external data store can retain a selected checkout for coordination, so the command must use that already-resolved authority.\n\nThe prior plan incorrectly promised a preserved `WORKTREE_LIST_ERROR` code. The existing shared `RequiresGitError` represents a missing checkout; no command-specific classifier or wrapper is needed.\n\n## Success Criteria\n\n- [hard] REQ-01: Worktree listing uses `list_worktrees()` on the already-resolved selected checkout, including relocated external-store context through `write_checkout()`, and still omits entries without a branch. The private porcelain parser, `GitWorktreeEntry` and their two parser unit tests are removed; no listing process starts outside the Git module.\n- [hard] REQ-02: Existing Git-checkout output, filtering and external-store identity behavior remain unchanged, with the current worktree-list CLI tests passing.\n- [hard] REQ-03: A missing checkout returns the existing `RequiresGitError(GitRequirementGap::NoRepository)`: `REQUIRES_GIT`, exit 10 and canonical remediation. Dispatch declares `raises [RequiresGit]`; other Git failures propagate. CLI coverage owns the mapping and remedy, while the existing status-row census and generated reference reflect the shared contract.\n\n## Notes\n\nDEC-26 extends the shared worktree Git-requirement contract to listing. Reuse supplied checkout facts without adding discovery; sibling context reuse belongs to the invocation-layout mechanism. Historical planning evidence remains in version history.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:57:45.246765338Z",
   "first_ready_at": "2026-11-05T01:05:34.432147653Z",
   "gates_required": [
     "cargo-ci",
@@ -16,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "59c4c2bb-ef58-44e7-8921-1cb7d748cb56",
+      "run_id": "a1d97e05-fb4e-4687-ab89-21607dc4e925",
       "status": "passed",
-      "updated_at": "2026-11-05T01:57:45.114865742Z",
+      "updated_at": "2026-11-05T02:57:32.773552429Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,7 +41,7 @@
     "satisfies:f4d9502a/REQ-08"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Worktree list reads worktrees through the module",
-  "updated_at": "2026-11-05T02:00:52.780854213Z"
+  "updated_at": "2026-11-05T02:57:45.246765338Z"
 }
