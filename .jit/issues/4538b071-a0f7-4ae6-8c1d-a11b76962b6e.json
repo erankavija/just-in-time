@@ -15,7 +15,20 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ec3380bd-1314-4df2-947a-05eb681aa8bb",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:34:42.688611434Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "a76ad9b1-8c6d-496f-88f1-7c2df0d14a0e",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:28:32.610895257Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove explicitly unused API routes and client methods",
-  "updated_at": "2026-11-05T01:17:50.170016349Z"
+  "updated_at": "2026-11-05T01:34:42.688611434Z"
 }
