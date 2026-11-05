@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cebc1568-85a1-4bb1-9e27-15db0559b355",
+      "status": "failed",
+      "updated_at": "2026-11-05T02:07:58.265919929Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d48e28bf-e001-4f50-9f01-44c97cc8658c",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Object reader and presence check in the git module",
-  "updated_at": "2026-11-05T01:52:01.370001536Z"
+  "updated_at": "2026-11-05T02:07:58.265919929Z"
 }
