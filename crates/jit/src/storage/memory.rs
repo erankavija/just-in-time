@@ -227,6 +227,20 @@ impl InMemoryStorage {
         }
     }
 
+    fn read_repository_state(&self) -> Result<std::sync::MutexGuard<'_, MemoryRepositoryState>> {
+        crate::storage::repository_state_store::retry_optimistic_reads(
+            "in-memory repository",
+            || match self.try_repository_state() {
+                Ok(state) if state.data_root_exists && state.record.is_some() => Ok(None),
+                Ok(state) => Ok(Some(Ok(state))),
+                Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
+                    Ok(None)
+                }
+                Err(error) => Err(error.into()),
+            },
+        )
+    }
+
     pub(crate) fn mutation_interruptions(
         &self,
     ) -> Arc<dyn crate::storage::MutationInterruptionInjector> {
@@ -249,7 +263,7 @@ impl InMemoryStorage {
                 .as_str()
         );
         let files = self
-            .repository_state()
+            .read_repository_state()?
             .entries
             .iter()
             .filter_map(|(path, entry)| {
@@ -782,7 +796,7 @@ impl Default for InMemoryStorage {
 
 impl super::gate_run_reader::GateRunTree for InMemoryStorage {
     fn list_directory(&self, directory: &VirtualPath) -> Result<TreeNode<Vec<String>>> {
-        let state = self.repository_state();
+        let state = self.read_repository_state()?;
         Ok(match entry_without_following(&state, directory) {
             TreeNode::Present(RepositoryEntry::Directory { .. }) => TreeNode::Present(
                 state
@@ -804,7 +818,7 @@ impl super::gate_run_reader::GateRunTree for InMemoryStorage {
 
     fn read_regular_file(&self, file: &VirtualPath) -> Result<TreeNode<Vec<u8>>> {
         Ok(
-            match entry_without_following(&self.repository_state(), file) {
+            match entry_without_following(&*self.read_repository_state()?, file) {
                 TreeNode::Present(RepositoryEntry::File { content, .. }) => {
                     TreeNode::Present(content.bytes().to_vec())
                 }
@@ -876,7 +890,7 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn load_issue(&self, id: &IssueId) -> Result<Issue> {
-        Self::load_issue_entry(&self.repository_state(), id)?
+        Self::load_issue_entry(&*self.read_repository_state()?, id)?
             .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
     }
 
@@ -887,7 +901,7 @@ impl IssueStore for InMemoryStorage {
         use crate::storage::PathReadError;
         // In-memory: a missing issue is always NotFound (no I/O involved); a
         // present-but-corrupt record surfaces as a genuine parse failure.
-        Self::load_issue_entry(&self.repository_state(), id)
+        Self::load_issue_entry(&*self.read_repository_state()?, id)
             .map_err(PathReadError::Other)?
             .ok_or_else(|| PathReadError::NotFound(format!("Issue not found: {}", id)))
     }
@@ -898,36 +912,23 @@ impl IssueStore for InMemoryStorage {
     ) -> Result<crate::domain::identity::IssueId> {
         crate::storage::resolve_issue_id_among(
             prefix,
-            &Self::load_issues(&self.repository_state())?,
+            &Self::load_issues(&*self.read_repository_state()?)?,
         )
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        crate::storage::repository_state_store::retry_optimistic_reads("issue snapshot", || {
-            let state = match self.try_repository_state() {
-                Ok(state) => state,
-                Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
-                    return Ok(None)
-                }
-                Err(error) => return Err(error.into()),
-            };
-            if state.data_root_exists && state.record.is_some() {
-                Ok(None)
-            } else {
-                Ok(Some(Self::load_issues(&state)))
-            }
-        })
+        Self::load_issues(&*self.read_repository_state()?)
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        match Self::data_entry_bytes(&self.repository_state(), &VirtualPath::GATES) {
+        match Self::data_entry_bytes(&*self.read_repository_state()?, &VirtualPath::GATES) {
             Some(bytes) => Ok(parse_gate_registry(&bytes)?),
             None => Ok(GateRegistry::default()),
         }
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {
-        Self::load_events(&self.repository_state())
+        Self::load_events(&*self.read_repository_state()?)
     }
 
     fn read_archive_evidence_record(
@@ -935,7 +936,7 @@ impl IssueStore for InMemoryStorage {
         target: &PlanTarget,
     ) -> Result<Option<ArchiveEvidenceRecord>> {
         let path = VirtualPath::archive_evidence_record(target);
-        let state = self.repository_state();
+        let state = self.read_repository_state()?;
         match state.entries.get(&path) {
             None | Some(RepositoryEntry::Absent) => Ok(None),
             Some(RepositoryEntry::File { content, .. }) => serde_json::from_slice(content.bytes())
@@ -1001,7 +1002,7 @@ impl IssueStore for InMemoryStorage {
         // File -> Some, absent or non-file -> None.
         use crate::repository_state::RepositoryEntry;
         let vpath = self.repo_file_vpath(rel_path)?;
-        Ok(match self.repository_state().entries.get(&vpath) {
+        Ok(match self.read_repository_state()?.entries.get(&vpath) {
             Some(RepositoryEntry::File { content, .. }) => Some(
                 String::from_utf8(content.bytes().to_vec())
                     .map_err(anyhow::Error::from)
@@ -1018,7 +1019,7 @@ impl IssueStore for InMemoryStorage {
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
         let vpath = self.repo_file_vpath(path)?;
-        let state = self.repository_state();
+        let state = self.read_repository_state()?;
         let Some(commit) = at_commit else {
             // A non-file entry is refused as the file backend's confined read
             // refuses one.
@@ -1051,6 +1052,35 @@ impl IssueStore for InMemoryStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_read_getters_return_conflict_when_memory_state_is_held() {
+        let store = InMemoryStorage::new();
+        let held = store.repository_state();
+        let reader = store.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let id = crate::test_utils::issue_id(1);
+            let prefix = crate::domain::identity::IssueIdPrefix::from(&id);
+            let errors = [
+                reader.load_issue(&id).unwrap_err(),
+                reader.resolve_issue_id(&prefix).unwrap_err(),
+                reader.load_gate_registry().unwrap_err(),
+                reader.read_events().unwrap_err(),
+                reader.list_gate_presets().unwrap_err(),
+            ];
+            tx.send(errors).unwrap();
+        });
+        let result = rx.recv_timeout(std::time::Duration::from_secs(2));
+        drop(held);
+        thread.join().unwrap();
+        for error in result.unwrap() {
+            assert!(matches!(
+                error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+                Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+            ));
+        }
+    }
 
     #[test]
     fn test_unseeded_store_models_absent_root_seeding_marks_existing() {

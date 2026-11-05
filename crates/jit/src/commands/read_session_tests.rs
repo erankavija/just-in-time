@@ -152,6 +152,26 @@ fn test_with_read_session_refuses_contended_memory_state_without_waiting() {
     ));
 }
 
+#[test]
+fn test_resolve_issue_id_propagates_contended_memory_conflict() {
+    let store = crate::storage::InMemoryStorage::new();
+    let executor = super::test_helpers::memory_executor(store.clone());
+    let held = store.repository_state();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let thread = std::thread::spawn(move || {
+        tx.send(executor.issues().resolve_issue_id(&"0000".parse().unwrap()))
+            .unwrap();
+    });
+    let result = rx.recv_timeout(Duration::from_secs(2));
+    drop(held);
+    thread.join().unwrap();
+    let error = result.unwrap().unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+}
+
 /// Every reader holds its read session open at the barrier, so all of them
 /// pass it only if none waits on the held mutation session or on another
 /// reader.
