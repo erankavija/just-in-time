@@ -268,9 +268,10 @@
           "short_id": "d48e28bf",
           "title": "Object reader and presence check in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_additive_integration"
+          "worker_status": "merged_and_gated",
+          "source_merge": "524e7b6f54c8d0839d7ceeee21f5ce3fe0d8065e"
         },
         {
           "id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
@@ -287,15 +288,16 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_running"
+          "worker_status": "full_gates_running"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
           "short_id": "ea4b7363",
           "title": "Release actor reads git user.name through the module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementation_complete_pending_gates"
         }
       ]
     },
@@ -347,8 +349,9 @@
           "short_id": "a273667c",
           "title": "Path reads at a commit go through the git module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -371,8 +374,9 @@
           "short_id": "dcf88b6f",
           "title": "Pinned target inspection reads blobs through the object reader",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -747,7 +751,9 @@
     "732f7afb Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Base099Donecbe2c0651 mergedCargo28900273; init732 next. D25 charter authority121816926 and link3db4377c5 landed by frontend, preserve nonblocking cutover632 on integration. d48 corrected full gatesab9c87a8/42705ea4 pass on d8d04ef4; ten new tests include NUL rejection; base additive test conflict being verified. Server/base worktrees reclaimed. d681 implementation owns only reviewed seven-file context/fallback footprint, excluding632 read admission/with_read_session.",
     "f6eaba42 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "Steward approved ea4b7363 footprint-only reconciliation: actual second caller commands/mod.rs::publish_captured_release now supplies canonical WorktreePaths alongside claim-release callback. Two existing files, criteria unchanged, no new probe/cache/error/read-session behavior. Background/manifest/overview updated and native validation passed. Exclude frontend632 D25 admission/with_read_session edits and preserve actor precedence/fallback semantics."
+    "Steward approved ea4b7363 footprint-only reconciliation: actual second caller commands/mod.rs::publish_captured_release now supplies canonical WorktreePaths alongside claim-release callback. Two existing files, criteria unchanged, no new probe/cache/error/read-session behavior. Background/manifest/overview updated and native validation passed. Exclude frontend632 D25 admission/with_read_session edits and preserve actor precedence/fallback semantics.",
+    "d48e28bf Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "d48Done507748f7b after mergedstableCargo e91fc299 on524e7b6f5; object/base byteproof69PASS. Frontend a236 tracker boundary finished eccbe08e1. Ready dcf/a273 consumers claimed for isolated parallel work. EA two-file implementation complete, fullgates next; d681 fullgates running after149focused regressions. 9de refresh has only conjunction-comment conflict combining reviewed f6/9de ID removals; exact byte proof+fmt, mandatory mergedCargo."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1112,7 +1118,7 @@
     "d48e28bf": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "ab9c87a8-1fdd-4184-bb97-38038a2709e2",
+        "cargo-ci": "e91fc299-886a-4061-941f-7bb9272ccccc",
         "code-review": "42705ea4-66dd-4ccb-b9fa-f006bde39978"
       },
       "reviewed_source": "d8d04ef41469b562aa4c64c508bc258d9238c7bf",
@@ -1138,13 +1144,15 @@
       ],
       "stale_narrative": "Named pinned-batch parser convergence exception remains explicitly owned by dcf88b6f; no untracked future implementation promises.",
       "deferred_items": "No linked documents; pinned-inspection migration is distinct declared dcf88b6f task and remains mandatory for epic completion.",
-      "holistic": "Single new streaming process/header mechanism serves reader/presence; canonical runner/errors and shared fixtures used; two-file footprint. Additive base integration in progress, mandatory merged Cargo pending."
+      "holistic": "Single new streaming process/header mechanism serves reader/presence; canonical runner/errors and shared fixtures used; two-file footprint. Additive base integration in progress, mandatory merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS e91fc299-886a-4061-941f-7bb9272ccccc on 524e7b6f54c8d0839d7ceeee21f5ce3fe0d8065e."
     }
   },
   "source_queue": [
-    "f6eaba42 if frontend unready",
-    "d48e28bf after composition ready",
-    "ready interleave"
+    "9de4c09c after comment integration",
+    "e3c38fea",
+    "f649c144",
+    "632 when ready interleave"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",

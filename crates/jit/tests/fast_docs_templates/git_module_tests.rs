@@ -1528,3 +1528,266 @@ fn test_compare_with_base_unrelated_history_reports_no_merge_base() {
 
     assert_eq!(comparison, BaseComparison::NoMergeBase);
 }
+
+#[cfg(unix)]
+#[test]
+fn test_object_reader_answers_incremental_binary_tree_and_missing_requests_in_one_process() {
+    use jit::storage::git::GitObjectType;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let bytes = b"asset\0with\nbytes\xff\n";
+    repository
+        .write("assets/binary file", bytes)
+        .commit("binary asset");
+    let stand_in = GitStandIn::new();
+    let handle = checkout(Git::with_program(stand_in.program()), repository.root());
+    let mut reader = handle.object_reader().unwrap();
+    let document = reader.read("HEAD:README.md").unwrap().unwrap();
+    assert_eq!(document.bytes(), b"readme");
+    assert_eq!(document.object_type(), GitObjectType::Blob);
+    let binary = reader.read("HEAD:assets/binary file").unwrap().unwrap();
+    assert_eq!(binary.bytes(), bytes);
+    assert_eq!(
+        binary.id().as_str(),
+        repository.git(&["rev-parse", "HEAD:assets/binary file"])
+    );
+    assert_eq!(
+        reader.read("HEAD:assets").unwrap().unwrap().object_type(),
+        GitObjectType::Tree
+    );
+    assert_eq!(reader.read("HEAD:absent path").unwrap(), None);
+    assert_eq!(reader.read("unresolvable:missing path").unwrap(), None);
+    assert_eq!(reader.read(binary.id().as_str()).unwrap().unwrap(), binary);
+    drop(reader);
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(repository.root()));
+    assert_eq!(invocations[0].args(), ["cat-file", "--batch"]);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_object_types_preserves_input_order_and_absence_in_one_process() {
+    use jit::storage::git::GitObjectType;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    repository.git(&["tag", "-a", "annotated", "-m", "tag"]);
+    let stand_in = GitStandIn::new();
+    let handle = checkout(Git::with_program(stand_in.program()), repository.root());
+    assert_eq!(
+        handle
+            .object_types([
+                "HEAD:README.md",
+                "HEAD:",
+                "HEAD:missing",
+                "unresolvable",
+                "HEAD",
+                "annotated",
+                "HEAD:README.md"
+            ])
+            .unwrap(),
+        [
+            Some(GitObjectType::Blob),
+            Some(GitObjectType::Tree),
+            None,
+            None,
+            Some(GitObjectType::Commit),
+            Some(GitObjectType::Tag),
+            Some(GitObjectType::Blob)
+        ]
+    );
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(repository.root()));
+    assert_eq!(invocations[0].args(), ["cat-file", "--batch-check"]);
+}
+
+#[test]
+fn test_object_reader_rejects_invalid_names_without_corrupting_the_next_request() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let handle = checkout(Git::default(), repository.root());
+    let mut reader = handle.object_reader().unwrap();
+    ["HEAD\nHEAD", "HEAD\0suffix"].into_iter().for_each(|name| {
+        assert!(matches!(reader.read(name), Err(GitError::InvalidPath(_))));
+    });
+    assert_eq!(
+        reader.read("HEAD:README.md").unwrap().unwrap().bytes(),
+        b"readme"
+    );
+}
+
+#[test]
+fn test_object_types_validates_every_name_before_starting_git() {
+    let dir = TempDir::new().unwrap();
+    let handle = checkout(
+        Git::with_program(dir.path().join("missing-git")),
+        dir.path(),
+    );
+    ["HEAD\nHEAD", "HEAD\0suffix"].into_iter().for_each(|name| {
+        assert!(matches!(
+            handle.object_types(["HEAD", name]),
+            Err(GitError::InvalidPath(_))
+        ));
+    });
+}
+
+#[test]
+fn test_object_operations_preserve_missing_executable_errors() {
+    let dir = TempDir::new().unwrap();
+    let handle = checkout(
+        Git::with_program(dir.path().join("missing-git")),
+        dir.path(),
+    );
+    assert!(matches!(
+        handle.object_reader(),
+        Err(GitError::GitUnavailable { .. })
+    ));
+    assert!(matches!(
+        handle.object_types(["HEAD"]),
+        Err(GitError::GitUnavailable { .. })
+    ));
+}
+
+#[cfg(unix)]
+fn scripted_object_checkout(dir: &TempDir, body: &str) -> GitCheckout {
+    let program = dir.path().join("object-git");
+    jit::test_utils::write_executable(&program, format!("#!/bin/sh\n{body}\n")).unwrap();
+    checkout(Git::with_program(program), dir.path())
+}
+
+#[cfg(unix)]
+#[test]
+fn test_object_reader_rejects_malformed_headers_and_truncated_object_frames() {
+    let oid = "1".repeat(40);
+    [
+        "not-an-oid blob 0\n\n".to_owned(),
+        format!("{oid} unknown 0\n\n"),
+        format!("{oid} blob -1\n"),
+        format!("{oid} blob 18446744073709551616\n"),
+        "different-name missing\n".to_owned(),
+        format!("{oid} blob 0"),
+        format!("{oid} blob 2\na"),
+        format!("{oid} blob 1\nax"),
+    ]
+    .into_iter()
+    .for_each(|response| {
+        let dir = TempDir::new().unwrap();
+        let handle =
+            scripted_object_checkout(&dir, &format!("read -r request\nprintf '%s' '{response}'"));
+        let mut reader = handle.object_reader().unwrap();
+        assert!(
+            matches!(
+                reader.read("requested-name"),
+                Err(GitError::UnexpectedOutput { .. })
+            ),
+            "{response:?}"
+        );
+        assert!(matches!(
+            reader.read("another-name"),
+            Err(GitError::UnexpectedOutput { .. })
+        ));
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn test_object_reader_drop_and_protocol_failure_reap_the_child() {
+    use nix::errno::Errno;
+    use nix::sys::wait::{waitpid, WaitPidFlag};
+    use nix::unistd::Pid;
+
+    [false, true].into_iter().for_each(|fail| {
+        let dir = TempDir::new().unwrap();
+        let handle = scripted_object_checkout(
+            &dir,
+            r#"
+read -r request
+pid=$$
+printf '%040d blob %s\n%s\n' 0 "${#pid}" "$pid"
+read -r request
+printf 'malformed\n'
+read -r request
+"#,
+        );
+        let mut reader = handle.object_reader().unwrap();
+        let object = reader.read("child-pid").unwrap().unwrap();
+        let pid = std::str::from_utf8(object.bytes())
+            .unwrap()
+            .parse::<i32>()
+            .unwrap();
+        assert!(pid > 0);
+        if fail {
+            assert!(matches!(
+                reader.read("fail"),
+                Err(GitError::UnexpectedOutput { .. })
+            ));
+            assert_eq!(
+                waitpid(Pid::from_raw(pid), Some(WaitPidFlag::WNOHANG)),
+                Err(Errno::ECHILD)
+            );
+        }
+        drop(reader);
+        assert_eq!(
+            waitpid(Pid::from_raw(pid), Some(WaitPidFlag::WNOHANG)),
+            Err(Errno::ECHILD)
+        );
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn test_object_reader_drains_stderr_while_waiting_for_a_response() {
+    let dir = TempDir::new().unwrap();
+    let handle = scripted_object_checkout(
+        &dir,
+        r#"
+read -r request
+printf '%131072s' diagnostic >&2
+printf '%040d blob 0\n\n' 0
+read -r request
+"#,
+    );
+    assert_eq!(
+        handle
+            .object_reader()
+            .unwrap()
+            .read("empty")
+            .unwrap()
+            .unwrap()
+            .bytes(),
+        b""
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_object_types_checks_process_exit_and_rejects_extra_responses() {
+    ["exit 9", "printf 'extra\\n'"]
+        .into_iter()
+        .for_each(|ending| {
+            let dir = TempDir::new().unwrap();
+            let handle = scripted_object_checkout(
+                &dir,
+                &format!("read -r request\nprintf '%040d blob 0\\n' 0\nread -r request\n{ending}"),
+            );
+            assert!(matches!(
+                handle.object_types(["object"]),
+                Err(GitError::UnexpectedOutput { .. })
+            ));
+        });
+}
+
+#[cfg(unix)]
+#[test]
+fn test_object_reader_reports_failed_process_diagnostics() {
+    let dir = TempDir::new().unwrap();
+    let handle =
+        scripted_object_checkout(&dir, "read -r request\nprintf 'object failure' >&2\nexit 7");
+    let mut reader = handle.object_reader().unwrap();
+    assert!(
+        matches!(reader.read("object"), Err(GitError::UnexpectedOutput { output, .. }) if output.contains("object failure"))
+    );
+}
