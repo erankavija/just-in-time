@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-bb5040a8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "32c40f08e934c80ae4ba90a1fcbf661a7c087310",
+  "completed_at": "2026-11-05T00:06:18.649908392Z",
+  "duration_ms": 203283,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are met by the attributable implementation and focused tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "57280492-270c-44bb-a854-7b0770ecc954",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:02:55.366631629Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 33d19b2c, 74a85de5, a67e055e (all `jit:bb5040a8`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/bb5040a8/requirement/REQ-01 and REQ-02 (.jit/issues/bb5040a8-1341-4e8e-ac13-6eef116574f4.json); @/charter/D-21 and D-4 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, convention-convergence, and orthogonal-tests (.jit/invariants.toml); @/issue/f4d9502a/requirement/REQ-10 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T00:01:01Z), with ancestry covering all tagged commits; code-review pending\nTruncation recovery: reread bounded current implementation and test ranges plus focused caller searches after the combined read truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are met by the attributable implementation and focused tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -3,8 +3,8 @@
 //! This module composes the existing pure pieces into the single capability the
 //! write path needs (DR §7.5, plan step 5 "local"):
 //!
-//! 1. project the [`Issue`](crate::domain::Issue) into the canonical
-//!    [`Projection`](crate::domain::projection::Projection) (cheap selector fields only);
+//! 1. project the [`Issue`] into the canonical
+//!    [`Projection`] (cheap selector fields only);
 //! 2. select the [`RuleScope::Local`] rules whose selector matches the issue —
 //!    graph-scope rules are SKIPPED entirely on write (DR §7.4);
 //! 3. lazily add the parsed `sections` view to the projection ONLY when a
@@ -13,9 +13,9 @@
 //!    never parses the Markdown description (perf, DR §6.1);
 //! 4. obtain each rule's JSON Schema (raw [`Assertion::JsonSchema`] uses its
 //!    schema directly; the shorthand kinds are lowered via
-//!    [`desugar`](crate::validation::desugar::desugar)) and validate the
+//!    [`desugar`]) and validate the
 //!    projection through a
-//!    [`SchemaEngine`](crate::validation::engine::SchemaEngine), collecting
+//!    [`SchemaEngine`], collecting
 //!    [`Finding`]s carrying the rule's severity.
 //!
 //! [`evaluate_local`] owns an engine; [`evaluate_local_with_engine`] shares a

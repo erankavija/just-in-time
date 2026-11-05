@@ -994,15 +994,16 @@
     "f35c86de": 1,
     "487f45a9": 3,
     "0eca332a": 3,
-    "0546fc82": 3,
+    "0546fc82": 4,
     "ab168296": 0,
-    "755964b2": 1
+    "755964b2": 1,
+    "fe3ad1b0": 1
   },
   "surfaced_pitfalls": [
     {
       "source": "wave 4 workers",
       "summary": "cargo doc -p jit --no-deps reports unresolved intra-doc links (pre-existing): cli.rs, commands/mod.rs (incl. :2303 RepositoryLayout), bulk_update.rs, document.rs, gate.rs, dependency.rs, config.rs, validate.rs, project.rs:112, profile.rs:441 PackageArchiveError, domain/artifact_discovery.rs:243 private crate::commands::archive, domain/types.rs:129,185,1220,1442",
-      "disposition": "reconcile against REQ-03-type criteria before container gates"
+      "disposition": "Resolved by755964b2: actual merged workspace private-items Rustdoc command passes at e2925fcd8, linked trackedverification. Not inferred from doctests."
     },
     {
       "source": "wave 5 lead",
@@ -1639,7 +1640,7 @@
     },
     "0546fc82": {
       "status": "in_progress",
-      "note": "Actual dc and0eca dependencies Done; final mechanical97d93990/docreview5f6275eb PASS; formalPASS, queued integration."
+      "note": "All bounded finalaudit findings fixedb4d26070a; mechanicalbe51aa00/docreviewf24a5166 PASS; evidence84c51d94a; formalPASS, queue afterorigin. Approved D02 generator prose footprint; +1core pendingintegration."
     },
     "083c9a91": {
       "status": "done"
@@ -1850,7 +1851,8 @@
       "status": "done"
     },
     "fe3ad1b0": {
-      "status": "in_progress"
+      "status": "in_progress",
+      "note": "Two stale current narratives fixede08e28738; Cargo f14a2f36/review6c6439db stablePASS; evidence8b915471f; finalformal audit inprogress, queue afterGit ec9."
     },
     "ab168296": {
       "status": "done",
@@ -1859,9 +1861,11 @@
       "closure": "85e56e0cd"
     },
     "755964b2": {
-      "status": "in_progress",
+      "status": "done",
       "model": "gpt-6-luna high",
-      "note": "Final Cargo a123b6e4 and review59b5ca56 stablePASS; cumulativeF1F2 resolved; formalleadPASS; queued integration plus merged Rustdoc."
+      "note": "Actual merged Cargo98eb3137 and private-items Rustdoc PASS; source-pinned tracked verification; final code-review59b5ca56 stablePASS.",
+      "merge": "e2925fcd8",
+      "production_delta": 0
     }
   },
   "handoff": {
@@ -1995,7 +1999,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "f997 Done on main; fe3 finalgatesPASS/formalaudit finishing;0546/755 ready for interleaved integration. Timing/trial held.",
+    "status": "755/f997 Done;0546 finalboundedrepairgatesPASS, fe3 finalgatesPASS; outputstory acceptance waitsdocsDone. Timing/trial held.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -2004,9 +2008,9 @@
     "split_debug_merge": "649d398b3",
     "production_delta": 0,
     "active_wave": [
-      "fe3 gate-record-only acceptance",
-      "0546 queued after cc9/4858",
-      "755 queued after cc9/4858"
+      "0546 ready afterGit origin",
+      "fe3 finalacceptance afterGit ec9",
+      "46 after0546Done"
     ],
     "parallelism": "Pinned isolated reviews completed concurrently; read-only Rustdoc criterion audit runs while ready source merges interleave across leads. Full merged Cargo checks remain serial; cheap checks and AI reviews hold no Cargo locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
@@ -2148,6 +2152,10 @@
         {
           "merge": "da2245869",
           "delta": 0
+        },
+        {
+          "merge": "e2925fcd8",
+          "delta": 0
         }
       ],
       "current_epic_delta": 183,
@@ -2184,7 +2192,7 @@
     "f997_transitive_input": "Approved counter root in cargo-ci-selftest52c2ec0fb; finalCargo4eb950c8 and review15c7cc86 stablePASS. Earlier actualrecords preserved.",
     "rustdoc_repair": {
       "id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
-      "status": "in_progress",
+      "status": "done",
       "model": "gpt-6-luna high",
       "audit": "/tmp/jit-df129d9e-session14/rustdoc-criterion-audit.md",
       "scope": "Comment references only; actual facade REQ03 regression plus compiler-confirmed residual links; existing private-items Rustdoc command, no newchecker/runtime/import/API.",
@@ -2194,7 +2202,10 @@
       "review": "59b5ca56-d680-4d80-8970-3c9e96908f79 stablePASS, records7b916541b; formalPASS",
       "diagnostics": "111 actual blockingRustdoc diagnostics:35unresolved,41private,24redundant,11malformedHTML;52files,211changedlines allRustdoc; refreshed private-items docsPASS.",
       "rework": 1,
-      "verification": "dev/active/755964b2/verification.md in755 branch"
+      "verification": "dev/active/755964b2/verification.md in755 branch",
+      "merge": "e2925fcd8",
+      "merged_cargo": "98eb3137-610e-4d0f-8043-d804e01ef320",
+      "merged_rustdoc": "PASS existing workspace private-items command; source e2925fcd8, linked dev/active/755964b2/verification.md"
     },
     "docs_preparation_exception": "Approved combined7052b1fb3/final0eca preparation; finalsource291d665d2, mechanical97d93990 and docreview5f6275eb stablePASS, evidence d4e03af46 and formalleadPASS. Realprimary deps still governclaim/Done.",
     "0eca332a": {
@@ -2205,6 +2216,14 @@
       "merged_cargo": "5d29627b-18b0-4d8f-8bd2-f84014e96913",
       "code_review": "766aceb2-550f-42dd-8704-232525a5036c"
     },
-    "0546_extra_rework": "One extra boundedround approved: sole lowclarity findingab76b35e; inserted that in one sentence, source291d665d2; finalgatesPASS. Both original/final phrasing grammatical persteward; no newcontract requirement."
+    "0546_extra_rework": "Steward approved fourth bounded round: complete docs audit found3collectionexamples inclgraphsummary and falseuniversalexitintro. Fixed canonical generator prose and regenerated page b4d26070a; D02recordsfootprint. Finalmechanicalbe51aa00/docreviewf24a5166 PASS, records84c51d94a. +1core pendingmerge.",
+    "fe3ad1b0": {
+      "source": "e08e28738",
+      "rework": 1,
+      "cargo": "f14a2f36-a00e-4150-b4a4-b380f065656c",
+      "review": "6c6439db-00f5-4742-b4f5-642efdba5422",
+      "records": "8b915471f",
+      "production_delta": 0
+    }
   }
 }
