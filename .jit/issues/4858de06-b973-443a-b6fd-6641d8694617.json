@@ -14,7 +14,14 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "npm-ci": {
+      "run_id": "5c7b346c-d3ea-4aa3-bcbd-c1361717aedb",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:40:56.130681761Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4858de06-b973-443a-b6fd-6641d8694617",
   "labels": [
     "epic:frontends-share-core",
@@ -25,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Load issue details safely across selection changes",
-  "updated_at": "2026-11-05T00:34:44.649782831Z"
+  "updated_at": "2026-11-05T00:40:56.130681761Z"
 }
