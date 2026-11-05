@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "188acbdf-25f3-4f15-b8c4-5b6c563c3ddc",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:04:35.129812266Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5ce878f8-1b15-4fa0-82a5-9195c13baeec",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:07:57.097649335Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "CLI tests for commands with no git executable",
-  "updated_at": "2026-11-05T02:52:44.326476862Z"
+  "updated_at": "2026-11-05T03:07:57.097649335Z"
 }
