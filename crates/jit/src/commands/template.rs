@@ -203,38 +203,7 @@ impl<S: IssueStore> TemplateOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("template apply", || {
-            let (lease_targets, lease_mode) = {
-                let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-                let Some(image) =
-                    capture_template_image(&mut *session, &context, &request, container_id)?
-                else {
-                    return Ok(AttemptOutcome::Retry);
-                };
-                let captured = derive_captured_template_apply(
-                    &image,
-                    &request,
-                    container_id,
-                    anchor_bindings,
-                    force,
-                    &context,
-                )?;
-                (
-                    existing_template_lease_targets(
-                        &captured.issues,
-                        &captured.derived.lease_targets,
-                    ),
-                    captured.declarations.config().enforcement_mode(),
-                )
-            };
-            let warnings = super::refuse_foreign_leases_read(
-                self.exec.require_worktree_paths()?,
-                lease_mode,
-                &lease_targets,
-            )?
-            .into_iter()
-            .map(|(_, warning)| warning)
-            .collect::<Vec<_>>();
-
+            let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some(image) =
                 capture_template_image(&mut *session, &context, &request, container_id)?
@@ -249,14 +218,11 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 force,
                 &context,
             )?;
-            if captured.declarations.config().enforcement_mode() != lease_mode
-                || existing_template_lease_targets(
-                    &captured.issues,
-                    &captured.derived.lease_targets,
-                ) != lease_targets
-            {
-                return Ok(AttemptOutcome::Retry);
-            }
+            let warnings = super::refuse_foreign_leases_held(
+                captured.declarations.config().enforcement_mode(),
+                &existing_template_lease_targets(&captured.issues, &captured.derived.lease_targets),
+                claims_guard.as_ref(),
+            )?;
             if captured.derived.intents.is_empty() {
                 captured.derived.result.populate_created_issues(&image)?;
                 return Ok(AttemptOutcome::Done((captured.derived.result, warnings)));
