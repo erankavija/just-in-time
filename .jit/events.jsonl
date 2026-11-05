@@ -24889,3 +24889,7 @@
 {"gate_key":"cargo-ci","id":"c1f777e4-8905-4983-a671-2a8932a5d478","issue_id":"1d2235b1-7a07-4428-842b-db338fd133c0","timestamp":"2026-11-05T00:24:00.631367420Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"36cbaefb-df16-451c-a131-0dbfb2c5c06c","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:25:39.357566187Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:frontend-config","id":"04389c11-7525-4488-8656-92c7381935b4","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:25:39.357566187Z","type":"issue_claimed"}
+{"id":"dfe71932-46df-496e-83b1-64089e2dbf0e","issue_id":"755964b2-ee96-4fee-aa80-8f782c94dd47","priority":"normal","timestamp":"2026-11-05T00:27:07.828738294Z","title":"Rust API links name the owners after facade extraction","type":"issue_created"}
+{"fields":["dependencies"],"id":"f3a422b8-feff-4511-bf5a-32eae7bd43f5","issue_id":"df129d9e-c795-4d92-9ee5-ffd776339252","timestamp":"2026-11-05T00:27:23.443283212Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"ef082512-72a5-4c2f-bdd1-85a0579c96b1","issue_id":"755964b2-ee96-4fee-aa80-8f782c94dd47","timestamp":"2026-11-05T00:27:23.660616049Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:df129d9e-lead","id":"19c9682d-74af-4743-9499-74f65c744f08","issue_id":"755964b2-ee96-4fee-aa80-8f782c94dd47","timestamp":"2026-11-05T00:27:23.660616049Z","type":"issue_claimed"}
