@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f88c56f3-29de-4266-a914-833d4190ef51",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:47:16.521249969Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "93f3da67-d33f-495a-b708-76e5a5172c95",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:50:59.794633001Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ab168296-45d1-44cb-9ee1-6bdf53b9488c",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue listing renders directly through the shared output contract",
-  "updated_at": "2026-11-04T23:26:08.371357826Z"
+  "updated_at": "2026-11-04T23:50:59.794633001Z"
 }
