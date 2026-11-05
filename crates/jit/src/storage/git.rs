@@ -169,6 +169,22 @@ pub struct GitCheckout {
     worktree_root: PathBuf,
 }
 
+/// The relationship between a checkout's HEAD and a requested base commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BaseComparison {
+    /// Both commits resolve and share history.
+    Compared {
+        /// The nearest shared ancestor of HEAD and the base commit.
+        merge_base: CanonicalCommitOid,
+        /// The base revision peeled to a full commit OID.
+        base_commit: CanonicalCommitOid,
+    },
+    /// The base revision cannot be peeled to a commit.
+    BaseUnresolved,
+    /// Both commits resolve but share no history.
+    NoMergeBase,
+}
+
 impl GitCheckout {
     pub fn new(git: Git, worktree_root: PathBuf) -> Self {
         Self { git, worktree_root }
@@ -209,6 +225,52 @@ impl GitCheckout {
             branch => Some(branch.to_owned()),
         };
         Ok(Some(Head { commit, branch }))
+    }
+
+    // Temporary @/inv/convention-convergence exception: branch comparisons
+    // converge here when fb5e8e8d (check_branch_divergence) and 47d62472
+    // (validate_branch_drift) migrate their consumers.
+    /// Compare this checkout's HEAD with a caller-selected base revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if git cannot start, produces a non-canonical OID, or
+    /// fails to compare two resolved commits for a reason other than unrelated
+    /// histories.
+    pub fn compare_with_base(&self, base: &str) -> Result<BaseComparison, GitError> {
+        let base_commit = match self.resolve_commit(base) {
+            Ok(ArtifactVersion::Pinned(oid)) => oid,
+            Ok(version) => {
+                return Err(GitError::UnexpectedOutput {
+                    command: format!("rev-parse --verify {base}^{{commit}}"),
+                    output: version.as_str().to_owned(),
+                });
+            }
+            Err(GitError::RevisionNotFound { .. }) => return Ok(BaseComparison::BaseUnresolved),
+            Err(error) => return Err(error),
+        };
+        let args = ["merge-base", "HEAD", base_commit.as_str()];
+        let output = self.git.run(&self.worktree_root, args)?;
+        match output.status.code() {
+            Some(0) => {
+                let oid = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+                let merge_base = CanonicalCommitOid::parse(oid.clone()).map_err(|_| {
+                    GitError::NonCanonicalOid {
+                        revision: "HEAD".to_owned(),
+                        output: oid,
+                    }
+                })?;
+                Ok(BaseComparison::Compared {
+                    merge_base,
+                    base_commit,
+                })
+            }
+            Some(1) => Ok(BaseComparison::NoMergeBase),
+            _ => Err(GitError::UnexpectedOutput {
+                command: args.join(" "),
+                output: stderr(&output),
+            }),
+        }
     }
 
     /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.

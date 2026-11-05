@@ -1,4 +1,4 @@
-use jit::storage::git::{Git, GitCheckout, GitError, ProbedCheckout};
+use jit::storage::git::{BaseComparison, Git, GitCheckout, GitError, ProbedCheckout};
 use jit::test_harness::git::GitRepository;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -335,4 +335,93 @@ fn test_dirty_paths_runs_one_git_process_in_the_checkout() {
     let invocations = stand_in.invocations();
     assert_eq!(invocations.len(), 1);
     assert_eq!(invocations[0].directory(), Some(repository.root()));
+}
+
+#[test]
+fn test_compare_with_base_descendant_reports_base_as_merge_base() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let base = repository.git(&["rev-parse", "HEAD"]);
+    repository.git(&["branch", "base"]);
+    repository.write("next.txt", "next").commit("next");
+
+    let comparison = checkout(Git::default(), repository.root())
+        .compare_with_base("base")
+        .unwrap();
+
+    assert!(
+        matches!(comparison, BaseComparison::Compared { merge_base, base_commit }
+        if merge_base.as_str() == base && base_commit.as_str() == base)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_compare_with_base_diverged_linked_worktree_uses_selected_checkout() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let common = repository.git(&["rev-parse", "HEAD"]);
+    let linked = dir.path().join("linked");
+    let linked_path = linked.to_str().unwrap();
+    repository.git(&["worktree", "add", "--quiet", "-b", "topic", linked_path]);
+    repository.write("base.txt", "base");
+    let base = repository.commit("advance base");
+    std::fs::write(linked.join("topic.txt"), "topic").unwrap();
+    repository.git(&["-C", linked_path, "add", "topic.txt"]);
+    repository.git(&[
+        "-C",
+        linked_path,
+        "commit",
+        "--quiet",
+        "-m",
+        "advance topic",
+    ]);
+    let stand_in = GitStandIn::new();
+
+    let comparison = checkout(Git::with_program(stand_in.program()), &linked)
+        .compare_with_base(&repository.git(&["branch", "--show-current"]))
+        .unwrap();
+
+    assert!(
+        matches!(comparison, BaseComparison::Compared { merge_base, base_commit }
+        if merge_base.as_str() == common && base_commit.as_str() == base)
+    );
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 2);
+    assert!(invocations
+        .iter()
+        .all(|invocation| invocation.directory() == Some(linked.as_path())));
+}
+
+#[test]
+fn test_compare_with_base_missing_ref_reports_base_unresolved() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+
+    let comparison = checkout(Git::default(), repository.root())
+        .compare_with_base("refs/heads/missing")
+        .unwrap();
+
+    assert_eq!(comparison, BaseComparison::BaseUnresolved);
+}
+
+#[test]
+fn test_compare_with_base_unrelated_history_reports_no_merge_base() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let unrelated = GitRepository::init(dir.path().join("unrelated"));
+    unrelated.write("other.txt", "other").commit("other");
+    repository.git(&[
+        "fetch",
+        unrelated.root().to_str().unwrap(),
+        "HEAD:refs/heads/unrelated",
+    ]);
+
+    let comparison = checkout(Git::default(), repository.root())
+        .compare_with_base("unrelated")
+        .unwrap();
+
+    assert_eq!(comparison, BaseComparison::NoMergeBase);
 }
