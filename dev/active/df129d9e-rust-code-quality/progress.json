@@ -981,7 +981,7 @@
     "5f12265a": 1,
     "f35c86de": 1,
     "487f45a9": 3,
-    "0eca332a": 2,
+    "0eca332a": 3,
     "0546fc82": 2,
     "ab168296": 0
   },
@@ -2131,6 +2131,9 @@
       "focused_tests": "14 passed",
       "branch_cargo": "passed f88c56f3;5049+25",
       "review": "stablePASS93f3da67, zero findings; evidence836992d50"
-    }
+    },
+    "0eca_extra_rework": "Steward approved one extra mechanical round: full650e4906 passed5052tests+25doctests/budgets, Clippy rejected decimal permission0. Replace only0 with0o000, then fullgate/review. No behavior change.",
+    "0546_mechanical_blocker": "Actual run ecc372aa: M2/M3/M5/M6/M7/M9 pass; M8 rejects jq in installed8c dispatch script/protocol. Steward assigning original owner; no waiver.",
+    "f997_transitive_input": "Steward approved counter root in cargo-ci-selftest after positive review cb10432b; source52c2ec0fb, affected validation/review pending. Prior actualPASS retained, not current acceptance."
   }
 }

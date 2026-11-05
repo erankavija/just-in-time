@@ -423,7 +423,7 @@ fn invoke_gate_evaluate_many_permission_denied(json: bool) -> Vec<Output> {
     let id = setup_auto_gate_issue(&cli, "true");
     let registry = cli.root().join(".jit/gates.toml");
     let permissions = fs::metadata(&registry).unwrap().permissions();
-    fs::set_permissions(&registry, fs::Permissions::from_mode(0)).unwrap();
+    fs::set_permissions(&registry, fs::Permissions::from_mode(0o000)).unwrap();
     let output = evaluate_many_in(&cli, &id, json);
     fs::set_permissions(&registry, permissions).unwrap();
     vec![output]
