@@ -24,6 +24,7 @@ command_group! {
     storage: [HandlerStore],
     leaves: {
         "invariant_check" => InvariantCommands::Check => check()
+            raises [RetryableConflict]
             findings ValidationFailed "Enforcement drift was found (declared enforcement not backed by an enforcing rule)." -> InvariantCheckResult,
     }
 }

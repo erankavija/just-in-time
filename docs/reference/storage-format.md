@@ -110,23 +110,25 @@ open fails with an error naming the record. Repository discovery recognizes a
 pending record as well as an initialized `index.json`, so a repository whose
 index a crash left unwritten still reaches that session open.
 
-A read through the read driver takes no lock (`@/charter/D-22`). It counts
-only when no redo record was present and the event log did not grow between its
-open and the end of its reads; otherwise it reads again. After a few such
-attempts it reads once under a mutation session, whose open applies a leftover
-record; a record that open cannot apply fails the read with `recovery_failed`,
-naming `jit recover`. These commands read through the driver:
+A read through the read driver takes no repository write lock and does not apply
+redo records (`@/charter/D-25`). It counts only when no redo record was present
+and the event log did not grow between its open and the end of its reads;
+otherwise it retries. After bounded attempts it returns `RETRYABLE_CONFLICT`:
+retry the read, and run `jit recover` if a pending redo record persists. These
+commands read through the driver:
 
 - `jit validate`, except `--fix` without `--dry-run`, `--branch-drift` and
   `--leases`
 - `jit doc check-links`
 - `jit invariant check`
+- `jit issue batch-create --dry-run`
 - `jit profile apply --dry-run` and `jit profile diff`
 - `jit profile add --dry-run` and `jit profile pack --dry-run`
 
-Every other read-only command opens no session: it reads the files as they
-stand, which until the record is applied may be the state before the mutation
-or partly applied.
+Issue listings also admit one snapshot over every contributing data root before
+serving it. Other read-only commands may read individual files as they stand,
+which until a record is applied may be the state before the mutation or partly
+applied.
 
 ## Issue JSON Schema
 

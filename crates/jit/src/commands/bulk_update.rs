@@ -448,31 +448,42 @@ impl<S: IssueStore> IssueOps<'_, S> {
         preview.matched = matched.iter().map(|i| i.id.clone()).collect();
 
         for issue in matched {
-            let changes = self.compute_changes(issue, operations)?;
-
-            // Check for validation errors. Preview is read-only: pass force=false
-            // so blocking rules surface as would-fail and nothing is logged. The
-            // transition guards the write path reaches through the chokepoint are
-            // replayed here as the pure read they are, so a dependency- or
-            // gate-blocked item is reported before anyone runs the update.
-            let blocked = operations
-                .state
-                .filter(|target| *target != issue.state)
-                .map(|target| self.exec.transition_blockers(issue, target))
-                .unwrap_or(Ok(()));
-
-            if let Err(e) = blocked.and_then(|()| self.validate_update_preview(issue, operations)) {
-                preview.would_fail.push((issue.id.clone(), e.to_string()));
-            } else if changes.is_empty() {
-                // No changes - would be skipped
-                preview.changes.push((issue.id.clone(), vec![]));
-            } else {
-                preview.changes.push((issue.id.clone(), changes));
-            }
+            self.preview_issue(issue, operations, &mut preview)?;
         }
 
         preview.compute_summary();
         Ok(preview)
+    }
+
+    fn preview_issue(
+        &self,
+        issue: &Issue,
+        operations: &UpdateOperations,
+        preview: &mut BulkUpdatePreview,
+    ) -> Result<()> {
+        let changes = self.compute_changes(issue, operations)?;
+        let blocked = operations
+            .state
+            .filter(|target| *target != issue.state)
+            .map(|target| self.exec.transition_blockers(issue, target))
+            .unwrap_or(Ok(()));
+
+        if let Err(error) = blocked.and_then(|()| self.validate_update_preview(issue, operations)) {
+            if matches!(
+                error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+                Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+            ) {
+                return Err(error);
+            }
+            preview
+                .would_fail
+                .push((issue.id.clone(), error.to_string()));
+        } else if changes.is_empty() {
+            preview.changes.push((issue.id.clone(), vec![]));
+        } else {
+            preview.changes.push((issue.id.clone(), changes));
+        }
+        Ok(())
     }
 
     /// Compute what changes would be made to an issue
@@ -661,6 +672,43 @@ mod tests {
             done_at: None,
             archived_from: None,
         }
+    }
+
+    #[test]
+    fn test_preview_issue_propagates_retryable_conflict_and_keeps_validation_findings() {
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
+        let issue = create_test_issue(&crate::test_utils::issue_id(1), State::Ready, vec![]);
+        let operations = UpdateOperations {
+            add_gates: vec!["missing".parse().unwrap()],
+            ..Default::default()
+        };
+        let held = storage.repository_state();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let mut preview = BulkUpdatePreview::new();
+            let result = executor
+                .issues()
+                .preview_issue(&issue, &operations, &mut preview);
+            tx.send((executor, issue, operations, result)).unwrap();
+        });
+        let received = rx.recv_timeout(std::time::Duration::from_secs(2));
+        drop(held);
+        thread.join().unwrap();
+        let (executor, issue, operations, result) = received.unwrap();
+        assert!(matches!(
+            result
+                .unwrap_err()
+                .downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+            Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        let mut preview = BulkUpdatePreview::new();
+        executor
+            .issues()
+            .preview_issue(&issue, &operations, &mut preview)
+            .unwrap();
+        assert_eq!(preview.would_fail.len(), 1);
+        assert_eq!(preview.would_fail[0].0, issue.id);
     }
 
     #[test]

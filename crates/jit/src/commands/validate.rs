@@ -410,7 +410,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// and the plan documents its transition rules read.
     pub(crate) fn capture_mutation_base(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&IssueId>,
     ) -> Result<Option<MutationBase>> {

@@ -605,8 +605,9 @@ order, with repeated roots reported as `unchanged`. Otherwise it is `null`.
 ## Profile Commands
 
 Profile inspection works without an initialized repository. Application targets
-the current JIT repository and applies a leftover redo record before planning or
-writing.
+the current JIT repository and applies a leftover redo record before writing.
+Read-only planning returns a retryable conflict when it cannot obtain an admitted
+snapshot.
 
 Profile commands that select packages take one or more repeatable `--profile <DIR>` flags,
 each a bare package directory path relative to the worktree.

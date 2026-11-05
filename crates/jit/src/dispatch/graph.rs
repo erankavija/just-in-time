@@ -157,12 +157,12 @@ command_group! {
     command: GraphCommands,
     storage: [HandlerStore],
     leaves: {
-        "graph_deps" => GraphCommands::Deps { id, depth } => deps(id, depth) -> GraphDepsTreeResponse,
-        "graph_rdeps" => GraphCommands::Rdeps { id, depth } => rdeps(id, depth) -> GraphDownstreamResponse,
-        "graph_roots" => GraphCommands::Roots => roots() -> GraphRootsResponse,
-        "graph_tree" => GraphCommands::Tree { root } => tree(root) -> GraphTreeResponse,
+        "graph_deps" => GraphCommands::Deps { id, depth } => deps(id, depth) raises [RetryableConflict] -> GraphDepsTreeResponse,
+        "graph_rdeps" => GraphCommands::Rdeps { id, depth } => rdeps(id, depth) raises [RetryableConflict] -> GraphDownstreamResponse,
+        "graph_roots" => GraphCommands::Roots => roots() raises [RetryableConflict] -> GraphRootsResponse,
+        "graph_tree" => GraphCommands::Tree { root } => tree(root) raises [RetryableConflict] -> GraphTreeResponse,
         "graph_export" => GraphCommands::Export { format, full, scope, output } => export(format, full, scope, output)
-            -> GraphExportOutput
+            raises [RetryableConflict] -> GraphExportOutput
             as union [GraphExportSummaryResponse, GraphExportFullResponse, GraphExportWritten]
             "Default shape: lean summary nodes (id, short_id, title, state, priority, labels) with no gate fields. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status, plus the resolved-hierarchy fields (parent, children, cluster, rank). With --output: the path the export was written to.",
     }
@@ -176,7 +176,7 @@ pub mod rdeps {
         command: RdepsArgs,
         storage: [IssueStore],
         leaves: {
-            "rdeps" => args => rdeps(args.id, args.depth) -> GraphDownstreamResponse,
+            "rdeps" => args => rdeps(args.id, args.depth) raises [RetryableConflict] -> GraphDownstreamResponse,
         }
     }
 }

@@ -61,10 +61,10 @@ function App() {
     document.addEventListener('pointerup', onPointerUp);
   }, []);
   const { theme, toggleTheme } = useTheme();
-  const searchResults = useSearch(searchQuery, allIssues);
+  const [version, setVersion] = useState(0);
+  const searchResults = useSearch(searchQuery, version);
 
   // Live update version from SSE
-  const [version, setVersion] = useState(0);
   const { connected } = useEventStream({
     onChanged: useCallback((v: number) => setVersion(v), []),
   });
@@ -86,7 +86,6 @@ function App() {
       .catch((err) => console.warn('Failed to fetch namespace configuration:', err));
   }, []);
 
-  // Load all issues for client-side search (re-fetch on version change)
   useEffect(() => {
     apiClient.listIssues().then(setAllIssues).catch(console.error);
   }, [version]);
@@ -133,7 +132,7 @@ function App() {
             }}>
               {searchResults.results.map((result, idx) => (
                 <div
-                  key={result.issue?.id ?? `server-${result.serverResult?.path}-${result.serverResult?.line_number}-${idx}`}
+                  key={`${result.issue_id ?? 'document'}-${result.path}-${result.line_number}-${idx}`}
                   style={{
                     padding: '0.5rem',
                     cursor: 'pointer',
@@ -142,14 +141,14 @@ function App() {
                     fontSize: '0.875rem',
                   }}
                   onClick={() => {
-                    if (result.issue) {
-                      setSelectedIssueId(result.issue.id);
-                      setFocusIssueId(result.issue.id); // Also focus in graph
+                    if (result.issue_id) {
+                      setSelectedIssueId(result.issue_id);
+                      setFocusIssueId(result.issue_id); // Also focus in graph
                       setSearchQuery(''); // Clear search after selection
-                    } else if (result.serverResult) {
+                    } else {
                       // Open document viewer for document matches
                       setDocumentViewerState({
-                        path: result.serverResult.path,
+                        path: result.path,
                         searchQuery: searchQuery,
                       });
                       setSearchQuery(''); // Clear search after selection
@@ -162,30 +161,21 @@ function App() {
                     e.currentTarget.style.background = 'transparent';
                   }}
                 >
-                  {result.issue ? (
+                  {result.issue_id ? (
                     <>
-                      <span style={{ color: 'var(--text-secondary)' }}>{result.issue.id}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{result.issue_id}</span>
                       {' • '}
-                      <span style={{ color: 'var(--text-primary)' }}>{result.issue.title}</span>
-                      {result.type === 'client' && (
-                        <span style={{ 
-                          marginLeft: '0.5rem',
-                          fontSize: '0.75rem',
-                          color: 'var(--accent)',
-                        }}>
-                          ⚡
-                        </span>
-                      )}
+                      <span style={{ color: 'var(--text-primary)' }}>{result.line_text}</span>
                     </>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       <div>
-                        <span style={{ color: 'var(--text-secondary)' }}>📄 {result.serverResult?.path}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>📄 {result.path}</span>
                         <span style={{ marginLeft: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                          Line {result.serverResult?.line_number}
+                          Line {result.line_number}
                         </span>
                       </div>
-                      {result.serverResult?.line_text && (
+                      {result.line_text && (
                         <div style={{ 
                           fontSize: '0.75rem',
                           color: 'var(--text-muted)',
@@ -195,7 +185,7 @@ function App() {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                         }}>
-                          {result.serverResult.line_text.trim()}
+                          {result.line_text.trim()}
                         </div>
                       )}
                     </div>
