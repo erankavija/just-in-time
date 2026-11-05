@@ -25089,3 +25089,4 @@
 {"gate_key":"code-review","id":"55358fd6-2fec-4b2b-a49a-a2cdafa370b9","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-05T01:55:45.572787603Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"b2147758-cf8a-4a1d-bb3e-dc9b902f26d5","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-05T02:01:12.466035904Z","to":"done","type":"issue_state_changed"}
 {"id":"a505d982-99ab-4565-8704-4af82d40f690","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-05T02:01:12.466035904Z","type":"issue_completed"}
+{"fields":["documents"],"id":"19629df0-1229-414f-be54-ff2b6138f18b","issue_id":"df129d9e-c795-4d92-9ee5-ffd776339252","timestamp":"2026-11-05T02:02:44.908284413Z","type":"issue_updated","updated_by":"doc-add"}
