@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-review-f4-plan",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "21cd8fb9fffec340c051edc316c80af2fbc19074",
+  "completed_at": "2026-11-05T01:36:35.349818238Z",
+  "duration_ms": 265067,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Linked artifacts are complete; validation, render check, and native batch dry-run pass with all required criteria covered.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "97a30f16-04dc-45dd-84a9-74acd5cdf9f3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:32:10.282391806Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Linked artifacts are complete; validation, render check, and native batch dry-run pass with all required criteria covered.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

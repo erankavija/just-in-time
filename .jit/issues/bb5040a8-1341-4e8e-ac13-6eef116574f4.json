@@ -8,6 +8,7 @@
   ],
   "description": "Add the git module's query for the `origin` remote's URL.\n\n## Background\n\n- Snapshot export reads the origin URL through libgit2 (`origin_remote_url`, `crates/jit/src/commands/snapshot.rs:19-23`).\n- `git remote get-url origin` prints the URL and exits nonzero when there is no `origin` remote.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::origin_url()` runs one `git remote get-url origin` and returns the URL, or `None` when the repository has no `origin`.\n- [hard] REQ-02: The behaviour suite covers a repository with and without an `origin` and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T01:38:59.505179214Z",
   "first_ready_at": "2026-11-01T14:05:18.523910827Z",
   "gates_required": [
     "cargo-ci",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "3b20d4bb-e933-4037-8405-25d3806fbd33",
+      "run_id": "4e0b64b4-735d-44d5-879d-b108a7b982dc",
       "status": "passed",
-      "updated_at": "2026-11-05T00:45:11.920792750Z",
+      "updated_at": "2026-11-05T01:36:12.787791618Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -38,7 +39,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Origin URL query in the git module",
-  "updated_at": "2026-11-05T00:48:22.863812140Z"
+  "updated_at": "2026-11-05T01:38:59.505179214Z"
 }
