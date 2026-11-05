@@ -24,7 +24,7 @@ pub(crate) fn enters(path: &str, reserved: &str) -> bool {
 /// so root-vs-descendant is a type-level distinction rather than a value test.
 ///
 /// The descendant payload is [`Cow<'static, str>`] so well-known paths can be
-/// `Cow::Borrowed` const associated items of [`VirtualPath`], while parsing and
+/// `Cow::Borrowed` const associated items of [`crate::repository_state::VirtualPath`], while parsing and
 /// deserialization mint `Cow::Owned`. `Cow`'s `Eq`/`Ord`/`Hash` compare and
 /// hash by `str` content, so a borrowed const and an owned parse of the same
 /// path unify as one map key.

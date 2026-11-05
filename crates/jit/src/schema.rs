@@ -708,14 +708,15 @@ pub fn render_exit_code_reference() -> String {
          (`crates/jit/src/schema.rs`). Do not edit by hand; regenerate instead. -->\n\n",
     );
     out.push_str(
-        "`jit` returns a small, stable set of process exit codes so scripts and \
+        "`jit` defines a small, stable set of process exit codes so scripts and \
          agents can branch on outcomes without parsing output. This page is \
          projected from the exit-code taxonomy and the command mappings in \
          `jit --schema`. Each emitted mapping is bound by a test to the runtime \
          that produces it: the shared classifier (`classify` in \
          `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
-         findings envelope a completed run reports (the findings signals). Every \
-         run exits through one exit site with its envelope's code.\n\n",
+         findings envelope a completed run reports (the findings signals). See \
+         [CLI JSON contracts](cli-commands.md#cli-json-contracts) for output and \
+         child-process passthrough behavior.\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");

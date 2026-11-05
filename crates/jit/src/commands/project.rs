@@ -113,7 +113,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// so a region-mode projection changes only its delimited block, a shared target
     /// composes deterministically, and a failing render leaves every target
     /// byte-identical (`@/inv/atomic-writes`). A missing target/source/marker or
-    /// unknown kind is a typed [`ProjectionError`] surfaced before any write, so it
+    /// unknown kind is a typed [`crate::repository_state::ProjectionError`] surfaced before any write, so it
     /// keeps the validation exit code.
     pub fn project_render(&self, name: Option<&str>) -> Result<ProjectRenderResult> {
         use crate::repository_state::{

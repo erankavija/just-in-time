@@ -261,7 +261,7 @@ impl GraphFinding {
 /// `repo_default_format` is the repo-level default content format used to parse
 /// a source issue's criteria section (a `label-coverage` rule) when the issue
 /// carries no per-issue `content_format`. The same
-/// [`content_parser_for`](crate::document::content_parser_for) selector the write
+/// [`content_parser_for`] selector the write
 /// path uses is applied here, so HTML/XML sources are parsed consistently. A
 /// selected format whose parser feature is not compiled surfaces as a
 /// config-error finding on the source issue (no silent Markdown fallback).

@@ -290,12 +290,11 @@ impl From<crate::domain::item::ItemError> for ProducerError {
 }
 
 /// A typed failure raised while parsing captured declaration files into the
-/// canonical bundle ([`declarations_from_image`] /
-/// [`validation_declarations_from_image`]).
+/// canonical bundle (`declarations_from_image` / `validation_declarations_from_image`).
 ///
 /// Each variant carries its leaf parser's concrete error; rendering lives in this
 /// type's `Display` impl rather than at the parse site. Also the stored type of a
-/// deferred `rules.toml` load failure ([`CapturedRepositoryDeclarations::rules_load_error`]).
+/// deferred `rules.toml` load failure (`CapturedRepositoryDeclarations::rules_load_error`).
 #[derive(Debug, thiserror::Error)]
 pub enum DeclarationParseError {
     /// A required declaration file was absent from the captured image.
@@ -755,7 +754,7 @@ pub fn derive_materialization(
 /// published file. It then derives the complete owned-materialization set —
 /// default rules and their schemas, plus every configured projection — from that
 /// edited configuration, with `declarations` supplying the gates and rules,
-/// exactly as [`derive_semantic_mutation`] does. The
+/// exactly as `derive_semantic_mutation` does. The
 /// authored `config.toml` write, emitted only when the edit changes its bytes,
 /// carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against

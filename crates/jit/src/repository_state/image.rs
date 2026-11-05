@@ -806,7 +806,7 @@ struct ImageData {
 /// Complete immutable repository image consumed by pure producers.
 ///
 /// Clones share the captured data and the token. Equality compares the
-/// captured data only; a session recognises its own image by [`ImageToken`].
+/// captured data only; a session recognises its own image by `ImageToken`.
 #[derive(Debug, Clone)]
 pub struct RepositoryImage {
     data: Arc<ImageData>,

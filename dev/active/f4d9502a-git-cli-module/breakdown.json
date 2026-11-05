@@ -244,8 +244,8 @@
  },
  {
   "key": "layout-fallback-removal",
-  "title": "Storage and executor stop re-detecting the layout",
-  "description": "Remove the lazy layout detection inside storage and the command executor, so each handle uses the layout its constructor's caller supplied and never starts git to find one.\n\n## Background\n\n- `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) runs `WorktreePaths::detect_for_data_root` when no paths were configured. Its callers are the primary-checkout read tier, `load_index_from_main_worktree` (`crates/jit/src/storage/json.rs:866-880`) and `load_issue_from_main_worktree` (`crates/jit/src/storage/json.rs:931-945`).\n- `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2240-2256`) detects lazily when `with_worktree_paths` (`crates/jit/src/commands/mod.rs:2234-2237`) was not called. Its callers are the lease guard of guarded mutations, `claims_mutation_guard` (`crates/jit/src/commands/mod.rs:755-774`, called from `commands/dependency.rs`, `commands/issue.rs`, `commands/gate.rs` and `commands/mod.rs`), template lease warnings (`crates/jit/src/commands/template.rs:194`) and `validate --leases` (`crates/jit/src/commands/validate.rs:2228`).\n- Production handles receive their paths at construction: the CLI configures storage and the executor from its one detection, and the server does the same from its data root. `jit recover` builds an executor without paths (`crates/jit/src/commands/claim.rs:732`), but derived-state repair reaches none of the callers above.\n- A grep of in-process tests that build a git repository and a storage handle or executor finds one group that relies on the lazy detection through a caller above: the primary-checkout tier tests (`crates/jit/src/storage/json.rs:2381`, `:2577`, `:2619`). The tests in `commands/mod.rs` supply their paths, and the claim tests build theirs by hand. The other in-process tests over git repositories read git through libgit2 or the layout, not through these callers.\n\n## Success Criteria\n\n- [hard] REQ-01: A `JsonFileStorage` with no configured paths reads only its own data root: it has no primary-checkout tier and starts no git process to find one.\n- [hard] REQ-02: An executor built without `with_worktree_paths` answers `require_worktree_paths` with non-git paths derived from its layout, or from its storage root when it has no layout, without starting a process. A guarded mutation on such an executor takes no lease guard.\n- [hard] REQ-03: No production code in `storage/json.rs` or `commands/mod.rs` calls a `WorktreePaths` detection function.\n- [hard] REQ-04: Two unit tests fail on today's code, and the three primary-checkout tier tests configure their storage's paths and pass. Storage over a linked checkout's data root with no configured paths does not list an issue only the primary checkout holds, and lists it once the paths are configured. `require_worktree_paths` on an executor over a git repository built without paths reports a non-git checkout.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "title": "Layout consumers share invocation-owned checkout facts",
+  "description": "Keep Git layout observations in one invocation-owned context so bootstrap and checkout projections reuse facts instead of probing a checkout again.\n\n## Background\n\n`WorktreePaths::detect_from_with_non_git_root` (`crates/jit/src/storage/worktree_paths.rs:84`) probes the selected data root, then the explicit worktree root when the data root is external. `for_worktree_root` (`:204`) currently probes the selected checkout again and probes a sibling each time it is projected. The external-store investigation measured four layout processes for a two-checkout listing and for active-lease validation.\n\nThe reconciled layout contract permits one computation per distinct checkout context: ordinary issue reads use at most one Git process, external bootstrap uses at most two layout processes, and an external-store operation visiting N distinct checkout contexts including the selected checkout uses at most N+1 layout processes. The failed data-root probe is included; lease and issue counts cannot increase this bound. Existing external-store coordination and per-checkout identity behavior remain required.\n\n`JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:612`) and `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2589`) still discover layouts when callers omit them. The shared bootstrap already supplies paths to both handles. Recovery's nested repair executor (`crates/jit/src/commands/claim.rs`, `ClaimOps::recover`) can receive the existing paths while retaining the fallible `with_layout` binding introduced on main.\n\n## Success Criteria\n\n- [hard] REQ-01: Detection retains each queried path's successful, absent, or error outcome in one invocation-scoped layout context. A successful probe associates only the queried path, its filesystem-canonical alias when available, and the Git-reported top level with that checkout. Bootstrap preserves data-root-first selection and the external fallback, with at most one layout process for an in-checkout data root and at most two for an external data root. Negative observations are not broadened to parent or descendant paths; common and private Git directories are not treated as equivalent worktree probe paths.\n- [hard] REQ-02: Cloning and projecting supplied worktree paths retain the same context. `for_worktree_root` reuses the selected checkout and previously observed siblings, including absent siblings, without another probe; concurrent identical requests cannot duplicate a process. An external operation visiting N distinct checkout contexts including the selected checkout uses at most N+1 layout processes regardless of repeated listed paths or lease count. Data-root ownership, linked-store write policy, common-directory coordination, subdirectory roots, separate identities, and moved or previously unvisited checkout behavior remain unchanged.\n- [hard] REQ-03: Storage and executor no longer call a layout detector when paths are absent. Unconfigured storage reads only its local data root; an unconfigured executor reports non-Git paths from its explicit layout or existing storage-root fallback and takes no lease guard. Production bootstrap and recovery construction share supplied context, preserve fallible layout binding and recovery ordering, and keep missing Git optional for core commands. Existing primary-tier fixtures supply their paths explicitly.\n- [hard] REQ-04: The worktree-path mechanism tests own exact-alias, negative/error reuse, clone sharing, and concurrent duplicate-probe behavior. The existing CLI process-budget suite covers external primary/linked bootstrap and external worktree listing plus active-lease validation, including a selected subdirectory and moved sibling, and checks the revised bounds without growth from additional leases. Existing ordinary-read process assertions and external-store identity/coordination tests remain passing; no duplicate behavioral matrix or new Cargo test target is introduced.\n\n## Notes\n\nThe implementation follows the reconciled `layout-once` contract and proposed DEC-27. The historical evidence is `dev/active/f4d9502a-git-cli-module/layout-probe-investigation.md`. Git remains the classifier; no new authority flag, Git-file parser, persistent cache, or inferred sibling administrative path is introduced. Layout value equality remains independent of mutable observation state. The distinct roles of `git()`, `write_checkout()`, and the guarded initialization-identity path remain intact.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -255,7 +255,8 @@
    "component:storage",
    "component:core",
    "per:@/charter/D-21",
-   "satisfies:f4d9502a/REQ-04"
+   "satisfies:f4d9502a/REQ-04",
+   "component:testing"
   ],
   "gates": [
    "cargo-ci",
@@ -263,27 +264,35 @@
   ],
   "depends_on": [
    "server-layout-from-data-root",
-   "head-tier-removal"
+   "git-process-budget-test"
   ],
   "planning": {
-   "outcome": "Storage and the executor use supplied layouts only and never detect lazily.",
+   "outcome": "Bootstrap and checkout projections reuse invocation-owned layout facts within the distinct-context process bounds.",
    "contract_refs": [
-    "layout-once"
+    "layout-once",
+    "git-module",
+    "git-test-fixtures"
    ],
    "produces_contracts": [],
    "source_refs": [
     "REQ-04",
-    "DEC-09"
+    "REQ-07",
+    "DEC-09",
+    "DEC-27"
    ],
    "terminal": {
-    "consumer_family": "layout consumers",
-    "test_boundary": "layout fallback unit tests",
-    "worker_sized_reason": "Two lazy fallbacks in two functions are replaced by non-probing defaults, with two regression tests and three fixture updates.",
+    "consumer_family": "invocation layout consumers",
+    "test_boundary": "invocation layout contract",
+    "worker_sized_reason": "One layout ownership change carries observations through existing clones and projections while eliminating competing lazy discovery; mechanism tests and CLI wiring prove the same bounded contract.",
     "footprint": {
      "touches": [
+      "crates/jit/src/storage/worktree_paths.rs",
       "crates/jit/src/storage/json.rs",
       "crates/jit/src/commands/mod.rs",
-      "crates/jit/src/storage/worktree_paths.rs"
+      "crates/jit/src/commands/claim.rs",
+      "crates/jit/src/test_utils.rs",
+      "crates/jit/src/dispatch/hooks.rs",
+      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs"
      ]
     }
    }
@@ -429,6 +438,9 @@
      "touches": [
       "crates/jit/tests/cli_repo_workflow/main.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The completed ordinary-read budget suite retains its accepted issue identity and assertions; the pending layout ownership remediation extends its existing test file for external-context wiring. This metadata-only exception preserves the instantiated graph under DEC-24 and expires when f4d9502a closes; it does not authorize new fan-out."
     }
    }
   }
@@ -540,7 +552,7 @@
  {
   "key": "worktree-info-head-lookup",
   "title": "Worktree info reads its branch through the module",
-  "description": "Make `jit worktree info` take its branch from the git module's head lookup instead of its own `git rev-parse`.\n\n## Background\n\n- `execute_worktree_info` (`crates/jit/src/commands/worktree.rs:169-189`) calls the file's own `get_current_branch` (`crates/jit/src/commands/worktree.rs:46-63`), which runs `git rev-parse --abbrev-ref HEAD` in the worktree root. When git fails it reports \"Failed to get current git branch. Are you in a git repository?\" followed by git's stderr, which the CLI reports as `WORKTREE_INFO_ERROR` with exit 1.\n- Through the module, a missing checkout starts no process and an unborn branch is `head() == Ok(None)`, so neither case has stderr to quote.\n- The branch feeds the worktree identity load and the reported entry.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:195` onwards; unit test `crates/jit/src/commands/worktree.rs:489`.\n- Kept as one change for a build reason: the file's `get_current_branch` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree info` takes its branch from the head lookup of the paths' git checkout, rendered as the branch name or `HEAD` when detached. The file's `get_current_branch` no longer exists.\n- [hard] REQ-02: Without a git checkout the command fails with \"jit worktree info requires a git repository\", and on an unborn branch with \"the current branch has no commits yet; make a first commit\"; both report `WORKTREE_INFO_ERROR` with exit 1. CLI tests assert both, and they fail on today's message.\n- [hard] REQ-03: The existing worktree info tests pass unchanged.\n\n## Notes\n\n- Behaviour change: the two failure messages name the requirement and no longer quote git's stderr; the code and exit status are unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit worktree info` read the selected checkout's current branch through the Git module while preserving its stable worktree identity.\n\n## Background\n\n- The command has a private branch subprocess. The shared Git module supplies the same branch label and distinguishes a confirmed unborn checkout from failed Git operations.\n- The shared `RequiresGitError` already represents a missing repository and a repository without commits. The earlier plan incorrectly described `WORKTREE_INFO_ERROR` as the preserved code; the current classifier uses the shared error vocabulary.\n- An external data store can still have a selected checkout for coordination. Use the already-resolved checkout authority, preserve that behavior, and keep the worktree ID stable when the branch changes.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree info` reports the selected checkout's current branch through `head()` and `Head::branch_label()`, including `HEAD` when detached, while preserving the stable worktree ID. The private `get_current_branch` helper no longer exists.\n- [hard] REQ-02: A missing checkout and a confirmed unborn checkout return the existing `RequiresGitError` with `GitRequirementGap::NoRepository` and `NoCommits`, respectively: `REQUIRES_GIT`, exit 10, and the canonical remediation for each gap. Dispatch declares the shared error contract; other Git failures propagate without a command-specific wrapper. CLI coverage verifies both gaps.\n- [hard] REQ-03: Existing worktree-info behavior, including selected data roots and external-store identities, remains covered; branch-switch coverage asserts a fresh branch with the same worktree ID.\n\n## Notes\n\n- Steward-approved reconciliation in plan DEC-26 replaces the incorrect command-specific error promise with the existing typed contract. Historical planning evidence remains in version history.\n- Reuse the already-resolved selected checkout; do not add a probe or broaden guarded init-identity behavior.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -569,20 +581,22 @@
     "REQ-02",
     "REQ-05",
     "DEC-10",
-    "DEC-18"
+    "DEC-18",
+    "DEC-26"
    ],
    "terminal": {
     "consumer_family": "worktree info",
     "test_boundary": "worktree CLI tests",
-    "worker_sized_reason": "One private lookup is replaced by the module operation at its single call site, with two message tests.",
+    "worker_sized_reason": "One branch adapter and its declared shared error contract, with current-branch and missing-fact CLI coverage.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/worktree.rs",
-      "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
+      "crates/jit/src/dispatch/worktree.rs",
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
+      "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs",
+      "docs/reference/exit-codes.md"
      ]
-    },
-    "warning_overrides": {
-     "chain-link": "The instantiated worktree-info adapter owns current-branch reporting and CLI error composition; the head producer owns Git failure semantics. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -838,7 +852,7 @@
  {
   "key": "worktree-list-through-module",
   "title": "Worktree list reads worktrees through the module",
-  "description": "Make `jit worktree list` read worktrees through the git module's listing, deleting its private porcelain parser.\n\n## Background\n\n- `execute_worktree_list_at` (`crates/jit/src/commands/worktree.rs:223-301`) starts `git worktree list --porcelain` itself and parses it with `parse_git_worktree_porcelain` (`crates/jit/src/commands/worktree.rs:90-123`) into `GitWorktreeEntry` (`crates/jit/src/commands/worktree.rs:67`), dropping worktrees without a branch. A failed listing reports `git_command_failed(\"git worktree list --porcelain\", <stderr>)`, which the CLI reports as `WORKTREE_LIST_ERROR` with exit 1.\n- Without a git checkout the module starts no process, so there is no stderr to quote.\n- Parser unit tests: `crates/jit/src/commands/worktree.rs:513` and `crates/jit/src/commands/worktree.rs:1063`. CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:453` onwards.\n- Kept as one change for a build reason: the parser and its entry type are private, and uncalled private items fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree list` lists worktrees through `list_worktrees` of the paths' git checkout and still omits worktrees without a branch. `parse_git_worktree_porcelain`, `GitWorktreeEntry` and their two unit tests no longer exist, and the command starts no git process outside the module.\n- [hard] REQ-02: Output in a git checkout is unchanged, and the worktree list CLI tests pass unchanged.\n- [hard] REQ-03: Without a git checkout the command fails with \"jit worktree list requires a git repository\", reported as `WORKTREE_LIST_ERROR` with exit 1. A CLI test asserts it and fails on today's message.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement and no longer quotes git's stderr; the code and exit status are unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Read worktree listings through the shared Git module and remove the command's private porcelain parser.\n\n## Background\n\nThe worktree command currently starts Git itself and parses entries into a private `GitWorktreeEntry`, omitting detached and bare entries without branches. The module already owns porcelain parsing. An external data store can retain a selected checkout for coordination, so the command must use that already-resolved authority.\n\nThe prior plan incorrectly promised a preserved `WORKTREE_LIST_ERROR` code. The existing shared `RequiresGitError` represents a missing checkout; no command-specific classifier or wrapper is needed.\n\n## Success Criteria\n\n- [hard] REQ-01: Worktree listing uses `list_worktrees()` on the already-resolved selected checkout, including relocated external-store context through `write_checkout()`, and still omits entries without a branch. The private porcelain parser, `GitWorktreeEntry` and their two parser unit tests are removed; no listing process starts outside the Git module.\n- [hard] REQ-02: Existing Git-checkout output, filtering and external-store identity behavior remain unchanged, with the current worktree-list CLI tests passing.\n- [hard] REQ-03: A missing checkout returns the existing `RequiresGitError(GitRequirementGap::NoRepository)`: `REQUIRES_GIT`, exit 10 and canonical remediation. Dispatch declares `raises [RequiresGit]`; other Git failures propagate. CLI coverage owns the mapping and remedy, while the existing status-row census and generated reference reflect the shared contract.\n\n## Notes\n\nDEC-26 extends the shared worktree Git-requirement contract to listing. Reuse supplied checkout facts without adding discovery; sibling context reuse belongs to the invocation-layout mechanism. Historical planning evidence remains in version history.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -866,7 +880,8 @@
    "source_refs": [
     "REQ-02",
     "REQ-08",
-    "DEC-09"
+    "DEC-09",
+    "DEC-26"
    ],
    "terminal": {
     "consumer_family": "worktree list command",
@@ -875,11 +890,12 @@
     "footprint": {
      "touches": [
       "crates/jit/src/commands/worktree.rs",
-      "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
+      "crates/jit/src/dispatch/worktree.rs",
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
+      "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs",
+      "docs/reference/exit-codes.md"
      ]
-    },
-    "warning_overrides": {
-     "chain-link": "The instantiated list adapter owns CLI filtering/errors and removal of its private parser; module parsing is shared with lease validation. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -887,7 +903,7 @@
  {
   "key": "lease-validation-lists-once",
   "title": "Lease validation lists worktrees once per run",
-  "description": "Make `jit validate --leases` list worktrees once before examining leases, instead of once per lease, and state what it does without a git checkout.\n\n## Background\n\n- `validate_leases` (`crates/jit/src/commands/validate.rs:2222-2276`) calls `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2422-2463`) for every lease. Each call starts `git worktree list --porcelain` and reads every listed worktree's identity file. Measured: `jit validate --leases --json` in a repository with nine leases starts nine listings.\n- Without a git checkout (outside a repository, or with no git executable) leases can still be stored under `.git/jit/`. Today the first lease's listing then fails with the untyped \"Failed to execute git worktree list\" or \"git worktree list failed\" error.\n- The exit-code projection states that `validate --leases` exits 1 when it finds invalid leases or cannot run (`crates/jit/src/schema.rs:989`, `docs/reference/exit-codes.md`). Claim subcommands, not validation, carry the typed git-requirement error with exit 10 (`@/charter/D-4`).\n- CLI lease-validation tests: `crates/jit/tests/cli_item_validate/validation_lease_tests.rs:229` onwards. CLI suites plant leases through their shared lease-store test helper.\n- Kept as one change for a build reason: `check_worktree_exists` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_leases` lists worktrees once through the module before examining leases and reads each listed worktree's id once; `check_worktree_exists` no longer exists, and `commands/validate.rs` starts no git process for lease validation. With a git checkout, findings and remedies are unchanged, and the lease-validation tests pass unchanged.\n- [hard] REQ-02: Without a git checkout, `validate --leases` reports no finding when no lease is stored. When leases are stored it fails with exit 1 and the message \"lease validation requires a git repository to check lease worktrees\", as the projected row states.\n- [hard] REQ-03: A CLI test plants three leases, puts the counting stand-in first on `PATH`, and asserts that `jit validate --leases --json` records exactly one `worktree list` invocation; today it records one per lease, so it fails.\n- [hard] REQ-04: A CLI test plants a lease, runs `jit validate --leases --json` with no git executable on `PATH`, and asserts exit 1 with REQ-02's message; today's message is the untyped listing failure, so it fails.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement instead of a failed `git worktree list`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Use the shared Git worktree listing for lease validation while preserving one listing per run and the existing findings response.\n\n## Background\n\n`validate_leases` already computes `recorded_worktree_ids` before its lease loop. That helper still starts `git worktree list --porcelain` and parses paths privately, then reads each listed checkout's identity. The historical per-lease listing and `check_worktree_exists` implementation have already been removed; the remaining change is module convergence and an explicit missing-checkout message.\n\nThe current validation dispatcher turns failed or unavailable lease checks into `Outcome::findings(ErrorCode::ValidationFailed, ...)`. Its generated exit-code row is `VALIDATION_FAILED` with exit 4, not the earlier plan's exit 1. Preserve this findings path, including its structured report.\n\n## Success Criteria\n\n- [hard] REQ-01: Lease validation obtains worktrees once through the module before examining stored leases and reads each listed checkout's ID once. It uses the already-resolved selected/relocated checkout; no lease-listing process starts in `commands/validate.rs`. Existing findings, remedies, external-store identity behavior and lease-validation tests remain unchanged.\n- [hard] REQ-02: Without a Git checkout, validation reports no finding when no lease is stored. With stored leases it reports \"lease validation requires a git repository to check lease worktrees\" through the existing `VALIDATION_FAILED` findings response with exit 4; it does not replace that report with an ordinary typed-error envelope.\n- [hard] REQ-03: A CLI test plants three leases, puts the shared counting stand-in first on the child's PATH, and asserts exactly one `worktree list` invocation. This preserves the already-landed listing bound while proving the module migration.\n- [hard] REQ-04: A CLI test plants a lease, runs without a Git executable on the child's PATH, and asserts the REQ-02 finding and exit 4. Existing canonical status/envelope owners remain authoritative; no duplicate matrix is added.\n\n## Notes\n\nDEC-28 reconciles the stale exit-status promise with the current shared validation contract. Layout-probe reuse is owned by the invocation-layout mechanism; this command continues to project each listed checkout through its shared paths API.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -920,7 +936,8 @@
     "REQ-12",
     "DEC-03",
     "DEC-08",
-    "DEC-17"
+    "DEC-17",
+    "DEC-28"
    ],
    "terminal": {
     "consumer_family": "lease validation",
@@ -929,7 +946,8 @@
     "footprint": {
      "touches": [
       "crates/jit/src/commands/validate.rs",
-      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs"
+      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs",
+      "crates/jit/src/storage/git.rs"
      ]
     }
    }
@@ -990,7 +1008,7 @@
  {
   "key": "branch-drift-through-module",
   "title": "Branch drift validation compares in the selected worktree",
-  "description": "Make `jit validate --branch-drift` compare through the git module in the selected worktree, instead of running git in the process working directory, and report each outcome with its own message.\n\n## Background\n\n- `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2162-2211`) runs `git merge-base HEAD origin/main` and `git rev-parse origin/main` with no directory, so it inspects the process working directory even when `JIT_DATA_DIR` selects another repository. The CLI calls it at `crates/jit/src/main.rs:6770`.\n- Its failures quote git's stderr: \"Failed to get merge-base with origin/main: <stderr>\", reported for a missing `origin/main` and for unrelated histories alike, and \"Failed to get origin/main commit: <stderr>\". A drifted branch reports both commits and `git rebase origin/main`. Every failure exits 1, as the projected `validate --branch-drift` row states (`crates/jit/src/schema.rs:982`; `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:737`).\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:640` and `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:652`, built on `setup_repo` and `attach_origin_remote` in the same file.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_branch_drift` compares through the module's base comparison of `require_worktree_paths()?.git()` with base `origin/main`, and `commands/validate.rs` starts no git process for it.\n- [hard] REQ-02: Each outcome exits 1 with its own message: no git checkout gives \"branch drift validation requires a git repository\"; `BaseUnresolved` gives \"origin/main does not resolve to a commit\"; `NoMergeBase` gives \"HEAD shares no history with origin/main\"; a drifted branch reports both commits and the rebase, as today.\n- [hard] REQ-03: CLI tests assert REQ-02's messages for a repository without `origin/main` and for one whose `origin/main` has unrelated history; today both report the quoted merge-base failure, so they fail.\n- [hard] REQ-04: A CLI test runs `jit validate --branch-drift` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a drifted repository, and asserts the drift failure; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Behaviour change: failure messages name the missing fact and no longer quote git's stderr; the exit status is unchanged.\n- Whether the check runs, and against which base, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit validate --branch-drift` compare through the git module in the selected worktree, instead of running git in the process working directory, and report each outcome with its own message.\n\n## Background\n\n- `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2162-2211`) runs `git merge-base HEAD origin/main` and `git rev-parse origin/main` with no directory, so it inspects the process working directory even when `JIT_DATA_DIR` selects another repository. The CLI calls it at `crates/jit/src/main.rs:6770`.\n- Its failures quote git's stderr: \"Failed to get merge-base with origin/main: <stderr>\", reported for a missing `origin/main` and for unrelated histories alike, and \"Failed to get origin/main commit: <stderr>\". A drifted branch reports both commits and `git rebase origin/main`. The current dispatcher wraps failed checks in `Outcome::findings(ErrorCode::ValidationFailed, ...)`, and the generated `validate` row reports exit 4. The earlier exit-1 promise is superseded by DEC-28.\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:640` and `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:652`, built on `setup_repo` and `attach_origin_remote` in the same file.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_branch_drift` compares through the module's base comparison of the already-resolved selected checkout from `require_worktree_paths()?.write_checkout()` (including external-store context) with base `origin/main`, and `commands/validate.rs` starts no git process for it.\n- [hard] REQ-02: Each failing outcome preserves the existing `VALIDATION_FAILED` findings response with exit 4 and its own message: no git checkout gives \"branch drift validation requires a git repository\"; `BaseUnresolved` gives \"origin/main does not resolve to a commit\"; `NoMergeBase` gives \"HEAD shares no history with origin/main\"; a drifted branch reports both commits and the rebase, as today.\n- [hard] REQ-03: CLI tests assert REQ-02's messages for a repository without `origin/main` and for one whose `origin/main` has unrelated history; today both report the quoted merge-base failure, so they fail.\n- [hard] REQ-04: A CLI test runs `jit validate --branch-drift` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a drifted repository, and asserts the drift failure; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Behaviour change: failure messages name the missing fact and no longer quote git's stderr; the current shared findings response and exit 4 remain unchanged (DEC-28); no ordinary error wrapper replaces the report.\n- Whether the check runs, and against which base, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1020,7 +1038,8 @@
     "REQ-02",
     "REQ-03",
     "DEC-04",
-    "DEC-21"
+    "DEC-21",
+    "DEC-28"
    ],
    "terminal": {
     "consumer_family": "branch drift validation",
@@ -2466,7 +2485,7 @@
  {
   "key": "git-layout-once",
   "title": "Layout facts are detected once and reach every consumer",
-  "description": "Detect the selected checkout's layout once per invocation with one git process, inside the storage-owned git module, and hand that value to every consumer so none detects again.\n\n## Success Criteria\n\n- [hard] REQ-01: One module under storage starts git, and layout detection is one probe process per invocation in the CLI and the server.\n- [hard] REQ-02: Storage, the executor, init and hook installation use the supplied layout, and none of them starts git to detect it.\n- [hard] REQ-03: A CLI test with a counting stand-in shows that `query available` and `issue show` start at most one git process in a primary and in a linked checkout.\n\n## Notes\n\n- Shared git test fixtures belong to this story.\n",
+  "description": "Resolve layout facts once per distinct checkout context and share those invocation-owned observations with every consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned Git module performs at most one layout probe per distinct queried checkout context. Ordinary checkout reads use at most one Git process, external-store startup at most two layout probes, and external listing or lease validation across N queried checkout contexts at most N+1, including the failed data-root probe. Known aliases and repeated consumers reuse observations; lease and issue counts do not multiply probes.\n- [hard] REQ-02: Storage, executor, recovery, server, init and hooks share supplied context. Missing context never triggers hidden discovery; data-root selection, external-store coordination and moved or unvisited checkout identities remain correct.\n- [hard] REQ-03: The existing counting suite retains ordinary primary/linked issue-read assertions and proves the external-context bounds. Mechanism tests own alias, absent/error-result, clone and concurrency behavior; existing external-store tests retain behavioral ownership.\n\n## Notes\n\nDEC-27 deliberately reconciles the former universal one-process promise while retaining the prohibition on duplicate detection. No direct Git metadata parser, new authority flag or cross-invocation cache is introduced.\n",
   "type": "story",
   "priority": "normal",
   "labels": [
@@ -2483,17 +2502,17 @@
   ],
   "depends_on": [
    "init-git-classification-from-layout",
-   "hooks-install-from-layout",
-   "git-process-budget-test"
+   "hooks-install-from-layout"
   ],
   "planning": {
-   "outcome": "Layout detection is one probe per invocation and every consumer receives it.",
+   "outcome": "Layout facts are resolved once per distinct invocation context and shared with every consumer.",
    "contract_refs": [],
    "produces_contracts": [],
    "source_refs": [
     "REQ-04",
     "REQ-07",
-    "DEC-09"
+    "DEC-09",
+    "DEC-27"
    ]
   }
  },

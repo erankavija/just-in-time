@@ -1,7 +1,7 @@
 //! Validation report types: the findings a report holds with their provenance,
 //! the wire [`RuleReport`] and [`ExplainReport`] it projects to, and the
 //! selections every validation view computes from one
-//! [`ValidationReport`](crate::validation::ValidationReport).
+//! [`ValidationReport`].
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
