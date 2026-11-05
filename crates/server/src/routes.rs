@@ -1367,7 +1367,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_routes_omits_retired_paths_and_keeps_gate_list() {
+    async fn test_create_routes_omits_retired_paths_and_keeps_retained_paths() {
         let server = test_app(memory_executor_declaring(
             InMemoryStorage::new(),
             MemoryDeclarations::default(),
@@ -1382,6 +1382,10 @@ mod tests {
             server.get(path).await.assert_status(StatusCode::NOT_FOUND);
         }
         server.get("/gates").await.assert_status_ok();
+        server
+            .get("/issues/nonexistent/documents/README.md/diff")
+            .await
+            .assert_status(StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
