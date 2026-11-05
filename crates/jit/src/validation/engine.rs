@@ -2,7 +2,7 @@
 //! projection against it, and report a [`Finding`] per failure.
 //!
 //! This is the engine's evaluation primitive (DR §5). It does exactly one thing:
-//! given a [`Rule`] carrying a JSON Schema and a [`Projection`] serialized to a
+//! given a [`Rule`] carrying a JSON Schema and a [`crate::domain::projection::Projection`] serialized to a
 //! [`serde_json::Value`], it returns one [`Finding`] for every schema violation,
 //! carrying the rule's name and severity into each finding.
 //!
@@ -306,7 +306,7 @@ impl SchemaEngine {
     ///
     /// This is the caching primitive. The cache is keyed by `schema_key` — the
     /// schema's canonical serialized form, obtained from
-    /// [`schema_key`](crate::validation::engine::schema_key) — so the returned
+    /// [`schema_key`] — so the returned
     /// `Arc<Validator>` is pointer-identical across calls for the **same schema**,
     /// and the schema is compiled at most once (DR §5.2). Because the key is the
     /// full serialized schema (not a lossy hash), two distinct schemas can never

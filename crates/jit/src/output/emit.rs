@@ -1,4 +1,4 @@
-//! The one renderer of a handler [`Outcome`](crate::dispatch::Outcome).
+//! The one renderer of a handler [`Outcome`].
 
 use super::failure::classify;
 use super::{ErrorCode, ExitCode, JsonError, JsonOutput, OutputMode, RunStatus};
