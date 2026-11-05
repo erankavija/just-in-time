@@ -161,7 +161,7 @@ jit gate status <issue> unit-tests --findings   # structured findings view
 
 ### Built for Orchestration
 
-Machine output is first-class: `--json` throughout the day-to-day command surface, with list output in one envelope: `{"count": N, "<collection>": [...]}`. Exit codes are typed (invalid argument, not found, validation/gates, requires-git) and `jit --schema` documents each command's JSON shape and the full exit-code taxonomy.
+Machine output is first-class throughout the day-to-day command surface. See the [CLI JSON contracts](docs/reference/cli-commands.md#cli-json-contracts) for the global `--json` option and list payload shape. Exit codes are typed (invalid argument, not found, validation/gates, requires-git) and `jit --schema` documents each command's JSON shape and the full exit-code taxonomy.
 
 ```bash
 jit issue status <id>...                 # state + gates + unmet deps, one line per issue
