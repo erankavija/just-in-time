@@ -1006,7 +1006,7 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
             .unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
     // `repo-validate` is a config-declared REGISTRY gate with no preset of that
     // name, so the registry-key fallback WOULD match it.

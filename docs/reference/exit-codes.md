@@ -34,7 +34,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `11` | A lock wait expired while another jit process held the lock (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be retried. |  |
 | `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |
 | `apply` | `4` | The dependency would create a cycle. |  |
-| `claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install` | `10` | The command requires Git. |  |
+| `claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install, worktree info` | `10` | The command requires Git. |  |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. | yes |
 | `dep add` | `4` | The dependency would create a cycle. Repository or domain validation failed. |  |
 | `doc check-links` | `4` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
@@ -42,10 +42,13 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `gate preset apply` | `3` | One or more preset targets failed; the findings report retains successful targets and per-target errors. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `gate evaluate, gate evaluate-all` | `4` | A quality-gate checker did not pass. |  |
-| `gate evaluate-many` | `4` | The first failing target's checker ran and its verdict was fail. | yes |
-| `gate evaluate-many` | `10` | The first failing target's checker could not run to a verdict. | yes |
-| `gate evaluate-many` | `3` | The first failing target's id resolves to no issue. | yes |
-| `gate evaluate-many` | `2` | The first failing target does not require the gate, or its manual gate lacks `--by`. The first failing target's id prefix is too short. The first failing target's id prefix matches several issues. | yes |
+| `gate evaluate-many` | `2` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `3` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `4` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `1` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `10` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `5` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
+| `gate evaluate-many` | `11` | The first failing target determines the classified code and status; the findings report retains every target's result. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `profile diff` | `4` | The difference report found targets or final validation that prevent publication. | yes |
 | `profile apply` | `4` | Profile planning found packages being applied that define one target or declaration differently. A profile application would overwrite paths that differ from HEAD; committing or discarding those changes lets it proceed. |  |

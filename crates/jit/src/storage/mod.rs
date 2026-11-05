@@ -180,7 +180,10 @@ pub trait IssueStore: Clone {
     /// helpers. File-backed storage retains this explicit authority instead of
     /// inferring a worktree from the selected data-root parent.
     #[doc(hidden)]
-    fn configure_repository_layout(&self, _layout: &crate::repository_state::RepositoryLayout) {}
+    fn configure_repository_layout(
+        &self,
+        _layout: &crate::repository_state::RepositoryLayout,
+    ) -> std::result::Result<(), RepositoryStateStoreError>;
 
     /// Return the explicit repository layout bound to this backend.
     ///

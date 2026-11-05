@@ -833,6 +833,23 @@ fn entry_without_following<'a>(
 }
 
 impl IssueStore for InMemoryStorage {
+    fn configure_repository_layout(
+        &self,
+        layout: &crate::repository_state::RepositoryLayout,
+    ) -> std::result::Result<(), crate::storage::RepositoryStateStoreError> {
+        let bound = self.repository_layout();
+        if bound.worktree_root() != layout.worktree_root()
+            || bound.data_root() != layout.data_root()
+        {
+            return Err(
+                crate::storage::RepositoryStateStoreError::RetryableConflict {
+                    path: layout.worktree_root().display().to_string(),
+                },
+            );
+        }
+        Ok(())
+    }
+
     fn repository_layout(&self) -> Result<crate::repository_state::RepositoryLayout> {
         Ok(InMemoryStorage::repository_layout(self))
     }
