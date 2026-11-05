@@ -101,6 +101,7 @@ async fn main() -> Result<()> {
     let state = AppState {
         executor,
         tracker,
+        capture_cache: Default::default(),
         project_name,
         shutdown: shutdown.clone(),
     };

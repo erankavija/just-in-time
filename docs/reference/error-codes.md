@@ -41,3 +41,4 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `recovery_failed` | Applying a leftover redo record, or a recovery routine, failed. | `1` |
 | `SERVER_EXITED` | The foreground server process exited with a failure status. | `1` |
 | `LOCK_TIMEOUT` | A lock wait expired while another jit process held the lock; nothing was changed. | `11` |
+| `RETRYABLE_CONFLICT` | The repository changed or is busy; retry. If a pending redo record persists, run `jit recover`. | `12` |

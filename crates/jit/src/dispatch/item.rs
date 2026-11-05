@@ -35,8 +35,8 @@ command_group! {
     command: ItemCommands,
     storage: [IssueStore],
     leaves: {
-        "item_list" => ItemCommands::List { kind } => list(kind) -> ItemListResult,
-        "item_search" => ItemCommands::Search { query, kind } => search(query, kind) -> ItemListResult,
+        "item_list" => ItemCommands::List { kind } => list(kind) raises [RetryableConflict] -> ItemListResult,
+        "item_search" => ItemCommands::Search { query, kind } => search(query, kind) raises [RetryableConflict] -> ItemListResult,
         "item_show" => ItemCommands::Show { qualified_id } => show(qualified_id) -> ItemShowResult,
         "item_resolve" => ItemCommands::Resolve { qualified_id } => show(qualified_id) -> ItemShowResult,
     }

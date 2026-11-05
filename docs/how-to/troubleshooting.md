@@ -256,10 +256,10 @@ application are defined in
 Error: applying the leftover redo record failed: <cause>
 ```
 
-`jit recover` prints `Recovery failed:` in place of `Error:`. Under `--json`,
-`jit recover` and the commands that
-[read through the read driver](../reference/storage-format.md#publication-and-recovery)
-report `recovery_failed` where mutating commands report `GENERIC_ERROR`.
+`jit recover` prints `Recovery failed:` in place of `Error:` and reports
+`recovery_failed` under `--json`. Nonblocking reads do not apply the record:
+they return `RETRYABLE_CONFLICT` if they cannot obtain an admitted snapshot.
+Retry the read; if a pending record persists, run `jit recover`.
 
 **Cause:** Session open could not apply the record, for example because a path
 it writes is not writable or a file occupies a directory it creates. The record

@@ -35,7 +35,7 @@ command_group! {
     storage: [IssueStore],
     leaves: {
         "label_namespaces" => LabelCommands::Namespaces => namespaces() -> NamespacesResponse,
-        "label_values" => LabelCommands::Values { namespace } => values(namespace) -> LabelValuesResponse,
+        "label_values" => LabelCommands::Values { namespace } => values(namespace) raises [RetryableConflict] -> LabelValuesResponse,
     }
 }
 

@@ -13,7 +13,7 @@ use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
     RepositoryIndex, RepositoryIndexError, RepositoryLayout, RepositoryRootClass, VirtualPath,
-    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
 };
 use crate::storage::{
     git::{Git, GitCheckout, GitError},
@@ -429,6 +429,8 @@ pub struct JsonFileStorage {
     active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
     /// Explicit worktree/data-root authority for repository-relative readers.
     repository_layout: Arc<Mutex<Option<RepositoryLayout>>>,
+    #[cfg(test)]
+    issue_read_hook: Arc<Mutex<Option<IssueReadHook>>>,
     /// Authoritative Git/non-Git classification for the selected data root.
     worktree_paths: Arc<Mutex<Option<WorktreePaths>>>,
     /// Shared commit-keyed pinned evidence retained for the most recent capture.
@@ -440,6 +442,17 @@ pub struct JsonFileStorage {
     /// content hashing that dominates large pinned documents.
     pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
     git: Git,
+}
+
+#[cfg(test)]
+type IssueReadHook = (IssueReadPhase, Box<dyn FnOnce() + Send>);
+
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum IssueReadPhase {
+    Membership,
+    Record,
+    AfterRead,
 }
 
 impl JsonFileStorage {
@@ -474,6 +487,8 @@ impl JsonFileStorage {
             mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
+            #[cfg(test)]
+            issue_read_hook: Arc::new(Mutex::new(None)),
             worktree_paths: Arc::new(Mutex::new(None)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
@@ -787,13 +802,17 @@ impl JsonFileStorage {
     /// survives any tombstone. Only an absent file or directory is skipped; any
     /// other failure aborts rather than exposing a plausible but incomplete set.
     fn load_aggregated_issue_ids(&self) -> Result<Vec<IssueId>> {
+        self.load_issue_ids_from(self.primary_layout()?.as_ref())
+    }
+
+    fn load_issue_ids_from(&self, primary: Option<&RepositoryLayout>) -> Result<Vec<IssueId>> {
         let mut membership = BTreeMap::new();
         merge_store_membership(
             &self.resolve_virtual_path(&VirtualPath::INDEX)?,
             &self.resolve_virtual_path(&VirtualPath::ISSUES)?,
             &mut membership,
         )?;
-        if let Some(primary) = self.primary_layout()? {
+        if let Some(primary) = primary {
             merge_store_membership(
                 &primary.resolve(&VirtualPath::INDEX)?,
                 &primary.resolve(&VirtualPath::ISSUES)?,
@@ -806,20 +825,52 @@ impl JsonFileStorage {
             .collect())
     }
 
-    /// Load every issue the aggregated membership names, under an
-    /// already-held `.index.lock`.
-    ///
-    /// An id whose record vanished since membership was read is skipped; a
-    /// record that exists and cannot be read or parsed fails the listing,
-    /// naming it, so a listing never hides an issue.
-    fn read_member_issues(&self) -> Result<Vec<Issue>> {
-        self.load_aggregated_issue_ids()?
-            .iter()
-            .filter_map(|id| match self.load_issue(id) {
-                Err(error) if error.downcast_ref::<IssueNotFoundError>().is_some() => None,
-                loaded => Some(loaded),
+    #[cfg(test)]
+    fn run_issue_read_hook(&self, phase: IssueReadPhase) {
+        let hook = {
+            let mut hook = self.issue_read_hook.lock().unwrap();
+            if hook
+                .as_ref()
+                .is_some_and(|(selected, _)| *selected == phase)
+            {
+                hook.take().map(|(_, callback)| callback)
+            } else {
+                None
+            }
+        };
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    /// Load the issues named by the pinned source set.
+    fn read_member_issues(&self, primary: Option<&RepositoryLayout>) -> Result<Vec<Issue>> {
+        let ids = self.load_issue_ids_from(primary)?;
+        #[cfg(test)]
+        self.run_issue_read_hook(IssueReadPhase::Membership);
+        ids.iter()
+            .filter_map(|id| {
+                #[cfg(test)]
+                self.run_issue_read_hook(IssueReadPhase::Record);
+                match self.load_issue_with_primary(id, || Ok(primary.cloned())) {
+                    Err(error) if error.downcast_ref::<IssueNotFoundError>().is_some() => None,
+                    loaded => Some(loaded),
+                }
             })
             .collect()
+    }
+
+    fn load_issue_with_primary(
+        &self,
+        id: &IssueId,
+        primary: impl FnOnce() -> Result<Option<RepositoryLayout>>,
+    ) -> Result<Issue> {
+        let path = self.resolve_virtual_path(&VirtualPath::issue_record(id))?;
+        if path.exists() {
+            return self.read_issue_record(&path);
+        }
+        self.load_issue_from_primary(id, primary()?.as_ref())?
+            .ok_or_else(|| IssueNotFoundError::across_sources(id).into())
     }
 
     /// Load an issue from the main worktree's `.jit/` directory.
@@ -830,7 +881,15 @@ impl JsonFileStorage {
     /// non-standard layout), and `Err` for genuine I/O or parse failures on a file
     /// that does exist.
     fn load_issue_from_main_worktree(&self, id: &IssueId) -> Result<Option<Issue>> {
-        let Some(layout) = self.primary_layout()? else {
+        self.load_issue_from_primary(id, self.primary_layout()?.as_ref())
+    }
+
+    fn load_issue_from_primary(
+        &self,
+        id: &IssueId,
+        primary: Option<&RepositoryLayout>,
+    ) -> Result<Option<Issue>> {
+        let Some(layout) = primary else {
             return Ok(None);
         };
         if read_tombstones(&self.resolve_virtual_path(&VirtualPath::INDEX)?)?.contains(id) {
@@ -1055,34 +1114,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_issue(&self, id: &IssueId) -> Result<Issue> {
-        // Try the selected data-root record first.
-        let issue_path = self.resolve_virtual_path(&VirtualPath::issue_record(id))?;
-        if issue_path.exists() {
-            // Read directly, taking no per-issue lock. Issue JSON is published by
-            // atomic temp-file-plus-rename (see atomic_write), so a reader can never
-            // observe a torn file; writers serialize on `.repo-write.lock`, and
-            // `list_issues` holds the repo-scoped `.index.lock` shared around its
-            // load loop. A `<id>.lock` sidecar was therefore redundant and, created
-            // once per issue ever read, grew the lock-file set without bound.
-            //
-            // Caller audit (fc744df6): production consumers use the returned owned
-            // value for display, resolution, validation, or as a mutation snapshot.
-            // Mutations publish through `RepositoryStateStore`, which compares the
-            // files it writes under the repository write lock. The old `_lock` guard
-            // was local and dropped before this method returned, so no caller ever
-            // inherited serialization from it.
-            return self.read_issue_record(&issue_path);
-        }
-
-        // Fallback: try reading from main worktree (if in secondary)
-        match self.load_issue_from_main_worktree(id) {
-            Ok(Some(issue)) => return Ok(issue),
-            Ok(None) => {} // absent from main worktree or not applicable; continue
-            Err(e) => return Err(e), // genuine I/O/parse failure
-        }
-
-        // Issue not found in any source
-        Err(IssueNotFoundError::across_sources(id).into())
+        self.load_issue_with_primary(id, || self.primary_layout())
     }
 
     fn load_issue_or_not_found(
@@ -1124,10 +1156,57 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        let index_lock_path = self.root.join(INDEX_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&index_lock_path)?;
-
-        self.read_member_issues()
+        use crate::storage::repository_state_store::{admit_read_sources, retry_optimistic_reads};
+        retry_optimistic_reads("issue snapshot", || {
+            let layout = self.configured_layout()?;
+            let selected = match self.open_read_session(layout) {
+                Ok(session) => session,
+                Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
+                    return Ok(None)
+                }
+                Err(error) => return Err(error.into()),
+            };
+            let primary = match self.primary_layout() {
+                Ok(primary) => primary,
+                Err(error) => {
+                    return Ok(admit_read_sources([selected.admit()])?.map(|()| Err(error)));
+                }
+            };
+            let primary_store = primary
+                .as_ref()
+                .map(|layout| JsonFileStorage::new(layout.data_root()));
+            let primary_session = match primary_store.as_ref().zip(primary.as_ref()) {
+                Some((store, layout)) => {
+                    if let Err(error) = store.configure_repository_layout(layout) {
+                        return Ok(
+                            admit_read_sources([selected.admit()])?.map(|()| Err(error.into()))
+                        );
+                    }
+                    match store.open_read_session(layout.clone()) {
+                        Ok(session) => Some(session),
+                        Err(crate::storage::RepositoryStateStoreError::RetryableConflict {
+                            ..
+                        }) => {
+                            let _ = selected.admit();
+                            return Ok(None);
+                        }
+                        Err(error) => {
+                            return Ok(
+                                admit_read_sources([selected.admit()])?.map(|()| Err(error.into()))
+                            );
+                        }
+                    }
+                }
+                None => None,
+            };
+            let result = self.read_member_issues(primary.as_ref());
+            #[cfg(test)]
+            self.run_issue_read_hook(IssueReadPhase::AfterRead);
+            let admissions = std::iter::once(selected.admit())
+                .chain(primary_session.iter().map(|session| session.admit()))
+                .collect::<Vec<_>>();
+            Ok(admit_read_sources(admissions)?.map(|()| result))
+        })
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
@@ -1950,16 +2029,246 @@ mod tests {
         }
 
         #[test]
-        fn test_list_issues_changes_no_file_other_than_the_index_lock() {
+        fn test_list_issues_does_not_wait_for_index_lock() {
+            let (temp, _) = crate::test_utils::setup_test_repo().unwrap();
+            let data = temp.path().join(".jit");
+            let storage =
+                JsonFileStorage::with_lock_timeout(&data, std::time::Duration::from_millis(50));
+            let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+            storage.configure_repository_layout(&layout).unwrap();
+            let locker = FileLocker::new(std::time::Duration::from_millis(50));
+            let _guard = locker
+                .lock_exclusive(&data.join(crate::repository_state::INDEX_LOCK_FILE))
+                .unwrap();
+            assert!(storage.list_issues().is_ok());
+        }
+
+        #[test]
+        fn test_list_issues_completes_while_repository_writer_lock_is_held() {
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let guard = storage.acquire_repo_write_lock().unwrap();
+            let (tx, rx) = std::sync::mpsc::channel();
+            let reader = storage.clone();
+            let thread = std::thread::spawn(move || tx.send(reader.list_issues().is_ok()).unwrap());
+            let finished = rx.recv_timeout(std::time::Duration::from_secs(5));
+            drop(guard);
+            thread.join().unwrap();
+            assert!(finished.unwrap());
+        }
+
+        #[test]
+        fn test_list_issues_refuses_a_replaced_selected_data_root() {
+            let (temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let data = temp.path().join(".jit");
+            fs::rename(&data, temp.path().join("old-data")).unwrap();
+            fs::create_dir(&data).unwrap();
+            let error = storage.list_issues().unwrap_err();
+            assert!(matches!(
+                error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+                Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+            ));
+        }
+
+        fn assert_selected_commit_crossing(phase: IssueReadPhase) {
+            let (temp, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let original = crate::test_utils::fixture_issue("before".into(), String::new());
+            seed_issue_preimage(&storage, &original);
+            let executor = crate::test_utils::file_executor(temp.path()).unwrap();
+            *storage.issue_read_hook.lock().unwrap() = Some((
+                phase,
+                Box::new(move || {
+                    executor
+                        .issues()
+                        .create_issue(
+                            "crossing".into(),
+                            String::new(),
+                            crate::domain::Priority::Normal,
+                            vec![],
+                            vec![],
+                            None,
+                            None,
+                            false,
+                        )
+                        .unwrap();
+                }),
+            ));
+            let issues = storage.list_issues().unwrap();
+            assert!(issues.iter().any(|issue| issue.title == "crossing"));
+        }
+
+        fn assert_primary_commit_crossing(phase: IssueReadPhase) {
+            let (temp, primary, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp.path()).unwrap();
+            let original = crate::test_utils::fixture_issue("before".into(), String::new());
+            seed_issue_preimage(&primary, &original);
+            commit_all(temp.path());
+            let (_container, linked_root) = add_secondary_worktree(temp.path());
+            let data = linked_root.join(".jit");
+            fs::create_dir_all(&data).unwrap();
+            let linked = JsonFileStorage::new(&data);
+            configure_test_layout(&linked, &linked_root, &data);
+            let executor = crate::test_utils::file_executor(temp.path()).unwrap();
+            *linked.issue_read_hook.lock().unwrap() = Some((
+                phase,
+                Box::new(move || {
+                    executor
+                        .issues()
+                        .create_issue(
+                            "primary crossing".into(),
+                            String::new(),
+                            crate::domain::Priority::Normal,
+                            vec![],
+                            vec![],
+                            None,
+                            None,
+                            false,
+                        )
+                        .unwrap();
+                }),
+            ));
+            let issues = linked.list_issues().unwrap();
+            assert!(issues.iter().any(|issue| issue.title == "primary crossing"));
+        }
+
+        #[test]
+        fn test_list_issues_retries_selected_commits_at_each_read_phase() {
+            assert_selected_commit_crossing(IssueReadPhase::Membership);
+            assert_selected_commit_crossing(IssueReadPhase::Record);
+        }
+
+        #[test]
+        fn test_list_issues_retries_primary_commits_at_each_read_phase() {
+            assert_primary_commit_crossing(IssueReadPhase::Membership);
+            assert_primary_commit_crossing(IssueReadPhase::Record);
+        }
+
+        #[test]
+        fn test_list_issues_retries_when_absent_primary_data_root_appears() {
+            let (temp, primary, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp.path()).unwrap();
+            let issue = crate::test_utils::fixture_issue("appeared".into(), String::new());
+            seed_issue_preimage(&primary, &issue);
+            commit_all(temp.path());
+            let (_container, linked_root) = add_secondary_worktree(temp.path());
+            let data = linked_root.join(".jit");
+            fs::create_dir_all(&data).unwrap();
+            let linked = JsonFileStorage::new(&data);
+            configure_test_layout(&linked, &linked_root, &data);
+            let primary_data = temp.path().join(".jit");
+            let hidden = temp.path().join("hidden-data");
+            fs::rename(&primary_data, &hidden).unwrap();
+            *linked.issue_read_hook.lock().unwrap() = Some((
+                IssueReadPhase::Membership,
+                Box::new(move || fs::rename(hidden, primary_data).unwrap()),
+            ));
+            let issues = linked.list_issues().unwrap();
+            assert!(issues.iter().any(|found| found.id == issue.id));
+        }
+
+        #[test]
+        fn test_list_issues_retries_when_primary_data_root_is_replaced() {
+            let (temp, primary, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp.path()).unwrap();
+            let original = crate::test_utils::fixture_issue("old root".into(), String::new());
+            seed_issue_preimage(&primary, &original);
+            commit_all(temp.path());
+            let (_container, linked_root) = add_secondary_worktree(temp.path());
+            let data = linked_root.join(".jit");
+            fs::create_dir_all(&data).unwrap();
+            let local_original = data.join("issues").join(format!("{}.json", original.id));
+            if local_original.exists() {
+                fs::remove_file(local_original).unwrap();
+            }
+            let linked = JsonFileStorage::new(&data);
+            configure_test_layout(&linked, &linked_root, &data);
+            let replacement = temp.path().join("replacement");
+            fs::create_dir_all(replacement.join("issues")).unwrap();
+            let changed = crate::test_utils::fixture_issue("new root".into(), String::new());
+            fs::write(
+                replacement
+                    .join("issues")
+                    .join(format!("{}.json", changed.id)),
+                crate::repository_state::serialize_issue(&changed).unwrap(),
+            )
+            .unwrap();
+            let primary_data = temp.path().join(".jit");
+            let old = temp.path().join("old-data");
+            *linked.issue_read_hook.lock().unwrap() = Some((
+                IssueReadPhase::Membership,
+                Box::new(move || {
+                    fs::rename(&primary_data, old).unwrap();
+                    fs::rename(replacement, primary_data).unwrap();
+                }),
+            ));
+            let issues = linked.list_issues().unwrap();
+            assert!(issues.iter().any(|issue| issue.id == changed.id));
+            assert!(!issues.iter().any(|issue| issue.id == original.id));
+        }
+
+        #[test]
+        fn test_list_issues_refuses_a_primary_leftover_redo() {
+            let (temp, _, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp.path()).unwrap();
+            commit_all(temp.path());
+            let (_container, linked_root) = add_secondary_worktree(temp.path());
+            let data = linked_root.join(".jit");
+            fs::create_dir_all(&data).unwrap();
+            let linked = JsonFileStorage::new(&data);
+            configure_test_layout(&linked, &linked_root, &data);
+            let scratch = temp
+                .path()
+                .join(".jit")
+                .join(crate::storage::RECORD_SCRATCH_DIR);
+            fs::create_dir_all(&scratch).unwrap();
+            fs::write(scratch.join(crate::storage::RECORD_FILE_NAME), b"pending").unwrap();
+            let error = linked.list_issues().unwrap_err();
+            assert!(format!("{error:#}").contains("jit recover"));
+        }
+
+        #[test]
+        fn test_list_issues_discards_read_error_crossed_by_a_commit() {
+            let (temp, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let issue = crate::test_utils::fixture_issue("existing".into(), String::new());
+            seed_issue_preimage(&storage, &issue);
+            let path = storage
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::issue_record(&issue.id))
+                .unwrap();
+            let original = fs::read(&path).unwrap();
+            fs::write(&path, b"invalid").unwrap();
+            let executor = crate::test_utils::file_executor(temp.path()).unwrap();
+            *storage.issue_read_hook.lock().unwrap() = Some((
+                IssueReadPhase::AfterRead,
+                Box::new(move || {
+                    fs::write(&path, original).unwrap();
+                    executor
+                        .issues()
+                        .create_issue(
+                            "after crossing".into(),
+                            String::new(),
+                            crate::domain::Priority::Normal,
+                            vec![],
+                            vec![],
+                            None,
+                            None,
+                            false,
+                        )
+                        .unwrap();
+                }),
+            ));
+            let issues = storage.list_issues().unwrap();
+            assert!(issues.iter().any(|found| found.title == "after crossing"));
+        }
+
+        #[test]
+        fn test_list_issues_changes_no_repository_files() {
             let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
             let issue = crate::test_utils::fixture_issue(
                 "Listed without writes".to_string(),
                 "Description".to_string(),
             );
             seed_issue_preimage(&storage, &issue);
-            // Warm the index lock so the comparison covers every other file.
-            let _ = storage.list_issues().unwrap();
-
             let before = physical_files(&storage.root);
             let listed = storage.list_issues().unwrap();
             let after = physical_files(&storage.root);
