@@ -123,6 +123,7 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **D-23** — Retire the bundled MCP server and its support surfaces; the CLI remains the machine interface
 - **D-24** — Git-hook installation requires a Git checkout; core tracker operations remain Git-optional
 - **D-25** — Reads return a retryable conflict instead of waiting on writers
+- **D-26** — Redo records bind worktree writes to their original root
 <!-- jit:charter:end -->
 
 <!-- jit:dogfood-guidance:begin -->
