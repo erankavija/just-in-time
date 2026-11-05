@@ -281,9 +281,10 @@
           "short_id": "d5cae9e3",
           "title": "CLI tests for commands with no git executable",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "c922166bb5ba050c39d9757d452cbe3fce26bfaa"
         },
         {
           "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
@@ -817,7 +818,8 @@
     "d68150e2 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "d681 actual merged Cargo b634207b PASS on084db8cc5, Done/lease released e375af7d8 before downstream claims. Steward approved83c8632f exact fourth file storage/git.rs solely removal of fulfilled history convergence comment when duplicate removed, no executable edit. 83 and3f8 actualReady claimed; source dcf next while632 remains unready. a273 lead audit confirmed :/message expression broken by appending peel suffix; worker now resolves original expression then peels canonical object ID in same reader, focused regression running. EA andd5 full pipelines running.",
     "dcf88b6f Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "dcf actual mergedCargo4b78c2a9 PASS, Done/released1893a4bf6. d5 fullCargo188acbdf/review5ce878f8 stable PASS, exact two-file preservation, next ready source. Steward approved83REQ03 factual reconciliation: removed test_executor replaced by current shared nonGit fixture followed by Git init; bind existing executor to detected paths after init, all history/diff assertions unchanged. Active criterion/manifest updated. Steward approved EA exact3 extra CLI fixture files (6 total); actual failure48bdc215 preserved8dda31d66, rework2 broader invocation audit/non-fail-fast tests. No production fallback or weakened actor contract."
+    "dcf actual mergedCargo4b78c2a9 PASS, Done/released1893a4bf6. d5 fullCargo188acbdf/review5ce878f8 stable PASS, exact two-file preservation, next ready source. Steward approved83REQ03 factual reconciliation: removed test_executor replaced by current shared nonGit fixture followed by Git init; bind existing executor to detected paths after init, all history/diff assertions unchanged. Active criterion/manifest updated. Steward approved EA exact3 extra CLI fixture files (6 total); actual failure48bdc215 preserved8dda31d66, rework2 broader invocation audit/non-fail-fast tests. No production fallback or weakened actor contract.",
+    "d5cae9e3 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1238,10 +1240,11 @@
       "verdict": "PASS",
       "reviewed_source": "65fd1fe5420fd4eae75e466265dfb9bd16309bc8",
       "gates": {
-        "cargo-ci": "188acbdf-25f3-4f15-b8c4-5b6c563c3ddc",
+        "cargo-ci": "172143f1-e2b0-4edf-b28b-538a07321e97",
         "code-review": "5ce878f8-1b15-4fa0-82a5-9195c13baeec"
       },
-      "criteria": "Two CLI tests cover required core commands and all seven claim subcommands in real checkout under child-only empty PATH; canonical RequiresGit/status checked. Two files exact after refresh, no new target/global state, no linked docs or deferrals. Mandatory merged Cargo pending."
+      "criteria": "Two CLI tests cover required core commands and all seven claim subcommands in real checkout under child-only empty PATH; canonical RequiresGit/status checked. Two files exact after refresh, no new target/global state, no linked docs or deferrals. Mandatory merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 172143f1-e2b0-4edf-b28b-538a07321e97 on c922166bb5ba050c39d9757d452cbe3fce26bfaa."
     }
   },
   "source_queue": [
