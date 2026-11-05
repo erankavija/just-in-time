@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f649c144",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07ffda330683386b7c51c5f9420100f318bfd169",
+  "completed_at": "2026-11-05T01:56:00.312187532Z",
+  "duration_ms": 160967,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared worktree listing migration and focused CLI coverage satisfy all issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0ada9cd5-1a64-4194-95f0-cbe4f1b96e77",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:53:19.344709422Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c067706085679d8e33f2eca3645d6a951ac4b67b (`jit:f649c144`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02, REQ-08, REQ-12 (issue Markdown); relevant invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0; run 07ffda3 covers c067706 per supplied ancestry); code-review pending for this run\nTruncation recovery: Narrowed broad searches to relevant issue records, policy sources, and affected implementation/test ranges; archival-study hits were outside the impact cone.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared worktree listing migration and focused CLI coverage satisfy all issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
