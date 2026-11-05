@@ -27,8 +27,11 @@ types and no `plan` template has no template for `jit apply plan` to apply, and 
 issues carry no bracket. Adopting it is opt-in: declare the `planning` and `breakdown`
 types in the type hierarchy and add a `plan` template to `.jit/templates.toml`
 (plus the two coverage rules), then `jit apply plan <C>` on a container scaffolds
-the bracket. Issues stay untouched until you bracket them. The
-[how-to guide](../how-to/adopt-planning-bracket.md) walks through every block.
+the bracket. Issues stay untouched until you bracket them. The `plan` template
+names its gates rather than carrying them, so it works only alongside the gate
+and rule declarations those names resolve to
+([Graph Template Registry](../reference/storage-format.md#graph-template-registry)).
+The [how-to guide](../how-to/adopt-planning-bracket.md) walks through every block.
 
 ## The problem it solves
 

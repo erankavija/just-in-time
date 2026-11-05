@@ -10,7 +10,9 @@ in order — each gate blocks the next step. Section numbers refer to the skill'
    (planning-role type, plan-quality gate) and `B` (breakdown-role type, coverage
    + breakdown-review gates), wires `B → P` and the anchor edge `C → B`, and moves
    `C`'s pre-existing upstream deps onto `P`. Node roles, types, gates, and `P`'s
-   plan-doc location come from `.jit/templates.toml`. Commit JIT state.
+   plan-doc location come from `.jit/templates.toml`; the gates it names
+   resolve against the gate and rules registries
+   ([Graph Template Registry](https://github.com/erankavija/just-in-time/blob/main/docs/reference/storage-format.md#graph-template-registry)). Commit JIT state.
 
 2. **Produce the plan on `P`.** The plan is the spec for the decomposition. Use
    the epic's design doc (Section 2) as `P`'s plan-doc; otherwise dispatch an
