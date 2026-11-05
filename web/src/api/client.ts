@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Issue, GraphData, StatusSummary, DocumentContent, DocumentHistory, DocumentDiff, ConfigHierarchy, ConfigNamespaces, GateDefinition, GateRunSummary, GateRunDetail } from '../types/models';
+import type { Issue, GraphData, DocumentContent, DocumentHistory, ConfigHierarchy, ConfigNamespaces, GateDefinition, GateRunSummary, GateRunDetail } from '../types/models';
 
 // Use the origin the page was served from so that multiple jit servers
 // running on different ports each talk to their own API.
@@ -30,11 +30,6 @@ export const apiClient = {
 
   async getGraph(): Promise<GraphData> {
     const response = await api.get('/graph');
-    return response.data;
-  },
-
-  async getStatus(): Promise<StatusSummary> {
-    const response = await api.get('/status');
     return response.data;
   },
 
@@ -71,20 +66,6 @@ export const apiClient = {
     return response.data;
   },
 
-  async getDocumentDiff(
-    issueId: string,
-    path: string,
-    from: string,
-    to?: string
-  ): Promise<DocumentDiff> {
-    const params = new URLSearchParams();
-    params.set('from', from);
-    if (to) params.set('to', to);
-    const encodedPath = encodeURIComponent(path);
-    const response = await api.get(`/issues/${issueId}/documents/${encodedPath}/diff?${params.toString()}`);
-    return response.data;
-  },
-
   async getDocumentByPath(
     path: string,
     commit?: string
@@ -108,11 +89,6 @@ export const apiClient = {
 
   async listGates(): Promise<GateDefinition[]> {
     const response = await api.get('/gates');
-    return response.data;
-  },
-
-  async getGateDefinition(key: string): Promise<GateDefinition> {
-    const response = await api.get(`/gates/${encodeURIComponent(key)}`);
     return response.data;
   },
 

@@ -29,3 +29,16 @@ wrapper_exit_code=0
 ```
 
 The build-script warning concerns absent embedded web assets; it is separate from Rustdoc link resolution. The command matches the publication build in `.github/workflows/docs.yml` and includes private items.
+
+## Merged verification
+
+The same existing workspace/private-items command passed on main source `e2925fcd8ddd6a7ca453e695ea574bf89acb9a49` after merge `e2925fcd8`. It ran through `scripts/cargo-ci.sh --cargo doc --no-deps --workspace --document-private-items` under the shared build locks, with an owned temporary directory, incremental compilation disabled and the sccache bypass enabled. Exit status was `0`; no Rustdoc link diagnostics were emitted.
+
+```text
+ Documenting jit v1.0.0 (/home/vkaskivuo/Projects/just-in-time/crates/jit)
+ Documenting jit-server v1.0.0 (/home/vkaskivuo/Projects/just-in-time/crates/server)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.78s
+   Generated /home/vkaskivuo/Projects/just-in-time/target/doc/jit/index.html and 1 other file
+```
+
+The full merged Cargo gate also passed stably: run `98eb3137-610e-4d0f-8043-d804e01ef320`. The final configured code review is `59b5ca56-d680-4d80-8970-3c9e96908f79`, with zero findings.
