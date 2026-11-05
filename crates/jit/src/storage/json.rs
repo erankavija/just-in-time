@@ -2373,7 +2373,7 @@ mod tests {
         let worktree = TempDir::new().unwrap();
         let repository = GitRepository::init(worktree.path());
         let expected = b"binary\0bytes\xff\n";
-        repository.write("assets/data.bin", expected);
+        repository.write("assets/data\n.bin", expected);
         let commit = repository.commit("binary asset");
         repository.git(&["tag", "-a", "asset-tag", "-m", "tag"]);
         let stand_in = GitStandIn::new();
@@ -2381,7 +2381,7 @@ mod tests {
         let storage = JsonFileStorage::with_git(&data, Git::with_program(stand_in.program()));
         configure_test_layout(&storage, worktree.path(), &data);
 
-        let result = storage.read_path_bytes("assets/data.bin", Some("asset-tag"));
+        let result = storage.read_path_bytes("assets/data\n.bin", Some("asset-tag"));
 
         assert_eq!(
             result.unwrap(),
@@ -2390,7 +2390,7 @@ mod tests {
         let invocations = stand_in.invocations();
         assert_eq!(invocations.len(), 1);
         assert_eq!(invocations[0].directory(), Some(repository.root()));
-        assert_eq!(invocations[0].args(), ["cat-file", "--batch"]);
+        assert_eq!(invocations[0].args(), ["cat-file", "--batch", "-Z"]);
     }
 
     #[test]

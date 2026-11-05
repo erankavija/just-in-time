@@ -21,7 +21,7 @@ COPY scripts/ ./scripts/
 COPY --from=web-builder /build/web/dist ./web/dist/
 RUN cargo build --locked --release -p jit-server --bin jit-server
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.title="JIT Issue Tracker"
 LABEL org.opencontainers.image.description="Repository-mounted JIT HTTP server and Web UI"
