@@ -886,7 +886,8 @@
     "fb guard authority correction: initial lead brief inferred write_checkout incorrectly; original git-absent assertion failed and was preserved. Steward directed paths.git data-history; withdrawn invalid external-store refusal expectation removed, final40worktreeCLI passed. Initial and corrected evidence retained.",
     "fb5e8e8d Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward approved933ff852 -> c140921c after cycle/redundancy check: existing libgit2 read_file_from_git resolves original expression then peels, so two-version one-child migration uses shared reader resolution and canonical commit:path. No criteria weakening/private resolver;1ac retains existing prerequisites. Frontend parked chain now includes c140.",
-    "504 independentR1FAIL identified missing original-root redo authority; steward acceptedD26 recorded1d487be2e. Revisedplan inR2review, implementation held for independentPASS+steward exact-footprint acceptance. Main source boundary released afterfbclosure0c83d3d4f; c0ea isolated clean rebuild running."
+    "504 independentR1FAIL identified missing original-root redo authority; steward acceptedD26 recorded1d487be2e. Revisedplan inR2review, implementation held for independentPASS+steward exact-footprint acceptance. Main source boundary released afterfbclosure0c83d3d4f; c0ea isolated clean rebuild running.",
+    "c0ea checkpoint Done after actual clean Cargo and independent holisticPASS; seeded artifact failures3d160332/ffdc3aee and cached failurec5ff62bc preserved. Local target cleanup resolved E0463/E0460 without source edits. Tracker-only landing adds no production change; mandatory merged-source policy not triggered."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1391,6 +1392,15 @@
       },
       "criteria": "All3 corrected criteria met; data-history supplied context, canonical comparison, all3 callers, exact refusal message, preserved noGit allow, existing CLI owner extended without weakening. Actual old-code RED and focused/fullPASS; obsolete comparison comment only in shared module. No deferred scope.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 1f3f1879-d902-4380-a3ef-3e1f435eb339 on e552fbb2cdec781216419c1d8918f37c75cd9de6."
+    },
+    "c0ea31ee": {
+      "verdict": "PASS",
+      "reviewed_source": "488f97bd49d2ef49ea261278949bd7e10b834338",
+      "gates": {
+        "cargo-ci": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+        "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
+      },
+      "criteria": "All3 layout checkpoint criteria audited: shared invocation observations, supplied storage/executor/recovery/server/init/hooks, ordinary/external/moved/lease counting suite, owning alias/error/clone/concurrency tests. Resolved d681 pitfall reconciled before gate. No source implementation introduced by checkpoint."
     }
   },
   "source_queue": [
@@ -1404,10 +1414,12 @@
   ],
   "checkpoints": {
     "c0ea31ee": {
-      "status": "in_progress",
-      "worker_status": "clean_rebuild_after_seeded_artifact_failures",
-      "tree": "agent-c0ea31ee",
-      "evidence": "Actual failedCargo3d160332(E0463 serde_json) andffdc3aee(E0460 serde_core);5056tests+25doctests passed both. Narrow cache repair insufficient, isolated target fully cleaned; forced requiredCargo then holistic queued. No source changes or gate bypass."
+      "status": "done",
+      "worker_status": "gated_and_closed",
+      "gates": {
+        "cargo-ci": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+        "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
+      }
     }
   }
 }
