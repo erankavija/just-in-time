@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "49d70fbe-e049-4c6e-8660-35219dd00760",
-      "status": "passed",
-      "updated_at": "2026-11-05T01:55:51.681037514Z",
+      "run_id": "529b8064-a55f-4f23-b7bf-facd626796ea",
+      "status": "failed",
+      "updated_at": "2026-11-05T02:55:44.441657696Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Share version-scoped issue capture and projections",
-  "updated_at": "2026-11-05T02:08:50.653498832Z"
+  "updated_at": "2026-11-05T02:55:44.441657696Z"
 }
