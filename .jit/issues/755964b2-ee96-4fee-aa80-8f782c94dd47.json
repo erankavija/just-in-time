@@ -14,6 +14,7 @@
       "path": "dev/active/755964b2/verification.md"
     }
   ],
+  "done_at": "2026-11-05T01:28:07.836954605Z",
   "first_ready_at": "2026-11-05T00:27:07.828738294Z",
   "gates_required": [
     "cargo-ci",
@@ -21,9 +22,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "a123b6e4-771f-40c9-8b31-cb01ea88bf44",
+      "run_id": "98eb3137-610e-4d0f-8043-d804e01ef320",
       "status": "passed",
-      "updated_at": "2026-11-05T00:58:14.437741495Z",
+      "updated_at": "2026-11-05T01:25:38.126956524Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,7 +43,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Rust API links name the owners after facade extraction",
-  "updated_at": "2026-11-05T01:03:41.647212716Z"
+  "updated_at": "2026-11-05T01:28:07.836954605Z"
 }

@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-0546fc82",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "89837a52a57418d36a299e8a09a8634fe173133d",
+  "completed_at": "2026-11-05T00:04:52.636086241Z",
+  "duration_ms": 2004,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "docs-mechanical",
+  "inputs_digest": "14dd9d3f43598e15e4fdb0ccb79b5a3d873f6ce7526b201e6c4e7e9c4f6057f8",
+  "issue_id": "0546fc82-435f-4d02-9af2-0dc22e301d60",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ecc372aa-db28-4f98-8fc7-69fec326b528",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:04:50.631428327Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n== M8 package content ==\nFORBIDDEN: jit-dogfood: .agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md names 'jq' (installed paths require no jq)\nFORBIDDEN: jit-dogfood: .agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh names 'jq' (installed paths require no jq)\n\n== M9 policy phrases ==\nOK: declared policy phrases hold\n\n"
+}

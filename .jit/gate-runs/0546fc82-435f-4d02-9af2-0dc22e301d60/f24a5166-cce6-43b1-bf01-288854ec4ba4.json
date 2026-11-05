@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-0546fc82",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9a744e90132770b14729898d37efc84975368890",
+  "completed_at": "2026-11-05T01:25:28.728553187Z",
+  "duration_ms": 137229,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped CLI output documentation is accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "0546fc82-435f-4d02-9af2-0dc22e301d60",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f24a5166-cce6-43b1-bf01-288854ec4ba4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:23:11.498803373Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` (level 4) with no resolved children. Reviewed all 16 reachable `jit:0546fc82` commits individually with rename detection; current code and documentation confirm the resulting contract.\n\nDocumentation impact: the canonical reference accurately covers global `--json`, list payloads, warning streams, post-parse failures, findings, parser errors, and passthrough behavior. Linked adopter docs cite it without duplicating the list contract. Prior blocking feedback is resolved.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped CLI output documentation is accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

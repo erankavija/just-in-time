@@ -671,7 +671,7 @@ path resolves to below.
 ### Get Single Value
 
 ```bash
-jit config get <dotted.key> [--json]
+jit config get <dotted.key>
 ```
 
 Resolves a dotted key against the WHOLE configuration surface — type

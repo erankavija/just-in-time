@@ -65,7 +65,7 @@
           "short_id": "4d8791fb",
           "title": "Unify issue and linked-document search",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "d4172016-0225-4ae8-aa37-3e4f28a1922c",
@@ -79,14 +79,14 @@
           "short_id": "4538b071",
           "title": "Remove explicitly unused API routes and client methods",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ca44bb7c-c9b9-48cf-a478-71e901023870",
           "short_id": "ca44bb7c",
           "title": "Unify raw document response construction",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "a236e81e-4890-4607-931a-e3d3612c3899",
@@ -167,10 +167,12 @@
   "escalations": [],
   "rework_counts": {
     "9c3eb2bf": 2,
-    "cd0ac0f7": 1
+    "cd0ac0f7": 1,
+    "4538b071": 1,
+    "6326532e": 2
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Foundation wave, configuration refresh and issue-detail repair landed with merged gates. Shared-snapshot implementation is in progress; remaining overlapping server handlers are sequenced. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
+  "note": "Foundation, semantic search, API cleanup and browser fixes landed with merged gates. D-25 shared read convergence and raw-document response consolidation are in progress. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
@@ -178,5 +180,14 @@
       "summary": "Reviewer flags satisfies:c8e79465/REQ-01 on server-modules as not directly establishing route behavior; reconcile against server-story REQ-01 before container completion.",
       "status": "open"
     }
-  ]
+  ],
+  "decision_d25": {
+    "date": "2026-11-05",
+    "decision": "User chose nonblocking reads; steward authorized D-25 and 632 REQ-04/05",
+    "scope": "Canonical admission and bounded retry, memory contention, shared CLI/HTTP conflict classification, charter projection, adopter docs and owning tests",
+    "review_history": [
+      "e16df9af: deterministic concurrency coverage repaired",
+      "713a548e: D-22 lock fallback superseded by approved D-25"
+    ]
+  }
 }
