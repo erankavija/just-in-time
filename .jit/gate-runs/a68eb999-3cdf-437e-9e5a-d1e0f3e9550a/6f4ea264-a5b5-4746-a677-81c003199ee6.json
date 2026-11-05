@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c6ceb6f6ce9b27e067f112ae031bcd3725a844d7",
+  "completed_at": "2026-11-05T23:34:02.774971118Z",
+  "duration_ms": 103393,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/planning-bracket.md",
+        "id": "F1",
+        "line": 30,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The new concept, adoption, and custom-gate passages restate the canonical template/gate/rule contract instead of citing it, violating REQ-03."
+      }
+    ],
+    "summary": "The canonical template distribution contract is accurate, but issue-authored restatements violate the required single canonical home.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "a68eb999-3cdf-437e-9e5a-d1e0f3e9550a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6f4ea264-a5b5-4746-a677-81c003199ee6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T23:32:19.381659188Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 30187 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ae0e-619d-77e2-ad3c-34b128b14d33\n--------\nuser\n--- 30174 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf task (maximum hierarchy level; no resolved children). Reviewed the two individually tagged `jit:a68eb999` commits; the documentation commit is the relevant footprint. Current behavior matches the canonical storage reference.\n\nDocumentation impact: the canonical reference is accurate and discoverable, but the same contract is restated in multiple issue-authored pages, contrary to REQ-03.\n\n1. **F1 — Blocking, issue-impact:** The newly added passages restate the canonical template/gate/rule contract instead of only citing its canonical home: [planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/planning-bracket.md:30), [adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:29), and [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:771). This violates hard REQ-03 and adds repeated prose. Replace each assertion with a context-specific link to the Graph Template Registry; retain the manual’s copy-as-a-set instruction as the linked principle’s consequence.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The canonical template distribution contract is accurate, but issue-authored restatements violate the required single canonical home.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new concept, adoption, and custom-gate passages restate the canonical template/gate/rule contract instead of citing it, violating REQ-03.\",\"file\":\"docs/concepts/planning-bracket.md\",\"line\":30}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

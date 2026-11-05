@@ -25,11 +25,13 @@ exact blocks to lift:
   breakable, with **no** software vocabulary anywhere (proof the bracket carries
   no baked-in altitude).
 
-> The files under `docs/examples/` are EXAMPLES, not active on this repository. To
-> use one, copy its `config.toml` to `.jit/config.toml`, its `rules.toml` to
-> `.jit/rules.toml`, its `templates.toml` to `.jit/templates.toml`, and its
-> `schemas/` directory to `.jit/schemas/`. Neither example carries a
-> `gates.toml`; the three gate definitions the template names come from
+> The files under `docs/examples/` are EXAMPLES, not active on this repository.
+> Copy an example as a set
+> ([why](../reference/storage-format.md#graph-template-registry)): its `config.toml` to
+> `.jit/config.toml`, its `rules.toml` to `.jit/rules.toml`, its
+> `templates.toml` to `.jit/templates.toml`, and its `schemas/` directory to
+> `.jit/schemas/`. Neither example carries a `gates.toml`; the three gate
+> definitions the template names come from
 > [Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders).
 
 **Bracket configuration is optional and affects issues only when applied.** A
@@ -363,8 +365,9 @@ jit issue batch-create --from-json "$DIR/breakdown.json" --dry-run --json
 ```
 
 Then drive `P` through `plan-review`. Review fails missing/invalid manifests,
-stale generated output, duplicated task prose, and non-worker-sized terminal
-tasks. Missing hierarchy/source universes, invented references, tier-laundered
+stale generated output, duplicated task prose, terminal tasks one worker cannot
+deliver in one focused cycle, over-split chain links, and a manifest over the
+validator's issue budget (`--max-issues`, default 50). Missing hierarchy/source universes, invented references, tier-laundered
 leaves, and malformed/duplicate contract headings also fail. Per-code sizing
 overrides remain visible for reviewer judgment. Shared contracts are marked
 `plan-fixed` or `implementation-produced`; produced contracts require one
