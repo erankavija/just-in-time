@@ -340,13 +340,20 @@ struct FailureFixture {
 
 impl FailureFixture {
     fn new(cli: JitCli, init_baseline: Option<&Path>) -> Self {
-        let git_ceiling = cli.root().display().to_string();
+        let root = cli
+            .root()
+            .canonicalize()
+            .expect("canonicalize the owned failure-probe root");
+        let git_ceiling = root
+            .parent()
+            .expect("the owned failure-probe root has a parent")
+            .display()
+            .to_string();
         Self {
             cli,
             claimed_issue: None,
-            // Git may discover a repository inherited from the host's `/tmp`.
-            // Stop discovery at the temporary repository so `git:absent`
-            // observes only the fixture it was asked to inspect.
+            // Permit Git discovery from `.jit` into the owned root, while
+            // preventing `git:absent` from inheriting a host repository.
             environment: BTreeMap::from([(
                 "GIT_CEILING_DIRECTORIES".to_owned(),
                 Some(git_ceiling),
