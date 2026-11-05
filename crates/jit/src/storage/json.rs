@@ -16,6 +16,7 @@ use crate::repository_state::{
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
 };
 use crate::storage::{
+    git::{Git, GitCheckout, GitError},
     FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
     RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
     RepositoryNotFoundError, RepositoryStateStore, WorktreePaths,
@@ -438,7 +439,7 @@ pub struct JsonFileStorage {
     /// while the request resolves to the same commit and object, skipping the
     /// content hashing that dominates large pinned documents.
     pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
-    git_program: PathBuf,
+    git: Git,
 }
 
 impl JsonFileStorage {
@@ -476,7 +477,7 @@ impl JsonFileStorage {
             worktree_paths: Arc::new(Mutex::new(None)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
-            git_program: PathBuf::from("git"),
+            git: Git::default(),
             root,
             locker: FileLocker::new(timeout),
         }
@@ -496,12 +497,9 @@ impl JsonFileStorage {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_git_program<P: AsRef<Path>, G: Into<PathBuf>>(
-        root: P,
-        git_program: G,
-    ) -> Self {
+    pub(crate) fn with_git<P: AsRef<Path>>(root: P, git: Git) -> Self {
         let mut storage = Self::new(root);
-        storage.git_program = git_program.into();
+        storage.git = git;
         storage
     }
 
@@ -510,15 +508,12 @@ impl JsonFileStorage {
         repo_root: &Path,
         requests: &BTreeSet<(String, String)>,
         kind_only: &BTreeSet<(String, String)>,
-    ) -> BTreeMap<
-        (String, String),
-        Result<crate::storage::PinnedTargetRead, crate::storage::GitRevisionError>,
-    > {
+    ) -> BTreeMap<(String, String), Result<crate::storage::PinnedTargetRead, GitError>> {
         let mut cache = self
             .pinned_target_cache
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        crate::storage::GitRevisionResolver::with_git_program(repo_root, self.git_program.clone())
+        GitCheckout::new(self.git.clone(), repo_root.to_path_buf())
             .inspect_pinned_targets(requests, kind_only, &mut cache)
     }
 
