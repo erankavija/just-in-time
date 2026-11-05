@@ -789,12 +789,16 @@
    "terminal": {
     "consumer_family": "claim release actor",
     "test_boundary": "claims unit tests",
-    "worker_sized_reason": "One release-actor resolver and its existing callers use the supplied checkout; the release-output fixture supplies an explicit actor instead of host Git configuration.",
+    "worker_sized_reason": "One resolver and its callers use the supplied checkout; release fixtures supply explicit child actors, and the fulfilled two-line convergence comment is removed.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/claim.rs",
       "crates/jit/src/commands/mod.rs",
-      "crates/jit/tests/cli_issue/gate_field_contract_test.rs"
+      "crates/jit/tests/cli_issue/gate_field_contract_test.rs",
+      "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
+      "crates/jit/tests/cli_repo_workflow/workflow_tests.rs",
+      "crates/jit/tests/cli_repo_workflow/test_cli_consistency.rs",
+      "crates/jit/src/storage/git.rs"
      ]
     }
    }
@@ -1906,7 +1910,7 @@
  {
   "key": "document-history-through-module",
   "title": "Document history comes from the module's path history",
-  "description": "Make the CLI and server document history read the git module's path history instead of walking history in libgit2.\n\n## Background\n\n- `get_file_history` (`crates/jit/src/commands/document.rs:864-914`) walks the whole history from `HEAD` in libgit2. It lists a commit whose tree holds the path when the path is added or its blob differs from the first parent's; a commit deleting the path is never listed, and a merge is compared with its first parent only.\n- `document_history` (`crates/jit/src/commands/document.rs:556-579`) fails outside git; `get_document_history` (`crates/jit/src/commands/document.rs:731-754`) returns an empty list there. Both produce `CommitInfo` with a seven-character id, the author name, the commit time as `%Y-%m-%d %H:%M:%S` UTC and the trimmed message.\n- `GitCheckout::file_history(path)` returns the path's commits under git's default history simplification.\n- The server routes' `test_executor` (`crates/server/src/routes.rs:1054-1080`) builds executors without paths, and `test_document_reads_serve_a_derived_document_without_a_link` (`crates/server/src/routes.rs:2225`) asserts a history count and a diff over a real repository.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:108` onwards.\n- Kept as one change for a build reason: `get_file_history` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants map `file_history` of the executor's git checkout to `CommitInfo` as today, `get_file_history` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: CLI tests assert the behaviour change: a commit that deletes the document is listed (today omitted, so this assertion fails on today's code), and a merge identical to one parent for it is omitted. The CLI command still fails outside git and the server variant still returns an empty list there.\n- [hard] REQ-03: `test_executor` supplies detected `WorktreePaths` through `with_worktree_paths` for file-backed storage, and `test_document_reads_serve_a_derived_document_without_a_link` passes unchanged.\n\n## Notes\n\n- Behaviour change: history follows git's default history simplification for the path.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the CLI and server document history read the git module's path history instead of walking history in libgit2.\n\n## Background\n\n- `get_file_history` (`crates/jit/src/commands/document.rs:864-914`) walks the whole history from `HEAD` in libgit2. It lists a commit whose tree holds the path when the path is added or its blob differs from the first parent's; a commit deleting the path is never listed, and a merge is compared with its first parent only.\n- `document_history` (`crates/jit/src/commands/document.rs:556-579`) fails outside git; `get_document_history` (`crates/jit/src/commands/document.rs:731-754`) returns an empty list there. Both produce `CommitInfo` with a seven-character id, the author name, the commit time as `%Y-%m-%d %H:%M:%S` UTC and the trimmed message.\n- `GitCheckout::file_history(path)` returns the path's commits under git's default history simplification.\n- The server route fixture `test_document_reads_serve_a_derived_document_without_a_link` now uses the shared non-Git `setup_test_repo_with_config`, then initializes Git in its owned temporary root. Bind detected paths after that initialization using its actual selected data root; its history and diff assertions remain unchanged.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:108` onwards.\n- Kept as one change for a build reason: `get_file_history` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants map `file_history` of the executor's git checkout to `CommitInfo` as today, `get_file_history` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: CLI tests assert the behaviour change: a commit that deletes the document is listed (today omitted, so this assertion fails on today's code), and a merge identical to one parent for it is omitted. The CLI command still fails outside git and the server variant still returns an empty list there.\n- [hard] REQ-03: The existing real-Git route fixture supplies detected `WorktreePaths` through `with_worktree_paths` after Git initialization, using its actual selected data root and the same owned temporary root; `test_document_reads_serve_a_derived_document_without_a_link` keeps its assertions and passes.\n\n## Notes\n\n- Behaviour change: history follows git's default history simplification for the path.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1992,11 +1996,13 @@
    "terminal": {
     "consumer_family": "document link check",
     "test_boundary": "link check CLI tests",
-    "worker_sized_reason": "One loop collects its lookups into one module call and one helper is deleted.",
+    "worker_sized_reason": "One asset loop uses one module call; the shared parser recognizes canonical OID plus submodule as absent, retaining older Git missing responses, with one owning mixed-batch contract.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/document.rs",
-      "crates/jit/tests/cli_query_graph/check_links_tests.rs"
+      "crates/jit/tests/cli_query_graph/check_links_tests.rs",
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
     }
    }

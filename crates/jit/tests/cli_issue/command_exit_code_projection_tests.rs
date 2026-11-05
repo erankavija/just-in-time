@@ -975,8 +975,47 @@ fn invoke_profile_add_occupied_destination(json: bool) -> Vec<Output> {
     )]
 }
 
+fn invoke_retryable_reads(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
+    let scratch = cli.root().join(".jit/tmp");
+    fs::create_dir_all(&scratch).unwrap();
+    fs::write(scratch.join("redo.record"), b"pending").unwrap();
+    let manifest = cli.root().join("batch.json");
+    fs::write(&manifest, "[]").unwrap();
+    vec![
+        output_in_form(&cli, &["archive", "candidates"], json),
+        output_in_form(&cli, &["doc", "check-links", "--scope", "all"], json),
+        output_in_form(&cli, &["graph", "roots"], json),
+        output_in_form(&cli, &["invariant", "check"], json),
+        output_in_form(
+            &cli,
+            &["profile", "diff", "--profile", "packages/profile"],
+            json,
+        ),
+        output_in_form(&cli, &["query", "all"], json),
+        output_in_form(&cli, &["issue", "list"], json),
+        output_in_form(
+            &cli,
+            &[
+                "issue",
+                "batch-create",
+                "--from-json",
+                manifest.to_str().unwrap(),
+                "--dry-run",
+            ],
+            json,
+        ),
+        output_in_form(&cli, &["item", "list"], json),
+        output_in_form(&cli, &["label", "values", "type"], json),
+        output_in_form(&cli, &["validate"], json),
+    ]
+}
+
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
+    test_command_exit_codes_retryable_reads_emit_12: ("archive candidates, archive document, archive container, doc conformance, doc check-links, graph deps, graph rdeps, graph roots, graph tree, graph export, rdeps, invariant check, profile diff, profile apply, profile pack, profile add, query all, query available, query blocked, query strategic, query closed, query count, query divergence, query, status, issue list, issue search, issue batch-create, issue update, issue claim-next, snapshot export, item list, item search, label values, validate", 12, false) => invoke_retryable_reads;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
     test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
     test_command_exit_codes_not_found_emits_3: ("*", 3, false) => invoke_not_found;

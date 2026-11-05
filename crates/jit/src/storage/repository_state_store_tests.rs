@@ -20,6 +20,67 @@ use std::sync::Mutex;
 use tempfile::TempDir;
 
 #[test]
+fn test_admit_read_sources_discards_errors_when_any_source_moved() {
+    let admissions = vec![
+        Err(RepositoryStateStoreError::Io(std::io::Error::other(
+            "transient",
+        ))),
+        Ok(ReadAdmission::Moved),
+    ];
+    assert!(admit_read_sources(admissions).unwrap().is_none());
+}
+
+#[test]
+fn test_admit_read_sources_returns_stable_admission_errors() {
+    let admissions = vec![
+        Err(RepositoryStateStoreError::Io(std::io::Error::other(
+            "stable",
+        ))),
+        Ok(ReadAdmission::Granted),
+    ];
+    assert!(admit_read_sources(admissions).is_err());
+}
+
+fn assert_issue_listing_rejects_pending_redo<B: SessionRecordBackend>()
+where
+    B::Store: IssueStore,
+{
+    let backend = B::seeded();
+    backend
+        .store()
+        .configure_repository_layout(&backend.layout())
+        .unwrap();
+    backend.commit(&leftover_record());
+    let error = backend.store().list_issues().unwrap_err();
+    assert!(format!("{error:#}").contains("jit recover"), "{error:#}");
+    drop(backend.open().unwrap());
+    backend.store().list_issues().unwrap();
+}
+
+#[test]
+fn test_list_issues_refuses_contended_memory_state_without_waiting() {
+    let store = InMemoryStorage::new();
+    let held = store.repository_state();
+    let reader = store.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let thread = std::thread::spawn(move || tx.send(reader.list_issues()).unwrap());
+    let result = rx.recv_timeout(std::time::Duration::from_secs(2));
+    drop(held);
+    thread.join().unwrap();
+    let error = result.unwrap().unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<RepositoryStateStoreError>(),
+        Some(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+}
+
+#[test]
+fn test_list_issues_rejects_pending_redo_on_both_backends() {
+    assert_issue_listing_rejects_pending_redo::<FileSessionBackend>();
+    assert_issue_listing_rejects_pending_redo::<MemorySessionBackend>();
+}
+
+#[test]
 fn test_advisory_error_classification_only_accepts_permission_denied_io() {
     let errors = [
         RepositoryStateStoreError::Io(std::io::Error::other("hard I/O failure")),

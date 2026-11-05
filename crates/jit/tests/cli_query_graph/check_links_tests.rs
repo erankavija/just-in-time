@@ -10,6 +10,7 @@
 //! 7. JSON output support
 
 use jit::test_cli::JitCli;
+use jit::test_harness::git::GitStandIn;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -632,6 +633,111 @@ fn test_git_versioned_asset_exists() {
     // Check should pass because asset exists in git
     let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
     assert!(stdout.contains("valid"));
+}
+
+#[test]
+fn test_check_document_links_without_git_counts_only_working_tree_assets() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Local asset without Git"])
+        .unwrap();
+    let doc_path = "docs/local.md";
+    let asset_path = "docs/assets/local.png";
+    fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
+    fs::write(cli.root().join(doc_path), "![Local](assets/local.png)\n").unwrap();
+    fs::write(cli.root().join(asset_path), b"image").unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
+    let present = check_links_report(&cli);
+    assert!(
+        errors_for_document(&present, doc_path).is_empty(),
+        "{present}"
+    );
+
+    fs::remove_file(cli.root().join(asset_path)).unwrap();
+    let missing = check_links_report(&cli);
+    assert!(
+        errors_for_document(&missing, doc_path)
+            .iter()
+            .any(|error| error["type"] == "missing_asset" && error["resolved"] == asset_path),
+        "{missing}"
+    );
+}
+
+#[test]
+fn test_check_document_links_reports_absent_head_submodule_asset_missing() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
+    let issue_id = cli.create_issue(["--title", "Submodule asset"]).unwrap();
+    let doc_path = "docs/submodule.md";
+    let asset_path = "docs/assets/module";
+    fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
+    fs::write(
+        cli.root().join(doc_path),
+        "# Submodule\n\n![Module](assets/module)\n",
+    )
+    .unwrap();
+    fs::write(cli.root().join(asset_path), b"placeholder").unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
+    fs::remove_file(cli.root().join(asset_path)).unwrap();
+    cli.git([
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        "160000,1111111111111111111111111111111111111111,docs/assets/module",
+    ])
+    .unwrap();
+    cli.git(["commit", "-q", "-m", "record absent submodule gitlink"])
+        .unwrap();
+    let report = check_links_report(&cli);
+    assert!(report["errors"].is_array(), "{report}");
+    assert!(
+        errors_for_document(&report, doc_path)
+            .iter()
+            .any(|error| error["type"] == "missing_asset" && error["resolved"] == asset_path),
+        "an absent submodule object must be missing: {report}"
+    );
+}
+
+#[test]
+fn test_check_document_links_batches_head_asset_presence_into_one_cat_file_process() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
+    let issue_id = cli.create_issue(["--title", "Versioned assets"]).unwrap();
+    let doc_path = "docs/batched.md";
+    let assets = ["one.png", "two.png", "three.png"];
+    fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
+    let document = assets
+        .iter()
+        .map(|asset| format!("![{asset}](assets/{asset})"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(cli.root().join(doc_path), document).unwrap();
+    assets.iter().for_each(|asset| {
+        fs::write(cli.root().join("docs/assets").join(asset), b"image").unwrap();
+    });
+    cli.commit("add document and assets").unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
+    assets.iter().for_each(|asset| {
+        fs::remove_file(cli.root().join("docs/assets").join(asset)).unwrap();
+    });
+    let stand_in = GitStandIn::new();
+    let output = cli
+        .command_with_env(
+            ["doc", "check-links", "--scope", "all", "--json"],
+            [("PATH", stand_in.search_path())],
+        )
+        .output()
+        .unwrap();
+    let cat_file_calls = stand_in
+        .invocations()
+        .into_iter()
+        .filter(|call| call.args().first().is_some_and(|arg| arg == "cat-file"))
+        .collect::<Vec<_>>();
+    assert_eq!(cat_file_calls.len(), 1, "{cat_file_calls:?}");
+    assert!(
+        output.status.success(),
+        "committed assets must remain present: {output:?}"
+    );
 }
 
 /// The link report of `doc check-links --json`: the failure envelope's

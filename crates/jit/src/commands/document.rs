@@ -1273,12 +1273,33 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // Create link validator
         let link_validator = LinkValidator::new(repo_root.to_path_buf(), all_document_paths);
 
-        // Try to open git repository for checking versioned assets
-        let git_repo = git2::Repository::discover(repo_root).ok();
-
         // Read every reference at the version it names, before any classification.
         let readings =
             self.read_documents_at_named_versions(&layout, &all_documents, &link_validator)?;
+
+        let missing_worktree_assets = all_documents
+            .iter()
+            .zip(&readings)
+            .filter(|(_, reading)| matches!(reading, CheckedDocument::WorkingTree))
+            .flat_map(|((_, document), _)| &document.assets)
+            .filter(|asset| asset.asset_type == AssetType::Local)
+            .filter_map(|asset| asset.resolved_path.as_ref())
+            .filter(|path| !repo_root.join(path).exists())
+            .collect::<std::collections::BTreeSet<_>>();
+        let committed_assets = match self.exec.require_worktree_paths()?.write_checkout() {
+            Some(checkout) if !missing_worktree_assets.is_empty() => {
+                let names = missing_worktree_assets
+                    .iter()
+                    .map(|path| format!("HEAD:{}", path.to_string_lossy()))
+                    .collect::<Vec<_>>();
+                missing_worktree_assets
+                    .into_iter()
+                    .zip(checkout.object_types(names)?)
+                    .filter_map(|(path, object_type)| object_type.map(|_| path))
+                    .collect::<std::collections::BTreeSet<_>>()
+            }
+            _ => std::collections::BTreeSet::new(),
+        };
 
         let mut urls = all_documents
             .iter()
@@ -1341,7 +1362,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                                 Some(pinned) => pinned.target_kind(resolved).is_file(),
                                 None => {
                                     repo_root.join(resolved).exists()
-                                        || check_asset_in_git(&git_repo, resolved)
+                                        || committed_assets.contains(resolved)
                                 }
                             };
 
@@ -2041,24 +2062,6 @@ fn derive_document_remove(
             },
         ],
     })
-}
-
-/// Check if an asset exists in git repository
-fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -> bool {
-    if let Some(repo) = repo {
-        // Try to find the file in HEAD
-        if let Ok(head) = repo.head() {
-            if let Some(target) = head.target() {
-                if let Ok(commit) = repo.find_commit(target) {
-                    if let Ok(tree) = commit.tree() {
-                        let path_str = path.to_str().unwrap_or("");
-                        return tree.get_path(std::path::Path::new(path_str)).is_ok();
-                    }
-                }
-            }
-        }
-    }
-    false
 }
 
 #[cfg(test)]

@@ -175,13 +175,14 @@ command_group! {
         "doc_show" => DocCommands::Show { id, path, at }
             => show(&id, &path, at.as_deref()) -> DocumentContentResult,
         "doc_dir" => DocCommands::Dir { id, area } => dir(&id, &area) -> ArtifactDirectoryResponse,
-        "doc_conformance" => DocCommands::Conformance => conformance() -> ArtifactConformanceResponse,
+        "doc_conformance" => DocCommands::Conformance => conformance() raises [RetryableConflict] -> ArtifactConformanceResponse,
         "doc_history" => DocCommands::History { id, path } => history(&id, &path) -> DocumentHistory,
         "doc_diff" => DocCommands::Diff { id, path, from, to }
             => diff(&id, &path, &from, to.as_deref()) -> DocumentDiffResult,
         "doc_assets_list" => DocCommands::Assets { command: AssetCommands::List { id, path, rescan } }
             => assets_list(&id, &path, rescan) -> AssetListResult,
         "doc_check-links" => DocCommands::CheckLinks { scope } => check_links(&scope)
+            raises [RetryableConflict]
             findings ValidationFailed "One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal." -> LinkCheckResult,
     }
 }

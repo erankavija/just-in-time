@@ -1,0 +1,43 @@
+{
+  "branch": "worktree-agent-6326532e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e8ddc033a9fb0a16dfb8a9ccf36d777cc7e7a100",
+  "completed_at": "2026-11-05T01:53:19.153499090Z",
+  "duration_ms": 332444,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/capture_cache.rs",
+        "id": "F1",
+        "line": 54,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/6326532e/requirement/REQ-01",
+          "@/issue/6326532e/requirement/REQ-03",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "The concurrent-admission test can pass without admitting a second request while capture is in flight."
+      }
+    ],
+    "summary": "Concurrent cache admission is not deterministically exercised.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e16df9af-49a1-469d-95e6-34d02203a698",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:47:46.709448748Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5753 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-6326532e\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a964-0553-7341-aee7-8c7abfc32d00\n--------\nuser\n--- 5740 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7b834e9 (claim), 798e62e (implementation), e8ddc03 (gate record)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/6326532e/requirement/REQ-01..03 and @/issue/0f8efc37/requirement/REQ-06 (.jit/issues); @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-22 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0; covers 7b834e9 and 798e62e); code-review pending\nTruncation recovery: recovered bounded routes and json patches; limited AGENTS discovery to this worktree\n\n1. [blocking, issue-impact] `crates/server/src/capture_cache.rs:54` — The purported concurrent-admission test only yields once before releasing the first capture. It passes if the second task does not reach `get` until after the first initialization completes, so it does not deterministically prove in-flight admission sharing. The route test is likewise sequential. This leaves the required deterministic concurrent-admission coverage unmet. References: `@/issue/6326532e/requirement/REQ-01`, `@/issue/6326532e/requirement/REQ-03`, `@/invariant/orthogonal-tests`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Concurrent cache admission is not deterministically exercised.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The concurrent-admission test can pass without admitting a second request while capture is in flight.\",\"file\":\"crates/server/src/capture_cache.rs\",\"line\":54,\"references\":[\"@/issue/6326532e/requirement/REQ-01\",\"@/issue/6326532e/requirement/REQ-03\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
