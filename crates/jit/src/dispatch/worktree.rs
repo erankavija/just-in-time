@@ -58,7 +58,7 @@ command_group! {
     command: WorktreeCommands,
     storage: JsonFileStorage,
     leaves: {
-        "worktree_info" => WorktreeCommands::Info => info() -> WorktreeInfo,
+        "worktree_info" => WorktreeCommands::Info => info() raises [RequiresGit] -> WorktreeInfo,
         "worktree_list" => WorktreeCommands::List => list() -> WorktreeListResponse,
         "worktree_store-divergence" => WorktreeCommands::StoreDivergence => store_divergence() -> WorktreeStoreDivergenceResponse,
         "worktree_exec" => WorktreeCommands::Exec { command } => exec(command) -> WorktreeExecResponse,
