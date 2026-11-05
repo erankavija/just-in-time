@@ -289,7 +289,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "profile_fixture_rework"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
@@ -298,7 +298,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_complete_pending_gates"
+          "worker_status": "cargo_failed_fixture_scope_escalated"
         }
       ]
     },
@@ -352,7 +352,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "implementing"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -377,7 +377,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "implementing"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -510,7 +510,8 @@
     "ec9e812c": 1,
     "f6eaba42": 1,
     "9de4c09c": 1,
-    "d48e28bf": 1
+    "d48e28bf": 1,
+    "d68150e2": 1
   },
   "surfaced_pitfalls": [
     {
@@ -755,7 +756,8 @@
     "Steward approved ea4b7363 footprint-only reconciliation: actual second caller commands/mod.rs::publish_captured_release now supplies canonical WorktreePaths alongside claim-release callback. Two existing files, criteria unchanged, no new probe/cache/error/read-session behavior. Background/manifest/overview updated and native validation passed. Exclude frontend632 D25 admission/with_read_session edits and preserve actor precedence/fallback semantics.",
     "d48e28bf Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "d48Done507748f7b after mergedstableCargo e91fc299 on524e7b6f5; object/base byteproof69PASS. Frontend a236 tracker boundary finished eccbe08e1. Ready dcf/a273 consumers claimed for isolated parallel work. EA two-file implementation complete, fullgates next; d681 fullgates running after149focused regressions. 9de refresh has only conjunction-comment conflict combining reviewed f6/9de ID removals; exact byte proof+fmt, mandatory mergedCargo.",
-    "9de4c09c Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "9de4c09c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "d68150e2 actual Cargo failure 9c02d30d exposed profile dirty-target fixture with bound layout but no explicit WorktreePaths. Steward approved exact eighth file commands/profile.rs to supply detected paths alongside existing layout, preserving assertions and production. Criteria unchanged; native manifest validation passed. Rework 1 dispatched. ea4b7363 actual Cargo c21d7c93 failed CLI release field fixture lacking actor in non-Git repository; fixture scope escalation pending. dcf88b6f and a273667c dispatched from 9e4fa52c5."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,

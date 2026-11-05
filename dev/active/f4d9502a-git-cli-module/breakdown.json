@@ -292,7 +292,8 @@
       "crates/jit/src/commands/claim.rs",
       "crates/jit/src/test_utils.rs",
       "crates/jit/src/dispatch/hooks.rs",
-      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs"
+      "crates/jit/tests/cli_repo_workflow/git_process_budget_tests.rs",
+      "crates/jit/src/commands/profile.rs"
      ]
     }
    }
