@@ -86,7 +86,6 @@ function App() {
       .catch((err) => console.warn('Failed to fetch namespace configuration:', err));
   }, []);
 
-  // Load all issues for client-side search (re-fetch on version change)
   useEffect(() => {
     apiClient.listIssues().then(setAllIssues).catch(console.error);
   }, [version]);
