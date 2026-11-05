@@ -393,6 +393,7 @@ const getLayoutedElements = (
 
 interface GraphViewProps {
   onNodeClick?: (issueId: string) => void;
+  onGraphNodes?: (nodes: ApiGraphNode[]) => void;
   labelFilters?: string[];
   layoutAlgorithm?: LayoutAlgorithm;
   onLayoutChange?: (algorithm: LayoutAlgorithm) => void;
@@ -406,6 +407,7 @@ interface GraphViewProps {
 
 export function GraphView({
   onNodeClick,
+  onGraphNodes,
   labelFilters = [],
   layoutAlgorithm = 'compact',
   // onLayoutChange is received but not used in current implementation
@@ -469,6 +471,7 @@ export function GraphView({
   // Once the graph has loaded once, background SSE refreshes should not show
   // the full-page loading overlay (which blanks out the graph and causes flashing).
   const hasLoadedOnceRef = useRef(false);
+  const graphLoadSeqRef = useRef(0);
 
   // Save expansion state to localStorage whenever it changes
   useEffect(() => {
@@ -597,11 +600,14 @@ export function GraphView({
   }, [version]);
 
   const loadGraph = useCallback(async () => {
+    const requestSeq = ++graphLoadSeqRef.current;
     const isBackground = hasLoadedOnceRef.current;
     try {
       if (!isBackground) setLoading(true);
       setError(null);
       const data = await apiClient.getGraph();
+      if (requestSeq !== graphLoadSeqRef.current) return;
+      onGraphNodes?.(data.nodes);
 
       // Build filter configuration
       const filters: GraphFilter[] = [];
@@ -906,14 +912,18 @@ export function GraphView({
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load graph');
-      console.error('Failed to load graph:', err);
+      if (requestSeq === graphLoadSeqRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to load graph');
+        console.error('Failed to load graph:', err);
+      }
     } finally {
-      hasLoadedOnceRef.current = true;
-      if (!isBackground) setLoading(false);
+      if (requestSeq === graphLoadSeqRef.current) {
+        hasLoadedOnceRef.current = true;
+        if (!isBackground) setLoading(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, labelFilters, layoutAlgorithm, hierarchyConfig, expansionState, version]);
+  }, [setNodes, setEdges, labelFilters, layoutAlgorithm, hierarchyConfig, expansionState, version, onGraphNodes]);
 
   // Reset the stable-layout fingerprint whenever view settings that affect the
   // rendered structure change.  This forces a full Dagre run on the next
@@ -924,6 +934,7 @@ export function GraphView({
 
   useEffect(() => {
     loadGraph();
+    return () => { graphLoadSeqRef.current += 1; };
   }, [loadGraph]);
 
   // Handle focus requests

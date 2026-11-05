@@ -45,6 +45,19 @@ describe('IssueDetail request ordering', () => {
   beforeEach(() => getIssue.mockReset());
   afterEach(() => vi.restoreAllMocks());
 
+  it('test_issue_detail_displays_dependency_title_from_full_graph_summary', async () => {
+    const selected = issue('parent', 'Parent issue');
+    selected.dependencies = [{ id: 'dependency', short_id: 'dep' }];
+    getIssue.mockResolvedValue(selected);
+
+    render(<IssueDetail
+      issueId="parent"
+      issueTitles={new Map([['dependency', 'Hidden dependency']])}
+    />);
+
+    expect(await screen.findByText('Hidden dependency')).toBeInTheDocument();
+  });
+
   it('test_issue_detail_first_selection_displays_details_and_clears_loading', async () => {
     const first = deferred<Issue>();
     getIssue.mockReturnValueOnce(first.promise);
