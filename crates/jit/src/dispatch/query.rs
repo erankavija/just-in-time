@@ -92,23 +92,23 @@ command_group! {
     command: QueryCommands,
     storage: [IssueStore],
     leaves: {
-        "query_all" => QueryCommands::All { filters, full } => list_all(filters, full) -> IssueListing
+        "query_all" => QueryCommands::All { filters, full } => list_all(filters, full) raises [RetryableConflict] -> IssueListing
             as union [crate::output::IssueListResponse, crate::output::IssueListFullResponse]
             ISSUE_LISTING,
-        "query_available" => QueryCommands::Available { filters, full } => available(filters, full) -> SubsetListing
+        "query_available" => QueryCommands::Available { filters, full } => available(filters, full) raises [RetryableConflict] -> SubsetListing
             as union [crate::output::IssueListResponse, crate::output::IssueListFullResponse]
             ISSUE_LISTING,
-        "query_blocked" => QueryCommands::Blocked { filters, full } => blocked(filters, full) -> BlockedListing
+        "query_blocked" => QueryCommands::Blocked { filters, full } => blocked(filters, full) raises [RetryableConflict] -> BlockedListing
             as union [crate::output::BlockedListResponse, crate::output::BlockedFullListResponse]
             "Default shape: MinimalBlockedIssue entries (lean fields plus blocked_reasons strings). With --full: BlockedIssue entries (lean fields plus structured blocked_reasons). Neither shape carries gate-list fields; a blocking gate appears only as a reason entry.",
-        "query_strategic" => QueryCommands::Strategic { filters, full } => strategic(filters, full) -> SubsetListing
+        "query_strategic" => QueryCommands::Strategic { filters, full } => strategic(filters, full) raises [RetryableConflict] -> SubsetListing
             as union [crate::output::IssueListResponse, crate::output::IssueListFullResponse]
             ISSUE_LISTING,
-        "query_closed" => QueryCommands::Closed { filters, full } => closed(filters, full) -> SubsetListing
+        "query_closed" => QueryCommands::Closed { filters, full } => closed(filters, full) raises [RetryableConflict] -> SubsetListing
             as union [crate::output::IssueListResponse, crate::output::IssueListFullResponse]
             ISSUE_LISTING,
-        "query_count" => QueryCommands::Count { by, filters } => count(by, filters) -> StateRollup,
-        "query_divergence" => QueryCommands::Divergence => divergence() -> DivergenceResponse,
+        "query_count" => QueryCommands::Count { by, filters } => count(by, filters) raises [RetryableConflict] -> StateRollup,
+        "query_divergence" => QueryCommands::Divergence => divergence() raises [RetryableConflict] -> DivergenceResponse,
     }
 }
 
@@ -120,7 +120,7 @@ pub mod bare {
         command: (IssueFilterArgs, bool),
         storage: [IssueStore],
         leaves: {
-            "query" => (filters, full) => list_all(filters, full) -> IssueListing
+            "query" => (filters, full) => list_all(filters, full) raises [RetryableConflict] -> IssueListing
                 as union [crate::output::IssueListResponse, crate::output::IssueListFullResponse]
                 ISSUE_LISTING,
         }
@@ -145,7 +145,7 @@ pub mod status {
         command: (),
         storage: [IssueStore],
         leaves: {
-            "status" => () => summary() -> StatusResponse,
+            "status" => () => summary() raises [RetryableConflict] -> StatusResponse,
         }
     }
 }

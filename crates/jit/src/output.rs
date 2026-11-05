@@ -843,6 +843,9 @@ pub enum ExitCode {
     /// A lock wait expired while another jit process held the lock (11)
     LockTimeout = 11,
 
+    /// A repository read or mutation conflicted and may be retried (12).
+    RetryableConflict = 12,
+
     /// A downstream reader closed the pipe while jit was writing (141)
     ///
     /// `128 + SIGPIPE (13) = 141`: the exit status a shell reports for a
@@ -855,7 +858,7 @@ pub enum ExitCode {
 
 impl ExitCode {
     /// Every exit code, in documentation order.
-    pub const ALL: [ExitCode; 10] = [
+    pub const ALL: [ExitCode; 11] = [
         ExitCode::Success,
         ExitCode::GenericError,
         ExitCode::InvalidArgument,
@@ -865,6 +868,7 @@ impl ExitCode {
         ExitCode::AlreadyExists,
         ExitCode::ExternalError,
         ExitCode::LockTimeout,
+        ExitCode::RetryableConflict,
         ExitCode::BrokenPipe,
     ];
 
@@ -889,6 +893,7 @@ impl ExitCode {
             ExitCode::LockTimeout => {
                 "A lock wait expired while another jit process held the lock; retrying may succeed"
             }
+            ExitCode::RetryableConflict => "The repository changed or is busy; retry",
             ExitCode::BrokenPipe => {
                 "Downstream reader closed the pipe while jit was writing (128 + SIGPIPE)"
             }
@@ -995,6 +1000,8 @@ wire_vocabulary! {
         ServerExited = "SERVER_EXITED",
         /// A lock wait expired while another jit process held the lock.
         LockTimeout = "LOCK_TIMEOUT",
+        /// A repository read or mutation conflicted and may be retried.
+        RetryableConflict = "RETRYABLE_CONFLICT",
     }
 }
 
@@ -1027,6 +1034,7 @@ impl ErrorCode {
             | ErrorCode::RepositoryFormatUnsupported => ExitCode::ExternalError,
             ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
             ErrorCode::LockTimeout => ExitCode::LockTimeout,
+            ErrorCode::RetryableConflict => ExitCode::RetryableConflict,
             ErrorCode::ParseError
             | ErrorCode::ItemNotFound
             | ErrorCode::ProfileError
@@ -1100,6 +1108,7 @@ impl ErrorCode {
             ErrorCode::LockTimeout => {
                 "A lock wait expired while another jit process held the lock; nothing was changed."
             }
+            ErrorCode::RetryableConflict => "The repository changed or is busy; retry. If a pending redo record persists, run `jit recover`.",
         }
     }
 }
@@ -2998,6 +3007,7 @@ mod tests {
             (ErrorCode::RecoveryFailed, ExitCode::GenericError),
             (ErrorCode::ServerExited, ExitCode::GenericError),
             (ErrorCode::LockTimeout, ExitCode::LockTimeout),
+            (ErrorCode::RetryableConflict, ExitCode::RetryableConflict),
         ];
 
         assert_eq!(expected.len(), ErrorCode::ALL.len());

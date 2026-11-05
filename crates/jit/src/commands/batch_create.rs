@@ -572,20 +572,30 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let mut session = self
-            .exec
-            .storage
-            .open_mutation_session(self.exec.require_layout()?)?;
-        let crate::commands::validate::MutationBase { image, issues } = self
-            .exec
-            .capture_mutation_base(session.as_mut(), &[], None)?
-            .ok_or_else(|| anyhow!("batch validation capture conflicted"))?;
-        let declarations = crate::repository_state::declarations_from_image(&image)?;
-        let ids = batch_issue_ids(
-            &crate::repository_state::MutationContext::preview(),
-            defs.len(),
-        );
-        Self::collect_batch_problems_from_declarations(defs, &ids, &declarations, &issues)
+        let layout = self.exec.require_layout()?;
+        super::with_read_session(
+            self.exec.storage(),
+            &layout,
+            "batch validation",
+            |session| {
+                let Some(crate::commands::validate::MutationBase { image, issues }) =
+                    self.exec.capture_mutation_base(session, &[], None)?
+                else {
+                    return Ok(None);
+                };
+                let declarations = crate::repository_state::declarations_from_image(&image)?;
+                let ids = batch_issue_ids(
+                    &crate::repository_state::MutationContext::preview(),
+                    defs.len(),
+                );
+                Ok(Some(Self::collect_batch_problems_from_declarations(
+                    defs,
+                    &ids,
+                    &declarations,
+                    &issues,
+                )?))
+            },
+        )
     }
 }
 
@@ -670,6 +680,31 @@ mod tests {
             depends_on: deps.iter().map(|s| s.to_string()).collect(),
             planning: None,
         }
+    }
+
+    #[test]
+    fn test_validate_batch_from_json_does_not_wait_for_held_writer() {
+        let storage = InMemoryStorage::new();
+        let exec = crate::commands::test_helpers::memory_executor(storage.clone());
+        let guard = storage.acquire_repo_write_lock().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            tx.send(exec.issues().validate_batch_from_json(&[]))
+                .unwrap()
+        });
+        let result = rx.recv_timeout(std::time::Duration::from_secs(2));
+        drop(guard);
+        thread.join().unwrap();
+        let result = result.expect("batch preview waited for the writer");
+        assert!(
+            result.is_ok()
+                || matches!(
+                    result
+                        .unwrap_err()
+                        .downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+                    Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+                )
+        );
     }
 
     #[test]

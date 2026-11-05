@@ -210,6 +210,23 @@ impl InMemoryStorage {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    pub(crate) fn try_repository_state(
+        &self,
+    ) -> std::result::Result<
+        std::sync::MutexGuard<'_, MemoryRepositoryState>,
+        crate::storage::RepositoryStateStoreError,
+    > {
+        match self.repository_state.try_lock() {
+            Ok(state) => Ok(state),
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => Err(
+                crate::storage::RepositoryStateStoreError::RetryableConflict {
+                    path: "in-memory repository is busy".into(),
+                },
+            ),
+        }
+    }
+
     pub(crate) fn mutation_interruptions(
         &self,
     ) -> Arc<dyn crate::storage::MutationInterruptionInjector> {
@@ -886,17 +903,20 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        let outcome = crate::storage::repository_state_store::retry_optimistic_reads(|| {
-            let state = self.repository_state();
+        crate::storage::repository_state_store::retry_optimistic_reads("issue snapshot", || {
+            let state = match self.try_repository_state() {
+                Ok(state) => state,
+                Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. }) => {
+                    return Ok(None)
+                }
+                Err(error) => return Err(error.into()),
+            };
             if state.data_root_exists && state.record.is_some() {
                 Ok(None)
             } else {
                 Ok(Some(Self::load_issues(&state)))
             }
-        })?;
-        outcome.unwrap_or_else(|| Err(crate::storage::RepositoryStateStoreError::RetryableConflict {
-            path: "issue snapshot has a pending redo record; run `jit recover` if the record remains".into(),
-        }.into()))
+        })
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {

@@ -527,51 +527,19 @@ fn derive_repository_export(
         .transpose()
 }
 
-/// Lock-free attempts a read makes before it takes the operation's mutation
-/// session.
 #[cfg(test)]
 use crate::storage::repository_state_store::READ_OPTIMISTIC_ATTEMPTS;
 
-/// Run `read` over a lock-free read session, and surface what it returned,
-/// value or error, only once the store admits the capture (`@/charter/D-22`).
-///
-/// A capture a commit crossed can be torn, so a refused attempt's result is
-/// discarded; `None`, a `Busy` and a `Moved` admission each fail an attempt.
-/// After [`READ_OPTIMISTIC_ATTEMPTS`] failed attempts, each followed by a
-/// jittered backoff of about 1, 2, 4 and 8 ms, `read` runs once through
-/// [`with_mutation_session`], whose open applies a leftover redo record.
-///
-/// # Errors
-///
-/// [`RecoveryFailedError`](crate::errors::RecoveryFailedError) when that open
-/// cannot apply a leftover record, and otherwise what `read` or the store
-/// returned.
+/// Read an admitted snapshot without taking a repository write lock (@/charter/D-25).
 pub fn with_read_session<S: crate::storage::RepositoryStateStore, T>(
     store: &S,
     layout: &crate::repository_state::RepositoryLayout,
     operation: &'static str,
     mut read: impl FnMut(&mut dyn crate::storage::RepositoryReadSession) -> Result<Option<T>>,
 ) -> Result<T> {
-    if let Some(outcome) = crate::storage::repository_state_store::retry_optimistic_reads(|| {
+    crate::storage::repository_state_store::retry_optimistic_reads(operation, || {
         read_optimistically(store, layout, &mut read)
-    })? {
-        return outcome;
-    }
-    with_mutation_session(store, layout, operation, |session| {
-        Ok(match read(session)? {
-            Some(value) => SessionStep::Done(value),
-            None => SessionStep::Retry,
-        })
     })
-    .map_err(
-        |error| match crate::storage::repository_state_store::is_leftover_record_failure(&error) {
-            true => crate::errors::RecoveryFailedError(error.context(
-                "a leftover redo record blocks this read; run `jit recover` with write access",
-            ))
-            .into(),
-            false => error,
-        },
-    )
 }
 
 /// One optimistic attempt: `read`'s outcome when the store admits it.
@@ -590,7 +558,17 @@ fn read_optimistically<S: crate::storage::RepositoryStateStore, T>(
     let outcome = read(session.as_mut());
     Ok(
         match crate::storage::repository_state_store::admit_read_sources([session.admit()])? {
-            Some(()) => outcome.transpose(),
+            Some(()) => match outcome {
+                Err(error)
+                    if matches!(
+                        error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+                        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+                    ) =>
+                {
+                    None
+                }
+                outcome => outcome.transpose(),
+            },
             None => None,
         },
     )

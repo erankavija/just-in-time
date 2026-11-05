@@ -295,6 +295,7 @@ command_group! {
     storage: [HandlerStore],
     leaves: {
         "validate" => args => validate(args)
+            raises [RetryableConflict]
             findings ValidationFailed "Repository, scope, issue, selected-rule, or explanation validation reported error-severity findings, or a `--branch-drift` or `--leases` check failed or could not run." -> ValidateResponse
             as union [
                 RuleReport,

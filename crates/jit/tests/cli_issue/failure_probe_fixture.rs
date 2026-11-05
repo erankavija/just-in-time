@@ -403,6 +403,11 @@ impl FailureFixture {
                 fs::write(self.root().join(".jit/config.toml"), "not = valid = toml")
                     .expect("write malformed config");
             }
+            SetupStep::PendingRedo => {
+                let scratch = self.root().join(".jit/tmp");
+                fs::create_dir_all(&scratch).expect("create redo scratch");
+                fs::write(scratch.join("redo.record"), b"pending").expect("write pending redo");
+            }
             SetupStep::MalformedEventsLog => {
                 fs::write(self.root().join(".jit/events.jsonl"), "{\n")
                     .expect("write malformed event log");
@@ -583,6 +588,7 @@ enum SetupStep {
     MalformedIndex,
     MalformedConfig,
     MalformedEventsLog,
+    PendingRedo,
     MalformedGateRegistry,
     MalformedServerPid,
     MalformedLeaseRecord,
@@ -622,6 +628,7 @@ impl SetupStep {
             "malformed-index" => Ok(Self::MalformedIndex),
             "malformed-config-toml" => Ok(Self::MalformedConfig),
             "malformed-events-log" => Ok(Self::MalformedEventsLog),
+            "pending-redo" => Ok(Self::PendingRedo),
             "malformed-gate-registry" => Ok(Self::MalformedGateRegistry),
             "malformed-server-pid-file" => Ok(Self::MalformedServerPid),
             "malformed-lease-record" => Ok(Self::MalformedLeaseRecord),
@@ -672,6 +679,7 @@ impl SetupStep {
             Self::MalformedIndex
             | Self::MalformedConfig
             | Self::MalformedEventsLog
+            | Self::PendingRedo
             | Self::MalformedGateRegistry
             | Self::MalformedServerPid
             | Self::MalformedLeaseRecord

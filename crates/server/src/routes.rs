@@ -49,7 +49,7 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::LinkedCheckoutWriteRefused => StatusCode::CONFLICT,
         ErrorCode::ValidationFailed | ErrorCode::GateFailed => StatusCode::UNPROCESSABLE_ENTITY,
         ErrorCode::PermissionDenied => StatusCode::FORBIDDEN,
-        ErrorCode::LockTimeout => StatusCode::SERVICE_UNAVAILABLE,
+        ErrorCode::LockTimeout | ErrorCode::RetryableConflict => StatusCode::SERVICE_UNAVAILABLE,
         ErrorCode::IoError
         | ErrorCode::ParseError
         | ErrorCode::RequiresGit
@@ -1289,6 +1289,10 @@ mod tests {
             ),
             (ErrorCode::PermissionDenied, StatusCode::FORBIDDEN),
             (ErrorCode::LockTimeout, StatusCode::SERVICE_UNAVAILABLE),
+            (
+                ErrorCode::RetryableConflict,
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
             (ErrorCode::IoError, StatusCode::INTERNAL_SERVER_ERROR),
             (ErrorCode::ParseError, StatusCode::INTERNAL_SERVER_ERROR),
         ];
@@ -1663,6 +1667,23 @@ mod tests {
             ))
             .await
             .assert_status(StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_list_issues_returns_retryable_status_for_pending_redo_and_retries() {
+        let (temp, executor) = setup_test_repo_with_config(&taxonomy_config()).unwrap();
+        let scratch = temp.path().join(".jit/tmp");
+        std::fs::create_dir_all(&scratch).unwrap();
+        let record = scratch.join("redo.record");
+        std::fs::write(&record, b"pending").unwrap();
+        let server = test_app(executor);
+        server
+            .get("/issues")
+            .await
+            .assert_status(StatusCode::SERVICE_UNAVAILABLE);
+        assert!(record.exists());
+        std::fs::remove_file(record).unwrap();
+        server.get("/issues").await.assert_status_ok();
     }
 
     #[tokio::test]

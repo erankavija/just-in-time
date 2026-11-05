@@ -58,6 +58,23 @@ where
 }
 
 #[test]
+fn test_list_issues_refuses_contended_memory_state_without_waiting() {
+    let store = InMemoryStorage::new();
+    let held = store.repository_state();
+    let reader = store.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let thread = std::thread::spawn(move || tx.send(reader.list_issues()).unwrap());
+    let result = rx.recv_timeout(std::time::Duration::from_secs(2));
+    drop(held);
+    thread.join().unwrap();
+    let error = result.unwrap().unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<RepositoryStateStoreError>(),
+        Some(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+}
+
+#[test]
 fn test_list_issues_rejects_pending_redo_on_both_backends() {
     assert_issue_listing_rejects_pending_redo::<FileSessionBackend>();
     assert_issue_listing_rejects_pending_redo::<MemorySessionBackend>();

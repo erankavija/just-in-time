@@ -61,7 +61,7 @@ pub enum RepositoryStateStoreError {
     Layout(#[from] RepositoryLayoutError),
     #[error(transparent)]
     Capture(#[from] CaptureError),
-    #[error("repository changed after capture: {path}")]
+    #[error("repository changed or is busy: {path}; retry. If a pending redo record persists, run `jit recover`.")]
     RetryableConflict { path: String },
     #[error("selected data-root destination became occupied: {path}")]
     OccupiedDataRoot { path: PathBuf },
@@ -327,12 +327,13 @@ pub enum ReadAdmission {
 pub(crate) const READ_OPTIMISTIC_ATTEMPTS: u32 = 4;
 
 pub(crate) fn retry_optimistic_reads<T>(
+    operation: &str,
     mut attempt: impl FnMut() -> anyhow::Result<Option<anyhow::Result<T>>>,
-) -> anyhow::Result<Option<anyhow::Result<T>>> {
+) -> anyhow::Result<T> {
     use std::hash::{BuildHasher, Hasher};
     for index in 0..READ_OPTIMISTIC_ATTEMPTS {
         if let Some(outcome) = attempt()? {
-            return Ok(Some(outcome));
+            return outcome;
         }
         let base = 1_000u64 << index;
         let draw = std::collections::hash_map::RandomState::new()
@@ -340,7 +341,10 @@ pub(crate) fn retry_optimistic_reads<T>(
             .finish();
         std::thread::sleep(std::time::Duration::from_micros(base / 2 + draw % base));
     }
-    Ok(None)
+    Err(RepositoryStateStoreError::RetryableConflict {
+        path: operation.to_owned(),
+    }
+    .into())
 }
 
 pub(crate) fn admit_read_sources(
@@ -618,9 +622,11 @@ fn observe_json_commits(
 
 /// [`observe_json_commits`] over the in-memory backend, read under one lock
 /// of its state.
-fn observe_memory_commits(storage: &InMemoryStorage) -> CommitObservation {
-    let state = storage.repository_state();
-    CommitObservation {
+fn observe_memory_commits(
+    storage: &InMemoryStorage,
+) -> Result<CommitObservation, RepositoryStateStoreError> {
+    let state = storage.try_repository_state()?;
+    Ok(CommitObservation {
         data_root: state.data_root_exists,
         record: state.record.is_some(),
         log: match state.entries.get(&VirtualPath::EVENTS) {
@@ -629,7 +635,7 @@ fn observe_memory_commits(storage: &InMemoryStorage) -> CommitObservation {
             }
             _ => None,
         },
-    }
+    })
 }
 
 impl RepositoryStateStore for JsonFileStorage {
@@ -762,7 +768,7 @@ impl RepositoryStateStore for InMemoryStorage {
         Ok(Box::new(MemoryReadSession {
             layout,
             storage: self.clone(),
-            opened: observe_memory_commits(self),
+            opened: observe_memory_commits(self)?,
         }))
     }
 }
@@ -819,7 +825,7 @@ impl RepositoryReadSession for MemoryReadSession {
         self.opened.ensure_capturable()?;
         capture_memory_image(
             &self.layout,
-            &self.storage.repository_state(),
+            &*self.storage.try_repository_state()?,
             spec,
             CapturedAnswers::default(),
         )
@@ -832,18 +838,28 @@ impl RepositoryReadSession for MemoryReadSession {
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         self.opened.ensure_capturable()?;
         let prior = image.into_answers(&spec);
-        capture_memory_image(&self.layout, &self.storage.repository_state(), spec, prior)
+        capture_memory_image(
+            &self.layout,
+            &*self.storage.try_repository_state()?,
+            spec,
+            prior,
+        )
     }
 
     fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
         self.opened.ensure_capturable()?;
-        memory_history_log(&self.storage)
+        history_log_bytes(
+            self.storage
+                .try_repository_state()?
+                .entries
+                .get(&VirtualPath::EVENTS),
+        )
     }
 }
 
 impl OptimisticReadSession for MemoryReadSession {
     fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
-        self.opened.admit(Ok(observe_memory_commits(&self.storage)))
+        self.opened.admit(observe_memory_commits(&self.storage))
     }
 }
 

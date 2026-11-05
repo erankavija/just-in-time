@@ -1167,7 +1167,7 @@ impl IssueStore for JsonFileStorage {
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
         use crate::storage::repository_state_store::{admit_read_sources, retry_optimistic_reads};
-        let outcome = retry_optimistic_reads(|| {
+        retry_optimistic_reads("issue snapshot", || {
             let layout = self.configured_layout()?;
             let selected = match self.open_read_session(layout) {
                 Ok(session) => session,
@@ -1216,10 +1216,7 @@ impl IssueStore for JsonFileStorage {
                 .chain(primary_session.iter().map(|session| session.admit()))
                 .collect::<Vec<_>>();
             Ok(admit_read_sources(admissions)?.map(|()| result))
-        })?;
-        outcome.unwrap_or_else(|| Err(crate::storage::RepositoryStateStoreError::RetryableConflict {
-            path: "issue snapshot changed or has a pending redo record; run `jit recover` if the record remains".into(),
-        }.into()))
+        })
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
