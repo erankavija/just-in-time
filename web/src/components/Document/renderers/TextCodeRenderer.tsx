@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import SyntaxHighlighter from '../../SyntaxHighlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { DocumentRendererProps } from './index';
 import { DEFAULT_DOCUMENT_FONT_SIZE } from './constants';

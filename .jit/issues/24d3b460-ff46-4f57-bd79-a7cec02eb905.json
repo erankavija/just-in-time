@@ -8,12 +8,26 @@
   ],
   "description": "Add the git module's query for the repository's configured `user.name`.\n\n## Background\n\n- The claim-release actor fallback reads `user.name` with its own `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`), the last git spawn in the claim commands once their branch lookup goes through the module.\n- `git config user.name` prints the value and exits 1 when it is unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::user_name()` reads `user.name` with one git process and returns `None` when it is unset.\n- [hard] REQ-02: The behaviour suite covers a set and an unset name and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T00:21:52.973251900Z",
   "first_ready_at": "2026-11-01T14:05:18.054432817Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2071d95d-f455-4be8-8065-27a464e754a1",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:20:29.613719214Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d6cd0057-7076-47da-b055-f871eeb6379f",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:46:14.489959775Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
   "labels": [
     "type:task",
@@ -25,7 +39,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "User name query in the git module",
-  "updated_at": "2026-11-04T22:53:53.611979710Z"
+  "updated_at": "2026-11-05T00:21:52.973251900Z"
 }

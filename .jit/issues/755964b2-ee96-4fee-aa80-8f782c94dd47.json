@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-05T00:27:23.660616049Z",
+  "context": {},
+  "created_at": "2026-11-05T00:27:07.828738294Z",
+  "dependencies": [],
+  "description": "Repair Rust API documentation references after the command-family facade moves so the published documentation resolves names to their actual owners.\n\n## Background\n\nThe bulk-update documentation names `Self::capture_proposed_base` inside `IssueOps`, but the helper remains on `CommandExecutor`. Command-family comments also contain unqualified type names absent from their module scopes. The facade migrations require intra-doc links to name the resulting paths; passing doctests does not establish that generated API links resolve.\n\n## Success Criteria\n\n- [hard] REQ-01: Intra-doc links in the migrated command families resolve to their actual canonical owners, including the bulk-update capture helper and the repository-layout, document-path, projection and profile archive error types.\n- [hard] REQ-02: The existing workspace API documentation generation, including private items, completes without unresolved-link diagnostics. Any confirmed residual missing-name or malformed-link references are corrected at their existing comments.\n- [hard] REQ-03: The repair changes documentation references only: no runtime behavior, API visibility, imports, forwarding methods, compatibility names, checker mechanisms or lint exemptions are introduced.\n\n## Notes\n\nUse the existing Rustdoc generation workflow as the resolver. Public-only documentation has different visibility diagnostics; do not claim it was verified from the private-items build. Historical warning lists are investigation leads, not current evidence.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-05T00:27:07.828738294Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "755964b2-ee96-4fee-aa80-8f782c94dd47",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "satisfies:df129d9e/REQ-03",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Rust API links name the owners after facade extraction",
+  "updated_at": "2026-11-05T00:27:23.660616049Z"
+}
