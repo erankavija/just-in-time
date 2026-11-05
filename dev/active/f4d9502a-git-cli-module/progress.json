@@ -203,9 +203,10 @@
           "short_id": "c16c834c",
           "title": "Storage pinned inspection runs on a module checkout",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "3a1e7a96cace3407668ceeb7afede87c606c1b25"
         },
         {
           "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
@@ -214,7 +215,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
@@ -223,16 +224,17 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
           "short_id": "ec9e812c",
           "title": "Pinned-read behaviour suite moves into the git module suite",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "f76ab00b4b22f91feb9ddc8d0a8db44b6d4af92e"
         },
         {
           "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
@@ -241,7 +243,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "f6eaba42-e756-4b94-b66e-ea1f46838bde",
@@ -262,8 +264,9 @@
           "short_id": "d48e28bf",
           "title": "Object reader and presence check in the git module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementation_running"
         },
         {
           "id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
@@ -276,7 +279,7 @@
         {
           "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
           "short_id": "d68150e2",
-          "title": "Storage and executor stop re-detecting the layout",
+          "title": "Layout consumers share invocation-owned checkout facts",
           "classification": "implementation",
           "status": "backlog",
           "external_blockers": []
@@ -495,7 +498,8 @@
     "bb5040a8": 1,
     "28ccf9a9": 1,
     "ec9e812c": 1,
-    "f6eaba42": 1
+    "f6eaba42": 1,
+    "9de4c09c": 1
   },
   "surfaced_pitfalls": [
     {
@@ -727,7 +731,10 @@
     "f6 Cargo cc72ca26 failed four shared corpus setups because child Git ceiling excludes own root from .jit discovery. Steward authorized parent-ceiling fix preserving host isolation, child-only environment and existing test owners; failed evidence86cb8402c retained, red/green rework in progress.",
     "Do not nest tracker commands under jit worktree exec: repository lock is non-reentrant and times out. Tracker commands take own locks; use exec only around short Git commit/file updates.",
     "Origin Done after merged stable Cargo4e0b64b4. Corrected claims fullgates848ee4a5/2682790f and info1ee8a09a/38f4141a pass; shared fixture fix0f144b98d reused exactly in11871fa14. Final DEC26-28 plan review97a30f16 passes on21cd8fb9; pending metadata integration. Completed HEAD/list/history trees reclaimed canonically.",
-    "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge."
+    "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge.",
+    "ec9 relocation Done after actual stable merged Cargo; source released immediately to df fe3. Object-reader producer is unblocked.",
+    "ec9 closure script corrected raw gate_key vs CLI key before mutation, actual closure42664758e. d48 claimed922c1664d and dispatched Astra high; e3 focused checks, f649 stable Cargo/review PASS on07ffda330; retained evidence7b8320175. Base final relocated suite integration preserves55incoming+4base tests,59PASS; origin tree reclaimed. c506 fullgatesPASS and exact source preserved. Source sequence c16\u2192frontend4538\u2192c506 per steward; after both listing consumers converge, obsolete two-line exception may be deleted with executable/test byte proof and merged check, retaining actual reviews under explicit steward ruling.",
+    "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -932,7 +939,7 @@
     "c16c834c": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "651231e7-be6f-44d8-8ab6-be6b1dfdc278",
+        "cargo-ci": "c56c9cef-6471-49aa-a1e1-027ec20d54ce",
         "code-review": "16162d47-5745-47a4-883d-3d027a097051"
       },
       "reviewed_source": "c821a42391da77bc6c801b28fc2d38af3f00059c",
@@ -944,12 +951,13 @@
       "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
       "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
       "deferred_items": "No linked design documents or in-scope deferrals.",
-      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS c56c9cef-6471-49aa-a1e1-027ec20d54ce on 3a1e7a96cace3407668ceeb7afede87c606c1b25."
     },
     "ec9e812c": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "ee5279b9-e853-48f4-990f-8e096f101412",
+        "cargo-ci": "f635018d-15df-4fee-9d45-87c9aadcce49",
         "code-review": "52c1a8c0-2887-4b10-92f8-a154b33dc6a6"
       },
       "reviewed_source": "23894b96c90ee007abd5a4e305f9e32b66110109",
@@ -968,7 +976,8 @@
       },
       "stale_narrative": "Old file references only in historical investigations and archived evidence; no current code/user docs reference removed suite.",
       "deferred_items": "No issue-linked design docs or in-scope deferrals.",
-      "holistic": "One owning suite; shared GitRepository/GitStandIn/checkout helpers; no production changes. Main integration pending."
+      "holistic": "One owning suite; shared GitRepository/GitStandIn/checkout helpers; no production changes. Main integration pending.",
+      "integration": "Reviewed nine cases and forty assertions preserved byte-for-byte alongside incoming tests; focused composition passed. Main f76ab00b4b22f91feb9ddc8d0a8db44b6d4af92e merged Cargo stable PASS f635018d-15df-4fee-9d45-87c9aadcce49."
     },
     "732f7afb": {
       "verdict": "PASS",
@@ -986,12 +995,108 @@
       "stale_narrative": "No live obsolete branch-subprocess prose; init guard and external-root semantics preserved.",
       "deferred_items": "No linked documents or in-scope deferrals.",
       "holistic": "Shared HEAD operation and helper; no new discovery. Main integration pending."
+    },
+    "f6eaba42": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "848ee4a5-ad6a-494e-ba59-100774d485e0",
+        "code-review": "2682790f-a190-4bbd-8918-49cdc774952a"
+      },
+      "reviewed_source": "4ed5e7cf9c69b2ef5fd4c3fb8b61469298ee6086",
+      "evidence_commit": "d36d5ac3f",
+      "criteria": {
+        "REQ-01": "One claim_branch uses selected write checkout and canonical HEAD labels; missing executable/no checkout map to NoRepository, unborn to NoCommits.",
+        "REQ-02": "Coordinator uses storage Git head; no private branch subprocess.",
+        "REQ-03": "Missing executable red/green unit test and existing CLI matrix pass.",
+        "REQ-04": "Both old branch helpers and is_inside_git_work_tree removed."
+      },
+      "prior_findings": "Cargo cc72ca26 exposed shared fixture ceiling bug. Canonical fix0f144b98d proved own-checkout discovery and host isolation, preserved in final source; corrected full Cargo passes.",
+      "advisory_disposition": {
+        "finding": "F1 release-actor git user.name spawn is pre-existing.",
+        "removal_owner": "ea4b7363",
+        "disposition": "Explicit separate task owns release actor; branch lookup criteria met. Epic must remove it before completion."
+      },
+      "stale_narrative": "No obsolete branch-helper narrative in live source; original background is historical.",
+      "deferred_items": "No linked documents; release actor has explicit separate implementation owner.",
+      "holistic": "Canonical Git/RequiresGit types and child-only fixture isolation; main integration pending."
+    },
+    "9de4c09c": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "1ee8a09a-e0c7-4013-8be2-e02f0e95de07",
+        "code-review": "38f4141a-3d72-47ee-b610-65c8ca6317f4"
+      },
+      "reviewed_source": "1b0104ca7d47ad44038ad2da727ac8085ef63e46",
+      "evidence_commit": "3ae8eb0bc",
+      "criteria": {
+        "REQ-01": "Selected write checkout head/branch_label reports current/detached branch with stable identity.",
+        "REQ-02": "Shared RequiresGit gaps and raises binding; generated canonical reference; other Git errors propagate.",
+        "REQ-03": "Existing external/projection cases and fresh branch/stable ID test pass."
+      },
+      "prior_findings": "Cargo9614c618 failed canonical corpus due shared fixture ceiling. Exact canonical0f144b98d fix reused as11871fa14; corrected full Cargo/review pass.",
+      "stale_narrative": "DEC26 reconciled obsolete error promise in authoritative plan/manifest; no command-specific wrapper introduced.",
+      "deferred_items": "No linked documents or in-scope deferrals.",
+      "holistic": "Incoming field projection preserved; status census owns numeric/envelope contract; main integration pending."
+    },
+    "c5062e21": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "82093768-2d32-4f26-97a0-9f657b3d0888",
+        "code-review": "149faf22-3f88-438c-a7f3-d29fefc5e66d"
+      },
+      "reviewed_source": "b1515873e3280ebedf4cce9f746a987cfe71b2f0",
+      "evidence_commit": "40ba848ff",
+      "criteria": {
+        "REQ-01": "Thin server adapter invokes public shared bootstrap; executor/paths/count/session reused, startup locks dropped before watcher/serve.",
+        "REQ-02": "Outside-cwd selected Git checkout and nonGit process fallback owning tests pass, along with relative reads and recovery-before-validation."
+      },
+      "prior_findings": "First independent review; no findings.",
+      "stale_narrative": "Old helper name only in dated frontend investigation evidence; no live code/docs retain removed API.",
+      "deferred_items": "No issue-linked documents; invocation cache implementation is approved separate d681 leaf.",
+      "holistic": "Two-file server footprint; no private discovery or duplicated recovery mechanism; main integration pending."
+    },
+    "f649c144": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "c281683c-fd7b-477e-b4ec-5a1734744980",
+        "code-review": "0ada9cd5-1a64-4194-95f0-cbe4f1b96e77"
+      },
+      "reviewed_source": "07ffda330683386b7c51c5f9420100f318bfd169",
+      "evidence_commit": "7b8320175",
+      "criteria": {
+        "REQ-01": "Shared selected write-checkout listing once before lease loop; identity projection/read pipeline preserved.",
+        "REQ-02": "NoGit/no lease passes; stored leases preserve validation findings and required missing-checkout message.",
+        "REQ-03": "Three leases counted one shared listing; existing bound characterized without claiming false RED.",
+        "REQ-04": "Missing-checkout message test red/green with child-only PATH; existing external-store lease behavior passes."
+      },
+      "prior_findings": "First independent code review; no findings. Expected RED is missing-checkout diagnostic, not preexisting listing count.",
+      "stale_narrative": "Shared convergence comment remains until both e3/f649 consumers integrated; removal is a required integration action. Historical investigation preserved.",
+      "deferred_items": "No linked documents or in-scope behavioral deferral.",
+      "holistic": "One existing module operation and projection pipeline; no new cache or discovery. Shared canonical fixture correction reused exactly. Main integration pending."
+    },
+    "e3c38fea": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "59c4c2bb-ef58-44e7-8921-1cb7d748cb56",
+        "code-review": "d5c75795-96fa-4a34-90c2-1efd58116c6d"
+      },
+      "reviewed_source": "cf86f3cf6eabd6531eee70dd793a61cb2064458f",
+      "evidence_commit": "7526e34a7",
+      "criteria": {
+        "REQ-01": "Selected write checkout shared listing; branchless entries omitted; private parser/type/two obsolete tests removed.",
+        "REQ-02": "Existing main/linked/external identity and claims output passes; detached filtering owned here.",
+        "REQ-03": "Shared RequiresGit gap/remedy and raises contract; canonical row census/reference updated, other errors propagate."
+      },
+      "prior_findings": "First independent review; no findings. Worker corrected initial zero-selected test and accessor compile failure, then all48focused checks passed before full gates.",
+      "stale_narrative": "Obsolete e3 convergence pointer removed; historical investigation retained. Final f649 pointer removed only after both migrations converge, per explicit steward ruling.",
+      "deferred_items": "No linked documents or in-scope deferrals.",
+      "holistic": "Module owns porcelain parser; consumer owns filtering/mapping. No new discovery/parser/cache. Main integration pending."
     }
   },
   "source_queue": [
-    "df0546",
-    "ec9e812c",
-    "df fe3",
+    "c16c834c",
+    "frontend4538b071",
+    "c5062e21",
     "ready interleave"
   ],
   "blocked_source_exclusions": [

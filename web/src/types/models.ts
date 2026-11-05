@@ -122,14 +122,6 @@ export interface GraphData {
   edges: GraphEdge[];
 }
 
-export interface StatusSummary {
-  total_issues: number;
-  by_state: Record<State, number>;
-  by_priority: Record<Priority, number>;
-  ready_count: number;
-  blocked_count: number;
-}
-
 export interface SearchMatch {
   text: string;
   start: number;
@@ -168,13 +160,6 @@ export interface CommitInfo {
 export interface DocumentHistory {
   path: string;
   commits: CommitInfo[];
-}
-
-export interface DocumentDiff {
-  path: string;
-  from: string;
-  to: string;
-  diff: string;
 }
 
 export interface NamespaceInfo {
