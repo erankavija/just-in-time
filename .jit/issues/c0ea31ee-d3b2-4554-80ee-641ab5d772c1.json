@@ -14,7 +14,20 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+      "status": "passed",
+      "updated_at": "2026-11-05T04:44:45.246301896Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "7c42386f-317d-4d2e-920d-00dac7a19857",
+      "status": "passed",
+      "updated_at": "2026-11-05T04:47:06.779809175Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c0ea31ee-d3b2-4554-80ee-641ab5d772c1",
   "labels": [
     "type:story",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Layout facts are detected once and reach every consumer",
-  "updated_at": "2026-11-05T04:27:39.244025307Z"
+  "updated_at": "2026-11-05T04:47:06.779809175Z"
 }

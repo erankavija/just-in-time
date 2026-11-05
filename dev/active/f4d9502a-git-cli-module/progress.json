@@ -567,10 +567,10 @@
     {
       "issue": "f4d9502a",
       "criterion": "REQ-04",
-      "status": "owner_reconciled_remediation_pending",
+      "status": "closed",
       "finding": "External data-root fallback performs two layout probes; for_worktree_root adds probes for listed checkouts. Preserve external-store and relocated-checkout identity while resolving the invocation-wide one-process contract.",
       "owner": "layout_probe_research",
-      "disposition": "DEC27 owner permits one computation per distinct checkout context: ordinary reads<=1, external bootstrap<=2, external N contexts<=N+1. Duplicate probes remain defect; approved d681 remediation awaits independent plan review and implementation."
+      "disposition": "DEC27 bounds implemented by d68150e2, completed at e375af7d8 after stable branch and merged Cargo and independent review. Existing CLI counting suite proves ordinary <=1, external startup <=2, external traversal N+1 independent of lease count; shared LayoutContext owns alias, negative/error, clone and concurrency observations. c0ea31ee checkpoint independently audits composition."
     }
   ],
   "reconciled_after_breakdown": [
