@@ -35,7 +35,8 @@ worker-sized. Never implement the planned work.
    area's terminals beneath it. Drop criteria that neither change observable
    behaviour nor remove a real duplicate.
 4. Run `jit apply plan <C>` once. Record planning node `P`, breakdown node `B`,
-   their configured gates, and P's plan path. Commit JIT state.
+   their configured gates, P's plan path, and any `upstream_move` report (the
+   edges moved from `C` onto `P`). Commit JIT state.
 
 Read [interview-protocol.md](references/interview-protocol.md) when eliciting intent.
 
@@ -114,7 +115,8 @@ contract/task, removing superseded prose, regenerating the plan, and rerunning a
 four commands. Append-only correction sections fail. Report each round's issue
 count and its change from the previous round.
 
-Audit upstream dependencies moved from `C` to `P`. Keep planning-required edges.
+Audit the upstream dependencies the recorded `upstream_move` report lists as
+moved from `C` to `P`. Keep planning-required edges.
 For implementation-consumed edges, remove them from `P` and record the external
 dependency plus its target manifest key in Decisions for breakdown to re-home.
 
