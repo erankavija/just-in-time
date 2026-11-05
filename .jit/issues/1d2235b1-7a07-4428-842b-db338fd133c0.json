@@ -8,12 +8,26 @@
   ],
   "description": "The storage predicate and its watcher consumer form one small behavior cutover.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned predicate derives watched paths from storage constants, includes config.toml, and emits configuration changes; watcher tests cover included and unrelated paths.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:38:19.632457107Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "af550397-b709-42b4-b3df-a2baeac8dabd",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:32:55.997345001Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "040dcae8-993b-42a3-910a-35b511a90339",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:36:46.933875024Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1d2235b1-7a07-4428-842b-db338fd133c0",
   "labels": [
     "type:task",
@@ -25,7 +39,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Centralize watcher path selection",
-  "updated_at": "2026-11-04T23:08:48.206190229Z"
+  "updated_at": "2026-11-04T23:38:19.632457107Z"
 }

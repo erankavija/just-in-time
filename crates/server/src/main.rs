@@ -3,12 +3,6 @@
 //! Provides a web API for the Just-In-Time issue tracker, enabling web UI
 //! and external integrations to query and visualize issues.
 
-#[cfg(feature = "embed-web")]
-mod embedded;
-mod routes;
-mod sse;
-mod watcher;
-
 use anyhow::{Context, Result};
 use axum::Router;
 use clap::Parser;
@@ -19,11 +13,13 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
+#[cfg(feature = "embed-web")]
+use jit_server::embedded;
+use jit_server::routes::AppState;
 use jit_server::shutdown::{
     await_shutdown_signal, configured_drain_deadline, run_shutdown_sequence, ServerHandle,
 };
-use jit_server::{prepare_server_storage, resolve_listener, ListenerSource};
-use routes::AppState;
+use jit_server::{prepare_server_storage, resolve_listener, routes, watcher, ListenerSource};
 
 /// JIT REST API Server
 #[derive(Parser, Debug)]
