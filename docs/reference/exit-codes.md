@@ -34,7 +34,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `11` | A lock wait expired while another jit process held the lock (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be retried. |  |
 | `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |
 | `apply` | `4` | The dependency would create a cycle. |  |
-| `claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install, worktree info` | `10` | The command requires Git. |  |
+| `claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install, worktree info, worktree list` | `10` | The command requires Git. |  |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. | yes |
 | `dep add` | `4` | The dependency would create a cycle. Repository or domain validation failed. |  |
 | `doc check-links` | `4` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
