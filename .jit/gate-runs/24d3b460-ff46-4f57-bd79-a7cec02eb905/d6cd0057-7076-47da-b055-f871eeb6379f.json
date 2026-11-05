@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-24d3b460",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c159bf2e85b79a02b0b969839c5389863c3747f2",
+  "completed_at": "2026-11-04T23:46:14.487992174Z",
+  "duration_ms": 212022,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The Git user-name query meets both hard requirements with focused one-process behavior coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d6cd0057-7076-47da-b055-f871eeb6379f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:42:42.465321102Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a7e4dc4179e50d57cc077536dde0cb852b5180f6, 2e96caae48877e62ba0d334ac41917362542fce2\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-21, @/charter/D-4, @/issue/f4d9502a/requirement/REQ-03, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction\nGate evidence: cargo-ci passed (exit 0); run c159bf2e85b79a02b0b969839c5389863c3747f2 contains both attributable commits\nTruncation recovery: Re-read bounded current implementation and changed-test ranges; omitted combined output was outside the attributable impact cone.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The Git user-name query meets both hard requirements with focused one-process behavior coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

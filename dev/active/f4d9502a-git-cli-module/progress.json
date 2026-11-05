@@ -95,16 +95,17 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_checks"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
           "short_id": "24d3b460",
           "title": "User name query in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "ad4a28ae7d4663690de452d0e9d5a2133721f9a2"
         },
         {
           "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
@@ -149,7 +150,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "fidelity_rework_full_gates_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
@@ -198,7 +199,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "migration_checks_queued"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
@@ -223,7 +224,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "migration_checks_queued"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
@@ -482,7 +483,8 @@
     "4ba18af4": 1,
     "24d3b460": 1,
     "bb5040a8": 1,
-    "28ccf9a9": 1
+    "28ccf9a9": 1,
+    "ec9e812c": 1
   },
   "surfaced_pitfalls": [
     {
@@ -640,6 +642,20 @@
       "model": "gpt-6-luna",
       "effort": "high",
       "reason": "Mechanical suite relocation preserving every existing assertion."
+    },
+    {
+      "issue": "4ba18af4",
+      "agent": "/root/head_integration",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Preserve reviewed HEAD and user-name tests across additive merge conflict."
+    },
+    {
+      "issue": "437907da",
+      "agent": "/root/listing_integration",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Preserve reviewed listing and user-name methods across additive merge conflict."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -678,7 +694,13 @@
     "437 evidence38fdf0b9a and historyf253efc8f preserve actual stable passes. 24 evidenceb8e3338bc ready for coordinated integration. History advisory disposition owner-approved; consumer83 removes tracked exception.",
     "Source queue still paused per steward:061 thenabf then24 thenwatcher thenab168 then6d93; further Git primitives interleave by readiness. No indirect retry.",
     "HEAD gate approvalccc20a3ae closes historicalF1; branch remains isolated. Origin Cargo passed, review running.",
-    "Brief corrections: for_test exists only pending HEAD branch, so new tests use existing checkout helper; storage new stays storage-visible. RUSTC_WRAPPER must be empty, not punctuation period. Cargo integration target is contracts, not fast_docs_templates. Workers retain queued failed invocations and collect corrected checks."
+    "Brief corrections: for_test exists only pending HEAD branch, so new tests use existing checkout helper; storage new stays storage-visible. RUSTC_WRAPPER must be empty, not punctuation period. Cargo integration target is contracts, not fast_docs_templates. Workers retain queued failed invocations and collect corrected checks.",
+    "Steward narrowed source pause: unaffected queue resumes abf then24 thenwatcher thenab168 then6d93 thenHEAD thenfrontendoffload then437 thenfrontendbinding. Blocked061/38df source must never be included or retried indirectly. Verify actual delta/ancestry; own auto-review rejection stops action.",
+    "Seven isolated Git changes have stable full-gate approval. ec9 rework is two Clippy needless borrows only; all behavior assertions retained. c506 waits actual frontend9c API landing despite candidate already reviewed.",
+    "24d3b460 completed after merged Cargo2071d95d onad4a28ae7; source slot releases directly tofrontendwatcher. HEAD and437 refreshes resolving additive conflicts in isolated trees. ec9 narrow borrow rework verified, full gates to rerun.",
+    "24 worktree reclaimed; branch retained. HEAD/listing refreshed stable approvals preserveddd9335368/56fbb0c72; ec9 corrected approvaldc9741d27. All implemented branch gates pass, awaiting coordinated source integration.",
+    "Listing old wrapper reused owned fixed TMPDIR; finished successfully. Empty-directory removal refused because a zero-byte Codex synthetic-mount marker remains, left untouched. Future wrapper replaced with unique mktemp and cleanup trap.",
+    "Await explicit6d93 merged web/smoke release before HEAD canonical merge; ready branchdd9335368 contains only HEAD source plus actual evidence. Verify blocked061/policy ancestry and delta again immediately before landing."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -701,17 +723,17 @@
     "4ba18af4": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "efe556af-9584-46bc-a85f-8cad3f0748ac",
-        "code-review": "b3e1a579-b6a9-4152-b77d-0869a4d10aad"
+        "cargo-ci": "95beac63-76a0-407c-810e-f5e2ef961a9d",
+        "code-review": "eeb77a1a-4f39-4850-a376-a972f0825405"
       },
-      "reviewed_source": "8336a1af28e870c916b297ca96473e0ade4dacbf",
-      "evidence_commit": "ccc20a3ae",
+      "reviewed_source": "90c7113262d06347ce4486a88699af9327cabee0",
+      "evidence_commit": "dd9335368",
       "prior_findings": [
         {
           "run": "008c2ae3",
           "id": "F1",
           "status": "closed",
-          "evidence": "git.rs:195/291 validates successful protocol and captured commit; git_module_tests.rs:263/272 reject invalid and stale recognized checkouts. Constructor visibility also restricted; correctness does not depend on visibility."
+          "evidence": "git.rs:195/318 validates successful protocol and captured commit; git_module_tests.rs:263/272 reject invalid and stale recognized checkouts."
         }
       ],
       "criteria": {
@@ -722,7 +744,8 @@
       },
       "stale_narrative": "No one-process HEAD budget remains in live code/tests/plan; experiment explicitly preserves rejected historical approach.",
       "deferred_items": "Linked head-lookup-experiment.md has no in-scope deferred markers. Git minimum/Docker change and WorktreePaths redesign explicitly excluded from approved decision.",
-      "holistic": "Shared environment fixture from24 reused exactly. Canonical Git runner/error behavior retained. Direct-main integration and merged Cargo remain pending."
+      "holistic": "Shared environment fixture from24 reused exactly. Canonical Git runner/error behavior retained. Direct-main integration and merged Cargo remain pending.",
+      "integration": "Refreshed against landed user-name primitive; both implementations and owning tests preserved; configured Cargo and independent review stable PASS. Main merge and merged Cargo remain pending."
     },
     "7297f922": {
       "verdict": "PASS",
@@ -786,7 +809,7 @@
     "24d3b460": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "b1b6484c-e4f7-4a19-9867-08ecfd29871a",
+        "cargo-ci": "2071d95d-f455-4be8-8065-27a464e754a1",
         "code-review": "d6cd0057-7076-47da-b055-f871eeb6379f"
       },
       "reviewed_source": "c159bf2e85b79a02b0b969839c5389863c3747f2",
@@ -797,15 +820,16 @@
       "prior_findings": "No failed gate review.",
       "stale_narrative": "No stale forward-looking references in crates/docs/dev; plan describes producer and explicit subsequent consumers.",
       "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
-      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending."
+      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending.",
+      "integration": "Main sourcead4a28ae7 preserves reviewed delta; merged Cargo passed stable2071d95d. Blocked061 and installer policy source excluded. Lease released."
     },
     "437907da": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "7c5b38ce-f0bb-4be4-bd8e-311f55bad81c",
-        "code-review": "2b28f5dd-f3a9-4f0f-982b-de016269c8f8"
+        "cargo-ci": "5dd13d62-baa7-4c92-b6ad-ae47b7b9eb8c",
+        "code-review": "12612785-0367-4000-b6e9-bd10587f82d9"
       },
-      "reviewed_source": "b0d40b2e2d0f6e18f77ff9db32c756c8d05b5cfd",
+      "reviewed_source": "47c808991067d7a7b83f3e0f7427dfe649e24fad",
       "criteria": {
         "REQ-01": "One NUL-framed porcelain listing returns paths and optional branches.",
         "REQ-02": "Primary, linked, slash branch, detached, bare and newline-path tests passed; process count asserted."
@@ -813,7 +837,9 @@
       "prior_findings": "No failed gate review.",
       "stale_narrative": "No stale forward-looking references in crates/docs/dev; plan describes producer and explicit subsequent consumers.",
       "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
-      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending."
+      "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending.",
+      "evidence_commit": "56fbb0c72",
+      "integration": "Refreshed against landed user-name primitive; both implementations and owning tests preserved; configured Cargo and independent review stable PASS. Main merge and merged Cargo remain pending."
     },
     "cc9f213e": {
       "verdict": "PASS",
@@ -835,6 +861,96 @@
         "owner_ruling": "Steward inspected comment and issue; retain named exception until consumer83 removes duplicate. It records required convergence condition and allowed evidence pointer. No source change or rerun solely for mistaken commit-ID interpretation.",
         "removal_owner": "83c8632f"
       }
+    },
+    "bb5040a8": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "993734b8-08c1-42ad-a1a9-23e19c3cf53f",
+        "code-review": "57280492-270c-44bb-a854-7b0770ecc954"
+      },
+      "reviewed_source": "32c40f08e934c80ae4ba90a1fcbf661a7c087310",
+      "evidence_commit": "33616e5fe",
+      "criteria": {
+        "REQ-01": "One origin query; absent origin yields None, failures remain typed; only final command newline stripped.",
+        "REQ-02": "Present newline-containing local URL and missing origin counted once; invalid root errors."
+      },
+      "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
+      "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
+      "deferred_items": "No linked design documents or in-scope deferrals.",
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+    },
+    "09974ad1": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "05be4b61-11dd-45b0-9fa7-c4332ed768fd",
+        "code-review": "db8d37ea-9b42-4c8d-b290-956909bcf99f"
+      },
+      "reviewed_source": "7164c39b45b999652e04238dea39d3fb0ec72a22",
+      "evidence_commit": "5bb99f2f7",
+      "criteria": {
+        "REQ-01": "Compared carries canonical base/merge-base OIDs; unresolved and unrelated distinct; supplied base resolved once, selected checkout used.",
+        "REQ-02": "Four owning tests cover descendant, diverged linked checkout, missing base and unrelated histories."
+      },
+      "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
+      "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
+      "deferred_items": "No linked design documents or in-scope deferrals.",
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+    },
+    "c16c834c": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "651231e7-be6f-44d8-8ab6-be6b1dfdc278",
+        "code-review": "16162d47-5745-47a4-883d-3d027a097051"
+      },
+      "reviewed_source": "c821a42391da77bc6c801b28fc2d38af3f00059c",
+      "evidence_commit": "f9488ada2",
+      "criteria": {
+        "REQ-01": "JsonFileStorage owns Git and directly constructs GitCheckout for requested root; return error names GitError. No bridge/program path remains in json.rs.",
+        "REQ-02": "All five current capture test constructors inject Git; process/subcommand assertions unchanged."
+      },
+      "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
+      "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
+      "deferred_items": "No linked design documents or in-scope deferrals.",
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+    },
+    "ec9e812c": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "ee5279b9-e853-48f4-990f-8e096f101412",
+        "code-review": "52c1a8c0-2887-4b10-92f8-a154b33dc6a6"
+      },
+      "reviewed_source": "23894b96c90ee007abd5a4e305f9e32b66110109",
+      "evidence_commit": "dc9741d27",
+      "prior_findings": [
+        {
+          "run": "104bb4a6",
+          "finding": "Two Clippy needless generic-argument borrows",
+          "status": "closed",
+          "evidence": "e80bb8943 removes only borrowed format expressions; all assertions retained; final Cargo and review pass."
+        }
+      ],
+      "criteria": {
+        "REQ-01": "All nine cases now in git_module_tests.rs using shared checkout helper and module types; old file and actual mod.rs registration removed.",
+        "REQ-02": "All forty assertion macros preserved; old-to-new case census verified; full tests and lint pass."
+      },
+      "stale_narrative": "Old file references only in historical investigations and archived evidence; no current code/user docs reference removed suite.",
+      "deferred_items": "No issue-linked design docs or in-scope deferrals.",
+      "holistic": "One owning suite; shared GitRepository/GitStandIn/checkout helpers; no production changes. Main integration pending."
     }
-  }
+  },
+  "source_queue": [
+    "6d93ab14 current",
+    "4ba18af4",
+    "frontend offload",
+    "df0eca",
+    "dc048377",
+    "437907da",
+    "frontend binding",
+    "dff997",
+    "readiness interleave"
+  ],
+  "blocked_source_exclusions": [
+    "06177584 dependency tree source",
+    "38df8a6c installer policy source"
+  ]
 }
