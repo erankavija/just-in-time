@@ -21,6 +21,12 @@
       "status": "passed",
       "updated_at": "2026-11-05T00:56:45.075118190Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8ff420b3-2ad3-4398-bcfe-0dad96498cdf",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:03:07.540709916Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "fe3ad1b0-6d71-4cc7-a02f-a43b36f94548",
@@ -35,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One library error boundary for the CLI and the server",
-  "updated_at": "2026-11-05T00:56:45.075118190Z"
+  "updated_at": "2026-11-05T01:03:07.540709916Z"
 }
