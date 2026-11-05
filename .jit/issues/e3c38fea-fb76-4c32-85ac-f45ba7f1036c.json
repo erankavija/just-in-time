@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "59c4c2bb-ef58-44e7-8921-1cb7d748cb56",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:57:45.114865742Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d5c75795-96fa-4a34-90c2-1efd58116c6d",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:00:52.780854213Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktree list reads worktrees through the module",
-  "updated_at": "2026-11-05T01:39:57.932885810Z"
+  "updated_at": "2026-11-05T02:00:52.780854213Z"
 }
