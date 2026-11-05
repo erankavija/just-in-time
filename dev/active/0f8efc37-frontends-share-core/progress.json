@@ -58,7 +58,7 @@
           "short_id": "6326532e",
           "title": "Share version-scoped issue capture and projections",
           "classification": "implementation",
-          "status": "in_review"
+          "status": "done"
         },
         {
           "id": "4d8791fb-01c9-4d12-a54b-2990baa22ace",
@@ -105,7 +105,7 @@
           "short_id": "b067c2db",
           "title": "Use server search results in browser",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "in_review"
         },
         {
           "id": "c8e79465-e28c-4dea-8c25-ad3fdc812e34",
@@ -172,7 +172,7 @@
     "6326532e": 3
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Foundation, semantic search, API cleanup, raw responses and browser repairs landed with merged gates. D-25 convergence passed Cargo and docs checks and is in final review; b067 browser search is in progress. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
+  "note": "Foundation, semantic search, API cleanup, raw responses, D-25 convergence and browser fixes landed with merged gates; installed nonblocking reads verified. Browser search is in review. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
@@ -189,7 +189,8 @@
       "e16df9af: deterministic concurrency coverage repaired",
       "713a548e: D-22 lock fallback superseded by approved D-25"
     ],
-    "advisory": "Read-only steward audit of 93ae39349 found blocking in-memory getters; e4184f3f2 fixed them. Narrow follow-up found swallowed library preview conflict; f49a69276 fixed it. Both findings remain review evidence."
+    "advisory": "Read-only steward audit of 93ae39349 found blocking in-memory getters; e4184f3f2 fixed them. Narrow follow-up found swallowed library preview conflict; f49a69276 fixed it. Both findings remain review evidence.",
+    "installed_verification": "nonblocking-install-verification.md"
   },
   "scheduling_exception": "On 2026-11-05 the steward authorized dependency-ready b067c2db to start in parallel with unfinished wave 2 work because its only prerequisite 4d8791fb was done and its browser footprint is disjoint; all real dependencies, gates, and acceptance remain required."
 }
