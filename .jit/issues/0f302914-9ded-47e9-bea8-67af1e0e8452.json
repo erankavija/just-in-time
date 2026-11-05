@@ -9,12 +9,26 @@
   ],
   "description": "One server helper and its route-wide migration establish the runtime isolation property.\n\n## Background\n\nThe server already maps classified errors through `reject`; keep classification there while moving synchronous executor work off async workers.\n\n## Success Criteria\n\n- [hard] REQ-01: Every executor-reaching handler uses one server-owned blocking execution helper, mapping errors through the existing reject and classifier; multiple calls within a request share one offloaded closure.\n- [hard] REQ-02: Tests cover offload and error mapping.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-05T00:09:15.356213422Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bff1c533-b70b-4051-9844-b91813561ee3",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:03:18.069794003Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "37e8e5f9-26b8-4ed7-b534-c569bbeb4992",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:07:44.180759584Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0f302914-9ded-47e9-bea8-67af1e0e8452",
   "labels": [
     "type:task",
@@ -25,7 +39,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Offload executor work in server handlers",
-  "updated_at": "2026-11-04T23:28:21.064982608Z"
+  "updated_at": "2026-11-05T00:09:15.356213422Z"
 }
