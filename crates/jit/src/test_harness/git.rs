@@ -90,13 +90,38 @@ impl GitStandIn {
         Self::resolving_on(&std::env::var_os("PATH").unwrap_or_default())
     }
 
+    /// Create the stand-in with environment overrides for its real git child.
+    pub fn with_environment(overrides: &[(&str, &str)]) -> Self {
+        Self::resolving_on_with_environment(
+            &std::env::var_os("PATH").unwrap_or_default(),
+            overrides,
+        )
+    }
+
     fn resolving_on(search_path: &std::ffi::OsStr) -> Self {
+        Self::resolving_on_with_environment(search_path, &[])
+    }
+
+    fn resolving_on_with_environment(
+        search_path: &std::ffi::OsStr,
+        overrides: &[(&str, &str)],
+    ) -> Self {
         let stand_in = Self {
             dir: tempfile::TempDir::new().unwrap(),
             real_git: resolve_real_git(search_path),
         };
         std::fs::create_dir(stand_in.bin_dir()).unwrap();
         std::fs::create_dir(stand_in.records_dir()).unwrap();
+        let environment = overrides
+            .iter()
+            .map(|(key, value)| {
+                assert!(
+                    is_shell_variable_name(key),
+                    "invalid environment key: {key}"
+                );
+                format!("export {key}={}\n", shell_quote_value(value))
+            })
+            .collect::<String>();
         let script = format!(
             r#"{STAND_IN_HEADER}records={records}
 staged="$records/.$$"
@@ -108,7 +133,7 @@ until ln "$staged" "$records/$sequence" 2>/dev/null; do
   sequence=$((sequence + 1))
 done
 rm -f "$staged"
-exec {git} "$@"
+{environment}exec {git} "$@"
 "#,
             records = shell_quote(&stand_in.records_dir()),
             git = shell_quote(&stand_in.real_git),
@@ -242,7 +267,21 @@ impl GitInvocation {
 
 #[cfg(unix)]
 fn shell_quote(path: &Path) -> String {
-    format!("'{}'", path.to_str().unwrap().replace('\'', r"'\''"))
+    shell_quote_value(path.to_str().unwrap())
+}
+
+#[cfg(unix)]
+fn shell_quote_value(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
+}
+
+#[cfg(unix)]
+fn is_shell_variable_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    bytes
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
 }
 
 #[cfg(test)]

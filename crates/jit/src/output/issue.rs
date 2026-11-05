@@ -216,19 +216,15 @@ impl IssueListing {
             ))
         }
     }
-
-    fn render(&self, header: &str, columns: &[IssueColumn], quiet: bool) -> String {
-        let header = |_| header.to_owned();
-        match self {
-            Self::Summary(list) => list_text(header, &list.items, columns, quiet),
-            Self::Full(list) => list_text(header, &list.items, columns, quiet),
-        }
-    }
 }
 
 impl HumanRender for IssueListing {
     fn render_human(&self, mode: OutputMode) -> String {
-        self.render("All issues (filtered):", STATE_AND_PRIORITY, mode.quiet)
+        let header = |_| "All issues (filtered):".to_owned();
+        match self {
+            Self::Summary(list) => list_text(header, &list.items, STATE_AND_PRIORITY, mode.quiet),
+            Self::Full(list) => list_text(header, &list.items, STATE_AND_PRIORITY, mode.quiet),
+        }
     }
 }
 
@@ -280,8 +276,11 @@ impl SubsetListing {
 
 impl HumanRender for SubsetListing {
     fn render_human(&self, mode: OutputMode) -> String {
-        self.listing
-            .render(self.subset.header(), self.subset.columns(), mode.quiet)
+        let (header, columns) = (|_| self.subset.header().to_owned(), self.subset.columns());
+        match &self.listing {
+            IssueListing::Summary(list) => list_text(header, &list.items, columns, mode.quiet),
+            IssueListing::Full(list) => list_text(header, &list.items, columns, mode.quiet),
+        }
     }
 }
 
