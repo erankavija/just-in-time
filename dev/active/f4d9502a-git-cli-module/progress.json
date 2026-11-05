@@ -283,7 +283,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "implementing"
         },
         {
           "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
@@ -292,7 +292,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "cargo_passed_independent_review_running"
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
@@ -380,7 +380,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "gates_passed_lead_audit_pending"
         },
         {
           "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
@@ -695,6 +695,27 @@
       "model": "gpt-6-sol",
       "effort": "high",
       "reason": "Preserve reviewed listing and user-name methods across additive merge conflict."
+    },
+    {
+      "issue": "dcf88b6f",
+      "agent": "/root/pinned_object_consumer",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Bounded shared object-reader adoption preserving pinned process contract."
+    },
+    {
+      "issue": "a273667c",
+      "agent": "/root/path_object_consumer",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Bounded object-reader path migration preserving typed errors and revision semantics."
+    },
+    {
+      "issue": "d5cae9e3",
+      "agent": "/root/no_git_cli",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Mechanical two-test CLI boundary coverage using shared fixtures."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -765,7 +786,8 @@
     "Steward approved ea4b7363 exact third file tests/cli_issue/gate_field_contract_test.rs: explicit actor through existing child-only command_with_env on release, preserve all output assertions and production no-checkout semantics, audit same fixture family. Failed Cargo c21d7c93 preserved156b0115c; no prior review findings/linked docs. Rework1 queued. Native validator rejected now-unused chain-link override after footprint grew; removed obsolete override, validation passed.",
     "f649c144 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "f649c144 Done after actual merged Cargo5ac87f4a on833a71908 (5003 tests+25 doctests); closure97688a26d, tree reclaimed. e3 info/list composition pending focused check. d681 corrected fullCargo144a9cb4 stable PASS5016+25 on1f96b6ee, independent review running. dcf source264988e28 removes old blob batch/parser (69 module cases pass), full gates running. EA approved fixture rework dispatched. Ready d5cae9e3 claimed for next available worker slot.",
-    "e3c38fea Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "e3c38fea Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward approved d5cae9e3 stale registration footprint main.rs\u2192existing mod.rs, same two-test consolidated suite; manifest native validation passes. e3 Done/released33e9be6ed after actual mergedCargoa1d97e05, 63 focused composition checks and exact-byte proofs retained. d681 fully ready, all gates stable; next source because frontend632 explicitly not ready. dcf fullCargo7a74ef20 and review376ec987 stable PASS; lead audit finishing. a273 lead revision-expression concern under evidence-first audit before full gate."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1161,6 +1183,23 @@
       "deferred_items": "No linked documents; pinned-inspection migration is distinct declared dcf88b6f task and remains mandatory for epic completion.",
       "holistic": "Single new streaming process/header mechanism serves reader/presence; canonical runner/errors and shared fixtures used; two-file footprint. Additive base integration in progress, mandatory merged Cargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS e91fc299-886a-4061-941f-7bb9272ccccc on 524e7b6f54c8d0839d7ceeee21f5ce3fe0d8065e."
+    },
+    "d68150e2": {
+      "verdict": "PASS",
+      "reviewed_source": "1f96b6ee63ef7a0ddfddcfdd28a290644020f1ce",
+      "gates": {
+        "cargo-ci": "144a9cb4-3c97-407e-b9d6-150cafc3a624",
+        "code-review": "c150dd0b-16b8-4727-9300-aa51ea853098"
+      },
+      "criteria": "REQ01-04 verified; invocation context caches only exact/canonical/top aliases, shares clones/projections, removes omission discovery, preserves authority/recovery and bounded process behavior. Approved profile fixture correction passes; no deferred items or stale narrative. All eight own files exact after refresh. Mandatory merged Cargo pending."
+    },
+    "dcf88b6f": {
+      "verdict": "gates_passed_lead_audit_pending",
+      "reviewed_source": "5e10c355a6eaf638ad26db8754bc342e69b5e463",
+      "gates": {
+        "cargo-ci": "7a74ef20-acd1-442c-8134-0ba965366474",
+        "code-review": "376ec987-854b-41b8-9afd-63d701a6ae47"
+      }
     }
   },
   "source_queue": [
