@@ -23,7 +23,7 @@ const GIT_DIR_IDENTITY_DIR: &str = "jit";
 /// Serializes identity changes for one checkout over a store outside every checkout.
 const GIT_DIR_IDENTITY_LOCK: &str = "worktree.lock";
 
-/// Worktree identity persisted at the path [`identity_file`] resolves.
+/// Worktree identity persisted at the path `identity_file` resolves.
 ///
 /// The worktree ID is stable across relocations to support lease continuity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -359,6 +359,39 @@ impl GitCheckout {
         parse_file_history(&output.stdout).ok_or_else(|| unexpected(&output.stdout))
     }
 
+    // Temporary @/inv/convention-convergence exception: snapshot migration
+    // c140921c moves its origin lookup here.
+    /// Read the `origin` remote URL with one git process.
+    ///
+    /// Returns `None` when the checkout has no `origin` remote.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GitError::GitUnavailable`] if git cannot start, or
+    /// [`GitError::UnexpectedOutput`] if git fails for another reason or its
+    /// successful output is not one UTF-8 URL.
+    pub fn origin_url(&self) -> Result<Option<String>, GitError> {
+        const ARGS: [&str; 3] = ["remote", "get-url", "origin"];
+        let output = self.git.run(&self.worktree_root, ARGS)?;
+        if !output.status.success() {
+            if output.status.code() == Some(2) {
+                return Ok(None);
+            }
+            return Err(GitError::UnexpectedOutput {
+                command: ARGS.join(" "),
+                output: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+
+        let unexpected = || GitError::UnexpectedOutput {
+            command: ARGS.join(" "),
+            output: String::from_utf8_lossy(&output.stdout).into_owned(),
+        };
+        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
+        let url = stdout.strip_suffix('\n').ok_or_else(unexpected)?;
+        Ok(Some(url.to_owned()))
+    }
+
     // Temporary @/inv/convention-convergence exception: branch comparisons
     // converge here when fb5e8e8d (check_branch_divergence) and 47d62472
     // (validate_branch_drift) migrate their consumers.

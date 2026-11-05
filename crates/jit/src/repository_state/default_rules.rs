@@ -14,7 +14,7 @@
 //! longer reads any `[validation]` enforcement flags or per-namespace
 //! `values`/`pattern`/`required` constraints — those keys were removed. The set
 //! is derived purely from the RETAINED taxonomy: the `[namespaces]` registry and
-//! `[type_hierarchy]`. Hence the signature is [`default_ruleset(namespaces)`].
+//! `[type_hierarchy]`. Hence the signature is `default_ruleset(namespaces)`.
 //!
 //! # The fixed default contract (MF1)
 //!
@@ -320,10 +320,10 @@ pub(crate) fn default_rule_membership_diff_from_identities(
 
 /// The stable schema file name the `type-hierarchy-known` rule (`origin =
 /// "default"`) references once serialized to `.jit/rules.toml` (the sanitized
-/// `<origin>:<name>` identity + `.json`, matching [`serialize`](crate::repository_state::rule_serialize)'s
+/// `<origin>:<name>` identity + `.json`, matching `serialize`'s
 /// schema-stem derivation). This file is a write-through projection: the rule
 /// derives its enum from `[type_hierarchy]` in memory at load
-/// ([`with_default_assertions_from_config`]), so the file tracks config for
+/// (`with_default_assertions_from_config`), so the file tracks config for
 /// external consumers but never decides validation.
 pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json";
 
@@ -334,7 +334,7 @@ pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json"
 ///
 /// This is the SINGLE source for that schema's shape, shared by
 /// [`default_ruleset`] (used for both in-memory evaluation and the projection
-/// [`serialize`](crate::repository_state::rule_serialize) writes), so the baked
+/// `serialize` writes), so the baked
 /// `.jit/schemas/default-type-hierarchy-known.json` projection can never drift
 /// from the schema validation actually uses (one source, not two). Pure: no I/O,
 /// deterministic.
