@@ -262,7 +262,7 @@ pub fn pretty_document<T: Serialize>(document: &T) -> String {
 ///
 /// The DAG-authoritative hierarchy from `resolution` is flattened onto each node
 /// as `parent`, `children`, `cluster`, and `rank` — the same four fields, from
-/// the same [`NodeHierarchy`](crate::graph::hierarchy::NodeHierarchy)
+/// the same [`NodeHierarchy`]
 /// serialization, that `jit graph tree` emits. These appear only in the `--full`
 /// shape; the default summary shape is untouched.
 ///
