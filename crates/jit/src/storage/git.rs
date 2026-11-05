@@ -198,7 +198,7 @@ impl GitCheckout {
     }
 
     // Temporary @/inv/convention-convergence exception: branch lookups converge
-    // here when 732f7afb, 9de4c09c, 3f8da8c4 and c140921c land.
+    // here when 732f7afb, 3f8da8c4 and c140921c land.
     /// Read the checked-out commit and branch with at most two git processes.
     ///
     /// Validates the captured commit without history traversal or fetching.
