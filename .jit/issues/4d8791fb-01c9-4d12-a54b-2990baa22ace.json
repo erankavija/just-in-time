@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "389e8a32-8809-4380-a16c-1114eddc336d",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:41:12.214525554Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4d8791fb-01c9-4d12-a54b-2990baa22ace",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Unify issue and linked-document search",
-  "updated_at": "2026-11-05T01:19:13.235574583Z"
+  "updated_at": "2026-11-05T01:41:12.214525554Z"
 }
