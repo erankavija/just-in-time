@@ -120,9 +120,10 @@
           "short_id": "437907da",
           "title": "One worktree listing in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "f4b9813452665c72b989f209fc2d54e3cee567ce"
         },
         {
           "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
@@ -139,9 +140,10 @@
           "short_id": "4ba18af4",
           "title": "One head lookup in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "74d539f68af210ac2a12c02031caf50182649702"
         },
         {
           "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
@@ -157,9 +159,10 @@
           "short_id": "cc9f213e",
           "title": "Path history query in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "1876305d89eb1811b671f3deed73b0368892c625"
         }
       ]
     },
@@ -181,16 +184,18 @@
           "short_id": "732f7afb",
           "title": "Init records the worktree branch through the module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "reviewed_waiting_source_slot"
         },
         {
           "id": "9de4c09c-207b-4ea1-9482-3846383cd3c7",
           "short_id": "9de4c09c",
           "title": "Worktree info reads its branch through the module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "full_gates_running"
         },
         {
           "id": "c16c834c-f134-4af8-ab20-40c6a120e836",
@@ -206,8 +211,9 @@
           "short_id": "c5062e21",
           "title": "Server detects its layout once from the selected data root",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "claimed_dispatch_prepared"
         },
         {
           "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
@@ -239,8 +245,9 @@
           "short_id": "f6eaba42",
           "title": "Claims take their branch and git requirement from the module",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "fixture_rework"
         }
       ]
     },
@@ -484,12 +491,21 @@
     "24d3b460": 1,
     "bb5040a8": 1,
     "28ccf9a9": 1,
-    "ec9e812c": 1
+    "ec9e812c": 1,
+    "f6eaba42": 1
   },
   "surfaced_pitfalls": [
     {
       "issue": "81664a6a",
       "note": "Remaining git-spawning sites outside storage/git.rs are not marked as tracked exceptions; only layout detection (until 07663984) is. A reviewer may hold other sites to @/inv/convention-convergence; each is migrated by its own issue in this epic."
+    },
+    {
+      "issue": "f4d9502a",
+      "criterion": "REQ-04",
+      "status": "owner_reconciled_remediation_pending",
+      "finding": "External data-root fallback performs two layout probes; for_worktree_root adds probes for listed checkouts. Preserve external-store and relocated-checkout identity while resolving the invocation-wide one-process contract.",
+      "owner": "layout_probe_research",
+      "disposition": "DEC27 owner permits one computation per distinct checkout context: ordinary reads<=1, external bootstrap<=2, external N contexts<=N+1. Duplicate probes remain defect; approved d681 remediation awaits independent plan review and implementation."
     }
   ],
   "reconciled_after_breakdown": [
@@ -700,9 +716,17 @@
     "24d3b460 completed after merged Cargo2071d95d onad4a28ae7; source slot releases directly tofrontendwatcher. HEAD and437 refreshes resolving additive conflicts in isolated trees. ec9 narrow borrow rework verified, full gates to rerun.",
     "24 worktree reclaimed; branch retained. HEAD/listing refreshed stable approvals preserveddd9335368/56fbb0c72; ec9 corrected approvaldc9741d27. All implemented branch gates pass, awaiting coordinated source integration.",
     "Listing old wrapper reused owned fixed TMPDIR; finished successfully. Empty-directory removal refused because a zero-byte Codex synthetic-mount marker remains, left untouched. Future wrapper replaced with unique mktemp and cleanup trap.",
-    "Await explicit6d93 merged web/smoke release before HEAD canonical merge; ready branchdd9335368 contains only HEAD source plus actual evidence. Verify blocked061/policy ancestry and delta again immediately before landing."
+    "Await explicit6d93 merged web/smoke release before HEAD canonical merge; ready branchdd9335368 contains only HEAD source plus actual evidence. Verify blocked061/policy ancestry and delta again immediately before landing.",
+    "HEAD Done after main74d539f68 and mergedCargodd02d9b5; release directly tofrontendoffload. 9de/732/f6 now ready. History/origin isolated additive conflicts delegated to Sol; base auto-merged main5469c7bf with its own62-line operation and91-line tests unchanged, retains prior stable review pending merged checks.",
+    "437907da Done after merged Cargo c23e078c; source slot releases directly to frontend binding9c3. REQ-04 layout process budget investigation remains unresolved: external-store fallback probes twice and per-worktree consumers probe again. Steward authorized focused research, not a criterion waiver.",
+    "cc9 Done after merged stable Cargo e2dd6940; actual gate evidence already preserved by frontend neutral tracker commit c7b0f506b. Next ready slot origin; df0546 withdrawn for real docs findings, then df755.",
+    "Steward approved DEC27 reconciliation to distinct-context layout bounds and concrete d681 scope expansion/field exception with reduced dependencies, preserving53 nodes. Required independent plan review precedes implementation. DEC26 shared worktree-info errors is validated in isolated952fa6f32; 9de full gates running after canonical row/reference integration.",
+    "f6 Cargo cc72ca26 failed four shared corpus setups because child Git ceiling excludes own root from .jit discovery. Steward authorized parent-ceiling fix preserving host isolation, child-only environment and existing test owners; failed evidence86cb8402c retained, red/green rework in progress.",
+    "Do not nest tracker commands under jit worktree exec: repository lock is non-reentrant and times out. Tracker commands take own locks; use exec only around short Git commit/file updates."
   ],
-  "planning_reviews_pending": [],
+  "planning_reviews_pending": [
+    "DEC26 shared worktree-info contract and DEC27 bounded-context remediation refresh"
+  ],
   "worker_limit": 3,
   "reviews": {
     "b4ca051c": {
@@ -723,7 +747,7 @@
     "4ba18af4": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "95beac63-76a0-407c-810e-f5e2ef961a9d",
+        "cargo-ci": "dd02d9b5-fdb2-4cd5-868d-70c3381a63da",
         "code-review": "eeb77a1a-4f39-4850-a376-a972f0825405"
       },
       "reviewed_source": "90c7113262d06347ce4486a88699af9327cabee0",
@@ -745,7 +769,7 @@
       "stale_narrative": "No one-process HEAD budget remains in live code/tests/plan; experiment explicitly preserves rejected historical approach.",
       "deferred_items": "Linked head-lookup-experiment.md has no in-scope deferred markers. Git minimum/Docker change and WorktreePaths redesign explicitly excluded from approved decision.",
       "holistic": "Shared environment fixture from24 reused exactly. Canonical Git runner/error behavior retained. Direct-main integration and merged Cargo remain pending.",
-      "integration": "Refreshed against landed user-name primitive; both implementations and owning tests preserved; configured Cargo and independent review stable PASS. Main merge and merged Cargo remain pending."
+      "integration": "Main74d539f68 preserves approved protocol and user-name integration; merged Cargo stable PASSdd02d9b5. Lease released and downstream consumers ready."
     },
     "7297f922": {
       "verdict": "PASS",
@@ -826,7 +850,7 @@
     "437907da": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "5dd13d62-baa7-4c92-b6ad-ae47b7b9eb8c",
+        "cargo-ci": "c23e078c-3240-4c3b-8fa2-ab1d3e361a44",
         "code-review": "12612785-0367-4000-b6e9-bd10587f82d9"
       },
       "reviewed_source": "47c808991067d7a7b83f3e0f7427dfe649e24fad",
@@ -839,15 +863,15 @@
       "deferred_items": "No issue-linked design docs; consumer migrations are distinct declared tasks.",
       "holistic": "Canonical Git runner/errors and shared fixtures; no consumer cutover included; direct-main integration and merged Cargo pending.",
       "evidence_commit": "56fbb0c72",
-      "integration": "Refreshed against landed user-name primitive; both implementations and owning tests preserved; configured Cargo and independent review stable PASS. Main merge and merged Cargo remain pending."
+      "integration": "Main f4b981345 preserves reviewed listing additions and incoming HEAD byte-for-byte; focused composition check passed, merged Cargo stable PASS c23e078c. Prior independent review retained under explicit steward ruling."
     },
     "cc9f213e": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "6675ac07-1d42-44f5-a245-52334a7778c3",
-        "code-review": "ca9e3b4f-a1b6-4679-a246-53ba61137320"
+        "cargo-ci": "e2dd6940-9f4f-474d-901f-6f14f6ecdc68",
+        "code-review": "9071f74f-7c6e-4e73-9902-3c617e96753b"
       },
-      "reviewed_source": "334429c1e8ba6e5285fc907fbb3389f7849f2c57",
+      "reviewed_source": "b95c4e86dc592727ab1b295e3409ff4985a54266",
       "criteria": {
         "REQ-01": "One literal-path Git log; canonical OID, author, committer seconds and full message.",
         "REQ-02": "Added, changed, deleted path, identical-parent merge omission, multiline message, count and literal path tests passed."
@@ -859,8 +883,11 @@
       "advisory_disposition": {
         "finding": "F1 calls tracked83c8632f convergence issue a future commit identifier.",
         "owner_ruling": "Steward inspected comment and issue; retain named exception until consumer83 removes duplicate. It records required convergence condition and allowed evidence pointer. No source change or rerun solely for mistaken commit-ID interpretation.",
-        "removal_owner": "83c8632f"
-      }
+        "removal_owner": "83c8632f",
+        "latest": "9071f74f repeats low advisory against required temporary-convergence pointer; retain owner-approved exception until83c8632f removes duplicate."
+      },
+      "evidence_commit": "51b688ab9",
+      "integration": "Listing merge preserves both reviewed additions byte-for-byte; focused composition43tests passed. Main1876305d8 merged Cargo stable PASS e2dd6940. Frontend tracker commit c7b0f506b already preserved actual gate record; no duplicate evidence created."
     },
     "bb5040a8": {
       "verdict": "PASS",
@@ -936,18 +963,30 @@
       "stale_narrative": "Old file references only in historical investigations and archived evidence; no current code/user docs reference removed suite.",
       "deferred_items": "No issue-linked design docs or in-scope deferrals.",
       "holistic": "One owning suite; shared GitRepository/GitStandIn/checkout helpers; no production changes. Main integration pending."
+    },
+    "732f7afb": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "4c792cbc-fa99-4da8-9056-beff4a8a35e7",
+        "code-review": "337171b7-84b7-470d-ba03-606121c7fedf"
+      },
+      "reviewed_source": "0c92ce22ec14ad4703ecc96a562b9b5eddde839a",
+      "evidence_commit": "d90bf8f74",
+      "criteria": {
+        "REQ-01": "Existing guarded init uses supplied Git checkout and canonical branch_label; main fallback retained.",
+        "REQ-02": "Owning detached and unborn-trunk unit tests red then green; full gates pass."
+      },
+      "prior_findings": "No failed independent review. Lead duplicate rendering finding closed by canonical branch_label.",
+      "stale_narrative": "No live obsolete branch-subprocess prose; init guard and external-root semantics preserved.",
+      "deferred_items": "No linked documents or in-scope deferrals.",
+      "holistic": "Shared HEAD operation and helper; no new discovery. Main integration pending."
     }
   },
   "source_queue": [
-    "6d93ab14 current",
-    "4ba18af4",
-    "frontend offload",
-    "df0eca",
-    "dc048377",
-    "437907da",
-    "frontend binding",
-    "dff997",
-    "readiness interleave"
+    "bb5040a8 if ready",
+    "df755",
+    "repaired df0546 when ready",
+    "ready interleave"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",

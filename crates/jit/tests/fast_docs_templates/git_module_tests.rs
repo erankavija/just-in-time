@@ -658,6 +658,293 @@ fn test_dirty_paths_runs_one_git_process_in_the_checkout() {
     assert_eq!(invocations[0].directory(), Some(repository.root()));
 }
 
+#[cfg(unix)]
+#[test]
+fn test_list_worktrees_primary_linked_detached_and_slash_branches_use_one_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let primary_branch = repository.git(&["branch", "--show-current"]);
+    let linked = dir.path().join("linked with spaces");
+    let detached = dir.path().join("detached");
+    let slash_branch = dir.path().join("topic");
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "linked",
+        linked.to_str().unwrap(),
+    ]);
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "--detach",
+        detached.to_str().unwrap(),
+        "HEAD",
+    ]);
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "topic/nested/branch",
+        slash_branch.to_str().unwrap(),
+    ]);
+    repository.git(&[
+        "worktree",
+        "lock",
+        "--reason",
+        "worktree undergoing maintenance",
+        detached.to_str().unwrap(),
+    ]);
+    let stand_in = GitStandIn::new();
+
+    let worktrees = checkout(Git::with_program(stand_in.program()), repository.root())
+        .list_worktrees()
+        .unwrap();
+
+    let entries: BTreeSet<_> = worktrees
+        .iter()
+        .map(|worktree| {
+            (
+                worktree.path().to_path_buf(),
+                worktree.branch().map(str::to_owned),
+            )
+        })
+        .collect();
+    assert_eq!(worktrees.len(), entries.len());
+    assert_eq!(
+        entries,
+        BTreeSet::from([
+            (canonical(repository.root()), Some(primary_branch)),
+            (canonical(&linked), Some("linked".to_owned())),
+            (canonical(&detached), None),
+            (
+                canonical(&slash_branch),
+                Some("topic/nested/branch".to_owned())
+            ),
+        ])
+    );
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(repository.root()));
+    assert_eq!(
+        invocations[0].args(),
+        ["worktree", "list", "--porcelain", "-z"]
+    );
+}
+
+#[test]
+fn test_list_worktrees_from_linked_checkout_includes_bare_repository_without_branch() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let bare = dir.path().join("bare.git");
+    let linked = dir.path().join("linked-from-bare");
+    repository.git(&[
+        "clone",
+        "--quiet",
+        "--bare",
+        repository.root().to_str().unwrap(),
+        bare.to_str().unwrap(),
+    ]);
+    repository.git(&[
+        "--git-dir",
+        bare.to_str().unwrap(),
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "linked-from-bare",
+        linked.to_str().unwrap(),
+    ]);
+
+    let worktrees = checkout(Git::default(), &linked).list_worktrees().unwrap();
+
+    assert_eq!(worktrees.len(), 2);
+    assert!(worktrees
+        .iter()
+        .any(|worktree| worktree.path() == canonical(&bare) && worktree.branch().is_none()));
+    assert!(worktrees
+        .iter()
+        .any(|worktree| worktree.path() == canonical(&linked)
+            && worktree.branch() == Some("linked-from-bare")));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_list_worktrees_preserves_newlines_inside_worktree_paths() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let linked = dir.path().join("linked\n\nworktree misleading");
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "delimiter-path",
+        linked.to_str().unwrap(),
+    ]);
+
+    let worktrees = checkout(Git::default(), repository.root())
+        .list_worktrees()
+        .unwrap();
+
+    let linked_entry = worktrees
+        .iter()
+        .find(|worktree| worktree.branch() == Some("delimiter-path"))
+        .unwrap();
+    assert_eq!(linked_entry.path(), canonical(&linked));
+}
+
+#[test]
+fn test_file_history_returns_added_changed_and_deleted_commits_newest_first() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("history"));
+    repository.write("document.md", "first");
+    let added = repository.commit("add document");
+    repository.write("document.md", "second");
+    let changed = repository.commit("change document");
+    repository.write("other.md", "unrelated");
+    repository.commit("unrelated change");
+    std::fs::remove_file(repository.root().join("document.md")).unwrap();
+    let deleted = repository.commit("delete document");
+
+    let history = checkout(Git::default(), repository.root())
+        .file_history("document.md")
+        .unwrap();
+
+    let commits: Vec<_> = history
+        .iter()
+        .map(|entry| entry.commit().as_str())
+        .collect();
+    assert_eq!(commits, [deleted, changed, added]);
+}
+
+#[test]
+fn test_file_history_preserves_author_commit_time_and_multiline_message() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("metadata"));
+    let author = "History Author";
+    let message = "subject with café\n\nbody line one\nbody line two";
+    repository.git(&["config", "user.name", author]);
+    repository.write("document.md", "first");
+    repository.git(&["add", "--all"]);
+    repository.git(&[
+        "commit",
+        "--quiet",
+        "--message",
+        message,
+        "--date",
+        "2001-09-09T01:46:40Z",
+    ]);
+    let commit_time = repository.git(&["show", "-s", "--format=%ct", "HEAD"]);
+
+    let history = checkout(Git::default(), repository.root())
+        .file_history("document.md")
+        .unwrap();
+
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].author(), author);
+    assert_eq!(
+        history[0].commit_time(),
+        commit_time.parse::<i64>().unwrap()
+    );
+    assert_eq!(history[0].message(), format!("{message}\n"));
+}
+
+#[test]
+fn test_file_history_omits_merge_identical_to_one_parent() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("merge"));
+    repository.write("document.md", "base");
+    let added = repository.commit("add document");
+    let primary = repository.git(&["branch", "--show-current"]);
+    repository.git(&["checkout", "--quiet", "-b", "side"]);
+    repository.write("document.md", "side change");
+    let changed = repository.commit("side changes document");
+    repository.git(&["checkout", "--quiet", &primary]);
+    repository.write("other.md", "primary change");
+    repository.commit("primary changes another path");
+    repository.git(&["merge", "--quiet", "--no-ff", "-m", "merge side", "side"]);
+
+    let history = checkout(Git::default(), repository.root())
+        .file_history("document.md")
+        .unwrap();
+
+    let commits: Vec<_> = history
+        .iter()
+        .map(|entry| entry.commit().as_str())
+        .collect();
+    assert_eq!(commits, [changed, added]);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_file_history_treats_option_and_pathspec_metacharacters_literally() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("literal"));
+    repository.write(":(glob)*", "literal pathspec");
+    let magic = repository.commit("pathspec-looking name");
+    repository.write("--all", "literal option");
+    let option = repository.commit("option-looking name");
+    repository.write("other.md", "unrelated");
+    repository.commit("unrelated path");
+    let git = checkout(Git::default(), repository.root());
+
+    for (path, expected) in [(":(glob)*", magic), ("--all", option)] {
+        let history = git.file_history(path).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].commit().as_str(), expected);
+    }
+}
+
+#[test]
+fn test_file_history_missing_path_returns_empty_history() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+
+    assert!(checkout(Git::default(), repository.root())
+        .file_history("absent.md")
+        .unwrap()
+        .is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_file_history_runs_one_log_process_per_query_in_the_checkout() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let stand_in = GitStandIn::new();
+    let git = checkout(Git::with_program(stand_in.program()), repository.root());
+
+    git.file_history("README.md").unwrap();
+    assert_eq!(stand_in.invocations().len(), 1);
+    git.file_history("absent.md").unwrap();
+
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 2);
+    for invocation in invocations {
+        assert_eq!(invocation.directory(), Some(repository.root()));
+        assert!(invocation.args().iter().any(|arg| arg == "log"));
+    }
+}
+
+#[test]
+fn test_file_history_failed_log_returns_typed_error() {
+    let dir = TempDir::new().unwrap();
+
+    let error = checkout(Git::default(), dir.path())
+        .file_history("document.md")
+        .unwrap_err();
+
+    assert!(matches!(error, GitError::UnexpectedOutput { command, .. } if command.contains("log")));
+}
+
 #[test]
 fn test_compare_with_base_descendant_reports_base_as_merge_base() {
     let dir = TempDir::new().unwrap();

@@ -571,6 +571,25 @@ fn evaluate_all<S: HandlerStore>(
     Ok(Outcome::from(GateEvaluateAllResponse::new(id, keys)).with_warnings(warnings))
 }
 
+// Resolution, gate/transition checks, and repository read/publication failures.
+const EVALUATION_FAILURE_CODES: &[ErrorCode] = &[
+    ErrorCode::InvalidIdPrefix,
+    ErrorCode::AmbiguousId,
+    ErrorCode::IssueNotFound,
+    ErrorCode::GateNotFound,
+    ErrorCode::InvalidArgument,
+    ErrorCode::GateFailed,
+    ErrorCode::Blocked,
+    ErrorCode::ValidationFailed,
+    ErrorCode::ParseError,
+    ErrorCode::GenericError,
+    ErrorCode::IoError,
+    ErrorCode::PermissionDenied,
+    ErrorCode::RepositoryNotFound,
+    ErrorCode::RepositoryFormatUnsupported,
+    ErrorCode::LockTimeout,
+];
+
 /// Each requested issue in argument order, an unresolved id failing its own
 /// entry; any failure makes the batch findings under the first failure's code.
 /// Another agent's lease on any issue refuses the whole batch.
@@ -686,12 +705,7 @@ command_group! {
         "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force)
             raises [GateFailed] -> GateEvaluateAllResponse,
         "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force)
-            findings GateFailed "The first failing target's checker ran and its verdict was fail."
-            findings IoError "The first failing target's checker could not run to a verdict."
-            findings IssueNotFound "The first failing target's id resolves to no issue."
-            findings InvalidArgument "The first failing target does not require the gate, or its manual gate lacks `--by`."
-            findings InvalidIdPrefix "The first failing target's id prefix is too short."
-            findings AmbiguousId "The first failing target's id prefix matches several issues."
+            findings [EVALUATION_FAILURE_CODES] "The first failing target determines the classified code and status; the findings report retains every target's result."
             -> GateEvaluateManyResponse,
         "gate_fail" => GateCommands::Fail { id, gate_key, by } => fail(id, gate_key, by) -> GateFailResponse,
     },
@@ -701,7 +715,7 @@ command_group! {
 mod tests {
     use super::*;
     use crate::commands::test_helpers::{
-        memory_executor, seed_gate_registry, seed_issue, ExecutorTestAccess,
+        memory_executor, seed_gate_registry, seed_issue, seed_repo_file, ExecutorTestAccess,
     };
     use crate::commands::CommandExecutor;
     use crate::declarations::{GateDefinition as Declared, GateMode, GateStage};
@@ -819,6 +833,42 @@ mod tests {
     }
 
     #[test]
+    fn test_dispatch_evaluate_many_preserves_classified_registry_failures_and_their_reports() {
+        for (corrupt_registry, code) in [
+            (false, ErrorCode::GateNotFound),
+            (true, ErrorCode::ParseError),
+        ] {
+            let (executor, id) = requiring_manual_gate();
+            if corrupt_registry {
+                seed_repo_file(executor.storage(), ".jit/gates.toml", "gates = [");
+            } else {
+                let mut registry = executor.storage().load_gate_registry().unwrap();
+                registry.gates.clear();
+                seed_gate_registry(executor.storage(), &registry);
+            }
+
+            let (status, printed) = run(
+                &executor,
+                GateCommands::EvaluateMany {
+                    gate_key: "tests".to_owned(),
+                    ids: vec![id.clone()],
+                    by: Some("human:reviewer".to_owned()),
+                    force: false,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(status, code.exit_code().into());
+            assert_eq!(printed["error"]["code"], code.as_str());
+            let results = printed["error"]["details"]["results"].as_array().unwrap();
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0]["issue_id"], id);
+            assert_eq!(results[0]["status"], "failed");
+            assert_eq!(results[0]["error"]["code"], code.as_str());
+        }
+    }
+
+    #[test]
     fn test_dispatch_status_of_a_gate_never_run_prints_a_typed_object_with_the_explanation() {
         let (executor, id) = requiring_manual_gate();
 
@@ -842,7 +892,6 @@ mod tests {
 
         let envelope = classify(&error);
         assert_eq!(envelope.error.code, ErrorCode::IssueNotFound);
-        assert_ne!(envelope.error.code, ErrorCode::GateCheckError);
     }
 
     #[test]

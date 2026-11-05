@@ -366,7 +366,7 @@ fn test_status_unknown_id_json_error_envelope() {
 }
 
 /// A too-short prefix (< 4 chars) refines to `INVALID_ID_PREFIX`, distinct from
-/// the not-found code — proving `refine_id_error` runs on the
+/// the not-found code — proving classification runs on the
 /// status path exactly as on `issue show`.
 #[test]
 fn test_status_short_prefix_json_error_envelope() {

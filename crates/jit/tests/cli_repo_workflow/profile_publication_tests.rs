@@ -102,7 +102,7 @@ pub(super) fn executor_with_interruptions(
     let data = repository.join(".jit");
     let storage = JsonFileStorage::with_mutation_interruptions(&data, interruptions);
     let layout = discover_repository_layout(repository, &data).unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
+    CommandExecutor::new(storage).with_layout(layout).unwrap()
 }
 
 fn write_package(repository: &Path, version: &str) {

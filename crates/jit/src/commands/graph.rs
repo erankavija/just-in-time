@@ -760,7 +760,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
     /// // Resolution reads the hierarchy the repository's `config.toml` declares.
     /// let (repo, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
     /// let layout = discover_repository_layout(repo.path(), repo.path().join(".jit")).unwrap();
-    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     /// let new = |title: &str, labels: Vec<String>| {
     ///     executor
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
@@ -851,7 +851,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
     ///
     /// let (repo, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
     /// let layout = discover_repository_layout(repo.path(), repo.path().join(".jit")).unwrap();
-    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     /// // An epic that contains nothing, plus a task that claims to belong to it.
     /// let container_type = taxonomy.type_at_level(2);
     /// let leaf_type = taxonomy.type_at_level(4);

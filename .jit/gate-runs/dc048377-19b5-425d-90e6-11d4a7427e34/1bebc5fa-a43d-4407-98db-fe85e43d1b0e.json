@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-dc048377",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ad70a24579be282a8ef87679cf9cbda62f89389e",
+  "completed_at": "2026-11-05T00:26:01.438521829Z",
+  "duration_ms": 270394,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable changes satisfy the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dc048377-19b5-425d-90e6-11d4a7427e34",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1bebc5fa-a43d-4407-98db-fe85e43d1b0e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:21:31.043867438Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9f34c4175, 31f5d3645, ad70a2457 (`jit:dc048377`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; scripts/docs-package-content.toml\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/worktree-cache-test, @/gate/cargo-ci, @/gate/docs-mechanical, @/gate/doc-review (.jit/gates.toml)\nGate evidence: worktree-cache-test, cargo-ci, docs-mechanical, and doc-review passed (exit 0); each recorded run contains all attributable commits\nTruncation recovery: narrowed reads covered individual source/test patches, projection and worktree handlers, dispatcher/protocol, package manifest, and package-content policy\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable changes satisfy the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
