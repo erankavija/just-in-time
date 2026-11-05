@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-0546fc82",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "70853144d77625fd1c5db6f3b7bf33f14576c49b",
+  "completed_at": "2026-11-04T23:14:07.953219449Z",
+  "duration_ms": 116526,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue’s CLI output contract documentation is accurate, canonical, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "0546fc82-435f-4d02-9af2-0dc22e301d60",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5a6df072-c557-4892-9da3-c48be68d6753",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:12:11.426219733Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task; reviewed four reachable `jit:0546fc82` commits individually. Current code confirms the documented global flag, stream rules, warnings, findings envelope, and parser behavior. The prior terminology finding is resolved.\n\nDocumentation impact: canonical coverage is accurate and discoverable. Repository-wide link-check noise is pre-existing and unrelated.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s CLI output contract documentation is accurate, canonical, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

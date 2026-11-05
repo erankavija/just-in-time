@@ -358,8 +358,9 @@ jit label values milestone
 # Total: 2
 ```
 
-Both accept `--json` and emit the list envelope:
-`{"count": N, "namespaces": [...]}` and `{"count": N, "namespace": "...", "values": [...]}`.
+Both accept `--json`; see the [CLI JSON contracts](cli-commands.md#cli-json-contracts)
+for the shared list payload shape. The collection keys are `namespaces` and
+`values`, respectively; values also echo the namespace as `namespace`.
 
 ### Atomic Label Operations
 
