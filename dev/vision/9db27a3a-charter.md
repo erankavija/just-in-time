@@ -44,6 +44,7 @@ one that adds it (D-18).
 - D-22: Reads never wait on writers; a lock-free capture is admitted only when no commit crossed it
 - D-23: Retire the bundled MCP server and its support surfaces; the CLI remains the machine interface
 - D-24: Git-hook installation requires a Git checkout; core tracker operations remain Git-optional
+- D-25: Reads return a retryable conflict instead of waiting on writers
 
 ## Decision Details
 
@@ -464,4 +465,12 @@ one that adds it (D-18).
 - **Reasoning:** Installing a Git hook is inherently a Git operation. Documenting
   its existing prerequisite aligns the charter, user guarantees and common error
   contract without weakening the Git-optional core.
+- **Date:** 2026-11-05
+
+
+### D-25: Reads return a retryable conflict instead of waiting on writers
+
+- **Chosen:** A read captures and admits without acquiring a repository write lock or performing recovery. After bounded retries it returns a typed retryable conflict; it never falls back to a writer/session lock. Multi-root reads admit the entire capture. Explicit recovery and mutation recovery retain D-17 semantics. This supersedes only D-22’s lock-taking read fallback.
+- **Rejected:** Taking a repository lock after contention, including coordinated multi-root locking: it blocks readers and adds recovery/lock-order machinery to reads.
+- **Reasoning:** The owner explicitly chose nonblocking reads. Bounded conflicts preserve coherent observations and predictable contention behavior through one shared read mechanism (D-18/D-20).
 - **Date:** 2026-11-05
