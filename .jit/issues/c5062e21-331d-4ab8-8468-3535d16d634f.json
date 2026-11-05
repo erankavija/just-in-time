@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "82093768-2d32-4f26-97a0-9f657b3d0888",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:38:34.762955986Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "149faf22-3f88-438c-a7f3-d29fefc5e66d",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:42:44.447966719Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Server detects its layout once from the selected data root",
-  "updated_at": "2026-11-05T01:12:01.086681605Z"
+  "updated_at": "2026-11-05T01:42:44.447966719Z"
 }
