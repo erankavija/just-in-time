@@ -1604,6 +1604,50 @@ fn test_object_types_preserves_input_order_and_absence_in_one_process() {
     assert_eq!(invocations[0].args(), ["cat-file", "--batch-check"]);
 }
 
+#[cfg(unix)]
+#[test]
+fn test_object_operations_treat_gitlink_as_absent_between_valid_objects() {
+    use jit::storage::git::GitObjectType;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    repository
+        .write("assets/one", b"first")
+        .write("assets/two", b"second");
+    repository.commit("add assets");
+    repository.git(&[
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        "160000,1111111111111111111111111111111111111111,assets/module",
+    ]);
+    repository.git(&["commit", "--quiet", "--message", "add gitlink"]);
+
+    let stand_in = GitStandIn::new();
+    let handle = checkout(Git::with_program(stand_in.program()), repository.root());
+    assert_eq!(
+        handle
+            .object_types(["HEAD:assets/one", "HEAD:assets/module", "HEAD:assets/two",])
+            .unwrap(),
+        [Some(GitObjectType::Blob), None, Some(GitObjectType::Blob)]
+    );
+    let mut reader = handle.object_reader().unwrap();
+    assert_eq!(
+        reader.read("HEAD:assets/one").unwrap().unwrap().bytes(),
+        b"first"
+    );
+    assert_eq!(reader.read("HEAD:assets/module").unwrap(), None);
+    assert_eq!(
+        reader.read("HEAD:assets/two").unwrap().unwrap().bytes(),
+        b"second"
+    );
+    drop(reader);
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 2, "{invocations:?}");
+    assert_eq!(invocations[0].args(), ["cat-file", "--batch-check"]);
+    assert_eq!(invocations[1].args(), ["cat-file", "--batch"]);
+}
+
 #[test]
 fn test_object_reader_rejects_invalid_names_without_corrupting_the_next_request() {
     let dir = TempDir::new().unwrap();
@@ -1668,6 +1712,9 @@ fn test_object_reader_rejects_malformed_headers_and_truncated_object_frames() {
         format!("{oid} blob -1\n"),
         format!("{oid} blob 18446744073709551616\n"),
         "different-name missing\n".to_owned(),
+        "not-an-oid submodule\n".to_owned(),
+        format!("{oid} submodule extra\n"),
+        format!("{oid} unknown\n"),
         format!("{oid} blob 0"),
         format!("{oid} blob 2\na"),
         format!("{oid} blob 1\nax"),

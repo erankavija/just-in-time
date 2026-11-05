@@ -550,7 +550,8 @@ pub struct GitObjectReader {
 
 impl GitObjectReader {
     /// Read another name, including names discovered from an earlier answer.
-    /// Missing names return `None`; newline or NUL input is rejected before sending.
+    /// Missing names and gitlinks without a readable object return `None`;
+    /// newline or NUL input is rejected before sending.
     /// I/O or protocol errors end the session and return [`GitError::UnexpectedOutput`].
     pub fn read(&mut self, name: &str) -> Result<Option<GitObject>, GitError> {
         let Some(header) = self.process.request(name)? else {
@@ -586,7 +587,8 @@ impl GitCheckout {
     }
 
     /// Look up object kinds in input order through one `cat-file --batch-check`.
-    /// Missing names return `None`. Every name is validated before starting Git.
+    /// Missing names and gitlinks without a readable object return `None`.
+    /// Every name is validated before starting Git.
     /// Startup, I/O and protocol failures use the module's typed errors.
     pub fn object_types(
         &self,
@@ -783,7 +785,11 @@ fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHead
         .ok()
         .and_then(|header| header.strip_suffix('\n'))
         .ok_or_else(malformed)?;
-    if line.strip_suffix(" missing") == Some(name) {
+    if line.strip_suffix(" missing") == Some(name)
+        || line
+            .strip_suffix(" submodule")
+            .is_some_and(|id| GitObjectId::parse(id).is_some())
+    {
         return Ok(None);
     }
     let mut fields = line.split(' ');
