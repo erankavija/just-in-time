@@ -257,8 +257,6 @@ impl GitCheckout {
         }
     }
 
-    // Temporary @/inv/convention-convergence exception: recorded_worktree_ids
-    // converges here when f649c144 lands.
     /// List every worktree, including detached and bare entries, with one git
     /// process. Branch names omit the `refs/heads/` prefix.
     ///
