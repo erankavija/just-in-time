@@ -25,7 +25,7 @@
           "short_id": "0f302914",
           "title": "Offload executor work in server handlers",
           "classification": "implementation",
-          "status": "ready_to_land"
+          "status": "done"
         },
         {
           "id": "abf68973-3771-47cb-89d0-708290cb00ac",
@@ -51,7 +51,7 @@
           "short_id": "cd0ac0f7",
           "title": "Reload browser hierarchy on configuration events",
           "classification": "implementation",
-          "status": "in_review_after_rework"
+          "status": "ready_to_land"
         },
         {
           "id": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
@@ -150,7 +150,7 @@
         "6d93ab14-4c72-4ec5-9c50-471cf0d95746"
       ],
       "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
-      "status": "in_progress",
+      "status": "ready_to_land",
       "reduction": "bb03df0a\u21926d93ab14 direct edge removed by transitive reduction; reachability through 0f8efc37\u21923a61ff16\u21924858de06 retained."
     },
     {
@@ -170,7 +170,7 @@
     "cd0ac0f7": 1
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Watcher and server library changes landed and passed merged Cargo. Offload and binding await their coordinated source slots; 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
+  "note": "Watcher, server library, and offload landed and passed merged Cargo. Binding awaits its coordinated source slot; browser config refresh and issue-detail repair passed review and await their slots. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",

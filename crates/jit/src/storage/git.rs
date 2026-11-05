@@ -241,6 +241,49 @@ impl GitCheckout {
         }
     }
 
+    // Temporary @/inv/convention-convergence exception: the parsers in
+    // parse_git_worktree_porcelain and recorded_worktree_ids converge here
+    // when e3c38fea and f649c144 land.
+    /// List every worktree, including detached and bare entries, with one git
+    /// process. Branch names omit the `refs/heads/` prefix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails, or reports malformed or
+    /// non-UTF-8 output.
+    pub fn list_worktrees(&self) -> Result<Vec<Worktree>, GitError> {
+        const ARGS: [&str; 4] = ["worktree", "list", "--porcelain", "-z"];
+        let output = self.git.run(&self.worktree_root, ARGS)?;
+        let unexpected = |output: &str| GitError::UnexpectedOutput {
+            command: ARGS.join(" "),
+            output: output.to_owned(),
+        };
+        if !output.status.success() {
+            return Err(unexpected(&String::from_utf8_lossy(&output.stderr)));
+        }
+        let stdout = std::str::from_utf8(&output.stdout)
+            .map_err(|_| unexpected(&String::from_utf8_lossy(&output.stdout)))?;
+        stdout
+            .split("\0\0")
+            .filter(|block| !block.is_empty())
+            .map(|block| {
+                let mut fields = block.split('\0');
+                let path = fields
+                    .next()
+                    .and_then(|line| line.strip_prefix("worktree "))
+                    .filter(|path| !path.is_empty())
+                    .ok_or_else(|| unexpected(block))?;
+                let branch = fields
+                    .find_map(|line| line.strip_prefix("branch refs/heads/"))
+                    .map(str::to_owned);
+                Ok(Worktree {
+                    path: PathBuf::from(path),
+                    branch,
+                })
+            })
+            .collect()
+    }
+
     // Temporary @/inv/convention-convergence exception: claim release's actor
     // fallback still queries user.name directly until ea4b7363.
     /// Read the configured user name, if this checkout has one.
@@ -344,6 +387,25 @@ impl GitCheckout {
             }
         }
         Ok(paths)
+    }
+}
+
+/// A repository worktree and its checked-out branch, if any.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Worktree {
+    path: PathBuf,
+    branch: Option<String>,
+}
+
+impl Worktree {
+    /// The absolute path reported by git.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// The branch name, or `None` for detached and bare worktrees.
+    pub fn branch(&self) -> Option<&str> {
+        self.branch.as_deref()
     }
 }
 

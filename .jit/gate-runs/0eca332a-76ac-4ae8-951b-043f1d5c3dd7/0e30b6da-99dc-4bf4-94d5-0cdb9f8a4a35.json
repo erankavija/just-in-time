@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-0eca332a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a0e102d7bd00be45d011661aefb932adbf48b1d3",
+  "completed_at": "2026-11-04T23:16:32.064536308Z",
+  "duration_ms": 263967,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable changes remove unproduced error codes while preserving typed classification, findings emission, child-status passthrough, and generated contracts.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0eca332a-76ac-4ae8-951b-043f1d5c3dd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0e30b6da-99dc-4bf4-94d5-0cdb9f8a4a35",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:12:08.097341374Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6b563b36, c165cc76, b4676f11, c76adc6b\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/df129d9e/requirement/REQ-09, REQ-13 and @/issue/0eca332a/decision/D-01, D-02 (issue descriptions); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/{semantic-types,canonical-cutover,architecture-dependency-direction,semantic-test-assertions,orthogonal-tests,essential-code-prose,single-source-prose} (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci pending (no recorded run or exit code); code-review pending\nTruncation recovery: reread each truncated patch and current classifier, registry, emitter, worktree, schema, and generated-reference sections in bounded path/range calls\n\n1. No findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable changes remove unproduced error codes while preserving typed classification, findings emission, child-status passthrough, and generated contracts.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

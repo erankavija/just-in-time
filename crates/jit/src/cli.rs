@@ -2545,7 +2545,12 @@ pub enum WorktreeCommands {
     /// Examples:
     ///   jit worktree info          # Show current worktree info
     ///   jit worktree info --json   # JSON output
-    Info,
+    ///   jit worktree info --field data_root  # Resolved store path without a parser
+    Info {
+        /// Print one top-level field as plain text; --json retains its JSON type.
+        #[arg(long, value_name = "NAME")]
+        field: Option<String>,
+    },
 
     /// List all git worktrees with JIT status
     ///

@@ -14,6 +14,73 @@ use std::fs;
 // === jit worktree info tests ===
 
 #[test]
+fn test_worktree_info_field_projection_preserves_value_types_and_raw_paths() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let store = cli.root().join("tracker space[1] \"quoted\"");
+    fs::rename(cli.root().join(".jit"), &store).unwrap();
+    for (field, expected) in [
+        ("data_root", Value::from(store.to_str().unwrap())),
+        ("is_main_worktree", Value::from(true)),
+    ] {
+        let plain = cli
+            .command_with_env(
+                ["worktree", "info", "--field", field],
+                [("JIT_DATA_DIR", &store)],
+            )
+            .output()
+            .unwrap();
+        assert!(plain.status.success(), "{plain:?}");
+        let text = match &expected {
+            Value::String(text) => text.clone(),
+            other => other.to_string(),
+        };
+        assert_eq!(
+            String::from_utf8(plain.stdout).unwrap(),
+            format!("{text}\n")
+        );
+        let json = cli
+            .command_with_env(
+                ["worktree", "info", "--field", field, "--json"],
+                [("JIT_DATA_DIR", &store)],
+            )
+            .output()
+            .unwrap();
+        assert!(json.status.success(), "{json:?}");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&json.stdout).unwrap(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn test_worktree_info_field_projection_rejects_unknown_fields_in_both_modes() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    for json in [false, true] {
+        let mut command = cli.command(["worktree", "info", "--field", "absent_field"]);
+        if json {
+            command.arg("--json");
+        }
+        let output = command.output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        if json {
+            let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(response["error"]["code"], "INVALID_ARGUMENT");
+            assert!(response["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("absent_field"));
+        } else {
+            assert!(String::from_utf8(output.stderr)
+                .unwrap()
+                .contains("absent_field"));
+        }
+    }
+}
+
+#[test]
 fn test_worktree_info_success() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
