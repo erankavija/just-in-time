@@ -9,6 +9,7 @@
   ],
   "description": "Make `jit validate --branch-drift` compare through the git module in the selected worktree, instead of running git in the process working directory, and report each outcome with its own message.\n\n## Background\n\n- `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2162-2211`) runs `git merge-base HEAD origin/main` and `git rev-parse origin/main` in the selected data root. This already handles an ordinary repository selected by `JIT_DATA_DIR`, but an external store is not the selected worktree; use the supplied checkout authority. The CLI calls it at `crates/jit/src/main.rs:6770`.\n- Its failures quote git's stderr: \"Failed to get merge-base with origin/main: <stderr>\", reported for a missing `origin/main` and for unrelated histories alike, and \"Failed to get origin/main commit: <stderr>\". A drifted branch reports both commits and `git rebase origin/main`. The current dispatcher wraps failed checks in `Outcome::findings(ErrorCode::ValidationFailed, ...)`, and the generated `validate` row reports exit 4. The earlier exit-1 promise is superseded by DEC-28.\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:640` and `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:652`, built on `setup_repo` and `attach_origin_remote` in the same file.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_branch_drift` compares through the module's base comparison of the already-resolved selected checkout from `require_worktree_paths()?.write_checkout()` (including external-store context) with base `origin/main`, and `commands/validate.rs` starts no git process for it.\n- [hard] REQ-02: Each failing outcome preserves the existing `VALIDATION_FAILED` findings response with exit 4 and its own message: no git checkout gives \"branch drift validation requires a git repository\"; `BaseUnresolved` gives \"origin/main does not resolve to a commit\"; `NoMergeBase` gives \"HEAD shares no history with origin/main\"; a drifted branch reports both commits and the rebase, as today.\n- [hard] REQ-03: CLI tests assert REQ-02's messages for a repository without `origin/main` and for one whose `origin/main` has unrelated history; today both report the quoted merge-base failure, so they fail.\n- [hard] REQ-04: A CLI test runs `jit validate --branch-drift` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a drifted repository, and asserts the drift failure. This preserves existing selection behavior; the baseline already passes this scenario.\n\n## Notes\n\n- Behaviour change: failure messages name the missing fact and no longer quote git's stderr; the current shared findings response and exit 4 remain unchanged (DEC-28); no ordinary error wrapper replaces the report.\n- Whether the check runs, and against which base, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T04:15:03.246382159Z",
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
@@ -16,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "b62e4d14-6ed0-4ccd-ba27-6d3d6e033c35",
+      "run_id": "c0fc1f14-1870-4b22-af67-a8e59463e24b",
       "status": "passed",
-      "updated_at": "2026-11-05T04:07:52.190009586Z",
+      "updated_at": "2026-11-05T04:14:16.130726317Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,7 +41,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Branch drift validation compares in the selected worktree",
-  "updated_at": "2026-11-05T04:11:33.657268039Z"
+  "updated_at": "2026-11-05T04:15:03.246382159Z"
 }

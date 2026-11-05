@@ -326,10 +326,11 @@
           "short_id": "47d62472",
           "title": "Branch drift validation compares in the selected worktree",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "prepared",
-          "worker": "agent:f4d9502a-lead"
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "0757e05ba7c4c74ca47e5ce3f076a5b0624ae7ae"
         },
         {
           "id": "83c8632f-5495-4fef-a774-730ebeae95be",
@@ -854,7 +855,8 @@
     "47 rework1 consolidates literal selected-data-dir case into existing property owner without newfixture duplication. c140 stewardapproved deletion of both fulfilledHEAD andorigin convergence comments, exactgit.rs executable/testbytes preserved. 9ec landingheld for available-target gitlink consumerclassification; rawtwo-versionprobe preserved in lead scratch.",
     "92afc5d8 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward-approved fb factual reconciliation: current worktree.rs255/303 accepts repository/layout and executes Git at data_root; no test-mode bypass or namedemptytests remain, gate.rs has3currentcalls. Preserve existing selectedrepositoryowner, allow/refuse semantics andliteralcase; do not restoreobsoletebypass. Actualexternalstoreauthority supplies missingbehavior forRED. Sameconsumer scope.",
-    "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate."
+    "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate.",
+    "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1343,10 +1345,11 @@
       "verdict": "PASS",
       "reviewed_source": "8bbd549e25e6c92ab216ed5b2f418ef573226154",
       "gates": {
-        "cargo-ci": "b62e4d14-6ed0-4ccd-ba27-6d3d6e033c35",
+        "cargo-ci": "c0fc1f14-1870-4b22-af67-a8e59463e24b",
         "code-review": "41db8bbd-5147-40d0-a2b1-3e02f91713d0"
       },
-      "criteria": "All4correctedcriteria met: supplied write_checkout typedbasecomparison, distinct exactmessages/findings exit4, actualRED missingbase/unrelated/noGit/externalstore, literal selected-data-dir scenario consolidated in existing owner. Leadrework1 duplicatefixtureclosed. No linked docs/deferrals; basecomparison convergencecomment legitimately awaitsfb. Mandatory mergedCargo pending."
+      "criteria": "All4correctedcriteria met: supplied write_checkout typedbasecomparison, distinct exactmessages/findings exit4, actualRED missingbase/unrelated/noGit/externalstore, literal selected-data-dir scenario consolidated in existing owner. Leadrework1 duplicatefixtureclosed. No linked docs/deferrals; basecomparison convergencecomment legitimately awaitsfb. Mandatory mergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS c0fc1f14-1870-4b22-af67-a8e59463e24b on 0757e05ba7c4c74ca47e5ce3f076a5b0624ae7ae."
     }
   },
   "source_queue": [
