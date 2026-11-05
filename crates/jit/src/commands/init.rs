@@ -300,23 +300,12 @@ impl<S: IssueStore> ProfileOps<'_, S> {
             return Ok((None, Vec::new()));
         }
 
-        // Get git branch name
-        let branch = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&paths.worktree_root)
-            .args(["branch", "--show-current"])
-            .output()
-            .ok()
-            .and_then(|output| {
-                if output.status.success() {
-                    String::from_utf8(output.stdout).ok()
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_else(|| "main".to_string())
-            .trim()
-            .to_string();
+        let branch = paths
+            .git()
+            .and_then(|git| git.head().ok())
+            .flatten()
+            .map(|head| head.branch_label().to_owned())
+            .unwrap_or_else(|| "main".to_string());
 
         // Create or update worktree identity
         // This handles copied files in git worktrees automatically
@@ -489,6 +478,54 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn test_initialize_worktree_identity_records_head_for_detached_checkout() {
+        let repo = TempDir::new().unwrap();
+        let git = crate::test_harness::git::GitRepository::init(repo.path());
+        git.write("tracked", "content");
+        git.commit("initial");
+        git.git(&["checkout", "--quiet", "--detach", "HEAD"]);
+        fs::create_dir_all(repo.path().join(".jit")).unwrap();
+
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &repo.path().join(".jit"),
+            repo.path(),
+        )
+        .unwrap();
+        let identity = file_executor(repo.path())
+            .unwrap()
+            .profiles()
+            .initialize_worktree_identity(&paths)
+            .unwrap()
+            .0
+            .unwrap();
+
+        assert_eq!(identity.branch, "HEAD");
+    }
+
+    #[test]
+    fn test_initialize_worktree_identity_records_main_for_unborn_trunk() {
+        let repo = TempDir::new().unwrap();
+        let git = crate::test_harness::git::GitRepository::init(repo.path());
+        git.git(&["branch", "--move", "trunk"]);
+        fs::create_dir_all(repo.path().join(".jit")).unwrap();
+
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &repo.path().join(".jit"),
+            repo.path(),
+        )
+        .unwrap();
+        let identity = file_executor(repo.path())
+            .unwrap()
+            .profiles()
+            .initialize_worktree_identity(&paths)
+            .unwrap()
+            .0
+            .unwrap();
+
+        assert_eq!(identity.branch, "main");
+    }
 
     /// Count each apply's own pre-commit check, the one boundary every
     /// publication crosses on both the redo-record and the absent-root path,
