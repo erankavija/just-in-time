@@ -63,9 +63,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "35fd9abc-f250-4933-9564-b282379a6fa2",
+      "run_id": "f604a1fc-d5f9-4548-8dd1-5ed1f0c04d4d",
       "status": "failed",
-      "updated_at": "2026-11-05T05:51:36.489316977Z",
+      "updated_at": "2026-11-05T06:06:31.017611928Z",
       "updated_by": "auto:executor"
     }
   },
@@ -81,5 +81,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-05T05:51:36.489316977Z"
+  "updated_at": "2026-11-05T06:06:31.017611928Z"
 }
