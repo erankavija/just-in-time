@@ -789,7 +789,7 @@
    "terminal": {
     "consumer_family": "claim release actor",
     "test_boundary": "claims unit tests",
-    "worker_sized_reason": "One release-actor resolver and its existing callers use the supplied checkout; existing release success fixtures supply explicit child actors instead of depending on host Git configuration.",
+    "worker_sized_reason": "One resolver and its callers use the supplied checkout; release fixtures supply explicit child actors, and the fulfilled two-line convergence comment is removed.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/claim.rs",
@@ -797,7 +797,8 @@
       "crates/jit/tests/cli_issue/gate_field_contract_test.rs",
       "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
       "crates/jit/tests/cli_repo_workflow/workflow_tests.rs",
-      "crates/jit/tests/cli_repo_workflow/test_cli_consistency.rs"
+      "crates/jit/tests/cli_repo_workflow/test_cli_consistency.rs",
+      "crates/jit/src/storage/git.rs"
      ]
     }
    }
@@ -1995,11 +1996,13 @@
    "terminal": {
     "consumer_family": "document link check",
     "test_boundary": "link check CLI tests",
-    "worker_sized_reason": "One loop collects its lookups into one module call and one helper is deleted.",
+    "worker_sized_reason": "One asset loop uses one module call; the shared parser recognizes canonical OID plus submodule as absent, retaining older Git missing responses, with one owning mixed-batch contract.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/document.rs",
-      "crates/jit/tests/cli_query_graph/check_links_tests.rs"
+      "crates/jit/tests/cli_query_graph/check_links_tests.rs",
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
     }
    }
