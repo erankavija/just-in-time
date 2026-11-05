@@ -682,18 +682,6 @@ fn dependency_batch_error_code(batch: &crate::errors::DependencyBatchRejectedErr
         .unwrap_or(ErrorCode::ValidationFailed)
 }
 
-/// Build a command handler's machine-readable error under `code`, except that a
-/// lock wait that expired reports [`ErrorCode::LockTimeout`], so contention is
-/// distinguishable from the command's own failure on every command.
-pub fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> JsonError {
-    let code = if crate::storage::is_lock_timeout(error) {
-        ErrorCode::LockTimeout
-    } else {
-        code
-    };
-    JsonError::new(code, error.to_string())
-}
-
 /// Build the `jit dep add` envelope for a rejected batch (jit:c8518f2a).
 ///
 /// Every rejected edge is named under `details.rejected`, each carrying its own
@@ -705,16 +693,11 @@ pub fn dependency_batch_json_error(
     batch: &crate::errors::DependencyBatchRejectedError,
 ) -> JsonError {
     let from_id = batch.from_id();
-    let edge_code = |err: &anyhow::Error| match classify_code(err) {
-        ErrorCode::GenericError => ErrorCode::DependencyError,
-        code => code,
-    };
-
     let rejected = batch
         .rejected()
         .iter()
         .map(|(to, err)| {
-            let code = edge_code(err);
+            let code = classify_code(err);
             let message = if code == ErrorCode::CycleDetected {
                 format!("Adding dependency would create a cycle: {from_id} -> {to}")
             } else {
@@ -734,11 +717,10 @@ pub fn dependency_batch_json_error(
         .iter()
         .position(|(_, err)| classify_code(err).exit_code() != ExitCode::ValidationFailed)
         .unwrap_or(0)];
-    let mut json_error = match edge_code(err) {
+    let mut json_error = match classify_code(err) {
         ErrorCode::CycleDetected => JsonError::cycle_detected(from_id, to),
         ErrorCode::IssueNotFound => JsonError::issue_not_found(to),
-        ErrorCode::ValidationFailed => command_json_error(err, ErrorCode::ValidationFailed),
-        _ => super::refine_id_error(err, command_json_error(err, ErrorCode::DependencyError)),
+        _ => classify(err),
     };
 
     let mut details = json_error
@@ -1248,12 +1230,10 @@ mod repository_state_classifier_tests {
 
 #[cfg(test)]
 mod lock_timeout_classification_tests {
-    //! A lock wait that expired is reported as contention wherever it surfaces:
-    //! through the shared classifier and through a handler's own JSON error,
-    //! including when a mutation session wraps it and callers add context.
+    //! Contention survives mutation-session wrapping and added context.
 
-    use super::{classify, command_json_error};
-    use crate::output::{ErrorCode, ExitCode};
+    use super::classify;
+    use crate::output::ErrorCode;
     use crate::storage::{LockMode, LockTimeout, RepositoryStateStoreError};
 
     fn session_lock_timeout() -> anyhow::Error {
@@ -1287,31 +1267,6 @@ mod lock_timeout_classification_tests {
         assert_eq!(
             classify(&contended.into()).error.code,
             ErrorCode::LockTimeout
-        );
-    }
-
-    #[test]
-    fn test_command_json_error_reports_lock_timeout_over_handler_code() {
-        [
-            ErrorCode::GenericError,
-            ErrorCode::GateError,
-            ErrorCode::PresetError,
-        ]
-        .into_iter()
-        .for_each(|handler_code| {
-            assert_eq!(
-                command_json_error(&session_lock_timeout(), handler_code).exit_code(),
-                ExitCode::LockTimeout
-            );
-        });
-    }
-
-    #[test]
-    fn test_command_json_error_keeps_handler_code_for_other_failures() {
-        let error = anyhow::anyhow!("gate registry is malformed");
-        assert_eq!(
-            command_json_error(&error, ErrorCode::GateError).exit_code(),
-            ErrorCode::GateError.exit_code()
         );
     }
 }
@@ -1635,6 +1590,46 @@ mod derived_guidance_tests {
             "the dominant edge's own details survive"
         );
         assert_suggestions(&json, &[&["query all"], &["Check", "issue ID"]]);
+    }
+
+    #[test]
+    fn test_dependency_batch_preserves_generic_and_typed_edge_classification() {
+        for (cause, code, status) in [
+            (
+                anyhow::anyhow!("unclassified target failure"),
+                ErrorCode::GenericError,
+                crate::output::ExitCode::GenericError,
+            ),
+            (
+                std::io::Error::other("target read failed").into(),
+                ErrorCode::IoError,
+                crate::output::ExitCode::ExternalError,
+            ),
+        ] {
+            let message = cause.to_string();
+            let error = batch(vec![("requested-target", cause)]);
+            let dedicated = dependency_batch_json_error(
+                error
+                    .downcast_ref::<DependencyBatchRejectedError>()
+                    .unwrap(),
+            );
+
+            for envelope in [dedicated, classify(&error)] {
+                assert_eq!(envelope.error.code, code);
+                assert_eq!(envelope.exit_code(), status);
+                let details = details_of(&envelope);
+                assert_eq!(details["from_id"], issue_id(1).to_string());
+                assert_eq!(
+                    details["rejected"],
+                    serde_json::json!([{
+                        "from": issue_id(1),
+                        "to": "requested-target",
+                        "code": code.as_str(),
+                        "message": message,
+                    }]),
+                );
+            }
+        }
     }
 
     #[test]

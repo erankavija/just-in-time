@@ -8,6 +8,7 @@
   ],
   "description": "Make `jit validate --leases` list worktrees once before examining leases, instead of once per lease, and state what it does without a git checkout.\n\n## Background\n\n- `validate_leases` (`crates/jit/src/commands/validate.rs:2222-2276`) calls `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2422-2463`) for every lease. Each call starts `git worktree list --porcelain` and reads every listed worktree's identity file. Measured: `jit validate --leases --json` in a repository with nine leases starts nine listings.\n- Without a git checkout (outside a repository, or with no git executable) leases can still be stored under `.git/jit/`. Today the first lease's listing then fails with the untyped \"Failed to execute git worktree list\" or \"git worktree list failed\" error.\n- The exit-code projection states that `validate --leases` exits 1 when it finds invalid leases or cannot run (`crates/jit/src/schema.rs:989`, `docs/reference/exit-codes.md`). Claim subcommands, not validation, carry the typed git-requirement error with exit 10 (`@/charter/D-4`).\n- CLI lease-validation tests: `crates/jit/tests/cli_item_validate/validation_lease_tests.rs:229` onwards. CLI suites plant leases through their shared lease-store test helper.\n- Kept as one change for a build reason: `check_worktree_exists` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_leases` lists worktrees once through the module before examining leases and reads each listed worktree's id once; `check_worktree_exists` no longer exists, and `commands/validate.rs` starts no git process for lease validation. With a git checkout, findings and remedies are unchanged, and the lease-validation tests pass unchanged.\n- [hard] REQ-02: Without a git checkout, `validate --leases` reports no finding when no lease is stored. When leases are stored it fails with exit 1 and the message \"lease validation requires a git repository to check lease worktrees\", as the projected row states.\n- [hard] REQ-03: A CLI test plants three leases, puts the counting stand-in first on `PATH`, and asserts that `jit validate --leases --json` records exactly one `worktree list` invocation; today it records one per lease, so it fails.\n- [hard] REQ-04: A CLI test plants a lease, runs `jit validate --leases --json` with no git executable on `PATH`, and asserts exit 1 with REQ-02's message; today's message is the untyped listing failure, so it fails.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement instead of a failed `git worktree list`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T01:05:34.432147653Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "satisfies:f4d9502a/REQ-12"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Lease validation lists worktrees once per run",
-  "updated_at": "2026-10-21T15:43:45.657382750Z"
+  "updated_at": "2026-11-05T01:05:34.432147653Z"
 }

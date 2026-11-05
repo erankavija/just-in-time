@@ -711,3 +711,144 @@ fn test_dirty_paths_runs_one_git_process_in_the_checkout() {
     assert_eq!(invocations.len(), 1);
     assert_eq!(invocations[0].directory(), Some(repository.root()));
 }
+
+#[cfg(unix)]
+#[test]
+fn test_list_worktrees_primary_linked_detached_and_slash_branches_use_one_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let primary_branch = repository.git(&["branch", "--show-current"]);
+    let linked = dir.path().join("linked with spaces");
+    let detached = dir.path().join("detached");
+    let slash_branch = dir.path().join("topic");
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "linked",
+        linked.to_str().unwrap(),
+    ]);
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "--detach",
+        detached.to_str().unwrap(),
+        "HEAD",
+    ]);
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "topic/nested/branch",
+        slash_branch.to_str().unwrap(),
+    ]);
+    repository.git(&[
+        "worktree",
+        "lock",
+        "--reason",
+        "worktree undergoing maintenance",
+        detached.to_str().unwrap(),
+    ]);
+    let stand_in = GitStandIn::new();
+
+    let worktrees = checkout(Git::with_program(stand_in.program()), repository.root())
+        .list_worktrees()
+        .unwrap();
+
+    let entries: BTreeSet<_> = worktrees
+        .iter()
+        .map(|worktree| {
+            (
+                worktree.path().to_path_buf(),
+                worktree.branch().map(str::to_owned),
+            )
+        })
+        .collect();
+    assert_eq!(worktrees.len(), entries.len());
+    assert_eq!(
+        entries,
+        BTreeSet::from([
+            (canonical(repository.root()), Some(primary_branch)),
+            (canonical(&linked), Some("linked".to_owned())),
+            (canonical(&detached), None),
+            (
+                canonical(&slash_branch),
+                Some("topic/nested/branch".to_owned())
+            ),
+        ])
+    );
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(repository.root()));
+    assert_eq!(
+        invocations[0].args(),
+        ["worktree", "list", "--porcelain", "-z"]
+    );
+}
+
+#[test]
+fn test_list_worktrees_from_linked_checkout_includes_bare_repository_without_branch() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let bare = dir.path().join("bare.git");
+    let linked = dir.path().join("linked-from-bare");
+    repository.git(&[
+        "clone",
+        "--quiet",
+        "--bare",
+        repository.root().to_str().unwrap(),
+        bare.to_str().unwrap(),
+    ]);
+    repository.git(&[
+        "--git-dir",
+        bare.to_str().unwrap(),
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "linked-from-bare",
+        linked.to_str().unwrap(),
+    ]);
+
+    let worktrees = checkout(Git::default(), &linked).list_worktrees().unwrap();
+
+    assert_eq!(worktrees.len(), 2);
+    assert!(worktrees
+        .iter()
+        .any(|worktree| worktree.path() == canonical(&bare) && worktree.branch().is_none()));
+    assert!(worktrees
+        .iter()
+        .any(|worktree| worktree.path() == canonical(&linked)
+            && worktree.branch() == Some("linked-from-bare")));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_list_worktrees_preserves_newlines_inside_worktree_paths() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let linked = dir.path().join("linked\n\nworktree misleading");
+    repository.git(&[
+        "worktree",
+        "add",
+        "--quiet",
+        "-b",
+        "delimiter-path",
+        linked.to_str().unwrap(),
+    ]);
+
+    let worktrees = checkout(Git::default(), repository.root())
+        .list_worktrees()
+        .unwrap();
+
+    let linked_entry = worktrees
+        .iter()
+        .find(|worktree| worktree.branch() == Some("delimiter-path"))
+        .unwrap();
+    assert_eq!(linked_entry.path(), canonical(&linked));
+}

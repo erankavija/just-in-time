@@ -19,7 +19,7 @@ git checkout main
 git status        # tracked changes allowed only under the resolved data root
 ```
 
-The script obtains the absolute data root from `jit worktree info --json` (requires `jit` and `jq`). Staged or unstaged changes under that root may remain: workers branch from the committed main revision. Any other tracked change blocks dispatch and is named in the refusal; commit or stash it first. An external data root exempts no checkout path. The snapshot includes all dirt, preserving the leak-check baseline in step 4.
+The script obtains the absolute data root from `jit worktree info --field data_root` (requires `jit`). Staged or unstaged changes under that root may remain: workers branch from the committed main revision. Any other tracked change blocks dispatch and is named in the refusal; commit or stash it first. An external data root exempts no checkout path. The snapshot includes all dirt, preserving the leak-check baseline in step 4.
 
 ### Step 2 — Manual worktree creation + snapshot
 
