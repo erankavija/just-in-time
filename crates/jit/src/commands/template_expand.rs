@@ -80,6 +80,15 @@ pub struct AnchorGates {
     pub gates: Vec<GateKey>,
 }
 
+/// One container dependency a transform moves onto the node of `role`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedUpstreamMove {
+    /// The created node's template role that receives the dependency.
+    pub role: String,
+    /// The moved dependency's full id.
+    pub dependency: IssueId,
+}
+
 /// The complete, storage-free description of what applying a template does.
 ///
 /// Produced by [`expand_template`] and committed by the apply executor in this
@@ -97,6 +106,9 @@ pub struct TemplateDelta {
     pub remove_edges: Vec<DeltaEdge>,
     /// Gates to attach to bound anchor issues.
     pub anchor_gates: Vec<AnchorGates>,
+    /// The container dependencies the transforms move, one per moved edge pair
+    /// in `add_edges`/`remove_edges`.
+    pub upstream_moves: Vec<PlannedUpstreamMove>,
 }
 
 /// Expand `template` over a container snapshot into the delta an apply commits.
@@ -237,6 +249,7 @@ pub fn expand_template(
     //    container's PRE-APPLY upstream deps onto the target role's node: the
     //    role node gains each dep, the container loses it.
     let mut remove_edges: Vec<DeltaEdge> = Vec::new();
+    let mut upstream_moves: Vec<PlannedUpstreamMove> = Vec::new();
     let container_anchor = resolved_bindings
         .iter()
         .find(|(_, id)| *id == &container.id)
@@ -264,6 +277,10 @@ pub fn expand_template(
                         dependent: DeltaEndpoint::ExistingIssue(container.id.clone()),
                         dependency: DeltaEndpoint::ExistingIssue(dep_id.clone()),
                     });
+                    upstream_moves.push(PlannedUpstreamMove {
+                        role: transform.role.clone(),
+                        dependency: dep_id.clone(),
+                    });
                 }
             }
         }
@@ -287,6 +304,7 @@ pub fn expand_template(
         add_edges,
         remove_edges,
         anchor_gates,
+        upstream_moves,
     })
 }
 

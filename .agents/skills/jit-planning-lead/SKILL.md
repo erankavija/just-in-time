@@ -36,7 +36,8 @@ worker-sized. Never implement the planned work.
    areas to separate containers. Drop criteria that neither change observable
    behaviour nor remove a real duplicate.
 4. Run `jit apply plan <C>` once. Record planning node `P`, breakdown node `B`,
-   their configured gates, and P's plan path. A template names its gates; see
+   their configured gates, P's plan path, and any `upstream_move` report (the
+   edges moved from `C` onto `P`). A template names its gates; see
    [Graph Template Registry](https://github.com/erankavija/just-in-time/blob/main/docs/reference/storage-format.md#graph-template-registry).
    Commit JIT state.
 
@@ -119,7 +120,8 @@ contract/task, removing superseded prose, regenerating the plan, and rerunning a
 four commands. Append-only correction sections fail. Report each round's issue
 count and its change from the previous round.
 
-Audit upstream dependencies moved from `C` to `P`. Keep planning-required edges.
+Audit the upstream dependencies the recorded `upstream_move` report lists as
+moved from `C` to `P`. Keep planning-required edges.
 For implementation-consumed edges, remove them from `P` and record the external
 dependency plus its target manifest key in Decisions for breakdown to re-home.
 

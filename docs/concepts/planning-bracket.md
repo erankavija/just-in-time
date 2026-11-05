@@ -141,7 +141,9 @@ That shapes the spine edges:
 - **Retrofit moves upstream deps onto `P`.** When you bracket a container
   (`jit apply plan <C>`), `C`'s pre-existing upstream dependencies **move onto
   `P`** — planning waits on that upstream work, and `C` becomes the pure closure
-  node at the back of its own bracket.
+  node at the back of its own bracket. The move cannot tell children from
+  prerequisites, so on a populated container `jit apply` reports each moved
+  edge; re-home the children that do not gate planning.
 
 ## The three gates
 
