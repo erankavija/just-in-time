@@ -12,9 +12,9 @@
   ],
   "gates_status": {
     "doc-review": {
-      "run_id": "6f4ea264-a5b5-4746-a677-81c003199ee6",
-      "status": "failed",
-      "updated_at": "2026-11-05T23:34:02.777135830Z",
+      "run_id": "84c4254a-ba13-4cba-9840-c22cf629130d",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:38:05.808638186Z",
       "updated_by": "auto:executor"
     }
   },
@@ -26,5 +26,5 @@
   "priority": "low",
   "state": "in_progress",
   "title": "State that a template names gates rather than carrying them",
-  "updated_at": "2026-11-05T23:34:02.777135830Z"
+  "updated_at": "2026-11-05T23:38:05.808638186Z"
 }
