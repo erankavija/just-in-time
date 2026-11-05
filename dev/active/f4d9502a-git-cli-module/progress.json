@@ -405,10 +405,11 @@
           "short_id": "fb5e8e8d",
           "title": "Main-history guard runs against the selected worktree",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "prepared",
-          "worker": "agent:f4d9502a-lead"
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "e552fbb2cdec781216419c1d8918f37c75cd9de6"
         }
       ]
     },
@@ -555,7 +556,8 @@
     "83c8632f": 1,
     "3f8da8c4": 1,
     "47d62472": 1,
-    "9ecde705": 1
+    "9ecde705": 1,
+    "fb5e8e8d": 1
   },
   "surfaced_pitfalls": [
     {
@@ -880,7 +882,9 @@
     "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done.",
     "Stewardfbpolicyruling: mutationguard uses supplied data-history paths.git(); relocatedcodecheckout mustnotlendhistory to externalnonGitstore. Existingownerassertion preserved, rootwrite_checkoutinferencewithdrawn.504planner mustpreserveseparatedatahistory/codeevidenceauthorities. 504claimedplanningonly perDEC04/23 outside53manifest/REQcredit, Terrahighdesignthenindependentreview/stewardacceptance. c0ea checkpointclaimed forcriteriaaudit+cargo/holisticgatesin isolation, no source-slotreservation.",
-    "Steward-approved post-plan d9ba0029 semantic correction: unchanged original revision -> shared canonical commit resolution -> canonical commit:path in one child; erroneous suffix-first expression contract corrected, availability/error rules retained. Added actual c140921c prerequisite with no cycle, reduced transitive d68150e2 edge; no redundant a273 edge. Producer must land/gate before archive dispatch. Rationale: dev/active/c140921c/revision-producer-plan.md."
+    "Steward-approved post-plan d9ba0029 semantic correction: unchanged original revision -> shared canonical commit resolution -> canonical commit:path in one child; erroneous suffix-first expression contract corrected, availability/error rules retained. Added actual c140921c prerequisite with no cycle, reduced transitive d68150e2 edge; no redundant a273 edge. Producer must land/gate before archive dispatch. Rationale: dev/active/c140921c/revision-producer-plan.md.",
+    "fb guard authority correction: initial lead brief inferred write_checkout incorrectly; original git-absent assertion failed and was preserved. Steward directed paths.git data-history; withdrawn invalid external-store refusal expectation removed, final40worktreeCLI passed. Initial and corrected evidence retained.",
+    "fb5e8e8d Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1375,6 +1379,16 @@
       },
       "criteria": "All4correctedcriteria met: supplied write_checkout typedbasecomparison, distinct exactmessages/findings exit4, actualRED missingbase/unrelated/noGit/externalstore, literal selected-data-dir scenario consolidated in existing owner. Leadrework1 duplicatefixtureclosed. No linked docs/deferrals; basecomparison convergencecomment legitimately awaitsfb. Mandatory mergedCargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS c0fc1f14-1870-4b22-af67-a8e59463e24b on 0757e05ba7c4c74ca47e5ce3f076a5b0624ae7ae."
+    },
+    "fb5e8e8d": {
+      "verdict": "PASS",
+      "reviewed_source": "4fc42eb64e71780af840cd99b2c0e2e77122ac89",
+      "gates": {
+        "cargo-ci": "1f3f1879-d902-4380-a3ef-3e1f435eb339",
+        "code-review": "65c49afc-490a-4694-a01b-4bfc0f0f1622"
+      },
+      "criteria": "All3 corrected criteria met; data-history supplied context, canonical comparison, all3 callers, exact refusal message, preserved noGit allow, existing CLI owner extended without weakening. Actual old-code RED and focused/fullPASS; obsolete comparison comment only in shared module. No deferred scope.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 1f3f1879-d902-4380-a3ef-3e1f435eb339 on e552fbb2cdec781216419c1d8918f37c75cd9de6."
     }
   },
   "source_queue": [
