@@ -16,7 +16,7 @@ use crate::repository_state::{
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
 };
 use crate::storage::{
-    git::{Git, GitCheckout, GitError},
+    git::{Git, GitCheckout, GitError, GitObjectType},
     FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
     RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
     RepositoryNotFoundError, RepositoryStateStore, WorktreePaths,
@@ -1256,34 +1256,45 @@ impl IssueStore for JsonFileStorage {
         let repo_root = layout.worktree_root();
 
         if let Some(commit_ref) = at_commit {
-            use git2::Repository;
-
-            let repo = Repository::open(repo_root).map_err(|e| {
-                PathReadError::Other(anyhow!("Failed to open git repository: {}", e))
-            })?;
-
-            let commit_obj = repo
-                .revparse_single(commit_ref)
-                .map_err(|_| PathReadError::CommitNotFound(commit_ref.to_string()))?;
-
-            let commit = commit_obj
-                .peel_to_commit()
-                .map_err(|e| PathReadError::Other(anyhow!("Failed to peel to commit: {}", e)))?;
-
-            let tree = commit
-                .tree()
-                .map_err(|e| PathReadError::Other(anyhow!("Failed to get commit tree: {}", e)))?;
-
-            let entry = tree
-                .get_path(std::path::Path::new(path))
-                .map_err(|_| PathReadError::NotFound(path.to_string()))?;
-
-            let blob = repo
-                .find_blob(entry.id())
-                .map_err(|e| PathReadError::Other(anyhow!("Failed to read blob: {}", e)))?;
-
-            let short_hash = format!("{:.7}", commit.id());
-            Ok((blob.content().to_vec(), short_hash))
+            let checkout = GitCheckout::new(self.git.clone(), repo_root.to_path_buf());
+            let mut reader = checkout
+                .object_reader()
+                .map_err(|error| PathReadError::Other(error.into()))?;
+            let resolved = reader
+                .read(commit_ref)
+                .map_err(|error| match error {
+                    GitError::InvalidPath(_) => {
+                        PathReadError::CommitNotFound(commit_ref.to_string())
+                    }
+                    error => PathReadError::Other(error.into()),
+                })?
+                .ok_or_else(|| PathReadError::CommitNotFound(commit_ref.to_string()))?;
+            let commit = if resolved.object_type() == GitObjectType::Commit {
+                resolved
+            } else {
+                reader
+                    .read(&format!("{}^{{commit}}", resolved.id().as_str()))
+                    .map_err(|error| PathReadError::Other(error.into()))?
+                    .filter(|object| object.object_type() == GitObjectType::Commit)
+                    .ok_or_else(|| {
+                        PathReadError::Other(anyhow!("Failed to peel to commit: {commit_ref}"))
+                    })?
+            };
+            let commit_id = commit.id().as_str();
+            let blob = reader
+                .read(&format!("{commit_id}:{path}"))
+                .map_err(|error| match error {
+                    GitError::InvalidPath(message) => PathReadError::InvalidPath(message),
+                    error => PathReadError::Other(error.into()),
+                })?
+                .ok_or_else(|| PathReadError::NotFound(path.to_string()))?;
+            if blob.object_type() != GitObjectType::Blob {
+                return Err(PathReadError::Other(anyhow!(
+                    "Failed to read blob at {path} in commit {commit_id}: object is {:?}",
+                    blob.object_type()
+                )));
+            }
+            Ok((blob.bytes().to_vec(), commit_id[..7].to_string()))
         } else {
             let relative = crate::domain::relative_path::RootRelativePath::parse(path)
                 .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
@@ -2333,6 +2344,118 @@ mod tests {
 
             assert_eq!(storage.load_index().unwrap().deleted_ids, vec![tombstone]);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_path_bytes_at_commit_reads_binary_through_one_object_reader() {
+        use crate::test_harness::git::{GitRepository, GitStandIn};
+
+        let worktree = TempDir::new().unwrap();
+        let repository = GitRepository::init(worktree.path());
+        let expected = b"binary\0bytes\xff\n";
+        repository.write("assets/data.bin", expected);
+        let commit = repository.commit("binary asset");
+        repository.git(&["tag", "-a", "asset-tag", "-m", "tag"]);
+        let stand_in = GitStandIn::new();
+        let data = worktree.path().join(".jit");
+        let storage = JsonFileStorage::with_git(&data, Git::with_program(stand_in.program()));
+        configure_test_layout(&storage, worktree.path(), &data);
+
+        let result = storage.read_path_bytes("assets/data.bin", Some("asset-tag"));
+
+        assert_eq!(
+            result.unwrap(),
+            (expected.to_vec(), commit[..7].to_string())
+        );
+        let invocations = stand_in.invocations();
+        assert_eq!(invocations.len(), 1);
+        assert_eq!(invocations[0].directory(), Some(repository.root()));
+        assert_eq!(invocations[0].args(), ["cat-file", "--batch"]);
+    }
+
+    #[test]
+    fn test_read_path_bytes_at_commit_preserves_message_search_revision() {
+        use crate::test_harness::git::GitRepository;
+
+        let worktree = TempDir::new().unwrap();
+        let repository = GitRepository::init(worktree.path());
+        repository.write("docs/file.md", b"selected");
+        let selected = repository.commit("unique needle message");
+        repository.write("docs/file.md", b"later");
+        repository.commit("later message");
+        let data = worktree.path().join(".jit");
+        let storage = JsonFileStorage::new(&data);
+        configure_test_layout(&storage, worktree.path(), &data);
+
+        assert_eq!(
+            storage
+                .read_path_bytes("docs/file.md", Some(":/unique needle"))
+                .unwrap(),
+            (b"selected".to_vec(), selected[..7].to_string())
+        );
+    }
+
+    #[test]
+    fn test_read_path_bytes_at_commit_reports_absent_path_in_real_repository() {
+        use crate::storage::PathReadError;
+        use crate::test_harness::git::GitRepository;
+
+        let worktree = TempDir::new().unwrap();
+        let repository = GitRepository::init(worktree.path());
+        repository.write("assets/existing.bin", b"present");
+        let commit = repository.commit("asset");
+        let data = worktree.path().join(".jit");
+        let storage = JsonFileStorage::new(&data);
+        configure_test_layout(&storage, worktree.path(), &data);
+
+        assert!(matches!(
+            storage.read_path_bytes("assets/missing.bin", Some(&commit)),
+            Err(PathReadError::NotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_read_path_bytes_at_commit_reports_non_commit_revision_as_other() {
+        use crate::storage::PathReadError;
+        use crate::test_harness::git::GitRepository;
+
+        let worktree = TempDir::new().unwrap();
+        let repository = GitRepository::init(worktree.path());
+        repository.write("assets/data.bin", b"contents");
+        repository.commit("asset");
+        let data = worktree.path().join(".jit");
+        let storage = JsonFileStorage::new(&data);
+        configure_test_layout(&storage, worktree.path(), &data);
+
+        assert!(matches!(
+            storage.read_path_bytes("assets/data.bin", Some("HEAD^{tree}")),
+            Err(PathReadError::Other(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_path_bytes_at_commit_returns_symlink_blob() {
+        use crate::test_harness::git::GitRepository;
+        use std::os::unix::fs as unix_fs;
+
+        let worktree = TempDir::new().unwrap();
+        let repository = GitRepository::init(worktree.path());
+        repository.write("assets/target.bin", b"contents");
+        unix_fs::symlink("target.bin", worktree.path().join("assets/link.bin")).unwrap();
+        let commit = repository.commit("asset and link");
+        let data = worktree.path().join(".jit");
+        let storage = JsonFileStorage::new(&data);
+        configure_test_layout(&storage, worktree.path(), &data);
+
+        assert_eq!(
+            storage
+                .read_path_bytes("assets/link.bin", Some(&commit))
+                .unwrap()
+                .0,
+            b"target.bin"
+        );
     }
 
     #[cfg(unix)]
