@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-a236e81e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7736252f9b51edfaa27fcac9eff424d8df28681c",
+  "completed_at": "2026-11-05T02:34:38.007615873Z",
+  "duration_ms": 213663,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The completed dependencies satisfy the story's repository-layout binding and shared-server-bootstrap requirement.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a236e81e-4890-4607-931a-e3d3612c3899",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "32dd81fe-bda4-4ae3-b5d0-5463bb378f9b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T02:31:04.344530184Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: eccbe08e1, 7736252f (only claim and gate-record metadata)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/a236e81e/requirement/REQ-01, @/issue/0f8efc37/requirement/REQ-01, @/issue/0f8efc37/requirement/REQ-02, @/issue/f4d9502a/requirement/REQ-03, @/issue/f4d9502a/requirement/REQ-04, @/charter/D-21, @/invariant/event-log, @/invariant/gate-semantics, @/gate/jit-validate\nGate evidence: repo-validate passed (exit 0; commit eccbe08e1 covers eccbe08e1, not 7736252f); code-review pending\nTruncation recovery: recovered the broad symbol-search truncation with bounded reads of the affected storage, bootstrap, server, conformance-test, and individual dependency-patch paths\n\n1. No findings. The integrated dependencies enforce mismatched-layout rejection in `crates/jit/src/storage/json.rs:917` and propagate it through `CommandExecutor::with_layout` at `crates/jit/src/commands/mod.rs:2570`; server startup uses the shared `open_repository` constructor at `crates/server/src/lib.rs:78` before serving in `crates/server/src/main.rs:67`, with focused coverage in `crates/server/src/lib.rs:98`.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The completed dependencies satisfy the story's repository-layout binding and shared-server-bootstrap requirement.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
