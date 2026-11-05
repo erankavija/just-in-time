@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "b7acb022-8e15-4373-b204-9adef6426e01",
+      "run_id": "49d70fbe-e049-4c6e-8660-35219dd00760",
       "status": "passed",
-      "updated_at": "2026-11-05T01:47:28.744897314Z",
+      "updated_at": "2026-11-05T01:55:51.681037514Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e16df9af-49a1-469d-95e6-34d02203a698",
+      "status": "failed",
+      "updated_at": "2026-11-05T01:53:19.155075758Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Share version-scoped issue capture and projections",
-  "updated_at": "2026-11-05T01:47:28.744897314Z"
+  "updated_at": "2026-11-05T01:55:51.681037514Z"
 }
