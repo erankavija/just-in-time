@@ -120,7 +120,7 @@ A document read uses the explicit `--at` revision, else the reference's pinned c
 | pinned-counting-wrappers-converge | Pinned-read tests count processes with the shared stand-in | task | Pinned-read tests count git processes through the shared stand-in only. | git-test-fixtures | REQ-07, DEC-16 | touches 2 | — | git-cli-test-fixture |
 | git-object-reads | Object reader and presence check in the git module | task | The git module reads many objects through one cat-file process per reader. | git-pinned-reads | REQ-10, DEC-13, DEC-14 | touches 2 | — | pinned-read-suite-relocation |
 | pinned-inspection-object-reader | Pinned target inspection reads blobs through the object reader | task | Pinned inspection reads blobs through the single object reader. | git-object-reads, git-pinned-reads | REQ-10, DEC-13 | touches 1 | — | git-object-reads |
-| archive-pinned-reads-batched | Archive planning reads pinned evidence through one git process | task | Archive planning resolves pinned documents through one object reader process. | git-object-reads, git-revision-resolver-bridge, git-test-fixtures | REQ-03, REQ-10, DEC-13 | touches 2 | — | git-object-reads, layout-fallback-removal |
+| archive-pinned-reads-batched | Archive planning reads pinned evidence through one git process | task | Archive planning resolves pinned documents through one object reader process. | git-object-reads, git-revision-resolver-bridge, git-test-fixtures | REQ-03, REQ-10, DEC-13 | touches 2 | — | git-object-reads, snapshot-metadata-through-module |
 | git-revision-bridge-removal | Remove the revision resolver bridge | task | The revision resolver bridge and the single-path pinned read are gone. | git-revision-resolver-bridge, git-object-reads | REQ-02, REQ-11, DEC-13 | touches 4 | — | archive-pinned-reads-batched, storage-pinned-inspection-migration |
 | pinned-path-reads-through-module | Path reads at a commit go through the git module | task | Storage reads a path at a commit through the module object reader. | git-object-reads, document-read-versions | REQ-01, REQ-10, DEC-13, DEC-22 | touches 1 | — | git-object-reads, server-image-git-cli |
 | document-show-reads-storage | Document show reads through storage at the version it names | task | jit doc show reads unpinned documents from the working tree through storage. | document-read-versions | REQ-06, REQ-10, DEC-06, DEC-22 | touches 3 | — | pinned-path-reads-through-module |
@@ -245,7 +245,7 @@ flowchart LR
     N28 --> N30
     N30 --> N31
     N30 --> N32
-    N5 --> N32
+    N42 --> N32
     N32 --> N33
     N27 --> N33
     N30 --> N34
@@ -331,6 +331,10 @@ flowchart LR
 | Interim server window | `pinned-path-reads-through-module` and `document-history-through-module` follow `server-image-git-cli`, so the image carries git before any server path depends on it. |
 | Lazy-detection test sweep | A grep of in-process tests that build a git repository with a storage handle or executor and no paths finds three groups. The primary-checkout tier tests in `storage/json.rs` move with `layout-fallback-removal`. The server routes `test_executor` moves with `document-history-through-module`, which diff follows. The archive fixture moves with `archive-pinned-reads-batched`. Every entry whose consumer reads the executor's checkout depends on `layout-fallback-removal`. |
 | Shared-file contention | `storage/git.rs` and `git_module_tests.rs` receive one operation per mechanism entry, in distinct functions; `commands/document.rs`, `commands/worktree.rs`, `commands/claim.rs` and `storage/json.rs` are edited by several entries in distinct functions. Same-function edits are ordered by edges: show and history before diff, claims before the release actor, and the module-operation entries before their consumers. The remaining footprint advisories are distinct functions, and workers rebase. |
+
+## Post-plan sequencing correction
+
+The archive pinned-read consumer resolves the original revision expression before canonical-ID peeling, then requests the path at that canonical commit in the same reader. Appending peeling syntax to a message-search expression changes its meaning; the [shared revision-producer design](../c140921c/revision-producer-plan.md) records the correction and unchanged budgets. Steward-approved sequencing makes that producer a prerequisite of archive migration, replacing the now-transitive layout-context edge. Existing issue identities and completed migration history remain intact; archive implementation waits for the producer to land and pass gates.
 
 ## Investigation sources
 
