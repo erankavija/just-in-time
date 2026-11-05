@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1e7202f5-01e9-4e88-b4ee-f22fd3a4bde8",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:47:25.993019037Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fc2403fb-74d3-471e-b6aa-e3a743fb22e1",
   "labels": [
     "component:cli",
@@ -21,5 +28,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Applying a container template silently moves a populated container's children onto the planning node",
-  "updated_at": "2026-11-05T23:22:31.963653352Z"
+  "updated_at": "2026-11-05T23:47:25.993019037Z"
 }
