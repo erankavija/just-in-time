@@ -441,6 +441,7 @@ impl CommitObservation {
 
 /// A lock-free data capability, usable before a code root is selected.
 pub(crate) struct DataReadSession {
+    data_root: PathBuf,
     evidence: RepositoryRootEvidence,
     roots: CapabilityRoots,
     opened: CommitObservation,
@@ -448,10 +449,25 @@ pub(crate) struct DataReadSession {
 
 impl DataReadSession {
     pub(crate) fn open(data: &Path) -> Result<Self, RepositoryStateStoreError> {
-        let evidence = discover_root_evidence(&lexical_absolute(data)?, true)?;
+        Self::open_after_missing(data, || {})
+    }
+
+    fn open_after_missing(
+        data: &Path,
+        after_missing: impl FnMut(),
+    ) -> Result<Self, RepositoryStateStoreError> {
+        let data_root = lexical_absolute(data)?;
+        let evidence = discover_data_read_evidence(&data_root, after_missing)?;
         let (roots, _, _) = CapabilityRoots::open_data(&evidence)?;
+        // An ancestor can prove absence, but its contents are never this store's data.
+        if evidence.path() != data_root && roots.root(RepositoryRootClass::Data).is_some() {
+            return Err(RepositoryStateStoreError::RetryableConflict {
+                path: data_root.display().to_string(),
+            });
+        }
         let opened = observe_json_commits(&roots)?;
         Ok(Self {
+            data_root,
             evidence,
             roots,
             opened,
@@ -471,7 +487,7 @@ impl DataReadSession {
     }
 
     pub(crate) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
-        if discover_root_evidence(self.evidence.path(), true)? != self.evidence {
+        if discover_data_read_evidence(&self.data_root, || {})? != self.evidence {
             return Ok(ReadAdmission::Moved);
         }
         let (roots, _, _) = CapabilityRoots::open_data(&self.evidence)?;
@@ -494,9 +510,32 @@ impl DataReadSession {
     }
 }
 
+/// An absent data tree is observed through its first missing component's parent identity.
+fn discover_data_read_evidence(
+    data_root: &Path,
+    mut after_missing: impl FnMut(),
+) -> Result<RepositoryRootEvidence, RepositoryStateStoreError> {
+    data_root
+        .ancestors()
+        .map(|candidate| {
+            let result = discover_root_evidence(candidate, true);
+            if matches!(&result, Err(RepositoryStateStoreError::Io(error)) if error.kind() == ErrorKind::NotFound) {
+                after_missing();
+            }
+            result
+        })
+        .find(|result| {
+            !matches!(result, Err(RepositoryStateStoreError::Io(error)) if error.kind() == ErrorKind::NotFound)
+        })
+        .unwrap_or_else(|| {
+            Err(RepositoryStateStoreError::UnsafeTarget(data_root.display().to_string()))
+        })
+}
+
 /// The configuration and commit observation that selected one invocation's roots.
 #[derive(Clone)]
 pub(crate) struct ConfigurationObservation {
+    data_root: PathBuf,
     evidence: RepositoryRootEvidence,
     opened: CommitObservation,
     declarations: [Option<Vec<u8>>; 3],
@@ -521,6 +560,7 @@ impl ConfigurationObservation {
             |declarations| {
                 let config = crate::config::JitConfig::from_declaration_bytes(&declarations)?;
                 Ok(Self {
+                    data_root: session.data_root,
                     evidence: session.evidence,
                     opened: session.opened,
                     declarations,
@@ -531,7 +571,7 @@ impl ConfigurationObservation {
     }
 
     pub(in crate::storage) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
-        let current = DataReadSession::open(self.evidence.path())?;
+        let current = DataReadSession::open(&self.data_root)?;
         if current.evidence != self.evidence {
             return Ok(ReadAdmission::Moved);
         }

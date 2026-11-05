@@ -77,24 +77,7 @@ pub fn read_exact_data_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
         retry_optimistic_reads, DataReadSession, ReadAdmission,
     };
     retry_optimistic_reads("exact data store", || {
-        let session = match DataReadSession::open(data_root) {
-            Ok(session) => session,
-            Err(crate::storage::RepositoryStateStoreError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
-            {
-                // No captured content exists to admit when even an ancestor is absent.
-                return match super::capability_fs::open_absolute_dir_nofollow(data_root) {
-                    Err(super::capability_fs::CapabilityFsError::Io(error))
-                        if error.kind() == std::io::ErrorKind::NotFound =>
-                    {
-                        Ok(Some(Ok(ExactStoreSnapshot::default())))
-                    }
-                    Ok(_) => Ok(None),
-                    Err(error) => Err(error.into()),
-                };
-            }
-            Err(error) => return Err(error.into()),
-        };
+        let session = DataReadSession::open(data_root)?;
         if session.admit()? != ReadAdmission::Granted {
             return Ok(None);
         }

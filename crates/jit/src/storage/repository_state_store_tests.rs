@@ -3308,6 +3308,55 @@ fn test_configuration_read_with_held_writer_and_pending_record_conflicts_without
 }
 
 #[test]
+fn test_configuration_observation_admits_absent_ancestry_until_publication_or_replacement() {
+    let outer = TempDir::new().unwrap();
+    let ancestor = outer.path().join("new");
+    let data = ancestor.join("nested/data");
+    let observation = ConfigurationObservation::capture(&data).unwrap();
+    assert!(observation.config.worktree.is_none());
+    assert_eq!(observation.admit().unwrap(), ReadAdmission::Granted);
+    assert!(std::fs::read_dir(outer.path()).unwrap().next().is_none());
+
+    std::fs::create_dir(&ancestor).unwrap();
+    assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
+    let observation = ConfigurationObservation::capture(&data).unwrap();
+    std::fs::rename(&ancestor, outer.path().join("old")).unwrap();
+    std::fs::create_dir(&ancestor).unwrap();
+    assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
+
+    let observation = ConfigurationObservation::capture(&data).unwrap();
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::write(data.join("config.toml"), "[worktree]\nroot = '../code'\n").unwrap();
+    assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
+    let published = ConfigurationObservation::capture(&data).unwrap();
+    assert_eq!(
+        published.config.worktree.unwrap().root,
+        Some(PathBuf::from("../code"))
+    );
+}
+
+#[test]
+fn test_data_read_rejects_ancestor_published_during_absence_discovery() {
+    let outer = TempDir::new().unwrap();
+    let ancestor = outer.path().join("new/nested");
+    let data = ancestor.join("data");
+    let result = DataReadSession::open_after_missing(&data, || {
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(ancestor.join("config.toml"), "invalid ancestor declaration").unwrap();
+        std::fs::write(data.join("config.toml"), "[worktree]\nroot = '../code'\n").unwrap();
+    });
+    assert!(matches!(
+        result,
+        Err(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    let selected = ConfigurationObservation::capture(&data).unwrap();
+    assert_eq!(
+        selected.config.worktree.unwrap().root,
+        Some(PathBuf::from("../code"))
+    );
+}
+
+#[test]
 fn test_data_read_admission_detects_root_replacement() {
     let outer = TempDir::new().unwrap();
     let data = outer.path().join("data");
