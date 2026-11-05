@@ -8,12 +8,26 @@
   ],
   "description": "Add the git module's query for the commits that touched one path, backed by one `git log` process.\n\n## Background\n\n- Document history walks the whole history from `HEAD` in libgit2 (`get_file_history`, `crates/jit/src/commands/document.rs:864-914`), so its cost grows with project history (`@/charter/D-19`).\n- `git log -z --format=… -- <path>` lists the commits touching a path newest first, applies git's default history simplification, and can use commit-graph filters.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::file_history(path)` runs one `git log` over the path and returns commits newest first with full id, author name, commit time and message.\n- [hard] REQ-02: The behaviour suite covers an added, a changed and a deleted path, a merge identical to one parent, a message with newlines, and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T01:18:47.746629726Z",
   "first_ready_at": "2026-11-01T14:05:18.621291811Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e2dd6940-9f4f-474d-901f-6f14f6ecdc68",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:17:28.728029986Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9071f74f-7c6e-4e73-9902-3c617e96753b",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:51:41.835389557Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Path history query in the git module",
-  "updated_at": "2026-11-04T23:15:50.139602854Z"
+  "updated_at": "2026-11-05T01:18:47.746629726Z"
 }

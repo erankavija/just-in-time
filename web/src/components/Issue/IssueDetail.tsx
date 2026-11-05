@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import SyntaxHighlighter from '../SyntaxHighlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 import './IssueDetail.css';
@@ -105,13 +105,27 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
   // out-of-order responses (slow network, rapid version bumps) are discarded.
   const fetchSeqRef = useRef(0);
 
+  // Reset issue-specific UI before the load effect decides whether to show a
+  // foreground loading indicator or refresh in the background.
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+    setExpandedGate(null);
+    setGateRuns({});
+    setSelectedRun(null);
+    setSelectedRunId(null);
+  }, [issueId]);
+
   useEffect(() => {
     if (!issueId) {
+      fetchSeqRef.current += 1;
       setIssue(null);
+      setError(null);
+      setLoading(false);
       return;
     }
 
     loadIssue(issueId);
+    return () => { fetchSeqRef.current += 1; };
   }, [issueId, version]);
 
   // Load gate definitions when issue has gates
@@ -125,16 +139,6 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
       setGateDefinitions(map);
     }).catch(err => console.error('Failed to load gate definitions:', err));
   }, [hasGates]);
-
-  // Reset gate UI state when issue changes
-  useEffect(() => {
-    hasLoadedOnceRef.current = false; // Show loading indicator for the newly selected issue
-    fetchSeqRef.current = 0; // Reset sequence so stale in-flight requests are discarded
-    setExpandedGate(null);
-    setGateRuns({});
-    setSelectedRun(null);
-    setSelectedRunId(null);
-  }, [issueId]);
 
   // When version bumps while gate history is expanded, refresh those runs so
   // the list reflects any new run that just completed.

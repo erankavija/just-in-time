@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-437907da",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b0d40b2e2d0f6e18f77ff9db32c756c8d05b5cfd",
+  "completed_at": "2026-11-04T23:55:25.443539818Z",
+  "duration_ms": 253341,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed storage-owned worktree listing and focused behavior coverage satisfy this issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "437907da-4243-4ee2-828e-e13ba3efb5af",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2b28f5dd-f3a9-4f0f-982b-de016269c8f8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:51:12.102035948Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a0f836080e75ca54b484b936711a45ca2a98d2bf; 21f0df63ca5848c94d9e520b1e75b141359a9dc3; b0d40b2e2d0f6e18f77ff9db32c756c8d05b5cfd\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-08 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T23:49:40.973831673+00:00; ancestry contains all tagged commits)\nTruncation recovery: Narrowed the truncated merge diff to the worktree-listing implementation and its focused test hunks; inspected current callers, porcelain framing, and policy sources separately.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed storage-owned worktree listing and focused behavior coverage satisfy this issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

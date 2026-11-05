@@ -1,8 +1,9 @@
 # Rust build budgets: what the enforced constants rest on (jit:75b46be9, jit:0708d692)
 
-`scripts/rust-build-budget.sh` fails the `cargo-ci` gate on three quantities: the
-number of integration-test targets, the bytes of active test executables, and
-the measured suite clock. This document is where those three limits come from —
+`scripts/rust-build-budget.sh` checks `cargo-ci` budgets for the
+number of integration-test targets, the bytes of active test executables, the
+measured suite clock, and the production lines of `crates/jit/src/main.rs`. This
+document is where those limits come from —
 a measurement of the tree they are enforced against, and the rule that turns a
 measurement into a limit. The limits themselves are declared once, in that
 script, and this is the derivation they cite.
@@ -24,7 +25,7 @@ host. 24 cores, 31 GiB RAM, `sccache` on PATH, `TMPDIR` on tmpfs; durations in m
 ## How each quantity is measured
 
 Every number below is produced by the code that enforces it rather than by a
-reconstruction of it. One `./scripts/cargo-ci.sh` run reports all three on its
+reconstruction of it. One `./scripts/cargo-ci.sh` run reports each budget on its
 `budget` line; the commands below isolate one quantity each.
 
 | quantity | command |
@@ -32,9 +33,24 @@ reconstruction of it. One `./scripts/cargo-ci.sh` run reports all three on its
 | integration-test targets | `cargo metadata --no-deps --format-version=1 \| jq '[.packages[].targets[] \| select(.kind[] == "test")] \| length'` |
 | active test-executable bytes | `cargo test --workspace --no-run --message-format=json \| jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and .executable != null) \| .executable' \| sort -u \| xargs stat -c %s \| awk '{s+=$1} END {print s}'` |
 | suite clock | `./scripts/cargo-ci.sh`, `suite-clock` line |
+| main.rs production lines | `python3 scripts/production-lines.py --file crates/jit/src/main.rs` |
 
 The second command inherits the workspace test-profile policy, as every gate
 step does; see "Test-profile incremental state" below.
+
+## Thin CLI entry point (jit:f9977efd)
+
+At consolidated revision `c116d3a3a7ff0538073e555b8b346123e61e8e8a`,
+`python3 scripts/production-lines.py c116d3a3a7ff0538073e555b8b346123e61e8e8a`
+reports **37** production lines for `main`. The working-tree `--file` mode uses
+that same counter: blank lines, doc comments, and `#[cfg(test)]` items do not
+count; ordinary comments and `test-support`-gated code count.
+
+`MAX_MAIN_RS_CODE_LINES` follows **at most 10% headroom, rounded down to a whole
+line**: $\lfloor 37 \times 1.10 \rfloor = 40$. The checker applies this
+limit to `crates/jit/src/main.rs` under `--root` and appends `main-rs-lines=N/MAX`
+to its success line. Its `--self-test` fixtures prove the default counting rules,
+the inclusive boundary, and rejection one line beyond it without compilation.
 
 ## Unpacked debug information (jit:75b46be9)
 
@@ -231,8 +247,8 @@ removed. The fresh-target figure is the `after, cold` run of the pre-cutover sui
 for what separates it from a warm one.
 
 The same tree's target directory measures 3,313,861,767 bytes (3.1 GiB) by
-`du -sb target` after these runs. That is an observation, not one of the three
-enforced budgets: the fresh-validation target-directory threshold is an
+`du -sb target` after these runs. That is an observation, not an enforced
+budget: the fresh-validation target-directory threshold is an
 acceptance criterion checked by `scripts/benchmark-rust-build.sh` once per
 build-topology change, and this figure comes from a gate-warm tree rather than
 that harness's clean-room protocol.

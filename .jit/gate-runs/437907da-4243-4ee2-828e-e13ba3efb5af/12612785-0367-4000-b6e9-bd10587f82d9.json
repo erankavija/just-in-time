@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-437907da",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "47c808991067d7a7b83f3e0f7427dfe649e24fad",
+  "completed_at": "2026-11-05T00:31:17.745170326Z",
+  "duration_ms": 258661,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "GitCheckout::list_worktrees and its focused behavior coverage satisfy the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "437907da-4243-4ee2-828e-e13ba3efb5af",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "12612785-0367-4000-b6e9-bd10587f82d9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:26:59.084167593Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a0f83608, 21f0df63, b0d40b2e, 38fdf0b9, 47c80899 (`jit:437907da`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-08 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/invariant/convention-convergence (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T00:25:30Z); its run commit 47c80899 contains all tagged commits\nTruncation recovery: narrowed truncated merge output to the listing implementation, focused tests, current callers, and relevant policy sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"GitCheckout::list_worktrees and its focused behavior coverage satisfy the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

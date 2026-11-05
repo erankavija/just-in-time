@@ -284,22 +284,22 @@ the enforced `@/inv/bounded-rust-build-footprint` project invariant.
 
 ### Budgets
 
-`cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces three budgets on every
-gate run. Two are derived from `cargo metadata` and `cargo test --workspace --no-run
---message-format=json` rather than a `target/` directory scan (stale per-hash artifacts
-there cannot describe the current build): a bounded count of integration-test targets and
-a bounded total of unique active test-executable bytes. The third is derived from the measured
-nextest-plus-doctest suite duration, which `scripts/cargo-ci.sh` passes in as
-`--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. All three
-constants are declared once, in the script's header comment, and derived from a measurement
-of this tree and a stated headroom rule in
+`cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces build budgets on every
+gate run. The integration-test target count and unique active test-executable bytes derive
+from `cargo metadata` and `cargo test --workspace --no-run --message-format=json` rather than
+a `target/` directory scan, which would include stale per-hash artifacts. The suite-duration
+budget uses the measured nextest-plus-doctest duration, which `scripts/cargo-ci.sh` passes in
+as `--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. The checker also
+caps `crates/jit/src/main.rs` at `MAX_MAIN_RS_CODE_LINES`, using the shared
+`scripts/production-lines.py --file` counter. Budget constants are declared once in the
+checker and derived from a measurement of this tree and a stated headroom rule in
 [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md); see
 [dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
-for the measured margin this budget leaves on an idle and a contended host. "5. Inherent
-Test Costs" below attributes what the measured suite duration is spent on.
+for the measured margin the suite-duration budget leaves on an idle and a contended host.
+"5. Inherent Test Costs" below attributes what the measured suite duration is spent on.
 
-The measurement is taken over a target the `suite-build` step has already built and read
-into the page cache, so a fresh target directory and a warm one reach the same verdict and
+The suite-duration measurement is taken over a target the `suite-build` step has already
+built and read into the page cache, so a fresh target directory and a warm one reach the same verdict and
 a duration failure is about the tree (jit:0708d692). The suite runs no nested Cargo build:
 `.config/nextest.toml` declares no setup script, which `scratch_build/build_profile_policy_tests.rs`
 asserts. Profiled-repository fixtures and the recorded-failure corpus are built inside the suite
@@ -310,8 +310,8 @@ for the cold and warm figures behind this paragraph. Re-measuring needs `--force
 `jit gate evaluate` reuses a recorded verdict over unchanged declared inputs, `target/` not
 among them.
 
-A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
-acceptance threshold the benchmark protocol below validates against once per build-topology
+A separate benchmark threshold — at most 10 GiB for the complete fresh validation target
+directory — is validated by the protocol below once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
 defeat the point of the incremental-build policy described next. See
 [dev/benchmarks/rust-build-efficiency/report.md](benchmarks/rust-build-efficiency/report.md)
@@ -392,6 +392,9 @@ test target or dependency feature:
 - **Active test-executable bytes over budget** — the linked executables grew past the
   ceiling. Check whether a new dependency pulled in unexpectedly large debug info, or whether
   the debug profile policy above regressed, before adding more test code to the same suites.
+- **main.rs production lines over budget** — move command handling into `dispatch/` and
+  rendering into `output/`, keeping the entry point focused on parsing, bootstrap, dispatch,
+  rendering, and exit.
 - **Profile drift** — `[profile.dev]` or `[profile.test]` in the workspace `Cargo.toml` no
   longer sets `debug = "line-tables-only"`. Restore it.
 - **Remote resolver reintroduction** — `jsonschema` in `crates/jit/Cargo.toml` no longer sets

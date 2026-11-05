@@ -1,8 +1,25 @@
 use super::{
-    HumanRender, OutputMode, WorktreeExecResponse, WorktreeListResponse,
+    FieldProjection, HumanRender, OutputMode, WorktreeExecResponse, WorktreeListResponse,
     WorktreeStoreDivergenceResponse,
 };
 use crate::commands::worktree::WorktreeInfo;
+
+/// Worktree information or its selected top-level field.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum WorktreeInfoOutput {
+    Info(WorktreeInfo),
+    Projection(FieldProjection),
+}
+
+impl HumanRender for WorktreeInfoOutput {
+    fn render_human(&self, mode: OutputMode) -> String {
+        match self {
+            Self::Info(info) => info.render_human(mode),
+            Self::Projection(projection) => projection.render_human(mode),
+        }
+    }
+}
 
 impl HumanRender for WorktreeInfo {
     fn render_human(&self, _: OutputMode) -> String {

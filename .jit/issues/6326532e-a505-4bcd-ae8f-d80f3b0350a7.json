@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-05T01:08:26.791791439Z",
   "context": {},
   "created_at": "2026-11-04T22:24:54.946576604Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Share one issue snapshot across graph and base issue projections for each tracker version, while retaining live derived-document visibility.\n\n## Background\n\nThe list and graph handlers each load all issues today. The list also calls `DocumentOps::with_reported_documents`, which discovers artifact paths outside the watched data directory; caching that complete response would hide artifact changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Concurrent list and graph requests share one captured issue snapshot and cached base projections per version; failed attempts remain retryable and stale completion cannot replace a newer generation.\n- [hard] REQ-02: The list applies fresh derived-document discovery over captured issue records without another issue listing, so adding, deleting or renaming an artifact after cache warm updates its reported documents at the same tracker version.\n- [hard] REQ-03: Configuration invalidation rebuilds projections with current declarations. Deterministic tests cover concurrent admission, version crossings, failure/retry and live artifact changes; tracker versions remain invalidation hints, not transaction revisions.\n\n## Notes\n\nUse the shared executor helper and existing lock-free repository read behavior; do not hold a writer lock across async work.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T00:09:15.356213422Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +24,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Share version-scoped issue capture and projections",
-  "updated_at": "2026-11-04T22:24:54.946576604Z"
+  "updated_at": "2026-11-05T01:08:26.791791439Z"
 }

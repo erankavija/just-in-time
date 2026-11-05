@@ -24,7 +24,7 @@ pub enum GitError {
         #[source]
         source: Arc<io::Error>,
     },
-    /// Git succeeded but its output does not have the requested shape.
+    /// Git failed or returned output outside the requested command contract.
     #[error("unexpected output from git {command}: {output}")]
     UnexpectedOutput { command: String, output: String },
     /// A path git reported could not be resolved.
@@ -170,45 +170,118 @@ pub struct GitCheckout {
 }
 
 impl GitCheckout {
-    pub fn new(git: Git, worktree_root: PathBuf) -> Self {
+    /// Construct operations for a checkout already recognized by Git.
+    pub(super) fn new(git: Git, worktree_root: PathBuf) -> Self {
         Self { git, worktree_root }
+    }
+
+    /// Construct a checkout with an explicit executable for tests.
+    #[cfg(feature = "test-support")]
+    pub fn for_test(git: Git, worktree_root: PathBuf) -> Self {
+        Self::new(git, worktree_root)
     }
 
     // Temporary @/inv/convention-convergence exception: branch lookups converge
     // here when 732f7afb, 9de4c09c, f6eaba42, 3f8da8c4 and c140921c land.
-    /// Read the checked-out commit and branch with one git process.
+    /// Read the checked-out commit and branch with at most two git processes.
     ///
-    /// An unborn branch has no head. Detached checkouts have a commit and no
-    /// branch name.
+    /// Validates the captured commit without history traversal or fetching.
+    /// Only a confirmed unborn branch has no head; detached heads have no branch.
     ///
     /// # Errors
     ///
-    /// Returns [`GitError::GitUnavailable`] if git cannot start or
-    /// [`GitError::UnexpectedOutput`] if successful output is not a canonical
-    /// commit and branch pair.
+    /// Returns [`GitError::GitUnavailable`] if git cannot start, or
+    /// [`GitError::UnexpectedOutput`] for command failures or invalid HEAD evidence.
     pub fn head(&self) -> Result<Option<Head>, GitError> {
-        const ARGS: [&str; 4] = ["rev-parse", "HEAD", "--abbrev-ref", "HEAD"];
-        let output = self.git.run(&self.worktree_root, ARGS)?;
-        if !output.status.success() {
-            return Ok(None);
-        }
+        const IDENTITY: [&str; 6] = [
+            "--no-replace-objects",
+            "rev-parse",
+            "--revs-only",
+            "HEAD",
+            "--symbolic-full-name",
+            "HEAD",
+        ];
+        let output = self.git.run(&self.worktree_root, IDENTITY)?;
+        let head = parse_head_output(&IDENTITY, &output, |stdout| {
+            if stdout.is_empty() {
+                Some(None)
+            } else {
+                parse_head_identity(stdout).map(Some)
+            }
+        })?;
 
-        let unexpected = || GitError::UnexpectedOutput {
+        match head {
+            Some(head) => {
+                // Replacements and commit graphs can mask a missing original object.
+                let args = [
+                    "--no-replace-objects",
+                    "-c",
+                    "core.commitGraph=false",
+                    "rev-list",
+                    "--no-walk",
+                    "--missing=print",
+                    head.commit.as_str(),
+                    "--",
+                ];
+                let output = self.git.run(&self.worktree_root, args)?;
+                parse_head_output(&args, &output, |stdout| {
+                    (stdout.strip_suffix('\n') == Some(head.commit.as_str())).then_some(())
+                })?;
+                Ok(Some(head))
+            }
+            None => {
+                const UNBORN: [&str; 4] =
+                    ["--no-replace-objects", "symbolic-ref", "--quiet", "HEAD"];
+                let output = self.git.run(&self.worktree_root, UNBORN)?;
+                parse_head_output(&UNBORN, &output, |stdout| {
+                    parse_head_branch(stdout.strip_suffix('\n')?).map(|_| ())
+                })?;
+                Ok(None)
+            }
+        }
+    }
+
+    // Temporary @/inv/convention-convergence exception: the parsers in
+    // parse_git_worktree_porcelain and recorded_worktree_ids converge here
+    // when e3c38fea and f649c144 land.
+    /// List every worktree, including detached and bare entries, with one git
+    /// process. Branch names omit the `refs/heads/` prefix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails, or reports malformed or
+    /// non-UTF-8 output.
+    pub fn list_worktrees(&self) -> Result<Vec<Worktree>, GitError> {
+        const ARGS: [&str; 4] = ["worktree", "list", "--porcelain", "-z"];
+        let output = self.git.run(&self.worktree_root, ARGS)?;
+        let unexpected = |output: &str| GitError::UnexpectedOutput {
             command: ARGS.join(" "),
-            output: String::from_utf8_lossy(&output.stdout).into_owned(),
+            output: output.to_owned(),
         };
-        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
-        let (commit, branch) = match stdout.lines().collect::<Vec<_>>().as_slice() {
-            [commit, branch] => (*commit, *branch),
-            _ => return Err(unexpected()),
-        };
-        let commit = CanonicalCommitOid::parse(commit).map_err(|_| unexpected())?;
-        let branch = match branch {
-            "HEAD" => None,
-            "" => return Err(unexpected()),
-            branch => Some(branch.to_owned()),
-        };
-        Ok(Some(Head { commit, branch }))
+        if !output.status.success() {
+            return Err(unexpected(&String::from_utf8_lossy(&output.stderr)));
+        }
+        let stdout = std::str::from_utf8(&output.stdout)
+            .map_err(|_| unexpected(&String::from_utf8_lossy(&output.stdout)))?;
+        stdout
+            .split("\0\0")
+            .filter(|block| !block.is_empty())
+            .map(|block| {
+                let mut fields = block.split('\0');
+                let path = fields
+                    .next()
+                    .and_then(|line| line.strip_prefix("worktree "))
+                    .filter(|path| !path.is_empty())
+                    .ok_or_else(|| unexpected(block))?;
+                let branch = fields
+                    .find_map(|line| line.strip_prefix("branch refs/heads/"))
+                    .map(str::to_owned);
+                Ok(Worktree {
+                    path: PathBuf::from(path),
+                    branch,
+                })
+            })
+            .collect()
     }
 
     // Temporary @/inv/convention-convergence exception: claim release's actor
@@ -236,6 +309,38 @@ impl GitCheckout {
             output: String::from_utf8_lossy(&output.stdout).into_owned(),
         })?;
         Ok(Some(name.strip_suffix('\n').unwrap_or(name).to_owned()))
+    }
+
+    // Temporary @/inv/convention-convergence exception: document history
+    // converges here when 83c8632f lands.
+    /// List commits touching a literal worktree-relative path, newest first,
+    /// with git's default history simplification. One git process.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails, or reports malformed
+    /// commit metadata.
+    pub fn file_history(&self, path: &str) -> Result<Vec<FileHistoryCommit>, GitError> {
+        let args = [
+            "--literal-pathspecs",
+            "log",
+            "-z",
+            "--no-show-signature",
+            "--no-notes",
+            "--encoding=UTF-8",
+            "--format=%H%x00%an%x00%ct%x00%B",
+            "--",
+            path,
+        ];
+        let output = self.git.run(&self.worktree_root, args)?;
+        let unexpected = |bytes: &[u8]| GitError::UnexpectedOutput {
+            command: args.join(" "),
+            output: String::from_utf8_lossy(bytes).into_owned(),
+        };
+        if !output.status.success() {
+            return Err(unexpected(&output.stderr));
+        }
+        parse_file_history(&output.stdout).ok_or_else(|| unexpected(&output.stdout))
     }
 
     /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.
@@ -283,6 +388,114 @@ impl GitCheckout {
         }
         Ok(paths)
     }
+}
+
+/// A repository worktree and its checked-out branch, if any.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Worktree {
+    path: PathBuf,
+    branch: Option<String>,
+}
+
+impl Worktree {
+    /// The absolute path reported by git.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// The branch name, or `None` for detached and bare worktrees.
+    pub fn branch(&self) -> Option<&str> {
+        self.branch.as_deref()
+    }
+}
+
+/// A commit in a path's history; the message retains its whitespace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileHistoryCommit {
+    commit: CanonicalCommitOid,
+    author: String,
+    commit_time: i64,
+    message: String,
+}
+
+impl FileHistoryCommit {
+    pub fn commit(&self) -> &CanonicalCommitOid {
+        &self.commit
+    }
+
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+
+    /// Committer time as Unix seconds.
+    pub fn commit_time(&self) -> i64 {
+        self.commit_time
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+fn parse_file_history(output: &[u8]) -> Option<Vec<FileHistoryCommit>> {
+    if output.is_empty() {
+        return Some(Vec::new());
+    }
+    let stdout = std::str::from_utf8(output).ok()?.strip_suffix('\0')?;
+    let fields: Vec<_> = stdout.split('\0').collect();
+    let records = fields.chunks_exact(4);
+    if !records.remainder().is_empty() {
+        return None;
+    }
+    records
+        .map(|record| {
+            Some(FileHistoryCommit {
+                commit: CanonicalCommitOid::parse(record[0]).ok()?,
+                author: record[1].to_owned(),
+                commit_time: record[2].parse().ok()?,
+                message: record[3].to_owned(),
+            })
+        })
+        .collect()
+}
+
+fn parse_head_output<T>(
+    command: &[&str],
+    output: &Output,
+    parse: impl FnOnce(&str) -> Option<T>,
+) -> Result<T, GitError> {
+    let parsed = match (
+        output.status.success(),
+        output.stderr.is_empty(),
+        std::str::from_utf8(&output.stdout),
+    ) {
+        (true, true, Ok(stdout)) => parse(stdout),
+        _ => None,
+    };
+    parsed.ok_or_else(|| GitError::UnexpectedOutput {
+        command: command.join(" "),
+        output: format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        ),
+    })
+}
+
+fn parse_head_identity(stdout: &str) -> Option<Head> {
+    let (oid, reference) = stdout.strip_suffix('\n')?.split_once('\n')?;
+    let commit = CanonicalCommitOid::parse(oid).ok()?;
+    let branch = match reference {
+        "HEAD" => None,
+        reference => Some(parse_head_branch(reference)?.to_owned()),
+    };
+    Some(Head { commit, branch })
+}
+
+fn parse_head_branch(reference: &str) -> Option<&str> {
+    reference
+        .strip_prefix("refs/heads/")
+        .filter(|branch| !branch.is_empty() && !branch.bytes().any(|byte| byte.is_ascii_control()))
 }
 
 /// Maximum pinned paths passed to one `git ls-tree` process, keeping the
@@ -972,6 +1185,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_parse_file_history_rejects_malformed_records() {
+        let oid = "a".repeat(40);
+        let record = format!("{oid}\0author\x00123\0message\n\0");
+        let malformed = [
+            record.trim_end_matches('\0').as_bytes().to_vec(),
+            format!("{oid}\0author\x00123\0").into_bytes(),
+            format!("{record}extra\0").into_bytes(),
+            b"short-oid\0author\x00123\0message\0".to_vec(),
+            format!("{oid}\0author\0invalid-time\0message\0").into_bytes(),
+            format!("{oid}\0author\x009223372036854775808\0message\0").into_bytes(),
+            [record.as_bytes(), &[0xff]].concat(),
+        ];
+
+        for output in malformed {
+            assert!(parse_file_history(&output).is_none(), "{output:?}");
+        }
+    }
+
+    #[test]
     fn test_run_unstartable_program_is_unavailable_naming_program() {
         let dir = tempfile::tempdir().unwrap();
         let program = dir.path().join("missing-git");
@@ -984,6 +1216,47 @@ mod tests {
             matches!(&error, GitError::GitUnavailable { program: named, .. } if named == &program)
         );
         assert!(error.to_string().contains(program.to_str().unwrap()));
+    }
+
+    #[test]
+    fn test_parse_head_identity_rejects_malformed_protocol_records() {
+        let oid = "1".repeat(40);
+        [
+            String::new(),
+            format!("{oid}\n"),
+            format!("{oid}\nrefs/heads/"),
+            format!("{oid}\nrefs/heads/\n"),
+            format!("{oid}\nrefs/tags/tag\n"),
+            format!("{oid}\nHEAD\nextra\n"),
+            format!("{oid}\nrefs/heads/branch\0suffix\n"),
+            "invalid-object\nrefs/heads/branch\n".to_owned(),
+        ]
+        .iter()
+        .for_each(|output| assert!(parse_head_identity(output).is_none(), "{output:?}"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_parse_head_output_rejects_failed_noisy_or_non_utf8_output() {
+        use std::os::unix::process::ExitStatusExt;
+
+        [
+            (1, b"apparently valid".as_slice(), b"".as_slice()),
+            (0, b"apparently valid".as_slice(), b"warning".as_slice()),
+            (0, b"\xff".as_slice(), b"".as_slice()),
+        ]
+        .into_iter()
+        .for_each(|(status, stdout, stderr)| {
+            let output = Output {
+                status: std::process::ExitStatus::from_raw(status << 8),
+                stdout: stdout.to_vec(),
+                stderr: stderr.to_vec(),
+            };
+            assert!(matches!(
+                parse_head_output(&["head-test"], &output, |_| Some(())),
+                Err(GitError::UnexpectedOutput { .. })
+            ));
+        });
     }
 
     #[test]
