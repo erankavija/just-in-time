@@ -1,0 +1,50 @@
+{
+  "branch": "worktree-agent-abf68973",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ea17f6ec92efc66babd14c4bc33218e1d720e6c2",
+  "completed_at": "2026-11-04T23:19:47.440450471Z",
+  "duration_ms": 227705,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "id": "F1",
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/c8e79465/requirement/REQ-01"
+        ],
+        "severity": "low",
+        "summary": "The pre-existing satisfies:c8e79465/REQ-01 label is unsupported because the attributed module/dependency change does not make routes use shared core operations or preserve an HTTP contract."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/abf68973/requirement/REQ-01",
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "cargo-ci is pending, leaving REQ-01's requirement that server tests compile and run once materially unverified."
+      }
+    ],
+    "summary": "The source topology is correct, but required server test execution remains unverified and one pre-existing coverage claim is unsupported.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abf68973-3771-47cb-89d0-708290cb00ac",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "22e72871-42f0-40ea-9d23-f091fbbddeec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:15:59.734618965Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4389 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-abf68973\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8d9-0f31-7bd3-8428-ad26cd292186\n--------\nuser\n--- 4376 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: ea17f6ec9 (implementation); 38739cc6b (claim metadata)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/abf68973/requirement/REQ-01; @/issue/0f8efc37/requirement/REQ-11; @/issue/c8e79465/requirement/REQ-01; @/gate/cargo-ci; @/charter/D-18; @/charter/D-20; @/invariant/architecture-dependency-direction; @/invariant/essential-code-prose; @/invariant/orthogonal-tests\nGate evidence: cargo-ci pending (no recorded run or exit code)\nTruncation recovery: re-read per-commit patches and bounded plan, investigation, source, manifest, test, policy, and item ranges after initial combined reads truncated.\n\n1. **F1 — advisory, pre-existing, low:** `satisfies:c8e79465/REQ-01` predates this issue’s tagged commits, but its claimed contribution is unsupported: the target requires routes to use shared core operations and preserve HTTP contracts, while this change only moves module declarations and removes unused dependencies. References: `@/issue/c8e79465/requirement/REQ-01`.\n\n2. **F2 — blocking, issue-impact, high:** The required `cargo-ci` gate has not run. Although the current source removes duplicated binary module declarations and direct `git2`/`tower` dependencies, REQ-01 explicitly requires existing server tests to compile and run once; that hard criterion remains materially unverified. References: `@/issue/abf68973/requirement/REQ-01`, `@/gate/cargo-ci`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The source topology is correct, but required server test execution remains unverified and one pre-existing coverage claim is unsupported.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The pre-existing satisfies:c8e79465/REQ-01 label is unsupported because the attributed module/dependency change does not make routes use shared core operations or preserve an HTTP contract.\",\"references\":[\"@/issue/c8e79465/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cargo-ci is pending, leaving REQ-01's requirement that server tests compile and run once materially unverified.\",\"references\":[\"@/issue/abf68973/requirement/REQ-01\",\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
