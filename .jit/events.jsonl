@@ -25374,3 +25374,7 @@
 {"fields":["documents"],"id":"307ec147-04fb-43fd-93f5-7e8079970764","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-11-05T23:39:19.901226876Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"7e45c717-4922-4458-aaca-3ca43acf55f3","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-11-05T23:39:19.921365944Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"08f455b0-f3d5-40d3-b41c-2e0ccaa7c704","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-11-05T23:39:19.937600931Z","type":"issue_updated","updated_by":"doc-add"}
+{"id":"80d3d681-9bc5-47f0-a08e-126df984d319","issue_id":"f532daf2-f109-40e1-a621-8c0155cf5692","priority":"normal","timestamp":"2026-11-05T23:40:17.819231476Z","title":"Lock guards verify the identity of the lock file they hold","type":"issue_created"}
+{"from":"ready","id":"658ae907-6cce-4349-96ba-e521ecf339eb","issue_id":"f532daf2-f109-40e1-a621-8c0155cf5692","timestamp":"2026-11-05T23:40:28.680298516Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"e49ccbbd-cba4-4928-942f-438daae43325","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-11-05T23:40:55.770573864Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"backlog","id":"db196c6a-1219-4406-a1dc-b7a0974877cd","issue_id":"f532daf2-f109-40e1-a621-8c0155cf5692","timestamp":"2026-11-05T23:41:05.612050441Z","to":"ready","type":"issue_state_changed"}
