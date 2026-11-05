@@ -431,7 +431,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "independent_design_review_round2",
+          "worker_status": "design_review_pass_waiting_footprint_acceptance",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -887,7 +887,8 @@
     "fb5e8e8d Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward approved933ff852 -> c140921c after cycle/redundancy check: existing libgit2 read_file_from_git resolves original expression then peels, so two-version one-child migration uses shared reader resolution and canonical commit:path. No criteria weakening/private resolver;1ac retains existing prerequisites. Frontend parked chain now includes c140.",
     "504 independentR1FAIL identified missing original-root redo authority; steward acceptedD26 recorded1d487be2e. Revisedplan inR2review, implementation held for independentPASS+steward exact-footprint acceptance. Main source boundary released afterfbclosure0c83d3d4f; c0ea isolated clean rebuild running.",
-    "c0ea checkpoint Done after actual clean Cargo and independent holisticPASS; seeded artifact failures3d160332/ffdc3aee and cached failurec5ff62bc preserved. Local target cleanup resolved E0463/E0460 without source edits. Tracker-only landing adds no production change; mandatory merged-source policy not triggered."
+    "c0ea checkpoint Done after actual clean Cargo and independent holisticPASS; seeded artifact failures3d160332/ffdc3aee and cached failurec5ff62bc preserved. Local target cleanup resolved E0463/E0460 without source edits. Tracker-only landing adds no production change; mandatory merged-source policy not triggered.",
+    "504 designR3PASS: allR1/R2findingsclosed atdesignlevel underD26/D27. Durable design andall3reviews in dev/active/5046408a linked. No implementation yet; awaiting steward exact-footprint acceptance. Initial doclink lacked lead actor and failed; retried successfully with owning actor before commit/validation."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
