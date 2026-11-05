@@ -1,0 +1,23 @@
+{
+  "branch": "worktree-agent-a236e81e",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "eccbe08e171c633a749bbaab78202e9ab7de6a6e",
+  "completed_at": "2026-11-05T02:30:52.720179471Z",
+  "duration_ms": 4210,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "repo-validate",
+  "issue_id": "a236e81e-4890-4607-931a-e3d3612c3899",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "134bf0dc-5617-47e7-b455-ed223e8151b1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T02:30:48.509975545Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Repository validation passed\n"
+}

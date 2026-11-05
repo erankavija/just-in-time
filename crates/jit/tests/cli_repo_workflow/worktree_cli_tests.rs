@@ -276,6 +276,64 @@ fn test_worktree_info_stable_across_invocations() {
     assert_eq!(id1, id2, "Worktree ID should be stable");
 }
 
+#[test]
+fn test_worktree_info_reports_current_branch_after_switch_with_stable_id() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+
+    let before = cli.run_json(["worktree", "info"]).unwrap();
+    cli.git(["switch", "-q", "-c", "next-branch"]).unwrap();
+    let after = cli.run_json(["worktree", "info"]).unwrap();
+
+    assert_eq!(after["branch"], "next-branch");
+    assert_eq!(after["worktree_id"], before["worktree_id"]);
+}
+
+#[test]
+fn test_worktree_info_reports_head_when_detached() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.git(["switch", "-q", "--detach"]).unwrap();
+
+    let info = cli.run_json(["worktree", "info"]).unwrap();
+
+    assert_eq!(info["branch"], "HEAD");
+}
+
+fn assert_worktree_info_requires_git(cli: &JitCli, remedy: &str) {
+    let human = cli.command(["worktree", "info"]).output().unwrap();
+    let json = cli
+        .command(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+    let failure: Value = serde_json::from_slice(&json.stdout).unwrap();
+
+    assert!(String::from_utf8_lossy(&human.stderr).contains(remedy));
+    assert_eq!(
+        failure["error"]["code"],
+        jit::output::ErrorCode::RequiresGit.as_str()
+    );
+    assert!(failure["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains(remedy));
+}
+
+#[test]
+fn test_worktree_info_without_git_checkout_reports_git_init_remedy() {
+    let cli = JitCli::initialised().unwrap();
+
+    assert_worktree_info_requires_git(&cli, "git init");
+}
+
+#[test]
+fn test_worktree_info_on_unborn_branch_reports_initial_commit_remedy() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+
+    assert_worktree_info_requires_git(&cli, "git commit --allow-empty");
+}
+
 /// Relocation must surface as a shared success warning on the `worktree info` command
 /// path (regression guard: storage no longer prints it, the output layer does).
 /// Previously this condition was an `eprintln!` from storage on every command;
