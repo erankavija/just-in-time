@@ -27,9 +27,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "dff8fa8d-d88c-43e9-aa6a-fa5d70db1e22",
-      "status": "failed",
-      "updated_at": "2026-11-05T00:45:15.130663013Z",
+      "run_id": "59b5ca56-d680-4d80-8970-3c9e96908f79",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:03:41.647212716Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rust API links name the owners after facade extraction",
-  "updated_at": "2026-11-05T00:58:14.437741495Z"
+  "updated_at": "2026-11-05T01:03:41.647212716Z"
 }
