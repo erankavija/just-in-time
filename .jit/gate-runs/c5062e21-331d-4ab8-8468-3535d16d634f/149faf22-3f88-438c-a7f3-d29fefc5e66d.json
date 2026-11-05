@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-c5062e21",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b1515873e3280ebedf4cce9f746a987cfe71b2f0",
+  "completed_at": "2026-11-05T01:42:44.446385570Z",
+  "duration_ms": 249526,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Server startup now uses the shared repository bootstrap, preserves ordering, releases serialization before serving, and has focused Git and non-Git derivation coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c5062e21-331d-4ab8-8468-3535d16d634f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "149faf22-3f88-438c-a7f3-d29fefc5e66d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:38:34.920300027Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e63c8b273f559674083aefcf66c4b2e200d82cc3, 50561cd80ce34e6a9da19a3b89e9648d37209f1e, e5dee6a96fb2ad4a6b68de3f1542f1e6a6d755ee\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-21; @/issue/f4d9502a/requirement/REQ-03; @/issue/f4d9502a/requirement/REQ-04; @/issue/0f8efc37/requirement/REQ-01; @/invariant/architecture-dependency-direction; @/invariant/essential-code-prose; @/invariant/orthogonal-tests; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T01:36:49.351994825Z); run b1515873e3280ebedf4cce9f746a987cfe71b2f0 contains every attributable commit\nTruncation recovery: re-read each server patch and each relevant JIT-record patch separately; bounded current-source and policy reads recovered all relevant evidence\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Server startup now uses the shared repository bootstrap, preserves ordering, releases serialization before serving, and has focused Git and non-Git derivation coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
