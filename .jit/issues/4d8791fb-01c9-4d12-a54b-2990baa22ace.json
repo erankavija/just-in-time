@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "389e8a32-8809-4380-a16c-1114eddc336d",
+      "run_id": "3383f3dc-1e06-4345-957d-53fc462c32a3",
       "status": "passed",
-      "updated_at": "2026-11-05T01:41:12.214525554Z",
+      "updated_at": "2026-11-05T01:59:15.140970004Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Unify issue and linked-document search",
-  "updated_at": "2026-11-05T01:47:09.926235978Z"
+  "updated_at": "2026-11-05T01:59:15.140970004Z"
 }
