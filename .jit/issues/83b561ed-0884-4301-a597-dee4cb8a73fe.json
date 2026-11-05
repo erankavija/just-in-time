@@ -13,7 +13,14 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "npm-ci": {
+      "run_id": "88f99c6f-ecf1-4df0-9a87-b42c11268fd4",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:53:39.919825495Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "83b561ed-0884-4301-a597-dee4cb8a73fe",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Use unfiltered graph summaries for browser metadata",
-  "updated_at": "2026-11-05T03:44:13.281935794Z"
+  "updated_at": "2026-11-05T03:53:39.919825495Z"
 }
