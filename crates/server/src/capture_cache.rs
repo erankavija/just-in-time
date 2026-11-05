@@ -79,19 +79,17 @@ mod tests {
             }
         });
         started.notified().await;
-        let second = tokio::spawn({
-            let (cache, tracker, calls) = (cache.clone(), tracker.clone(), calls.clone());
-            async move {
-                cache
-                    .get(&tracker, || async {
-                        calls.fetch_add(1, Ordering::SeqCst);
-                        Ok::<_, ()>(8)
-                    })
-                    .await
-                    .unwrap()
-            }
+        let second = cache.get(&tracker, || async {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok::<_, ()>(8)
         });
-        tokio::task::yield_now().await;
+        tokio::pin!(second);
+        assert!(matches!(
+            futures::poll!(&mut second),
+            std::task::Poll::Pending
+        ));
+        assert!(!first.is_finished());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
         release.notify_one();
         assert_eq!((*first.await.unwrap(), *second.await.unwrap()), (7, 7));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
