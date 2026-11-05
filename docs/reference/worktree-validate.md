@@ -146,7 +146,7 @@ wt:e5f6g7h8      bugfix/login              /home/user/project-bugfix            
 For JSON output (envelope also carries `message` and `warnings`):
 ```json
 {
-  "count": 3,
+  "count": 1,
   "worktrees": [
     {
       "worktree_id": "wt:main",
@@ -306,7 +306,7 @@ stores; `reference_store` is `null` when the checkout has none:
 
 ```json
 {
-  "count": 3,
+  "count": 1,
   "checkout_store": "/home/user/project-feature/.jit",
   "reference_store": "/home/user/project/.jit",
   "divergences": [

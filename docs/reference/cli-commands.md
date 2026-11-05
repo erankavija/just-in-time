@@ -2981,7 +2981,7 @@ JSON uses the list envelope over `nodes`:
 {
   "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
   "depth": 1,
-  "count": 2,
+  "count": 1,
   "nodes": [
     {
       "id": "<dep-uuid>",
@@ -2993,7 +2993,7 @@ JSON uses the list envelope over `nodes`:
       "children": []
     }
   ],
-  "summary": { "total": 2, "by_state": { "done": 1, "ready": 1 } }
+  "summary": { "total": 1, "by_state": { "done": 1 } }
 }
 ```
 
