@@ -196,9 +196,10 @@
           "short_id": "9de4c09c",
           "title": "Worktree info reads its branch through the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "aa31a16ec45068e1089f3c8fdb9a8a00549235fc"
         },
         {
           "id": "c16c834c-f134-4af8-ab20-40c6a120e836",
@@ -753,7 +754,8 @@
     "f6eaba42 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward approved ea4b7363 footprint-only reconciliation: actual second caller commands/mod.rs::publish_captured_release now supplies canonical WorktreePaths alongside claim-release callback. Two existing files, criteria unchanged, no new probe/cache/error/read-session behavior. Background/manifest/overview updated and native validation passed. Exclude frontend632 D25 admission/with_read_session edits and preserve actor precedence/fallback semantics.",
     "d48e28bf Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "d48Done507748f7b after mergedstableCargo e91fc299 on524e7b6f5; object/base byteproof69PASS. Frontend a236 tracker boundary finished eccbe08e1. Ready dcf/a273 consumers claimed for isolated parallel work. EA two-file implementation complete, fullgates next; d681 fullgates running after149focused regressions. 9de refresh has only conjunction-comment conflict combining reviewed f6/9de ID removals; exact byte proof+fmt, mandatory mergedCargo."
+    "d48Done507748f7b after mergedstableCargo e91fc299 on524e7b6f5; object/base byteproof69PASS. Frontend a236 tracker boundary finished eccbe08e1. Ready dcf/a273 consumers claimed for isolated parallel work. EA two-file implementation complete, fullgates next; d681 fullgates running after149focused regressions. 9de refresh has only conjunction-comment conflict combining reviewed f6/9de ID removals; exact byte proof+fmt, mandatory mergedCargo.",
+    "9de4c09c Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1045,7 +1047,7 @@
     "9de4c09c": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "1ee8a09a-e0c7-4013-8be2-e02f0e95de07",
+        "cargo-ci": "3c0b5201-5a87-49ca-9d62-80f3662bf7be",
         "code-review": "38f4141a-3d72-47ee-b610-65c8ca6317f4"
       },
       "reviewed_source": "1b0104ca7d47ad44038ad2da727ac8085ef63e46",
@@ -1058,7 +1060,8 @@
       "prior_findings": "Cargo9614c618 failed canonical corpus due shared fixture ceiling. Exact canonical0f144b98d fix reused as11871fa14; corrected full Cargo/review pass.",
       "stale_narrative": "DEC26 reconciled obsolete error promise in authoritative plan/manifest; no command-specific wrapper introduced.",
       "deferred_items": "No linked documents or in-scope deferrals.",
-      "holistic": "Incoming field projection preserved; status census owns numeric/envelope contract; main integration pending."
+      "holistic": "Incoming field projection preserved; status census owns numeric/envelope contract; main integration pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 3c0b5201-5a87-49ca-9d62-80f3662bf7be on aa31a16ec45068e1089f3c8fdb9a8a00549235fc."
     },
     "c5062e21": {
       "verdict": "PASS",
