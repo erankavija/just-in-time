@@ -24869,3 +24869,4 @@
 {"fields":["dependencies"],"id":"40239fb4-9139-464a-9640-8a317d6f8c2e","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-05T00:08:14.746537954Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"9768c728-58e3-4be2-bbba-72a00081d567","issue_id":"0546fc82-435f-4d02-9af2-0dc22e301d60","timestamp":"2026-11-05T00:10:31.529993738Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"74f79ff7-e089-4386-881a-c981fd2bcefc","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","new_count":41,"old_count":42,"removed_deps":["dc048377-19b5-425d-90e6-11d4a7427e34"],"timestamp":"2026-11-05T00:10:31.529993738Z","type":"dependency_reduced"}
+{"gate_key":"cargo-ci","id":"397944f0-0965-46e7-9aef-371f8a4c78c5","issue_id":"ec9e812c-dea5-4c6c-be38-4cd5349d6225","timestamp":"2026-11-05T00:16:39.117211393Z","type":"gate_failed","updated_by":"auto:executor"}
