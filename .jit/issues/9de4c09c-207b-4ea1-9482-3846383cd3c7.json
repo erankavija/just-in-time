@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "9614c618-e38f-4cfa-9723-d9a313595956",
-      "status": "failed",
-      "updated_at": "2026-11-05T01:21:10.178492765Z",
+      "run_id": "1ee8a09a-e0c7-4013-8be2-e02f0e95de07",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:32:42.563502359Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "38f4141a-3d72-47ee-b610-65c8ca6317f4",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:36:58.961546045Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktree info reads its branch through the module",
-  "updated_at": "2026-11-05T01:21:10.178492765Z"
+  "updated_at": "2026-11-05T01:36:58.961546045Z"
 }
