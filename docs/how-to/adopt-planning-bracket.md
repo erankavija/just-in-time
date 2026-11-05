@@ -366,8 +366,9 @@ jit issue batch-create --from-json "$DIR/breakdown.json" --dry-run --json
 ```
 
 Then drive `P` through `plan-review`. Review fails missing/invalid manifests,
-stale generated output, duplicated task prose, and non-worker-sized terminal
-tasks. Missing hierarchy/source universes, invented references, tier-laundered
+stale generated output, duplicated task prose, terminal tasks one worker cannot
+deliver in one focused cycle, over-split chain links, and a manifest over the
+validator's issue budget (`--max-issues`, default 50). Missing hierarchy/source universes, invented references, tier-laundered
 leaves, and malformed/duplicate contract headings also fail. Per-code sizing
 overrides remain visible for reviewer judgment. Shared contracts are marked
 `plan-fixed` or `implementation-produced`; produced contracts require one

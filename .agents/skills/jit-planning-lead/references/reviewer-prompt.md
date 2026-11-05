@@ -39,6 +39,7 @@ broken intermediate states, unmitigated risks, or stale prior findings. Require
 the author to replace or merge defective contracts/tasks, remove superseded prose,
 regenerate, and rerun all checks.
 
-Report blocking findings with artifact/code citations and exact corrections; omit
+Report the manifest issue count and its change from the prior round, then
+blocking findings with artifact/code citations and exact corrections; omit
 passing checks and restated review scope. End with exactly `VERDICT: PASS` or
 `VERDICT: FAIL`.
