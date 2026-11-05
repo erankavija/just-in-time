@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "4c792cbc-fa99-4da8-9056-beff4a8a35e7",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:11:19.116045800Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "337171b7-84b7-470d-ba03-606121c7fedf",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:15:22.549163851Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "732f7afb-f1ee-4242-aa18-82b3b70ea96f",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Init records the worktree branch through the module",
-  "updated_at": "2026-11-05T00:42:27.224832455Z"
+  "updated_at": "2026-11-05T01:15:22.549163851Z"
 }
