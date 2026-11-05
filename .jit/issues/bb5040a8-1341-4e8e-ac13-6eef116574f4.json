@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3b20d4bb-e933-4037-8405-25d3806fbd33",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:45:11.920792750Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "bc67bc3d-d4d7-433d-ba92-b8be3a334e90",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:48:22.863812140Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Origin URL query in the git module",
-  "updated_at": "2026-11-04T23:13:59.568296247Z"
+  "updated_at": "2026-11-05T00:48:22.863812140Z"
 }
