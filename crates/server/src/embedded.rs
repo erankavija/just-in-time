@@ -6,6 +6,7 @@
 
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
+use percent_encoding::percent_decode_str;
 use rust_embed::Embed;
 use std::path::Path;
 
@@ -18,52 +19,34 @@ pub fn has_embedded_assets() -> bool {
     WebAssets::iter().next().is_some()
 }
 
-fn decode_percent_encoded_path(path: &str) -> Option<Vec<u8>> {
-    fn hex_value(byte: u8) -> Option<u8> {
-        match byte {
-            b'0'..=b'9' => Some(byte - b'0'),
-            b'a'..=b'f' => Some(byte - b'a' + 10),
-            b'A'..=b'F' => Some(byte - b'A' + 10),
-            _ => None,
-        }
-    }
-
-    let bytes = path.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'%' {
-            let high = hex_value(*bytes.get(index + 1)?)?;
-            let low = hex_value(*bytes.get(index + 2)?)?;
-            decoded.push((high << 4) | low);
-            index += 3;
-        } else {
-            decoded.push(bytes[index]);
-            index += 1;
-        }
-    }
-    Some(decoded)
-}
-
 fn decoded_route(path: &str) -> Option<String> {
-    String::from_utf8(decode_percent_encoded_path(path)?).ok()
+    let bytes = path.as_bytes();
+    if bytes.iter().enumerate().any(|(index, byte)| {
+        *byte == b'%'
+            && (!bytes.get(index + 1).is_some_and(u8::is_ascii_hexdigit)
+                || !bytes.get(index + 2).is_some_and(u8::is_ascii_hexdigit))
+    }) {
+        return None;
+    }
+    percent_decode_str(path)
+        .decode_utf8()
+        .ok()
+        .map(|decoded| decoded.into_owned())
 }
 
 fn is_forbidden_route(path: &str) -> bool {
-    let Some(decoded) = decoded_route(path) else {
-        return true;
-    };
-    decoded == "api"
-        || decoded.starts_with("api/")
-        || decoded.contains('\\')
-        || decoded
-            .split('/')
-            .any(|segment| matches!(segment, "." | ".."))
+    path == "api"
+        || path.starts_with("api/")
+        || path.starts_with('/')
+        || path.contains('\\')
+        || path.bytes().any(|byte| byte.is_ascii_control())
+        || path.split('/').any(|segment| matches!(segment, "." | ".."))
 }
 
 fn spa_fallback_path(path: &str) -> Option<&'static str> {
     let decoded = decoded_route(path)?;
-    (!is_forbidden_route(path) && Path::new(&decoded).extension().is_none()).then_some("index.html")
+    (!is_forbidden_route(&decoded) && Path::new(&decoded).extension().is_none())
+        .then_some("index.html")
 }
 
 fn asset_metadata(path: &str) -> (mime_guess::Mime, &'static str) {
@@ -82,7 +65,10 @@ fn asset_metadata(path: &str) -> (mime_guess::Mime, &'static str) {
 /// The SPA entry point is never cached; exact non-index assets retain immutable caching.
 pub async fn embedded_fallback(uri: axum::http::Uri) -> Response {
     let requested = uri.path().trim_start_matches('/');
-    if is_forbidden_route(requested) {
+    let Some(decoded) = decoded_route(requested) else {
+        return (StatusCode::NOT_FOUND, "not found").into_response();
+    };
+    if is_forbidden_route(&decoded) {
         return (StatusCode::NOT_FOUND, "not found").into_response();
     }
 
@@ -149,6 +135,23 @@ mod tests {
         ] {
             assert_eq!(spa_fallback_path(path), None, "accepted {path:?}");
         }
+    }
+
+    #[test]
+    fn test_spa_fallback_path_rejects_invalid_percent_encoded_paths() {
+        for path in [
+            "docs/%", "docs/%2", "docs/%GG", "docs/%FF", "docs/%00", "%2Fetc",
+        ] {
+            assert_eq!(spa_fallback_path(path), None, "accepted {path:?}");
+        }
+    }
+
+    #[test]
+    fn test_decoded_route_decodes_unicode_and_reserved_characters() {
+        assert_eq!(
+            decoded_route("docs/Caf%C3%A9%20%26%20notes"),
+            Some("docs/Café & notes".to_string())
+        );
     }
 
     #[test]

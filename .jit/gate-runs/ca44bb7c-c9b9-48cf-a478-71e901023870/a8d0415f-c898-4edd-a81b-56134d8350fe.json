@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-ca44bb7c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5b2a5dd9070726596a2d95a608ee7971739f9680",
+  "completed_at": "2026-11-05T02:22:12.010167066Z",
+  "duration_ms": 187474,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation satisfies the raw-response consolidation criterion with preserved response and path-safety behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ca44bb7c-c9b9-48cf-a478-71e901023870",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a8d0415f-c898-4edd-a81b-56134d8350fe",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T02:19:04.535850554Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8290e209 (claim metadata), 47f4bbed (implementation), 5b2a5dd9 (gate-record metadata)\nPolicy sources: AGENTS.md\nResolved items: @/issue/0f8efc37/requirement/REQ-12 (issue Markdown), @/issue/c8e79465/requirement/REQ-01 (issue Markdown), @/invariant/essential-code-prose (.jit/invariants.toml), @/invariant/orthogonal-tests (.jit/invariants.toml), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0) at 47f4bbed; ancestry covers the implementation and claim commits; code-review pending\nTruncation recovery: narrowed reads of routes, embedded handler, tests, codec call sites, plan, and investigation; no relevant evidence omitted\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation satisfies the raw-response consolidation criterion with preserved response and path-safety behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-f6eaba42",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4ed5e7cf9c69b2ef5fd4c3fb8b61469298ee6086",
+  "completed_at": "2026-11-05T01:35:12.938630229Z",
+  "duration_ms": 240237,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/claim.rs",
+        "id": "F1",
+        "line": 280,
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-21"
+        ],
+        "severity": "low",
+        "summary": "Release-actor fallback directly starts git outside the storage-owned Git module."
+      }
+    ],
+    "summary": "The attributable branch-lookup migration meets its hard criteria; one pre-existing direct Git spawn remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f6eaba42-e756-4b94-b66e-ea1f46838bde",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2682790f-a190-4bbd-8918-49cdc774952a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:31:12.701213616Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 16e5f6af, 8b87dd70, 86cb8402, 0f144b98 (`jit:f6eaba42`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 and @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02, REQ-05, REQ-12 (epic description); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T01:29:42Z); supplied ancestry contains all four attributable commits\nTruncation recovery: re-read affected patches and current code with path-scoped diffs and line ranges after broad output truncated\n\n1. [advisory][pre-existing] `crates/jit/src/commands/claim.rs:280` still directly starts `git config user.name` for release-actor fallback, outside the storage-owned Git module. This predates the attributable patch and does not block the branch-lookup migration, but remains contrary to @/charter/D-21.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable branch-lookup migration meets its hard criteria; one pre-existing direct Git spawn remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Release-actor fallback directly starts git outside the storage-owned Git module.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":280,\"references\":[\"@/charter/D-21\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

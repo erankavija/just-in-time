@@ -7,6 +7,7 @@
   ],
   "description": "Make pinned target inspection read its blobs through the module's object reader, so one `cat-file` answer parser remains.\n\n## Background\n\n- `GitCheckout::inspect_pinned_targets` reads blobs with a write-all-then-read `cat-file --batch` and its own answer parser, moved from the revision resolver (`read_blob_batch` and `parse_cat_file_batch`).\n- The module's object reader answers the same requests through one process with its own parser.\n- The pinned-inspection cases in the module suite count processes per inspection.\n\n## Success Criteria\n\n- [hard] REQ-01: `inspect_pinned_targets` reads its blobs through one object reader, and the write-all-then-read batch and its parser no longer exist.\n- [hard] REQ-02: The pinned-inspection cases keep their results, process counts and subcommands.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T02:30:03.066260495Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Pinned target inspection reads blobs through the object reader",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-05T02:30:03.066260495Z"
 }
