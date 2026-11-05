@@ -42,10 +42,43 @@ fn test_worktree_info_json_output() {
     assert!(json["worktree_id"].is_string());
     assert!(json["branch"].is_string());
     assert!(json["root_path"].is_string());
+    assert_eq!(json["data_root"].as_str(), cli.root().join(".jit").to_str());
 
     // Worktree ID should start with "wt:"
     let wt_id = json["worktree_id"].as_str().unwrap();
     assert!(wt_id.starts_with("wt:"), "ID should start with 'wt:'");
+}
+
+#[test]
+fn test_worktree_info_reports_resolved_data_root_in_json_and_human_output() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let custom = cli.root().join("tracker space");
+    fs::rename(cli.root().join(".jit"), &custom).unwrap();
+    let nested = cli.root().join("nested");
+    fs::create_dir(&nested).unwrap();
+
+    for selection in [custom.clone(), std::path::PathBuf::from("../tracker space")] {
+        let output = cli
+            .command_with_env(
+                ["worktree", "info", "--json"],
+                [("JIT_DATA_DIR", &selection)],
+            )
+            .current_dir(&nested)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(json["data_root"].as_str(), custom.to_str());
+        cli.command_with_env(["worktree", "info"], [("JIT_DATA_DIR", &selection)])
+            .current_dir(&nested)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(format!(
+                "Data root:  {}",
+                custom.display()
+            )));
+    }
 }
 
 #[test]
@@ -72,6 +105,10 @@ fn test_worktree_info_follows_overridden_data_root_checkout() {
         Some(worktree_path.to_str().unwrap())
     );
     assert_eq!(json["is_main_worktree"], false);
+    assert_eq!(
+        json["data_root"].as_str(),
+        worktree_path.join(".jit").to_str()
+    );
 }
 
 #[test]

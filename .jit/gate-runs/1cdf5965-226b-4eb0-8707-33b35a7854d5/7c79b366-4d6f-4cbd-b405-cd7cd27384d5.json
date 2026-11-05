@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-1cdf5965",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "87f00f61e33e2da460a3e2563c627c9442e9fc1b",
+  "completed_at": "2026-11-04T23:21:33.764804884Z",
+  "duration_ms": 241711,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged implementation builds pass-local node and cluster indexes, preserves bulk layout and refresh behavior, and has passing recorded web CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7c79b366-4d6f-4cbd-b405-cd7cd27384d5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:17:32.053164942Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 93839e5a8, 87f00f61e3 (`jit:1cdf5965`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/active/0f8efc37-frontends-share-core/plan.md; dev/active/0f8efc37-frontends-share-core/investigation.md\nResolved items: @/issue/0f8efc37/requirement/REQ-15, @/issue/3a61ff16/requirement/REQ-01, @/issue/0f8efc37/decision/D-4 (issue descriptions); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: npm-ci — passed, exit 0; prior code-review — passed, exit 0\nTruncation recovery: re-read affected patches, current source ranges, tests, plan, and investigation in bounded calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged implementation builds pass-local node and cluster indexes, preserves bulk layout and refresh behavior, and has passing recorded web CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

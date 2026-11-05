@@ -21,6 +21,8 @@ CANNOT_JUDGE=75
 #   JIT_CONTEXT_FILE  — set automatically by jit for --pass-context gates
 #   REVIEWER_AGENT    — command that reads a prompt from stdin and writes a
 #                       review to stdout. Evaluated as a shell command.
+# Optional: python3 and git add gate ancestry facts; jit resolves commits omitted
+# from captured gate projections. Missing tools leave ancestry unavailable.
 #
 # Example REVIEWER_AGENT values:
 #   your-reviewer-command                   # configure inspection-only mode
@@ -68,9 +70,7 @@ fi
 AGENT_STDERR=$(mktemp)
 trap 'rm -f "$AGENT_STDERR"' EXIT
 
-# Feed the complete context directly. The JSON contains the resolved `prompt`
-# plus the issue, gate, and prior-run data, so no external JSON parser is
-# required on the adopter host.
+# Keep the captured context intact; ancestry enrichment is best effort.
 REVIEW_STATUS=0
 REVIEW_OUTPUT=$(
   {
@@ -83,6 +83,19 @@ the review policy and use the remaining fields as evidence.
 ```json
 EOF
     cat "$JIT_CONTEXT_FILE"
+    cat <<'EOF'
+```
+
+## Gate evidence ancestry
+
+```json
+EOF
+    if command -v python3 >/dev/null 2>&1; then
+      python3 "$(dirname "$0")/ai-review-ancestry.py" "$JIT_CONTEXT_FILE" 2>/dev/null \
+        || echo '{"status":"unavailable","reason":"Ancestry enrichment failed."}'
+    else
+      echo '{"status":"unavailable","reason":"python3 is unavailable."}'
+    fi
     cat <<'EOF'
 ```
 

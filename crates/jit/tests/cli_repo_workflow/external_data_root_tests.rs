@@ -77,6 +77,8 @@ fn test_linked_checkouts_over_external_store_share_claims_under_the_repository_c
 
     let primary_info = json_over(&primary, &store, &["worktree", "info"]);
     let linked_info = json_over(&linked, &store, &["worktree", "info"]);
+    assert_eq!(primary_info["data_root"].as_str(), store.to_str());
+    assert_eq!(linked_info["data_root"], primary_info["data_root"]);
     assert_eq!(primary_info["is_main_worktree"], true);
     assert_eq!(linked_info["is_main_worktree"], false);
     assert_eq!(
