@@ -9,6 +9,7 @@
   ],
   "description": "Use the shared Git worktree listing for lease validation while preserving one listing per run and the existing findings response.\n\n## Background\n\n`validate_leases` already computes `recorded_worktree_ids` before its lease loop. That helper still starts `git worktree list --porcelain` and parses paths privately, then reads each listed checkout's identity. The historical per-lease listing and `check_worktree_exists` implementation have already been removed; the remaining change is module convergence and an explicit missing-checkout message.\n\nThe current validation dispatcher turns failed or unavailable lease checks into `Outcome::findings(ErrorCode::ValidationFailed, ...)`. Its generated exit-code row is `VALIDATION_FAILED` with exit 4, not the earlier plan's exit 1. Preserve this findings path, including its structured report.\n\n## Success Criteria\n\n- [hard] REQ-01: Lease validation obtains worktrees once through the module before examining stored leases and reads each listed checkout's ID once. It uses the already-resolved selected/relocated checkout; no lease-listing process starts in `commands/validate.rs`. Existing findings, remedies, external-store identity behavior and lease-validation tests remain unchanged.\n- [hard] REQ-02: Without a Git checkout, validation reports no finding when no lease is stored. With stored leases it reports \"lease validation requires a git repository to check lease worktrees\" through the existing `VALIDATION_FAILED` findings response with exit 4; it does not replace that report with an ordinary typed-error envelope.\n- [hard] REQ-03: A CLI test plants three leases, puts the shared counting stand-in first on the child's PATH, and asserts exactly one `worktree list` invocation. This preserves the already-landed listing bound while proving the module migration.\n- [hard] REQ-04: A CLI test plants a lease, runs without a Git executable on the child's PATH, and asserts the REQ-02 finding and exit 4. Existing canonical status/envelope owners remain authoritative; no duplicate matrix is added.\n\n## Notes\n\nDEC-28 reconciles the stale exit-status promise with the current shared validation contract. Layout-probe reuse is owned by the invocation-layout mechanism; this command continues to project each listed checkout through its shared paths API.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:48:37.509334186Z",
   "first_ready_at": "2026-11-05T01:05:34.432147653Z",
   "gates_required": [
     "cargo-ci",
@@ -16,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "c281683c-fd7b-477e-b4ec-5a1734744980",
+      "run_id": "5ac87f4a-888e-4770-8514-ffe0147d915c",
       "status": "passed",
-      "updated_at": "2026-11-05T01:53:19.095664981Z",
+      "updated_at": "2026-11-05T02:48:06.493940202Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,7 +42,7 @@
     "satisfies:f4d9502a/REQ-12"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Lease validation lists worktrees once per run",
-  "updated_at": "2026-11-05T01:56:00.314644695Z"
+  "updated_at": "2026-11-05T02:48:37.509334186Z"
 }
