@@ -370,7 +370,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "reviewed_awaiting_user_floor_decision"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -379,7 +379,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "prepared",
+          "worker_status": "conditional_design_complete_waiting_a273",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -405,10 +405,11 @@
           "short_id": "fb5e8e8d",
           "title": "Main-history guard runs against the selected worktree",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "prepared",
-          "worker": "agent:f4d9502a-lead"
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "e552fbb2cdec781216419c1d8918f37c75cd9de6"
         }
       ]
     },
@@ -430,7 +431,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "planning",
+          "worker_status": "design_review_pass_waiting_footprint_acceptance",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -533,9 +534,9 @@
     },
     {
       "issue": "c140921c",
-      "status": "shared_producer_research",
+      "status": "conditional_design_recorded",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Stewardrequires sharedproducerfix; no privateconsumerworkaround orintentionalregression. Mapcallers/tests/options/processbudgets andproposeboundedfootprintbeforeexpansion."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded."
     }
   ],
   "rework_counts": {
@@ -555,7 +556,8 @@
     "83c8632f": 1,
     "3f8da8c4": 1,
     "47d62472": 1,
-    "9ecde705": 1
+    "9ecde705": 1,
+    "fb5e8e8d": 1
   },
   "surfaced_pitfalls": [
     {
@@ -565,10 +567,10 @@
     {
       "issue": "f4d9502a",
       "criterion": "REQ-04",
-      "status": "owner_reconciled_remediation_pending",
+      "status": "closed",
       "finding": "External data-root fallback performs two layout probes; for_worktree_root adds probes for listed checkouts. Preserve external-store and relocated-checkout identity while resolving the invocation-wide one-process contract.",
       "owner": "layout_probe_research",
-      "disposition": "DEC27 owner permits one computation per distinct checkout context: ordinary reads<=1, external bootstrap<=2, external N contexts<=N+1. Duplicate probes remain defect; approved d681 remediation awaits independent plan review and implementation."
+      "disposition": "DEC27 bounds implemented by d68150e2, completed at e375af7d8 after stable branch and merged Cargo and independent review. Existing CLI counting suite proves ordinary <=1, external startup <=2, external traversal N+1 independent of lease count; shared LayoutContext owns alias, negative/error, clone and concurrency observations. c0ea31ee checkpoint independently audits composition."
     }
   ],
   "reconciled_after_breakdown": [
@@ -879,7 +881,14 @@
     "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect.",
     "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done.",
-    "Stewardfbpolicyruling: mutationguard uses supplied data-history paths.git(); relocatedcodecheckout mustnotlendhistory to externalnonGitstore. Existingownerassertion preserved, rootwrite_checkoutinferencewithdrawn.504planner mustpreserveseparatedatahistory/codeevidenceauthorities. 504claimedplanningonly perDEC04/23 outside53manifest/REQcredit, Terrahighdesignthenindependentreview/stewardacceptance. c0ea checkpointclaimed forcriteriaaudit+cargo/holisticgatesin isolation, no source-slotreservation."
+    "Stewardfbpolicyruling: mutationguard uses supplied data-history paths.git(); relocatedcodecheckout mustnotlendhistory to externalnonGitstore. Existingownerassertion preserved, rootwrite_checkoutinferencewithdrawn.504planner mustpreserveseparatedatahistory/codeevidenceauthorities. 504claimedplanningonly perDEC04/23 outside53manifest/REQcredit, Terrahighdesignthenindependentreview/stewardacceptance. c0ea checkpointclaimed forcriteriaaudit+cargo/holisticgatesin isolation, no source-slotreservation.",
+    "Steward-approved post-plan d9ba0029 semantic correction: unchanged original revision -> shared canonical commit resolution -> canonical commit:path in one child; erroneous suffix-first expression contract corrected, availability/error rules retained. Added actual c140921c prerequisite with no cycle, reduced transitive d68150e2 edge; no redundant a273 edge. Producer must land/gate before archive dispatch. Rationale: dev/active/c140921c/revision-producer-plan.md.",
+    "fb guard authority correction: initial lead brief inferred write_checkout incorrectly; original git-absent assertion failed and was preserved. Steward directed paths.git data-history; withdrawn invalid external-store refusal expectation removed, final40worktreeCLI passed. Initial and corrected evidence retained.",
+    "fb5e8e8d Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward approved933ff852 -> c140921c after cycle/redundancy check: existing libgit2 read_file_from_git resolves original expression then peels, so two-version one-child migration uses shared reader resolution and canonical commit:path. No criteria weakening/private resolver;1ac retains existing prerequisites. Frontend parked chain now includes c140.",
+    "504 independentR1FAIL identified missing original-root redo authority; steward acceptedD26 recorded1d487be2e. Revisedplan inR2review, implementation held for independentPASS+steward exact-footprint acceptance. Main source boundary released afterfbclosure0c83d3d4f; c0ea isolated clean rebuild running.",
+    "c0ea checkpoint Done after actual clean Cargo and independent holisticPASS; seeded artifact failures3d160332/ffdc3aee and cached failurec5ff62bc preserved. Local target cleanup resolved E0463/E0460 without source edits. Tracker-only landing adds no production change; mandatory merged-source policy not triggered.",
+    "504 designR3PASS: allR1/R2findingsclosed atdesignlevel underD26/D27. Durable design andall3reviews in dev/active/5046408a linked. No implementation yet; awaiting steward exact-footprint acceptance. Initial doclink lacked lead actor and failed; retried successfully with owning actor before commit/validation."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1374,6 +1383,25 @@
       },
       "criteria": "All4correctedcriteria met: supplied write_checkout typedbasecomparison, distinct exactmessages/findings exit4, actualRED missingbase/unrelated/noGit/externalstore, literal selected-data-dir scenario consolidated in existing owner. Leadrework1 duplicatefixtureclosed. No linked docs/deferrals; basecomparison convergencecomment legitimately awaitsfb. Mandatory mergedCargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS c0fc1f14-1870-4b22-af67-a8e59463e24b on 0757e05ba7c4c74ca47e5ce3f076a5b0624ae7ae."
+    },
+    "fb5e8e8d": {
+      "verdict": "PASS",
+      "reviewed_source": "4fc42eb64e71780af840cd99b2c0e2e77122ac89",
+      "gates": {
+        "cargo-ci": "1f3f1879-d902-4380-a3ef-3e1f435eb339",
+        "code-review": "65c49afc-490a-4694-a01b-4bfc0f0f1622"
+      },
+      "criteria": "All3 corrected criteria met; data-history supplied context, canonical comparison, all3 callers, exact refusal message, preserved noGit allow, existing CLI owner extended without weakening. Actual old-code RED and focused/fullPASS; obsolete comparison comment only in shared module. No deferred scope.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 1f3f1879-d902-4380-a3ef-3e1f435eb339 on e552fbb2cdec781216419c1d8918f37c75cd9de6."
+    },
+    "c0ea31ee": {
+      "verdict": "PASS",
+      "reviewed_source": "488f97bd49d2ef49ea261278949bd7e10b834338",
+      "gates": {
+        "cargo-ci": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+        "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
+      },
+      "criteria": "All3 layout checkpoint criteria audited: shared invocation observations, supplied storage/executor/recovery/server/init/hooks, ordinary/external/moved/lease counting suite, owning alias/error/clone/concurrency tests. Resolved d681 pitfall reconciled before gate. No source implementation introduced by checkpoint."
     }
   },
   "source_queue": [
@@ -1384,5 +1412,15 @@
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
     "38df8a6c installer policy source"
-  ]
+  ],
+  "checkpoints": {
+    "c0ea31ee": {
+      "status": "done",
+      "worker_status": "gated_and_closed",
+      "gates": {
+        "cargo-ci": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+        "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
+      }
+    }
+  }
 }

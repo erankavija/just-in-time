@@ -4,15 +4,15 @@ use super::CommandExecutor;
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::errors::{GitRequirementGap, RequiresGitError};
-use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
+use crate::repository_state::RECORD_SCRATCH_DIR;
 use crate::storage::claim_coordinator::{read_active_leases, Lease};
+use crate::storage::git::BaseComparison;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{read_exact_store, IssueStore, StorageWarning, RECORD_FILE_NAME};
 use anyhow::{anyhow, ensure, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::path::Path;
 use std::process::{Command, ExitStatus};
 
 /// Worktree information for display
@@ -54,6 +54,26 @@ pub struct WorktreeOps<'a, S: IssueStore> {
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn worktrees(&self) -> WorktreeOps<'_, S> {
         WorktreeOps { exec: self }
+    }
+
+    /// Refuse shared registry edits when the selected data root's checkout diverges
+    /// from `origin/main`; absent git, an unresolved base or unrelated histories allow them.
+    pub(crate) fn require_common_history_with_main(&self) -> Result<()> {
+        let Some(checkout) = self.require_worktree_paths()?.git() else {
+            return Ok(());
+        };
+        match checkout.compare_with_base("origin/main")? {
+            BaseComparison::Compared {
+                merge_base,
+                base_commit,
+            } if merge_base != base_commit => anyhow::bail!(
+                "Global operations require common history with main\n\n\
+                 Your branch has diverged from origin/main. To proceed:\n  \
+                 git fetch origin\n  \
+                 git rebase origin/main"
+            ),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -243,91 +263,6 @@ pub struct StoreDivergenceReport {
     pub reference_store: Option<String>,
     /// Every record the two stores disagree about, empty when they agree.
     pub divergences: Vec<StoreDivergence>,
-}
-
-/// Whether the branch checked out at `repository` has moved off `origin/main`:
-/// `origin/main` is not an ancestor of its HEAD. A repository with no `origin/main`
-/// has not diverged.
-///
-/// # Errors
-///
-/// Returns an error when git cannot be spawned.
-pub fn check_branch_divergence(repository: &Path) -> Result<bool> {
-    let merge_base_output = Command::new("git")
-        .args(["merge-base", "HEAD", "origin/main"])
-        .current_dir(repository)
-        .output()
-        .context("Failed to execute git merge-base")?;
-
-    // If origin/main doesn't exist, not an error - just not diverged
-    if !merge_base_output.status.success() {
-        return Ok(false);
-    }
-
-    let main_commit_output = Command::new("git")
-        .args(["rev-parse", "origin/main"])
-        .current_dir(repository)
-        .output()
-        .context("Failed to execute git rev-parse")?;
-
-    if !main_commit_output.status.success() {
-        return Ok(false);
-    }
-
-    let merge_base = String::from_utf8(merge_base_output.stdout)
-        .context("Invalid UTF-8 in merge-base output")?
-        .trim()
-        .to_string();
-
-    let main_commit = String::from_utf8(main_commit_output.stdout)
-        .context("Invalid UTF-8 in rev-parse output")?
-        .trim()
-        .to_string();
-
-    // Branch has diverged if merge-base is not the same as origin/main
-    Ok(merge_base != main_commit)
-}
-
-/// Refuse a global operation (config, gates registry, type hierarchy) on a
-/// repository whose branch has diverged from `origin/main`, since it would modify
-/// state shared by all agents.
-///
-/// `layout` names the repository the operation serves, and its data root decides
-/// what git sees: the worktree root of a store outside git is the invocation's
-/// directory. A store with no repository on disk, and a repository outside git
-/// (`@/charter/D-4`), have no history to guard.
-///
-/// # Errors
-///
-/// Returns an error when the branch has diverged, naming the rebase that reconciles it.
-pub fn enforce_main_only_operations(layout: Option<&RepositoryLayout>) -> Result<()> {
-    let Some(repository) = layout.map(RepositoryLayout::data_root) else {
-        return Ok(());
-    };
-
-    // Skip enforcement if git is not available
-    match Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .current_dir(repository)
-        .output()
-    {
-        Ok(output) if output.status.success() => {
-            // We're in a real git repo, check for divergence
-            if check_branch_divergence(repository)? {
-                anyhow::bail!(
-                    "Global operations require common history with main\n\n\
-                     Your branch has diverged from origin/main. To proceed:\n  \
-                     git fetch origin\n  \
-                     git rebase origin/main"
-                );
-            }
-            Ok(())
-        }
-        _ => {
-            // Not in a git repo or git not available - skip check
-            Ok(())
-        }
-    }
 }
 
 #[cfg(test)]
