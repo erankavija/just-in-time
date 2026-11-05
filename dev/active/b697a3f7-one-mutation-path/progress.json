@@ -14,7 +14,7 @@
           "title": "Type labels have one exact extraction",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "landing"
         },
         {
           "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
@@ -22,7 +22,7 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
@@ -131,7 +131,9 @@
       "status": "resolved"
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "f6477007": 1
+  },
   "surfaced_pitfalls": [],
   "started_at": "2026-11-06T01:20:00+02:00",
   "coordination": [
