@@ -348,10 +348,8 @@ fn test_status_unknown_id_fails() {
         .failure();
 }
 
-/// Under `--json`, a non-matching (but long-enough) id yields the JSON error
-/// envelope with `ISSUE_NOT_FOUND` — the same contract as
-/// `issue show`, routed through `handle_json_error!`. Pins that id failures do
-/// not escape to bare human stderr when `--json` is requested.
+/// Under `--json`, a non-matching (but long-enough) id yields the
+/// `ISSUE_NOT_FOUND` envelope, matching `issue show`.
 #[test]
 fn test_status_unknown_id_json_error_envelope() {
     let temp = JitCli::initialised().unwrap();
