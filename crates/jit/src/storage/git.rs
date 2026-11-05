@@ -385,9 +385,6 @@ impl GitCheckout {
         Ok(Some(url.to_owned()))
     }
 
-    // Temporary @/inv/convention-convergence exception: branch comparisons
-    // converge here when fb5e8e8d (check_branch_divergence) and 47d62472
-    // (validate_branch_drift) migrate their consumers.
     /// Compare this checkout's HEAD with a caller-selected base revision.
     ///
     /// # Errors
