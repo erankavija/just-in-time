@@ -527,9 +527,11 @@ mod tests {
     fn test_get_config_covers_whole_surface_on_fresh_repo() {
         let dir = tempfile::TempDir::new().unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage).with_layout(
-            crate::test_utils::repository_layout_for_data_root(dir.path()),
-        );
+        let executor = CommandExecutor::new(storage)
+            .with_layout(crate::test_utils::repository_layout_for_data_root(
+                dir.path(),
+            ))
+            .unwrap();
 
         // No config.toml at all: every top-level section still resolves
         // (empty object), it's just not an unknown key.
@@ -599,9 +601,11 @@ schema = 1
         )
         .unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage).with_layout(
-            crate::test_utils::repository_layout_for_data_root(dir.path()),
-        );
+        let executor = CommandExecutor::new(storage)
+            .with_layout(crate::test_utils::repository_layout_for_data_root(
+                dir.path(),
+            ))
+            .unwrap();
 
         assert_eq!(
             executor
@@ -666,7 +670,7 @@ schema = 1
         let layout =
             crate::storage::discover_repository_layout(dir.path().parent().unwrap(), dir.path())
                 .unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         executor
             .profiles()
             .initialize_fresh_repository(dir.path().parent().unwrap(), None)
@@ -708,9 +712,11 @@ schema = 1
     fn test_get_config_unknown_top_level_key_is_invalid_argument() {
         let dir = tempfile::TempDir::new().unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage).with_layout(
-            crate::test_utils::repository_layout_for_data_root(dir.path()),
-        );
+        let executor = CommandExecutor::new(storage)
+            .with_layout(crate::test_utils::repository_layout_for_data_root(
+                dir.path(),
+            ))
+            .unwrap();
 
         let err = executor.config().get_config("bogus_section").unwrap_err();
         assert!(err.downcast_ref::<InvalidArgumentError>().is_some());

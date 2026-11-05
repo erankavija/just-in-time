@@ -624,7 +624,9 @@ mod tests {
 
         let memory = crate::storage::InMemoryStorage::rooted_at(repo.path());
         let layout = memory.repository_layout();
-        let memory_executor = CommandExecutor::new(memory.clone()).with_layout(layout);
+        let memory_executor = CommandExecutor::new(memory.clone())
+            .with_layout(layout)
+            .unwrap();
         memory_executor
             .profiles()
             .initialize_fresh_repository(repo.path(), None)
@@ -839,6 +841,7 @@ mod tests {
 
         let result = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(repo.path(), storage.root()).unwrap())
+            .unwrap()
             .initialize_selected(repo.path(), &[repo.path().join("packages/workflow")])
             .unwrap();
 

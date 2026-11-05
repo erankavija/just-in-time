@@ -1511,7 +1511,7 @@ mod tests {
         std::fs::write(repo.path().join(".jit/events.jsonl"), "").unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         let error = executor.validation().validate_silent().unwrap_err();
 
@@ -1546,7 +1546,7 @@ mod tests {
         .unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         let (repaired, _) = executor.validation().repair_derived_state(true).unwrap();
 
@@ -1577,7 +1577,7 @@ mod tests {
         .unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         let (fixes, _messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert!(fixes >= 1, "the stale projection region must be repaired");
@@ -1623,7 +1623,7 @@ mod tests {
 
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         let (_, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
         let error = report.structural_failure.unwrap();
         assert!(format!("{error:#}").contains("invariants"), "{error:#}");
@@ -1684,7 +1684,7 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         executor
             .validation()
             .validate_silent()
@@ -1713,7 +1713,7 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         let asset = repo.path().join(".agents/skills/jit-manage/SKILL.md");
         std::fs::write(&asset, "EDITED PROFILE ASSET\n").unwrap();
 
@@ -1904,8 +1904,9 @@ mod tests {
         );
         let publications = Arc::new(Publications::default());
         let storage = storage.with_mutation_interruption_view(publications.clone());
-        let executor =
-            CommandExecutor::new(storage.clone()).with_layout(executor.require_layout().unwrap());
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(executor.require_layout().unwrap())
+            .unwrap();
         let (preview, _, _, _) = executor.validation().validate_with_fix(true).unwrap();
         assert_eq!(publications.0.load(Ordering::SeqCst), 0);
         assert_eq!(storage.load_issue(&source.id).unwrap(), source);
@@ -1977,8 +1978,9 @@ mod tests {
             1,
             SessionRaceAction::Save(Box::new(raced.clone())),
         );
-        let executor =
-            CommandExecutor::new(storage).with_layout(executor.require_layout().unwrap());
+        let executor = CommandExecutor::new(storage)
+            .with_layout(executor.require_layout().unwrap())
+            .unwrap();
 
         let (failure, _) = executor
             .validation()
