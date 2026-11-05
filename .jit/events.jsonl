@@ -24854,3 +24854,5 @@
 {"id":"bc57085d-a02e-4b28-8936-73d0f6a8cae4","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","new_count":24,"old_count":25,"removed_deps":["6d93ab14-4c72-4ec5-9c50-471cf0d95746"],"timestamp":"2026-11-04T23:46:58.379282303Z","type":"dependency_reduced"}
 {"from":"ready","id":"2d88900f-dd5a-408f-baed-3196040edbef","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-04T23:52:29.474333037Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:f4d9502a-lead","id":"d11e15fa-807a-459b-8e3c-39c7d8b7f78c","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-04T23:52:29.474333037Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"cbbd01db-82c9-4762-aff9-66d2b6a9add0","issue_id":"4ba18af4-dcf3-480d-a785-40dc4533349c","timestamp":"2026-11-04T23:58:55.332481986Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"869975b5-362b-48ad-af9a-d2d7bb3aed90","issue_id":"4ba18af4-dcf3-480d-a785-40dc4533349c","timestamp":"2026-11-05T00:03:36.866032024Z","type":"gate_passed","updated_by":"auto:executor"}
