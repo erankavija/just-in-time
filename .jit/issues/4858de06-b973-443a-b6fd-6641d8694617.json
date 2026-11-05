@@ -23,9 +23,9 @@
       "updated_by": "auto:executor"
     },
     "npm-ci": {
-      "run_id": "5c7b346c-d3ea-4aa3-bcbd-c1361717aedb",
+      "run_id": "a54e4f23-4ecf-40a6-9885-5d9a09a7abcf",
       "status": "passed",
-      "updated_at": "2026-11-05T00:40:56.130681761Z",
+      "updated_at": "2026-11-05T01:14:24.805278286Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +39,5 @@
   "priority": "high",
   "state": "done",
   "title": "Load issue details safely across selection changes",
-  "updated_at": "2026-11-05T00:44:27.702517977Z"
+  "updated_at": "2026-11-05T01:14:24.805278286Z"
 }
