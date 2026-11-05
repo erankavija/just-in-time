@@ -267,7 +267,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "implementation_running"
+          "worker_status": "corrected_full_gates_running"
         },
         {
           "id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
@@ -282,8 +282,9 @@
           "short_id": "d68150e2",
           "title": "Layout consumers share invocation-owned checkout facts",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
@@ -500,7 +501,8 @@
     "28ccf9a9": 1,
     "ec9e812c": 1,
     "f6eaba42": 1,
-    "9de4c09c": 1
+    "9de4c09c": 1,
+    "d48e28bf": 1
   },
   "surfaced_pitfalls": [
     {
@@ -736,7 +738,8 @@
     "ec9 relocation Done after actual stable merged Cargo; source released immediately to df fe3. Object-reader producer is unblocked.",
     "ec9 closure script corrected raw gate_key vs CLI key before mutation, actual closure42664758e. d48 claimed922c1664d and dispatched Astra high; e3 focused checks, f649 stable Cargo/review PASS on07ffda330; retained evidence7b8320175. Base final relocated suite integration preserves55incoming+4base tests,59PASS; origin tree reclaimed. c506 fullgatesPASS and exact source preserved. Source sequence c16\u2192frontend4538\u2192c506 per steward; after both listing consumers converge, obsolete two-line exception may be deleted with executable/test byte proof and merged check, retaining actual reviews under explicit steward ruling.",
     "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "c5062e21 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "c5062e21 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "c506Done4a77db9f2 unlocks d681; dispatched against reviewed DEC27 plan. Preserve user D25 nonblocking read cutover from frontend632; do not touch its json admitted listing or commands with_read_session fallback. d48 initialCargocebc1568 Clippy failed only byte-char-array expression;4990+25 passed; actual failure4e725c25e preserved, one-line correction87281c148 fullgates running. Both e3/f649 stable reviewPASS ready. Base next after frontend D25 metadata boundary."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1097,9 +1100,7 @@
     }
   },
   "source_queue": [
-    "c16c834c",
-    "frontend4538b071",
-    "c5062e21",
+    "09974ad1",
     "ready interleave"
   ],
   "blocked_source_exclusions": [
