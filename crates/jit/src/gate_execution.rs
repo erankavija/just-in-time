@@ -13,6 +13,7 @@ use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, Reposi
 use crate::domain::{
     Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
+use crate::storage::git::Head;
 use anyhow::{Context, Result};
 use std::io::Write;
 use std::path::Path;
@@ -70,7 +71,7 @@ pub struct GateRunSubject<'a> {
 /// Execute a gate checker with optional structured context.
 ///
 /// This function runs the specified checker and captures all execution details
-/// including exit code, output, timing, and git context if available.
+/// including exit code, output, timing, and the supplied worktree head.
 ///
 /// Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS`)
 /// are always set. `JIT_ISSUE_DOCS` is built from `documents` via
@@ -86,14 +87,15 @@ pub fn execute_gate_checker_with_context(
     }: GateRunSubject<'_>,
     checker: &GateChecker,
     working_dir: &Path,
+    head: Option<&Head>,
     context: Option<&GateContext>,
     documents: &[DocumentReference],
 ) -> Result<GateRunResult> {
     let start_time = Instant::now();
     let started_at = chrono::Utc::now();
 
-    let commit = get_git_commit(working_dir);
-    let branch = get_git_branch(working_dir);
+    let commit = head.map(|head| head.commit().as_str().to_string());
+    let branch = head.map(|head| head.branch_label().to_string());
 
     // Build base env vars that are always set
     let mut base_env = std::collections::HashMap::new();
@@ -532,45 +534,6 @@ fn is_git_plumbing(repository_path: &str) -> bool {
     repository_path.split('/').any(|segment| segment == ".git")
 }
 
-/// Resolve the current `HEAD` commit hash for `working_dir`.
-///
-/// Returns `None` when `working_dir` is not inside a git repository, when git
-/// is unavailable, or when the `git rev-parse HEAD` invocation fails (e.g. a
-/// repository with no commits yet). The value is the full 40-character SHA, the
-/// same one stamped into [`GateRunResult::commit`](crate::domain::GateRunResult).
-fn get_git_commit(working_dir: &Path) -> Option<String> {
-    Command::new("git")
-        .arg("rev-parse")
-        .arg("HEAD")
-        .current_dir(working_dir)
-        .output()
-        .ok()
-        .and_then(|output| {
-            if output.status.success() {
-                Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-            } else {
-                None
-            }
-        })
-}
-
-fn get_git_branch(working_dir: &Path) -> Option<String> {
-    Command::new("git")
-        .arg("rev-parse")
-        .arg("--abbrev-ref")
-        .arg("HEAD")
-        .current_dir(working_dir)
-        .output()
-        .ok()
-        .and_then(|output| {
-            if output.status.success() {
-                Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-            } else {
-                None
-            }
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -600,6 +563,7 @@ mod tests {
             },
             checker,
             working_dir,
+            None,
             context,
             documents,
         )
@@ -739,15 +703,48 @@ mod tests {
     }
 
     #[test]
-    fn test_git_context_graceful_degradation() {
-        // Test in a non-git directory
-        let temp_dir = std::env::temp_dir();
-        let commit = get_git_commit(&temp_dir);
-        let branch = get_git_branch(&temp_dir);
+    fn test_execute_gate_checker_in_memory_evidence_ignores_explicit_git_working_dir() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        repository.write("seed.txt", "seed\n").commit("seed");
+        let in_memory = crate::commands::test_helpers::setup();
+        let head = in_memory
+            .require_worktree_paths()
+            .unwrap()
+            .git()
+            .map(|git| git.head())
+            .transpose()
+            .unwrap()
+            .flatten();
+        assert!(head.is_none());
+        let checker = GateChecker::Exec {
+            command: "true".to_string(),
+            timeout_seconds: 10,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
+        };
 
-        // Should not panic, just return None values
-        assert!(commit.is_none() || !commit.unwrap().is_empty());
-        assert!(branch.is_none() || !branch.unwrap().is_empty());
+        let result = execute_gate_checker_with_context(
+            GateRunSubject {
+                run_id: &crate::test_utils::gate_run_id(1),
+                gate_key: &"g".parse().unwrap(),
+                issue_id: &crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
+                stage: GateStage::Postcheck,
+            },
+            &checker,
+            repository.root(),
+            head.as_ref(),
+            None,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+        assert_eq!(result.commit, None);
+        assert_eq!(result.branch, None);
     }
 
     /// A worktree with `src/` and `docs/` beneath a git repository, where
@@ -761,19 +758,7 @@ mod tests {
         std::fs::write(root.join("src/lib.rs"), "fn main() {}\n").expect("write source");
         std::fs::write(root.join("docs/guide.md"), "guide\n").expect("write doc");
         std::fs::write(root.join("seed.txt"), "seed\n").expect("write seed");
-        crate::test_cli::init_git_repository(root).expect("initialize git repository");
-        let added = Command::new("git")
-            .args(["add", "."])
-            .current_dir(root)
-            .status()
-            .expect("git add runs");
-        assert!(added.success(), "git add failed");
-        let committed = Command::new("git")
-            .args(["commit", "-q", "-m", "seed"])
-            .current_dir(root)
-            .status()
-            .expect("git commit runs");
-        assert!(committed.success(), "git commit failed");
+        crate::test_harness::git::GitRepository::init(root).commit("seed");
         temp
     }
 
@@ -1123,25 +1108,19 @@ mod tests {
         assert_ne!(baseline, layout_digest(&layout, &["."]));
     }
 
-    /// A recorded gate run stamps the `HEAD` commit the checker started at.
     #[test]
     fn test_execute_gate_checker_records_head_commit() {
         let temp = tempfile::TempDir::new().unwrap();
-        crate::test_cli::init_git_repository(temp.path()).unwrap();
-        std::fs::write(temp.path().join("seed.txt"), "seed\n").expect("write seed");
-        let added = Command::new("git")
-            .args(["add", "."])
-            .current_dir(temp.path())
-            .status()
-            .expect("git add runs");
-        assert!(added.success(), "git add failed");
-        let committed = Command::new("git")
-            .args(["commit", "-q", "-m", "seed"])
-            .current_dir(temp.path())
-            .status()
-            .expect("git commit runs");
-        assert!(committed.success(), "git commit failed");
-
+        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        let expected_commit = repository.write("seed.txt", "seed\n").commit("seed");
+        let head = crate::storage::WorktreePaths::detect_from(repository.root())
+            .unwrap()
+            .git()
+            .unwrap()
+            .head()
+            .unwrap()
+            .unwrap();
+        let checker_dir = tempfile::TempDir::new().unwrap();
         let checker = GateChecker::Exec {
             command: "true".to_string(),
             timeout_seconds: 10,
@@ -1151,19 +1130,23 @@ mod tests {
             prompt: None,
             prompt_file: None,
         };
-        let result = execute_fixture_checker(
-            &"g".parse().unwrap(),
-            &crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
-            GateStage::Postcheck,
+        let result = execute_gate_checker_with_context(
+            GateRunSubject {
+                run_id: &crate::test_utils::gate_run_id(1),
+                gate_key: &"g".parse().unwrap(),
+                issue_id: &crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
+                stage: GateStage::Postcheck,
+            },
             &checker,
-            temp.path(),
+            checker_dir.path(),
+            Some(&head),
             None,
             &[],
         )
         .unwrap();
 
-        assert!(result.commit.is_some());
-        assert_eq!(result.commit, get_git_commit(temp.path()));
+        assert_eq!(result.commit.as_deref(), Some(expected_commit.as_str()));
+        assert_eq!(result.branch.as_deref(), Some(head.branch_label()));
     }
 
     #[test]

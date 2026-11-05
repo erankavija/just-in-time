@@ -16,7 +16,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c1b0cc1-ab9b-4179-a9c8-89feea8967e7",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:47:28.633777608Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4c16f96a-c643-46c0-bc48-3cca022950b9",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:50:00.453477430Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3f8da8c4-4fb4-4191-bec4-d496155b6266",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate runs take commit and branch evidence from the module",
-  "updated_at": "2026-11-05T03:03:44.336926588Z"
+  "updated_at": "2026-11-05T03:50:00.453477430Z"
 }
