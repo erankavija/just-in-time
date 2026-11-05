@@ -485,7 +485,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     /// the run publishes, rewrites, and unlinks no repository content. The
     /// issue set the report resolves owners against — both the short ids those
     /// issues answer to and the document references they hold — is read through
-    /// [`IssueStore::list_issues`](crate::storage::IssueStore::list_issues). A
+    /// [`IssueStore::list_issues`]. A
     /// declared area that does not exist yet contributes no findings.
     ///
     /// # Errors
@@ -787,7 +787,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         })
     }
 
-    /// Load an issue, returning a typed [`PathReadError`].
+    /// Load an issue, returning a typed [`crate::storage::PathReadError`].
     ///
     /// Delegates to [`IssueStore::load_issue_or_not_found`], which each
     /// backend implements without string-matching: `JsonFileStorage` checks for
@@ -804,7 +804,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     /// Note: This method is part of the public API used by jit-server.
     /// It's not called from the CLI binary, hence the dead_code warning.
     ///
-    /// Returns typed [`PathReadError`] so route handlers can distinguish 404
+    /// Returns typed [`crate::storage::PathReadError`] so route handlers can distinguish 404
     /// (file or document not found) from 500 (storage failure)
     /// without string-matching on error messages.
     #[allow(dead_code)]
@@ -873,7 +873,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     ///
     /// Note: Part of public API used by jit-server.
     ///
-    /// Returns [`PathReadError::NotFound`] when the issue has no document at
+    /// Returns [`crate::storage::PathReadError::NotFound`] when the issue has no document at
     /// `path` so that route handlers can return HTTP 404 without
     /// string-matching on the error message.
     #[allow(dead_code)]
@@ -906,7 +906,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     ///
     /// Note: Part of public API used by jit-server.
     ///
-    /// Returns [`PathReadError::NotFound`] when the issue has no document at
+    /// Returns [`crate::storage::PathReadError::NotFound`] when the issue has no document at
     /// `path` so that route handlers can return HTTP 404 without
     /// string-matching on the error message.
     #[allow(dead_code)]

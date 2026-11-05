@@ -123,7 +123,7 @@ pub enum ConfigKeyError {
 /// value.
 ///
 /// Pure and total over any [`serde_json::Value`] object tree — no IO, no
-/// knowledge of [`JitConfig`](crate::config::JitConfig)'s actual shape — so it
+/// knowledge of [`JitConfig`]'s actual shape — so it
 /// is unit-tested directly against hand-built snapshots, decoupled from
 /// [`EffectiveConfig::full_snapshot`]'s IO-heavy assembly. An intermediate key
 /// (fewer segments than the value's depth) returns the WHOLE subtree at that

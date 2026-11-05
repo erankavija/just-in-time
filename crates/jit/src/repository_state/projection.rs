@@ -26,7 +26,7 @@
 //! untouched; publication lands through the mutation session's redo record.
 //!
 //! Target path, mode, style, and delimiters come ONLY from
-//! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no
+//! [`ProjectionConfig`]; this module hardcodes no
 //! documentation filename. The projection-to-body wiring (which registry or source
 //! feeds which projection) lives in
 //! [`project_render`](crate::repository_state::projection_render).
@@ -39,10 +39,10 @@ use thiserror::Error;
 /// Errors raised while rendering or writing a generic projection.
 ///
 /// Shared by [`require_target`] here, the body-rendering wiring in
-/// [`project_render`](crate::repository_state::projection_render), and the
+/// `project_render`, and the
 /// session-backed project-render command. Managed-region structure is
 /// validated exclusively by
-/// [`managed_document`](crate::repository_state::managed_document).
+/// `managed_document`.
 #[derive(Debug, Error)]
 pub enum ProjectionError {
     /// A projection declared no `target`. The path is required (the engine applies
@@ -174,7 +174,7 @@ fn render_id_anchor(registry: &InvariantRegistry) -> String {
 /// `- **{self-id}** — {display}\n` line, in the order the rows were resolved
 /// (registry order for a registry-first kind, document order for a markdown-first
 /// kind). `display` is the row `text` with a leading occurrence of its OWN
-/// `self-id` and the separator that follows it stripped (see [`id_anchor_display`]),
+/// `self-id` and the separator that follows it stripped (see `id_anchor_display`),
 /// so a row whose source text repeats its self-id — e.g. a charter decision line
 /// `D-1: <one-liner>` — renders `- **D-1** — <one-liner>` rather than doubling the
 /// id, while a row whose text does not begin with its self-id (e.g. an invariant

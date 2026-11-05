@@ -492,7 +492,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     ///
     /// # Errors
     ///
-    /// Every [`PackageArchiveError`] the read reports; an archive that cannot
+    /// Every [`crate::profile::PackageArchiveError`] the read reports; an archive that cannot
     /// be read or is larger than a package archive may be; a destination that
     /// is not worktree content or is occupied; and the publication failures of
     /// the shared mutation session.

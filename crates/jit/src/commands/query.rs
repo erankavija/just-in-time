@@ -234,7 +234,7 @@ impl<S: IssueStore> QueryOps<'_, S> {
     }
 
     /// Aggregate filtered issues into the counts-by-state
-    /// [`StateRollup`](crate::commands::StateRollup) behind `jit query count --by
+    /// [`StateRollup`] behind `jit query count --by
     /// state`.
     ///
     /// Every supplied field filter narrows the bucket. Label patterns use the

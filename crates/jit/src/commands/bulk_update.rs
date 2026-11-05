@@ -212,7 +212,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// nominates skip CANDIDATES from the unlocked `matched` snapshot, but
     /// never authorizes a skip by itself; every candidate is confirmed inside
     /// one shared verification session
-    /// ([`Self::confirm_bulk_noop_candidates`]) before being recorded as
+    /// (`confirm_bulk_noop_candidates`) before being recorded as
     /// skipped, so repository-dependent validity is decided only inside a
     /// session — the shared one, or the normal per-issue one for anything the
     /// shared session does not confirm. The shared session's own apply
@@ -323,13 +323,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// non-candidate.
     ///
     /// The confirmed set is not returned straight from this read: the
-    /// closure finalizes an EMPTY-delta [`MaterializationPlan`] over the
+    /// closure finalizes an EMPTY-delta [`crate::repository_state::MaterializationPlan`] over the
     /// exact captured `image` and returns [`SessionStep::Apply`], so the
     /// driver's `session.apply` still replays the same optimistic-concurrency
     /// check a real mutation's apply gets -- a concurrent change to anything
     /// within the captured footprint (the same footprint the per-issue
     /// publication session captures, since both call
-    /// [`Self::capture_proposed_base`] identically) raises a retryable
+    /// `CommandExecutor::capture_proposed_base` identically) raises a retryable
     /// conflict and the driver re-runs this whole closure against a fresh
     /// capture, so a confirmed candidate is never stale by more than one
     /// failed apply attempt -- the same guarantee any pre-change per-issue

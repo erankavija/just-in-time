@@ -683,7 +683,7 @@ impl JsonFileStorage {
     /// Acquire the bootstrap lock keyed at the WORKTREE root, serializing the
     /// worktree-side namespace across every session sharing the worktree
     /// regardless of its data root. For a nested repo this is the same reentrant
-    /// instance as [`acquire_bootstrap_write_lock`]; for a disjoint data root it
+    /// instance as `acquire_bootstrap_write_lock`; for a disjoint data root it
     /// is a distinct, outer lock that prevents two such sessions from
     /// concurrently publishing into one worktree.
     pub(crate) fn acquire_worktree_bootstrap_lock(

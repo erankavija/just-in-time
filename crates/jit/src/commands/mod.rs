@@ -441,7 +441,7 @@ pub(crate) fn map_occupied_export_error(
     }
 }
 
-/// Drive `attempt` up to [`MUTATION_SESSION_RETRY_LIMIT`] times, owning the
+/// Drive `attempt` up to `MUTATION_SESSION_RETRY_LIMIT` times, owning the
 /// retry bound and the terminal [`MutationSessionExhausted`] error.
 ///
 /// Each call returns [`AttemptOutcome::Done`] to stop with a value,
@@ -536,7 +536,7 @@ const READ_OPTIMISTIC_ATTEMPTS: u32 = 4;
 ///
 /// A capture a commit crossed can be torn, so a refused attempt's result is
 /// discarded; `None`, a `Busy` and a `Moved` admission each fail an attempt.
-/// After [`READ_OPTIMISTIC_ATTEMPTS`] failed attempts, each followed by a
+/// After `READ_OPTIMISTIC_ATTEMPTS` failed attempts, each followed by a
 /// jittered backoff of about 1, 2, 4 and 8 ms, `read` runs once through
 /// [`with_mutation_session`], whose open applies a leftover redo record.
 ///
@@ -2561,10 +2561,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Construct this executor over its canonical [`RepositoryLayout`].
+    /// Construct this executor over its canonical [`crate::repository_state::RepositoryLayout`].
     ///
     /// The permanent construction surface for the layout every session-opening
-    /// command mutates through (see the [`layout`](Self::layout) field). The CLI
+    /// command mutates through (see the `layout` field). The CLI
     /// supplies it at startup from the Git-optional worktree root plus the selected
     /// data root; tests supply a fixture layout over a temporary worktree.
     pub fn with_layout(mut self, layout: crate::repository_state::RepositoryLayout) -> Self {

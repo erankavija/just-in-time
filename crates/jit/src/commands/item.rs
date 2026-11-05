@@ -191,7 +191,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// For every configured kind with `scope = "project"`:
     /// - **markdown-first**: its `source` file (a repository-local path) is read
     ///   through the storage boundary
-    ///   ([`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file))
+    ///   ([`IssueStore::read_repo_file`])
     ///   and scanned the SAME way an issue description is. The source path comes
     ///   ONLY from config — no filename is hardcoded — and this command does NO
     ///   direct filesystem I/O: path-safety (repository-local enforcement) and
