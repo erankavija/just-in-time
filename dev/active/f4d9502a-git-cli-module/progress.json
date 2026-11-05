@@ -370,7 +370,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "reviewed_awaiting_user_floor_decision"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -379,7 +379,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "prepared",
+          "worker_status": "conditional_design_complete_waiting_a273",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -431,7 +431,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "planning",
+          "worker_status": "independent_design_review_round2",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -534,9 +534,9 @@
     },
     {
       "issue": "c140921c",
-      "status": "shared_producer_research",
+      "status": "conditional_design_recorded",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Stewardrequires sharedproducerfix; no privateconsumerworkaround orintentionalregression. Mapcallers/tests/options/processbudgets andproposeboundedfootprintbeforeexpansion."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded."
     }
   ],
   "rework_counts": {
@@ -885,7 +885,8 @@
     "Steward-approved post-plan d9ba0029 semantic correction: unchanged original revision -> shared canonical commit resolution -> canonical commit:path in one child; erroneous suffix-first expression contract corrected, availability/error rules retained. Added actual c140921c prerequisite with no cycle, reduced transitive d68150e2 edge; no redundant a273 edge. Producer must land/gate before archive dispatch. Rationale: dev/active/c140921c/revision-producer-plan.md.",
     "fb guard authority correction: initial lead brief inferred write_checkout incorrectly; original git-absent assertion failed and was preserved. Steward directed paths.git data-history; withdrawn invalid external-store refusal expectation removed, final40worktreeCLI passed. Initial and corrected evidence retained.",
     "fb5e8e8d Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "Steward approved933ff852 -> c140921c after cycle/redundancy check: existing libgit2 read_file_from_git resolves original expression then peels, so two-version one-child migration uses shared reader resolution and canonical commit:path. No criteria weakening/private resolver;1ac retains existing prerequisites. Frontend parked chain now includes c140."
+    "Steward approved933ff852 -> c140921c after cycle/redundancy check: existing libgit2 read_file_from_git resolves original expression then peels, so two-version one-child migration uses shared reader resolution and canonical commit:path. No criteria weakening/private resolver;1ac retains existing prerequisites. Frontend parked chain now includes c140.",
+    "504 independentR1FAIL identified missing original-root redo authority; steward acceptedD26 recorded1d487be2e. Revisedplan inR2review, implementation held for independentPASS+steward exact-footprint acceptance. Main source boundary released afterfbclosure0c83d3d4f; c0ea isolated clean rebuild running."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1400,5 +1401,13 @@
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
     "38df8a6c installer policy source"
-  ]
+  ],
+  "checkpoints": {
+    "c0ea31ee": {
+      "status": "in_progress",
+      "worker_status": "clean_rebuild_after_seeded_artifact_failures",
+      "tree": "agent-c0ea31ee",
+      "evidence": "Actual failedCargo3d160332(E0463 serde_json) andffdc3aee(E0460 serde_core);5056tests+25doctests passed both. Narrow cache repair insufficient, isolated target fully cleaned; forced requiredCargo then holistic queued. No source changes or gate bypass."
+    }
+  }
 }
