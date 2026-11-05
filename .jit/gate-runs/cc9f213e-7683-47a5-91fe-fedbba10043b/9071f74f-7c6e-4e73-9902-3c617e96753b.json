@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-cc9f213e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b95c4e86dc592727ab1b295e3409ff4985a54266",
+  "completed_at": "2026-11-05T00:51:41.833724228Z",
+  "duration_ms": 212108,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/git.rs",
+        "id": "F1",
+        "line": 271,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The temporary-convergence comment is task narrative rather than essential API behavior prose."
+      }
+    ],
+    "summary": "The path-history query meets both hard requirements with focused behavior coverage; one isolated advisory prose finding remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9071f74f-7c6e-4e73-9902-3c617e96753b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:48:09.724851891Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ba1b8238c, c8a96596c, 334429c1e, f253efc8f, b95c4e86\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/cc9f213e/requirement/REQ-01, @/issue/cc9f213e/requirement/REQ-02, @/issue/f4d9502a/requirement/REQ-10, @/charter/D-19, @/charter/D-21, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T00:46:39Z); its b95c4e86 run contains every tagged commit\nTruncation recovery: Re-read individual commit/file patches, merge parent deltas, and bounded current source, test, and policy ranges.\n\n1. [advisory][issue-impact] F1 — `crates/jit/src/storage/git.rs:271` retains a temporary-convergence task narrative beside the API rather than essential behavior prose. The prior advisory remains unresolved. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The path-history query meets both hard requirements with focused behavior coverage; one isolated advisory prose finding remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The temporary-convergence comment is task narrative rather than essential API behavior prose.\",\"file\":\"crates/jit/src/storage/git.rs\",\"line\":271,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -798,3 +798,149 @@ fn test_list_worktrees_preserves_newlines_inside_worktree_paths() {
         .unwrap();
     assert_eq!(linked_entry.path(), canonical(&linked));
 }
+
+#[test]
+fn test_file_history_returns_added_changed_and_deleted_commits_newest_first() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("history"));
+    repository.write("document.md", "first");
+    let added = repository.commit("add document");
+    repository.write("document.md", "second");
+    let changed = repository.commit("change document");
+    repository.write("other.md", "unrelated");
+    repository.commit("unrelated change");
+    std::fs::remove_file(repository.root().join("document.md")).unwrap();
+    let deleted = repository.commit("delete document");
+
+    let history = checkout(Git::default(), repository.root())
+        .file_history("document.md")
+        .unwrap();
+
+    let commits: Vec<_> = history
+        .iter()
+        .map(|entry| entry.commit().as_str())
+        .collect();
+    assert_eq!(commits, [deleted, changed, added]);
+}
+
+#[test]
+fn test_file_history_preserves_author_commit_time_and_multiline_message() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("metadata"));
+    let author = "History Author";
+    let message = "subject with café\n\nbody line one\nbody line two";
+    repository.git(&["config", "user.name", author]);
+    repository.write("document.md", "first");
+    repository.git(&["add", "--all"]);
+    repository.git(&[
+        "commit",
+        "--quiet",
+        "--message",
+        message,
+        "--date",
+        "2001-09-09T01:46:40Z",
+    ]);
+    let commit_time = repository.git(&["show", "-s", "--format=%ct", "HEAD"]);
+
+    let history = checkout(Git::default(), repository.root())
+        .file_history("document.md")
+        .unwrap();
+
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].author(), author);
+    assert_eq!(
+        history[0].commit_time(),
+        commit_time.parse::<i64>().unwrap()
+    );
+    assert_eq!(history[0].message(), format!("{message}\n"));
+}
+
+#[test]
+fn test_file_history_omits_merge_identical_to_one_parent() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("merge"));
+    repository.write("document.md", "base");
+    let added = repository.commit("add document");
+    let primary = repository.git(&["branch", "--show-current"]);
+    repository.git(&["checkout", "--quiet", "-b", "side"]);
+    repository.write("document.md", "side change");
+    let changed = repository.commit("side changes document");
+    repository.git(&["checkout", "--quiet", &primary]);
+    repository.write("other.md", "primary change");
+    repository.commit("primary changes another path");
+    repository.git(&["merge", "--quiet", "--no-ff", "-m", "merge side", "side"]);
+
+    let history = checkout(Git::default(), repository.root())
+        .file_history("document.md")
+        .unwrap();
+
+    let commits: Vec<_> = history
+        .iter()
+        .map(|entry| entry.commit().as_str())
+        .collect();
+    assert_eq!(commits, [changed, added]);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_file_history_treats_option_and_pathspec_metacharacters_literally() {
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("literal"));
+    repository.write(":(glob)*", "literal pathspec");
+    let magic = repository.commit("pathspec-looking name");
+    repository.write("--all", "literal option");
+    let option = repository.commit("option-looking name");
+    repository.write("other.md", "unrelated");
+    repository.commit("unrelated path");
+    let git = checkout(Git::default(), repository.root());
+
+    for (path, expected) in [(":(glob)*", magic), ("--all", option)] {
+        let history = git.file_history(path).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].commit().as_str(), expected);
+    }
+}
+
+#[test]
+fn test_file_history_missing_path_returns_empty_history() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+
+    assert!(checkout(Git::default(), repository.root())
+        .file_history("absent.md")
+        .unwrap()
+        .is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_file_history_runs_one_log_process_per_query_in_the_checkout() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let stand_in = GitStandIn::new();
+    let git = checkout(Git::with_program(stand_in.program()), repository.root());
+
+    git.file_history("README.md").unwrap();
+    assert_eq!(stand_in.invocations().len(), 1);
+    git.file_history("absent.md").unwrap();
+
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 2);
+    for invocation in invocations {
+        assert_eq!(invocation.directory(), Some(repository.root()));
+        assert!(invocation.args().iter().any(|arg| arg == "log"));
+    }
+}
+
+#[test]
+fn test_file_history_failed_log_returns_typed_error() {
+    let dir = TempDir::new().unwrap();
+
+    let error = checkout(Git::default(), dir.path())
+        .file_history("document.md")
+        .unwrap_err();
+
+    assert!(matches!(error, GitError::UnexpectedOutput { command, .. } if command.contains("log")));
+}

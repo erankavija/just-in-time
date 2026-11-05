@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f9977efd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "580a5da063a90323b7cc7272e85606089f9b33f6",
+  "completed_at": "2026-11-05T00:13:36.875645929Z",
+  "duration_ms": 225457,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and current behavior matches the applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f9977efd-9626-4075-9cdb-d8f74dd9881d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "15c7cc86-2177-42fd-a132-8d0c82dc2c49",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T00:09:51.418042414Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 580a5da, 52c2ec0, f802b47, b920c9c, 14c061d, b6463d7, 9354b02, b41a623, de8330, 16aada0, 3a96a07, 5595358, 6541499, c116d3a\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/df129d9e/requirement/REQ-08; @/issue/f9977efd/decision/D-01,D-02; @/invariant/bounded-rust-build-footprint, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose; @/gate/cargo-ci, @/gate/build-budget-selftest\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T00:06:28Z; its run contains 13/14 tagged commits, excluding later record-only 580a5da); prior code-review passed\nTruncation recovery: reread all tagged patches individually; narrowed current-source reads and resolved items separately\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and current behavior matches the applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
