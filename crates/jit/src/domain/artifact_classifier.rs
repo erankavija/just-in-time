@@ -265,7 +265,7 @@ pub struct CitationLocation {
 /// are examined left to right, resuming past the end of each one examined.
 /// That loses no citation: an occurrence starting inside another is preceded
 /// by the cited path's own opening characters, which name path content, so
-/// [`is_whole_path_citation`] rejects it. Columns are counted in characters,
+/// `is_whole_path_citation` rejects it. Columns are counted in characters,
 /// so text in any script is located where its reader sees it.
 pub struct CitationScanner {
     sources: Vec<String>,

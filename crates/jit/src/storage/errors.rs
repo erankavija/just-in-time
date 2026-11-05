@@ -94,7 +94,7 @@ pub enum GateNotFoundError {
     #[error("Gate '{0}' not found")]
     ByKey(GateKey),
     /// A single gate-key lookup missed during preset creation, phrased
-    /// "Gate not found in registry: <key>" (`gate preset create`).
+    /// "Gate not found in registry: `<key>`" (`gate preset create`).
     #[error("Gate not found in registry: {0}")]
     InRegistry(GateKey),
 }
@@ -106,19 +106,19 @@ impl GateNotFoundError {
     }
 
     /// Build a [`GateNotFoundError::Single`] for one missing gate key
-    /// ("Gate '<key>' not found in registry").
+    /// ("Gate '`<key>`' not found in registry").
     pub fn single(key: &GateKey) -> Self {
         Self::Single(key.clone())
     }
 
     /// Build a [`GateNotFoundError::ByKey`] for one missing gate key, using the
-    /// `gate show`/`gate remove` phrasing ("Gate '<key>' not found").
+    /// `gate show`/`gate remove` phrasing ("Gate '`<key>`' not found").
     pub fn by_key(key: &GateKey) -> Self {
         Self::ByKey(key.clone())
     }
 
     /// Build a [`GateNotFoundError::InRegistry`] for one missing gate key, using
-    /// the `gate preset create` phrasing ("Gate not found in registry: <key>").
+    /// the `gate preset create` phrasing ("Gate not found in registry: `<key>`").
     pub fn in_registry(key: &GateKey) -> Self {
         Self::InRegistry(key.clone())
     }

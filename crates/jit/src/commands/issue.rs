@@ -661,7 +661,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .collect()
     }
 
-    /// Build the [`IssueShowResponse`](crate::commands::IssueShowResponse) for one
+    /// Build the [`IssueShowResponse`] for one
     /// already-loaded issue: enriched dependencies, gate runs, and the
     /// documents every reader reports ([`DocumentOps::issue_documents`]).
     pub fn show_response(&self, issue: Issue) -> Result<crate::commands::IssueShowResponse> {
@@ -678,11 +678,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
         })
     }
 
-    /// Build the compact [`IssueStatusResponse`](crate::commands::IssueStatusResponse)
+    /// Build the compact [`IssueStatusResponse`]
     /// for one already-loaded issue.
     ///
     /// Loads the issue's enriched dependencies and gate runs, builds the full
-    /// [`IssueShowResponse`](crate::commands::IssueShowResponse), and projects it
+    /// [`IssueShowResponse`], and projects it
     /// down to the compact status shape — so the projection is byte-for-byte the
     /// same one `jit issue show`/`jit issue status` produce. Shared by
     /// `issue status` and `issue children` (the latter is this projection over a
