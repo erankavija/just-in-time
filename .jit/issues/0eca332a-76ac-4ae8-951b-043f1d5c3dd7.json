@@ -15,6 +15,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "650e4906-aef9-4837-8093-78a5e7dcbaeb",
+      "status": "failed",
+      "updated_at": "2026-11-05T00:04:50.350384714Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "0e30b6da-99dc-4bf4-94d5-0cdb9f8a4a35",
       "status": "passed",
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Retire error codes that nothing produces",
-  "updated_at": "2026-11-04T23:16:32.066055236Z"
+  "updated_at": "2026-11-05T00:04:50.350384714Z"
 }
