@@ -78,6 +78,13 @@
       "format": "markdown",
       "label": "Session 13 handoff",
       "path": "dev/active/df129d9e-rust-code-quality/handoff-13.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "handoff",
+      "format": "markdown",
+      "label": "Session 14: independent work complete; timing chain held",
+      "path": "dev/active/df129d9e-rust-code-quality/handoff-14.md"
     }
   ],
   "first_ready_at": "2026-07-27T20:07:37.084018691Z",
@@ -99,5 +106,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-11-05T00:27:23.443283212Z"
+  "updated_at": "2026-11-05T02:02:44.908284413Z"
 }

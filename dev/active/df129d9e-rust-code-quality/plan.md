@@ -35,7 +35,7 @@
 
 ### `failure-classification` [implementation-produced] — One library error classifier
 
-`jit::output::failure::classify(&anyhow::Error) -> JsonError` returns the code, message, details and suggestions for any error; the exit code is `ErrorCode::exit_code` of that code. It lives in `crates/jit/src/output/failure.rs`, a submodule declared from `output.rs`, which stays the module root (D-4). The downcast order of today's `error_to_error_code` is semantic and is preserved. The in-binary classifier test modules move with it and remain its owning tests.
+`jit::output::failure::classify(&anyhow::Error) -> JsonError` returns the code, message, details and suggestions for any error; the exit code is `ErrorCode::exit_code` of that code. It lives in `crates/jit/src/output/failure.rs`, a submodule declared from `output.rs`, which stays the module root (D-4). Classification preserves the semantic downcast order; its owning unit tests live with the classifier.
 
 ### `type-only-error-codes` [plan-fixed] — An error's code depends only on its type
 
