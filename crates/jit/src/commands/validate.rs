@@ -1203,63 +1203,35 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     /// Ok(()) when the branch is up-to-date, Err naming both commits and the
     /// rebase that reconciles them when it has drifted.
     pub fn validate_branch_drift(&self) -> Result<()> {
-        use std::process::Command;
+        use crate::storage::git::BaseComparison;
 
-        let layout = self
+        let checkout = self
             .exec
-            .gates()
-            .real_repo_layout()
-            .context("Branch drift needs a repository on disk")?;
-        let repository = layout.data_root();
-
-        // Get merge-base between HEAD and origin/main
-        let merge_base_output = Command::new("git")
-            .args(["merge-base", "HEAD", "origin/main"])
-            .current_dir(repository)
-            .output()
-            .context("Failed to execute git merge-base")?;
-
-        if !merge_base_output.status.success() {
-            let stderr = String::from_utf8_lossy(&merge_base_output.stderr);
-            anyhow::bail!(
-                "Failed to get merge-base with origin/main: {}",
-                stderr.trim()
-            );
-        }
-
-        let merge_base = String::from_utf8(merge_base_output.stdout)?
-            .trim()
-            .to_string();
-
-        // Get current origin/main commit
-        let main_commit_output = Command::new("git")
-            .args(["rev-parse", "origin/main"])
-            .current_dir(repository)
-            .output()
-            .context("Failed to execute git rev-parse")?;
-
-        if !main_commit_output.status.success() {
-            let stderr = String::from_utf8_lossy(&main_commit_output.stderr);
-            anyhow::bail!("Failed to get origin/main commit: {}", stderr.trim());
-        }
-
-        let main_commit = String::from_utf8(main_commit_output.stdout)?
-            .trim()
-            .to_string();
-
-        // If merge-base != main commit, branch has diverged
-        if merge_base != main_commit {
-            anyhow::bail!(
-                "Branch has diverged from origin/main\n\
-                 Merge base: {}\n\
-                 Main commit: {}\n\
-                 Fix: git rebase origin/main",
+            .require_worktree_paths()?
+            .write_checkout()
+            .context("branch drift validation requires a git repository")?;
+        match checkout.compare_with_base("origin/main")? {
+            BaseComparison::BaseUnresolved => {
+                anyhow::bail!("origin/main does not resolve to a commit")
+            }
+            BaseComparison::NoMergeBase => {
+                anyhow::bail!("HEAD shares no history with origin/main")
+            }
+            BaseComparison::Compared {
                 merge_base,
-                main_commit
-            );
+                base_commit,
+            } if merge_base != base_commit => {
+                anyhow::bail!(
+                    "Branch has diverged from origin/main\n\
+                     Merge base: {}\n\
+                     Main commit: {}\n\
+                     Fix: git rebase origin/main",
+                    merge_base.as_str(),
+                    base_commit.as_str()
+                )
+            }
+            BaseComparison::Compared { .. } => Ok(()),
         }
-
-        Ok(())
     }
 
     /// Validate all active leases are consistent and not stale.
