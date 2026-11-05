@@ -601,7 +601,7 @@ fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_co
     let repo = GitRepository::init(dir.path().join("repo"));
     (0..40).for_each(|index| {
         repo.write(
-            &format!("docs/file-{index}.md"),
+            format!("docs/file-{index}.md"),
             format!("file-{index}").as_bytes(),
         );
     });
@@ -665,7 +665,7 @@ fn test_inspect_pinned_targets_lists_only_requested_paths_of_a_commit_tree() {
     let dir = TempDir::new().unwrap();
     let repo = GitRepository::init(dir.path().join("repo"));
     (0..40).for_each(|index| {
-        repo.write(&format!("other/file-{index}.md"), b"unrequested");
+        repo.write(format!("other/file-{index}.md"), b"unrequested");
     });
     repo.write("docs/nested/file.md", b"requested");
     repo.commit("wide tree");
