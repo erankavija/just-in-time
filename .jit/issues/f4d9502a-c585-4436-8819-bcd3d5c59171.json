@@ -100,6 +100,71 @@
       "format": "markdown",
       "label": "Layout process-budget investigation",
       "path": "dev/active/f4d9502a-git-cli-module/layout-probe-investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "c47081d4af2be9ec3321040be8b55db7280621e55dbf6e25d4a81758293c7a64",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "plan.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/plan.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "972e8235fcd5a9c595cf47106875484bc234aefd1837cc66c01781db42992b6e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../c140921c/revision-producer-plan.md",
+          "resolved_path": "dev/active/c140921c/revision-producer-plan.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b23757685ac5a67ed8bfd83dc0208df2607ac6327cd5d655466bfbe8506c1375",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "progress.json",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "be14e3775daceb625e97fff2ca493dd9e9b586757026df403ceb0fcd71b3105a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3cdf9932ef87d53804743de2e3e4a219a5bc11369b104ae23afa6a458120e0a2",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1f3de0ed00c986d92417b1b8f2861468646d76af4b71839516a583b8fcdb27a3",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/design.md",
+          "resolved_path": "dev/active/5046408a/design.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b359bdf6a7ffb0b3d50bc35b86b351eaeadc6f2070b45c429e4a77a928f242af",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/design-review-r3.md",
+          "resolved_path": "dev/active/5046408a/design-review-r3.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Live execution checkpoint: reviewed Git work and split-root implementation",
+      "path": "dev/active/f4d9502a-git-cli-module/handoff-2.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:37.009914436Z",
@@ -123,5 +188,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-05T01:14:05.662929397Z"
+  "updated_at": "2026-11-05T04:57:00.691792621Z"
 }
