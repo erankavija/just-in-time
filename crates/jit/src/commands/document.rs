@@ -718,17 +718,20 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         issue_id: &IssueId,
         path: &str,
     ) -> Result<crate::commands::DocumentHistory> {
-        use git2::Repository;
-
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
-        let layout = self.exec.require_layout()?;
-        let repo = Repository::open(layout.worktree_root())
-            .map_err(|e| anyhow!("Not a git repository: {}", e))?;
-
-        let commits = self.get_file_history(&repo, path)?;
+        let checkout = self
+            .exec
+            .require_worktree_paths()?
+            .git()
+            .ok_or_else(|| anyhow!("Not a git repository"))?;
+        let commits = checkout
+            .file_history(path)?
+            .into_iter()
+            .map(commit_info_from_git)
+            .collect();
 
         Ok(crate::commands::DocumentHistory {
             path: path.to_string(),
@@ -883,23 +886,21 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         path: &str,
     ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        use git2::Repository;
 
         let issue = self.load_issue_typed(issue_id)?;
         self.find_issue_document(issue, path)?;
 
-        let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
-        let repo_root = layout.worktree_root();
-
-        // Try to get history from git, return empty list if not available
-        if let Ok(repo) = Repository::open(repo_root) {
-            if let Ok(history) = self.get_file_history(&repo, path) {
-                return Ok(history);
-            }
-        }
-
-        // No git or no history available - return empty list
-        Ok(Vec::new())
+        let paths = self
+            .exec
+            .require_worktree_paths()
+            .map_err(PathReadError::Other)?;
+        Ok(paths
+            .git()
+            .and_then(|checkout| checkout.file_history(path).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(commit_info_from_git)
+            .collect())
     }
 
     /// Get diff between document versions.
@@ -1008,58 +1009,6 @@ impl<S: IssueStore> DocumentOps<'_, S> {
 
         let content = std::str::from_utf8(blob.content())?;
         Ok(content.to_string())
-    }
-
-    fn get_file_history(&self, repo: &git2::Repository, path: &str) -> Result<Vec<CommitInfo>> {
-        let mut revwalk = repo.revwalk()?;
-        revwalk.push_head()?;
-
-        let mut commits = Vec::new();
-        let file_path = std::path::Path::new(path);
-
-        for oid in revwalk {
-            let oid = oid?;
-            let commit = repo.find_commit(oid)?;
-
-            // Check if this commit touches the file
-            let tree = commit.tree()?;
-            if tree.get_path(file_path).is_ok() {
-                // Check if this commit modified the file (not just has it)
-                let parent_count = commit.parent_count();
-                let mut modified = parent_count == 0; // Root commit always counts
-
-                if !modified && parent_count > 0 {
-                    let parent = commit.parent(0)?;
-                    let parent_tree = parent.tree()?;
-
-                    // Compare file content with parent
-                    let current_entry = tree.get_path(file_path).ok();
-                    let parent_entry = parent_tree.get_path(file_path).ok();
-
-                    modified = match (current_entry, parent_entry) {
-                        (Some(curr), Some(par)) => curr.id() != par.id(),
-                        (Some(_), None) => true, // File added
-                        _ => false,
-                    };
-                }
-
-                if modified {
-                    let author = commit.author();
-                    let time = commit.time();
-                    let datetime =
-                        chrono::DateTime::from_timestamp(time.seconds(), 0).unwrap_or_default();
-
-                    commits.push(CommitInfo {
-                        sha: format!("{:.7}", oid),
-                        author: author.name().unwrap_or("Unknown").to_string(),
-                        date: datetime.format("%Y-%m-%d %H:%M:%S").to_string(),
-                        message: commit.message().unwrap_or("").trim().to_string(),
-                    });
-                }
-            }
-        }
-
-        Ok(commits)
     }
 
     pub fn list_document_assets(
@@ -2062,6 +2011,16 @@ fn derive_document_remove(
             },
         ],
     })
+}
+
+fn commit_info_from_git(commit: crate::storage::git::FileHistoryCommit) -> CommitInfo {
+    let datetime = chrono::DateTime::from_timestamp(commit.commit_time(), 0).unwrap_or_default();
+    CommitInfo {
+        sha: commit.commit().as_str()[..7].to_string(),
+        author: commit.author().to_string(),
+        date: datetime.format("%Y-%m-%d %H:%M:%S").to_string(),
+        message: commit.message().trim().to_string(),
+    }
 }
 
 #[cfg(test)]

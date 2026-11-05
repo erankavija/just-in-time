@@ -386,7 +386,15 @@ fn test_issue_release_keeps_storage_gate_fields() {
     let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     temp.run(["issue", "claim", &id, "agent:worker-1"]).unwrap();
-    let record = temp.run_json(["issue", "release", &id, "timeout"]).unwrap();
+    let output = temp
+        .command_with_env(
+            ["issue", "release", &id, "timeout", "--json"],
+            [("JIT_AGENT_ID", "agent:release-test")],
+        )
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "issue release failed: {output:?}");
+    let record: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_storage_record(&record, "issue release");
 }
 

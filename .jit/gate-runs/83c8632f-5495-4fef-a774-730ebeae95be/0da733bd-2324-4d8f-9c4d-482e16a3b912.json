@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-83c8632f",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bc43305db7a93bdc0fff8ee4847e41bf353d70b7",
+  "completed_at": "2026-11-05T03:39:11.999313026Z",
+  "duration_ms": 231270,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable document-history changes meet the issue criteria and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "83c8632f-5495-4fef-a774-730ebeae95be",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0da733bd-2324-4d8f-9c4d-482e16a3b912",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:35:20.728890294Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 539d3787, bb590121, aed43c47 (`jit:83c8632f`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 and @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-01 and REQ-10 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci and @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-05T03:33:39Z; ancestry covers all three tagged commits. code-review pending, no exit code.\nTruncation recovery: Re-read each tagged patch and bounded current source, tests, route fixture, and policy sections after combined-output truncation.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable document-history changes meet the issue criteria and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
