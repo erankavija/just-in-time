@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-05T00:08:14.312789221Z",
+  "dependencies": [],
+  "description": "Remove the external JSON-processor dependency from the packaged worktree dispatcher while retaining its resolved-store guard.\n\n## Background\n\nThe dispatch change delivered in 8c67b21a resolves the store through worktree information, but its packaged script and protocol require an external JSON processor. Installed package policy requires these paths to work without one. The existing issue-show field projection already provides raw scalar output that worktree information can share.\n\n## Success Criteria\n\n- [hard] REQ-01: Worktree information supports single-field projection through the shared output projection mechanism, including raw scalar output, typed JSON output, unknown-field errors and schema coverage; existing issue-show projection behavior is preserved.\n- [hard] REQ-02: The canonical dispatcher consumes the raw resolved data root without an external JSON processor, refuses missing, empty, relative or unsuccessful root resolution, and preserves literal-path exclusions and rejection of tracked changes outside the store.\n- [hard] REQ-03: The installed protocol describes the supported invocation and package content contains no prohibited processor dependency; the dispatcher regression suite covers valid and invalid root responses.\n\n## Notes\n\nFollow-up to the completed dispatch implementation in 8c67b21a (source commit 12ad7f0af); that issue remains Done. Generalize the existing projection once, without a private parser, special root flag, package-policy suppression or copied dispatch variant.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-05T00:08:14.312789221Z",
+  "gates_required": [
+    "worktree-cache-test",
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "dc048377-19b5-425d-90e6-11d4a7427e34",
+  "labels": [
+    "milestone:v1.0",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Remove the dispatcher JSON-processor dependency",
+  "updated_at": "2026-11-05T00:08:14.312789221Z"
+}

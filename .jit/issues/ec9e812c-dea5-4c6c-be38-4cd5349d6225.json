@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-04T23:59:18.502818356Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Move the pinned-read behaviour suite into the git module's suite and point it at the module API instead of the bridge.\n\n## Background\n\n- `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` exercises `GitRevisionResolver` through `new` (`:69`, `:92`, `:126`) and `with_git_program` (`:157`, `:237`, `:351`, `:392`, `:426`, `:461`), and matches `GitRevisionError` variants. The type is a bridge over `GitCheckout`.\n- The module's behaviour suite is `crates/jit/tests/fast_docs_templates/git_module_tests.rs`; `crates/jit/tests/fast_docs_templates/main.rs` lists the suite's modules.\n\n## Success Criteria\n\n- [hard] REQ-01: The suite's cases live in `crates/jit/tests/fast_docs_templates/git_module_tests.rs` and build `GitCheckout` values with `Git::default()` or `Git::with_program`; `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` and its module line no longer exist.\n- [hard] REQ-02: Every moved case keeps its assertions, matching the module's error variants.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T23:35:23.054710125Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +26,7 @@
     "satisfies:f4d9502a/REQ-02"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Pinned-read behaviour suite moves into the git module suite",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-04T23:59:18.502818356Z"
 }
