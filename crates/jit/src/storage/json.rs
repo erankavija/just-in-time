@@ -614,15 +614,10 @@ impl JsonFileStorage {
             return Ok(paths);
         }
         let layout = self.configured_layout()?;
-        let detected =
-            WorktreePaths::detect_for_data_root(layout.data_root(), layout.worktree_root())?;
-        self.configure_worktree_paths(&detected);
-        Ok(self
-            .worktree_paths
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone()
-            .unwrap_or(detected))
+        Ok(WorktreePaths::non_git(
+            layout.data_root(),
+            layout.worktree_root(),
+        ))
     }
 
     /// Open and retain this storage's canonical startup mutation session.
@@ -1335,6 +1330,8 @@ mod tests {
     fn configure_test_layout(storage: &JsonFileStorage, worktree: &Path, data: &Path) {
         let layout = crate::storage::discover_repository_layout(worktree, data).unwrap();
         storage.configure_repository_layout(&layout).unwrap();
+        let paths = WorktreePaths::detect_for_data_root(data, worktree).unwrap();
+        storage.configure_worktree_paths(&paths);
     }
 
     #[test]
@@ -1684,6 +1681,28 @@ mod tests {
                 String::from_utf8_lossy(&output.stderr)
             );
             (container, worktree_path)
+        }
+
+        #[test]
+        fn test_layout_context_omitted_from_storage_reads_only_the_local_store() {
+            let dir = tempfile::tempdir().unwrap();
+            let primary = crate::test_harness::git::GitRepository::init(dir.path().join("primary"));
+            primary.write("base", "base").commit("base");
+            let linked = dir.path().join("linked");
+            primary.git(&["worktree", "add", "-q", linked.to_str().unwrap()]);
+            let storage = JsonFileStorage::new(linked.join(".jit"));
+            let layout =
+                crate::storage::discover_repository_layout(&linked, linked.join(".jit")).unwrap();
+            storage.configure_repository_layout(&layout).unwrap();
+            let primary_storage = JsonFileStorage::new(primary.root().join(".jit"));
+            let issue = crate::test_utils::fixture_issue("Primary only".to_string(), String::new());
+            seed_issue_preimage(&primary_storage, &issue);
+
+            assert!(storage.list_issues().unwrap().is_empty());
+            assert!(!storage
+                .configured_worktree_paths()
+                .unwrap()
+                .has_claims_coordination());
         }
 
         fn seed_index_preimage(storage: &JsonFileStorage, index: &Index) {

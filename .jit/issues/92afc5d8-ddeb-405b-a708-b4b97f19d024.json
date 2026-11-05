@@ -7,6 +7,7 @@
   ],
   "description": "Make `jit init` decide whether to claim the `.gitattributes` merge driver from the layout the invocation already detected, instead of starting `git rev-parse --is-inside-work-tree` again.\n\n## Background\n\n- `gitattributes_claim` (`crates/jit/src/commands/init.rs:524-535`), called once per initialization (`crates/jit/src/commands/init.rs:175`), calls `worktree_is_git_work_tree` (`crates/jit/src/commands/init.rs:539-548`), which starts git a second time per `jit init`.\n- The executor holds the invocation's `WorktreePaths` (`require_worktree_paths`, `crates/jit/src/commands/mod.rs:2240`), which already say whether the worktree is a git checkout.\n- CLI tests assert the merge-driver line in a git repository (`crates/jit/tests/cli_repo_workflow/init_tests.rs:519`).\n- Kept as one change for a build reason: `worktree_is_git_work_tree` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: The merge-driver claim is eligible exactly when the executor's paths are a git checkout and the data root lies beneath the worktree root. `worktree_is_git_work_tree` no longer exists and `commands/init.rs` starts no process.\n- [hard] REQ-02: A unit test initializes a real git work tree through an executor whose paths classify it as outside git and asserts no merge-driver claim; today's code claims one because it asks git directly.\n- [hard] REQ-03: The init CLI tests pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:f4d9502a/REQ-04"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Init reads git classification from the invocation's layout",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-05T03:02:23.946863524Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-e3c38fea",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cf86f3cf6eabd6531eee70dd793a61cb2064458f",
+  "completed_at": "2026-11-05T02:00:52.779236414Z",
+  "duration_ms": 187399,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Attributable work satisfies the issue criteria with no review findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d5c75795-96fa-4a34-90c2-1efd58116c6d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:57:45.380159250Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: debf83542 `jit:e3c38fea` (covered by cargo-ci run cf86f3cf)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02 and REQ-08 (issue description); @/invariant/convention-convergence, architecture-dependency-direction, orthogonal-tests, essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-05T01:55:52Z; its run contains debf83542\nTruncation recovery: per-file and zero-context commit patches; narrowed reads of list implementation, checkout authority, error mapping, tests, and generated reference\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Attributable work satisfies the issue criteria with no review findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

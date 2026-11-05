@@ -9,12 +9,26 @@
   ],
   "description": "Keep Git layout observations in one invocation-owned context so bootstrap and checkout projections reuse facts instead of probing a checkout again.\n\n## Background\n\n`WorktreePaths::detect_from_with_non_git_root` (`crates/jit/src/storage/worktree_paths.rs:84`) probes the selected data root, then the explicit worktree root when the data root is external. `for_worktree_root` (`:204`) currently probes the selected checkout again and probes a sibling each time it is projected. The external-store investigation measured four layout processes for a two-checkout listing and for active-lease validation.\n\nThe reconciled layout contract permits one computation per distinct checkout context: ordinary issue reads use at most one Git process, external bootstrap uses at most two layout processes, and an external-store operation visiting N distinct checkout contexts including the selected checkout uses at most N+1 layout processes. The failed data-root probe is included; lease and issue counts cannot increase this bound. Existing external-store coordination and per-checkout identity behavior remain required.\n\n`JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:612`) and `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2589`) still discover layouts when callers omit them. The shared bootstrap already supplies paths to both handles. Recovery's nested repair executor (`crates/jit/src/commands/claim.rs`, `ClaimOps::recover`) can receive the existing paths while retaining the fallible `with_layout` binding introduced on main.\n\n## Success Criteria\n\n- [hard] REQ-01: Detection retains each queried path's successful, absent, or error outcome in one invocation-scoped layout context. A successful probe associates only the queried path, its filesystem-canonical alias when available, and the Git-reported top level with that checkout. Bootstrap preserves data-root-first selection and the external fallback, with at most one layout process for an in-checkout data root and at most two for an external data root. Negative observations are not broadened to parent or descendant paths; common and private Git directories are not treated as equivalent worktree probe paths.\n- [hard] REQ-02: Cloning and projecting supplied worktree paths retain the same context. `for_worktree_root` reuses the selected checkout and previously observed siblings, including absent siblings, without another probe; concurrent identical requests cannot duplicate a process. An external operation visiting N distinct checkout contexts including the selected checkout uses at most N+1 layout processes regardless of repeated listed paths or lease count. Data-root ownership, linked-store write policy, common-directory coordination, subdirectory roots, separate identities, and moved or previously unvisited checkout behavior remain unchanged.\n- [hard] REQ-03: Storage and executor no longer call a layout detector when paths are absent. Unconfigured storage reads only its local data root; an unconfigured executor reports non-Git paths from its explicit layout or existing storage-root fallback and takes no lease guard. Production bootstrap and recovery construction share supplied context, preserve fallible layout binding and recovery ordering, and keep missing Git optional for core commands. Existing primary-tier fixtures supply their paths explicitly.\n- [hard] REQ-04: The worktree-path mechanism tests own exact-alias, negative/error reuse, clone sharing, and concurrent duplicate-probe behavior. The existing CLI process-budget suite covers external primary/linked bootstrap and external worktree listing plus active-lease validation, including a selected subdirectory and moved sibling, and checks the revised bounds without growth from additional leases. Existing ordinary-read process assertions and external-store identity/coordination tests remain passing; no duplicate behavioral matrix or new Cargo test target is introduced.\n\n## Notes\n\nThe implementation follows the reconciled `layout-once` contract and proposed DEC-27. The historical evidence is `dev/active/f4d9502a-git-cli-module/layout-probe-investigation.md`. Git remains the classifier; no new authority flag, Git-file parser, persistent cache, or inferred sibling administrative path is introduced. Layout value equality remains independent of mutable observation state. The distinct roles of `git()`, `write_checkout()`, and the guarded initialization-identity path remain intact.\n",
   "documents": [],
+  "done_at": "2026-11-05T03:02:23.946863524Z",
   "first_ready_at": "2026-11-05T02:11:08.421679524Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b634207b-d898-413c-8752-00f4a9225b5c",
+      "status": "passed",
+      "updated_at": "2026-11-05T03:01:12.896063975Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c150dd0b-16b8-4727-9300-aa51ea853098",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:53:40.175587612Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
   "labels": [
     "type:task",
@@ -28,7 +42,7 @@
     "component:testing"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Layout consumers share invocation-owned checkout facts",
-  "updated_at": "2026-11-05T02:11:51.604834409Z"
+  "updated_at": "2026-11-05T03:02:23.946863524Z"
 }

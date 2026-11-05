@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-9de4c09c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1b0104ca7d47ad44038ad2da727ac8085ef63e46",
+  "completed_at": "2026-11-05T01:36:58.959978257Z",
+  "duration_ms": 256260,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and the passing cargo-ci run covers all attributable commits.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9de4c09c-207b-4ea1-9482-3846383cd3c7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "38f4141a-3d72-47ee-b610-65c8ca6317f4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T01:32:42.699257287Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 951df1d, 952fa6f, a68ebe60, da449869 (jit:9de4c09c)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02 and REQ-05 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/invariant/architecture-dependency-direction, convention-convergence, essential-code-prose, orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T01:31:12Z); run 1b0104c contains every attributable commit\nTruncation recovery: recovered the truncated worktree-path/CommandExecutor search with exact current-file ranges\n\n1. No findings. `WorktreeOps::info` now uses the selected checkout’s `head()` and `branch_label()` while retaining identity loading; dispatch declares `RequiresGit`, and CLI coverage exercises branch switching, detached HEAD, and both typed Git gaps.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and the passing cargo-ci run covers all attributable commits.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

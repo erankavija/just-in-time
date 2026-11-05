@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-dcf88b6f",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e10c355a6eaf638ad26db8754bc342e69b5e463",
+  "completed_at": "2026-11-05T02:56:42.656491827Z",
+  "duration_ms": 127517,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Pinned target inspection uses the shared incremental object reader; the old batch reader/parser is removed and existing result/process/subcommand coverage remains applicable.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dcf88b6f-b6d8-4e3d-b4c9-8cb718487b04",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "376ec987-854b-41b8-9afd-63d701a6ae47",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T02:54:35.138752387Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 264988e28 (`jit:dcf88b6f`); current merge adds only an unrelated comment change\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence (.jit/invariants.toml); @/issue/f4d9502a/requirement/REQ-10 (parent issue Markdown)\nGate evidence: cargo-ci passed (exit 0); its run commit contains 264988e28\nTruncation recovery: reread object-reader implementation and pinned-inspection tests in bounded line ranges after initial search truncation\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Pinned target inspection uses the shared incremental object reader; the old batch reader/parser is removed and existing result/process/subcommand coverage remains applicable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
