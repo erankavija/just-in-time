@@ -46,6 +46,7 @@ one that adds it (D-18).
 - D-24: Git-hook installation requires a Git checkout; core tracker operations remain Git-optional
 - D-25: Reads return a retryable conflict instead of waiting on writers
 - D-26: Redo records bind worktree writes to their original root
+- D-27: Recovery completes committed work before write policy governs new work
 
 ## Decision Details
 
@@ -496,4 +497,26 @@ one that adds it (D-18).
   changes on restart. One binding in the existing durable record preserves that
   authority with no second recovery mechanism (D-18/D-20). The record is local
   recovery state; repository configuration remains portable.
+- **Date:** 2026-11-05
+
+### D-27: Recovery completes committed work before write policy governs new work
+
+- **Chosen:** Mutation and explicit-recovery startup complete an already committed
+  redo record under D-26 before evaluating linked-checkout write policy for new
+  work. Recovery preserves the original event and override-audit bytes; it does
+  not authorize a new mutation or create another override event. After recovery,
+  the shared policy evaluates coherent recovered configuration and the invocation
+  override before opening the new mutation session. With no pending record,
+  refusal still precedes mutation locks and writes. With a pending record, only
+  completion of that older commit may precede refusal. Reads retain D-25 and
+  never perform recovery. This explicitly narrows the former unconditional
+  refusal-before-recovery guarantee.
+- **Rejected:** Reconstructing a declaration postimage solely to authorize replay,
+  which adds a second bootstrap view; blocking recovery on current write policy,
+  which can strand an already committed change; and reading partially applied
+  configuration for policy, which makes the result depend on the crash point.
+- **Reasoning:** D-17's durable commit already authorizes its recorded writes.
+  Policy governs the next mutation, not whether that commit finishes. Separating
+  these boundaries preserves one replay mechanism and one policy computation
+  (D-18/D-20), with D-26 retaining original-target validation.
 - **Date:** 2026-11-05
