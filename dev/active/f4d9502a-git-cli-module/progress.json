@@ -203,9 +203,10 @@
           "short_id": "c16c834c",
           "title": "Storage pinned inspection runs on a module checkout",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "3a1e7a96cace3407668ceeb7afede87c606c1b25"
         },
         {
           "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
@@ -732,7 +733,8 @@
     "Origin Done after merged stable Cargo4e0b64b4. Corrected claims fullgates848ee4a5/2682790f and info1ee8a09a/38f4141a pass; shared fixture fix0f144b98d reused exactly in11871fa14. Final DEC26-28 plan review97a30f16 passes on21cd8fb9; pending metadata integration. Completed HEAD/list/history trees reclaimed canonically.",
     "Final DEC26-28 plan metadata landed: owner-approved d681 context reuse/field exception,53nodes; worktree-info/list RequiresGit10, validation/drift Findings4. Passing reviews55ba7fdd and97a30f16 preserved. Ready e3/f649 claimed under revised actual descriptions. No Git production source changed in planning merge.",
     "ec9 relocation Done after actual stable merged Cargo; source released immediately to df fe3. Object-reader producer is unblocked.",
-    "ec9 closure script corrected raw gate_key vs CLI key before mutation, actual closure42664758e. d48 claimed922c1664d and dispatched Astra high; e3 focused checks, f649 stable Cargo/review PASS on07ffda330; retained evidence7b8320175. Base final relocated suite integration preserves55incoming+4base tests,59PASS; origin tree reclaimed. c506 fullgatesPASS and exact source preserved. Source sequence c16\u2192frontend4538\u2192c506 per steward; after both listing consumers converge, obsolete two-line exception may be deleted with executable/test byte proof and merged check, retaining actual reviews under explicit steward ruling."
+    "ec9 closure script corrected raw gate_key vs CLI key before mutation, actual closure42664758e. d48 claimed922c1664d and dispatched Astra high; e3 focused checks, f649 stable Cargo/review PASS on07ffda330; retained evidence7b8320175. Base final relocated suite integration preserves55incoming+4base tests,59PASS; origin tree reclaimed. c506 fullgatesPASS and exact source preserved. Source sequence c16\u2192frontend4538\u2192c506 per steward; after both listing consumers converge, obsolete two-line exception may be deleted with executable/test byte proof and merged check, retaining actual reviews under explicit steward ruling.",
+    "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -937,7 +939,7 @@
     "c16c834c": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "651231e7-be6f-44d8-8ab6-be6b1dfdc278",
+        "cargo-ci": "c56c9cef-6471-49aa-a1e1-027ec20d54ce",
         "code-review": "16162d47-5745-47a4-883d-3d027a097051"
       },
       "reviewed_source": "c821a42391da77bc6c801b28fc2d38af3f00059c",
@@ -949,7 +951,8 @@
       "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
       "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
       "deferred_items": "No linked design documents or in-scope deferrals.",
-      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS c56c9cef-6471-49aa-a1e1-027ec20d54ce on 3a1e7a96cace3407668ceeb7afede87c606c1b25."
     },
     "ec9e812c": {
       "verdict": "PASS",
