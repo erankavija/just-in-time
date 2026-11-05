@@ -64,6 +64,24 @@ pub enum RepositoryRootClass {
 
 pub use self::identity::VirtualPath;
 
+/// Whether a path relative to the selected data root changes graph inputs.
+pub fn is_graph_relevant_data_path(path: &Path) -> bool {
+    if path.is_absolute()
+        || path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().ends_with(".tmp"))
+    {
+        return false;
+    }
+
+    path.starts_with(VirtualPath::GATE_RUNS.relative().as_path())
+        || (path.parent() == Some(VirtualPath::ISSUES.relative().as_path())
+            && path.extension().is_some_and(|ext| ext == "json"))
+        || [VirtualPath::INDEX, VirtualPath::GATES, VirtualPath::CONFIG]
+            .iter()
+            .any(|known| path == known.relative().as_path())
+}
+
 /// Sole defining scope of the [`VirtualPath`] identity and of its well-known
 /// const paths.
 ///
@@ -743,6 +761,39 @@ fn lexical_absolute(path: &Path) -> Result<PathBuf, RepositoryLayoutError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_graph_relevant_data_path_includes_storage_records_and_configuration() {
+        let paths = [
+            VirtualPath::INDEX.relative().as_path().to_path_buf(),
+            VirtualPath::GATES.relative().as_path().to_path_buf(),
+            VirtualPath::CONFIG.relative().as_path().to_path_buf(),
+            VirtualPath::ISSUES.relative().as_path().join("issue.json"),
+            VirtualPath::GATE_RUNS.relative().as_path().join("run.json"),
+        ];
+        assert!(paths.iter().all(|path| is_graph_relevant_data_path(path)));
+    }
+
+    #[test]
+    fn test_graph_relevant_data_path_excludes_unrelated_and_temporary_files() {
+        let paths = [
+            VirtualPath::EVENTS.relative().as_path().to_path_buf(),
+            VirtualPath::SERVER_PID.relative().as_path().to_path_buf(),
+            VirtualPath::SERVER_LOG.relative().as_path().to_path_buf(),
+            VirtualPath::ISSUES.relative().as_path().join("issue.tmp"),
+            VirtualPath::ISSUES
+                .relative()
+                .as_path()
+                .join("issue.json.tmp"),
+            VirtualPath::ISSUES
+                .relative()
+                .as_path()
+                .join("nested/issue.json"),
+            PathBuf::from("other/index.json"),
+            PathBuf::from("other/gate-runs/run.json"),
+        ];
+        assert!(paths.iter().all(|path| !is_graph_relevant_data_path(path)));
+    }
 
     fn root(path: &str) -> RepositoryRootEvidence {
         RepositoryRootEvidence::new(path, format!("id:{path}"), true)
