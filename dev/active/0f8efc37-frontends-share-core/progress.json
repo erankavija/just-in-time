@@ -11,7 +11,7 @@
           "short_id": "9c3eb2bf",
           "title": "Reject incompatible repository layout bindings",
           "classification": "implementation",
-          "status": "rework"
+          "status": "ready_to_land"
         },
         {
           "id": "1d2235b1-7a07-4428-842b-db338fd133c0",
@@ -25,7 +25,7 @@
           "short_id": "0f302914",
           "title": "Offload executor work in server handlers",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "ready_to_land"
         },
         {
           "id": "abf68973-3771-47cb-89d0-708290cb00ac",
@@ -169,7 +169,7 @@
     "9c3eb2bf": 2
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Three first-wave workers dispatched; independent server-modules is undispatched; external dependencies and exact graph remain in instantiation.json.",
+  "note": "1cdf landed; abf, watcher, binding and offload have passing stable gates in isolated branches. Source queue is paused pending 061 merge authorization; installer policy awaits separate user approval.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
