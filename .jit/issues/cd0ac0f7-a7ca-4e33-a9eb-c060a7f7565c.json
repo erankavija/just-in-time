@@ -14,10 +14,16 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "run_id": "a4809918-52e7-4121-bb6d-b3e81432ab32",
+      "status": "failed",
+      "updated_at": "2026-11-05T00:32:56.884211891Z",
+      "updated_by": "auto:executor"
+    },
     "npm-ci": {
-      "run_id": "55bd2f91-88dc-4b1a-8edb-935f5b0c596c",
+      "run_id": "4ceaf6c7-b01c-415f-8e10-20d0dd2dec20",
       "status": "passed",
-      "updated_at": "2026-11-05T00:29:18.033211553Z",
+      "updated_at": "2026-11-05T00:35:23.557837380Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reload browser hierarchy on configuration events",
-  "updated_at": "2026-11-05T00:29:18.033211553Z"
+  "updated_at": "2026-11-05T00:35:23.557837380Z"
 }

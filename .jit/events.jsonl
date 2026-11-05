@@ -24890,3 +24890,5 @@
 {"from":"ready","id":"36cbaefb-df16-451c-a131-0dbfb2c5c06c","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:25:39.357566187Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:frontend-config","id":"04389c11-7525-4488-8656-92c7381935b4","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:25:39.357566187Z","type":"issue_claimed"}
 {"gate_key":"npm-ci","id":"93db2a1c-d688-4b17-a351-007b4b3c4ed7","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:29:18.033211553Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"14fc9f5a-9381-489e-ab4d-06f6705fd1b0","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:32:56.884211891Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"35691b88-94ed-473e-ab7a-ccd3ac214eed","issue_id":"cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c","timestamp":"2026-11-05T00:35:23.557837380Z","type":"gate_passed","updated_by":"auto:executor"}
