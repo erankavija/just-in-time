@@ -47,10 +47,10 @@ command_group! {
     command: ArchiveCommands,
     storage: JsonFileStorage,
     leaves: {
-        "archive_candidates" => ArchiveCommands::Candidates => candidates() -> ArchiveCandidates,
-        "archive_document" => ArchiveCommands::Document { path, execute } => document(path, execute) -> ArchiveTargetResponse
+        "archive_candidates" => ArchiveCommands::Candidates => candidates() raises [RetryableConflict] -> ArchiveCandidates,
+        "archive_document" => ArchiveCommands::Document { path, execute } => document(path, execute) raises [RetryableConflict] -> ArchiveTargetResponse
             as union [ArtifactPlan, ArchiveExecutionResult] "Default: the ArtifactPlan preview. With --execute: the ArchiveExecutionResult of the run.",
-        "archive_container" => ArchiveCommands::Container { id, execute } => container(id, execute) -> ArchiveTargetResponse
+        "archive_container" => ArchiveCommands::Container { id, execute } => container(id, execute) raises [RetryableConflict] -> ArchiveTargetResponse
             as union [ArtifactPlan, ArchiveExecutionResult] "Default: the ArtifactPlan preview. With --execute: the ArchiveExecutionResult of the run.",
     }
 }

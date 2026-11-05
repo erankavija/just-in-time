@@ -1,67 +1,115 @@
-import { describe, it, expect } from 'vitest';
-import { filterIssues } from '../../utils/clientSearch';
-import type { Issue } from '../../types/models';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { apiClient } from '../../api/client';
+import type { SearchResponse, SearchResult } from '../../types/models';
+import { useSearch } from './useSearch';
 
-// Note: Hook tests require complex setup with React Testing Library
-// For now, we test the underlying logic directly
+vi.mock('../../api/client', () => ({ apiClient: { search: vi.fn() } }));
 
-const createMockIssue = (overrides: Partial<Issue>): Issue => ({
-  id: 'mock-id',
-  short_id: 'mock-id',
-  title: 'Mock Issue',
-  description: 'Mock description',
-  state: 'backlog',
-  priority: 'normal',
-  dependencies: [],
-  labels: [],
-  documents: [],
-  gates_required: [],
-  gates_status: {},
-  created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
-  ...overrides,
-});
+const search = vi.mocked(apiClient.search);
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+function response(query: string, results: SearchResult[]): SearchResponse {
+  return { query, results, total: results.length, duration_ms: 1 };
+}
+
+const issueMatch: SearchResult = {
+  issue_id: 'issue-1', path: 'issues/issue-1.json', line_number: 0,
+  line_text: 'Issue title', matches: [],
+};
+const documentMatch: SearchResult = {
+  path: 'docs/plan.md', line_number: 3, line_text: 'matching document text', matches: [],
+};
 
 describe('useSearch', () => {
-  const mockIssues = [
-    createMockIssue({ id: '1', title: 'Authentication bug' }),
-    createMockIssue({ id: '2', title: 'UI polish' }),
-    createMockIssue({ id: '3', title: 'Fix auth system' }),
-  ];
-
-  // Test the underlying search logic since hook testing has setup complexity
-  it('should handle empty query', () => {
-    const results = filterIssues(mockIssues, '');
-    expect(results).toEqual([]);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    search.mockReset();
   });
 
-  it('should find issues client-side', () => {
-    const results = filterIssues(mockIssues, 'auth');
-    // Should find issues 1 and 3
-    expect(results.length).toBe(2);
+  afterEach(() => vi.useRealTimers());
+
+  it('test_use_search_ignores_out_of_order_query_responses', async () => {
+    const first = deferred<SearchResponse>();
+    const second = deferred<SearchResponse>();
+    search.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { result, rerender } = renderHook(
+      ({ query, version }) => useSearch(query, version),
+      { initialProps: { query: 'first', version: 0 } },
+    );
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    rerender({ query: 'second', version: 0 });
+    expect(result.current.results).toEqual([]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    await act(async () => { second.resolve(response('second', [issueMatch, documentMatch])); });
+    expect(result.current.results).toEqual([issueMatch, documentMatch]);
+
+    await act(async () => { first.resolve(response('first', [documentMatch])); });
+    expect(result.current.results).toEqual([issueMatch, documentMatch]);
+    expect(search).toHaveBeenNthCalledWith(2, 'second', { limit: 50 });
   });
 
-  it('should find all matching terms', () => {
-    const results = filterIssues(mockIssues, 'auth bug');
-    // Only issue 1 has both "auth" and "bug"
-    expect(results).toHaveLength(1);
-    expect(results[0].issue.id).toBe('1');
+  it('test_use_search_invalidates_in_flight_results_when_version_changes', async () => {
+    const oldVersion = deferred<SearchResponse>();
+    const newVersion = deferred<SearchResponse>();
+    search.mockReturnValueOnce(oldVersion.promise).mockReturnValueOnce(newVersion.promise);
+    const { result, rerender } = renderHook(
+      ({ version }) => useSearch('issue', version),
+      { initialProps: { version: 1 } },
+    );
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    rerender({ version: 2 });
+    expect(result.current.results).toEqual([]);
+    await act(async () => { oldVersion.resolve(response('issue', [issueMatch])); });
+    expect(result.current.results).toEqual([]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    await act(async () => { newVersion.resolve(response('issue', [documentMatch])); });
+    expect(result.current.results).toEqual([documentMatch]);
+    expect(search).toHaveBeenCalledTimes(2);
   });
 
-  it('should not find non-matching queries', () => {
-    const results = filterIssues(mockIssues, 'nonexistent');
-    expect(results).toEqual([]);
+  it('test_use_search_does_not_restore_results_when_query_returns_to_previous_text', async () => {
+    const refreshed = deferred<SearchResponse>();
+    search
+      .mockResolvedValueOnce(response('alpha', [issueMatch]))
+      .mockReturnValueOnce(refreshed.promise);
+    const { result, rerender } = renderHook(
+      ({ query }) => useSearch(query, 0),
+      { initialProps: { query: 'alpha' } },
+    );
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(result.current.results).toEqual([issueMatch]);
+    rerender({ query: 'beta' });
+    rerender({ query: 'alpha' });
+    expect(result.current.results).toEqual([]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    await act(async () => { refreshed.resolve(response('alpha', [documentMatch])); });
+    expect(result.current.results).toEqual([documentMatch]);
   });
 
-  it('should be case insensitive', () => {
-    const results = filterIssues(mockIssues, 'AUTH');
-    expect(results.length).toBeGreaterThan(0);
+  it('test_use_search_clearing_query_discards_pending_errors', async () => {
+    const pending = deferred<SearchResponse>();
+    search.mockReturnValueOnce(pending.promise);
+    const { result, rerender } = renderHook(
+      ({ query }) => useSearch(query, 0),
+      { initialProps: { query: 'broken' } },
+    );
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    rerender({ query: '' });
+    await act(async () => { pending.reject(new Error('stale failure')); });
+    expect(result.current).toEqual({ results: [], loading: false, error: null });
   });
 });
-
-// TODO: Add full hook integration tests when React Testing Library setup is fixed
-// These would test:
-// - Debouncing behavior
-// - Server API calls
-// - Error handling
-// - Result merging

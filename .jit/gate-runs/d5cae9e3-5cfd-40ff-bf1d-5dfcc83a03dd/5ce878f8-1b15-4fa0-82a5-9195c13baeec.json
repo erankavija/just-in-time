@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-d5cae9e3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "65fd1fe5420fd4eae75e466265dfb9bd16309bc8",
+  "completed_at": "2026-11-05T03:07:57.096078615Z",
+  "duration_ms": 198181,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable CLI workflow tests cover all required core and claim commands under an empty PATH, with no unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5ce878f8-1b15-4fa0-82a5-9195c13baeec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:04:38.915059520Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5c8eceeeff69c8298064b9e1e3882a8f2545eab3, 737f87099ba15f8691345bcde0118e3139667b67, d74a90b7070e5dc38caa7d5e38b2bf1d67dc52f8\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 and @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-12 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-05T03:02:41.814108547+00:00; run commit 65fd1fe5420fd4eae75e466265dfb9bd16309bc8 contains every attributable commit\nTruncation recovery: recovered combined-output truncation with bounded per-commit record-patch reads and separate current test, fixture, dispatch, and policy reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable CLI workflow tests cover all required core and claim commands under an empty PATH, with no unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

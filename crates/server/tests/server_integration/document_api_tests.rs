@@ -14,6 +14,7 @@ fn serve(executor: CommandExecutor<InMemoryStorage>) -> TestServer {
     let state = AppState {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
+        capture_cache: Default::default(),
         project_name: "test-project".to_string(),
         shutdown: CancellationToken::new(),
     };

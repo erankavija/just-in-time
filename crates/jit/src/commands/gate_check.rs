@@ -4756,17 +4756,29 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .contains("injected postcheck persistence failure"),
             "unexpected error: {error:#}"
         );
+        use crate::storage::RepositoryStateStore;
+        let read_error = executor.storage.load_issue(&issue_id).unwrap_err();
+        assert!(matches!(
+            read_error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+            Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+        ));
+        drop(
+            executor
+                .storage
+                .open_mutation_session(executor.storage.repository_layout())
+                .expect("explicit recovery completes the committed redo"),
+        );
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
-        assert!(
-            issue.gates_status.is_empty(),
-            "failed persistence must not leave an unrecorded checker verdict"
-        );
-        assert!(executor
+        let runs = executor
             .storage
             .list_gate_runs_for_issue(&issue_id)
-            .unwrap()
-            .is_empty());
+            .unwrap();
+        assert_eq!(runs.len(), 1);
+        let state = &issue.gates_status[&"postcheck".parse().unwrap()];
+        assert_eq!(state.run_id.as_ref(), Some(&runs[0].run_id));
+        assert_eq!(state.status, GateStatus::Passed);
+        assert_eq!(runs[0].status, crate::domain::GateRunStatus::Passed);
     }
 
     #[test]

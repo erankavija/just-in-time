@@ -532,10 +532,10 @@ confirmation = "invoked"
 
 [[arms]]
 path = "issue list"
-argv = ["issue", "list", "--state", "impossible", "--json"]
-setup = ["init"]
-expected_failure = "State parsing rejects `impossible` after the list arm has dispatched."
-expected_code = "INVALID_ARGUMENT"
+argv = ["issue", "list", "--json"]
+setup = ["init", "pending-redo"]
+expected_failure = "A pending redo record prevents an admitted issue snapshot."
+expected_code = "RETRYABLE_CONFLICT"
 confirmation = "invoked"
 
 [[arms]]

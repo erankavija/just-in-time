@@ -257,6 +257,12 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
             ErrorCode::RecoveryFailed
         };
     }
+    if matches!(
+        error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+        Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+    ) {
+        return ErrorCode::RetryableConflict;
+    }
     // A lock wait that expired is contention, not the command's own failure:
     // the command changed nothing and may be retried.
     if crate::storage::is_lock_timeout(error) {
@@ -1840,7 +1846,7 @@ mod malformed_identity_classification_tests {
         );
     }
     #[test]
-    fn test_with_read_session_reports_an_unappliable_leftover_record_as_recovery_failed() {
+    fn test_with_read_session_reports_pending_redo_as_retryable_conflict() {
         use crate::commands::with_read_session;
         use crate::storage::repository_state_store::test_fixtures::{
             leftover_record, leftover_target, InterruptAtMoment, MemorySessionBackend,
@@ -1871,13 +1877,14 @@ mod malformed_identity_classification_tests {
         })
         .unwrap_err();
 
-        assert!(error
-            .downcast_ref::<crate::errors::RecoveryFailedError>()
-            .is_some());
+        assert!(matches!(
+            error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+            Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+        ));
         assert!(error.to_string().contains("jit recover"), "{error}");
         assert_eq!(
             crate::output::failure::classify(&error).error.code,
-            crate::output::ErrorCode::RecoveryFailed
+            crate::output::ErrorCode::RetryableConflict
         );
     }
 }

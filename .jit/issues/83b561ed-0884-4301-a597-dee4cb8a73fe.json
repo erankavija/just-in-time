@@ -7,6 +7,7 @@
   ],
   "description": "The browser replaces the issue-list metadata source with unfiltered graph summaries.\n\n## Success Criteria\n\n- [hard] REQ-01: Change events no longer request /issues; full unfiltered graph summaries provide labels and dependency titles even when graph filters hide nodes. Remove `listIssues` and its test with the final App caller, after the search scorer has been replaced.\n- [hard] REQ-02: Tests cover filtered dependencies and refresh.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T03:37:33.871492581Z",
   "gates_required": [
     "npm-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:3a61ff16/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Use unfiltered graph summaries for browser metadata",
-  "updated_at": "2026-11-04T22:24:54.946576604Z"
+  "updated_at": "2026-11-05T03:37:33.871492581Z"
 }
