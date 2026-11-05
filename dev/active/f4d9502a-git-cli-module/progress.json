@@ -93,9 +93,10 @@
           "short_id": "09974ad1",
           "title": "Base comparison operation in the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_waiting_source_slot"
+          "worker_status": "merged_and_gated",
+          "source_merge": "3e51590fb87af84bc45b951ef6fe2923e71c3ad0"
         },
         {
           "id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
@@ -739,7 +740,8 @@
     "ec9 closure script corrected raw gate_key vs CLI key before mutation, actual closure42664758e. d48 claimed922c1664d and dispatched Astra high; e3 focused checks, f649 stable Cargo/review PASS on07ffda330; retained evidence7b8320175. Base final relocated suite integration preserves55incoming+4base tests,59PASS; origin tree reclaimed. c506 fullgatesPASS and exact source preserved. Source sequence c16\u2192frontend4538\u2192c506 per steward; after both listing consumers converge, obsolete two-line exception may be deleted with executable/test byte proof and merged check, retaining actual reviews under explicit steward ruling.",
     "c16c834c Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "c5062e21 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
-    "c506Done4a77db9f2 unlocks d681; dispatched against reviewed DEC27 plan. Preserve user D25 nonblocking read cutover from frontend632; do not touch its json admitted listing or commands with_read_session fallback. d48 initialCargocebc1568 Clippy failed only byte-char-array expression;4990+25 passed; actual failure4e725c25e preserved, one-line correction87281c148 fullgates running. Both e3/f649 stable reviewPASS ready. Base next after frontend D25 metadata boundary."
+    "c506Done4a77db9f2 unlocks d681; dispatched against reviewed DEC27 plan. Preserve user D25 nonblocking read cutover from frontend632; do not touch its json admitted listing or commands with_read_session fallback. d48 initialCargocebc1568 Clippy failed only byte-char-array expression;4990+25 passed; actual failure4e725c25e preserved, one-line correction87281c148 fullgates running. Both e3/f649 stable reviewPASS ready. Base next after frontend D25 metadata boundary.",
+    "09974ad1 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -927,7 +929,7 @@
     "09974ad1": {
       "verdict": "PASS",
       "gates": {
-        "cargo-ci": "05be4b61-11dd-45b0-9fa7-c4332ed768fd",
+        "cargo-ci": "28900273-f4d7-4715-be37-524cc0fe3970",
         "code-review": "db8d37ea-9b42-4c8d-b290-956909bcf99f"
       },
       "reviewed_source": "7164c39b45b999652e04238dea39d3fb0ec72a22",
@@ -939,7 +941,8 @@
       "prior_findings": "No failed code-review gate. Origin lead URL-fidelity finding closed by real-Git red/green test.",
       "stale_narrative": "No stale forward-looking references in live source/docs; historical plan describes explicit producer/consumer ordering.",
       "deferred_items": "No linked design documents or in-scope deferrals.",
-      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending."
+      "holistic": "Canonical module runner/errors reused; behavior assertions preserved. Direct-main integration and merged Cargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 28900273-f4d7-4715-be37-524cc0fe3970 on 3e51590fb87af84bc45b951ef6fe2923e71c3ad0."
     },
     "c16c834c": {
       "verdict": "PASS",
