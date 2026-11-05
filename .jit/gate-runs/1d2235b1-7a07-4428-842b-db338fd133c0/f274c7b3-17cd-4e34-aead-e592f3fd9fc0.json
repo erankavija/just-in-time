@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-1d2235b1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "55b0cd314386c851341efc9e7cfd0de17133aa33",
+  "completed_at": "2026-11-04T23:18:53.132437303Z",
+  "duration_ms": 163558,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed storage predicate and watcher integration satisfy the issue-scoped hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1d2235b1-7a07-4428-842b-db338fd133c0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f274c7b3-17cd-4e34-aead-e592f3fd9fc0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:16:09.573732374Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 55b0cd314 (`jit:1d2235b1`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/0f8efc37/requirement/REQ-03, @/issue/0f8efc37/requirement/REQ-04, @/issue/c8e79465/requirement/REQ-01 (.jit/issues); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci pending (no recorded exit code)\nTruncation recovery: narrowed reads of applicable policy, label declarations, item sources, and each attributed patch/current Rust file after broad output truncated\n\n1. No findings. The storage-owned predicate derives its allowlist from `VirtualPath` constants, includes `config.toml`, and the watcher scopes events to its normalized data root; focused tests cover included configuration and unrelated paths.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed storage predicate and watcher integration satisfy the issue-scoped hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
