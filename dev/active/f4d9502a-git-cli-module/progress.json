@@ -349,8 +349,9 @@
           "short_id": "9ecde705",
           "title": "Link checks test asset presence through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatch_prepared"
         },
         {
           "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
@@ -743,6 +744,13 @@
       "model": "gpt-6-sol",
       "effort": "high",
       "reason": "Second rework requires bounded repository-wide release invocation audit after narrow fixture audit missed other families."
+    },
+    {
+      "issue": "9ecde705",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "reason": "Bounded batching of asset presence into canonical object_types while preserving landed HTTP probe pool.",
+      "prepared": true
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -819,7 +827,8 @@
     "d681 actual merged Cargo b634207b PASS on084db8cc5, Done/lease released e375af7d8 before downstream claims. Steward approved83c8632f exact fourth file storage/git.rs solely removal of fulfilled history convergence comment when duplicate removed, no executable edit. 83 and3f8 actualReady claimed; source dcf next while632 remains unready. a273 lead audit confirmed :/message expression broken by appending peel suffix; worker now resolves original expression then peels canonical object ID in same reader, focused regression running. EA andd5 full pipelines running.",
     "dcf88b6f Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "dcf actual mergedCargo4b78c2a9 PASS, Done/released1893a4bf6. d5 fullCargo188acbdf/review5ce878f8 stable PASS, exact two-file preservation, next ready source. Steward approved83REQ03 factual reconciliation: removed test_executor replaced by current shared nonGit fixture followed by Git init; bind existing executor to detected paths after init, all history/diff assertions unchanged. Active criterion/manifest updated. Steward approved EA exact3 extra CLI fixture files (6 total); actual failure48bdc215 preserved8dda31d66, rework2 broader invocation audit/non-fail-fast tests. No production fallback or weakened actor contract.",
-    "d5cae9e3 Done and lease released after actual stable merged Cargo; next source owner notified directly."
+    "d5cae9e3 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "d5 actual mergedCargo172143f1 stable PASS, Done/released3181d2865. a273 corrected fullCargo passed, independent review running. Ready9ecde705 claimed/prepared for next available worker slot, exact document asset-presence function/tests independent of83 history functions; preserve landed7516 timed HTTP probe pool per recorded second-lander ruling. Source boundary remains unreserved while632 is unready."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
