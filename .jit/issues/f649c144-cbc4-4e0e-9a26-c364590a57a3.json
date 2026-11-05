@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c281683c-fd7b-477e-b4ec-5a1734744980",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:53:19.095664981Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0ada9cd5-1a64-4194-95f0-cbe4f1b96e77",
+      "status": "passed",
+      "updated_at": "2026-11-05T01:56:00.314644695Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lease validation lists worktrees once per run",
-  "updated_at": "2026-11-05T01:39:58.241415836Z"
+  "updated_at": "2026-11-05T01:56:00.314644695Z"
 }
