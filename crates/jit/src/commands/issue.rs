@@ -1149,8 +1149,26 @@ impl<S: IssueStore> IssueOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = self.exec.storage.resolve_issue_id(id)?;
+        let actor = claim::resolve_release_actor(self.exec.require_worktree_paths()?)?;
         self.exec
-            .publish_captured_release(&full_id, reason.to_string())
+            .publish_captured_release(&full_id, reason.to_string(), actor)
+    }
+
+    /// Release an issue with an explicit audit actor, without resolving invocation identity.
+    ///
+    /// Returns the persisted issue.
+    pub fn release_issue_as(
+        &self,
+        id: &IssueIdPrefix,
+        reason: &str,
+        actor: crate::domain::Assignee,
+    ) -> Result<Issue>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let full_id = self.exec.storage.resolve_issue_id(id)?;
+        self.exec
+            .publish_captured_release(&full_id, reason.to_string(), actor)
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
