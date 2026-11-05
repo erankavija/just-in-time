@@ -15,10 +15,16 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "run_id": "0e30b6da-99dc-4bf4-94d5-0cdb9f8a4a35",
+    "cargo-ci": {
+      "run_id": "bad751b7-8692-4263-8de4-a2a32be7d2a7",
       "status": "passed",
-      "updated_at": "2026-11-04T23:16:32.066055236Z",
+      "updated_at": "2026-11-05T00:08:38.194930340Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "766aceb2-550f-42dd-8704-232525a5036c",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:13:51.316635415Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Retire error codes that nothing produces",
-  "updated_at": "2026-11-04T23:16:32.066055236Z"
+  "updated_at": "2026-11-05T00:13:51.316635415Z"
 }
