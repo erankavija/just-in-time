@@ -540,10 +540,10 @@
     },
     {
       "issue": "5046408a",
-      "status": "accepted_one_additional_cycle",
+      "status": "cycle3_boundary_design_review_required",
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
-      "evidence": "Cargo f604a1fc: malformed config validate exit/report regression; primary project_config CLI 10 pass/4 fail also shows invalid project-name repair blocked. No source edits after gate failure.",
-      "ruling": "Steward accepts reviewed diagnostics R2 semantics/matrix and exact10-file correction. Authorizes one additional bounded implementation cycle3 without resetting prior2 failures. Preserve RED/assertions, D20/D25/D26/D27 and error/report/repair boundaries; next material gap or full-gate failure returns to steward."
+      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate.",
+      "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch."
     }
   ],
   "rework_counts": {
@@ -921,7 +921,9 @@
     "Rework2 investigation found eager full JitConfig assembly also blocks config set project.name repair and existing diagnostic response shape. Steward requires bounded design review/acceptance before edits; primary preparing alternatives/footprint only. declarations/mod.rs was already named in accepted step3; verify added owners exactly. Main clean/free, source frozen at376978ed0.",
     "Live handoff-3.md records both504 full-gate failures, closed absent-ancestry rework and required bounded diagnostic/repair design review. No session stop requested; primary proposal work continues.",
     "504 diagnostics R1 footprint FAIL resolved by restoring existing storage test owner; R2 design PASS. Steward accepts ten-file correction and exactly cycle3, prior two gate failures retained. Durable proposal/reviews linked before source dispatch. Main remains source-free until all checks/reviews pass.",
-    "Lease renewal correction: claim acquire did not extend existing expiry. Actual claim renew --extension14400 at06:31UTC extends a273/c140/504 to10:31UTC; use renew and verify expires_at, not acquire, for held leases."
+    "Lease renewal correction: claim acquire did not extend existing expiry. Actual claim renew --extension14400 at06:31UTC extends a273/c140/504 to10:31UTC; use renew and verify expires_at, not acquire, for held leases.",
+    "Cycle3 original config diagnostics/repair regression now green; broad non-fail-fast CLI/contracts exposes five failing tests plus two hidden registry arms. Source ten-file diff frozenf0c5fd8a over376978ed0. Concrete boundary proposal sent steward: recommend shared existing adapters/data-only exec (+3owners), explicit release actor (+3distinct owners,6total), permission source repair in current scope. No further edits pending ruling; prior single-extra-cycle limit remains.",
+    "Steward selects boundary optionA and in-footprint Io fix, exact13files subject to fresh independent design review before edits, no B/retryreset. Actor defect excluded from504 pending unchanged-main sanitized reproduction and injection audit; if confirmed propose separate same-epic leaf outside original53/noREQcredit, fourfiles, mainfix then504refresh. Primary read-only/proposal dispatch active."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1435,6 +1437,17 @@
         "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
       },
       "criteria": "All3 layout checkpoint criteria audited: shared invocation observations, supplied storage/executor/recovery/server/init/hooks, ordinary/external/moved/lease counting suite, owning alias/error/clone/concurrency tests. Resolved d681 pitfall reconciled before gate. No source implementation introduced by checkpoint."
+    },
+    "5046408a": {
+      "verdict": "FAIL at Tier1; correction partial",
+      "last_full_gate": "f604a1fc-d5f9-4548-8dd1-5ed1f0c04d4d (failed, preserved)",
+      "source_head": "376978ed05c011717ab7c2d88fab54954f045f15",
+      "uncommitted_diff_sha256": "f0c5fd8a3e18932804cd4f02b412b9d1540321d408522733e66601a7ce22b9a3",
+      "correction_cycle": 3,
+      "focused_evidence": "Declarations108/storage512/config-related183/bootstrap13; unchanged exit projection1 and project-config20 pass. Counts overlap and are not a workspace total. Fmt/all-target Clippy pass. Complete CLI1222pass/3fail; contracts548pass/2fail. Nine-arm registry sweep6match/3mismatch; no full gate or implementation reviews for current correction.",
+      "result": "/tmp/f4d9502a-lead/5046408a-rework-3-result.md",
+      "proposal": "/tmp/f4d9502a-lead/5046408a-rework-3-boundary-proposal.md",
+      "open_findings": "Permission Io source; item list/search/recover early declaration adapters; worktree-exec pending refusal; two actor-less release tests. No assertion weakening or ambient identity masking."
     }
   },
   "source_queue": [
@@ -1468,7 +1481,7 @@
       "independent_implementation_review": "Fresh Astra/high after full configured Cargo gate",
       "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic",
       "active_ownership": {
-        "split_root_impl": "Astra/xhigh: sole source owner for accepted ten-file diagnostic/repair correction, cycle3; resumes after durable linked acceptance. No other source edits authorized.",
+        "split_root_impl": "Read-only/proposal work only: concretize selected A thirteen-file boundary correction for fresh independent review; reproduce two actor failures on unchanged main with focused checks and audit existing injection. No source edits;504 ten-file correction remains frozen.",
         "split_root_consumers": "Complete; ownership returned to primary.",
         "split_root_design": "Docs slice complete and lead reviewed; ownership returned to primary."
       },

@@ -214,6 +214,79 @@
       "format": "markdown",
       "label": "Live split-root gate and diagnostic-design checkpoint",
       "path": "dev/active/f4d9502a-git-cli-module/handoff-3.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "6a84be3b84ff2e9c85f90cb856d7f7333155fe56400f7654a55b12c69dfb11a9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/diagnostics-design-review-r2.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-design-review-r2.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "be14e3775daceb625e97fff2ca493dd9e9b586757026df403ceb0fcd71b3105a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b18b4bbdb3e361030c14e53ba8b8e02d8d28a7bf2ec98d470e14b09710e8172f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-3.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff-3.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "4e83dfa505d3de1b3c012cd55eb7b6b9fccf9b31ca785e67cb927aba8c32cafe",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/diagnostics-proposal.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-proposal.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1aaea83e7dd4749ec36d14d4143bd71b6566fb5c66de26d9e2101530bfb32f12",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/design.md",
+          "resolved_path": "dev/active/5046408a/design.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d40457b12dbfbeed22b345982002668878654d5eac18abb46a3d8d9f341ea93f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff-2.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/handoff-2.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3be13174d26d8c4eed477a341760134f565863c46aad925a11be3c198edb538c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../5046408a/diagnostics-design-review-r1.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-design-review-r1.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d23db9334f39d74acfb4a11babafa9c68569ac6fe49afa48aa0616fed36e9961",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "progress.json",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/progress.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Live cycle3 boundary checkpoint",
+      "path": "dev/active/f4d9502a-git-cli-module/handoff-4.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:37.009914436Z",
@@ -237,5 +310,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-05T06:16:06.102965735Z"
+  "updated_at": "2026-11-05T07:19:25.963026471Z"
 }
