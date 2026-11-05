@@ -1827,7 +1827,8 @@
   ],
   "depends_on": [
    "document-show-reads-storage",
-   "document-history-through-module"
+   "document-history-through-module",
+   "snapshot-metadata-through-module"
   ],
   "planning": {
    "outcome": "Both document diff variants read their two versions through one reader process.",

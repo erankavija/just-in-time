@@ -124,7 +124,7 @@ A document read uses the explicit `--at` revision, else the reference's pinned c
 | git-revision-bridge-removal | Remove the revision resolver bridge | task | The revision resolver bridge and the single-path pinned read are gone. | git-revision-resolver-bridge, git-object-reads | REQ-02, REQ-11, DEC-13 | touches 4 | — | archive-pinned-reads-batched, storage-pinned-inspection-migration |
 | pinned-path-reads-through-module | Path reads at a commit go through the git module | task | Storage reads a path at a commit through the module object reader. | git-object-reads, document-read-versions | REQ-01, REQ-10, DEC-13, DEC-22 | touches 1 | — | git-object-reads, server-image-git-cli |
 | document-show-reads-storage | Document show reads through storage at the version it names | task | jit doc show reads unpinned documents from the working tree through storage. | document-read-versions | REQ-06, REQ-10, DEC-06, DEC-22 | touches 3 | — | pinned-path-reads-through-module |
-| document-diff-through-module | Document diff reads both versions through one git process | task | Both document diff variants read their two versions through one reader process. | git-object-reads, document-read-versions, git-test-fixtures | REQ-01, REQ-10, DEC-13 | touches 2 | — | document-show-reads-storage, document-history-through-module |
+| document-diff-through-module | Document diff reads both versions through one git process | task | Both document diff variants read their two versions through one reader process. | git-object-reads, document-read-versions, git-test-fixtures | REQ-01, REQ-10, DEC-13 | touches 2 | — | document-show-reads-storage, document-history-through-module, snapshot-metadata-through-module |
 | git-file-history | Path history query in the git module | task | The git module lists a path's history with one git log process. | git-module | REQ-10, DEC-13 | touches 2 | — | git-module-foundation |
 | document-history-through-module | Document history comes from the module's path history | task | Both document history variants read the module's path history. | git-file-history | REQ-01, REQ-10, DEC-13 | touches 4 | — | git-file-history, layout-fallback-removal, server-image-git-cli |
 | asset-check-through-module | Link checks test asset presence through one git process | task | The link check tests unpinned asset presence through one presence-check process. | git-object-reads, git-test-fixtures | REQ-01, REQ-10, DEC-13 | touches 4 | — | git-object-reads, layout-fallback-removal |
@@ -253,6 +253,7 @@ flowchart LR
     N34 --> N35
     N35 --> N36
     N38 --> N36
+    N42 --> N36
     N2 --> N37
     N37 --> N38
     N5 --> N38
@@ -335,6 +336,8 @@ flowchart LR
 ## Post-plan sequencing correction
 
 The archive pinned-read consumer resolves the original revision expression before canonical-ID peeling, then requests the path at that canonical commit in the same reader. Appending peeling syntax to a message-search expression changes its meaning; the [shared revision-producer design](../c140921c/revision-producer-plan.md) records the correction and unchanged budgets. Steward-approved sequencing makes that producer a prerequisite of archive migration, replacing the now-transitive layout-context edge. Existing issue identities and completed migration history remain intact; archive implementation waits for the producer to land and pass gates.
+
+The two-version document diff likewise waits for the shared revision producer: it resolves each original expression before requesting canonical commit:path, using one reader child for both versions. This post-plan prerequisite preserves the existing diff criteria and libgit2 expression semantics; document show retains its existing prerequisite chain.
 
 ## Investigation sources
 

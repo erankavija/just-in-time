@@ -4,7 +4,8 @@
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
     "1acfa592-ce5a-4b73-ad86-a82881f1208f",
-    "83c8632f-5495-4fef-a774-730ebeae95be"
+    "83c8632f-5495-4fef-a774-730ebeae95be",
+    "c140921c-0730-4983-8e77-c6a46bbdca5a"
   ],
   "description": "Make the CLI and server document diff read both versions through one git module object reader, removing the last libgit2 blob reader in the document commands.\n\n## Background\n\n- `document_diff` (`crates/jit/src/commands/document.rs:581-632`) and `get_document_diff` (`crates/jit/src/commands/document.rs:764-814`) each open libgit2 and call `read_file_from_git` (`crates/jit/src/commands/document.rs:848-862`) twice, then render a unified diff with the `similar` crate.\n- Outside git the CLI variant fails with \"Not a git repository\", and the server variant returns `PathReadError::Other(\"Document diff not available (requires git repository with history)\")`.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:263`, `:305`, and the server's `crates/server/tests/server_integration/document_api_tests.rs`.\n- Kept as one change for a build reason: `read_file_from_git` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants read the two versions through one object reader on the executor's git checkout. `read_file_from_git` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: Diff output is byte-identical, so the CLI and server diff tests pass unchanged; outside git each variant fails as today.\n- [hard] REQ-03: A CLI test with the counting stand-in first on `PATH` asserts one `cat-file` invocation for `jit doc diff`; today the diff runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
@@ -28,5 +29,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Document diff reads both versions through one git process",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-05T04:43:47.652101470Z"
 }
