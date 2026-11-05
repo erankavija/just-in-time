@@ -65,7 +65,7 @@
           "short_id": "4d8791fb",
           "title": "Unify issue and linked-document search",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_review"
         },
         {
           "id": "d4172016-0225-4ae8-aa37-3e4f28a1922c",
@@ -79,7 +79,7 @@
           "short_id": "4538b071",
           "title": "Remove explicitly unused API routes and client methods",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rework"
         },
         {
           "id": "ca44bb7c-c9b9-48cf-a478-71e901023870",
@@ -167,10 +167,11 @@
   "escalations": [],
   "rework_counts": {
     "9c3eb2bf": 2,
-    "cd0ac0f7": 1
+    "cd0ac0f7": 1,
+    "4538b071": 1
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "Foundation wave, configuration refresh and issue-detail repair landed with merged gates. Shared-snapshot implementation is in progress; remaining overlapping server handlers are sequenced. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
+  "note": "Foundation wave, configuration refresh and issue-detail repair landed with merged gates. Shared snapshot has focused checks passing and full Cargo pending; semantic search in review; API cleanup reworking retained-route coverage. 061 merge and esbuild installer policy remain separately blocked by automatic approval review.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
