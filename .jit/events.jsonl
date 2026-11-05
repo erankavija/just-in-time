@@ -25063,3 +25063,4 @@
 {"id":"e086eba9-7248-47a4-9a81-f8612e0a099a","issue_id":"0546fc82-435f-4d02-9af2-0dc22e301d60","timestamp":"2026-11-05T01:45:34.268736175Z","type":"issue_completed"}
 {"from":"ready","id":"7ab045b5-74f0-4e73-9bfe-50ed09f9b5f8","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-05T01:45:34.510636940Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"f0e84af6-ba9a-4966-9a87-5e2f9ed1e2ed","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-05T01:45:34.510636940Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"216ddb57-d3c7-4a6d-9aaf-43a116642452","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-05T01:50:13.365033516Z","type":"gate_passed","updated_by":"auto:executor"}
