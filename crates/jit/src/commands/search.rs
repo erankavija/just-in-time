@@ -12,6 +12,19 @@ pub struct ContentMatch {
     pub issue_title: Option<String>,
 }
 
+/// Options for matching semantic issue fields.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SemanticSearchOptions {
+    pub case_sensitive: bool,
+    pub regex: bool,
+}
+
+/// An issue and the semantic field which matched the query.
+pub struct SemanticIssueMatch {
+    pub issue: Issue,
+    pub text: String,
+}
+
 impl<S: IssueStore> QueryOps<'_, S> {
     /// Search file contents under the storage root with ripgrep.
     ///
@@ -50,25 +63,80 @@ impl<S: IssueStore> QueryOps<'_, S> {
             .collect())
     }
 
-    pub fn search_issues(&self, query: &str) -> Result<Vec<Issue>> {
-        let issues = self.exec.storage.list_issues()?;
-        let query_lower = query.to_lowercase();
-
-        let results = issues
+    /// Match the ID, title and description of each issue.
+    pub fn search_issue_matches(
+        &self,
+        query: &str,
+        options: SemanticSearchOptions,
+    ) -> Result<Vec<SemanticIssueMatch>> {
+        let regex = if options.regex {
+            Some(
+                regex::RegexBuilder::new(query)
+                    .case_insensitive(!options.case_sensitive)
+                    .build()
+                    .map_err(|error| {
+                        crate::errors::InvalidArgumentError::new(format!(
+                            "invalid search regex: {error}"
+                        ))
+                    })?,
+            )
+        } else {
+            None
+        };
+        let needle = if options.case_sensitive {
+            query.to_string()
+        } else {
+            query.to_lowercase()
+        };
+        let matches = |value: &str, id: bool| {
+            if let Some(regex) = &regex {
+                return regex.is_match(value);
+            }
+            let value = if options.case_sensitive {
+                value.to_string()
+            } else {
+                value.to_lowercase()
+            };
+            if id {
+                value.starts_with(&needle)
+            } else {
+                value.contains(&needle)
+            }
+        };
+        Ok(self
+            .exec
+            .storage
+            .list_issues()?
             .into_iter()
-            .filter(|issue| {
-                if query.is_empty() {
-                    return true;
-                }
-
-                // Search in title, description, and ID
-                issue.title.to_lowercase().contains(&query_lower)
-                    || issue.description.to_lowercase().contains(&query_lower)
-                    || issue.id.as_str().starts_with(&query_lower)
+            .filter_map(|issue| {
+                let text = [
+                    issue.title.as_str(),
+                    issue.description.as_str(),
+                    issue.id.as_str(),
+                ]
+                .into_iter()
+                .enumerate()
+                .find(|(index, field)| matches(field, *index == 2))
+                .map(|(_, field)| field.to_string());
+                text.map(|text| SemanticIssueMatch { issue, text })
             })
-            .collect();
+            .collect())
+    }
 
-        Ok(results)
+    pub fn search_issues_with_options(
+        &self,
+        query: &str,
+        options: SemanticSearchOptions,
+    ) -> Result<Vec<Issue>> {
+        Ok(self
+            .search_issue_matches(query, options)?
+            .into_iter()
+            .map(|item| item.issue)
+            .collect())
+    }
+
+    pub fn search_issues(&self, query: &str) -> Result<Vec<Issue>> {
+        self.search_issues_with_options(query, SemanticSearchOptions::default())
     }
 
     /// Search issues by text `query`, then narrow by optional filters.
@@ -127,6 +195,47 @@ impl<S: IssueStore> QueryOps<'_, S> {
 mod tests {
     use crate::search::SearchOptions;
     use crate::test_harness::TestHarness;
+
+    #[test]
+    fn test_search_issues_with_options_matches_semantic_fields_and_id_prefix() {
+        let harness = TestHarness::new();
+        let id = harness.create_issue("Alpha Beacon");
+        let options = super::SemanticSearchOptions {
+            case_sensitive: true,
+            regex: true,
+        };
+        let matches = harness
+            .executor
+            .queries()
+            .search_issues_with_options("^Alpha B.*", options)
+            .unwrap();
+        assert!(matches.iter().any(|issue| issue.id == id));
+        assert!(harness
+            .executor
+            .queries()
+            .search_issues_with_options("^alpha", options)
+            .unwrap()
+            .is_empty());
+        assert!(harness
+            .executor
+            .queries()
+            .search_issues(&id.to_string()[..8])
+            .unwrap()
+            .iter()
+            .any(|issue| issue.id == id));
+        assert!(harness
+            .executor
+            .queries()
+            .search_issues("lpha bea")
+            .unwrap()
+            .iter()
+            .any(|issue| issue.id == id));
+        assert!(harness
+            .executor
+            .queries()
+            .search_issues_with_options("[", options)
+            .is_err());
+    }
 
     #[test]
     fn test_search_content_attaches_issue_titles() {

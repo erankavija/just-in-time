@@ -1618,7 +1618,10 @@ fn test_json_capture_reads_no_blob_for_a_kind_only_pinned_request() {
         assert!(output.status.success(), "git {args:?} failed");
     }
     let stand_in = GitStandIn::new();
-    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let storage = JsonFileStorage::with_git(
+        &data,
+        crate::storage::git::Git::with_program(stand_in.program()),
+    );
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let request = ("HEAD".to_string(), "docs/a.md".to_string());
@@ -1682,7 +1685,10 @@ fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
         String::from_utf8(output.stdout).unwrap().trim().to_string()
     };
     let stand_in = GitStandIn::new();
-    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let storage = JsonFileStorage::with_git(
+        &data,
+        crate::storage::git::Git::with_program(stand_in.program()),
+    );
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let spec = pinned_capture_spec(["docs/a.md", "docs/b.md"]);
@@ -1756,7 +1762,10 @@ fn test_json_capture_re_resolves_moved_head_and_rekeys_pinned_cache() {
         String::from_utf8(output.stdout).unwrap().trim().to_string()
     };
     let stand_in = GitStandIn::new();
-    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let storage = JsonFileStorage::with_git(
+        &data,
+        crate::storage::git::Git::with_program(stand_in.program()),
+    );
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let spec = pinned_capture_spec(["docs/a.md"]);
@@ -1835,7 +1844,10 @@ fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing(
         String::from_utf8(output.stdout).unwrap().trim().to_string()
     };
     let stand_in = GitStandIn::new();
-    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let storage = JsonFileStorage::with_git(
+        &data,
+        crate::storage::git::Git::with_program(stand_in.program()),
+    );
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let spec = pinned_capture_spec(["docs/a.md", "docs/b.md"]);
@@ -1895,7 +1907,10 @@ fn test_json_capture_retains_only_pairs_used_by_the_most_recent_capture() {
         String::from_utf8(output.stdout).unwrap().trim().to_string()
     };
     let stand_in = GitStandIn::new();
-    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let storage = JsonFileStorage::with_git(
+        &data,
+        crate::storage::git::Git::with_program(stand_in.program()),
+    );
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
 

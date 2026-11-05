@@ -11,6 +11,16 @@ vi.mock('axios', () => ({
   },
 }));
 
+describe('apiClient - retained issue list', () => {
+  it('test_list_issues_uses_supported_issues_route', async () => {
+    mockGet.mockResolvedValue({ data: [] });
+
+    const { apiClient } = await import('./client');
+    await expect(apiClient.listIssues()).resolves.toEqual([]);
+    expect(mockGet).toHaveBeenCalledWith('/issues');
+  });
+});
+
 describe('apiClient - Document Methods', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,55 +131,6 @@ describe('apiClient - Document Methods', () => {
       await apiClient.getDocumentHistory('issue-456', 'docs/api-v2.0.md');
 
       expect(mockGet).toHaveBeenCalledWith('/issues/issue-456/documents/docs%2Fapi-v2.0.md/history');
-    });
-  });
-
-  describe('getDocumentDiff', () => {
-    it('should fetch document diff with from and to commits', async () => {
-      const mockResponse = {
-        data: {
-          path: 'src/main.rs',
-          from: 'abc123',
-          to: 'def456',
-          diff: '--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,4 @@\n+// New comment\n fn main() {',
-        },
-      };
-
-      mockGet.mockResolvedValue(mockResponse);
-
-      const { apiClient } = await import('./client');
-      const result = await apiClient.getDocumentDiff('issue-789', 'src/main.rs', 'abc123', 'def456');
-
-      expect(mockGet).toHaveBeenCalledWith('/issues/issue-789/documents/src%2Fmain.rs/diff?from=abc123&to=def456');
-      expect(result.from).toBe('abc123');
-      expect(result.to).toBe('def456');
-      expect(result.diff).toContain('--- a/src/main.rs');
-    });
-
-    it('should fetch document diff with only from commit (defaults to HEAD)', async () => {
-      const mockResponse = {
-        data: {
-          path: 'README.md',
-          from: 'abc123',
-          to: 'HEAD',
-          diff: '--- a/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n # Title\n+New line',
-        },
-      };
-
-      mockGet.mockResolvedValue(mockResponse);
-
-      const { apiClient } = await import('./client');
-      const result = await apiClient.getDocumentDiff('issue-101', 'README.md', 'abc123');
-
-      expect(mockGet).toHaveBeenCalledWith('/issues/issue-101/documents/README.md/diff?from=abc123');
-      expect(result.to).toBe('HEAD');
-    });
-
-    it('should handle errors gracefully', async () => {
-      mockGet.mockRejectedValue(new Error('Network error'));
-
-      const { apiClient } = await import('./client');
-      await expect(apiClient.getDocumentDiff('issue-999', 'missing.md', 'abc')).rejects.toThrow('Network error');
     });
   });
 });

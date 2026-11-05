@@ -8,12 +8,26 @@
   ],
   "description": "Make storage's pinned target inspection run on a git module checkout and replace its test-only program path with an injectable `Git`.\n\n## Background\n\n- `JsonFileStorage::inspect_pinned_targets` (`crates/jit/src/storage/json.rs:490-504`) builds a `GitRevisionResolver` from `git_program` (`crates/jit/src/storage/json.rs:403`, default `:441`), which only `#[cfg(test)] with_git_program` (`crates/jit/src/storage/json.rs:481-488`) sets.\n- That constructor's callers are the storage capture tests at `crates/jit/src/storage/repository_state_store_tests.rs:2657`, `:2695`, `:2744` and `:2772`, which pass the shared counting stand-in.\n- Its signature returns `Result<PinnedTargetRead, GitRevisionError>` (`crates/jit/src/storage/json.rs:496`), naming the bridge's error alias.\n- `GitRevisionResolver` is a bridge over `GitCheckout`.\n\n## Success Criteria\n\n- [hard] REQ-01: `JsonFileStorage` holds a `Git` in place of `git_program`, its test-only constructor takes a `Git`, and pinned inspection calls `GitCheckout::inspect_pinned_targets` on a checkout of that `Git` at the requested worktree root, without the bridge; its signature names the module's error type, not `GitRevisionError`.\n- [hard] REQ-02: The four capture tests construct storage with a `Git` naming the stand-in and keep their process counts and subcommands.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T02:06:00.755371569Z",
   "first_ready_at": "2026-11-04T23:35:23.054710125Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c56c9cef-6471-49aa-a1e1-027ec20d54ce",
+      "status": "passed",
+      "updated_at": "2026-11-05T02:05:47.657911006Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "16162d47-5745-47a4-883d-3d027a097051",
+      "status": "passed",
+      "updated_at": "2026-11-05T00:14:42.805222485Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c16c834c-f134-4af8-ab20-40c6a120e836",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:f4d9502a/REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Storage pinned inspection runs on a module checkout",
-  "updated_at": "2026-11-04T23:59:18.233643240Z"
+  "updated_at": "2026-11-05T02:06:00.755371569Z"
 }
