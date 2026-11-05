@@ -9,6 +9,7 @@
   ],
   "description": "`scripts/rust-build-budget.sh` gains a fourth budget that caps the production code lines of `crates/jit/src/main.rs`, so the thin entry point cannot regrow.\n\n## Background\n\nThe script declares three `readonly` budgets (`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`, `MAX_TEST_SUITE_SECONDS`), accumulates violations in `errors[]`, and on success prints one `rust-build-budget: integration-targets=… suite-duration=…` line. `scripts/cargo-ci.sh` greps `rust-build-budget: integration-targets=.*` and stores the rest in the gate summary. Policy checks read manifests under `--root`, which is how the checker's existing `--self-test` drives it against fixture roots. Budgets are declared once in the script and derived in `dev/benchmarks/rust-build-budgets/README.md`. Production lines are defined by the committed counter `scripts/production-lines.py`, which reads files at a git revision. In its default mode it excludes blank lines, doc comments, `#[cfg(test)]` items and test-only modules and files; plain `//` comments and `test-support`-gated code count.\n\n## Success Criteria\n\n- [hard] REQ-01: The script declares `readonly MAX_MAIN_RS_CODE_LINES` beside the other budgets and fails, naming the measured and allowed values, when `$ROOT/crates/jit/src/main.rs` exceeds it.\n- [hard] REQ-02: The count comes from `scripts/production-lines.py` in its default (survey-described) mode, extended with a mode that counts one working-tree file, applied to the file under `--root`; the revision mode's figures are unchanged.\n- [hard] REQ-03: The success line gains a `main-rs-lines=N/MAX` field after its existing fields, and `cargo-ci.sh`'s budget summary still parses it.\n- [hard] REQ-04: Fixtures in the existing `scripts/rust-build-budget.sh --self-test` show a fixture under the ceiling passing with the field reported and a fixture over it failing.\n- [hard] REQ-05: `dev/benchmarks/rust-build-budgets/README.md` derives the ceiling as the measured production lines of the consolidated `main.rs` plus at most 10% headroom, naming the commit measured.\n\n## Notes\n\nThe `bounded-rust-build-footprint` invariant names targets and executable bytes; this ceiling sits beside it as gate policy. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n\n## Decisions\n\n- D-01: The checker's shell self-test is the canonical budget-fixture owner after the former Rust fixture suite was removed. The steward approved REQ-04's location correction on 2026-11-05; under/over assertions and required gates remain unchanged.\n- D-02: The entry-point ceiling proceeds independently of deferred timing enforcement. Its only prerequisites are the consolidated entry point and canonical production-line counter; existing timing and host-sharing policies remain unchanged (steward ruling, 2026-11-05).\n",
   "documents": [],
+  "done_at": "2026-11-05T01:10:22.380468824Z",
   "first_ready_at": "2026-11-04T23:31:56.688940862Z",
   "gates_required": [
     "cargo-ci",
@@ -16,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "4eb950c8-0357-4698-9f80-eaa8c7c3740d",
+      "run_id": "15d42f63-28a7-46d9-97d8-4c2bebde827b",
       "status": "passed",
-      "updated_at": "2026-11-05T00:06:45.647654647Z",
+      "updated_at": "2026-11-05T01:09:24.245873156Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -38,7 +39,7 @@
     "satisfies:df129d9e/REQ-08"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Enforce a main.rs production-line ceiling in the budget script",
-  "updated_at": "2026-11-05T00:13:36.877272758Z"
+  "updated_at": "2026-11-05T01:10:22.380468824Z"
 }
