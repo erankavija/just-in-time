@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-1d2235b1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d50cf956e58c10f801d828adea55dee9600ce10d",
+  "completed_at": "2026-11-04T23:36:46.931449920Z",
+  "duration_ms": 194788,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed storage predicate and watcher integration satisfy the issue-scoped hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1d2235b1-7a07-4428-842b-db338fd133c0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "040dcae8-993b-42a3-910a-35b511a90339",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:33:32.142896305Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 55b0cd314, 9f0ea46de, d50cf956e (`jit:1d2235b1`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/0f8efc37/requirement/REQ-03, @/issue/0f8efc37/requirement/REQ-04, @/issue/c8e79465/requirement/REQ-01 (.jit/issues); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review passed with no findings\nTruncation recovery: narrowed reads of the plan, investigation, caller, path constants, predicate, tests, layout normalization, and each attributed patch\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed storage predicate and watcher integration satisfy the issue-scoped hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

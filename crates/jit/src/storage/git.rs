@@ -24,7 +24,7 @@ pub enum GitError {
         #[source]
         source: Arc<io::Error>,
     },
-    /// Git succeeded but its output does not have the requested shape.
+    /// Git failed or returned output outside the requested command contract.
     #[error("unexpected output from git {command}: {output}")]
     UnexpectedOutput { command: String, output: String },
     /// A path git reported could not be resolved.
@@ -170,45 +170,102 @@ pub struct GitCheckout {
 }
 
 impl GitCheckout {
-    pub fn new(git: Git, worktree_root: PathBuf) -> Self {
+    /// Construct operations for a checkout already recognized by Git.
+    pub(super) fn new(git: Git, worktree_root: PathBuf) -> Self {
         Self { git, worktree_root }
+    }
+
+    /// Construct a checkout with an explicit executable for tests.
+    #[cfg(feature = "test-support")]
+    pub fn for_test(git: Git, worktree_root: PathBuf) -> Self {
+        Self::new(git, worktree_root)
     }
 
     // Temporary @/inv/convention-convergence exception: branch lookups converge
     // here when 732f7afb, 9de4c09c, f6eaba42, 3f8da8c4 and c140921c land.
-    /// Read the checked-out commit and branch with one git process.
+    /// Read the checked-out commit and branch with at most two git processes.
     ///
-    /// An unborn branch has no head. Detached checkouts have a commit and no
-    /// branch name.
+    /// Validates the captured commit without history traversal or fetching.
+    /// Only a confirmed unborn branch has no head; detached heads have no branch.
     ///
     /// # Errors
     ///
-    /// Returns [`GitError::GitUnavailable`] if git cannot start or
-    /// [`GitError::UnexpectedOutput`] if successful output is not a canonical
-    /// commit and branch pair.
+    /// Returns [`GitError::GitUnavailable`] if git cannot start, or
+    /// [`GitError::UnexpectedOutput`] for command failures or invalid HEAD evidence.
     pub fn head(&self) -> Result<Option<Head>, GitError> {
-        const ARGS: [&str; 4] = ["rev-parse", "HEAD", "--abbrev-ref", "HEAD"];
+        const IDENTITY: [&str; 6] = [
+            "--no-replace-objects",
+            "rev-parse",
+            "--revs-only",
+            "HEAD",
+            "--symbolic-full-name",
+            "HEAD",
+        ];
+        let output = self.git.run(&self.worktree_root, IDENTITY)?;
+        let head = parse_head_output(&IDENTITY, &output, |stdout| {
+            if stdout.is_empty() {
+                Some(None)
+            } else {
+                parse_head_identity(stdout).map(Some)
+            }
+        })?;
+
+        match head {
+            Some(head) => {
+                // Replacements and commit graphs can mask a missing original object.
+                let args = [
+                    "--no-replace-objects",
+                    "-c",
+                    "core.commitGraph=false",
+                    "rev-list",
+                    "--no-walk",
+                    "--missing=print",
+                    head.commit.as_str(),
+                    "--",
+                ];
+                let output = self.git.run(&self.worktree_root, args)?;
+                parse_head_output(&args, &output, |stdout| {
+                    (stdout.strip_suffix('\n') == Some(head.commit.as_str())).then_some(())
+                })?;
+                Ok(Some(head))
+            }
+            None => {
+                const UNBORN: [&str; 4] =
+                    ["--no-replace-objects", "symbolic-ref", "--quiet", "HEAD"];
+                let output = self.git.run(&self.worktree_root, UNBORN)?;
+                parse_head_output(&UNBORN, &output, |stdout| {
+                    parse_head_branch(stdout.strip_suffix('\n')?).map(|_| ())
+                })?;
+                Ok(None)
+            }
+        }
+    }
+
+    // Temporary @/inv/convention-convergence exception: claim release's actor
+    // fallback still queries user.name directly until ea4b7363.
+    /// Read the configured user name, if this checkout has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails for a reason other than
+    /// the name being unset, or reports non-UTF-8 output.
+    pub fn user_name(&self) -> Result<Option<String>, GitError> {
+        const ARGS: [&str; 2] = ["config", "user.name"];
         let output = self.git.run(&self.worktree_root, ARGS)?;
         if !output.status.success() {
-            return Ok(None);
+            if output.status.code() == Some(1) {
+                return Ok(None);
+            }
+            return Err(GitError::UnexpectedOutput {
+                command: ARGS.join(" "),
+                output: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
         }
-
-        let unexpected = || GitError::UnexpectedOutput {
+        let name = std::str::from_utf8(&output.stdout).map_err(|_| GitError::UnexpectedOutput {
             command: ARGS.join(" "),
             output: String::from_utf8_lossy(&output.stdout).into_owned(),
-        };
-        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
-        let (commit, branch) = match stdout.lines().collect::<Vec<_>>().as_slice() {
-            [commit, branch] => (*commit, *branch),
-            _ => return Err(unexpected()),
-        };
-        let commit = CanonicalCommitOid::parse(commit).map_err(|_| unexpected())?;
-        let branch = match branch {
-            "HEAD" => None,
-            "" => return Err(unexpected()),
-            branch => Some(branch.to_owned()),
-        };
-        Ok(Some(Head { commit, branch }))
+        })?;
+        Ok(Some(name.strip_suffix('\n').unwrap_or(name).to_owned()))
     }
 
     // Temporary @/inv/convention-convergence exception: snapshot migration
@@ -289,6 +346,45 @@ impl GitCheckout {
         }
         Ok(paths)
     }
+}
+
+fn parse_head_output<T>(
+    command: &[&str],
+    output: &Output,
+    parse: impl FnOnce(&str) -> Option<T>,
+) -> Result<T, GitError> {
+    let parsed = match (
+        output.status.success(),
+        output.stderr.is_empty(),
+        std::str::from_utf8(&output.stdout),
+    ) {
+        (true, true, Ok(stdout)) => parse(stdout),
+        _ => None,
+    };
+    parsed.ok_or_else(|| GitError::UnexpectedOutput {
+        command: command.join(" "),
+        output: format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        ),
+    })
+}
+
+fn parse_head_identity(stdout: &str) -> Option<Head> {
+    let (oid, reference) = stdout.strip_suffix('\n')?.split_once('\n')?;
+    let commit = CanonicalCommitOid::parse(oid).ok()?;
+    let branch = match reference {
+        "HEAD" => None,
+        reference => Some(parse_head_branch(reference)?.to_owned()),
+    };
+    Some(Head { commit, branch })
+}
+
+fn parse_head_branch(reference: &str) -> Option<&str> {
+    reference
+        .strip_prefix("refs/heads/")
+        .filter(|branch| !branch.is_empty() && !branch.bytes().any(|byte| byte.is_ascii_control()))
 }
 
 /// Maximum pinned paths passed to one `git ls-tree` process, keeping the
@@ -990,6 +1086,47 @@ mod tests {
             matches!(&error, GitError::GitUnavailable { program: named, .. } if named == &program)
         );
         assert!(error.to_string().contains(program.to_str().unwrap()));
+    }
+
+    #[test]
+    fn test_parse_head_identity_rejects_malformed_protocol_records() {
+        let oid = "1".repeat(40);
+        [
+            String::new(),
+            format!("{oid}\n"),
+            format!("{oid}\nrefs/heads/"),
+            format!("{oid}\nrefs/heads/\n"),
+            format!("{oid}\nrefs/tags/tag\n"),
+            format!("{oid}\nHEAD\nextra\n"),
+            format!("{oid}\nrefs/heads/branch\0suffix\n"),
+            "invalid-object\nrefs/heads/branch\n".to_owned(),
+        ]
+        .iter()
+        .for_each(|output| assert!(parse_head_identity(output).is_none(), "{output:?}"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_parse_head_output_rejects_failed_noisy_or_non_utf8_output() {
+        use std::os::unix::process::ExitStatusExt;
+
+        [
+            (1, b"apparently valid".as_slice(), b"".as_slice()),
+            (0, b"apparently valid".as_slice(), b"warning".as_slice()),
+            (0, b"\xff".as_slice(), b"".as_slice()),
+        ]
+        .into_iter()
+        .for_each(|(status, stdout, stderr)| {
+            let output = Output {
+                status: std::process::ExitStatus::from_raw(status << 8),
+                stdout: stdout.to_vec(),
+                stderr: stderr.to_vec(),
+            };
+            assert!(matches!(
+                parse_head_output(&["head-test"], &output, |_| Some(())),
+                Err(GitError::UnexpectedOutput { .. })
+            ));
+        });
     }
 
     #[test]

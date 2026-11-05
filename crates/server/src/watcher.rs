@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use jit::repository_state::VirtualPath;
+use jit::repository_state::is_graph_relevant_data_path;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::broadcast;
 
@@ -59,58 +59,13 @@ impl ChangeTracker {
 
 const DEBOUNCE_MS: u64 = 200;
 
-/// Returns `true` if the notify event affects files that are displayed in the
-/// graph: issue records ([`VirtualPath::ISSUES`]), the index, the gate registry,
-/// and gate-run results ([`VirtualPath::GATE_RUNS`] and everything below it).
-///
-/// Atomic-write temp files and the high-frequency [`VirtualPath::EVENTS`],
-/// [`VirtualPath::SERVER_PID`] and [`VirtualPath::SERVER_LOG`] files never
-/// refresh the graph.
-pub fn is_graph_relevant(event: &notify::Event) -> bool {
-    event.paths.iter().any(|path| {
-        let filename = path.file_name().and_then(|f| f.to_str());
-
-        // Skip atomic-write temp files.
-        if filename.is_some_and(|f| f.ends_with(".tmp")) {
-            return false;
-        }
-
-        let names = |known: &VirtualPath| filename.is_some() && known.file_name() == filename;
-
-        // Ignore known high-frequency noise files.
-        if [
-            VirtualPath::EVENTS,
-            VirtualPath::SERVER_PID,
-            VirtualPath::SERVER_LOG,
-        ]
+/// Whether a filesystem event affects graph inputs under the watched data root.
+pub fn is_graph_relevant(event: &notify::Event, data_dir: &Path) -> bool {
+    event
+        .paths
         .iter()
-        .any(names)
-        {
-            return false;
-        }
-
-        // Gate run results (any file under the gate-runs directory) update the
-        // gate status shown on issue nodes.
-        let in_directory = |dir: &VirtualPath| {
-            path.components()
-                .any(|c| dir.file_name().is_some_and(|n| c.as_os_str() == n))
-        };
-        if in_directory(&VirtualPath::GATE_RUNS) {
-            return true;
-        }
-
-        // Issue records.
-        let in_issues = path
-            .parent()
-            .and_then(|p| p.file_name())
-            .is_some_and(|n| VirtualPath::ISSUES.file_name().is_some_and(|i| n == i));
-        if in_issues && filename.is_some_and(|f| f.ends_with(".json")) {
-            return true;
-        }
-
-        // Top-level registry files.
-        [VirtualPath::INDEX, VirtualPath::GATES].iter().any(names)
-    })
+        .filter_map(|path| path.strip_prefix(data_dir).ok())
+        .any(is_graph_relevant_data_path)
 }
 
 /// Start watching the given data directory for changes.
@@ -120,21 +75,23 @@ pub fn is_graph_relevant(event: &notify::Event) -> bool {
 /// A background Tokio task handles debouncing filesystem events (~200ms).
 pub fn start_watching(data_dir: impl AsRef<Path>) -> Result<(ChangeTracker, RecommendedWatcher)> {
     let tracker = ChangeTracker::new(64);
+    let data_dir = data_dir.as_ref().to_path_buf();
 
     // Use a tokio mpsc channel — the sender is Send and can be used from notify's thread
     let (fs_tx, mut fs_rx) = tokio::sync::mpsc::channel::<()>(128);
 
+    let watched_dir = data_dir.clone();
     let mut watcher = notify::recommended_watcher(
         move |res: std::result::Result<notify::Event, notify::Error>| {
             if let Ok(event) = res {
-                if is_graph_relevant(&event) {
+                if is_graph_relevant(&event, &watched_dir) {
                     let _ = fs_tx.try_send(());
                 }
             }
         },
     )?;
 
-    watcher.watch(data_dir.as_ref(), RecursiveMode::Recursive)?;
+    watcher.watch(&data_dir, RecursiveMode::Recursive)?;
 
     // Spawn a Tokio task that drains the channel with debouncing
     let debounce_tracker = tracker.clone();
@@ -153,6 +110,13 @@ pub fn start_watching(data_dir: impl AsRef<Path>) -> Result<(ChangeTracker, Reco
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jit::repository_state::VirtualPath;
+
+    const TEST_DATA_DIR: &str = "/data";
+
+    fn is_graph_relevant(event: &notify::Event) -> bool {
+        super::is_graph_relevant(event, Path::new(TEST_DATA_DIR))
+    }
 
     #[test]
     fn test_initial_version_is_zero() {
@@ -220,6 +184,26 @@ mod tests {
             .unwrap();
 
         assert!(version >= 1, "version should be at least 1, got {version}");
+    }
+
+    #[tokio::test]
+    async fn test_start_watching_emits_configuration_changes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let layout = jit::test_utils::repository_layout_for_data_root(tmp.path());
+        let (tracker, _watcher) = start_watching(tmp.path()).unwrap();
+        let mut rx = tracker.subscribe();
+
+        std::fs::write(
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
+            "[version]\nschema = 2\n",
+        )
+        .unwrap();
+
+        let version = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("timed out waiting for configuration change notification")
+            .unwrap();
+        assert!(version >= 1);
     }
 
     #[tokio::test]
@@ -293,68 +277,18 @@ mod tests {
         }
     }
 
-    fn data_path(path: &VirtualPath) -> std::path::PathBuf {
-        let temp = tempfile::tempdir().unwrap();
-        let layout = jit::test_utils::repository_layout_for_data_root(temp.path());
-        layout.resolve(path).unwrap()
-    }
-
-    fn make_data_event(path: &VirtualPath) -> notify::Event {
-        make_event(&[data_path(path)])
-    }
-
     #[test]
-    fn test_relevant_issue_json() {
-        let e = make_event(&[data_path(&VirtualPath::ISSUES).join("abc123.json")]);
-        assert!(is_graph_relevant(&e));
-    }
+    fn test_is_graph_relevant_only_forwards_included_data_root_paths() {
+        let unrelated = make_event(&[
+            Path::new(TEST_DATA_DIR).join("other/index.json"),
+            Path::new("/elsewhere").join(VirtualPath::CONFIG.relative().as_path()),
+        ]);
+        assert!(!is_graph_relevant(&unrelated));
 
-    #[test]
-    fn test_relevant_index_json() {
-        assert!(is_graph_relevant(&make_data_event(&VirtualPath::INDEX)));
-    }
-
-    #[test]
-    fn test_relevant_gates_toml() {
-        assert!(is_graph_relevant(&make_data_event(&VirtualPath::GATES)));
-    }
-
-    #[test]
-    fn test_relevant_gate_run_result() {
-        let e = make_data_event(&VirtualPath::gate_run_record(
-            &jit::test_utils::issue_id(1),
-            &jit::test_utils::gate_run_id(1),
-        ));
-        assert!(is_graph_relevant(&e));
-    }
-
-    #[test]
-    fn test_irrelevant_events_jsonl() {
-        assert!(!is_graph_relevant(&make_data_event(&VirtualPath::EVENTS)));
-    }
-
-    #[test]
-    fn test_irrelevant_unlisted_data_file() {
-        assert!(!is_graph_relevant(&make_data_event(&VirtualPath::CONFIG)));
-    }
-
-    #[test]
-    fn test_irrelevant_server_pid() {
-        assert!(!is_graph_relevant(&make_data_event(
-            &VirtualPath::SERVER_PID
-        )));
-    }
-
-    #[test]
-    fn test_irrelevant_server_log() {
-        assert!(!is_graph_relevant(&make_data_event(
-            &VirtualPath::SERVER_LOG
-        )));
-    }
-
-    #[test]
-    fn test_irrelevant_tmp_file() {
-        let e = make_event(&[data_path(&VirtualPath::ISSUES).join("abc123.tmp")]);
-        assert!(!is_graph_relevant(&e));
+        let included = make_event(&[
+            Path::new(TEST_DATA_DIR).join("other/index.json"),
+            Path::new(TEST_DATA_DIR).join(VirtualPath::CONFIG.relative().as_path()),
+        ]);
+        assert!(is_graph_relevant(&included));
     }
 }

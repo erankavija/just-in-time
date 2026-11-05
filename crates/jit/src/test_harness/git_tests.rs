@@ -101,6 +101,33 @@ fn test_git_stand_in_returns_the_real_git_output_and_exit_status() {
 
 #[cfg(unix)]
 #[test]
+fn test_git_stand_in_applies_environment_overrides_to_its_git_child() {
+    let (_dir, repository, _commit) = committed_repository();
+    repository.git(&["config", "--local", "--unset", "user.name"]);
+    let global_config_dir = TempDir::new().unwrap();
+    let global_config = global_config_dir.path().join("gitconfig");
+    std::fs::write(&global_config, "[user]\nname = Fixture User\n").unwrap();
+    let stand_in = GitStandIn::with_environment(&[
+        ("GIT_CONFIG_GLOBAL", global_config.to_str().unwrap()),
+        ("GIT_CONFIG_NOSYSTEM", "1"),
+    ]);
+
+    let output = Command::new(stand_in.program())
+        .arg("-C")
+        .arg(repository.root())
+        .args(["config", "user.name"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap().trim(),
+        "Fixture User"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn test_git_stand_in_on_a_child_search_path_records_the_child_git_process() {
     let (_dir, repository, commit) = committed_repository();
     let stand_in = GitStandIn::new();
