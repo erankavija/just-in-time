@@ -741,7 +741,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
-    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     /// let new = |title: &str| {
     ///     executor
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
@@ -803,7 +803,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
-    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     /// let new = |title: &str| {
     ///     executor
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
@@ -2914,7 +2914,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         dependent.dependencies = vec![dependency_id.clone()];
         let dependent_id = dependent.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependent);
-        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+        let executor = CommandExecutor::new(storage)
+            .with_layout(layout.clone())
+            .unwrap();
 
         assert!(executor
             .issues()
@@ -2930,6 +2932,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         CommandExecutor::new(recovered.clone())
             .with_layout(layout)
+            .unwrap()
             .issues()
             .delete_issue(&IssueIdPrefix::from(&dependency_id), true)
             .unwrap();
@@ -3976,7 +3979,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             dependent.dependencies.push(blocker_id.clone());
             let dependent_id = dependent.id.clone();
             crate::commands::test_helpers::seed_issue(&storage, dependent);
-            let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+            let executor = CommandExecutor::new(storage)
+                .with_layout(layout.clone())
+                .unwrap();
 
             assert!(executor
                 .issues()

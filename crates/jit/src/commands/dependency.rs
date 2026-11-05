@@ -822,7 +822,9 @@ mod captured_tests {
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source);
 
-        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+        let executor = CommandExecutor::new(storage)
+            .with_layout(layout.clone())
+            .unwrap();
         assert!(executor
             .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
@@ -834,7 +836,9 @@ mod captured_tests {
         assert_eq!(unchanged.dependencies, vec![dependency_id.clone()]);
         assert!(recovered.read_events().unwrap().is_empty());
 
-        let executor = CommandExecutor::new(recovered.clone()).with_layout(layout);
+        let executor = CommandExecutor::new(recovered.clone())
+            .with_layout(layout)
+            .unwrap();
         executor
             .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
@@ -879,7 +883,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source);
 
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .unwrap();
         let error = executor
             .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
@@ -916,7 +922,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source);
 
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
         let result = executor
             .graph()
             .remove_dependencies(&source_id, &[dependency_id.clone(), dependency_id.clone()])

@@ -1220,7 +1220,7 @@ impl<S: IssueStore> GateOps<'_, S> {
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
-    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     /// executor
     ///     .gates().define_gate(
     ///         &"tests".parse().unwrap(),
@@ -1938,7 +1938,9 @@ mod tests {
         seed_repo_file(&storage, ".jit/config.toml", "");
         let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+        let executor = CommandExecutor::new(storage)
+            .with_layout(layout.clone())
+            .unwrap();
 
         assert!(executor
             .gates()
@@ -1982,7 +1984,9 @@ mod tests {
         seed_issue(&storage, issue);
         let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+        let executor = CommandExecutor::new(storage)
+            .with_layout(layout.clone())
+            .unwrap();
 
         assert!(executor
             .gates()
@@ -2226,7 +2230,7 @@ mod tests {
         seed_repo_file(&storage, ".jit/config.toml", &config);
         seed_repo_file(&storage, ".jit/rules.toml", "");
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         executor
             .gates()

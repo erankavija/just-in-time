@@ -2139,7 +2139,9 @@ mod tests {
         storage.add_worktree_file("docs/guide.md", "![logo](./logo.png)\n");
         storage.add_worktree_file("docs/logo.png", "png bytes");
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .unwrap();
 
         let first = executor
             .documents()
@@ -2224,7 +2226,7 @@ mod tests {
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         let listed = executor.documents().list_document_references(&id).unwrap();
         let value = serde_json::to_value(&listed).unwrap();
@@ -2243,7 +2245,7 @@ mod tests {
         storage.add_worktree_file("docs/guide.md", "![logo](./logo.png)\n");
         storage.add_worktree_file("docs/logo.png", "png bytes");
         let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
+        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
         let listed = executor
             .documents()
@@ -2399,8 +2401,9 @@ mod tests {
         let issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
-        let executor =
-            CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(storage.repository_layout())
+            .unwrap();
 
         let error = executor
             .documents()
@@ -2421,8 +2424,9 @@ mod tests {
     fn test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling() -> Result<()>
     {
         let (temp, storage) = crate::test_utils::setup_test_repo()?;
-        let executor =
-            CommandExecutor::new(storage.clone()).with_layout(storage.configured_layout()?);
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(storage.configured_layout()?)
+            .unwrap();
         let issue_id = executor
             .issues()
             .create_issue(

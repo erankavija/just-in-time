@@ -2077,7 +2077,8 @@ mod tests {
             FailOnce::at(MutationPoint::BeforeCommitCheck),
         );
         let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap())
+            .unwrap();
 
         assert!(apply_package(&executor, &dogfood).is_err());
 
@@ -2092,7 +2093,8 @@ mod tests {
 
         let repaired = apply_package(
             &CommandExecutor::new(recovered.clone())
-                .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap()),
+                .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
+                .unwrap(),
             &dogfood,
         )
         .unwrap();
@@ -2177,7 +2179,8 @@ mod tests {
         fs::create_dir(&outside).unwrap();
         let storage = JsonFileStorage::new(repository.root().join("state"));
         let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(&outside, storage.root()).unwrap());
+            .with_layout(discover_repository_layout(&outside, storage.root()).unwrap())
+            .unwrap();
         executor
             .profiles()
             .initialize_fresh_repository(&outside, None)
@@ -2518,7 +2521,8 @@ mod tests {
         );
 
         let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap())
+            .unwrap();
         let package = shipped_package_in(temp.path(), "jit-default");
         let applied = apply_package(&executor, &package).unwrap();
         assert_eq!(
@@ -3146,6 +3150,7 @@ template = true
         let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
         CommandExecutor::new(bootstrap.clone())
             .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .unwrap()
             .profiles()
             .initialize_fresh_repository(temp.path(), None)
             .unwrap();
@@ -3157,7 +3162,8 @@ template = true
             publications.clone(),
         );
         let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap())
+            .unwrap();
 
         let applied = apply_selected_packages(
             &executor,
@@ -3204,9 +3210,9 @@ template = true
             temp.path().join(".jit"),
             publications.clone(),
         );
-        let executor = CommandExecutor::new(storage).with_layout(
-            discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap(),
-        );
+        let executor = CommandExecutor::new(storage)
+            .with_layout(discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap())
+            .unwrap();
 
         let reapplied = apply_selected_packages(
             &executor,
@@ -3231,6 +3237,7 @@ template = true
         let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
         CommandExecutor::new(bootstrap.clone())
             .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .unwrap()
             .profiles()
             .initialize_fresh_repository(temp.path(), None)
             .unwrap();
@@ -3243,7 +3250,8 @@ template = true
         );
         let selectors = [package_selector(&left), package_selector(&right)];
         let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap())
+            .unwrap();
 
         assert!(apply_selected_packages(&executor, &selectors).is_err());
 
@@ -3260,7 +3268,8 @@ template = true
 
         let retried = apply_selected_packages(
             &CommandExecutor::new(recovered.clone())
-                .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap()),
+                .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
+                .unwrap(),
             &selectors,
         )
         .unwrap();
@@ -3385,7 +3394,8 @@ template = true
             .replace("Published definition.", "Current registry definition.");
         fs::write(config_path, registry).unwrap();
         let reloaded = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap())
+            .unwrap();
 
         assert_eq!(
             reloaded

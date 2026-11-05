@@ -2462,7 +2462,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             fixture.executor.storage.root(),
             racer.clone(),
         ))
-        .with_layout(layout);
+        .with_layout(layout)
+        .unwrap();
 
         let forced = racing
             .gates()

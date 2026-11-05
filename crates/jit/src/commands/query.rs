@@ -250,7 +250,7 @@ impl<S: IssueStore> QueryOps<'_, S> {
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
-    /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
     /// let done = executor
     ///     .issues().create_issue("Shipped".into(), String::new(), Priority::Normal,
     ///         vec![], vec![], None, None, false)

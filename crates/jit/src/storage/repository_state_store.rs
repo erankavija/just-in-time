@@ -180,6 +180,26 @@ impl ActiveLayoutTracker {
         }
     }
 
+    pub(crate) fn check_binding(
+        &self,
+        layout: &RepositoryLayout,
+    ) -> Result<(), RepositoryStateStoreError> {
+        let slot = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((active, _)) = slot.as_ref() {
+            if active.worktree_root() != layout.worktree_root()
+                || active.data_root() != layout.data_root()
+            {
+                return Err(RepositoryStateStoreError::RetryableConflict {
+                    path: layout.worktree_root().display().to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Track `published` as the layout for the roots it publishes.
     ///
     /// An absent data root is bound to its parent plus the name it will take,
@@ -577,6 +597,7 @@ impl RepositoryStateStore for JsonFileStorage {
         // same canonical layout.
         self.active_mutation_layout().enter(&layout)?;
         let reentry = LayoutReentry(self.active_mutation_layout());
+        self.session_layout(layout.clone())?;
         // Mark a repository mutation session as held on this thread so a later
         // attempt to enter claim coordination (reverse order) is rejected.
         let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
@@ -618,7 +639,7 @@ impl RepositoryStateStore for JsonFileStorage {
             .root(RepositoryRootClass::Data)
             .map(|_| self.events_lock_spec());
 
-        self.configure_repository_layout(&layout);
+        self.configure_repository_layout(&layout)?;
         Ok(Box::new(JsonMutationSession {
             layout,
             storage: self.clone(),
@@ -938,7 +959,7 @@ impl JsonMutationSession {
         self.storage
             .active_mutation_layout()
             .rebind_published_root(&refreshed);
-        self.storage.configure_repository_layout(&refreshed);
+        self.storage.configure_repository_layout(&refreshed)?;
         match carries_worktree {
             // Through the published root's capabilities: the record the rename
             // carried in is removed from the scratch directory it now has.
