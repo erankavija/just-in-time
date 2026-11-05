@@ -599,6 +599,7 @@ fn test_git_guards_act_on_the_repository_they_serve_rather_than_the_working_dire
 
     let diverged = JitCli::initialised().unwrap();
     diverged.init_git().unwrap().commit("base").unwrap();
+    let base = diverged.git(["rev-parse", "HEAD"]).unwrap();
     let ahead = diverged
         .git(["commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead"])
         .unwrap();
@@ -644,11 +645,104 @@ fn test_git_guards_act_on_the_repository_they_serve_rather_than_the_working_dire
         .command_with_env(["validate", "--branch-drift"], data_root(&up_to_date))
         .assert()
         .success();
-    outside_git
-        .command_with_env(["validate", "--branch-drift"], data_root(&diverged))
+    let expected = format!(
+        "Branch has diverged from origin/main\nMerge base: {}\nMain commit: {}\nFix: git rebase origin/main",
+        base.trim(),
+        ahead,
+    );
+    assert_branch_drift_failure(
+        up_to_date.command_with_env(["validate", "--branch-drift"], data_root(&diverged)),
+        &expected,
+    );
+    assert_branch_drift_failure(
+        outside_git.command_with_env(["validate", "--branch-drift"], data_root(&diverged)),
+        &expected,
+    );
+}
+
+fn assert_branch_drift_failure(mut command: std::process::Command, expected: &str) {
+    let plain = command.output().unwrap();
+    assert_eq!(plain.status.code(), Some(4), "{plain:?}");
+    assert!(
+        String::from_utf8_lossy(&plain.stderr).contains(expected),
+        "expected {expected:?}: {plain:?}"
+    );
+
+    let json = command.arg("--json").output().unwrap();
+    assert_eq!(json.status.code(), Some(4), "{json:?}");
+    assert!(json.stderr.is_empty(), "{json:?}");
+    let response: Value = serde_json::from_slice(&json.stdout).unwrap();
+    assert_eq!(response["error"]["code"], "VALIDATION_FAILED");
+    let checks = response["error"]["details"]["validations"]
+        .as_array()
+        .unwrap();
+    let check = checks
+        .iter()
+        .find(|check| check["validation"] == "branch_drift")
+        .unwrap();
+    assert_eq!(check["valid"], false);
+    assert!(
+        check["message"].as_str().unwrap().contains(expected),
+        "expected {expected:?}: {response}"
+    );
+}
+
+#[test]
+fn test_validate_branch_drift_requires_a_git_checkout() {
+    let cli = JitCli::initialised().unwrap();
+
+    assert_branch_drift_failure(
+        cli.command(["validate", "--branch-drift"]),
+        "branch drift validation requires a git repository",
+    );
+}
+
+#[test]
+fn test_validate_branch_drift_names_unresolved_origin_main() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("base").unwrap();
+
+    assert_branch_drift_failure(
+        cli.command(["validate", "--branch-drift"]),
+        "origin/main does not resolve to a commit",
+    );
+}
+
+#[test]
+fn test_validate_branch_drift_names_unrelated_origin_main_history() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("base").unwrap();
+    let unrelated = cli
+        .git(["commit-tree", "HEAD^{tree}", "-m", "unrelated"])
+        .unwrap();
+    seed_origin_main(&cli, unrelated.trim());
+
+    assert_branch_drift_failure(
+        cli.command(["validate", "--branch-drift"]),
+        "HEAD shares no history with origin/main",
+    );
+}
+
+#[test]
+fn test_validate_branch_drift_uses_the_checkout_over_an_external_store() {
+    let (primary, linked, store) = JitCli::linked_checkouts_over_external_store().unwrap();
+    let base = primary.git(["rev-parse", "HEAD"]).unwrap();
+    primary.commit("Advance main").unwrap();
+    let ahead = seed_origin_main(&primary, "HEAD");
+
+    primary
+        .command_with_env(["validate", "--branch-drift"], [("JIT_DATA_DIR", &store)])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains(ahead));
+        .success();
+    let expected = format!(
+        "Branch has diverged from origin/main\nMerge base: {}\nMain commit: {}\nFix: git rebase origin/main",
+        base.trim(),
+        ahead,
+    );
+    assert_branch_drift_failure(
+        linked.command_with_env(["validate", "--branch-drift"], [("JIT_DATA_DIR", &store)]),
+        &expected,
+    );
 }
 
 #[test]

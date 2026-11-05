@@ -1178,6 +1178,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
+        use crate::storage::git::GitObjectType;
         use std::path::PathBuf;
 
         let layout = self.exec.require_layout()?;
@@ -1244,7 +1245,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                 missing_worktree_assets
                     .into_iter()
                     .zip(checkout.object_types(names)?)
-                    .filter_map(|(path, object_type)| object_type.map(|_| path))
+                    .filter_map(|(path, object_type)| {
+                        matches!(object_type, Some(GitObjectType::Blob | GitObjectType::Tree))
+                            .then_some(path)
+                    })
                     .collect::<std::collections::BTreeSet<_>>()
             }
             _ => std::collections::BTreeSet::new(),

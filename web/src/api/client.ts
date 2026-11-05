@@ -18,11 +18,6 @@ export const apiClient = {
     return response.data;
   },
 
-  async listIssues(): Promise<Issue[]> {
-    const response = await api.get('/issues');
-    return response.data;
-  },
-
   async getIssue(id: string): Promise<Issue> {
     const response = await api.get(`/issues/${id}`);
     return response.data;

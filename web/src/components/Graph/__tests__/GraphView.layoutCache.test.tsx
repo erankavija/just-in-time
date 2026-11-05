@@ -17,14 +17,14 @@ import type { GraphData, GraphNode } from '../../../types/models';
  * in-place data patch does not.
  */
 
-const { setNodes } = vi.hoisted(() => ({ setNodes: vi.fn() }));
+const { setNodes, setEdges } = vi.hoisted(() => ({ setNodes: vi.fn(), setEdges: vi.fn() }));
 
 vi.mock('reactflow', () => ({
   default: () => null,
   Controls: () => null,
   Background: () => null,
   useNodesState: () => [[], setNodes, vi.fn()],
-  useEdgesState: () => [[], vi.fn(), vi.fn()],
+  useEdgesState: () => [[], setEdges, vi.fn()],
   MarkerType: { ArrowClosed: 'arrowclosed' },
   Position: { Left: 'left', Right: 'right' },
 }));
@@ -60,6 +60,12 @@ const dagreLayout = vi.mocked(dagre.layout);
 // Stable identity across rerenders: a fresh array would reset the fingerprint
 // through the view-settings effect and mask what these tests assert.
 const NO_LABEL_FILTERS: string[] = [];
+
+function pendingGraph() {
+  let resolve!: (graph: GraphData) => void;
+  const promise = new Promise<GraphData>(complete => { resolve = complete; });
+  return { promise, resolve };
+}
 
 const node = (overrides: Partial<GraphNode> & Pick<GraphNode, 'id'>): GraphNode => ({
   short_id: overrides.id,
@@ -141,6 +147,43 @@ describe('GraphView stable-layout cache', () => {
       strategic_types: ['epic'],
       icons: {},
     });
+  });
+
+  it('test_graph_view_reports_full_nodes_with_an_active_label_filter', async () => {
+    const onGraphNodes = vi.fn();
+    render(<GraphView
+      layoutAlgorithm="dagre"
+      labelFilters={['team:visible']}
+      onGraphNodes={onGraphNodes}
+    />);
+
+    await waitFor(() => expect(onGraphNodes).toHaveBeenCalledWith(baseGraph().nodes));
+  });
+
+  it('test_graph_view_reports_only_the_latest_version_graph', async () => {
+    const oldVersion = pendingGraph();
+    const newVersion = pendingGraph();
+    getGraph.mockReset().mockReturnValueOnce(oldVersion.promise).mockReturnValueOnce(newVersion.promise);
+    getHierarchy.mockImplementation(() => new Promise(() => {}));
+    const onGraphNodes = vi.fn();
+    const view = render(<GraphView
+      layoutAlgorithm="dagre"
+      labelFilters={NO_LABEL_FILTERS}
+      version={1}
+      onGraphNodes={onGraphNodes}
+    />);
+    view.rerender(<GraphView
+      layoutAlgorithm="dagre"
+      labelFilters={NO_LABEL_FILTERS}
+      version={2}
+      onGraphNodes={onGraphNodes}
+    />);
+
+    const latest = { count: 1, nodes: [node({ id: 'latest' })], edges: [] };
+    await act(async () => newVersion.resolve(latest));
+    expect(onGraphNodes).toHaveBeenCalledWith(latest.nodes);
+    await act(async () => oldVersion.resolve(baseGraph()));
+    expect(onGraphNodes).toHaveBeenCalledTimes(1);
   });
 
   it('re-runs layout when a served cluster changes but nodes and edges do not', async () => {

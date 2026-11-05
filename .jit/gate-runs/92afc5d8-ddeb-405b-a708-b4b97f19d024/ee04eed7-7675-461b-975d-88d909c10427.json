@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-92afc5d8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "367506cae34e9dd0733ee1b5b8510fc1e6a1f4ae",
+  "completed_at": "2026-11-05T04:05:34.351377054Z",
+  "duration_ms": 152594,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed init change uses invocation-owned Git classification, removes the direct Git process, and adds the required focused regression test.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "92afc5d8-ddeb-405b-a708-b4b97f19d024",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ee04eed7-7675-461b-975d-88d909c10427",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T04:03:01.756830983Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:92afc5d8` — 5eb41778cf8cf7572be883f8d394a65755a456a5\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02 and REQ-04 (issue description); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-05T04:01:08Z; its run commit contains 5eb41778\nTruncation recovery: Re-read the commit patch, affected init regions, WorktreePaths contract, item sources, and parent criteria in bounded calls.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed init change uses invocation-owned Git classification, removes the direct Git process, and adds the required focused regression test.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

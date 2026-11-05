@@ -664,38 +664,43 @@ fn test_check_document_links_without_git_counts_only_working_tree_assets() {
 }
 
 #[test]
-fn test_check_document_links_reports_absent_head_submodule_asset_missing() {
-    let cli = JitCli::uninitialised().unwrap();
-    cli.init_git().unwrap().run(["init"]).unwrap();
-    let issue_id = cli.create_issue(["--title", "Submodule asset"]).unwrap();
-    let doc_path = "docs/submodule.md";
-    let asset_path = "docs/assets/module";
-    fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
-    fs::write(
-        cli.root().join(doc_path),
-        "# Submodule\n\n![Module](assets/module)\n",
-    )
-    .unwrap();
-    fs::write(cli.root().join(asset_path), b"placeholder").unwrap();
-    cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
-    fs::remove_file(cli.root().join(asset_path)).unwrap();
-    cli.git([
-        "update-index",
-        "--add",
-        "--cacheinfo",
-        "160000,1111111111111111111111111111111111111111,docs/assets/module",
-    ])
-    .unwrap();
-    cli.git(["commit", "-q", "-m", "record absent submodule gitlink"])
+fn test_check_document_links_reports_head_gitlink_missing_with_or_without_target_object() {
+    [false, true].into_iter().for_each(|target_available| {
+        let cli = JitCli::uninitialised().unwrap();
+        cli.init_git().unwrap().run(["init"]).unwrap();
+        let issue_id = cli.create_issue(["--title", "Submodule asset"]).unwrap();
+        let doc_path = "docs/submodule.md";
+        let asset_path = "docs/assets/module";
+        fs::create_dir_all(cli.root().join("docs/assets")).unwrap();
+        fs::write(
+            cli.root().join(doc_path),
+            "# Submodule\n\n![Module](assets/module)\n",
+        )
         .unwrap();
-    let report = check_links_report(&cli);
-    assert!(report["errors"].is_array(), "{report}");
-    assert!(
-        errors_for_document(&report, doc_path)
-            .iter()
-            .any(|error| error["type"] == "missing_asset" && error["resolved"] == asset_path),
-        "an absent submodule object must be missing: {report}"
-    );
+        fs::write(cli.root().join(asset_path), b"placeholder").unwrap();
+        cli.commit("record original asset").unwrap();
+        let available_target = cli.git(["rev-parse", "HEAD"]).unwrap();
+        cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
+        fs::remove_file(cli.root().join(asset_path)).unwrap();
+        let target = if target_available {
+            available_target.trim()
+        } else {
+            "1111111111111111111111111111111111111111"
+        };
+        let cacheinfo = format!("160000,{target},{asset_path}");
+        cli.git(["update-index", "--add", "--cacheinfo", &cacheinfo])
+            .unwrap();
+        cli.git(["commit", "-q", "-m", "record submodule gitlink"])
+            .unwrap();
+        let report = check_links_report(&cli);
+        assert!(report["errors"].is_array(), "{report}");
+        assert!(
+            errors_for_document(&report, doc_path)
+                .iter()
+                .any(|error| error["type"] == "missing_asset" && error["resolved"] == asset_path),
+            "gitlink target_available={target_available} must be missing: {report}"
+        );
+    });
 }
 
 #[test]
