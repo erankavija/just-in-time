@@ -7,6 +7,7 @@
   ],
   "description": "Make `jit worktree info` take its branch from the git module's head lookup instead of its own `git rev-parse`.\n\n## Background\n\n- `execute_worktree_info` (`crates/jit/src/commands/worktree.rs:169-189`) calls the file's own `get_current_branch` (`crates/jit/src/commands/worktree.rs:46-63`), which runs `git rev-parse --abbrev-ref HEAD` in the worktree root. When git fails it reports \"Failed to get current git branch. Are you in a git repository?\" followed by git's stderr, which the CLI reports as `WORKTREE_INFO_ERROR` with exit 1.\n- Through the module, a missing checkout starts no process and an unborn branch is `head() == Ok(None)`, so neither case has stderr to quote.\n- The branch feeds the worktree identity load and the reported entry.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:195` onwards; unit test `crates/jit/src/commands/worktree.rs:489`.\n- Kept as one change for a build reason: the file's `get_current_branch` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit worktree info` takes its branch from the head lookup of the paths' git checkout, rendered as the branch name or `HEAD` when detached. The file's `get_current_branch` no longer exists.\n- [hard] REQ-02: Without a git checkout the command fails with \"jit worktree info requires a git repository\", and on an unborn branch with \"the current branch has no commits yet; make a first commit\"; both report `WORKTREE_INFO_ERROR` with exit 1. CLI tests assert both, and they fail on today's message.\n- [hard] REQ-03: The existing worktree info tests pass unchanged.\n\n## Notes\n\n- Behaviour change: the two failure messages name the requirement and no longer quote git's stderr; the code and exit status are unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T00:39:42.448608679Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:f4d9502a/REQ-05"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Worktree info reads its branch through the module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-05T00:39:42.448608679Z"
 }
