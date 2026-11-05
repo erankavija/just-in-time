@@ -346,10 +346,11 @@
           "short_id": "92afc5d8",
           "title": "Init reads git classification from the invocation's layout",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "prepared",
-          "worker": "agent:f4d9502a-lead"
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "5363b6b99a931efd7a6282c8207427533240b851"
         },
         {
           "id": "9ecde705-8aa9-4ceb-a352-c08fc285af12",
@@ -850,7 +851,8 @@
     "Steward-approved factual correction47d62472: old validation already runs in layout.data_root. Actual baseline CLI filter ran3PASS4FAIL; literal selected-data-dir scenario passes and remains regressioncoverage. Missingcheckout/base/unrelatedmessages and externalstoreprovide genuineRED. Only obsolete REQ04 failure premise/background corrected; authority/messages/status4 and footprint unchanged.",
     "Steward approved c140 second file git.rs solely fulfilled HEAD convergence comment deletion; primitive executable/test bytes must remain exact, no extra fullgate solelyprose.",
     "c140 snapshot migration claimed from actualReady after3fDone; stewardapprovedtwo-file scope includes only fulfilled HEAD convergence comment in git.rs. a273 proposal fullCargo/review running isolated; Gitfloorpublication remainsheld.",
-    "47 rework1 consolidates literal selected-data-dir case into existing property owner without newfixture duplication. c140 stewardapproved deletion of both fulfilledHEAD andorigin convergence comments, exactgit.rs executable/testbytes preserved. 9ec landingheld for available-target gitlink consumerclassification; rawtwo-versionprobe preserved in lead scratch."
+    "47 rework1 consolidates literal selected-data-dir case into existing property owner without newfixture duplication. c140 stewardapproved deletion of both fulfilledHEAD andorigin convergence comments, exactgit.rs executable/testbytes preserved. 9ec landingheld for available-target gitlink consumerclassification; rawtwo-versionprobe preserved in lead scratch.",
+    "92afc5d8 Done and lease released after actual stable merged Cargo; next source owner notified directly."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1329,10 +1331,11 @@
       "verdict": "PASS",
       "reviewed_source": "367506cae34e9dd0733ee1b5b8510fc1e6a1f4ae",
       "gates": {
-        "cargo-ci": "a914c683-1b44-4374-bf54-c62308c817db",
+        "cargo-ci": "00a11171-3d1d-474f-bca6-063b8420d5c6",
         "code-review": "ee04eed7-7675-461b-975d-88d909c10427"
       },
-      "criteria": "All3criteria met: existingclaim reads supplied classification and nesteddata-root containment; private processhelper removed; realGit/nonGitclassified regression actuallyRED thenGREEN; unchanged25initCLItests pass. No linked docs, deferrals, stale references or own-file drift afterrefresh. Mandatory mergedCargo pending."
+      "criteria": "All3criteria met: existingclaim reads supplied classification and nesteddata-root containment; private processhelper removed; realGit/nonGitclassified regression actuallyRED thenGREEN; unchanged25initCLItests pass. No linked docs, deferrals, stale references or own-file drift afterrefresh. Mandatory mergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 00a11171-3d1d-474f-bca6-063b8420d5c6 on 5363b6b99a931efd7a6282c8207427533240b851."
     }
   },
   "source_queue": [

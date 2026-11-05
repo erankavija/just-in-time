@@ -8,6 +8,7 @@
   ],
   "description": "Resolve layout facts once per distinct checkout context and share those invocation-owned observations with every consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned Git module performs at most one layout probe per distinct queried checkout context. Ordinary checkout reads use at most one Git process, external-store startup at most two layout probes, and external listing or lease validation across N queried checkout contexts at most N+1, including the failed data-root probe. Known aliases and repeated consumers reuse observations; lease and issue counts do not multiply probes.\n- [hard] REQ-02: Storage, executor, recovery, server, init and hooks share supplied context. Missing context never triggers hidden discovery; data-root selection, external-store coordination and moved or unvisited checkout identities remain correct.\n- [hard] REQ-03: The existing counting suite retains ordinary primary/linked issue-read assertions and proves the external-context bounds. Mechanism tests own alias, absent/error-result, clone and concurrency behavior; existing external-store tests retain behavioral ownership.\n\n## Notes\n\nDEC-27 deliberately reconciles the former universal one-process promise while retaining the prohibition on duplicate detection. No direct Git metadata parser, new authority flag or cross-invocation cache is introduced.\n",
   "documents": [],
+  "first_ready_at": "2026-11-05T04:10:24.698088620Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -24,7 +25,7 @@
     "per:@/charter/D-21"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Layout facts are detected once and reach every consumer",
-  "updated_at": "2026-11-05T01:20:52.988265128Z"
+  "updated_at": "2026-11-05T04:10:24.698088620Z"
 }
