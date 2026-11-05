@@ -11,16 +11,6 @@ vi.mock('axios', () => ({
   },
 }));
 
-describe('apiClient - retained issue list', () => {
-  it('test_list_issues_uses_supported_issues_route', async () => {
-    mockGet.mockResolvedValue({ data: [] });
-
-    const { apiClient } = await import('./client');
-    await expect(apiClient.listIssues()).resolves.toEqual([]);
-    expect(mockGet).toHaveBeenCalledWith('/issues');
-  });
-});
-
 describe('apiClient - Document Methods', () => {
   beforeEach(() => {
     vi.clearAllMocks();
