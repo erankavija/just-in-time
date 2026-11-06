@@ -1003,14 +1003,6 @@ fn parse_head_branch(reference: &str) -> Option<&str> {
 /// argument list well inside the platform limit.
 const LS_TREE_PATHS_PER_PROCESS: usize = 1024;
 
-/// Bytes read at one canonical historical commit.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PinnedArtifactRead {
-    version: ArtifactVersion,
-    blob_oid: String,
-    bytes: Vec<u8>,
-}
-
 /// No-follow classification of one target at a resolved historical commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PinnedTargetRead {
@@ -1063,24 +1055,6 @@ impl PinnedTargetRead {
     }
 }
 
-impl PinnedArtifactRead {
-    /// Canonical pinned version associated with the bytes.
-    pub fn version(&self) -> &ArtifactVersion {
-        &self.version
-    }
-
-    /// True Git blob object id of the read content, so capture identity binds to
-    /// Git's own object identity rather than a synthesized surrogate.
-    pub fn blob_oid(&self) -> &str {
-        &self.blob_oid
-    }
-
-    /// Byte-faithful blob content read from Git history.
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
 impl GitCheckout {
     /// Resolve the original expression, then peel its canonical object to a commit.
     /// Uses one metadata-only process for full SHA-1/SHA-256, abbreviated and symbolic inputs.
@@ -1090,49 +1064,6 @@ impl GitCheckout {
         let resolution = process.resolve_commit(revision)?;
         process.finish()?;
         resolution.into_version(revision)
-    }
-
-    /// Resolve `revision` and read `path` from that exact commit.
-    ///
-    /// The method never consults the working tree. Resolution failures and
-    /// commit-tree/blob failures are returned to the caller as blockers.
-    pub fn read_pinned_path(
-        &self,
-        revision: &str,
-        path: &str,
-    ) -> Result<PinnedArtifactRead, GitError> {
-        validate_path(path)?;
-        let version = self.resolve_commit(revision)?;
-        let object = format!("{}:{path}", version.as_str());
-        let oid_output = self.git.run(
-            &self.worktree_root,
-            ["rev-parse", "--verify", object.as_str()],
-        )?;
-        if !oid_output.status.success() {
-            return Err(GitError::PinnedReadFailed {
-                revision: revision.to_string(),
-                path: path.to_string(),
-                stderr: stderr(&oid_output),
-            });
-        }
-        let blob_oid = String::from_utf8_lossy(&oid_output.stdout)
-            .trim()
-            .to_string();
-        let output = self
-            .git
-            .run(&self.worktree_root, ["cat-file", "blob", object.as_str()])?;
-        if !output.status.success() {
-            return Err(GitError::PinnedReadFailed {
-                revision: revision.to_string(),
-                path: path.to_string(),
-                stderr: stderr(&output),
-            });
-        }
-        Ok(PinnedArtifactRead {
-            version,
-            blob_oid,
-            bytes: output.stdout,
-        })
     }
 
     /// Resolve and inspect a set of pinned targets with shared Git processes.

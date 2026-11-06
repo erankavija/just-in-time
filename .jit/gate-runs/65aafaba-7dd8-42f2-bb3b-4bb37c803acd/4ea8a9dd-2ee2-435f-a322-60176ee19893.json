@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e653b29d91e5c652907d5832c24c4dd44c6fe60",
+  "completed_at": "2026-11-06T04:26:40.265925488Z",
+  "duration_ms": 254193,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable archive-planner refactor meets the scoped requirements and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "65aafaba-7dd8-42f2-bb3b-4bb37c803acd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4ea8a9dd-2ee2-435f-a322-60176ee19893",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T04:22:26.072656188Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1eff887b22b57609186395fb6b11af973f7e1834 (`jit:65aafaba`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/b697a3f7/requirement/REQ-06 and REQ-21 (issue Markdown); @/charter/D-20, D-21, D-22 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, essential-code-prose, orthogonal-tests, bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T04:20:37Z); run commit 5e653b29d91e5c652907d5832c24c4dd44c6fe60 covers 1eff887b22b57609186395fb6b11af973f7e1834\nTruncation recovery: narrowed archive, storage, and test reads after broad historical-artifact output truncated\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable archive-planner refactor meets the scoped requirements and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -9,12 +9,26 @@
   ],
   "description": "Delete the temporary `GitRevisionResolver` bridge and the single-path pinned read that only it and tests use.\n\n## Background\n\n- `crates/jit/src/storage/git_revision.rs` holds only `GitRevisionResolver`, a bridge delegating to `GitCheckout`, and the `GitRevisionError` name, re-exported at `crates/jit/src/storage/mod.rs:58`. Storage, the archive planner and the behaviour suite use the module API directly.\n- `GitCheckout::read_pinned_path` has no production caller once the archive planner reads through the object reader. Its return type `PinnedArtifactRead` (`crates/jit/src/storage/git_revision.rs:53`, re-exported at `crates/jit/src/storage/mod.rs:59`) has no other use. The module suite calls it in `test_git_revision_resolver_canonicalizes_symbolic_abbreviated_and_full_revisions` and `test_git_revision_resolver_never_falls_back_on_invalid_revision_or_failed_blob_read` (moved from `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:64` and `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:82`).\n\n## Success Criteria\n\n- [hard] REQ-01: `storage/git_revision.rs`, `GitRevisionResolver`, the `GitRevisionError` name and their re-exports no longer exist.\n- [hard] REQ-02: `GitCheckout::read_pinned_path` and its return type `PinnedArtifactRead` no longer exist, nor does the type's re-export. The two suite cases that call it keep their `resolve_commit` assertions and drop their pinned-path reads, whose unresolvable-revision and missing-path cases the object-reader cases own.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T04:39:49.072579391Z",
   "first_ready_at": "2026-11-06T03:51:07.187492475Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "04307b76-da0e-4663-aa6b-81e4caceec90",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:39:32.188847915Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1ca6ea0e-0cde-4807-85b1-42e77aba0f8b",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:33:03.316063443Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e6ec58f3-94d4-4886-85ef-fae12decaeba",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:f4d9502a/REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the revision resolver bridge",
-  "updated_at": "2026-11-06T04:03:07.853379963Z"
+  "updated_at": "2026-11-06T04:39:49.072579391Z"
 }
