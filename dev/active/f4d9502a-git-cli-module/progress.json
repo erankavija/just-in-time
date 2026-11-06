@@ -421,9 +421,9 @@
           "short_id": "1acfa592",
           "title": "Document show reads through storage at the version it names",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "landed_71dae3d3f"
         },
         {
           "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
