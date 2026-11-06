@@ -1889,7 +1889,7 @@ pub enum DocCommands {
 
     /// Check document links and assets for validity
     CheckLinks {
-        /// Scope of validation (all or issue:ID)
+        /// Scope of validation: all, issue:ID, or label:namespace:value
         #[arg(long, default_value = "all")]
         scope: String,
     },

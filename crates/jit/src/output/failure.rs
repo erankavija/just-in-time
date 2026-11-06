@@ -231,12 +231,16 @@ const MISSING_PROFILE_SUGGESTION: &str = "Place the package it depends on beside
 const RIPGREP_INSTALL_SUGGESTION: &str =
     "Install ripgrep from https://github.com/BurntSushi/ripgrep";
 
+fn invalid_id_prefix(
+    error: &anyhow::Error,
+) -> Option<&crate::domain::identity::InvalidIdPrefixError> {
+    error.chain().find_map(|cause| cause.downcast_ref())
+}
+
 /// The envelope of an ambiguous or too-short id prefix, carrying the offending
 /// prefix (and the candidates it matches) in `details`.
 pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
-    if let Some(prefix_error) =
-        error.downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
-    {
+    if let Some(prefix_error) = invalid_id_prefix(error) {
         return Some(
             JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
                 .with_details(serde_json::json!({ "prefix": prefix_error.prefix() })),
@@ -588,9 +592,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     if error
         .downcast_ref::<crate::storage::AmbiguousIdError>()
         .is_some()
-        || error
-            .downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
-            .is_some()
+        || invalid_id_prefix(error).is_some()
     {
         return if error
             .downcast_ref::<crate::storage::AmbiguousIdError>()
@@ -625,7 +627,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
             .downcast_ref::<crate::domain::vocabulary::UnknownToken>()
             .is_some()
         || error
-            .downcast_ref::<crate::document::DocumentScopeParseError>()
+            .downcast_ref::<crate::domain::issue_scope::IssueScopeParseError>()
             .is_some()
         || error.downcast_ref::<std::string::FromUtf8Error>().is_some()
         || error.downcast_ref::<std::str::Utf8Error>().is_some()
@@ -1598,12 +1600,22 @@ mod derived_guidance_tests {
 
     #[test]
     fn test_classify_invalid_id_prefix_names_the_prefix() {
-        let error: anyhow::Error = InvalidIdPrefixError::new("ab").into();
+        use crate::domain::identity::IssueIdPrefix;
+        use crate::domain::issue_scope::IssueScope;
 
-        let json = classify(&error);
+        let errors: [anyhow::Error; 2] = [
+            InvalidIdPrefixError::new("ab").into(),
+            "issue:ab"
+                .parse::<IssueScope<IssueIdPrefix>>()
+                .unwrap_err()
+                .into(),
+        ];
+        for error in errors {
+            let json = classify(&error.context("invalid selection"));
 
-        assert_eq!(json.error.code, ErrorCode::InvalidIdPrefix);
-        assert_eq!(details_of(&json)["prefix"], "ab");
+            assert_eq!(json.error.code, ErrorCode::InvalidIdPrefix);
+            assert_eq!(details_of(&json)["prefix"], "ab");
+        }
     }
 
     fn batch(rejected: Vec<(&str, anyhow::Error)>) -> anyhow::Error {

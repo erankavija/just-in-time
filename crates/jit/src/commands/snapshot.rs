@@ -3,13 +3,14 @@
 use crate::commands::{ArchiveOps, SessionStep, SnapshotExportResult};
 use crate::document::{AdapterRegistry, AssetScanner};
 use crate::domain::identity::IssueId;
+use crate::domain::issue_scope::{select_issues, IssueScope};
 use crate::domain::{DocumentReference, Issue, State};
 use crate::repository_state::{
     CaptureBudget, CaptureError, CaptureSpec, RepositoryImage, VirtualPath,
 };
 use crate::snapshot::{
     compute_sha256, AssetSnapshot, DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo,
-    SnapshotFormat, SnapshotManifest, SnapshotScope, SourceInfo, SourceMode, VerificationInfo,
+    SnapshotFormat, SnapshotManifest, SourceInfo, SourceMode, VerificationInfo,
 };
 use crate::storage::git::{GitCheckout, GitObjectReader};
 use crate::storage::{IssueStore, RepositoryStateStore};
@@ -69,10 +70,10 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
 
 /// The issue ids whose records `scope` reads: its one issue, or every issue
 /// the captured listing names.
-fn scope_issue_ids(image: &RepositoryImage, scope: &SnapshotScope) -> Result<Vec<IssueId>> {
+fn scope_issue_ids(image: &RepositoryImage, scope: &IssueScope<IssueId>) -> Result<Vec<IssueId>> {
     match scope {
-        SnapshotScope::Issue(id) => Ok(vec![id.clone()]),
-        SnapshotScope::All | SnapshotScope::Label { .. } => {
+        IssueScope::Issue(id) => Ok(vec![id.clone()]),
+        IssueScope::All | IssueScope::Label { .. } => {
             Ok(crate::repository_state::captured_issue_ids(image)?)
         }
     }
@@ -105,7 +106,7 @@ fn declaration_paths(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
 /// `None` is a retryable conflict.
 fn capture_snapshot_image(
     session: &mut dyn crate::storage::RepositoryMutationSession,
-    scope: &SnapshotScope,
+    scope: &IssueScope<IssueId>,
 ) -> Result<Option<RepositoryImage>> {
     let directories = VirtualPath::DECLARATION_DIRECTORIES;
     // The issue listing and one listing per declaration directory.
@@ -122,10 +123,8 @@ fn capture_snapshot_image(
     )?;
     spec.discover_listings(directories)?;
     match scope {
-        SnapshotScope::Issue(id) => spec.discover_paths([VirtualPath::issue_record(id)])?,
-        SnapshotScope::All | SnapshotScope::Label { .. } => {
-            spec.discover_listing(VirtualPath::ISSUES)?
-        }
+        IssueScope::Issue(id) => spec.discover_paths([VirtualPath::issue_record(id)])?,
+        IssueScope::All | IssueScope::Label { .. } => spec.discover_listing(VirtualPath::ISSUES)?,
     }
     super::capture_discovering(session, spec, |image, spec| {
         Ok(spec.discover_paths(
@@ -136,21 +135,6 @@ fn capture_snapshot_image(
             ),
         )?)
     })
-}
-
-/// Select the captured `issues` `scope` exports.
-fn enumerate_issues(issues: Vec<Issue>, scope: &SnapshotScope) -> Vec<Issue> {
-    match scope {
-        SnapshotScope::All => issues,
-        SnapshotScope::Issue(id) => issues.into_iter().filter(|issue| &issue.id == id).collect(),
-        SnapshotScope::Label { namespace, value } => {
-            let target_label = format!("{}:{}", namespace, value);
-            issues
-                .into_iter()
-                .filter(|issue| issue.labels.contains(&target_label))
-                .collect()
-        }
-    }
 }
 
 /// Write the stored bytes of each issue record in `issues` and of each
@@ -360,7 +344,7 @@ impl SnapshotExporter {
         issues: &[Issue],
         docs: &[DocumentSnapshot],
         mode: &SourceMode,
-        scope: &SnapshotScope,
+        scope: &IssueScope<IssueId>,
     ) -> Result<SnapshotManifest> {
         // Get repository info
         let repo_info = self.get_repo_info(mode)?;
@@ -537,11 +521,11 @@ This is a read-only export. Future versions may support:
     fn assemble(
         &self,
         image: &RepositoryImage,
-        scope: &SnapshotScope,
+        scope: &IssueScope<IssueId>,
         mode: &SourceMode,
     ) -> Result<(tempfile::TempDir, SnapshotManifest, Vec<String>)> {
-        let issues = enumerate_issues(
-            super::captured_issues(image, &scope_issue_ids(image, scope)?)?,
+        let issues = select_issues(
+            &super::captured_issues(image, &scope_issue_ids(image, scope)?)?,
             scope,
         );
         if issues.is_empty() {
@@ -719,7 +703,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     pub fn export_snapshot(
         &self,
         invocation_dir: &Path,
-        scope: &SnapshotScope,
+        scope: &IssueScope<IssueId>,
         mode: &SourceMode,
         format: &SnapshotFormat,
         out_path: Option<&Path>,
@@ -841,73 +825,23 @@ mod tests {
         SnapshotExporter::new(None, PathBuf::from("."), chrono::Utc::now())
     }
 
-    fn labelled_issue(title: &str, labels: &[&str]) -> Issue {
-        let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
-        issue.labels = labels.iter().map(|label| label.to_string()).collect();
-        issue
-    }
-
-    fn label_scope(namespace: &str, value: &str) -> SnapshotScope {
-        SnapshotScope::Label {
-            namespace: namespace.to_string(),
-            value: value.to_string(),
+    #[test]
+    fn test_generate_manifest_records_display_of_each_scope_form() {
+        let exporter = exporter();
+        let scopes = [
+            IssueScope::All,
+            IssueScope::Issue(crate::test_utils::issue_id(1)),
+            IssueScope::Label {
+                namespace: "team".into(),
+                value: "auth:login".into(),
+            },
+        ];
+        for scope in scopes {
+            let manifest = exporter
+                .generate_manifest(&[], &[], &SourceMode::WorkingTree, &scope)
+                .unwrap();
+            assert_eq!(manifest.scope, scope.to_string());
         }
-    }
-
-    #[test]
-    fn test_enumerate_issues_all() {
-        let issues = vec![
-            labelled_issue("Issue 1", &[]),
-            labelled_issue("Issue 2", &[]),
-        ];
-
-        assert_eq!(
-            enumerate_issues(issues.clone(), &SnapshotScope::All),
-            issues
-        );
-    }
-
-    #[test]
-    fn test_enumerate_issues_single() {
-        let issue = labelled_issue("Test Issue", &[]);
-        let issues = vec![issue.clone(), labelled_issue("Other Issue", &[])];
-
-        let selected = enumerate_issues(issues, &SnapshotScope::Issue(issue.id.clone()));
-
-        assert_eq!(selected, vec![issue]);
-    }
-
-    #[test]
-    fn test_enumerate_issues_label_epic() {
-        let issues = vec![
-            labelled_issue("Issue 1", &["epic:auth"]),
-            labelled_issue("Issue 2", &["epic:auth"]),
-            labelled_issue("Issue 3", &["epic:billing"]),
-            labelled_issue("Issue 4", &[]),
-        ];
-
-        let selected = enumerate_issues(issues.clone(), &label_scope("epic", "auth"));
-
-        assert_eq!(selected, issues[..2].to_vec());
-    }
-
-    #[test]
-    fn test_enumerate_issues_label_milestone() {
-        let issues = vec![
-            labelled_issue("Issue 1", &["milestone:v1.0"]),
-            labelled_issue("Issue 2", &["milestone:v2.0"]),
-        ];
-
-        let selected = enumerate_issues(issues.clone(), &label_scope("milestone", "v1.0"));
-
-        assert_eq!(selected, issues[..1].to_vec());
-    }
-
-    #[test]
-    fn test_enumerate_issues_label_no_matches() {
-        let issues = vec![labelled_issue("Issue", &[])];
-
-        assert!(enumerate_issues(issues, &label_scope("epic", "nonexistent")).is_empty());
     }
 
     #[test]

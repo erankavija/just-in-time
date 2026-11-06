@@ -1,9 +1,11 @@
 //! `jit snapshot export` handler.
 
-use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
+use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{SnapshotCommands, SnapshotExportArgs};
+use crate::domain::identity::IssueIdPrefix;
+use crate::domain::issue_scope::IssueScope;
 use crate::output::snapshot::SnapshotExportResponse;
-use crate::snapshot::{SnapshotFormat, SnapshotScope};
+use crate::snapshot::SnapshotFormat;
 use anyhow::Context;
 use std::path::Path;
 
@@ -11,7 +13,10 @@ fn export<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     args: SnapshotExportArgs,
 ) -> HandlerResult<SnapshotExportResponse> {
-    let snapshot_scope = SnapshotScope::parse(&args.scope, |id| resolve_issue(ctx.executor, id))?;
+    let snapshot_scope = args
+        .scope
+        .parse::<IssueScope<IssueIdPrefix>>()?
+        .resolve(|prefix| ctx.executor.issues().resolve_issue_id(prefix))?;
     let snapshot_format = SnapshotFormat::parse(&args.format)
         .with_context(|| format!("Invalid format: {}", args.format))?;
     let source_mode = ctx.executor.archive().determine_snapshot_source_mode(

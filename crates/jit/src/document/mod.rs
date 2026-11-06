@@ -10,7 +10,6 @@ mod link_target;
 mod link_validator;
 pub mod parser;
 mod reference;
-mod scope;
 
 pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
@@ -24,7 +23,6 @@ pub use reference::{
     DocumentReferenceRequests, DocumentReferenceResolution, DocumentTargetKind,
     UnresolvedDocumentReference,
 };
-pub use scope::{DocumentScope, DocumentScopeParseError};
 
 #[cfg(feature = "html")]
 pub use parser::HtmlContentParser;
