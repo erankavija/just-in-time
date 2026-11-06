@@ -333,6 +333,11 @@ the `brackets:` label all come from `.jit/templates.toml`) and in one step:
   dependencies onto `P`** (so planning waits on that upstream work and `C` becomes
   the pure closure node).
 
+If the repository lacks any declaration the template names (a node type, a
+label namespace, a gate, or the `doc_area`), apply creates nothing and one
+failure lists every unmet requirement by kind; see
+[`jit apply`](../reference/cli-commands.md#jit-apply).
+
 Add `--json` for a machine-readable result; re-applying requires `--force`, which
 refreshes the existing nodes' prose in place. After scaffolding the bracket is
 `C → B → P`:

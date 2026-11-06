@@ -20,6 +20,7 @@ use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
+use jit::templates::TemplatePrerequisitesUnmetError;
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_harness::TestHarness;
 use jit::test_utils::add_reducing_edge;
@@ -98,15 +99,23 @@ const DOCUMENT_AREA: &str = "workspace/notes";
 /// the captured aggregate the apply engine reads and the config file the query
 /// paths load, so the two views of the registry agree.
 fn declare_document_area(h: &TestHarness) {
-    let config = format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n");
-    h.storage.add_data_file("config.toml", &config);
+    declare_config(
+        h,
+        &format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n"),
+    );
+}
+
+/// Install `config` as this repository's `config.toml`, in both the captured
+/// aggregate the apply engine reads and the file the query paths load.
+fn declare_config(h: &TestHarness, config: &str) {
+    h.storage.add_data_file("config.toml", config);
     let config_path = h
         .storage
         .repository_layout()
         .resolve(&jit::repository_state::VirtualPath::CONFIG)
         .unwrap();
     std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
-    std::fs::write(config_path, &config).unwrap();
+    std::fs::write(config_path, config).unwrap();
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
@@ -336,26 +345,52 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
     );
 }
 
+/// REQ-01/REQ-06 (jit:0723860e): a repository missing prerequisites of several
+/// kinds learns every one of them from a single failed application.
 #[test]
-fn test_apply_rejects_a_document_area_the_registry_does_not_declare_and_creates_nothing() {
+fn test_apply_reports_every_unmet_prerequisite_in_one_failure_and_creates_nothing() {
     let h = TestHarness::new();
-    declare_document_area(&h);
-    let undeclared = format!("{DOCUMENT_AREA}-drafts");
-    let template = plan_template_document("{container.dir}/plan.md", Some(&undeclared));
-    let epic = create_epic(&h, "Undeclared area epic");
+    // The repository declares a vocabulary of its own and none of the template's
+    // types, its bracket namespace, its gates, or its document area.
+    declare_config(
+        &h,
+        "[type_hierarchy]\ntypes = { epic = 1 }\n\
+         [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n\
+         [namespaces.area]\ndescription = \"Area\"\nunique = false\n",
+    );
+    let epic = h
+        .executor
+        .issues()
+        .create_issue(
+            "Unprepared epic".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["type:epic".to_string()],
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .issue
+        .id;
 
     let before = h.all_issues().len();
     let error = h
         .executor
         .templates()
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .apply_template_with(&plan_template(), &epic, &container_binding(&epic), false)
         .unwrap_err();
 
-    // The application fails naming the area it was handed and the registry it
-    // was matched against, rather than composing a path outside the convention.
-    let message = error.to_string();
-    assert!(message.contains(&undeclared), "{message}");
-    assert!(message.contains(DOCUMENT_AREA), "{message}");
+    let report = error
+        .downcast_ref::<TemplatePrerequisitesUnmetError>()
+        .unwrap_or_else(|| panic!("expected the prerequisite report, got {error:#}"));
+    let kinds = report
+        .unmet()
+        .iter()
+        .map(std::mem::discriminant)
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(kinds.len(), 4, "every unmet kind in one failure: {error}");
     assert_eq!(h.all_issues().len(), before, "no node may be created");
 }
 
@@ -415,9 +450,6 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
 #[test]
 fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     let h = TestHarness::new();
-    // The template's document area is declared, so the refusal under test is
-    // the container's type rather than an undeclared area reached first.
-    declare_document_area(&h);
     let template = plan_template();
     let task = h
         .executor
@@ -678,38 +710,6 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
 
 // === APPA-01: gate presets validated before any mutation ===
 
-#[test]
-fn test_apply_rejects_unknown_gate_preset_and_creates_nothing() {
-    let h = TestHarness::new();
-    // A single planning node referencing a gate preset that does not exist.
-    let toml = r#"
-[[template]]
-name        = "ghostgate"
-applies_to  = ["epic"]
-  [[template.nodes]]
-  role        = "planning"
-  type        = "planning"
-  gates       = ["does-not-exist"]
-  description = "Plan {container.title}."
-"#;
-    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
-        .unwrap()
-        .get("ghostgate")
-        .unwrap()
-        .clone();
-    let epic = create_epic(&h, "Ghost-gate epic");
-
-    let before = h.all_issues().len();
-    let err = h
-        .executor
-        .templates()
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(err.to_string().contains("does-not-exist"));
-    // APPA-01: the missing-preset failure is caught before the first create.
-    assert_eq!(h.all_issues().len(), before);
-}
-
 // === REQ-13: anchor-level gate presets (jit:2614ecf2) ===
 
 #[test]
@@ -852,46 +852,6 @@ applies_to  = ["epic"]
         "bound anchor missing its declared gate preset: {:?}",
         container.gates_required
     );
-}
-
-#[test]
-fn test_apply_rejects_unknown_anchor_gate_preset_and_creates_nothing() {
-    let h = TestHarness::new();
-    // The `container` anchor references a gate name that is NEITHER a preset NOR
-    // a registry gate key; this must be rejected up front, exactly like an
-    // unknown node gate.
-    let toml = r#"
-[[template]]
-name        = "ghostanchorgate"
-applies_to  = ["epic"]
-  [[template.anchors]]
-  name  = "container"
-  gates = ["does-not-exist"]
-  [[template.nodes]]
-  role        = "breakdown"
-  type        = "breakdown"
-  labels      = ["brackets:{container.short_id}"]
-  description = "Break down {container.title}."
-  [[template.anchor_edges]]
-  from = "container"
-  to   = "breakdown"
-"#;
-    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
-        .unwrap()
-        .get("ghostanchorgate")
-        .unwrap()
-        .clone();
-    let epic = create_epic(&h, "Ghost-anchor-gate epic");
-
-    let before = h.all_issues().len();
-    let err = h
-        .executor
-        .templates()
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(err.to_string().contains("does-not-exist"), "{err}");
-    // The unknown-gate failure is caught before the first create (APPA-01).
-    assert_eq!(h.all_issues().len(), before);
 }
 
 /// REQ-02 (jit:ff1bbada): a template gate that no preset and no registry entry

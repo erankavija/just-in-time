@@ -16,7 +16,7 @@
 //! - node `role`s are unique within a template;
 //! - every `depends_on`, `anchor_edges`, and `transforms` reference resolves to
 //!   a declared node role / anchor name;
-//! - each node `type` exists in the configured `[type_hierarchy].types`;
+//! - each `applies_to` type exists in the configured `[type_hierarchy].types`;
 //! - each transform `kind` decodes to a [`TransformKind`];
 //! - the internal `depends_on` edges form a DAG (no cycle).
 //!
@@ -24,19 +24,17 @@
 //! precedent: an absent `templates.toml` loads as an empty registry, and an
 //! invalid file fails at load with a descriptive [`TemplateConfigError`].
 //!
-//! **Deferred:** gate-preset existence is NOT validated here. A node's `gates`
-//! are preset names resolved by the gate-preset manager
-//! ([`crate::gate_presets`]); that registry is not available at config-load time
-//! in this layer, so preset existence is checked by the apply engine in a later
-//! task (W2). The reference-integrity checks above are all resolvable from the
-//! template file plus the type hierarchy alone.
+//! The repository declarations applying a template depends on — node types,
+//! label namespaces, gates, and document areas — are its
+//! [`requirements`](GraphTemplate::requirements), checked together by the apply
+//! engine so one failed application names every unmet one.
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, State};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -111,17 +109,6 @@ pub enum TemplateConfigError {
         anchor: String,
     },
 
-    /// A node declares a `type` absent from `[type_hierarchy].types`.
-    #[error("template '{template}': node '{role}' has type '{type_name}', which is not declared in [type_hierarchy].types")]
-    UnknownType {
-        /// Name of the offending template.
-        template: String,
-        /// The role of the offending node.
-        role: String,
-        /// The undeclared type name.
-        type_name: String,
-    },
-
     /// An `applies_to` entry names a container type absent from
     /// `[type_hierarchy].types`.
     #[error("template '{template}': applies_to contains '{type_name}', which is not declared in [type_hierarchy].types")]
@@ -172,6 +159,84 @@ wire_vocabulary! {
         MoveUpstreamToRole = "move-upstream-to-role",
     }
 }
+
+/// A repository declaration applying a template depends on
+/// ([`GraphTemplate::requirements`]), by the registry that declares it.
+///
+/// Serializes as `{"kind": "<kind>", "name": "<declared name>"}`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(tag = "kind", content = "name", rename_all = "kebab-case")]
+pub enum TemplateRequirement {
+    /// A node's issue type, declared in `[type_hierarchy].types`.
+    Type(String),
+    /// The namespace of a label a node writes, declared in `[namespaces]`.
+    LabelNamespace(String),
+    /// A node or anchor gate, supplied by a gate preset or the gate registry.
+    Gate(GateKey),
+    /// A node's `doc_area`, declared in `[documentation] issue_scoped_areas`.
+    DocumentationArea(String),
+}
+
+impl std::fmt::Display for TemplateRequirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Type(name) => write!(f, "type '{name}' in [type_hierarchy].types"),
+            Self::LabelNamespace(name) => write!(f, "label namespace '{name}' in [namespaces]"),
+            Self::Gate(key) => write!(f, "gate '{key}' as a gate preset or in the gate registry"),
+            Self::DocumentationArea(area) => write!(
+                f,
+                "documentation area '{area}' in [documentation] issue_scoped_areas"
+            ),
+        }
+    }
+}
+
+/// Applying a template found requirements the repository does not declare.
+///
+/// Names every unmet [`TemplateRequirement`] at once, in requirement order; the
+/// CLI renders the template and the requirements into the `--json` envelope's
+/// `details`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplatePrerequisitesUnmetError {
+    template: String,
+    unmet: Vec<TemplateRequirement>,
+}
+
+impl TemplatePrerequisitesUnmetError {
+    /// Report `unmet` requirements of the template named `template`.
+    pub fn new(template: impl Into<String>, unmet: Vec<TemplateRequirement>) -> Self {
+        Self {
+            template: template.into(),
+            unmet,
+        }
+    }
+
+    /// The template whose requirements are unmet.
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+
+    /// Every unmet requirement.
+    pub fn unmet(&self) -> &[TemplateRequirement] {
+        &self.unmet
+    }
+}
+
+impl std::fmt::Display for TemplatePrerequisitesUnmetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "template '{}' requires {} repository declaration(s) this repository lacks; declare each, then re-apply:",
+            self.template,
+            self.unmet.len()
+        )?;
+        self.unmet
+            .iter()
+            .try_for_each(|requirement| write!(f, "\n  - {requirement}"))
+    }
+}
+
+impl std::error::Error for TemplatePrerequisitesUnmetError {}
 
 /// A loaded, validated set of graph templates from `.jit/templates.toml`, plus
 /// the repository's [`RoleBindings`] and [`AnchorBindings`].
@@ -314,8 +379,8 @@ pub struct TemplateNode {
     /// unique per template. Roles are template metadata, not stored on the
     /// created issue.
     pub role: String,
-    /// Issue type the created node carries (e.g. `"planning"`); must exist in
-    /// `[type_hierarchy].types`.
+    /// Issue type the created node carries (e.g. `"planning"`); a
+    /// [`TemplateRequirement::Type`] of applying the template.
     #[serde(rename = "type")]
     pub type_name: String,
     /// Gate or preset keys attached to the node. Spelling is checked on decode;
@@ -417,9 +482,9 @@ impl TemplateRegistry {
     /// Load and validate `.jit/templates.toml` relative to the given `.jit` root.
     ///
     /// Returns an empty registry when the file does not exist. `hierarchy_types`
-    /// is the configured `[type_hierarchy].types` key set, against which node
-    /// `type`s are checked; pass an empty slice to skip the type check (when no
-    /// hierarchy is configured).
+    /// is the configured `[type_hierarchy].types` key set, against which
+    /// `applies_to` types are checked; pass an empty slice to skip the type check
+    /// (when no hierarchy is configured).
     pub fn load<S: AsRef<str>>(
         layout: &RepositoryLayout,
         hierarchy_types: &[S],
@@ -438,7 +503,7 @@ impl TemplateRegistry {
     /// Parse and validate a `templates.toml` string.
     ///
     /// `hierarchy_types` is the configured `[type_hierarchy].types` key set;
-    /// pass an empty slice to skip the node-`type` check.
+    /// pass an empty slice to skip the `applies_to` type check.
     pub fn from_toml_str<S: AsRef<str>>(
         content: &str,
         hierarchy_types: &[S],
@@ -497,6 +562,72 @@ impl GraphTemplate {
         })
     }
 
+    /// The repository declarations applying this template depends on, derived
+    /// from its own nodes and anchors; empty for a template that declares none.
+    ///
+    /// A label's namespace is static while its value may be interpolated, so a
+    /// label whose namespace is itself interpolated or absent names none.
+    pub fn requirements(&self) -> BTreeSet<TemplateRequirement> {
+        let node_requirements = self.nodes.iter().flat_map(|node| {
+            let namespaces = std::iter::once(crate::labels::TYPE_NAMESPACE)
+                .chain(node.labels.iter().filter_map(|label| {
+                    label
+                        .split_once(':')
+                        .map(|(namespace, _)| namespace)
+                        .filter(|namespace| !namespace.is_empty() && !namespace.contains('{'))
+                }))
+                .map(|namespace| TemplateRequirement::LabelNamespace(namespace.to_owned()));
+            std::iter::once(TemplateRequirement::Type(node.type_name.clone()))
+                .chain(namespaces)
+                .chain(node.gates.iter().cloned().map(TemplateRequirement::Gate))
+                .chain(
+                    node.doc_area
+                        .iter()
+                        .cloned()
+                        .map(TemplateRequirement::DocumentationArea),
+                )
+        });
+        let anchor_gates = self
+            .anchors
+            .iter()
+            .flat_map(|anchor| anchor.gates.iter().cloned().map(TemplateRequirement::Gate));
+        node_requirements.chain(anchor_gates).collect()
+    }
+
+    /// The [`requirements`](Self::requirements) that `config`, the gate
+    /// `registry`, and the gate `presets` leave undeclared, in requirement order.
+    ///
+    /// An empty type hierarchy or namespace registry declares no vocabulary, so
+    /// it requires none, as the default rules keyed on those registries do. Pure,
+    /// so every checker is a view over what `jit apply` enforces
+    /// (`@/charter/D-20`).
+    pub fn unmet_requirements(
+        &self,
+        config: &crate::config::JitConfig,
+        registry: &crate::declarations::GateRegistry,
+        presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+    ) -> Vec<TemplateRequirement> {
+        let namespaces = crate::config_manager::namespaces_from_config(config);
+        let types = namespaces.declared_type_hierarchy();
+        let documentation = config.documentation.clone().unwrap_or_default();
+        let is_declared = |requirement: &TemplateRequirement| match requirement {
+            TemplateRequirement::Type(name) => types.is_empty() || types.contains_key(name),
+            TemplateRequirement::LabelNamespace(name) => {
+                namespaces.namespaces.is_empty() || namespaces.namespaces.contains_key(name)
+            }
+            TemplateRequirement::Gate(key) => {
+                presets.contains_key(key) || registry.gates.contains_key(key)
+            }
+            TemplateRequirement::DocumentationArea(area) => {
+                documentation.is_issue_scoped_area(area)
+            }
+        };
+        self.requirements()
+            .into_iter()
+            .filter(|requirement| !is_declared(requirement))
+            .collect()
+    }
+
     /// The node carrying the given `role`, or `None` if no node declares it.
     pub fn node(&self, role: &str) -> Option<&TemplateNode> {
         self.nodes.iter().find(|n| n.role == role)
@@ -531,7 +662,8 @@ impl GraphTemplate {
     }
 
     /// Validate one template's internal structure: unique roles/anchors, every
-    /// reference resolves, node types are known, and `depends_on` is acyclic.
+    /// reference resolves, `applies_to` types are known, and `depends_on` is
+    /// acyclic.
     ///
     /// `known_type` answers whether a type name is declared in the hierarchy
     /// (always `true` when no hierarchy is configured). Pure: no I/O.
@@ -576,15 +708,8 @@ impl GraphTemplate {
             }
         }
 
-        // Node types exist in the hierarchy; `depends_on` references a declared role.
+        // `depends_on` references a declared role.
         for node in &self.nodes {
-            if !known_type(&node.type_name) {
-                return Err(TemplateConfigError::UnknownType {
-                    template: self.name.clone(),
-                    role: node.role.clone(),
-                    type_name: node.type_name.clone(),
-                });
-            }
             for dep in &node.depends_on {
                 if !roles.contains(dep.as_str()) {
                     return Err(TemplateConfigError::UnknownRole {
@@ -1328,7 +1453,7 @@ role = "planning"
     }
 
     #[test]
-    fn test_unknown_node_type_rejected() {
+    fn test_from_toml_str_defers_an_undeclared_node_type_to_apply() {
         let toml = r#"
 [[template]]
 name = "t"
@@ -1337,26 +1462,69 @@ applies_to = ["epic"]
 role = "planning"
 type = "bogus"
 "#;
-        let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
-        match err {
-            TemplateConfigError::UnknownType { type_name, .. } => assert_eq!(type_name, "bogus"),
-            other => panic!("expected UnknownType, got {other:?}"),
-        }
+        // A node type is a prerequisite of applying the template, reported with
+        // the template's other unmet prerequisites rather than failing the load.
+        let registry = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        assert!(registry
+            .get("t")
+            .unwrap()
+            .requirements()
+            .contains(&TemplateRequirement::Type("bogus".to_string())));
     }
 
     #[test]
-    fn test_empty_hierarchy_skips_type_check() {
+    fn test_graph_template_requirements_derive_each_kind_from_the_declaring_field() {
         let toml = r#"
 [[template]]
 name = "t"
 applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "anything"
+  [[template.anchors]]
+  name  = "container"
+  gates = ["anchor-gate"]
+  [[template.nodes]]
+  role     = "first"
+  type     = "first-type"
+  gates    = ["node-gate"]
+  doc      = "{container.dir}/x.md"
+  doc_area = "some/area"
+  labels   = ["static-ns:{container.short_id}", "{dynamic}:value", "no-separator"]
+  [[template.nodes]]
+  role   = "second"
+  type   = "second-type"
+  labels = ["static-ns:other"]
 "#;
-        let empty: [&str; 0] = [];
-        let reg = TemplateRegistry::from_toml_str(toml, &empty).unwrap();
-        assert_eq!(reg.templates[0].nodes[0].type_name, "anything");
+        let template = TemplateRegistry::from_toml_str(toml, &[] as &[&str])
+            .unwrap()
+            .get("t")
+            .unwrap()
+            .clone();
+
+        let gate = |key: &str| TemplateRequirement::Gate(key.parse().unwrap());
+        let expected = BTreeSet::from([
+            TemplateRequirement::Type("first-type".to_string()),
+            TemplateRequirement::Type("second-type".to_string()),
+            // Every node writes its type as a label in the type namespace; a
+            // label whose namespace is interpolated or absent names none.
+            TemplateRequirement::LabelNamespace(crate::labels::TYPE_NAMESPACE.to_string()),
+            TemplateRequirement::LabelNamespace("static-ns".to_string()),
+            gate("node-gate"),
+            gate("anchor-gate"),
+            TemplateRequirement::DocumentationArea("some/area".to_string()),
+        ]);
+        assert_eq!(template.requirements(), expected);
+    }
+
+    #[test]
+    fn test_graph_template_requirements_of_a_template_declaring_nothing_are_empty() {
+        let toml = r#"
+[[template]]
+name = "t"
+applies_to = ["epic"]
+  [[template.anchors]]
+  name = "container"
+"#;
+        let registry = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        assert!(registry.get("t").unwrap().requirements().is_empty());
     }
 
     #[test]

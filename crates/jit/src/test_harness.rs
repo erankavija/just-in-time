@@ -273,21 +273,14 @@ pub fn seed_memory_gate_registry(
 /// the repository first. Reading them from the template is what keeps a changed
 /// declaration from needing an edit beside it.
 pub fn template_gate_keys(template: &crate::templates::GraphTemplate) -> Vec<GateKey> {
-    let mut keys: Vec<GateKey> = template
-        .nodes
-        .iter()
-        .flat_map(|node| node.gates.iter())
-        .chain(
-            template
-                .anchors
-                .iter()
-                .flat_map(|anchor| anchor.gates.iter()),
-        )
-        .cloned()
-        .collect();
-    keys.sort();
-    keys.dedup();
-    keys
+    template
+        .requirements()
+        .into_iter()
+        .filter_map(|requirement| match requirement {
+            crate::templates::TemplateRequirement::Gate(key) => Some(key),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Declare every gate key `template` names in the in-memory gate registry.
@@ -307,6 +300,11 @@ pub fn seed_memory_template_gates(
 /// case (`@/invariant/shared-test-contracts`). The whole registry is replaced,
 /// so a case that needs a specific definition seeds one itself.
 pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[GateKey]) {
+    seed_memory_gate_registry(storage, &manual_gate_registry(keys));
+}
+
+/// A gate registry declaring `keys` as manual postcheck gates.
+pub fn manual_gate_registry(keys: &[GateKey]) -> crate::declarations::GateRegistry {
     let mut registry = crate::declarations::GateRegistry::default();
     registry.gates.extend(keys.iter().map(|key| {
         (
@@ -325,7 +323,7 @@ pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[GateKey]) {
             },
         )
     }));
-    seed_memory_gate_registry(storage, &registry);
+    registry
 }
 
 impl Default for TestHarness {

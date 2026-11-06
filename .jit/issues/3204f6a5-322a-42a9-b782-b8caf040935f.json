@@ -53,9 +53,10 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-11-05T23:38:10.153768672Z",
-      "updated_by": null
+      "run_id": "40660dd3-d206-4433-ab6a-34363b13cb06",
+      "status": "failed",
+      "updated_at": "2026-11-06T00:16:03.571650733Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "3204f6a5-322a-42a9-b782-b8caf040935f",
@@ -76,5 +77,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Take engine vocabulary and test switches only from declarations and caller inputs",
-  "updated_at": "2026-11-05T23:59:53.967062859Z"
+  "updated_at": "2026-11-06T00:16:03.571650733Z"
 }

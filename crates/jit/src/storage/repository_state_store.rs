@@ -25,8 +25,7 @@ use crate::storage::{
     RedoApplyError, RedoRecord, RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME,
     RECORD_SCRATCH_DIR,
 };
-use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, OpenOptions};
+use cap_std::fs::Dir;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
@@ -2325,10 +2324,7 @@ fn inspect_capability_leaf(
         });
     }
     if metadata.is_file() {
-        let mut options = OpenOptions::new();
-        options.read(true);
-        options._cap_fs_ext_follow(FollowSymlinks::No);
-        let mut file = parent.open_with(leaf, &options)?;
+        let mut file = open_regular_file_nofollow(parent, leaf)?;
         if read == ReadMode::Tail {
             let length = file.metadata()?.len();
             let tail = EventLogTail::read_tail(length, |start, len| {

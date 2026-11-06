@@ -174,6 +174,28 @@ impl ValidationReport {
     }
 }
 
+/// The first template whose node types the declared hierarchy lacks.
+///
+/// A node type is a declaration a template names whatever it is applied to;
+/// its other requirements are prerequisites of applying it, judged by
+/// `jit apply` over the same computation.
+fn undeclared_template_node_types(
+    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+) -> Option<crate::templates::TemplatePrerequisitesUnmetError> {
+    let config = declarations.config();
+    config.templates.templates.iter().find_map(|template| {
+        let types = template
+            .unmet_requirements(config, declarations.gates(), &HashMap::new())
+            .into_iter()
+            .filter(|requirement| {
+                matches!(requirement, crate::templates::TemplateRequirement::Type(_))
+            })
+            .collect::<Vec<_>>();
+        (!types.is_empty())
+            .then(|| crate::templates::TemplatePrerequisitesUnmetError::new(&template.name, types))
+    })
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
 struct RepositoryJudgedInvalid(String);
@@ -214,6 +236,9 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
         Ok(declarations) => declarations,
         Err(error) => return failed(anyhow!(error).context("declaration validation pass")),
     };
+    if let Some(error) = undeclared_template_node_types(&declarations) {
+        return failed(anyhow!(error).context("declaration validation pass"));
+    }
     let expected = match declarations
         .rules_loaded()
         .then(|| {

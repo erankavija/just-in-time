@@ -1275,12 +1275,16 @@ fn test_package_capture_addresses_no_declared_source_by_pathname() {
 /// options are built in exactly one place.
 #[test]
 fn test_profile_package_reads_build_no_follow_options_in_one_place() {
-    let profile = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/profile");
-    let owners = definition_owners(&profile, "_cap_fs_ext_follow");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let owners = definition_owners(&source.join("profile"), "_cap_fs_ext_follow");
+    assert!(
+        owners.is_empty(),
+        "profile builds its own open options: {owners:?}"
+    );
     assert_eq!(
-        owners,
-        vec![PathBuf::from("nofollow.rs")],
-        "each entry names a profile module building its own no-follow open"
+        definition_owners(&source.join("storage"), "_cap_fs_ext_nonblock"),
+        vec![PathBuf::from("capability_fs.rs")],
+        "storage capability reads own the non-blocking no-follow options"
     );
 }
 

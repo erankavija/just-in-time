@@ -7,42 +7,6 @@ use crate::storage::StorageWarning;
 use anyhow::Result;
 use std::path::Path;
 
-/// Check if a process with the given PID exists
-///
-/// Uses platform-specific methods:
-/// - Unix: signal 0 (doesn't send signal, just checks if process exists)
-/// - Windows: OpenProcess with PROCESS_QUERY_INFORMATION
-#[cfg(unix)]
-pub fn process_exists(pid: u32) -> bool {
-    use nix::sys::signal::kill;
-    use nix::unistd::Pid;
-
-    // Guard the PID before handing it to kill(2): a checked u32->i32 conversion
-    // avoids wrap-around for large PIDs (notably `u32::MAX as i32 == -1`), and the
-    // positive-PID check prevents `kill(-1, 0)` (every process owned by the user)
-    // and `kill(0, 0)` (the caller's OWN process group) from being mistaken for a
-    // liveness probe. Any value that is not a valid positive PID is treated as a
-    // non-existent process. Signal 0 (None) only checks existence; it sends no
-    // signal.
-    match i32::try_from(pid) {
-        Ok(p) if p > 0 => kill(Pid::from_raw(p), None).is_ok(),
-        _ => false,
-    }
-}
-
-#[cfg(windows)]
-pub fn process_exists(_pid: u32) -> bool {
-    // TODO: Implement Windows process checking
-    // For now, assume process exists (safe default)
-    true
-}
-
-#[cfg(not(any(unix, windows)))]
-pub fn process_exists(_pid: u32) -> bool {
-    // Unknown platform - assume process exists (safe default)
-    true
-}
-
 /// Clean up stale lock files from dead processes
 ///
 /// Uses two-stage detection:
@@ -109,7 +73,7 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<Vec<StorageWarning>> {
                     if let Ok(meta_json) = fs::read_to_string(&metadata_path) {
                         if let Ok(meta) = serde_json::from_str::<LockMetadata>(&meta_json) {
                             // Check if process still exists
-                            if !process_exists(meta.pid) {
+                            if !crate::process::is_alive(meta.pid) {
                                 warnings.push(StorageWarning::LockFromDeadProcess {
                                     pid: meta.pid,
                                     path: path.clone(),
@@ -145,35 +109,6 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<Vec<StorageWarning>> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
-
-    #[test]
-    fn test_process_exists_for_current_process() {
-        let pid = std::process::id();
-        assert!(process_exists(pid), "Current process should exist");
-    }
-
-    #[test]
-    fn test_process_exists_for_invalid_pid() {
-        // Use a very high PID that is unlikely to exist
-        let invalid_pid = u32::MAX - 1;
-        assert!(!process_exists(invalid_pid), "Invalid PID should not exist");
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn test_process_exists_rejects_u32_max_without_process_wide_kill() {
-        // `u32::MAX as i32 == -1`, and `kill(-1, 0)` targets EVERY process owned
-        // by the user. The PID guard must reject this as a non-existent process
-        // rather than issuing the process-wide probe. (If the guard were missing,
-        // kill(-1, 0) would succeed and this would wrongly report `true`.)
-        assert!(
-            !process_exists(u32::MAX),
-            "u32::MAX must be rejected, never treated as a live process via kill(-1)"
-        );
-        // PID 0 maps to the caller's OWN process group under kill(2); it must not
-        // be mistaken for a liveness probe either.
-        assert!(!process_exists(0), "PID 0 must be rejected");
-    }
 
     #[test]
     fn test_cleanup_empty_directory() {
