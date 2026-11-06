@@ -1625,8 +1625,8 @@ registry file. Only the fields you pass change; every other field keeps its
 current value. The gate KEY is the gate's identity and cannot be changed. This
 edits the registry definition only; per-issue gate status (`gates_status`) is
 left untouched. The registry change and its `gate_definition_updated` event
-publish as one redo record. Refuses when another agent leases an issue that
-requires the gate.
+publish as one redo record. This operation follows the issue lease rule in the
+[Configuration Reference](configuration.md#enforce_leases).
 
 **Usage:**
 ```bash
@@ -2087,9 +2087,9 @@ is reusable.
 
 Issues are evaluated in argument order. Evaluation is serialised per issue,
 and the command continues after a checker failure, runner error, lookup error,
-or manual-gate attestation error. Under strict lease enforcement, another
-agent's lease on a requested issue refuses only that issue's entry, reported as
-a per-entry finding, and the other issues are still evaluated. Exit `0` means every issue passed; otherwise
+or manual-gate attestation error. Lease refusals are reported per entry under
+the [issue lease rule](configuration.md#enforce_leases), so other issues are
+still evaluated. Exit `0` means every issue passed; otherwise
 the command returns the first failing issue's code from the [`jit gate
 evaluate`](#jit-gate-evaluate) taxonomy.
 
@@ -3762,9 +3762,9 @@ jit hooks install
 ```
 
 One hook is installed: `pre-commit` validates branch divergence before a commit.
-An existing hook of the same name is left in place and reported as skipped. No
-hook checks leases; they are enforced when a mutation is written, so a hand edit
-of an issue record is not caught at commit.
+An existing hook of the same name is left in place and reported as skipped.
+Lease enforcement occurs during issue writes; a hand edit is not caught at
+commit. See the [Configuration Reference](configuration.md#enforce_leases).
 
 JSON returns `{hooks_dir, installed, skipped, message}`. Failures use the shared
 error classifier, which determines the envelope code and process exit status.

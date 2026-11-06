@@ -137,7 +137,7 @@ The claim creates a **lease** that:
 - Expires after its TTL (see the [default claim lease TTL](../reference/runtime-defaults.md))
 - Can be renewed if you need more time
 
-A lease is advisory work coordination: it signals intent and hands out exclusive *ownership of the lease*, but by default it does not lock the issue's files against an agent that skips claiming. Whether another agent's lease refuses a write is configurable — see `enforce_leases` in the [Configuration Reference](../reference/configuration.md#enforce_leases).
+A lease is advisory work coordination: it signals intent and hands out exclusive *ownership of the lease*, but by default it does not lock the issue's files against an agent that skips claiming. See the [Configuration Reference](../reference/configuration.md#enforce_leases) for lease enforcement behavior and scope.
 
 View active claims:
 

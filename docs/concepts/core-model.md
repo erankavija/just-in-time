@@ -1134,9 +1134,8 @@ jit claim acquire abc123 --ttl 600 --agent-id agent:worker-1
 jit issue claim abc123 agent:worker-1
 ```
 
-Leases are advisory. They coordinate cooperating agents, while
-`[worktree].enforce_leases` controls whether another agent's active lease refuses
-a write; with enforcement `off`, nothing is refused.
+Leases are advisory. They coordinate cooperating agents; the write rule and its
+scope are described in the [Configuration Reference](../reference/configuration.md#enforce_leases).
 `jit issue claim` separately rejects a conflicting live lease as part of its
 claiming behavior.
 
