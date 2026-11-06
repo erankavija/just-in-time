@@ -14,7 +14,14 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e84333e5-20f2-4c64-8928-84cee1e23ff3",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:52:29.928416447Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d28888f0-d189-49f5-899a-7e687bc219db",
   "labels": [
     "type:story",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Branch, worktree and base facts come from one module",
-  "updated_at": "2026-11-06T05:52:12.214486743Z"
+  "updated_at": "2026-11-06T05:52:29.928416447Z"
 }
