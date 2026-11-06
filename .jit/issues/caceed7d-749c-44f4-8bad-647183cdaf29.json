@@ -8,6 +8,7 @@
   ],
   "description": "Correct contributor documents that present the `git2` crate as jit's git integration.\n\n## Background\n\n- `dev/vision/document-viewer-implementation-plan.md:597` says \"`git2` crate - Already integrated for git operations\".\n- `dev/vision/knowledge-management-vision.md` plans git integration through `git2-rs` (`dev/vision/knowledge-management-vision.md:123`, `:130`, `:352`, `:539`).\n- Git access goes through one storage-owned module that runs the git CLI (`@/charter/D-21`). `dev/archive/`, `dev/benchmarks/` and `dev/active/` hold records and stay as written.\n\n## Success Criteria\n\n- [hard] REQ-01: Those five passages describe git access through the git CLI module (`@/charter/D-21`) or are marked as superseded, and no document under `dev/` outside `dev/archive/`, `dev/benchmarks/` and `dev/active/` presents git2 or libgit2 as the current integration.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T05:27:15.143834708Z",
   "first_ready_at": "2026-11-06T05:20:10.236593888Z",
   "gates_required": [
     "doc-review",
@@ -21,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "run_id": "495ff02a-6e9c-4628-9763-385a87ea220d",
+      "run_id": "5173b183-e3da-4f1d-86db-5538fdf65b1b",
       "status": "passed",
-      "updated_at": "2026-11-06T05:25:04.446826701Z",
+      "updated_at": "2026-11-06T05:27:14.932389048Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,7 +39,7 @@
     "satisfies:f4d9502a/REQ-13"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Contributor documents stop presenting libgit2 as the git integration",
-  "updated_at": "2026-11-06T05:26:05.762593095Z"
+  "updated_at": "2026-11-06T05:27:15.143834708Z"
 }
