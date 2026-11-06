@@ -28,6 +28,7 @@ fn test_repository_state_store_io_retains_the_concrete_source() {
         .chain()
         .find_map(|cause| cause.downcast_ref::<std::io::Error>())
         .expect("the output classifier must see the concrete I/O error");
+    assert_eq!(error.to_string(), source.to_string());
     assert_eq!(source.kind(), ErrorKind::PermissionDenied);
 }
 

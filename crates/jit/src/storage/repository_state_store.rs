@@ -2308,7 +2308,7 @@ fn inspect_capability_leaf(
         Err(error) => return Err(error.into()),
     };
     if metadata.is_symlink() {
-        let target = parent.read_link(leaf)?;
+        let target = parent.read_link_contents(leaf)?;
         let bytes = target.as_os_str().as_encoded_bytes().to_vec();
         return Ok(RepositoryEntry::Symlink {
             target: CapturedBytes::new(capability_metadata_identity(&metadata)?, bytes)?,
