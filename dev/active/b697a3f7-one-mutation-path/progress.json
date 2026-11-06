@@ -120,7 +120,7 @@
           "title": "One atomic file publication with a durability argument serves the redo put and external exports",
           "classification": "implementation",
           "worker": "claude opus",
-          "status": "dispatched (claude opus)"
+          "status": "done"
         }
       ]
     },
