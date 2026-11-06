@@ -632,6 +632,9 @@ prepare_measured_suite() {
   local -a executables=() readable=()
   local exe size bytes=0 built_ms warm_started_ms
   built_ms=$(epoch_milliseconds)
+  # The budget checker inspects the normal product binaries, which test
+  # harness compilation does not guarantee to leave at target/debug/<name>.
+  "${NICE_PREFIX[@]}" cargo build --workspace --bins || return 1
   "${NICE_PREFIX[@]}" cargo nextest run --workspace --no-run || return 1
   "${NICE_PREFIX[@]}" cargo test --workspace --no-run --message-format=json \
     >"$SUITE_ARTIFACTS_JSON" || return 1
