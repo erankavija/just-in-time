@@ -18,8 +18,8 @@ use crate::repository_state::{
 use crate::storage::capability_fs::CapabilityFsError;
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
-    EventAppend, IssueNotFoundError, IssueStore, PresetNotFoundError, PutFile, RedoApplyError,
-    RedoInterruptionInjector, RedoPoint, RedoRecord, RepoWriteGuard, RepoWriteLock,
+    EventAppend, IssueNotFoundError, IssueStore, PutFile, RedoApplyError, RedoInterruptionInjector,
+    RedoPoint, RedoRecord, RepoWriteGuard, RepoWriteLock,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -251,44 +251,6 @@ impl InMemoryStorage {
         &self,
     ) -> Arc<crate::storage::repository_state_store::ActiveLayoutTracker> {
         Arc::clone(&self.active_mutation_layout)
-    }
-
-    fn gate_presets_from_repository_state(
-        &self,
-    ) -> Result<std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>> {
-        let presets_prefix = format!(
-            "{}/",
-            crate::repository_state::VirtualPath::GATE_PRESETS
-                .relative()
-                .as_str()
-        );
-        let files = self
-            .read_repository_state()?
-            .entries
-            .iter()
-            .filter_map(|(path, entry)| {
-                if path.root_class() != RepositoryRootClass::Data {
-                    return None;
-                }
-                let filename = path
-                    .relative()
-                    .as_str()
-                    .strip_prefix(presets_prefix.as_str())?;
-                if filename.contains('/') || !filename.ends_with(".json") {
-                    return None;
-                }
-                Some(match entry {
-                    RepositoryEntry::File { content, .. } => {
-                        Ok((filename.to_string(), content.bytes().to_vec()))
-                    }
-                    _ => Err(crate::errors::InvalidArgumentError::new(format!(
-                        "Custom preset file '{filename}' must be an ordinary file"
-                    ))
-                    .into()),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-        crate::gate_presets::load_presets_from_custom_files(files)
     }
 
     /// Classify an `IssueStore` repository-relative input through the canonical
@@ -970,27 +932,6 @@ impl IssueStore for InMemoryStorage {
         super::gate_run_reader::list_gate_runs_for_issue(self, issue_id)
     }
 
-    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        let mut presets = self
-            .gate_presets_from_repository_state()?
-            .values()
-            .map(|preset| crate::gate_presets::PresetInfo {
-                name: preset.name.clone(),
-                description: preset.description.clone(),
-                gate_count: preset.gates.len(),
-            })
-            .collect::<Vec<_>>();
-        presets.sort_by(|left, right| left.name.cmp(&right.name));
-        Ok(presets)
-    }
-
-    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
-        self.gate_presets_from_repository_state()?
-            .get(name)
-            .cloned()
-            .ok_or_else(|| PresetNotFoundError::new(name).into())
-    }
-
     fn read_repo_file(
         &self,
         rel_path: &str,
@@ -1066,7 +1007,6 @@ mod tests {
                 reader.resolve_issue_id(&prefix).unwrap_err(),
                 reader.load_gate_registry().unwrap_err(),
                 reader.read_events().unwrap_err(),
-                reader.list_gate_presets().unwrap_err(),
             ];
             tx.send(errors).unwrap();
         });

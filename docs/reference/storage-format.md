@@ -119,6 +119,7 @@ commands read through the driver:
 
 - `jit validate`, except `--fix` without `--dry-run`, `--branch-drift` and
   `--leases`
+- `jit gate preset list` and `jit gate preset show`
 - `jit doc check-links`
 - `jit invariant check`
 - `jit issue batch-create --dry-run`

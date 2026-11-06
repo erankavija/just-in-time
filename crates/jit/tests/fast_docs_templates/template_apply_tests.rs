@@ -756,7 +756,7 @@ fn test_apply_attaches_registry_gate_key_not_preset() {
     // Guard: the name must NOT also be a preset, so the test exercises the
     // registry-key branch and not the preset branch.
     assert!(
-        h.storage.get_gate_preset("deploy-check").is_err(),
+        h.executor.gates().show_gate_preset("deploy-check").is_err(),
         "deploy-check must be a registry-only gate, not a preset"
     );
 
@@ -867,7 +867,7 @@ fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_su
         // name under test is supplied by neither.
         let h = TestHarness::new();
         assert!(
-            h.storage.get_gate_preset(key).is_err(),
+            h.executor.gates().show_gate_preset(key).is_err(),
             "{key} must not resolve as a preset this repository never declared"
         );
         assert!(
@@ -942,16 +942,7 @@ applies_to  = ["epic"]
 
 #[test]
 fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_registry_key() {
-    // Regression for issue 552ff75c (REQ-13). `resolve_template_gate` resolves a
-    // template gate NAME by preferring a gate preset, falling back to a registry
-    // gate key ONLY when the name is genuinely not a preset (`PresetNotFoundError`).
-    // If the preset store itself fails to LOAD (a malformed custom preset under
-    // `.jit/config/gate-presets/`), that error must PROPAGATE. The prior bug treated
-    // ANY preset-load error as "not a preset" and fell back to the registry key, so a
-    // broken preset config could let `jit apply` SUCCEED by accidentally matching a
-    // same-named registry gate. This is exercised over a real file-based
-    // `JsonFileStorage`: the parse-error path lives in `PresetManager::new`, which the
-    // in-memory `TestHarness` (a HashMap lookup) cannot reproduce.
+    // A malformed preset must prevent fallback to a same-named registry gate.
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
     std::fs::write(
@@ -987,16 +978,15 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // preset lookup returns `PresetNotFoundError`, the swallowed-error case the bug
     // abused to fall through to the registry key.
     let pre_err = executor
-        .storage()
-        .get_gate_preset("repo-validate")
+        .gates()
+        .show_gate_preset("repo-validate")
         .unwrap_err();
     assert!(
         pre_err.downcast_ref::<PresetNotFoundError>().is_some(),
         "repo-validate must be a registry-only gate so the fallback would match: {pre_err}"
     );
 
-    // Plant a MALFORMED custom preset file named for that SAME gate. Loading it makes
-    // `PresetManager::new` fail with a parse error, NOT `PresetNotFoundError`.
+    // The catalog must propagate a parse error for a same-named malformed preset.
     let presets_dir = temp.path().join("config").join("gate-presets");
     std::fs::create_dir_all(&presets_dir).unwrap();
     std::fs::write(
@@ -1009,8 +999,8 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // `PresetNotFoundError` — it is the parse error that `resolve_template_gate` must
     // propagate rather than swallow.
     let load_err = executor
-        .storage()
-        .get_gate_preset("repo-validate")
+        .gates()
+        .show_gate_preset("repo-validate")
         .unwrap_err();
     assert!(
         load_err.downcast_ref::<PresetNotFoundError>().is_none(),
