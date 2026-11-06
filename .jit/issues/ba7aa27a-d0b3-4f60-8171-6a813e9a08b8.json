@@ -22,7 +22,7 @@
     "type:enhancement"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Code checkouts select an external data root without environment variables",
-  "updated_at": "2026-11-01T23:10:12.690193790Z"
+  "updated_at": "2026-11-06T02:10:15.905385494Z"
 }
