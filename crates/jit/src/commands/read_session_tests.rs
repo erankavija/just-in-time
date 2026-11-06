@@ -237,3 +237,71 @@ fn test_with_read_session_leaves_a_leftover_record_on_both_backends() {
     assert_a_read_leaves_a_leftover_record::<FileSessionBackend>();
     assert_a_read_leaves_a_leftover_record::<MemorySessionBackend>();
 }
+
+#[test]
+fn test_captured_declarations_matches_the_parse_of_the_captured_image_and_writes_nothing() {
+    use crate::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
+    use crate::repository_state::VirtualPath;
+    use crate::storage::RepositoryStateStore;
+
+    let schema = VirtualPath::schema("captured.json").unwrap();
+    let rules = format!(
+        "[[rules]]\nname = \"captured-schema\"\nseverity = \"error\"\nassert = {{ json-schema = {:?} }}\n",
+        schema.relative().as_str(),
+    );
+    let storage = crate::storage::InMemoryStorage::new();
+    crate::test_harness::seed_memory_repository_file(
+        &storage,
+        &schema.repository_relative(),
+        r#"{ "type": "object" }"#,
+    );
+    let config = crate::test_taxonomy::test_taxonomy().config_fragment();
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(&config),
+            rules: Some(&rules),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
+    let layout = executor.require_layout().unwrap();
+    let image = executor
+        .storage()
+        .open_read_session(layout)
+        .unwrap()
+        .capture(
+            CaptureSpec::new(
+                VirtualPath::DECLARATION_FILES.into_iter().chain([schema]),
+                CaptureBudget {
+                    max_listings: 0,
+                    max_bytes: 1024 * 1024,
+                    max_depth: 8,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let parsed = crate::repository_state::declarations_from_image(&image).unwrap();
+    let before = executor.storage().repository_state().entries.clone();
+
+    let captured = executor.config().captured_declarations().unwrap();
+
+    assert_eq!(executor.storage().repository_state().entries, before);
+    let snapshot = |declarations: &crate::repository_state::CapturedRepositoryDeclarations| {
+        crate::config::EffectiveConfig::new(declarations.config().clone())
+            .full_snapshot()
+            .unwrap()
+    };
+    assert_eq!(snapshot(&captured), snapshot(&parsed));
+    assert_eq!(captured.rules(), parsed.rules());
+    assert!(captured
+        .rules()
+        .rules
+        .iter()
+        .any(|rule| rule.name == "captured-schema"));
+    assert_eq!(
+        serde_json::to_value(captured.namespaces()).unwrap(),
+        serde_json::to_value(parsed.namespaces()).unwrap()
+    );
+}

@@ -94,8 +94,9 @@ usage error.
 
 #### Failure modes
 
-The command fails outside a git repository and when worktree detection cannot
-complete. For the code each failure exits with, see the
+The command requires the `git` executable on `PATH` and a Git repository
+([Git Optional](../concepts/guarantees.md#git-optional)); it also fails when
+worktree detection cannot complete. For the code each failure exits with, see the
 [Exit Codes reference](exit-codes.md).
 
 ---
@@ -161,8 +162,9 @@ For JSON output (envelope also carries `message` and `warnings`):
 
 #### Failure modes
 
-The command fails outside a git repository and when the worktrees cannot be
-listed. For the code each failure exits with, see the
+The command requires the `git` executable on `PATH` and a Git repository
+([Git Optional](../concepts/guarantees.md#git-optional)); it also fails when the
+worktrees cannot be listed. For the code each failure exits with, see the
 [Exit Codes reference](exit-codes.md).
 
 ---
@@ -427,7 +429,7 @@ for expiry and references to missing worktrees or issues.
 | `--scope <ID>` | Report the findings of a container's bracket scope as a deterministic gate checker. Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
-| `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
+| `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires the `git` executable on `PATH` and a Git repository; see [Git Optional](../concepts/guarantees.md#git-optional)) |
 | `--leases` | Report expired leases and leases referencing missing worktrees or issues |
 | `--json` | Output as JSON |
 
@@ -542,8 +544,9 @@ its session opens
 ([Publication and Recovery](storage-format.md#publication-and-recovery)). It
 then runs, in sequence:
 1. Repair declaration-derived state through the `jit validate --fix` path
-2. In a Git repository, the coordination routines under `.git/jit/`: clear
-   claim locks left by dead processes (checked by PID), evict expired leases,
+2. When the `git` executable on `PATH` identifies a Git repository
+   ([Git Optional](../concepts/guarantees.md#git-optional)), the coordination
+   routines under `.git/jit/` clear claim locks left by dead processes (checked by PID), evict expired leases,
    reclaim indefinite leases whose heartbeat is [stale](claim.md#staleness), and remove
    interrupted lease operations' `*.tmp` stage files under `leases/` older than
    the [cleanup threshold](runtime-defaults.md). Without Git they are skipped

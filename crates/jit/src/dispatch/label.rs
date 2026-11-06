@@ -1,14 +1,20 @@
 //! `jit label` handlers.
 
-use super::{count_message, CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::LabelCommands;
 use crate::output::{
     LabelValuesResponse, LabelValuesScope, NamespacesHumanDetails, NamespacesResponse,
 };
 use crate::storage::IssueStore;
 
-fn namespaces<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<NamespacesResponse> {
-    let namespaces = ctx.executor.config().get_namespaces()?.namespaces;
+fn namespaces<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<NamespacesResponse> {
+    let namespaces = ctx
+        .executor
+        .config()
+        .captured_declarations()?
+        .namespaces()
+        .namespaces
+        .clone();
     let (names, details): (Vec<_>, Vec<_>) = namespaces.into_iter().unzip();
     let response = NamespacesResponse::with_extras(
         names,
@@ -32,9 +38,9 @@ fn values<S: IssueStore>(
 
 command_group! {
     command: LabelCommands,
-    storage: [IssueStore],
+    storage: [HandlerStore],
     leaves: {
-        "label_namespaces" => LabelCommands::Namespaces => namespaces() -> NamespacesResponse,
+        "label_namespaces" => LabelCommands::Namespaces => namespaces() raises [RetryableConflict] -> NamespacesResponse,
         "label_values" => LabelCommands::Values { namespace } => values(namespace) raises [RetryableConflict] -> LabelValuesResponse,
     }
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-23b48cf0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5752994db93cddfba119f94328a841fe24bb6ef7",
+  "completed_at": "2026-11-06T05:41:01.884451895Z",
+  "duration_ms": 94195,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Git-executable prerequisites and container support are accurately documented across the issue impact cone.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "23b48cf0-02af-4286-a788-bcda0ec32abf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e9be5392-a37b-483f-bf92-bbd0ca5c6732",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:39:27.689073158Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue with no resolved children; reviewed five reachable `jit:23b48cf0` commits individually. Two change documentation; three record gate results.\n\nDocumentation decision: the Git executable prerequisite is accurately documented in guarantees, installation, deployment, and affected command references. The prior claim-reference finding is resolved at `docs/reference/claim.md:104`.\n\nFindings:\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Git-executable prerequisites and container support are accurately documented across the issue impact cone.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

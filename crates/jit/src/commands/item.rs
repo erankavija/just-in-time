@@ -65,15 +65,28 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 }
 
-impl<S: IssueStore> ItemOps<'_, S> {
-    /// Resolve the effective item kinds from the cached `[item_kinds]` registry.
+/// Captured repository declarations.
+type Declarations = crate::repository_state::CapturedRepositoryDeclarations;
+
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
+    /// The captured declarations, with a declaration that does not parse
+    /// reported as an invalid configuration argument.
+    fn declarations(&self) -> Result<Declarations> {
+        self.exec.captured_declarations().map_err(|error| {
+            match error.downcast::<crate::repository_state::DeclarationParseError>() {
+                Ok(error) => configuration_argument_error(error).into(),
+                Err(error) => error,
+            }
+        })
+    }
+
+    /// Resolve the effective item kinds from the captured `[item_kinds]` registry.
     ///
     /// The engine bakes in no kinds: with no `[item_kinds]` table the result is
     /// empty (see [`resolve_item_kinds`]). A profile package or repository-authored
     /// config can supply the table.
-    pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
-        let config = self.exec.cached_config()?;
-        resolve_item_kinds(config.item_kinds.as_ref()).map_err(|err| {
+    fn item_kinds(declarations: &Declarations) -> Result<Vec<ItemKind>> {
+        resolve_item_kinds(declarations.config().item_kinds.as_ref()).map_err(|err| {
             crate::errors::InvalidArgumentError::new(format!(
                 "invalid [item_kinds] configuration: {err}"
             ))
@@ -89,8 +102,8 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// so an alias (`inv`) resolves to the same items as the registry name
     /// (`invariant`); an unresolved input stays as typed, so an unknown kind still
     /// yields an empty result / descriptive not-found rather than an error here.
-    fn canonical_kind_name(&self, name: &str) -> Result<String> {
-        let kinds = self.item_kinds()?;
+    fn canonical_kind_name(declarations: &Declarations, name: &str) -> Result<String> {
+        let kinds = Self::item_kinds(declarations)?;
         Ok(resolve_kind_alias(&kinds, name).unwrap_or(name).to_string())
     }
 
@@ -100,9 +113,8 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// indexing an issue must apply only issue-scope kinds — otherwise a project
     /// kind's id-pattern could spuriously match an issue line and collide with an
     /// issue-scope self-id.
-    fn issue_item_kinds(&self) -> Result<Vec<ItemKind>> {
-        Ok(self
-            .item_kinds()?
+    fn issue_item_kinds(declarations: &Declarations) -> Result<Vec<ItemKind>> {
+        Ok(Self::item_kinds(declarations)?
             .into_iter()
             .filter(|k| !k.kind_scope().is_project())
             .collect())
@@ -118,23 +130,23 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// so `--kind inv` filters the same items as `--kind invariant`. An unknown
     /// kind name yields an empty result (not an error) so callers can probe freely.
     pub fn list_items(&self, kind_filter: Option<&str>) -> Result<ItemListResult> {
+        let declarations = self.declarations()?;
         // Resolve a kind alias in the filter to the canonical registry name so both
         // the kind-set filter and the item filter compare against canonical names
         // (items always carry the registry name). An unresolved filter is kept
         // verbatim, so an unknown kind still yields an empty result.
         let canonical_filter: Option<String> = match kind_filter {
-            Some(f) => Some(self.canonical_kind_name(f)?),
+            Some(f) => Some(Self::canonical_kind_name(&declarations, f)?),
             None => None,
         };
         let filter = canonical_filter.as_deref();
         // Only issue-scope kinds index issue descriptions; project-scope kinds are
         // sourced from their config-declared file via `project_items`.
-        let kinds: Vec<ItemKind> = self
-            .issue_item_kinds()?
+        let kinds: Vec<ItemKind> = Self::issue_item_kinds(&declarations)?
             .into_iter()
             .filter(|k| filter.is_none_or(|f| k.name() == f))
             .collect();
-        let repo_format = self.exec.cached_config()?.content_format();
+        let repo_format = declarations.config().content_format();
         let mut issues = self.exec.storage.list_issues()?;
         // Deterministic output: order by short id, then the index's own order.
         issues.sort_by_key(|a| a.short_id());
@@ -144,7 +156,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
         // order, so both substrates surface through one list (REQ-01). The same
         // `kind_filter` applies to both substrates.
         items.extend(
-            self.project_items()?
+            self.project_items(&declarations)?
                 .into_iter()
                 .filter(|i| filter.is_none_or(|f| i.kind == f)),
         );
@@ -217,10 +229,10 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// qualified-id derivation are identical across them.
     ///
     /// [`ItemError::MissingProjectSource`]: crate::domain::item::ItemError::MissingProjectSource
-    fn project_items(&self) -> Result<Vec<AddressableItem>> {
+    fn project_items(&self, declarations: &Declarations) -> Result<Vec<AddressableItem>> {
         let mut sources = Vec::new();
         let mut registry_items = Vec::new();
-        for kind in self.item_kinds()? {
+        for kind in Self::item_kinds(declarations)? {
             if !kind.kind_scope().is_project() {
                 continue;
             }
@@ -289,7 +301,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
             }
         }
 
-        let repo_format = self.exec.cached_config()?.content_format();
+        let repo_format = declarations.config().content_format();
         // Project-scope source files use the repo's content format (Markdown by
         // default); reuse the same parser selection as issue descriptions.
         let parser = crate::document::content_parser_for(None, repo_format)
@@ -330,13 +342,14 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// different kind's item. An unresolvable scope or an unknown self-id is a
     /// descriptive error rather than a silent miss.
     pub fn show_item(&self, qualified: &str) -> Result<ItemShowResult> {
-        match self.resolve_item_address(qualified)? {
+        let declarations = self.declarations()?;
+        match Self::resolve_item_address(&declarations, qualified)? {
             // Project scope: sourced from a config-declared file, no owning issue
             // (REQ-01). The address always names its kind, so filter by kind AND
             // self-id.
             ResolvedItemAddress::Project { kind, self_id } => {
                 let item = self
-                    .project_items()?
+                    .project_items(&declarations)?
                     .into_iter()
                     .find(|i| i.kind == kind && i.self_id == self_id)
                     .ok_or_else(|| {
@@ -370,8 +383,8 @@ impl<S: IssueStore> ItemOps<'_, S> {
                     })?;
                 let issue = self.exec.storage.load_issue(&full_id)?;
 
-                let kinds = self.issue_item_kinds()?;
-                let repo_format = self.exec.cached_config()?.content_format();
+                let kinds = Self::issue_item_kinds(&declarations)?;
+                let repo_format = declarations.config().content_format();
                 let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                     .map_err(|err| {
                         anyhow!(
@@ -437,7 +450,10 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// address; a malformed one (including a kindless `@/<self-id>`) is the parser's
     /// own [`ItemError::InvalidAddress`](crate::domain::item::ItemError::InvalidAddress),
     /// never a self-id-only match.
-    fn resolve_item_address(&self, qualified: &str) -> Result<ResolvedItemAddress> {
+    fn resolve_item_address(
+        declarations: &Declarations,
+        qualified: &str,
+    ) -> Result<ResolvedItemAddress> {
         // Sugar `<short-id>/<self-id>`: infer the kind from the self-id's shape
         // against the issue-scoped kinds (project-scoped kinds have no sugar form).
         if !qualified.starts_with(PROJECT_SCOPE_SENTINEL) {
@@ -447,7 +463,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
                 ))
                 .into());
             }
-            return resolve_sugar_address(qualified, &self.item_kinds()?)
+            return resolve_sugar_address(qualified, &Self::item_kinds(declarations)?)
                 .map(ResolvedItemAddress::Issue)
                 .map_err(|err| anyhow!("cannot resolve item address '{qualified}': {err}"));
         }
@@ -462,7 +478,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
                 // alias (`@/inv/...`), which resolves to the registry name items
                 // carry, so downstream kind-AND-self-id filtering matches. An
                 // unknown kind stays verbatim, giving a descriptive not-found.
-                let kind = self.canonical_kind_name(&addr.kind)?;
+                let kind = Self::canonical_kind_name(declarations, &addr.kind)?;
                 // Bind the parsed scope token to local project identity: a bare
                 // `@` or a `@<name>` naming the repo's own declared project both
                 // collapse to `Scope::Project`; a `@<name>` naming any other
@@ -470,11 +486,10 @@ impl<S: IssueStore> ItemOps<'_, S> {
                 // lookup — REQ-09, D5). The wrapping context keeps the kind and
                 // self-id visible so a caller can confirm the value was
                 // structurally routed, not mis-split, even on the error path.
-                let local_name = self
-                    .exec
-                    .config_manager
-                    .project_name_from_config(self.exec.cached_config()?);
-                let scope = addr.scope.bind_local(local_name.as_deref()).map_err(|err| {
+                let scope = addr
+                    .scope
+                    .bind_local(declarations.config().project_name())
+                    .map_err(|err| {
                     anyhow!(
                         "cannot resolve item address '{qualified}' (kind '{kind}', self-id '{}'): {err}",
                         addr.self_id,
@@ -1228,16 +1243,15 @@ kind = \"advisory\"
     }
 
     /// A single migrated colon-free rule entry (`name`, no `default:`-style
-    /// prefix), mirroring a real `.jit/rules.toml` row well enough to exercise
-    /// the `rule` item kind's toml projection without pulling in the full
-    /// `RawRule` schema (irrelevant here: `load_toml_scope_items` reads this as a
-    /// generic `toml::Table`, never through the strict rule-engine parser).
+    /// prefix): a valid `.jit/rules.toml` row, since the command parses the
+    /// declarations it reads.
     const ONE_RULE: &str = "\
 [[rules]]
 name = \"coverage-preview\"
 origin = \"bracket\"
 severity = \"error\"
 enforce = true
+assert = { require-section = { heading = \"Goals\" } }
 ";
 
     #[test]
@@ -1270,22 +1284,22 @@ enforce = true
         assert_eq!(shown.issue_title, None);
     }
 
-    /// Two gate registry entries shaped like real `.jit/gates.toml` rows well
-    /// enough to exercise the `gate` kind's toml projection: only `key` and
-    /// `description` matter here (`load_toml_scope_items` reads this as a generic
-    /// `toml::Table`, never through the gate engine's stricter checker schema).
+    /// Two valid `.jit/gates.toml` rows; the `gate` kind's toml projection reads
+    /// only `key` and `description`.
     const TWO_GATES: &str = "\
 [[gates]]
 key = \"cargo-ci\"
 title = \"Cargo CI (fmt + clippy + tests)\"
 description = \"Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass.\"
 stage = \"postcheck\"
+mode = \"manual\"
 
 [[gates]]
 key = \"tests\"
 title = \"All Tests Pass\"
 description = \"Full test suite must pass\"
 stage = \"postcheck\"
+mode = \"manual\"
 ";
 
     #[test]
@@ -1365,6 +1379,7 @@ key = \"coverage-preview\"
 title = \"Coverage Preview\"
 description = \"Run scoped validation for the container resolved from the breakdown node's brackets label; blocks when a [hard] criterion is uncovered at plan time\"
 stage = \"postcheck\"
+mode = \"manual\"
 ";
 
     #[test]

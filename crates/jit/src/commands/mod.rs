@@ -133,14 +133,17 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 // Common imports used across modules
 use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
+#[cfg(any(test, feature = "test-support"))]
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::queries::ReadinessScope;
+#[cfg(any(test, feature = "test-support"))]
+use crate::domain::LabelNamespaces;
 use crate::domain::{
     is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
-    LabelNamespaces, Priority, ReadinessCorrection, State,
+    Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
@@ -522,6 +525,32 @@ fn derive_repository_export(
                 .map_err(Into::into)
         })
         .transpose()
+}
+
+/// Budget of [`CommandExecutor::captured_declarations`]: named files only.
+const DECLARATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_listings: 0,
+        max_bytes: CAPTURE_MAX_BYTES,
+        max_depth: 32,
+    };
+
+/// The schema files the captured `rules.toml` names. A rules file that does not
+/// parse names none here; the declaration parse reports it.
+fn rule_schema_paths(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<Vec<crate::repository_state::VirtualPath>> {
+    use crate::repository_state::VirtualPath;
+
+    let requests = image
+        .file_bytes(&VirtualPath::RULES)?
+        .and_then(|bytes| std::str::from_utf8(bytes).ok())
+        .and_then(|content| crate::declarations::rules::RuleSet::schema_requests(content).ok())
+        .unwrap_or_default();
+    Ok(requests
+        .iter()
+        .filter_map(|request| VirtualPath::schema_reference(&request.reference).ok())
+        .collect())
 }
 
 #[cfg(test)]
@@ -2516,11 +2545,14 @@ pub(crate) fn configuration_argument_error(
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
     config_manager: ConfigManager,
+    // `rules`, `effective_rules` and `namespaces` are test-only remnants, removed
+    // by 42046050 (executor-config-caches-removal).
     /// Lazily-parsed `.jit/rules.toml`, cached for the lifetime of the
     /// executor so the validation ruleset is read at most once per process
     /// rather than re-parsed on every write. The cached value retains any
     /// load/parse error so callers can surface a misconfigured rules file
     /// instead of silently treating it as "no rules".
+    #[cfg(any(test, feature = "test-support"))]
     rules: OnceLock<Result<RuleSet, RuleConfigError>>,
     /// Lazily-built EFFECTIVE rule set. When `.jit/rules.toml` is present it
     /// supplies the rules, with the `origin = "default"` family reconciled against
@@ -2532,6 +2564,7 @@ pub struct CommandExecutor<S: IssueStore> {
     /// default rules here. A load/parse error from either source is retained as an
     /// `Err` so a misconfigured repo surfaces the problem rather than silently
     /// disabling enforcement.
+    #[cfg(any(test, feature = "test-support"))]
     effective_rules: OnceLock<Result<RuleSet, String>>,
     /// Lazily-loaded `.jit/config.toml`, cached so the unified write-time
     /// validation entry point does not re-read and re-parse `config.toml` on
@@ -2541,6 +2574,7 @@ pub struct CommandExecutor<S: IssueStore> {
     config: OnceLock<Result<JitConfig, String>>,
     /// Lazily-built label namespace registry, derived from the cached config and
     /// cached alongside it for the same reason.
+    #[cfg(any(test, feature = "test-support"))]
     namespaces: OnceLock<Result<LabelNamespaces, String>>,
     /// The canonical repository layout every session this executor opens mutates
     /// through.
@@ -2584,9 +2618,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         Self {
             storage,
             config_manager,
+            #[cfg(any(test, feature = "test-support"))]
             rules: OnceLock::new(),
+            #[cfg(any(test, feature = "test-support"))]
             effective_rules: OnceLock::new(),
             config: OnceLock::new(),
+            #[cfg(any(test, feature = "test-support"))]
             namespaces: OnceLock::new(),
             layout: None,
             worktree_paths: OnceLock::new(),
@@ -2641,6 +2678,32 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
             .as_ref()
             .map_err(|message| anyhow!("{message}"))
+    }
+
+    /// The repository's declaration files, and the rule schemas `rules.toml`
+    /// names, captured in one read-driver snapshot and parsed once.
+    pub(crate) fn captured_declarations(
+        &self,
+    ) -> Result<crate::repository_state::CapturedRepositoryDeclarations>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{CaptureSpec, VirtualPath};
+
+        let layout = self.require_layout()?;
+        with_read_session(&self.storage, &layout, "declaration read", |session| {
+            let spec =
+                CaptureSpec::new(VirtualPath::DECLARATION_FILES, DECLARATION_CAPTURE_BUDGET)?;
+            let Some(image) = capture_discovering(session, spec, |image, spec| {
+                Ok(spec.discover_paths(rule_schema_paths(image)?)?)
+            })?
+            else {
+                return Ok(None);
+            };
+            Ok(Some(crate::repository_state::declarations_from_image(
+                &image,
+            )?))
+        })
     }
 
     /// The canonical mutation layout, or a typed error when none was supplied.
@@ -2907,6 +2970,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `Err` rather than being swallowed, so a misconfigured repository cannot
     /// silently disable all rule enforcement. The load is performed at most once
     /// and the outcome (success or failure) is cached.
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
         self.rules
             .get_or_init(|| {
@@ -2932,6 +2996,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// declared schemas, while default assertions derive from configuration.
     ///
     /// The result, including any configuration or rule-loading error, is cached.
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
@@ -2972,6 +3037,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Cached alongside [`cached_config`](Self::cached_config) so the registry is
     /// derived at most once per executor.
+    #[cfg(any(test, feature = "test-support"))]
     fn cached_namespaces(&self) -> Result<&LabelNamespaces> {
         self.namespaces
             .get_or_init(|| {

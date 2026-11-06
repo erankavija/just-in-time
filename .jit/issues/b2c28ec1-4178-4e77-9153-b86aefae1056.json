@@ -17,6 +17,7 @@
       "path": "dev/active/b2c28ec1/criteria-ruling.md"
     }
   ],
+  "done_at": "2026-11-06T05:40:59.233627013Z",
   "first_ready_at": "2026-11-06T04:39:49.072579391Z",
   "gates_required": [
     "cargo-ci",
@@ -30,9 +31,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "e3ff064f-dd20-4877-aea5-f7034b157762",
-      "status": "failed",
-      "updated_at": "2026-11-06T05:34:57.835884973Z",
+      "run_id": "a598182e-dd41-4617-9b75-4b18d75f1314",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:40:42.412854423Z",
       "updated_by": "auto:executor"
     }
   },
@@ -48,7 +49,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Relative path inputs validate through RootRelativePath::parse",
-  "updated_at": "2026-11-06T05:36:42.118533796Z"
+  "updated_at": "2026-11-06T05:40:59.233627013Z"
 }

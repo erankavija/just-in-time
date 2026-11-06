@@ -209,7 +209,8 @@
       "category": "criterion premise removed upstream",
       "issue": "b2c28ec1",
       "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
-      "status": "open"
+      "status": "resolved",
+      "decision": "steward: REQ-06 corrected (read_repo_file rustdoc names the parser; no other parser/splitter named in crates/); ruling dev/active/b2c28ec1/criteria-ruling.md; code-review passed on re-run"
     }
   ],
   "rework_counts": {

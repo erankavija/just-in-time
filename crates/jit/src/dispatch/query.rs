@@ -1,7 +1,7 @@
 //! `jit query` and `jit status` handlers.
 
 use super::issue::{list as list_all, ISSUE_LISTING};
-use super::{count_message, CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{CountDimension, IssueFilterArgs, QueryArgs, QueryCommands};
 use crate::commands::{DivergenceResponse, StateRollup};
 use crate::domain::Issue;
@@ -26,7 +26,7 @@ fn available<S: IssueStore>(
     subset(QuerySubset::Available, issues, full)
 }
 
-fn strategic<S: IssueStore>(
+fn strategic<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     filters: IssueFilterArgs,
     full: bool,
@@ -82,7 +82,7 @@ fn count<S: IssueStore>(
     Ok(Outcome::success_with(rollup, message))
 }
 
-fn divergence<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<DivergenceResponse> {
+fn divergence<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<DivergenceResponse> {
     let report = ctx.executor.graph().detect_divergences()?;
     let message = count_message(report.count(), "", " divergence(s)");
     Ok(Outcome::success_with(report, message))
@@ -90,7 +90,7 @@ fn divergence<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<Diver
 
 command_group! {
     command: QueryCommands,
-    storage: [IssueStore],
+    storage: [HandlerStore],
     leaves: {
         "query_all" => QueryCommands::All { filters, full } => list_all(filters, full) raises [RetryableConflict] -> IssueListing
             as union [crate::output::IssueListResponse, crate::output::IssueListFullResponse]
@@ -189,7 +189,7 @@ fn reject_parent_filters(
 }
 
 /// Run `jit query`: its subcommand, or the bare listing when none is given.
-pub fn run<S: IssueStore>(
+pub fn run<S: HandlerStore>(
     args: QueryArgs,
     ctx: &CommandContext<'_, S>,
     out: &mut dyn std::io::Write,

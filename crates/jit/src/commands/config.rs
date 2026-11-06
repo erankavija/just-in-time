@@ -275,21 +275,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> ConfigOps<'_, S> {
-    /// The repository's declared hierarchy and label associations.
-    pub fn get_hierarchy_config(&self) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
-        crate::config_manager::get_hierarchy_config(self.exec.storage())
-    }
-
-    /// The repository's label namespace declarations.
-    pub fn get_namespaces(&self) -> Result<LabelNamespaces> {
-        self.exec.config_manager.get_namespaces()
-    }
-
-    /// Icons resolved from the repository's hierarchy and icon configuration.
-    pub fn get_hierarchy_icons(&self) -> Result<std::collections::HashMap<String, String>> {
-        self.exec.config_manager.get_hierarchy_icons()
-    }
-
     /// The explicit layout selected when the executor was constructed.
     pub fn repository_layout(&self) -> Result<&crate::repository_state::RepositoryLayout> {
         self.exec.repository_layout()
@@ -424,11 +409,27 @@ impl<S: IssueStore> ConfigOps<'_, S> {
         ConfigValidationReport::at_data_root(layout.data_root(), root_override.as_deref())
     }
 
+    /// The repository's declaration files, and the rule schemas `rules.toml`
+    /// names, captured in one read-driver snapshot and parsed once.
+    pub fn captured_declarations(
+        &self,
+    ) -> Result<crate::repository_state::CapturedRepositoryDeclarations>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        self.exec.captured_declarations()
+    }
+
     /// The type hierarchy declared by the repository's namespace configuration.
-    pub fn declared_type_hierarchy(&self) -> Result<std::collections::HashMap<String, u8>> {
-        let layout = self.exec.storage().repository_layout()?;
-        let namespaces = crate::config_manager::ConfigManager::new(layout).get_namespaces()?;
-        Ok(namespaces.declared_type_hierarchy())
+    pub fn declared_type_hierarchy(&self) -> Result<std::collections::HashMap<String, u8>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self
+            .exec
+            .captured_declarations()?
+            .namespaces()
+            .declared_type_hierarchy())
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE

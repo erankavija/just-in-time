@@ -498,7 +498,10 @@ impl<S: IssueStore> GraphOps<'_, S> {
         format: GraphExportFormat,
         full: bool,
         scope: Option<&IssueId>,
-    ) -> Result<GraphExportOutput> {
+    ) -> Result<GraphExportOutput>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -506,7 +509,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
         // full JSON node shape. Resolution is always repository-wide.
         let needs_full_json = matches!((format, full), (GraphExportFormat::Json, true));
         let resolution = if scope.is_some() || needs_full_json {
-            let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+            let config = self.exec.captured_declarations()?.hierarchy()?;
             Some(crate::graph::hierarchy::resolve_hierarchy(
                 &issue_refs,
                 &config,
@@ -589,7 +592,12 @@ impl<S: IssueStore> GraphOps<'_, S> {
     ///
     /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
     /// `batch-create` consumes.
-    pub fn export_graph_batch(&self, scope: Option<&IssueId>) -> Result<BatchExport> {
+    pub fn export_graph_batch(&self, scope: Option<&IssueId>) -> Result<BatchExport>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let declarations = self.exec.captured_declarations()?;
+        let hierarchy = declarations.hierarchy()?;
         let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -597,8 +605,8 @@ impl<S: IssueStore> GraphOps<'_, S> {
         let member_ids: Option<HashSet<&IssueId>> = match &scope {
             Some(container) => {
                 let container_id = *container;
-                let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
-                let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
+                let resolution =
+                    crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &hierarchy);
                 Some(
                     resolution
                         .membership_closure(container_id)
@@ -612,8 +620,8 @@ impl<S: IssueStore> GraphOps<'_, S> {
         let in_scope = |id: &IssueId| member_ids.as_ref().is_none_or(|m| m.contains(id));
 
         // Config-derived projection inputs.
-        let stripped_ns = self.identity_bound_namespaces()?;
-        let bracket_types = self.bracket_node_types()?;
+        let stripped_ns = identity_bound_namespaces(&hierarchy, declarations.rules());
+        let bracket_types = bracket_node_types(&declarations.config().templates);
         let is_bracket = |issue: &Issue| {
             crate::labels::type_label_value(&issue.labels)
                 .is_some_and(|t| bracket_types.contains(t))
@@ -681,62 +689,6 @@ impl<S: IssueStore> GraphOps<'_, S> {
         })
     }
 
-    /// The set of label namespaces that are identity-bound and therefore
-    /// stripped from batch export (REQ-04). Derived from configuration only:
-    /// membership namespaces declared in `[type_hierarchy.label_associations]`,
-    /// plus the `satisfies-namespace` and `container-from-label` values of every
-    /// `label-coverage` rule in the effective ruleset.
-    fn identity_bound_namespaces(&self) -> Result<HashSet<String>> {
-        use crate::declarations::rules::Assertion;
-
-        let mut namespaces: HashSet<String> = HashSet::new();
-
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
-        for (_type_name, namespace) in hierarchy.membership_namespaces() {
-            namespaces.insert(namespace.clone());
-        }
-
-        for rule in &self.exec.effective_rules()?.rules {
-            if let Assertion::LabelCoverage { config } = &rule.assert {
-                namespaces.extend(
-                    [
-                        &config.authored_satisfies_namespace,
-                        &config.container_from_label,
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .cloned(),
-                );
-            }
-        }
-
-        Ok(namespaces)
-    }
-
-    /// The set of issue type names that serve a template planning- or
-    /// breakdown-role node (REQ-05). Collected across every registered template
-    /// via [`GraphTemplate::planning_type`]/[`breakdown_type`], resolved through
-    /// the repository's [`RoleBindings`] — no role or type literal.
-    ///
-    /// [`GraphTemplate::planning_type`]: crate::templates::GraphTemplate::planning_type
-    /// [`breakdown_type`]: crate::templates::GraphTemplate::breakdown_type
-    /// [`RoleBindings`]: crate::templates::RoleBindings
-    fn bracket_node_types(&self) -> Result<HashSet<String>> {
-        let registry = &self.exec.cached_config()?.templates;
-        Ok(registry
-            .templates
-            .iter()
-            .flat_map(|t| {
-                [
-                    t.planning_type(&registry.roles),
-                    t.breakdown_type(&registry.roles),
-                ]
-            })
-            .flatten()
-            .map(str::to_string)
-            .collect())
-    }
-
     /// Resolve the canonical hierarchy for `graph tree`, optionally scoped to a
     /// container's subtree.
     ///
@@ -789,12 +741,15 @@ impl<S: IssueStore> GraphOps<'_, S> {
     pub fn resolve_hierarchy_tree(
         &self,
         root: Option<&IssueId>,
-    ) -> Result<crate::commands::GraphTreeResponse> {
+    ) -> Result<crate::commands::GraphTreeResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::commands::{GraphTreeResponse, HierarchyNodeView};
 
+        let config = self.exec.captured_declarations()?.hierarchy()?;
         let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
         // When scoped to a root, keep the root plus its transitive dependency
@@ -873,11 +828,71 @@ impl<S: IssueStore> GraphOps<'_, S> {
     /// assert_eq!(report.items.len(), 1);
     /// assert_eq!(report.items[0].label, membership);
     /// ```
-    pub fn detect_divergences(&self) -> Result<DivergenceResponse> {
+    pub fn detect_divergences(&self) -> Result<DivergenceResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let config = self.exec.captured_declarations()?.hierarchy()?;
         let issues = self.exec.storage.list_issues()?;
-        let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         Ok(DivergenceResponse::from_issues(&issues, &config))
     }
+}
+
+/// The set of label namespaces that are identity-bound and therefore
+/// stripped from batch export (REQ-04). Derived from configuration only:
+/// membership namespaces declared in `[type_hierarchy.label_associations]`,
+/// plus the `satisfies-namespace` and `container-from-label` values of every
+/// `label-coverage` rule in the effective ruleset.
+fn identity_bound_namespaces(
+    hierarchy: &crate::domain::type_taxonomy::HierarchyConfig,
+    rules: &crate::declarations::rules::RuleSet,
+) -> HashSet<String> {
+    use crate::declarations::rules::Assertion;
+
+    let mut namespaces: HashSet<String> = HashSet::new();
+
+    for (_type_name, namespace) in hierarchy.membership_namespaces() {
+        namespaces.insert(namespace.clone());
+    }
+
+    for rule in &rules.rules {
+        if let Assertion::LabelCoverage { config } = &rule.assert {
+            namespaces.extend(
+                [
+                    &config.authored_satisfies_namespace,
+                    &config.container_from_label,
+                ]
+                .into_iter()
+                .flatten()
+                .cloned(),
+            );
+        }
+    }
+
+    namespaces
+}
+
+/// The set of issue type names that serve a template planning- or
+/// breakdown-role node (REQ-05). Collected across every registered template
+/// via [`GraphTemplate::planning_type`]/[`breakdown_type`], resolved through
+/// the repository's [`RoleBindings`] — no role or type literal.
+///
+/// [`GraphTemplate::planning_type`]: crate::templates::GraphTemplate::planning_type
+/// [`breakdown_type`]: crate::templates::GraphTemplate::breakdown_type
+/// [`RoleBindings`]: crate::templates::RoleBindings
+fn bracket_node_types(registry: &crate::templates::TemplateRegistry) -> HashSet<String> {
+    registry
+        .templates
+        .iter()
+        .flat_map(|t| {
+            [
+                t.planning_type(&registry.roles),
+                t.breakdown_type(&registry.roles),
+            ]
+        })
+        .flatten()
+        .map(str::to_string)
+        .collect()
 }
 
 /// Compute summary statistics from a dependency tree

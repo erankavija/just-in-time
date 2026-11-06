@@ -353,7 +353,8 @@ issue writes; a hand edit is not caught at commit. See the
 Error: Failed to detect worktree paths
 ```
 
-**Cause:** Not in a git repository, or git worktree not properly set up.
+**Cause:** The `git` executable is unavailable on `PATH`, you're not in a Git
+repository, or the git worktree is not properly set up. See [Git Optional](../concepts/guarantees.md#git-optional).
 
 **Solutions:**
 
