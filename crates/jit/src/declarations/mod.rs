@@ -8,9 +8,11 @@ mod gates;
 pub mod invariants;
 pub mod rules;
 
+pub(crate) use gates::normalize_gate_registry_for_document;
 pub use gates::{
-    parse_gate_registry, serialize_gate_registry, GateChecker, GateDeclarationError,
-    GateDefinition, GateMode, GateRegistry, GateStage, REVIEW_PLACEHOLDER_WARNING,
+    edit_gate_registry_document, parse_gate_registry, serialize_gate_registry, GateChecker,
+    GateDeclarationError, GateDefinition, GateMode, GateRegistry, GateStage,
+    REVIEW_PLACEHOLDER_WARNING,
 };
 
 use crate::config::{ItemKindConfigError, JitConfig};
