@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "doc-review": {
-      "run_id": "9c0843d7-855b-46f5-acfa-82f8e19196ee",
-      "status": "failed",
-      "updated_at": "2026-11-06T05:28:58.387276003Z",
+      "run_id": "e9be5392-a37b-483f-bf92-bbd0ca5c6732",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:41:01.886193285Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Git requirement pages name the git executable",
-  "updated_at": "2026-11-06T05:39:27.437335148Z"
+  "updated_at": "2026-11-06T05:41:01.886193285Z"
 }
