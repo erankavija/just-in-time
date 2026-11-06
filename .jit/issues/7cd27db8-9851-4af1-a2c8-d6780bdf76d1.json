@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2733d03e-a2db-4bca-8e3e-3824c3228a70",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:06:52.815355694Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Snapshot export reads committed files through one git process",
-  "updated_at": "2026-11-06T03:25:36.452222125Z"
+  "updated_at": "2026-11-06T04:06:52.815355694Z"
 }
