@@ -56,6 +56,7 @@ mod tests {
         assert!(is_alive(std::process::id()));
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_is_alive_reports_dead_for_exited_process() {
         let mut child = std::process::Command::new("true")
