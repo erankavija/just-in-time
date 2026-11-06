@@ -182,6 +182,13 @@
       "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
       "status": "resolved",
       "decision": "steward: one final round, scope = #[cfg(unix)] on unix-dependent tests in process.rs only; if code-review fails again, do not rework, send the finding to the steward"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "issue scope (criteria contradiction)",
+      "issue": "693a2fdd",
+      "detail": "code-review 3fe7575a F1: REQ-03 '(modified and failed)' vs REQ-01 'remaining tests pass unchanged' (test_apply_bulk_update_best_effort asserts errors-only). Recommended: comply with REQ-03, update the one test.",
+      "status": "open"
     }
   ],
   "rework_counts": {
