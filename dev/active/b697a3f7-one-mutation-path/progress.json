@@ -203,6 +203,13 @@
       "issue": "693a2fdd",
       "detail": "code-review 3fe7575a F1: REQ-03 '(modified and failed)' vs REQ-01 'remaining tests pass unchanged' (test_apply_bulk_update_best_effort asserts errors-only). Recommended: comply with REQ-03, update the one test.",
       "status": "open"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "criterion premise removed upstream",
+      "issue": "b2c28ec1",
+      "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -215,7 +222,8 @@
     "d3c94dc5": 1,
     "30334066": 1,
     "850eaad3": 1,
-    "b2c28ec1": 2
+    "b2c28ec1": 2,
+    "030df4b1": 1
   },
   "surfaced_pitfalls": [
     {
@@ -229,6 +237,13 @@
       "subject": "lock-free read conflicts under a continuous writer",
       "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
       "status": "open"
+    },
+    {
+      "found_in": "030df4b1",
+      "subject": "captured declaration parse fails on a missing default rule schema",
+      "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
+      "status": "open",
+      "owner": "42046050"
     }
   ],
   "started_at": "2026-11-06T01:20:00+02:00",

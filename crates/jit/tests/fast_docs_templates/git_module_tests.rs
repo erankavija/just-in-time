@@ -1358,11 +1358,7 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
         ("HEAD", "docs", Some(RepositoryTargetKind::Directory)),
         ("HEAD", "docs/[x].md", Some(RepositoryTargetKind::File)),
         ("HEAD", "docs/*.md", Some(RepositoryTargetKind::Missing)),
-        (
-            "HEAD",
-            ":(glob)docs/*.md",
-            Some(RepositoryTargetKind::Missing),
-        ),
+        ("HEAD", ":(glob)docs/*.md", None),
         (
             first.as_str(),
             "docs/file.md",
@@ -1389,6 +1385,10 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
     assert!(matches!(
         actual[&("not-a-revision".to_string(), "docs/file.md".to_string())],
         Err(GitError::RevisionNotFound { .. })
+    ));
+    assert!(matches!(
+        actual[&("HEAD".to_string(), ":(glob)docs/*.md".to_string())],
+        Err(GitError::InvalidPath(_))
     ));
     assert_eq!(
         actual[&(first.clone(), "docs/file.md".to_string())]
@@ -1419,7 +1419,14 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
             .count(),
         1
     );
-    assert_eq!(cache.len(), 12);
+    let invocation_count = stand_in.invocations().len();
+    let refused_request = [("HEAD".to_string(), ":(glob)docs/*.md".to_string())]
+        .into_iter()
+        .collect();
+    let _ =
+        batched.inspect_pinned_targets(&refused_request, &BTreeSet::new(), &mut BTreeMap::new());
+    assert_eq!(stand_in.invocations().len(), invocation_count);
+    assert_eq!(cache.len(), 11);
 }
 
 #[cfg(unix)]

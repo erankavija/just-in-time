@@ -208,11 +208,18 @@ fn render_document_diff(
 ) -> Result<String> {
     use similar::{ChangeTag, TextDiff};
 
-    crate::storage::validate_repo_relative_path(path)?;
+    let relative = crate::domain::relative_path::RootRelativePath::parse(path)
+        .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
+    if relative.is_root() {
+        return Err(crate::storage::PathReadError::InvalidPath(
+            "repository root is not a document path".to_string(),
+        )
+        .into());
+    }
     let relative_root = repository_root
         .strip_prefix(checkout_top_level)
         .unwrap_or(std::path::Path::new(""));
-    let relative_path = relative_root.join(path);
+    let relative_path = relative_root.join(relative.as_path());
     let relative_path = relative_path
         .to_str()
         .ok_or_else(|| anyhow!("document path is not valid UTF-8"))?;
@@ -637,15 +644,21 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, VirtualPath};
-        use crate::storage::validate_repo_relative_path;
+        use crate::repository_state::{finalize, RepositoryRootClass, VirtualPath};
         use std::collections::BTreeSet;
 
-        validate_repo_relative_path(path)?;
+        let relative = crate::domain::relative_path::RootRelativePath::parse(path)
+            .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
+        if relative.is_root() {
+            return Err(crate::storage::PathReadError::InvalidPath(
+                "repository root is not a document path".to_string(),
+            )
+            .into());
+        }
         let layout = self.exec.require_layout()?;
         let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
         let issue_path = VirtualPath::issue_record(issue_id);
-        let document_path = VirtualPath::worktree(path)
+        let document_path = VirtualPath::from_root(RepositoryRootClass::Worktree, relative)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
         let source = match commit {
             Some(revision) => DocumentScanSource::Pinned {
@@ -898,10 +911,9 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // None (working-tree read).
         let effective_commit = at_commit.or(doc.commit.as_deref());
 
-        // The storage layer now enforces repo-relative paths uniformly (see
-        // `JsonFileStorage::read_path_bytes`): empty, absolute, or `..`-bearing
-        // paths are rejected with `PathReadError::InvalidPath`, and working-tree
-        // reads are canonicalized + containment-checked against the repo root.
+        // `JsonFileStorage::read_path_bytes` parses paths with
+        // `RootRelativePath::parse`, rejects the root identity, and checks
+        // working-tree reads for containment against the repository root.
         // That makes pre-resolving to an absolute path here both unnecessary
         // and actively harmful, so we simply pass the stored repo-relative path
         // through.

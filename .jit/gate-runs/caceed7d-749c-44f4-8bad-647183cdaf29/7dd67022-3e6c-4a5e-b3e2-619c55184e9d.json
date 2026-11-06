@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-caceed7d",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2344263acf5b7a7f96908148a77d8716a9060461",
+  "completed_at": "2026-11-06T05:26:05.761001637Z",
+  "duration_ms": 60949,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue accurately corrects out-of-scope contributor planning material; no adopter documentation impact is missing.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "caceed7d-749c-44f4-8bad-647183cdaf29",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7dd67022-3e6c-4a5e-b3e2-619c55184e9d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:25:04.811076401Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `caceed7d` is a leaf task. I inspected both reachable tagged commits individually: `a59755a4` updates the two vision documents; `2344263a` records its prior gate run. The current storage Git module confirms the CLI-based implementation.\n\nDocumentation impact: the patch only updates `dev/` planning material, which is outside this gate’s adopter-facing surface. No adopter documentation update is required.\n\n1. No findings identified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue accurately corrects out-of-scope contributor planning material; no adopter documentation impact is missing.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
