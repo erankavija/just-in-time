@@ -1,11 +1,10 @@
-//! Configuration file loading and parsing.
+//! Configuration declarations and effective values.
 //!
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
 use crate::domain::item::KindScope;
 use crate::domain::vocabulary::wire_vocabulary;
-use crate::repository_state::RepositoryLayout;
 #[cfg(test)]
 use crate::repository_state::VirtualPath;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
@@ -1222,17 +1221,6 @@ impl JitConfig {
             .strictness()
     }
 
-    /// Load the configuration from the data root's declaration files through
-    /// [`assemble_configuration`](crate::declarations::assemble_configuration).
-    pub fn load(layout: &RepositoryLayout) -> Result<Self> {
-        Ok(
-            crate::storage::repository_state_store::ConfigurationObservation::capture(
-                layout.data_root(),
-            )?
-            .assemble()?,
-        )
-    }
-
     /// Validate every explicitly-declared `[item_kinds.X]` table, requiring all
     /// six fields (`section`, `id-pattern`, `markers`, `link-namespaces`, `scope`,
     /// `source-of-truth`) on each, and rejecting any `aliases` collision.
@@ -1302,12 +1290,11 @@ pub struct EffectiveConfig {
 }
 
 impl EffectiveConfig {
-    /// Load the effective configuration for `layout`. Owns the filesystem
-    /// interaction so callers in the `commands` layer never touch `std::fs`.
-    pub fn load(layout: &RepositoryLayout) -> Result<Self> {
-        Ok(Self {
-            repo_config: Some(JitConfig::load(layout)?),
-        })
+    /// Resolve effective values from an already-loaded repository configuration.
+    pub fn new(repo_config: JitConfig) -> Self {
+        Self {
+            repo_config: Some(repo_config),
+        }
     }
 
     /// Get the effective enforcement mode: the repository config's
@@ -1413,6 +1400,7 @@ impl EffectiveConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::configuration_store::load_configuration;
     use tempfile::TempDir;
 
     #[test]
@@ -1439,7 +1427,7 @@ depends_on = ["planning"]
         )
         .unwrap();
 
-        let config = JitConfig::load(&layout).unwrap();
+        let config = load_configuration(&layout).unwrap();
         let plan = config
             .templates
             .get("plan")
@@ -1468,7 +1456,7 @@ enforced-by = "dag-no-cycles"
         )
         .unwrap();
 
-        let config = JitConfig::load(&layout).unwrap();
+        let config = load_configuration(&layout).unwrap();
         assert_eq!(config.invariants.invariants.len(), 1);
         let inv = &config.invariants.invariants[0];
         assert_eq!(inv.id, "sample-invariant");
@@ -1496,7 +1484,7 @@ enforced-by = "dag-no-cycles"
         )
         .unwrap();
 
-        let config = JitConfig::load(&layout).unwrap();
+        let config = load_configuration(&layout).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.invariants.invariants.len(), 1);
         assert_eq!(config.invariants.invariants[0].id, "second-invariant");
@@ -1507,7 +1495,7 @@ enforced-by = "dag-no-cycles"
         // No `invariants.toml` → empty registry, whether or not config.toml exists.
         let no_config = TempDir::new().unwrap();
         assert!(
-            JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
+            load_configuration(&crate::test_utils::repository_layout_for_data_root(
                 no_config.path()
             ))
             .unwrap()
@@ -1524,7 +1512,7 @@ enforced-by = "dag-no-cycles"
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
-        assert!(JitConfig::load(&with_config_layout)
+        assert!(load_configuration(&with_config_layout)
             .unwrap()
             .invariants
             .invariants
@@ -1782,7 +1770,7 @@ enforced-by = "dag-no-cycles"
             bad,
         )
         .unwrap();
-        let err = JitConfig::load(&no_config_layout).unwrap_err();
+        let err = load_configuration(&no_config_layout).unwrap_err();
         assert!(
             err.to_string()
                 .contains(VirtualPath::INVARIANTS.relative().as_str()),
@@ -1804,7 +1792,7 @@ enforced-by = "dag-no-cycles"
             bad,
         )
         .unwrap();
-        let err = JitConfig::load(&with_config_layout).unwrap_err();
+        let err = load_configuration(&with_config_layout).unwrap_err();
         assert!(
             err.to_string()
                 .contains(VirtualPath::INVARIANTS.relative().as_str()),
@@ -1922,7 +1910,7 @@ default_type = "task"
             "[validation]\nstrictness = \"banana\"\n",
         )
         .unwrap();
-        let err = JitConfig::load(&layout).unwrap_err();
+        let err = load_configuration(&layout).unwrap_err();
         // The load path wraps the deserialize error with context, so inspect the
         // full chain for the offending value.
         let chain = format!("{err:#}");
@@ -1954,7 +1942,7 @@ default_type = "task"
             let temp_dir = TempDir::new().unwrap();
             let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
             std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &fragment).unwrap();
-            let loaded = JitConfig::load(&layout)
+            let loaded = load_configuration(&layout)
                 .expect_err("an unknown key must fail to load")
                 .to_string();
             let declared =
@@ -1973,7 +1961,7 @@ default_type = "task"
     #[test]
     fn test_load_missing_config() {
         let temp_dir = TempDir::new().unwrap();
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
+        let config = load_configuration(&crate::test_utils::repository_layout_for_data_root(
             temp_dir.path(),
         ))
         .unwrap();
@@ -1994,7 +1982,7 @@ types = { epic = 1, task = 2 }
 "#;
         std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), config_toml).unwrap();
 
-        let config = JitConfig::load(&layout).unwrap();
+        let config = load_configuration(&layout).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.type_hierarchy.unwrap().types.len(), 2);
     }
@@ -2007,7 +1995,7 @@ types = { epic = 1, task = 2 }
         let bad_toml = "[broken syntax";
         std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), bad_toml).unwrap();
 
-        let result = JitConfig::load(&layout);
+        let result = load_configuration(&layout);
         assert!(result.is_err());
     }
 
@@ -2220,7 +2208,7 @@ section = "success_criteria"
 
     #[test]
     fn test_item_kinds_load_rejects_partial_declaration() {
-        // The required-six rule fires through the real `JitConfig::load` path.
+        // The required-six rule fires through the real `load_configuration` path.
         let temp_dir = TempDir::new().unwrap();
         let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
@@ -2228,7 +2216,7 @@ section = "success_criteria"
             "[item_kinds.custom-decision]\nsection = \"decisions\"\nid-pattern = \"DEC-\\\\d+\"\n",
         )
         .unwrap();
-        let err = JitConfig::load(&layout).expect_err("load must reject partial kind");
+        let err = load_configuration(&layout).expect_err("load must reject partial kind");
         let msg = format!("{err:#}");
         assert!(
             msg.contains("custom-decision"),
@@ -2324,7 +2312,7 @@ section = "success_criteria"
 
     #[test]
     fn test_item_kinds_alias_collision_rejected_through_load() {
-        // The alias-collision guard fires through the real `JitConfig::load` path,
+        // The alias-collision guard fires through the real `load_configuration` path,
         // the same path that rejects a partial `[item_kinds]` declaration.
         let body = complete_kind_body();
         let temp_dir = TempDir::new().unwrap();
@@ -2334,7 +2322,7 @@ section = "success_criteria"
             format!("[item_kinds.custom-requirement]\n{body}aliases = [\"custom-requirement\"]\n"),
         )
         .unwrap();
-        let err = JitConfig::load(&layout).expect_err("load must reject colliding alias");
+        let err = load_configuration(&layout).expect_err("load must reject colliding alias");
         let msg = format!("{err:#}");
         assert!(
             msg.contains("custom-requirement"),
@@ -2715,11 +2703,10 @@ max_indefinite_leases_per_agent = 3
             let repo_dir_layout =
                 crate::test_utils::repository_layout_for_data_root(repo_dir.path());
             std::fs::write(repo_dir_layout.resolve(&VirtualPath::CONFIG).unwrap(), repo).unwrap();
-            let enforced = JitConfig::load(&repo_dir_layout)
+            let enforced = load_configuration(&repo_dir_layout)
                 .unwrap()
                 .enforcement_mode();
-            let reported = EffectiveConfig::load(&repo_dir_layout)
-                .unwrap()
+            let reported = EffectiveConfig::new(load_configuration(&repo_dir_layout).unwrap())
                 .enforcement_mode();
             assert_eq!(reported, enforced, "repo {repo:?}");
         }
@@ -2748,8 +2735,9 @@ max_indefinite_leases_per_agent = 3
             let dir = TempDir::new().unwrap();
             let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
             std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &repo).unwrap();
-            let enforced = JitConfig::load(&layout).unwrap().coordination();
-            let reported = EffectiveConfig::load(&layout).unwrap().coordination();
+            let enforced = load_configuration(&layout).unwrap().coordination();
+            let reported =
+                EffectiveConfig::new(load_configuration(&layout).unwrap()).coordination();
             assert_eq!(reported, enforced, "repo {repo:?}");
             assert_eq!(
                 enforced,
@@ -2843,7 +2831,7 @@ max_indefinite_leases_per_agent = 3
         )
         .unwrap();
 
-        let config = JitConfig::load(&layout).unwrap();
+        let config = load_configuration(&layout).unwrap();
         assert_eq!(
             config
                 .project
@@ -2867,7 +2855,7 @@ max_indefinite_leases_per_agent = 3
         )
         .unwrap();
 
-        let result = JitConfig::load(&layout);
+        let result = load_configuration(&layout);
         assert!(result.is_err());
         let msg = format!("{:#}", result.unwrap_err());
         assert!(
@@ -2879,7 +2867,7 @@ max_indefinite_leases_per_agent = 3
     #[test]
     fn test_jitconfig_load_project_absent_is_none() {
         let dir = TempDir::new().unwrap();
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
+        let config = load_configuration(&crate::test_utils::repository_layout_for_data_root(
             dir.path(),
         ))
         .unwrap();
