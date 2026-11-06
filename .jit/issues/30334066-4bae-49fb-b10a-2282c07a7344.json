@@ -9,12 +9,26 @@
   ],
   "description": "Name the repository's declaration files once, at the layout, then make snapshot export read the issues it exports and the repository's declaration files from one capture of the repository, and write their stored bytes, so the snapshot holds exactly what the repository holds.\n\n## Background\n\n- Well-known data-root paths are declared once through `declare_well_known_paths!` (`crates/jit/src/repository_state/path.rs:291-315`, invoked at `:317-348`): `CONFIG`, `GATES`, `TEMPLATES`, `RULES`, `INVARIANTS` and the `GATE_PRESETS` directory (`config/gate-presets`) among them. `VirtualPath::RECORDS` (`:356`) groups the record paths, but no layout-level name groups the declaration files; the set is implicit.\n- The mutation and validation base capture spells the set by hand: `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:331`) discovers `CONFIG, INVARIANTS, RULES, GATES, TEMPLATES` plus `INDEX` at `commands/validate.rs:361-370`.\n- The declaration assembly reads the same files from an image: `validation_declarations_from_image` (`crates/jit/src/repository_state/mod.rs:425`) reads `CONFIG` (`:429`), `TEMPLATES` (`:444`), `GATES` (`:455`) and `RULES` (`:459`), and its config assembly (`assemble_config_from_declarations`, `crates/jit/src/repository_state/materialize.rs`) reads `INVARIANTS`.\n- `SnapshotExporter` (`crates/jit/src/commands/snapshot.rs:31-36`) holds `storage`, `worktree_root`, `data_root` and `created_at`; `SnapshotExporter::new` (`:84-97`) takes all four. `CommandExecutor::export_snapshot` builds it at `:683-688`, and the unit-test helper `exporter` does at `:775-782`.\n- `enumerate_issues` (`:99-118`) is the only reader of `storage`: it lists or loads issues through `IssueStore` outside any session. Its five unit tests (`test_enumerate_issues_*`, `:785-893`) seed an `InMemoryStorage`.\n- `copy_jit_state` (`:447-475`) is the only reader of `data_root` (`:466`). It re-serializes each issue with `serde_json::to_string_pretty` (`:453`) instead of copying its record, and copies only `config.toml` and `gates.toml` (`:462-473`, hand-picked at `:462`) through the shared no-follow repository-file reader in `storage::capability_fs`. Stored records are written by the canonical serializer `serialize_issue` (`crates/jit/src/repository_state/mutation.rs:545`, keys sorted through `canonicalize_json`), so an exported record differs from the stored one in key order. `rules.toml`, `templates.toml`, `invariants.toml` and `config/gate-presets/` are not exported. `test_copy_jit_state_rejects_malformed_issue_id_without_escape` (`:1042-1050`) exercises the re-serializing path.\n- `export_snapshot` calls `assemble` (`:497`, which calls `enumerate_issues` at `:502` and `copy_jit_state` at `:509`) and then publishes through its own session (`publish_repository_export`, `crates/jit/src/commands/mod.rs`). No captured image exists during assembly.\n- `snapshot export` is recovery-dispatched (`crates/jit/src/cli.rs:2897`), so `open_repository` retains a mutation session for the whole command (`crates/jit/src/commands/bootstrap.rs:111-123`), which `main.rs` holds through dispatch (`crates/jit/src/main.rs:1627-1655`); a `with_mutation_session` capture inside the command reenters it. The lock-free read driver is out of scope here (DEC-24). `captured_active_issues` (`commands/mod.rs`) shows how indexed records are read from an image.\n- Test constraints: `crates/jit/tests/cli_issue/snapshot_export_tests.rs:80` asserts `.jit/issues` exists in the output, and `test_snapshot_export_rejects_symlinked_data_source_without_output` (`:523-555`) requires a symlinked `.jit/config.toml` to fail the export with no output.\n- `docs/reference/cli-commands.md:3564-3567` describes snapshot contents as issues, documents, assets, manifest and README.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath` exposes one declaration set, the declaration files (configuration, gates, templates, rules, invariants) and the declaration directories (the gate-preset directory), each named once in `crates/jit/src/repository_state/path.rs`; `capture_proposed_base_inner` discovers its declaration files through that set with no literal list of those five paths, and a unit test captures an image holding exactly the declaration files plus the index and shows `validation_declarations_from_image` assembles from it without a missing-capture error.\n- [hard] REQ-02: Export captures the scope's issue records and the declaration set (files, plus each `*.json` file under the gate-preset directory) in one `with_mutation_session` attempt that returns `SessionStep::Done` without applying a plan, under the session dispatch retains, and assembles the snapshot only from that image; `enumerate_issues` selects over the captured issues, and `SnapshotExporter` no longer has the `storage` and `data_root` fields or their constructor parameters, with `export_snapshot` and the unit-test helper updated.\n- [hard] REQ-03: Each exported `.jit/issues/<id>.json` and declaration file equals the stored bytes; a CLI test exporting a repository fails today because the exported issue record differs from `.jit/issues/<id>.json` byte for byte.\n- [hard] REQ-04: A CLI test with `rules.toml`, `templates.toml`, `invariants.toml` and a custom gate preset finds each in the snapshot; it fails today because only `config.toml` and `gates.toml` are copied.\n- [hard] REQ-05: A declaration captured as a symlink fails the export with no output; the existing CLI snapshot export tests pass, and the unit tests that seeded storage for `enumerate_issues` or `copy_jit_state` select over or copy from given issues and captured records instead.\n- [hard] REQ-06: The snapshot export section of `docs/reference/cli-commands.md` states that issue records are copied as stored and that the declaration files are included, without listing them in more than one place.\n\n## Notes\n\n- Behaviour change: exported issue records are the stored bytes rather than a re-serialization, and the snapshot carries every declaration file. Asserted by REQ-03 and REQ-04.\n- The base capture still reads the same five files; the directory part of the declaration set is not added to it.\n- The document and asset reads of the export (`read_from_filesystem`, `:175-190`) are unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-06T04:51:58.966440355Z",
   "first_ready_at": "2026-11-06T04:17:55.790973363Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7b7937d4-4d56-4e13-9e6a-e45498ed1bab",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:48:00.179937720Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "81033391-fd3b-4fd1-918a-01745cc558c0",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:51:50.890576984Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "30334066-4bae-49fb-b10a-2282c07a7344",
   "labels": [
     "type:task",
@@ -27,7 +41,7 @@
     "satisfies:b697a3f7/REQ-19"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Snapshot export copies stored bytes from one image",
-  "updated_at": "2026-11-06T04:18:30.813659169Z"
+  "updated_at": "2026-11-06T04:51:58.966440355Z"
 }

@@ -452,16 +452,17 @@ struct DerivedIssueDeletion {
 }
 
 /// Derive deletion, dependent-edge cleanup, and resulting automatic readiness
-/// transitions from one captured active graph.
+/// transitions from one captured active graph and its declarations.
 fn derive_issue_deletion(
     image: &crate::repository_state::RepositoryImage,
+    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
     context: &crate::repository_state::MutationContext,
     issues: &[Issue],
     target_id: &IssueId,
 ) -> Result<DerivedIssueDeletion> {
     use crate::repository_state::MutationIntent;
 
-    let graph = super::CapturedGraphEvidence::capture(image, issues, context)?;
+    let graph = super::CapturedGraphEvidence::capture(declarations, image, issues, context)?;
     let mut projected = issues
         .iter()
         .filter(|issue| &issue.id != target_id)
@@ -1016,15 +1017,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 .transpose()?
                 .flatten();
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) = self
+            let Some(base) = self
                 .exec
                 .capture_mutation_base(session.as_mut(), &[], &[])?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let target_id = require_issue_in_capture(&issues, id)?;
-            let config = crate::repository_state::assemble_config(&image)?;
-            let current_mode = config.enforcement_mode();
+            let target_id = require_issue_in_capture(&base.issues, id)?;
+            let declarations = base.declarations()?;
+            let current_mode = declarations.config().enforcement_mode();
             if target_id != expected_target || current_mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -1033,8 +1034,14 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 std::slice::from_ref(&target_id),
                 claims_guard.as_ref(),
             )?;
-            let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;
-            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
+            let derived = derive_issue_deletion(
+                &base.image,
+                declarations,
+                &context,
+                &base.issues,
+                &target_id,
+            )?;
+            let plan = finalize(&layout, &base.image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }

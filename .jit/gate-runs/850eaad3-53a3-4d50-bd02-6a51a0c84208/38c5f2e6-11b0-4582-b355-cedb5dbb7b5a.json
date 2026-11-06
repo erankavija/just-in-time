@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aead6a535d5812c4b0ee7f3d7d0996590c4db1a8",
+  "completed_at": "2026-11-06T05:04:50.750179801Z",
+  "duration_ms": 188465,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 1184,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-20",
+          "@/issue/b697a3f7/requirement/REQ-10"
+        ],
+        "severity": "high",
+        "summary": "Graph evidence calls plan_content_with_issues, which reparses the same image configuration with assemble_config after MutationBase::declarations()."
+      }
+    ],
+    "summary": "Graph evidence reparses configuration from mutation images after declarations are memoized.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "850eaad3-53a3-4d50-bd02-6a51a0c84208",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "38c5f2e6-11b0-4582-b355-cedb5dbb7b5a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:01:42.284605049Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4396 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1af3b-ecbb-7ef1-9cac-9a1348c47a1c\n--------\nuser\n--- 4383 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8a3ee93f0edbd66373e48a8213b7cd4b90bb0e85 (`jit:850eaad3`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-10 (.jit/issues/b697a3f7-ef84-4452-9b13-c8274f6abe4a.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-06T04:59:56Z; its run commit contains 8a3ee93f0edbd66373e48a8213b7cd4b90bb0e85\nTruncation recovery: Re-read all eight attributable patches individually; narrowed current-source reads for declaration and graph-evidence paths.\n\n1. **[blocking][issue-impact]** `CapturedGraphEvidence::capture` still calls `plan_content_with_issues` ([mod.rs:648](crates/jit/src/commands/mod.rs:648)), which directly calls `assemble_config(image)` ([validate.rs:1184](crates/jit/src/commands/validate.rs:1184)). Every affected graph-based mutation first obtains `base.declarations()` and then reparses the same base image’s configuration through this helper; template application has the same second parse. This fails REQ-02 and REQ-04’s one-parse requirement and the contributed REQ-10 claim. Pass the already parsed declarations/config into plan-content derivation instead. References: @/charter/D-20, @/issue/b697a3f7/requirement/REQ-10.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Graph evidence reparses configuration from mutation images after declarations are memoized.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Graph evidence calls plan_content_with_issues, which reparses the same image configuration with assemble_config after MutationBase::declarations().\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":1184,\"references\":[\"@/charter/D-20\",\"@/issue/b697a3f7/requirement/REQ-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
