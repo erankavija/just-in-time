@@ -410,6 +410,86 @@ fn test_configured_archive_document_and_container_cli_are_exact_deterministic_an
     assert!(!cli.root().join("archive").exists());
 }
 
+#[cfg(unix)]
+#[test]
+fn test_archive_container_preview_git_invocations_do_not_grow_with_pinned_documents() {
+    use jit::test_harness::git::{GitRepository, GitStandIn};
+
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(FIXTURES_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let repository = GitRepository::init(cli.root());
+    let documents = [
+        "fixtures/first.md",
+        "fixtures/second.md",
+        "fixtures/third.md",
+    ];
+    documents.iter().for_each(|path| {
+        repository.write(path, "pinned evidence");
+    });
+    let commit = repository.commit("pinned documents");
+    let id = cli
+        .create_issue(["--title", "Pinned container", "--type", "epic"])
+        .unwrap();
+    cli.run(["issue", "reject", &id, "--json"]).unwrap();
+    let mut counts = Vec::new();
+    for (index, path) in documents.iter().enumerate() {
+        cli.run([
+            "doc",
+            "add",
+            &id,
+            path,
+            "--commit",
+            &commit,
+            "--skip-scan",
+            "--json",
+        ])
+        .unwrap();
+        if index != 0 && index != documents.len() - 1 {
+            continue;
+        }
+        let stand_in = GitStandIn::new();
+        let output = cli
+            .command(["archive", "container", &id, "--json"])
+            .env("PATH", stand_in.search_path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let plan: ArtifactPlan = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(plan.count(), index + 1);
+        assert!(plan
+            .artifacts()
+            .iter()
+            .all(|artifact| artifact.version().as_str() == commit));
+        let invocations = stand_in.invocations();
+        counts.push((
+            invocations.len(),
+            invocations
+                .iter()
+                .filter(|invocation| invocation.args() == ["cat-file", "--batch", "-Z"])
+                .count(),
+        ));
+        eprintln!(
+            "{} pinned documents: {} git invocations",
+            index + 1,
+            invocations.len()
+        );
+    }
+    assert_eq!(
+        counts[0].0, counts[1].0,
+        "git processes must not scale with pinned documents"
+    );
+    assert!(
+        counts.iter().all(|(_, readers)| *readers == 1),
+        "the preview must share one object reader: {counts:?}"
+    );
+}
+
 #[test]
 fn test_archive_execute_is_explicit_and_available_for_document_and_container_targets() {
     let document_cli = JitCli::with_repository(

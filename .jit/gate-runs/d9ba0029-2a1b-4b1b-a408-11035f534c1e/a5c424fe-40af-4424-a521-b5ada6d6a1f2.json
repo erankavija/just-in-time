@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-d9ba0029",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0115d5a4846782d9cb602c4b347ee394550bc34b",
+  "completed_at": "2026-11-06T03:47:40.193937338Z",
+  "duration_ms": 215319,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Pinned archive evidence uses the selected checkout's shared object reader, preserves resolution semantics, and has focused selected-checkout and process-count coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d9ba0029-2a1b-4b1b-a408-11035f534c1e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a5c424fe-40af-4424-a521-b5ada6d6a1f2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T03:44:04.874257371Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 149d12d, a8eca0b, 0115d5a (`jit:d9ba0029`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 and D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-03 and REQ-10 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); applicable invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, at a8eca0b (contains 149d12d and a8eca0b; 0115d5a is the recording commit); code-review pending\nTruncation recovery: recovered the test patch and current archive/git-reader spans; omitted remainder was event/progress records or unrelated plan content outside the impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Pinned archive evidence uses the selected checkout's shared object reader, preserves resolution semantics, and has focused selected-checkout and process-count coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
