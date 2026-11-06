@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "97b29b93da0b0a0209ce4cf8b03bf7bd2e856ff3",
+  "completed_at": "2026-11-06T00:47:01.529431851Z",
+  "duration_ms": 289009,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/gate.rs",
+        "id": "F1",
+        "line": 618,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c2b3cefa/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "gate evaluate-many performs and discards a pre-session lease read outside the claims guard and gate input session."
+      }
+    ],
+    "summary": "gate evaluate-many retains a pre-session lock-free lease read.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1a117d4f-b6ad-48c4-ae1a-8465d7d93238",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T00:42:12.519718448Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10300 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ae4e-5957-71a3-bf38-2491a7ed76ba\n--------\nuser\n--- 10287 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: df59347fb5cca9eb8b1972cf45f1934cb7d0c512; 7b1b087e0aa2a61e05650fe1c6a6ad7d086537a9\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/charter/D-4, @/charter/D-20; @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests; @/issue/b697a3f7/requirement/REQ-04; @/issue/c2b3cefa/requirement/REQ-01, @/issue/c2b3cefa/requirement/REQ-02, @/issue/c2b3cefa/requirement/REQ-03, @/issue/c2b3cefa/requirement/REQ-04\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T00:40:32Z); run 97b29b93 contains both attributable commits\nTruncation recovery: reread each affected patch and current implementation in path-scoped ranges; narrowed the charter and template-test reads after broad output truncated\n\n1. **[blocking][issue-impact] F1 — `gate evaluate-many` still performs `ctx.executor.refuse_foreign_lease` before calling `pass_gate_many`.** This is the lock-free read form using cached configuration, outside both the claims guard and the inputs/publishing session; its warn-mode result is discarded by `map(drop)`. It violates the requirement that automated passes have no pre-session lease read. [crates/jit/src/dispatch/gate.rs:618](@/issue/c2b3cefa/requirement/REQ-02)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"gate evaluate-many retains a pre-session lock-free lease read.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"gate evaluate-many performs and discards a pre-session lease read outside the claims guard and gate input session.\",\"file\":\"crates/jit/src/dispatch/gate.rs\",\"line\":618,\"references\":[\"@/issue/c2b3cefa/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
