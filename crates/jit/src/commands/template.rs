@@ -201,12 +201,13 @@ impl std::error::Error for TemplatePrerequisitesUnmetError {}
 /// Check every requirement of `template` against the repository's declarations.
 ///
 /// An empty type hierarchy or namespace registry declares no vocabulary, so it
-/// requires none, as the default rules keyed on those registries do.
+/// requires none, as the default rules keyed on those registries do. Pure, so a
+/// validator reports what apply would (`@/charter/D-20`).
 ///
 /// # Errors
 ///
 /// [`TemplatePrerequisitesUnmetError`] naming every unmet requirement.
-fn require_template_prerequisites(
+pub(crate) fn require_template_prerequisites(
     template: &GraphTemplate,
     config: &crate::config::JitConfig,
     registry: &crate::declarations::GateRegistry,
