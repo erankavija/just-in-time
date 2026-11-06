@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e09960b93935c2ad601d652435914f08db75aae",
+  "completed_at": "2026-11-06T00:31:57.288990556Z",
+  "duration_ms": 215947,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation centralizes no-follow leaf opening, preserves reader/profile behavior, and covers the required unsafe and absent-leaf cases.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1bf0e59c-d8cd-4556-bdd6-e1319e44ef6a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T00:28:21.341379305Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 01c502bea723d7fefaa8672f04314631800aba5b (`jit:4334df62`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 and D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, convention-convergence, essential-code-prose, and orthogonal-tests (.jit/invariants.toml); @/issue/b697a3f7/requirement/REQ-16 and REQ-20 (.jit/issues/b697a3f7-ef84-4452-9b13-c8274f6abe4a.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T00:26:25.278237450+00:00; ancestry covers 01c502bea723d7fefaa8672f04314631800aba5b)\nTruncation recovery: narrowed the truncated combined policy search to configured sources and inspected each attributed patch and affected current source/test range\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation centralizes no-follow leaf opening, preserves reader/profile behavior, and covers the required unsafe and absent-leaf cases.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
