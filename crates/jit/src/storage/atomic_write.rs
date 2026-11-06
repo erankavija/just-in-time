@@ -17,7 +17,7 @@
 use crate::repository_state::FileMode;
 use anyhow::{Context, Result};
 use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, File, OpenOptions};
+use cap_std::fs::{Dir, OpenOptions};
 use std::ffi::OsStr;
 use std::fs;
 use std::io::{Read, Write};
@@ -112,24 +112,22 @@ pub(in crate::storage) fn write_staged_file(
     options._cap_fs_ext_follow(FollowSymlinks::No);
     let mut file = parent.open_with(leaf, &options)?;
     std::io::copy(&mut content, &mut file)?;
-    set_mode(&file, mode)?;
+    #[cfg(unix)]
+    file.set_permissions(permissions(mode))?;
+    #[cfg(not(unix))]
+    let _ = mode;
     file.sync_all()
 }
 
+/// The permission bits a staged file carries.
 #[cfg(unix)]
-fn set_mode(file: &File, mode: FileMode) -> std::io::Result<()> {
+fn permissions(mode: FileMode) -> cap_std::fs::Permissions {
     use cap_std::fs::PermissionsExt;
 
-    let bits = match mode {
+    cap_std::fs::Permissions::from_mode(match mode {
         FileMode::Regular => 0o644,
         FileMode::Executable => 0o755,
-    };
-    file.set_permissions(cap_std::fs::Permissions::from_mode(bits))
-}
-
-#[cfg(not(unix))]
-fn set_mode(_file: &File, _mode: FileMode) -> std::io::Result<()> {
-    Ok(())
+    })
 }
 
 /// Write `content` to `path`, truncating it, and return once those bytes are on
