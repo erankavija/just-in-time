@@ -192,10 +192,10 @@ fixture_issues=$(find "$fixture/.jit/issues" -name '*.json' | wc -l | tr -d ' ')
   echo "selftest: fixture mode generated $fixture_issues issues, expected 2" >&2
   exit 1
 }
-[[ ! -e "$scratch/fixture-out" ]] && ! grep -qv '^issue create \|^init \|^--version$' "$MOCK_JIT_LOG" || {
+if [[ -e "$scratch/fixture-out" ]] || grep -qv '^issue create \|^init \|^--version$' "$MOCK_JIT_LOG"; then
   echo "selftest: fixture mode ran more than the fixture generator" >&2
   exit 1
-}
+fi
 set +e
 SESSION_BENCH_BIN="$mock_jit" SESSION_BENCH_ISSUE_COUNT=2 \
 SESSION_BENCH_WORK_DIR="$work" SESSION_BENCH_FIXTURE_DIR="$fixture" \
