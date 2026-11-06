@@ -215,7 +215,7 @@
     "d3c94dc5": 1,
     "30334066": 1,
     "850eaad3": 1,
-    "b2c28ec1": 1
+    "b2c28ec1": 2
   },
   "surfaced_pitfalls": [
     {
@@ -252,6 +252,11 @@
       "with": "f4d9502a lead (just-in-time-13)",
       "item": "external chain",
       "decision": "c140921c landed df02f5271; d9ba0029 and 7cd27db8 ready and being dispatched by that lead; e6ec58f3 after d9ba0029. Git commit resolution now spawns cat-file --batch-check -Z, not rev-parse: tests counting git children by argv[0]=='rev-parse' must follow."
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "b2c28ec1",
+      "decision": "may change the ':(glob)docs/*.md' row of test_inspect_pinned_targets_classifies_every_target_class to a typed invalid-path refusal (by variant), keeping other rows; no new git-child counting there"
     }
   ],
   "notes": [
