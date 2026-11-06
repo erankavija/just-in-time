@@ -1007,7 +1007,7 @@ impl<S: IssueStore> GateOps<'_, S> {
     {
         use crate::repository_state::{
             assemble_config, finalize_gate_registry_edit, render_capture_closure, CaptureBudget,
-            CaptureSpec, MutationIntent, RepositoryEntry, VirtualPath,
+            CaptureSpec, MutationIntent, VirtualPath,
         };
 
         let layout = self.exec.require_layout()?;
@@ -1073,6 +1073,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 else {
                     return Ok(SessionStep::Retry);
                 };
+                let mut declarations = crate::repository_state::declarations_from_image(&image)?;
                 let warnings = if let Some(key) = leased_gate {
                     let targets = super::captured_active_issues(&image)?
                         .into_iter()
@@ -1080,23 +1081,17 @@ impl<S: IssueStore> GateOps<'_, S> {
                         .map(|issue| issue.id)
                         .collect::<Vec<_>>();
                     super::refuse_foreign_leases_held(
-                        assemble_config(&image)?.enforcement_mode(),
+                        declarations.config().enforcement_mode(),
                         &targets,
                         claims_guard.as_ref(),
                     )?
                 } else {
                     Vec::new()
                 };
-                let gates_path = VirtualPath::GATES;
-                let registry = match image.entry(&gates_path)? {
-                    RepositoryEntry::File { content, .. } => {
-                        crate::declarations::parse_gate_registry(content.bytes())?
-                    }
-                    RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
-                    _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
-                };
-                let derived = derive_gate_registry_mutation(registry, &request)?;
-                let mut declarations = crate::repository_state::declarations_from_image(&image)?;
+                let derived = derive_gate_registry_mutation(
+                    std::mem::take(&mut declarations.gates),
+                    &request,
+                )?;
                 declarations.gates = derived.registry.clone();
                 let intents = vec![
                     MutationIntent::EditGateRegistry {
@@ -1354,8 +1349,8 @@ impl<S: IssueStore> GateOps<'_, S> {
             };
             let issues = super::captured_active_issues(&image)?;
             let target = super::require_issue_in_capture(&issues, issue_id)?;
-            let config = crate::repository_state::assemble_config(&image)?;
-            let mode = config.enforcement_mode();
+            let mut declarations = crate::repository_state::declarations_from_image(&image)?;
+            let mode = declarations.config().enforcement_mode();
             if target != expected_target || mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -1369,7 +1364,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             let issue = captured_gate_preset_issue(&image, &target)?;
             let derived = derive_gate_preset_application(
                 issue,
-                captured_gate_registry(&image)?,
+                std::mem::take(&mut declarations.gates),
                 preset,
                 timeout_override,
                 PresetGateExclusions {
@@ -1383,7 +1378,6 @@ impl<S: IssueStore> GateOps<'_, S> {
                 return Ok(AttemptOutcome::Done((derived.result, warnings)));
             }
             let plan = if derived.edits_registry {
-                let mut declarations = crate::repository_state::declarations_from_image(&image)?;
                 declarations.gates = derived.registry;
                 finalize_gate_registry_edit(
                     &layout,

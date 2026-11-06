@@ -148,8 +148,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     .plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
                     .merge(plan_reduction_fixes(&mut projected)?);
                 let graph = CapturedGraphEvidence {
-                    declarations,
-                    plan_content: plan_content_with_issues(image, &projected)?,
+                    declarations: &declarations,
+                    plan_content: plan_content_with_issues(
+                        image,
+                        declarations.config(),
+                        &projected,
+                    )?,
                     context,
                 };
                 let readiness = plan_readiness_fixes(original, &mut projected, &graph)?;
@@ -438,12 +442,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
         .and_then(|captured| {
             captured
-                .map(|(image, (issues, _))| {
-                    Ok(MutationBase {
-                        image,
-                        issues: issues?,
-                    })
-                })
+                .map(|(image, (issues, _))| Ok(MutationBase::new(image, issues?)))
                 .transpose()
         })
     }
@@ -490,7 +489,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         }
         Ok(self
             .extend_mutation_base(session, image, std::slice::from_ref(issue_id))?
-            .map(|MutationBase { image, issues }| MutationPreflight {
+            .map(|MutationBase { image, issues, .. }| MutationPreflight {
                 image,
                 target,
                 issues: Some(issues),
@@ -1018,6 +1017,40 @@ pub(crate) struct MutationBase {
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// Every issue the listing in `image` states, sorted by id.
     pub(crate) issues: Vec<Issue>,
+    declarations: std::cell::OnceCell<ParsedBaseDeclarations>,
+}
+
+type ParsedBaseDeclarations = std::result::Result<
+    crate::repository_state::CapturedRepositoryDeclarations,
+    std::sync::Arc<crate::repository_state::DeclarationParseError>,
+>;
+
+impl MutationBase {
+    pub(crate) fn new(image: crate::repository_state::RepositoryImage, issues: Vec<Issue>) -> Self {
+        Self {
+            image,
+            issues,
+            declarations: std::cell::OnceCell::new(),
+        }
+    }
+
+    /// The declarations of `image`, parsed on first use so a mutation fails
+    /// on a declaration only when it reads one. Every call returns that one
+    /// parse, its failure included.
+    pub(crate) fn declarations(
+        &self,
+    ) -> std::result::Result<
+        &crate::repository_state::CapturedRepositoryDeclarations,
+        std::sync::Arc<crate::repository_state::DeclarationParseError>,
+    > {
+        self.declarations
+            .get_or_init(|| {
+                crate::repository_state::declarations_from_image(&self.image)
+                    .map_err(std::sync::Arc::new)
+            })
+            .as_ref()
+            .map_err(std::sync::Arc::clone)
+    }
 }
 
 /// The lease inputs and target issue a mutation reads before taking the claims
@@ -1145,14 +1178,14 @@ pub(super) fn plan_document_paths(
         .collect()
 }
 
-/// Plan content for the image's complete issue set. Its closure holds every
-/// path [`plan_document_paths`] derives. Invalid configuration yields no plans;
-/// the validation report reports the failure.
+/// Plan content for the image's complete issue set under `config`, the
+/// image's own configuration. Its closure holds every path
+/// [`plan_document_paths`] derives.
 pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
+    config: &crate::config::JitConfig,
     issues: &[Issue],
 ) -> Result<std::collections::HashMap<IssueId, String>> {
-    let config = crate::repository_state::assemble_config(image).unwrap_or_default();
     crate::validation::repository::plan_content(
         &|path| super::image_repo_bytes(image, path),
         issues,
@@ -1383,6 +1416,38 @@ mod tests {
         .unwrap();
         let executor = crate::commands::test_helpers::setup().with_worktree_paths(paths);
         assert!(executor.validation().validate_branch_drift().is_ok());
+    }
+
+    #[test]
+    fn test_mutation_base_declarations_returns_one_parse_from_every_call() {
+        use crate::test_harness::image::ImageBuilder;
+        let base = |gates: &str| {
+            MutationBase::new(
+                ImageBuilder::new()
+                    .files(&[
+                        (".jit/config.toml", Some("")),
+                        (".jit/gates.toml", Some(gates)),
+                        (".jit/rules.toml", None),
+                    ])
+                    .build(),
+                Vec::new(),
+            )
+        };
+
+        let parsed = base("");
+        assert!(std::ptr::eq(
+            parsed.declarations().unwrap(),
+            parsed.declarations().unwrap()
+        ));
+
+        let unparseable = base("[[gates]\n");
+        let first = unparseable.declarations().err().unwrap();
+        let second = unparseable.declarations().err().unwrap();
+        assert!(matches!(
+            *first,
+            crate::repository_state::DeclarationParseError::Gate(_)
+        ));
+        assert!(std::sync::Arc::ptr_eq(&first, &second));
     }
 
     use super::*;

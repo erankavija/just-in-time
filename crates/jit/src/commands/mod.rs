@@ -660,20 +660,21 @@ enum DerivedStateTransition {
 /// Declarations and plan content captured from one mutation image, over which
 /// the mutation evaluates graph rules at its timestamp.
 struct CapturedGraphEvidence<'a> {
-    declarations: crate::repository_state::CapturedRepositoryDeclarations,
+    declarations: &'a crate::repository_state::CapturedRepositoryDeclarations,
     plan_content: std::collections::HashMap<IssueId, String>,
     context: &'a crate::repository_state::MutationContext,
 }
 
 impl<'a> CapturedGraphEvidence<'a> {
     fn capture(
+        declarations: &'a crate::repository_state::CapturedRepositoryDeclarations,
         image: &crate::repository_state::RepositoryImage,
         issues: &[Issue],
         context: &'a crate::repository_state::MutationContext,
     ) -> Result<Self> {
         Ok(Self {
-            declarations: crate::repository_state::declarations_from_image(image)?,
-            plan_content: validate::plan_content_with_issues(image, issues)?,
+            declarations,
+            plan_content: validate::plan_content_with_issues(image, declarations.config(), issues)?,
             context,
         })
     }
@@ -1785,7 +1786,7 @@ fn derive_field_update(
             }
         }
         (None, false) => {
-            derive_write_validation(&projected, &evidence.graph.declarations, request.force)?
+            derive_write_validation(&projected, evidence.graph.declarations, request.force)?
         }
     };
     if request.issue_type.is_some() {
@@ -2863,17 +2864,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
             let issue_id = draft.id.clone();
-            let Some(crate::commands::validate::MutationBase { image, mut issues }) = self
-                .capture_mutation_base(
-                    session,
-                    &[VirtualPath::ISSUES, VirtualPath::issue_record(&issue_id)],
-                    &[],
-                )?
+            let Some(mut base) = self.capture_mutation_base(
+                session,
+                &[VirtualPath::ISSUES, VirtualPath::issue_record(&issue_id)],
+                &[],
+            )?
             else {
                 return Ok(SessionStep::Retry);
             };
-            let graph = CapturedGraphEvidence::capture(&image, &issues, context)?;
-            let declarations = &graph.declarations;
+            let mut issues = std::mem::take(&mut base.issues);
+            let image = &base.image;
+            let declarations = base.declarations()?;
+            let graph = CapturedGraphEvidence::capture(declarations, image, &issues, context)?;
             let mut final_draft = draft.clone();
             // Local rules see the created state, so readiness precedes validation.
             let projected = issues
@@ -2947,7 +2949,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     crate::validation::ReportedFinding::new(Some(issue_id.clone()), finding)
                 })
                 .collect();
-            let plan = finalize(&layout, &image, context, &intents, None)?;
+            let plan = finalize(&layout, image, context, &intents, None)?;
             Ok(SessionStep::Apply(plan, (created, findings)))
         })
     }
@@ -3074,17 +3076,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         else {
             return Ok(None);
         };
-        let enforcement_mode =
-            crate::repository_state::assemble_config(&light.image)?.enforcement_mode();
         let target = light.target.id;
+        // A preflight without prechecks reads only configuration.
         let Some(issues) = light.issues else {
             return Ok(Some(StateChangePreflight {
                 target,
-                enforcement_mode,
+                enforcement_mode: crate::repository_state::assemble_config(&light.image)?
+                    .enforcement_mode(),
                 precheck: None,
             }));
         };
-        let registry = crate::repository_state::declarations_from_image(&light.image)?.gates;
+        let declarations = crate::repository_state::declarations_from_image(&light.image)?;
+        let enforcement_mode = declarations.config().enforcement_mode();
+        let registry = declarations.gates;
         let issue = project(
             issues
                 .into_iter()
@@ -3299,19 +3303,19 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) = self
-                .capture_mutation_base(
-                    session.as_mut(),
-                    &precheck_run_paths,
-                    match precheck {
-                        Some(_) => std::slice::from_ref(&request.issue_id),
-                        None => &[],
-                    },
-                )?
+            let Some(base) = self.capture_mutation_base(
+                session.as_mut(),
+                &precheck_run_paths,
+                match precheck {
+                    Some(_) => std::slice::from_ref(&request.issue_id),
+                    None => &[],
+                },
+            )?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let target = require_issue_in_capture(&issues, &request.issue_id)?;
+            let (image, issues) = (&base.image, &base.issues);
+            let target = require_issue_in_capture(issues, &request.issue_id)?;
             let issue = issues
                 .iter()
                 .find(|issue| issue.id == target)
@@ -3324,7 +3328,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             {
                 return Ok(AttemptOutcome::Retry);
             }
-            let graph = CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let graph =
+                CapturedGraphEvidence::capture(base.declarations()?, image, issues, &context)?;
             let lease_warnings = if request.enforce_lease {
                 refuse_foreign_leases_held(
                     graph.declarations.config().enforcement_mode(),
@@ -3345,14 +3350,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
                 precheck.map(|precheck| &precheck.captured),
-                &image,
+                image,
                 &projected.issue,
                 &graph.declarations.gates,
             )?;
             if recorded.refused {
                 return self.publish_precheck_refusal(
                     session.as_mut(),
-                    &image,
+                    image,
                     &context,
                     issue,
                     recorded,
@@ -3365,7 +3370,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 recorded,
                 &effective_request,
                 CapturedTransitionEvidence {
-                    issues: &issues,
+                    issues,
                     graph: &graph,
                 },
             )?;
@@ -3373,7 +3378,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             lease_warnings.append(&mut derived.warnings);
             derived.warnings = lease_warnings;
             let issue_result = crate::repository_state::mutated_issue(
-                &image,
+                image,
                 &target,
                 &derived.intents,
                 context.timestamp(),
@@ -3388,7 +3393,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     })),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
+            let plan = finalize(&layout, image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -3486,16 +3491,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .flatten();
 
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) = self
-                .capture_mutation_base(
-                    session.as_mut(),
-                    &precheck_run_paths,
-                    std::slice::from_ref(request.issue_id()),
-                )?
+            let Some(base) = self.capture_mutation_base(
+                session.as_mut(),
+                &precheck_run_paths,
+                std::slice::from_ref(request.issue_id()),
+            )?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            if require_issue_in_capture(&issues, request.issue_id())? != expected_target {
+            let (image, issues) = (&base.image, &base.issues);
+            if require_issue_in_capture(issues, request.issue_id())? != expected_target {
                 return Ok(AttemptOutcome::Retry);
             }
             let mut issue = issues
@@ -3503,7 +3508,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .find(|issue| issue.id == expected_target)
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(expected_target.clone()))?;
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let declarations = base.declarations()?;
             if lifecycle_requires_prechecks(&request, &issue) != precheck.is_some() {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -3513,14 +3518,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
                 precheck.as_ref().map(|precheck| &precheck.captured),
-                &image,
+                image,
                 &issue,
                 &declarations.gates,
             )?;
             if recorded.refused {
                 return self.publish_precheck_refusal(
                     session.as_mut(),
-                    &image,
+                    image,
                     &context,
                     issue,
                     recorded,
@@ -3548,7 +3553,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     if issue.state == State::Backlog {
                         let blockers = issue::blocking_dependencies(
                             &issue,
-                            &crate::domain::queries::build_issue_map(&issues),
+                            &crate::domain::queries::build_issue_map(issues),
                         );
                         if !blockers.is_empty() {
                             return Err(crate::errors::TransitionBlockedError::dependencies(
@@ -3572,9 +3577,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 _ => {}
             }
             let prechecks_changed = !recorded.runs.is_empty();
-            let graph = CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let graph = CapturedGraphEvidence::capture(declarations, image, issues, &context)?;
             let evidence = CapturedTransitionEvidence {
-                issues: &issues,
+                issues,
                 graph: &graph,
             };
             let (target, gate_error) =
@@ -3644,7 +3649,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let changed = update.is_some();
             let readiness = update
                 .as_ref()
-                .map(|updated| derive_dependent_readiness(&issues, updated, &graph))
+                .map(|updated| derive_dependent_readiness(issues, updated, &graph))
                 .transpose()?;
             let (readiness, readiness_error) = readiness
                 .map(|readiness| (readiness.intents, readiness.error_after_apply))
@@ -3673,7 +3678,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .chain(readiness)
                 .collect::<Vec<_>>();
             let issue_result = crate::repository_state::mutated_issue(
-                &image,
+                image,
                 &expected_target,
                 &intents,
                 context.timestamp(),
@@ -3684,7 +3689,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     changed,
                 }));
             }
-            let plan = finalize(&layout, &image, &context, &intents, None)?;
+            let plan = finalize(&layout, image, &context, &intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -3770,7 +3775,7 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         );
         let context = production_mutation_context();
         let graph = CapturedGraphEvidence {
-            declarations,
+            declarations: &declarations,
             plan_content: std::collections::HashMap::new(),
             context: &context,
         };
@@ -3872,7 +3877,7 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         let issues = [issue.clone()];
         let context = production_mutation_context();
         let graph = CapturedGraphEvidence {
-            declarations,
+            declarations: &declarations,
             plan_content: std::collections::HashMap::new(),
             context: &context,
         };
@@ -4256,18 +4261,17 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             .storage
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
-        let crate::commands::validate::MutationBase { image, issues } = executor
+        let base = executor
             .capture_mutation_base(session.as_mut(), &[], std::slice::from_ref(issue_id))
             .unwrap()
             .unwrap();
-        let issue = issues
-            .into_iter()
+        let issue = base
+            .issues
+            .iter()
             .find(|issue| &issue.id == issue_id)
             .unwrap();
-        let registry = crate::repository_state::declarations_from_image(&image)
-            .unwrap()
-            .gates;
-        captured_precheck_evidence(&image, &issue, &registry).unwrap()
+        let registry = &base.declarations().unwrap().gates;
+        captured_precheck_evidence(&base.image, issue, registry).unwrap()
     }
 
     fn prior_precheck_run(issue_id: &IssueId) -> crate::domain::GateRunResult {

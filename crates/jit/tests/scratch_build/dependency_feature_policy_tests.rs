@@ -34,10 +34,14 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn workspace_toml(path: &str) -> toml::Value {
+    let text = std::fs::read_to_string(workspace_root().join(path))
+        .unwrap_or_else(|error| panic!("read {path}: {error}"));
+    toml::from_str(&text).unwrap_or_else(|error| panic!("parse {path}: {error}"))
+}
+
 fn jit_crate_manifest() -> toml::Value {
-    let text = std::fs::read_to_string(workspace_root().join("crates/jit/Cargo.toml"))
-        .expect("read crates/jit/Cargo.toml");
-    toml::from_str(&text).expect("crates/jit/Cargo.toml must be valid TOML")
+    workspace_toml("crates/jit/Cargo.toml")
 }
 
 fn dependency_table<'a>(manifest: &'a toml::Value, name: &str) -> &'a toml::Value {
@@ -45,6 +49,43 @@ fn dependency_table<'a>(manifest: &'a toml::Value, name: &str) -> &'a toml::Valu
         .get("dependencies")
         .and_then(|deps| deps.get(name))
         .unwrap_or_else(|| panic!("crates/jit/Cargo.toml has no [dependencies].{name} entry"))
+}
+
+#[test]
+fn test_workspace_dependencies_exclude_libgit2_bindings() {
+    let lock = workspace_toml("Cargo.lock");
+    let packages = lock["package"].as_array().expect("lockfile package array");
+    for banned in ["git2", "libgit2-sys", "libssh2-sys", "openssl-sys"] {
+        assert!(
+            packages
+                .iter()
+                .all(|package| package["name"].as_str() != Some(banned)),
+            "Cargo.lock must not contain `{banned}`"
+        );
+    }
+
+    for path in ["crates/jit/Cargo.toml", "crates/server/Cargo.toml"] {
+        let manifest = workspace_toml(path);
+        let targets = manifest
+            .get("target")
+            .and_then(toml::Value::as_table)
+            .into_iter()
+            .flat_map(|targets| targets.values());
+        for section in std::iter::once(&manifest).chain(targets) {
+            for kind in ["dependencies", "build-dependencies", "dev-dependencies"] {
+                if let Some(dependencies) = section.get(kind).and_then(toml::Value::as_table) {
+                    assert!(
+                        dependencies.iter().all(|(name, dependency)| {
+                            name != "git2"
+                                && dependency.get("package").and_then(toml::Value::as_str)
+                                    != Some("git2")
+                        }),
+                        "{path} [{kind}] must not declare git2, including renamed dependencies"
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -197,10 +238,7 @@ fn test_workspace_manifest_has_no_stray_reqwest_or_native_tls_dependency() {
         "crates/jit/Cargo.toml",
         "crates/server/Cargo.toml",
     ] {
-        let text = std::fs::read_to_string(workspace_root().join(manifest_path))
-            .unwrap_or_else(|e| panic!("read {manifest_path}: {e}"));
-        let manifest: toml::Value =
-            toml::from_str(&text).unwrap_or_else(|e| panic!("parse {manifest_path}: {e}"));
+        let manifest = workspace_toml(manifest_path);
         for table_name in ["dependencies", "workspace.dependencies"] {
             let Some(table) = (match table_name {
                 "workspace.dependencies" => manifest

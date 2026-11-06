@@ -1,0 +1,23 @@
+{
+  "branch": "worktree-agent-053b109e",
+  "by": "auto:executor",
+  "command": "cargo audit -D warnings",
+  "commit": "6900d305cba5f8c9daf11e6f8779e75fcd0f3f3b",
+  "completed_at": "2026-11-06T05:01:43.589519129Z",
+  "duration_ms": 1303,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "dependency-audit",
+  "issue_id": "053b109e-4abc-45b1-8f7b-2ab7682815ba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "add7040c-8a16-4e1e-9a03-6f88d1477967",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:01:42.285898186Z",
+  "status": "passed",
+  "stderr": "\u001b[0m\u001b[0m\u001b[1m\u001b[32m    Fetching\u001b[0m advisory database from `https://github.com/RustSec/advisory-db.git`\n\u001b[0m\u001b[0m\u001b[1m\u001b[32m      Loaded\u001b[0m 1409 security advisories (from /home/vkaskivuo/.cargo/advisory-db)\n\u001b[0m\u001b[0m\u001b[1m\u001b[32m    Updating\u001b[0m crates.io index\n\u001b[0m\u001b[0m\u001b[1m\u001b[32m    Scanning\u001b[0m Cargo.lock for vulnerabilities (385 crate dependencies)\n",
+  "stdout": ""
+}

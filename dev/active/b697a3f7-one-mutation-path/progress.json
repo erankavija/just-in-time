@@ -213,7 +213,10 @@
     "d2acb105": 1,
     "700a96dd": 1,
     "d3c94dc5": 1,
-    "30334066": 1
+    "30334066": 1,
+    "850eaad3": 1,
+    "b2c28ec1": 2,
+    "030df4b1": 1
   },
   "surfaced_pitfalls": [
     {
@@ -227,6 +230,13 @@
       "subject": "lock-free read conflicts under a continuous writer",
       "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
       "status": "open"
+    },
+    {
+      "found_in": "030df4b1",
+      "subject": "captured declaration parse fails on a missing default rule schema",
+      "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
+      "status": "open",
+      "owner": "42046050"
     }
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
@@ -250,6 +260,11 @@
       "with": "f4d9502a lead (just-in-time-13)",
       "item": "external chain",
       "decision": "c140921c landed df02f5271; d9ba0029 and 7cd27db8 ready and being dispatched by that lead; e6ec58f3 after d9ba0029. Git commit resolution now spawns cat-file --batch-check -Z, not rev-parse: tests counting git children by argv[0]=='rev-parse' must follow."
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "b2c28ec1",
+      "decision": "may change the ':(glob)docs/*.md' row of test_inspect_pinned_targets_classifies_every_target_class to a typed invalid-path refusal (by variant), keeping other rows; no new git-child counting there"
     }
   ],
   "notes": [
