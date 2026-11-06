@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "00d7c97882e942053d78fea40d7220c1124c57de",
+  "completed_at": "2026-11-06T05:40:42.409579184Z",
+  "duration_ms": 233836,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied in the attributable current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b2c28ec1-4178-4e77-9153-b86aefae1056",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a598182e-dd41-4617-9b75-4b18d75f1314",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:36:48.573078282Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 687707c77b977f473eecbca89e8e1e040f0d9a08, b85ca2bb4a52cc861e7cfcd2b59a348940ffb8d7, c8de62feb384fa21db5db4a97e40dd221c850a47, 00d7c97882e942053d78fea40d7220c1124c57de\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/b2c28ec1/requirement/REQ-01 through REQ-06 and @/issue/b697a3f7/requirement/REQ-20 (.jit issue sources); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; ancestry covers 687707c77 and b85ca2bb, not the later record/document commits); code-review failed (exit 1; prior F1 is addressed by the corrected current REQ-06 and linked ruling)\nTruncation recovery: reread storage and artifact patches by path; narrowed current parser, backend, conformance, classifier, and rustdoc reads; omitted truncated historic gate-record stdout as records of past\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied in the attributable current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
