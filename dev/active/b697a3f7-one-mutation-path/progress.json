@@ -32,7 +32,7 @@
           "title": "Gate registry edits keep the authored file",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "rework-1"
+          "status": "done"
         },
         {
           "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
