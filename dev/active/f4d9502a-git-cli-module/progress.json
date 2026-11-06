@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 6,
+  "current_wave": 10,
   "waves": [
     {
       "wave_number": 1,
@@ -501,32 +501,36 @@
           "short_id": "23b48cf0",
           "title": "Git requirement pages name the git executable",
           "classification": "documentation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "34851181-7812-4cef-9347-9b80c7fd288f",
           "short_id": "34851181",
           "title": "Trim the layout and git module surface to production callers",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
           "short_id": "78cb05ed",
           "title": "Build-policy check rejects native git and OpenSSL linkage",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "caceed7d-749c-44f4-8bad-647183cdaf29",
           "short_id": "caceed7d",
           "title": "Contributor documents stop presenting libgit2 as the git integration",
           "classification": "documentation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         }
       ]
     }
@@ -932,6 +936,38 @@
       "effort": "xhigh",
       "reason": "Bounded document diff reader migration with exact criteria.",
       "base": "28d98ee40"
+    },
+    {
+      "issue": "23b48cf0",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Wave 10 after libgit2 removal; disjoint footprints.",
+      "base": "a28ffc8bc"
+    },
+    {
+      "issue": "caceed7d",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Wave 10 after libgit2 removal; disjoint footprints.",
+      "base": "a28ffc8bc"
+    },
+    {
+      "issue": "34851181",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Wave 10 after libgit2 removal; disjoint footprints.",
+      "base": "a28ffc8bc"
+    },
+    {
+      "issue": "78cb05ed",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Wave 10 after libgit2 removal; disjoint footprints.",
+      "base": "a28ffc8bc"
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
