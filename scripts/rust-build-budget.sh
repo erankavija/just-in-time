@@ -20,6 +20,8 @@
 #                        --message-format=json`; default: run it live under
 #                        --root. Executable paths are read from this stream and
 #                        their on-disk sizes summed.
+#   --dynamic-dependencies FILE pre-captured executable<TAB>DT_NEEDED listing;
+#                        default: inspect the built jit and jit-server binaries.
 #   --test-suite-ms INTEGER measured nextest-plus-doctest suite duration, taken
 #                        over a target the caller has already built and read
 #                        into the page cache, so the value is the suite's
@@ -49,6 +51,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(dirname "$SCRIPT_DIR")
 METADATA_JSON=""
 ARTIFACTS_JSON=""
+DYNAMIC_DEPENDENCIES_FILE=""
 TEST_SUITE_MS=""
 TEST_SUITE_MS_PROVIDED=false
 
@@ -86,6 +89,7 @@ EOF
 jsonschema = { version = "0.46", default-features = false }
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 EOF
+    printf 'jit\tlibc.so.6\njit-server\tlibm.so.6\n' >"$fixture/dynamic-dependencies.txt"
     write_metadata "$((MAX_INTEGRATION_TARGETS - 1))"
     truncate -s 1 "$fixture/a"
     jq -nc --arg exe "$fixture/a" \
@@ -107,7 +111,8 @@ EOF
       unset BUSY_HOST_OVERRIDE
       "$BASH" "$script" --root "$fixture" \
         --metadata-json "$fixture/metadata.json" \
-        --artifacts-json "$fixture/artifacts.jsonl" "$@"
+        --artifacts-json "$fixture/artifacts.jsonl" \
+        --dynamic-dependencies "$fixture/dynamic-dependencies.txt" "$@"
     ) >"$fixture/stdout" 2>"$fixture/stderr" || actual=$?
     if [ "$actual" -ne "$expected" ]; then
       echo "FAIL: ${fixture##*/}: expected exit $expected, observed $actual" >&2
@@ -251,6 +256,13 @@ while [ "$#" -gt 0 ]; do
     --root) ROOT="$2"; shift 2 ;;
     --metadata-json) METADATA_JSON="$2"; shift 2 ;;
     --artifacts-json) ARTIFACTS_JSON="$2"; shift 2 ;;
+    --dynamic-dependencies)
+      if [ "$#" -lt 2 ]; then
+        echo "rust-build-budget: missing value for --dynamic-dependencies" >&2
+        exit 2
+      fi
+      DYNAMIC_DEPENDENCIES_FILE="$2"; shift 2
+      ;;
     --test-suite-ms)
       if [ "$#" -lt 2 ]; then
         echo "rust-build-budget: missing value for --test-suite-ms" >&2
@@ -385,6 +397,79 @@ if [ "$target_count" -gt "$MAX_INTEGRATION_TARGETS" ]; then
   errors+=("integration-test targets: observed ${target_count}, limit ${MAX_INTEGRATION_TARGETS}. Corrective area: consolidate top-level crates/jit/tests/*.rs entry points into cohesive suites (dev/benchmarks/rust-build-budgets/README.md).")
 fi
 
+# REQ-01: inspect the exact ELF DT_NEEDED entries of both shipped executables.
+# `readelf -d` exposes DT_NEEDED directly without scanning unrelated sections.
+dynamic_dependencies_status="checked"
+dynamic_dependencies=""
+if [ -n "$DYNAMIC_DEPENDENCIES_FILE" ]; then
+  [ -r "$DYNAMIC_DEPENDENCIES_FILE" ] || {
+    echo "rust-build-budget: cannot read dynamic-dependency listing: $DYNAMIC_DEPENDENCIES_FILE" >&2
+    exit 2
+  }
+  dynamic_dependencies=$(cat "$DYNAMIC_DEPENDENCIES_FILE") || {
+    echo "rust-build-budget: cannot read dynamic-dependency listing: $DYNAMIC_DEPENDENCIES_FILE" >&2
+    exit 2
+  }
+else
+  host_os=$(uname -s 2>/dev/null || true)
+  case "$host_os" in
+    Darwin | Windows_NT | CYGWIN* | MINGW* | MSYS*)
+      dynamic_dependencies_status="skipped-non-ELF"
+      ;;
+    *)
+      command -v readelf >/dev/null 2>&1 || {
+        echo "rust-build-budget: 'readelf' not found on ELF host; cannot inspect executable dynamic dependencies" >&2
+        exit 2
+      }
+      target_directory=$(printf '%s' "$metadata" | jq -r '.target_directory // empty')
+      if [ -z "$target_directory" ]; then
+        echo "rust-build-budget: Cargo metadata has no target_directory for dynamic-dependency inspection" >&2
+        exit 2
+      fi
+      build_directory="$target_directory"
+      if [ -n "${CARGO_BUILD_TARGET:-}" ]; then
+        build_directory="$build_directory/$CARGO_BUILD_TARGET"
+      fi
+      build_directory="$build_directory/debug"
+      for binary in jit jit-server; do
+        executable="$build_directory/$binary"
+        if [ ! -x "$executable" ]; then
+          echo "rust-build-budget: built executable is missing or not executable: $executable" >&2
+          exit 2
+        fi
+        if ! dynamic_section=$(readelf -d "$executable" 2>/dev/null); then
+          echo "rust-build-budget: readelf could not inspect executable: $executable" >&2
+          exit 2
+        fi
+        binary_dependencies=$(printf '%s\n' "$dynamic_section" | awk -v executable="$executable" '
+          /\(NEEDED\)/ {
+            soname = $0
+            sub(/^.*\[/, "", soname)
+            sub(/\].*$/, "", soname)
+            if (soname != "") print executable "\t" soname
+          }
+        ')
+        if [ -n "$binary_dependencies" ]; then
+          dynamic_dependencies+="$binary_dependencies"$'\n'
+        fi
+      done
+      ;;
+  esac
+fi
+
+while IFS=$'\t' read -r executable library extra || [ -n "${executable:-}${library:-}${extra:-}" ]; do
+  [ -z "${executable:-}${library:-}${extra:-}" ] && continue
+  if [ -z "${executable:-}" ] || [ -z "${library:-}" ] || [ -n "${extra:-}" ]; then
+    echo "rust-build-budget: invalid dynamic-dependency listing row; expected executable<TAB>DT_NEEDED" >&2
+    exit 2
+  fi
+  case "$library" in
+    libgit2 | libgit2.so | libgit2.so.* | libssl | libssl.so | libssl.so.* | libcrypto | libcrypto.so | libcrypto.so.*)
+      errors+=("dynamic dependency: executable '$executable' declares banned library '$library'.")
+      ;;
+  esac
+done <<< "$dynamic_dependencies"
+
 # REQ-02: unique active test-executable bytes from `cargo test --no-run`.
 # Selection matches the recorded benchmark method (a non-null executable with
 # profile.test == true); `sort -u` deduplicates paths before summing.
@@ -460,4 +545,4 @@ fi
 
 # REQ-06: one concise, parseable success line. cargo-ci.sh's summarize_pass
 # folds it into the persisted gate summary.
-echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} suite-duration=${suite_duration_status} main-rs-lines=${main_rs_lines}/${MAX_MAIN_RS_CODE_LINES}"
+echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} dynamic-dependencies=${dynamic_dependencies_status} suite-duration=${suite_duration_status} main-rs-lines=${main_rs_lines}/${MAX_MAIN_RS_CODE_LINES}"

@@ -1056,10 +1056,13 @@ mod tests {
             .with_layout(layout)
             .unwrap()
             .with_worktree_paths(
-                crate::storage::WorktreePaths::detect_from(data.root())
-                    .unwrap()
-                    .with_worktree_root(repository.root())
-                    .unwrap(),
+                crate::storage::WorktreePaths::detect_for_data_root(
+                    &data.root().join(".jit"),
+                    data.root(),
+                )
+                .unwrap()
+                .with_worktree_root(repository.root())
+                .unwrap(),
             );
 
         for (at, committed_only, expected) in [
@@ -1123,9 +1126,12 @@ mod tests {
         let commit = repository.commit("initial");
         repository.write("ignored", "local cache");
         let exporter = SnapshotExporter::new(
-            crate::storage::WorktreePaths::detect_from(repository.root())
-                .unwrap()
-                .git(),
+            crate::storage::WorktreePaths::detect_for_data_root(
+                &repository.root().join(".jit"),
+                repository.root(),
+            )
+            .unwrap()
+            .git(),
             repository.root().to_path_buf(),
             chrono::Utc::now(),
         );
@@ -1150,9 +1156,12 @@ mod tests {
         ]);
         repository.git(&["branch", "--move", "main"]);
         let exporter = SnapshotExporter::new(
-            crate::storage::WorktreePaths::detect_from(repository.root())
-                .unwrap()
-                .git(),
+            crate::storage::WorktreePaths::detect_for_data_root(
+                &repository.root().join(".jit"),
+                repository.root(),
+            )
+            .unwrap()
+            .git(),
             repository.root().to_path_buf(),
             chrono::Utc::now(),
         );

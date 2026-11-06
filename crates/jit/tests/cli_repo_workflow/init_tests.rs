@@ -134,9 +134,8 @@ fn test_init_outside_git_scaffolds_rules_without_creating_dot_git() {
     // `jit init` in a directory that is NOT a git repo must still scaffold the
     // default rules.toml, but it must NOT create a bogus `.git` control plane:
     // the scaffold write lock (.git/jit/locks/rules.lock) is git-only, and the
-    // non-git path is intentionally lockless. (Regression: gating the lock on
-    // `WorktreePaths::detect()` succeeding created `<dir>/.git/jit/locks`,
-    // because detect() returns Ok even outside git.)
+    // non-git path is intentionally lockless. Successful layout discovery alone
+    // does not imply Git authority for the scaffold lock.
     // Hermetic by construction: the control plane (and thus the scaffold lock) is
     // derived from the working tree that owns this `.jit` -- i.e. whether
     // `<temp>/.git` exists -- not from the ambient cwd. A fresh TempDir has no

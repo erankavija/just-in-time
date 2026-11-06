@@ -395,7 +395,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-05T07:52:38.826295491Z"
+  "updated_at": "2026-11-06T05:57:23.505596178Z"
 }

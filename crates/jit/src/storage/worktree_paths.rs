@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::collections::BTreeMap;
-use std::env;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -135,11 +134,6 @@ impl WorktreePaths {
         }
     }
 
-    /// Detect worktree context using git commands.
-    pub fn detect() -> Result<Self> {
-        Self::detect_from(&env::current_dir()?)
-    }
-
     /// Detect the checkout containing the selected JIT data root.
     ///
     /// `selected_data_root` is the authority for Git classification, including
@@ -154,24 +148,12 @@ impl WorktreePaths {
     /// or top-level path cannot be resolved.
     pub fn detect_for_data_root(selected_data_root: &Path, non_git_root: &Path) -> Result<Self> {
         let probe = existing_directory_for(selected_data_root);
-        Self::detect_from_with_non_git_root(&probe, non_git_root, Some(selected_data_root))
-    }
-
-    /// Detect worktree context from an explicitly selected repository root.
-    ///
-    /// This is the non-global counterpart to [`Self::detect`]. Validation views
-    /// use it so machine-local claims coordination is checked for the repository
-    /// being validated, even when that repository is not the process cwd.
-    pub(crate) fn detect_from(current: &Path) -> Result<Self> {
-        Self::detect_from_with_non_git_root(current, current, None)
-    }
-
-    fn detect_from_with_non_git_root(
-        current: &Path,
-        non_git_root: &Path,
-        selected_data_root: Option<&Path>,
-    ) -> Result<Self> {
-        Self::detect_with_context(current, non_git_root, selected_data_root, Arc::default())
+        Self::detect_with_context(
+            &probe,
+            non_git_root,
+            Some(selected_data_root),
+            Arc::default(),
+        )
     }
 
     fn detect_with_context(
@@ -402,13 +384,6 @@ impl WorktreePaths {
         self.relocated_worktree_checkout
             .as_ref()
             .map_or(&self.data_checkout_root, |checkout| &checkout.top_level)
-    }
-
-    /// Check if this is the main worktree.
-    ///
-    /// Returns true if `common_dir == <checkout top level>/.git`.
-    pub fn is_main_worktree(&self) -> bool {
-        !self.is_worktree()
     }
 
     /// Return the primary checkout root when this is a linked non-primary checkout.
@@ -791,15 +766,11 @@ mod tests {
         let current = tempfile::tempdir().unwrap();
         let selected_root = tempfile::tempdir().unwrap();
 
-        let paths = WorktreePaths::detect_from_with_non_git_root(
-            current.path(),
-            selected_root.path(),
-            None,
-        )
-        .unwrap();
+        let data_root = current.path().join(".jit");
+        let paths = WorktreePaths::detect_for_data_root(&data_root, selected_root.path()).unwrap();
 
         assert_eq!(paths.worktree_root, selected_root.path());
-        assert_eq!(paths.local_jit, selected_root.path().join(".jit"));
+        assert_eq!(paths.local_jit, data_root);
     }
 
     #[test]
@@ -876,7 +847,7 @@ mod tests {
         assert_eq!(paths.shared_jit, repository.root().join(".git/jit"));
         assert!(paths.has_claims_coordination());
         assert!(!paths.is_git_repository());
-        assert!(paths.is_main_worktree());
+        assert!(!paths.is_worktree());
         assert!(!paths.holds_linked_store());
     }
 
@@ -892,7 +863,7 @@ mod tests {
 
         assert_eq!(paths.worktree_root, subdirectory);
         assert_eq!(paths.common_dir, repository.root().join(".git"));
-        assert!(paths.is_main_worktree());
+        assert!(!paths.is_worktree());
         assert!(paths.is_primary_worktree_path(repository.root()).unwrap());
     }
 
@@ -1009,25 +980,6 @@ mod tests {
 
         assert!(!paths.has_claims_coordination());
         assert!(!paths.holds_linked_store());
-    }
-
-    #[test]
-    fn test_detect_in_main_worktree() {
-        let paths = WorktreePaths::detect_from(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
-
-        // Test the is_worktree() invariant: it should be false IFF common_dir == worktree_root/.git
-        let expected_is_main = paths.common_dir == paths.worktree_root.join(".git");
-        assert_eq!(
-            paths.is_worktree(),
-            !expected_is_main,
-            "is_worktree() should be false when common_dir == worktree_root/.git, true otherwise"
-        );
-
-        // If in main worktree, verify path structure
-        if expected_is_main {
-            assert_eq!(paths.local_jit, paths.worktree_root.join(".jit"));
-            assert_eq!(paths.shared_jit, paths.common_dir.join("jit"));
-        }
     }
 
     #[test]

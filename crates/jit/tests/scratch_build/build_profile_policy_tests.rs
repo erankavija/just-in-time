@@ -24,6 +24,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
 
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -37,6 +38,71 @@ fn workspace_manifest() -> toml::Value {
     let text =
         fs::read_to_string(workspace_root().join("Cargo.toml")).expect("read workspace Cargo.toml");
     toml::from_str(&text).expect("workspace Cargo.toml must be valid TOML")
+}
+
+/// Run the budget checker against small, owned Cargo and artifact fixtures.
+/// The checker is exercised directly, so these fixtures never invoke Cargo.
+fn run_build_budget_checker(dynamic_dependencies: &str) -> Output {
+    let root = workspace_root();
+    let fixture = tempfile::tempdir().expect("create build-budget fixture");
+    let fixture_root = fixture.path();
+    fs::create_dir_all(fixture_root.join("crates/jit/src")).unwrap();
+    fs::write(
+        fixture_root.join("Cargo.toml"),
+        "[profile.dev]\ndebug = \"line-tables-only\"\nincremental = true\n\
+         [profile.test]\ndebug = \"line-tables-only\"\nincremental = true\n",
+    )
+    .unwrap();
+    fs::write(
+        fixture_root.join("crates/jit/Cargo.toml"),
+        "[dependencies]\njsonschema = { version = \"0.46\", default-features = false }\n\
+         ureq = { version = \"3\", default-features = false, features = [\"rustls\", \"gzip\"] }\n",
+    )
+    .unwrap();
+    fs::write(
+        fixture_root.join("crates/jit/src/main.rs"),
+        "fn main() {}\n",
+    )
+    .unwrap();
+
+    let artifact_path = fixture_root.join("fixture-executable");
+    fs::write(&artifact_path, b"x").unwrap();
+    fs::write(
+        fixture_root.join("metadata.json"),
+        r#"{"packages":[{"targets":[{"kind":["lib"],"name":"jit"}]}]}"#,
+    )
+    .unwrap();
+    fs::write(
+        fixture_root.join("artifacts.jsonl"),
+        format!(
+            "{}\n",
+            serde_json::json!({
+                "reason": "compiler-artifact",
+                "profile": {"test": true},
+                "executable": artifact_path,
+            })
+        ),
+    )
+    .unwrap();
+    fs::write(
+        fixture_root.join("dynamic-dependencies.txt"),
+        dynamic_dependencies,
+    )
+    .unwrap();
+
+    Command::new("bash")
+        .current_dir(&root)
+        .arg("scripts/rust-build-budget.sh")
+        .arg("--root")
+        .arg(fixture_root)
+        .arg("--metadata-json")
+        .arg(fixture_root.join("metadata.json"))
+        .arg("--artifacts-json")
+        .arg(fixture_root.join("artifacts.jsonl"))
+        .arg("--dynamic-dependencies")
+        .arg(fixture_root.join("dynamic-dependencies.txt"))
+        .output()
+        .expect("run build-budget checker")
 }
 
 fn profile_table(manifest: &toml::Value, profile: &str) -> toml::Value {
@@ -177,6 +243,18 @@ fn test_cargo_ci_compiles_and_warms_the_measured_suite_before_starting_the_suite
 }
 
 #[test]
+fn test_cargo_ci_builds_product_binaries_before_dynamic_dependency_check() {
+    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
+        .expect("read scripts/cargo-ci.sh");
+    let prepare = shell_function_body(&script, "prepare_measured_suite");
+
+    assert!(
+        prepare.contains("cargo build --workspace --bins"),
+        "the suite preparation must build jit and jit-server as product executables before the budget checker inspects their dynamic dependencies"
+    );
+}
+
+#[test]
 fn test_cargo_ci_enforces_the_measured_suite_clock_through_the_budget_checker() {
     let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
         .expect("read scripts/cargo-ci.sh");
@@ -298,6 +376,66 @@ fn test_dev_profile_package_override_sets_dependency_opt_level_to_one() {
          compiled once and then executed by every test process, so their \
          unoptimized code is repeated cost, and level 1 was the measured \
          selection over level 2 (dev/benchmarks/dependency-profile-6d10e5d4/)"
+    );
+}
+
+#[test]
+fn test_build_budget_accepts_clean_dynamic_dependency_listing() {
+    let output = run_build_budget_checker("jit\tlibc.so.6\njit-server\tlibm.so.6\n");
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "clean dynamic-dependency listing should pass; stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_build_budget_rejects_libgit2_dynamic_dependency() {
+    let output = run_build_budget_checker("jit\tlibgit2.so.1\n");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(output.status.code(), Some(1), "stderr: {stderr}");
+    assert!(
+        stderr.contains("jit"),
+        "stderr must name the executable: {stderr}"
+    );
+    assert!(
+        stderr.contains("libgit2"),
+        "stderr must name the banned library: {stderr}"
+    );
+}
+
+#[test]
+fn test_build_budget_rejects_libssl_dynamic_dependency() {
+    let output = run_build_budget_checker("jit-server\tlibssl.so.3\n");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(output.status.code(), Some(1), "stderr: {stderr}");
+    assert!(
+        stderr.contains("jit-server"),
+        "stderr must name the executable: {stderr}"
+    );
+    assert!(
+        stderr.contains("libssl"),
+        "stderr must name the banned library: {stderr}"
+    );
+}
+
+#[test]
+fn test_build_budget_rejects_libcrypto_dynamic_dependency() {
+    let output = run_build_budget_checker("jit\tlibcrypto.so.3\n");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(output.status.code(), Some(1), "stderr: {stderr}");
+    assert!(
+        stderr.contains("jit"),
+        "stderr must name the executable: {stderr}"
+    );
+    assert!(
+        stderr.contains("libcrypto"),
+        "stderr must name the banned library: {stderr}"
     );
 }
 
