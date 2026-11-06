@@ -25670,3 +25670,4 @@
 {"from":"ready","id":"b28ac826-39f4-4bde-a1f5-fc51bd429405","issue_id":"caceed7d-749c-44f4-8bad-647183cdaf29","timestamp":"2026-11-06T05:20:41.007785724Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:f4d9502a-lead","id":"ec6689e5-0c4d-4e33-aea2-f35ea6bcbfd5","issue_id":"caceed7d-749c-44f4-8bad-647183cdaf29","timestamp":"2026-11-06T05:20:41.007785724Z","type":"issue_claimed"}
 {"gate_key":"docs-mechanical","id":"fa0309c6-a380-4089-96ad-3b4a059fd816","issue_id":"23b48cf0-02af-4286-a788-bcda0ec32abf","timestamp":"2026-11-06T05:26:09.534230013Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"0119423b-53fc-4a57-9e70-ffb842f96ff3","issue_id":"23b48cf0-02af-4286-a788-bcda0ec32abf","timestamp":"2026-11-06T05:28:58.387276003Z","type":"gate_failed","updated_by":"auto:executor"}
