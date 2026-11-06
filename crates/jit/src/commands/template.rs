@@ -24,7 +24,7 @@ use crate::repository_state::{
 use crate::storage::IssueNotFoundError;
 use crate::templates::{
     declared_container_label, GraphTemplate, InterpolationContext, RoleBindings,
-    TemplateRequirement,
+    TemplatePrerequisitesUnmetError,
 };
 use serde::Serialize;
 
@@ -159,85 +159,22 @@ impl UpstreamMoveReport {
     }
 }
 
-/// Applying a template found requirements the repository does not declare.
-///
-/// Names every unmet [`TemplateRequirement`] at once, in requirement order; the
-/// CLI renders the template and the requirements into the `--json` envelope's
-/// `details`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TemplatePrerequisitesUnmetError {
-    template: String,
-    unmet: Vec<TemplateRequirement>,
-}
-
-impl TemplatePrerequisitesUnmetError {
-    /// The template whose requirements are unmet.
-    pub fn template(&self) -> &str {
-        &self.template
-    }
-
-    /// Every unmet requirement.
-    pub fn unmet(&self) -> &[TemplateRequirement] {
-        &self.unmet
-    }
-}
-
-impl std::fmt::Display for TemplatePrerequisitesUnmetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "template '{}' requires {} repository declaration(s) this repository lacks; declare each, then re-apply:",
-            self.template,
-            self.unmet.len()
-        )?;
-        self.unmet
-            .iter()
-            .try_for_each(|requirement| write!(f, "\n  - {requirement}"))
-    }
-}
-
-impl std::error::Error for TemplatePrerequisitesUnmetError {}
-
 /// Check every requirement of `template` against the repository's declarations.
-///
-/// An empty type hierarchy or namespace registry declares no vocabulary, so it
-/// requires none, as the default rules keyed on those registries do. Pure, so a
-/// validator reports what apply would (`@/charter/D-20`).
 ///
 /// # Errors
 ///
 /// [`TemplatePrerequisitesUnmetError`] naming every unmet requirement.
-pub(crate) fn require_template_prerequisites(
+fn require_template_prerequisites(
     template: &GraphTemplate,
     config: &crate::config::JitConfig,
     registry: &crate::declarations::GateRegistry,
     presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
 ) -> std::result::Result<(), TemplatePrerequisitesUnmetError> {
-    let namespaces = crate::config_manager::namespaces_from_config(config);
-    let types = namespaces.declared_type_hierarchy();
-    let documentation = config.documentation.clone().unwrap_or_default();
-    let is_declared = |requirement: &TemplateRequirement| match requirement {
-        TemplateRequirement::Type(name) => types.is_empty() || types.contains_key(name),
-        TemplateRequirement::LabelNamespace(name) => {
-            namespaces.namespaces.is_empty() || namespaces.namespaces.contains_key(name)
-        }
-        TemplateRequirement::Gate(key) => {
-            presets.contains_key(key) || registry.gates.contains_key(key)
-        }
-        TemplateRequirement::DocumentationArea(area) => documentation.is_issue_scoped_area(area),
-    };
-    let unmet = template
-        .requirements()
-        .into_iter()
-        .filter(|requirement| !is_declared(requirement))
-        .collect::<Vec<_>>();
+    let unmet = template.unmet_requirements(config, registry, presets);
     if unmet.is_empty() {
         Ok(())
     } else {
-        Err(TemplatePrerequisitesUnmetError {
-            template: template.name.clone(),
-            unmet,
-        })
+        Err(TemplatePrerequisitesUnmetError::new(&template.name, unmet))
     }
 }
 
@@ -1427,6 +1364,7 @@ mod tests {
     use super::*;
     use crate::commands::template_expand::test_declarations as declared;
     use crate::domain::artifact_directory::ArtifactDirectoryError;
+    use crate::templates::TemplateRequirement;
 
     #[test]
     fn test_named_template_resolution_returns_typed_invalid_argument_for_unknown_name() {

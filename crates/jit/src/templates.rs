@@ -191,6 +191,53 @@ impl std::fmt::Display for TemplateRequirement {
     }
 }
 
+/// Applying a template found requirements the repository does not declare.
+///
+/// Names every unmet [`TemplateRequirement`] at once, in requirement order; the
+/// CLI renders the template and the requirements into the `--json` envelope's
+/// `details`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplatePrerequisitesUnmetError {
+    template: String,
+    unmet: Vec<TemplateRequirement>,
+}
+
+impl TemplatePrerequisitesUnmetError {
+    /// Report `unmet` requirements of the template named `template`.
+    pub fn new(template: impl Into<String>, unmet: Vec<TemplateRequirement>) -> Self {
+        Self {
+            template: template.into(),
+            unmet,
+        }
+    }
+
+    /// The template whose requirements are unmet.
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+
+    /// Every unmet requirement.
+    pub fn unmet(&self) -> &[TemplateRequirement] {
+        &self.unmet
+    }
+}
+
+impl std::fmt::Display for TemplatePrerequisitesUnmetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "template '{}' requires {} repository declaration(s) this repository lacks; declare each, then re-apply:",
+            self.template,
+            self.unmet.len()
+        )?;
+        self.unmet
+            .iter()
+            .try_for_each(|requirement| write!(f, "\n  - {requirement}"))
+    }
+}
+
+impl std::error::Error for TemplatePrerequisitesUnmetError {}
+
 /// A loaded, validated set of graph templates from `.jit/templates.toml`, plus
 /// the repository's [`RoleBindings`] and [`AnchorBindings`].
 ///
@@ -545,6 +592,40 @@ impl GraphTemplate {
             .iter()
             .flat_map(|anchor| anchor.gates.iter().cloned().map(TemplateRequirement::Gate));
         node_requirements.chain(anchor_gates).collect()
+    }
+
+    /// The [`requirements`](Self::requirements) that `config`, the gate
+    /// `registry`, and the gate `presets` leave undeclared, in requirement order.
+    ///
+    /// An empty type hierarchy or namespace registry declares no vocabulary, so
+    /// it requires none, as the default rules keyed on those registries do. Pure,
+    /// so every checker is a view over what `jit apply` enforces
+    /// (`@/charter/D-20`).
+    pub fn unmet_requirements(
+        &self,
+        config: &crate::config::JitConfig,
+        registry: &crate::declarations::GateRegistry,
+        presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+    ) -> Vec<TemplateRequirement> {
+        let namespaces = crate::config_manager::namespaces_from_config(config);
+        let types = namespaces.declared_type_hierarchy();
+        let documentation = config.documentation.clone().unwrap_or_default();
+        let is_declared = |requirement: &TemplateRequirement| match requirement {
+            TemplateRequirement::Type(name) => types.is_empty() || types.contains_key(name),
+            TemplateRequirement::LabelNamespace(name) => {
+                namespaces.namespaces.is_empty() || namespaces.namespaces.contains_key(name)
+            }
+            TemplateRequirement::Gate(key) => {
+                presets.contains_key(key) || registry.gates.contains_key(key)
+            }
+            TemplateRequirement::DocumentationArea(area) => {
+                documentation.is_issue_scoped_area(area)
+            }
+        };
+        self.requirements()
+            .into_iter()
+            .filter(|requirement| !is_declared(requirement))
+            .collect()
     }
 
     /// The node carrying the given `role`, or `None` if no node declares it.

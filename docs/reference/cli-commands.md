@@ -3420,6 +3420,9 @@ names all the unmet ones. `--json` puts them in `details`:
 }
 ```
 
+`jit validate` reports a template node type the declared hierarchy lacks
+before the template is applied.
+
 ```bash
 jit apply plan epic-123
 jit apply plan epic-123 --json

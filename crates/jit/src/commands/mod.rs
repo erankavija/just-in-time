@@ -120,10 +120,7 @@ pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
 pub use query::{ByStateKey, RollupTotals, StateCount, StateRollup};
 pub use search::{ContentMatch, SemanticIssueMatch, SemanticSearchOptions};
-pub use template::{
-    TemplateApplyResult, TemplateOps, TemplatePrerequisitesUnmetError, UpstreamMove,
-    UpstreamMoveReport,
-};
+pub use template::{TemplateApplyResult, TemplateOps, UpstreamMove, UpstreamMoveReport};
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
     PlannedUpstreamMove, TemplateDelta,

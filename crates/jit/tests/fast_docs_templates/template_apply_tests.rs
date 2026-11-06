@@ -15,12 +15,12 @@
 //! reduced spine C→B→P→upstream.
 
 use jit::commands::test_helpers::ExecutorTestAccess;
-use jit::commands::TemplatePrerequisitesUnmetError;
 use jit::declarations::{GateChecker, GateMode};
 use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
+use jit::templates::TemplatePrerequisitesUnmetError;
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_harness::TestHarness;
 use jit::test_utils::add_reducing_edge;
