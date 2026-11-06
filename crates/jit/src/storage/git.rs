@@ -393,7 +393,7 @@ impl GitCheckout {
             Ok(ArtifactVersion::Pinned(oid)) => oid,
             Ok(version) => {
                 return Err(GitError::UnexpectedOutput {
-                    command: format!("rev-parse --verify {base}^{{commit}}"),
+                    command: "cat-file --batch-check -Z".into(),
                     output: version.as_str().to_owned(),
                 });
             }
@@ -537,27 +537,48 @@ pub struct GitObjectReader {
     process: CatFileProcess,
 }
 
+/// Resolution of an original expression followed by canonical-object commit peeling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommitResolution {
+    Commit(CanonicalCommitOid),
+    /// The original expression did not identify an object.
+    Missing,
+    /// An object exists but cannot be peeled to a commit.
+    NonCommit,
+    Ambiguous,
+}
+
+impl CommitResolution {
+    fn into_version(self, revision: &str) -> Result<ArtifactVersion, GitError> {
+        let reason = match self {
+            Self::Commit(commit) => return Ok(ArtifactVersion::Pinned(commit)),
+            Self::Missing => "revision does not identify an object",
+            Self::NonCommit => "object cannot be peeled to a commit",
+            Self::Ambiguous => "revision is ambiguous",
+        };
+        Err(GitError::RevisionNotFound {
+            revision: revision.to_owned(),
+            stderr: reason.to_owned(),
+        })
+    }
+}
+
 impl GitObjectReader {
+    /// Resolve and peel within this session, draining unrequested bodies in bounded memory.
+    pub fn resolve_commit(&mut self, name: &str) -> Result<CommitResolution, GitError> {
+        self.process.resolve_commit(name)
+    }
+
     /// Read another name, including names discovered from an earlier answer.
     /// Missing names and gitlinks without a readable object return `None`;
     /// NUL input is rejected before sending.
     /// I/O or protocol errors end the session and return [`GitError::UnexpectedOutput`].
     pub fn read(&mut self, name: &str) -> Result<Option<GitObject>, GitError> {
-        let Some(header) = self.process.request(name)? else {
+        let Some(header) = self.process.request_object(name)? else {
             return Ok(None);
         };
-        let contents = (|| {
-            let output = self.process.output()?;
-            let mut bytes = Vec::new();
-            output.take(header.size).read_to_end(&mut bytes)?;
-            let mut separator = [0];
-            output.read_exact(&mut separator)?;
-            if bytes.len() as u64 != header.size || separator[0] != b'\0' {
-                return Err(invalid_object_output("invalid object body framing"));
-            }
-            Ok(bytes)
-        })();
-        let bytes = contents.map_err(|error| self.process.fail(error))?;
+        let mut bytes = Vec::new();
+        self.process.consume_body(header.size, &mut bytes)?;
         Ok(Some(GitObject {
             id: header.id,
             object_type: header.object_type,
@@ -595,7 +616,7 @@ impl GitCheckout {
             .iter()
             .map(|name| {
                 process
-                    .request(name)
+                    .request_object(name)
                     .map(|header| header.map(|header| header.object_type))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -623,6 +644,12 @@ struct ObjectHeader {
     id: GitObjectId,
     object_type: GitObjectType,
     size: u64,
+}
+
+enum ObjectResponse {
+    Found(ObjectHeader),
+    Missing,
+    Ambiguous,
 }
 
 struct CatFileProcess {
@@ -675,7 +702,7 @@ impl CatFileProcess {
             .ok_or_else(|| io::Error::other("git object session is closed"))
     }
 
-    fn request(&mut self, name: &str) -> Result<Option<ObjectHeader>, GitError> {
+    fn request(&mut self, name: &str) -> Result<ObjectResponse, GitError> {
         validate_object_name(name)?;
         let answer = (|| {
             let input = self
@@ -691,6 +718,61 @@ impl CatFileProcess {
             parse_object_header(name, &header)
         })();
         answer.map_err(|error| self.fail(error))
+    }
+
+    fn request_object(&mut self, name: &str) -> Result<Option<ObjectHeader>, GitError> {
+        match self.request(name)? {
+            ObjectResponse::Found(header) => Ok(Some(header)),
+            ObjectResponse::Missing => Ok(None),
+            ObjectResponse::Ambiguous => Err(GitError::UnexpectedOutput {
+                command: format!("cat-file {} -Z", self.mode.argument()),
+                output: format!("ambiguous object name: {name}"),
+            }),
+        }
+    }
+
+    fn consume_body(&mut self, size: u64, sink: &mut impl Write) -> Result<(), GitError> {
+        let consumed = (|| {
+            let output = self.output()?;
+            let length = io::copy(&mut output.take(size), sink)?;
+            let mut separator = [0];
+            output.read_exact(&mut separator)?;
+            if length != size || separator[0] != b'\0' {
+                return Err(invalid_object_output("invalid object body framing"));
+            }
+            Ok(())
+        })();
+        consumed.map_err(|error| self.fail(error))
+    }
+
+    fn metadata(&mut self, name: &str) -> Result<ObjectResponse, GitError> {
+        let response = self.request(name)?;
+        if let ObjectResponse::Found(header) = &response {
+            if matches!(self.mode, CatFileMode::Contents) {
+                self.consume_body(header.size, &mut io::sink())?;
+            }
+        }
+        Ok(response)
+    }
+
+    fn resolve_commit(&mut self, name: &str) -> Result<CommitResolution, GitError> {
+        let header = match self.metadata(name)? {
+            ObjectResponse::Found(header) => header,
+            ObjectResponse::Missing => return Ok(CommitResolution::Missing),
+            ObjectResponse::Ambiguous => return Ok(CommitResolution::Ambiguous),
+        };
+        let commit = if header.object_type == GitObjectType::Commit {
+            header
+        } else {
+            match self.metadata(&format!("{}^{{commit}}", header.id.as_str()))? {
+                ObjectResponse::Found(header) if header.object_type == GitObjectType::Commit => {
+                    header
+                }
+                ObjectResponse::Ambiguous => return Ok(CommitResolution::Ambiguous),
+                _ => return Ok(CommitResolution::NonCommit),
+            }
+        };
+        canonical_commit(name, commit.id.as_str()).map(CommitResolution::Commit)
     }
 
     fn finish(&mut self) -> Result<(), GitError> {
@@ -764,7 +846,7 @@ fn invalid_object_output(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message.into())
 }
 
-fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHeader>> {
+fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<ObjectResponse> {
     let malformed = || {
         invalid_object_output(format!(
             "invalid object header: {:?}",
@@ -780,7 +862,10 @@ fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHead
             .strip_suffix(" submodule")
             .is_some_and(|id| GitObjectId::parse(id).is_some())
     {
-        return Ok(None);
+        return Ok(ObjectResponse::Missing);
+    }
+    if line.strip_suffix(" ambiguous") == Some(name) {
+        return Ok(ObjectResponse::Ambiguous);
     }
     let mut fields = line.split(' ');
     let id = fields
@@ -799,7 +884,7 @@ fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHead
     if fields.next().is_some() {
         return Err(malformed());
     }
-    Ok(Some(ObjectHeader {
+    Ok(ObjectResponse::Found(ObjectHeader {
         id,
         object_type,
         size,
@@ -997,25 +1082,14 @@ impl PinnedArtifactRead {
 }
 
 impl GitCheckout {
-    /// Canonicalize `revision` with exact
-    /// `git rev-parse --verify <revision>^{commit}` semantics.
-    ///
-    /// Both full SHA-1 and SHA-256 OIDs are accepted; abbreviated and symbolic
-    /// inputs are returned only as Git's full canonical lowercase commit OID.
+    /// Resolve the original expression, then peel its canonical object to a commit.
+    /// Uses one metadata-only process for full SHA-1/SHA-256, abbreviated and symbolic inputs.
     pub fn resolve_commit(&self, revision: &str) -> Result<ArtifactVersion, GitError> {
-        let peeled = format!("{revision}^{{commit}}");
-        let output = self.git.run(
-            &self.worktree_root,
-            ["rev-parse", "--verify", peeled.as_str()],
-        )?;
-        if !output.status.success() {
-            return Err(GitError::RevisionNotFound {
-                revision: revision.to_string(),
-                stderr: stderr(&output),
-            });
-        }
-
-        canonical_version(revision, &String::from_utf8_lossy(&output.stdout))
+        validate_object_name(revision)?;
+        let mut process = CatFileProcess::start(self, CatFileMode::Types)?;
+        let resolution = process.resolve_commit(revision)?;
+        process.finish()?;
+        resolution.into_version(revision)
     }
 
     /// Resolve `revision` and read `path` from that exact commit.
@@ -1329,52 +1403,27 @@ impl GitCheckout {
         if revisions.is_empty() {
             return BTreeMap::new();
         }
-        let peeled = revisions
-            .iter()
-            .map(|revision| format!("{revision}^{{commit}}"))
-            .collect::<Vec<_>>();
-        let mut arguments = vec!["rev-parse", "--end-of-options"];
-        arguments.extend(peeled.iter().map(String::as_str));
-        let output = match self.git.run(&self.worktree_root, arguments) {
-            Ok(output) if output.status.success() => output,
-            Ok(_) => return self.resolve_commits_individually(revisions),
-            Err(error) => {
-                return revisions
-                    .iter()
-                    .map(|revision| (revision.clone(), Err(error.clone())))
-                    .collect()
-            }
-        };
-        let lines = output
-            .stdout
-            .split(|byte| *byte == b'\n')
-            // Git 2.55 echoes the end-of-options marker once when rev-parse
-            // is used without --verify. It is not a resolved revision.
-            .filter(|line| !line.is_empty() && *line != b"--end-of-options")
-            .collect::<Vec<_>>();
-        if lines.len() != revisions.len() {
-            return self.resolve_commits_individually(revisions);
-        }
-        revisions
-            .iter()
-            .zip(lines)
-            .map(|(revision, line)| {
-                (
-                    revision.clone(),
-                    canonical_version(revision, &String::from_utf8_lossy(line)),
-                )
-            })
-            .collect()
-    }
-
-    fn resolve_commits_individually(
-        &self,
-        revisions: &BTreeSet<String>,
-    ) -> BTreeMap<String, Result<ArtifactVersion, GitError>> {
-        revisions
-            .iter()
-            .map(|revision| (revision.clone(), self.resolve_commit(revision)))
-            .collect()
+        let resolved = (|| {
+            let mut process = CatFileProcess::start(self, CatFileMode::Types)?;
+            let results = revisions
+                .iter()
+                .map(|revision| {
+                    let result = match validate_object_name(revision) {
+                        Ok(()) => process.resolve_commit(revision)?.into_version(revision),
+                        Err(error) => Err(error),
+                    };
+                    Ok((revision.clone(), result))
+                })
+                .collect::<Result<BTreeMap<_, _>, GitError>>()?;
+            process.finish()?;
+            Ok(results)
+        })();
+        resolved.unwrap_or_else(|error: GitError| {
+            revisions
+                .iter()
+                .map(|revision| (revision.clone(), Err(error.clone())))
+                .collect()
+        })
     }
 }
 
@@ -1417,9 +1466,9 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).trim().to_string()
 }
 
-fn canonical_version(revision: &str, output: &str) -> Result<ArtifactVersion, GitError> {
+fn canonical_commit(revision: &str, output: &str) -> Result<CanonicalCommitOid, GitError> {
     let oid = output.trim().to_string();
-    ArtifactVersion::pinned(oid.clone()).map_err(|_| GitError::NonCanonicalOid {
+    CanonicalCommitOid::parse(oid.clone()).map_err(|_| GitError::NonCanonicalOid {
         revision: revision.to_string(),
         output: oid,
     })
@@ -1529,13 +1578,13 @@ mod tests {
     }
 
     #[test]
-    fn test_canonical_version_accepts_full_sha1_and_sha256_git_output() {
+    fn test_canonical_commit_accepts_full_sha1_and_sha256_git_output() {
         let sha1 = "0123456789abcdef0123456789abcdef01234567";
         let sha256 = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
 
-        assert_eq!(canonical_version("HEAD", sha1).unwrap().as_str(), sha1);
+        assert_eq!(canonical_commit("HEAD", sha1).unwrap().as_str(), sha1);
         assert_eq!(
-            canonical_version("HEAD", &format!("{sha256}\n"))
+            canonical_commit("HEAD", &format!("{sha256}\n"))
                 .unwrap()
                 .as_str(),
             sha256
@@ -1543,13 +1592,13 @@ mod tests {
     }
 
     #[test]
-    fn test_canonical_version_rejects_abbreviated_or_noncanonical_git_output() {
+    fn test_canonical_commit_rejects_abbreviated_or_noncanonical_git_output() {
         assert!(matches!(
-            canonical_version("HEAD", "01234567"),
+            canonical_commit("HEAD", "01234567"),
             Err(GitError::NonCanonicalOid { .. })
         ));
         assert!(matches!(
-            canonical_version("HEAD", "0123456789ABCDEF0123456789ABCDEF01234567"),
+            canonical_commit("HEAD", "0123456789ABCDEF0123456789ABCDEF01234567"),
             Err(GitError::NonCanonicalOid { .. })
         ));
     }

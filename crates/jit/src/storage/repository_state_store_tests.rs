@@ -1750,10 +1750,7 @@ fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
     assert_eq!(
         all_processes
             .iter()
-            .filter(|invocation| invocation
-                .args()
-                .first()
-                .is_some_and(|argument| argument == "rev-parse"))
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch-check", "-Z"])
             .count(),
         2
     );
@@ -1914,10 +1911,9 @@ fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing(
     let repeated = stand_in.invocations()[after_first..].to_vec();
     assert!(
         repeated.len() == 1
-            && repeated[0]
-                .args()
-                .first()
-                .is_some_and(|argument| argument == "rev-parse"),
+            && repeated
+                .iter()
+                .all(|invocation| invocation.args() == ["cat-file", "--batch-check", "-Z"]),
         "a capture after one that pins nothing must reuse cached evidence, spawned {repeated:?}"
     );
 }

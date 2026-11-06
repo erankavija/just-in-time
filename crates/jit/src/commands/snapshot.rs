@@ -40,7 +40,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         working_tree: bool,
         committed_only: bool,
     ) -> Result<SourceMode> {
-        let checkout = self.exec.require_worktree_paths()?.git();
+        let checkout = self.exec.require_worktree_paths()?.code_checkout();
         let resolve = |reference: &str| -> Result<String> {
             let checkout = checkout
                 .as_ref()
@@ -667,7 +667,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let exporter = SnapshotExporter::new(
             &self.exec.storage,
-            self.exec.require_worktree_paths()?.git(),
+            self.exec.require_worktree_paths()?.code_checkout(),
             layout.worktree_root().to_path_buf(),
             layout.data_root().to_path_buf(),
             chrono::Utc::now(),
@@ -1052,22 +1052,29 @@ mod tests {
     #[test]
     fn test_determine_snapshot_source_mode_resolves_requested_commit_and_defaults_to_head() {
         let temp = tempfile::tempdir().unwrap();
-        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        let repository = crate::test_harness::git::GitRepository::init(temp.path().join("code"));
         repository.write("tracked", "initial");
-        let initial = repository.commit("initial");
+        let initial = repository.commit("unique needle");
         repository.write("tracked", "updated");
         let head = repository.commit("updated");
+        let data = crate::test_harness::git::GitRepository::init(temp.path().join("data"));
+        data.write("tracked", "unrelated")
+            .commit("unrelated data history");
         let storage = InMemoryStorage::rooted_at(repository.root());
         let layout = storage.repository_layout();
         let executor = crate::commands::CommandExecutor::new(storage)
             .with_layout(layout)
             .unwrap()
             .with_worktree_paths(
-                crate::storage::WorktreePaths::detect_from(repository.root()).unwrap(),
+                crate::storage::WorktreePaths::detect_from(data.root())
+                    .unwrap()
+                    .with_worktree_root(repository.root())
+                    .unwrap(),
             );
 
         for (at, committed_only, expected) in [
             (Some(initial.as_str()), false, &initial),
+            (Some(":/unique needle"), false, &initial),
             (None, true, &head),
             (None, false, &head),
         ] {
