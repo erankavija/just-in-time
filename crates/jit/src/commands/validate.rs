@@ -149,7 +149,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     .merge(plan_reduction_fixes(&mut projected)?);
                 let graph = CapturedGraphEvidence {
                     declarations: &declarations,
-                    plan_content: plan_content_with_issues(image, &projected)?,
+                    plan_content: plan_content_with_issues(
+                        image,
+                        declarations.config(),
+                        &projected,
+                    )?,
                     context,
                 };
                 let readiness = plan_readiness_fixes(original, &mut projected, &graph)?;
@@ -1174,14 +1178,14 @@ pub(super) fn plan_document_paths(
         .collect()
 }
 
-/// Plan content for the image's complete issue set. Its closure holds every
-/// path [`plan_document_paths`] derives. Invalid configuration yields no plans;
-/// the validation report reports the failure.
+/// Plan content for the image's complete issue set under `config`, the
+/// image's own configuration. Its closure holds every path
+/// [`plan_document_paths`] derives.
 pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
+    config: &crate::config::JitConfig,
     issues: &[Issue],
 ) -> Result<std::collections::HashMap<IssueId, String>> {
-    let config = crate::repository_state::assemble_config(image).unwrap_or_default();
     crate::validation::repository::plan_content(
         &|path| super::image_repo_bytes(image, path),
         issues,

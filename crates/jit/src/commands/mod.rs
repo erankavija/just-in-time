@@ -645,7 +645,7 @@ impl<'a> CapturedGraphEvidence<'a> {
     ) -> Result<Self> {
         Ok(Self {
             declarations,
-            plan_content: validate::plan_content_with_issues(image, issues)?,
+            plan_content: validate::plan_content_with_issues(image, declarations.config(), issues)?,
             context,
         })
     }
@@ -3012,17 +3012,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         else {
             return Ok(None);
         };
-        let enforcement_mode =
-            crate::repository_state::assemble_config(&light.image)?.enforcement_mode();
         let target = light.target.id;
+        // A preflight without prechecks reads only configuration.
         let Some(issues) = light.issues else {
             return Ok(Some(StateChangePreflight {
                 target,
-                enforcement_mode,
+                enforcement_mode: crate::repository_state::assemble_config(&light.image)?
+                    .enforcement_mode(),
                 precheck: None,
             }));
         };
-        let registry = crate::repository_state::declarations_from_image(&light.image)?.gates;
+        let declarations = crate::repository_state::declarations_from_image(&light.image)?;
+        let enforcement_mode = declarations.config().enforcement_mode();
+        let registry = declarations.gates;
         let issue = project(
             issues
                 .into_iter()
