@@ -283,3 +283,35 @@ fn test_acquire_claim_synchronized_retried_past_the_commit_point_finds_its_lease
         assert_eq!(history(&temp), logged, "{point:?}: the retry logs nothing");
     }
 }
+
+#[test]
+fn test_lease_lock_apply_failing_before_the_commit_leaves_the_prior_lease_and_no_stage() {
+    let temp = TempDir::new().unwrap();
+    let clock = Arc::new(FixedClock::new(Utc::now()));
+    held_lease(&temp, &clock);
+    let prior = stored_lease(&temp);
+    let interrupted = actor(
+        &temp,
+        HOLDER,
+        &clock,
+        Arc::new(InterruptAt(LeasePoint::BeforeCommit)),
+    );
+
+    assert!(interrupted.renew_lease(&leased_issue(), 600).is_err());
+
+    assert_eq!(stored_lease(&temp), prior);
+    let leases = fs::read_dir(WorktreePaths::leases_dir(&shared_jit(&temp)))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        leases,
+        [
+            WorktreePaths::lease_path(&shared_jit(&temp), &leased_issue())
+                .file_name()
+                .unwrap()
+                .to_owned()
+        ],
+        "the failed publication left its stage beside the lease record"
+    );
+}

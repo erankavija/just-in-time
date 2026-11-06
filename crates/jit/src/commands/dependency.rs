@@ -225,7 +225,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("dependency mutation", || {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) =
-                self.capture_mutation_base(session.as_mut(), &[], None)?
+                self.capture_mutation_base(session.as_mut(), &[], &[])?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
@@ -277,7 +277,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) =
-                self.capture_mutation_base(session.as_mut(), &[], None)?
+                self.capture_mutation_base(session.as_mut(), &[], &[])?
             else {
                 return Ok(AttemptOutcome::Retry);
             };

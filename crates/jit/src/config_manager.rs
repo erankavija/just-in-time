@@ -1,9 +1,4 @@
-//! Configuration management layer.
-//!
-//! This module provides a clean separation between configuration loading and
-//! the storage layer. ConfigManager is responsible for loading and providing
-//! access to configuration data, ensuring the storage layer remains generic
-//! and focused on persisting runtime state.
+//! Configuration access and conversion to domain settings.
 
 use crate::config::{JitConfig, NamespaceConfig};
 use crate::domain::{LabelNamespace, LabelNamespaces};
@@ -20,10 +15,7 @@ pub const LINKED_CHECKOUT_WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 
 /// Manages configuration loading and access.
 ///
-/// ConfigManager provides a single point of access for all configuration data,
-/// separating configuration concerns from storage layer implementation.
-/// This enables the storage layer to remain generic and support different
-/// backends (JSON, SQL, etc.) without coupling to TOML parsing.
+/// Disk reads delegate to [`crate::storage::configuration_store`].
 #[derive(Clone)]
 pub struct ConfigManager {
     layout: Option<RepositoryLayout>,
@@ -45,15 +37,14 @@ impl ConfigManager {
         self.layout = Some(layout);
     }
 
-    /// Load the JIT configuration from config.toml.
+    /// Load the repository's configuration and declaration registries.
     ///
-    /// Returns an empty config (all fields None) if the file doesn't exist.
-    /// Returns an error if the file exists but is malformed.
+    /// Absent files contribute empty declarations; invalid files are errors.
     pub fn load(&self) -> Result<JitConfig> {
         let layout = self.layout.as_ref().ok_or_else(|| {
             anyhow::anyhow!("no repository layout configured for configuration loading")
         })?;
-        JitConfig::load(layout)
+        crate::storage::configuration_store::load_configuration(layout)
     }
 
     /// Get the namespace registry from configuration.

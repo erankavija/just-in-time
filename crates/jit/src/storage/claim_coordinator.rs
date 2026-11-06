@@ -22,6 +22,10 @@ use std::path::Path;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use super::atomic_write::{
+    open_dir_following, publish_git_control_file, remove_git_control_file, sync_directory_for,
+    Durability,
+};
 use super::lock::FileLocker;
 use super::worktree_paths::WorktreePaths;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId, WorktreeId};
@@ -290,12 +294,11 @@ pub struct ClaimCoordinator {
     locker: FileLocker,
     worktree_id: WorktreeId,
     agent_id: Assignee,
-    /// Whether to fsync lease records, the sequence and the history log on
-    /// every write. Defaults to `true` for crash durability in production.
-    /// Tests that exercise pure lease logic (not crash recovery) disable it via
-    /// [`ClaimCoordinator::with_fsync`]: an fsync costs ~10ms and property
-    /// tests do hundreds of writes, so leaving it on makes them minutes long.
-    fsync: bool,
+    /// How lease records, `claims.seq` and the history log reach the device:
+    /// fully durable in production. Tests that exercise pure lease logic (not
+    /// crash recovery) skip every sync via [`ClaimCoordinator::with_fsync`]:
+    /// an fsync costs milliseconds and property tests do thousands.
+    durability: Durability,
     /// Source of "now" for lease expiry and eviction. Defaults to
     /// [`SystemClock`] (the real system clock) in production; tests inject a
     /// deterministic clock so TTL boundaries are exercised without real delays.
@@ -568,7 +571,7 @@ impl ClaimCoordinator {
             locker,
             worktree_id,
             agent_id,
-            fsync: true,
+            durability: Durability::Full,
             clock: Arc::new(SystemClock),
             interruptions: Arc::new(NoLeaseInterruptions),
         }
@@ -600,14 +603,14 @@ impl ClaimCoordinator {
         self
     }
 
-    /// Override the fsync-on-write behavior (see the `fsync` field).
-    ///
-    /// Set `false` only in tests that verify lease invariants
-    /// rather than crash durability; it removes the per-write fsync that
-    /// otherwise dominates I/O-heavy property tests.
+    /// Skip every sync for `false` (see the `durability` field).
+    #[cfg(test)]
     #[must_use]
-    pub fn with_fsync(mut self, fsync: bool) -> Self {
-        self.fsync = fsync;
+    pub(crate) fn with_fsync(mut self, fsync: bool) -> Self {
+        self.durability = match fsync {
+            true => Durability::Full,
+            false => Durability::Unsynced,
+        };
         self
     }
 
@@ -806,7 +809,7 @@ impl ClaimCoordinator {
             .append(true)
             .open(self.paths.shared_jit.join("claims.jsonl"))?;
         file.write_all(lines)?;
-        if self.fsync {
+        if self.durability == Durability::Full {
             file.sync_all()?;
         }
         Ok(())
@@ -815,29 +818,27 @@ impl ClaimCoordinator {
     /// Publish `lease` as the issue's lease record, or remove the record for
     /// `None`; the rename or unlink is the commit point.
     fn publish_lease_record(&self, issue_id: &IssueId, lease: Option<&Lease>) -> Result<()> {
-        let dir = WorktreePaths::leases_dir(&self.paths.shared_jit);
-        let path = WorktreePaths::lease_path(&self.paths.shared_jit, issue_id);
+        let shared_jit = &self.paths.shared_jit;
+        let dir = WorktreePaths::leases_dir(shared_jit);
+        let path = WorktreePaths::lease_path(shared_jit, issue_id);
         match lease {
             Some(lease) => {
                 if !dir.try_exists()? {
                     fs::create_dir_all(&dir).context("Failed to create lease directory")?;
-                    self.sync_directory(&self.paths.shared_jit)?;
+                    sync_directory_for(&open_dir_following(shared_jit)?, self.durability)?;
                 }
-                let stage = WorktreePaths::lease_stage_path(&self.paths.shared_jit, issue_id);
                 self.check_interruption(LeasePoint::BeforeStage)?;
-                self.write_stage(&stage, &serde_json::to_vec_pretty(lease)?)?;
-                self.check_interruption(LeasePoint::BeforeCommit)?;
-                self.rename_into_place(&stage, &path)
+                publish_git_control_file(
+                    &self.paths,
+                    &path,
+                    &serde_json::to_vec_pretty(lease)?,
+                    self.durability,
+                    || self.check_interruption(LeasePoint::BeforeCommit),
+                )
             }
             None => {
                 self.check_interruption(LeasePoint::BeforeCommit)?;
-                match fs::remove_file(&path) {
-                    Ok(()) => self.sync_directory(&dir),
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                    Err(error) => Err(error).with_context(|| {
-                        format!("Failed to remove lease record {}", path.display())
-                    }),
-                }
+                remove_git_control_file(&self.paths, &path, self.durability)
             }
         }
     }
@@ -857,44 +858,14 @@ impl ClaimCoordinator {
                 })
             }
         };
-        self.replace_file(
-            &self.paths.shared_jit.join("claims.seq.stage"),
+        publish_git_control_file(
+            &self.paths,
             &path,
             (last + count).to_string().as_bytes(),
+            self.durability,
+            || Ok(()),
         )?;
         Ok(last + 1)
-    }
-
-    /// Replace `target` with `content` through `stage`.
-    fn replace_file(&self, stage: &Path, target: &Path, content: &[u8]) -> Result<()> {
-        self.write_stage(stage, content)?;
-        self.rename_into_place(stage, target)
-    }
-
-    /// Write `content` to `stage`, synced.
-    fn write_stage(&self, stage: &Path, content: &[u8]) -> Result<()> {
-        if self.fsync {
-            super::atomic_write::write_file_synced(stage, content)
-        } else {
-            fs::write(stage, content).with_context(|| format!("writing {}", stage.display()))
-        }
-    }
-
-    /// Rename `stage` over `target`, then sync the directory.
-    fn rename_into_place(&self, stage: &Path, target: &Path) -> Result<()> {
-        fs::rename(stage, target)
-            .with_context(|| format!("renaming {} to {}", stage.display(), target.display()))?;
-        target
-            .parent()
-            .map_or(Ok(()), |parent| self.sync_directory(parent))
-    }
-
-    fn sync_directory(&self, dir: &Path) -> Result<()> {
-        if self.fsync {
-            super::atomic_write::sync_directory(dir)
-        } else {
-            Ok(())
-        }
     }
 
     /// Under one [`LeaseLock`], evict expired leases and reclaim stale
@@ -1176,11 +1147,7 @@ mod tests {
         let dir = WorktreePaths::leases_dir(&coordinator.paths.shared_jit);
         let issue = crate::test_utils::issue_id(12);
         for name in [
-            WorktreePaths::lease_stage_path(&coordinator.paths.shared_jit, &issue)
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
+            crate::storage::atomic_write::unique_stage_name(),
             format!("{}.json", issue.as_str().to_uppercase()),
             "notes.json".to_string(),
             issue.to_string(),

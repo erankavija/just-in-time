@@ -1510,7 +1510,7 @@ mod tests {
     };
     use crate::storage::JsonFileStorage;
     use crate::storage::{
-        discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
+        discover_repository_layout, IssueStore, MutationPoint, RepositoryStateStore,
     };
     use crate::test_utils::{
         apply_package, apply_selected_packages, file_executor, selected_closure, setup_test_repo,
@@ -1519,33 +1519,9 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use tempfile::TempDir;
-
-    /// Observe actual publications without coupling the test to
-    /// preparatory graph or capture sessions. This apply edge runs
-    /// once for each delta that reaches `session.apply`.
-    struct PublicationCounter(AtomicUsize);
-
-    impl PublicationCounter {
-        fn new() -> Arc<Self> {
-            Arc::new(Self(AtomicUsize::new(0)))
-        }
-
-        fn count(&self) -> usize {
-            self.0.load(Ordering::SeqCst)
-        }
-    }
-
-    impl crate::storage::MutationInterruptionInjector for PublicationCounter {
-        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
-            if point == &MutationPoint::Redo(RedoPoint::BeforeApply) {
-                self.0.fetch_add(1, Ordering::SeqCst);
-            }
-            Ok(())
-        }
-    }
 
     /// Fail one named session moment, then let the next mutation session run.
     struct FailOnce {
@@ -3224,7 +3200,7 @@ template = true
             .unwrap();
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
         let right = package_declaring(&temp, "vendor/right", "right", &[]);
-        let publications = PublicationCounter::new();
+        let publications = crate::commands::test_helpers::PublicationCounter::new();
         let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
             publications.clone(),
@@ -3273,7 +3249,7 @@ template = true
         )
         .unwrap();
         let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let publications = PublicationCounter::new();
+        let publications = crate::commands::test_helpers::PublicationCounter::new();
         let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
             publications.clone(),

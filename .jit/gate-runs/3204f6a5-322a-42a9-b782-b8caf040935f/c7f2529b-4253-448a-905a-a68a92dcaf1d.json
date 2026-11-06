@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5d67aeca63330531c75891b6e86d4f925509536f",
+  "completed_at": "2026-11-06T02:37:55.308661329Z",
+  "duration_ms": 190093,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f368ce3d-domain-agnostic-engine/plan.md",
+        "id": "F1",
+        "line": 124,
+        "origin": "issue-impact",
+        "references": [
+          "f368ce3d/REQ-04",
+          "D3"
+        ],
+        "severity": "high",
+        "summary": "The plan reverses D3 by retaining container.hard_criteria instead of renaming it to container.criteria."
+      }
+    ],
+    "summary": "The manifest is valid, but the plan regresses the settled D3 token-rename decision.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "3204f6a5-322a-42a9-b782-b8caf040935f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c7f2529b-4253-448a-905a-a68a92dcaf1d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T02:34:45.215085294Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3929 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1aeb5-630d-7c13-a39f-feda2f4b2676\n--------\nuser\n--- 3916 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Manifest: 10 issues, unchanged from the prior round. Native validation, renderer check, and batch-create dry run pass.\n\n1. **F1 — blocking, issue-impact:** The prior D3 owner decision to rename the token to `{container.criteria}` was removed and reversed. The current plan and task retain `{container.hard_criteria}` despite expanding both `[hard]` and `[aspirational]` items. Restore D3 by replacing `container-criteria-declared-markers` with the `{container.criteria}` cutover task, amend epic REQ-04 accordingly, update its contract/tests, and regenerate the overview. [plan.md:46](dev/active/f368ce3d-domain-agnostic-engine/plan.md:46), [plan.md:124](dev/active/f368ce3d-domain-agnostic-engine/plan.md:124), prior reviewed revision `c756568be`:124.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest is valid, but the plan regresses the settled D3 token-rename decision.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan reverses D3 by retaining container.hard_criteria instead of renaming it to container.criteria.\",\"file\":\"dev/active/f368ce3d-domain-agnostic-engine/plan.md\",\"line\":124,\"references\":[\"f368ce3d/REQ-04\",\"D3\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
