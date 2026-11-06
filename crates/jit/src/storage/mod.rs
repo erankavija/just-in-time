@@ -367,20 +367,6 @@ pub trait IssueStore: Clone {
     /// - [`PathReadError::Other`] for any other read failure.
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError>;
 
-    /// List the gate presets this repository declares.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if presets cannot be loaded.
-    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>>;
-
-    /// Get a specific gate preset by name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the preset is not found or cannot be loaded.
-    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>;
-
     /// Read file bytes from the repository, optionally at a specific git commit.
     ///
     /// When `at_commit` is `None`, reads from the working tree.  Returns

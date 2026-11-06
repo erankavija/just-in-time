@@ -4,6 +4,7 @@ use super::*;
 use crate::declarations::GateMode;
 use crate::domain::identity::GateKey;
 use crate::domain::{GateRunResult, GateRunStatus};
+use crate::gate_presets::GatePresetCatalog;
 
 /// Error returned when `jit gate evaluate` runs an automated checker that does not pass.
 ///
@@ -276,39 +277,6 @@ const GATE_PRESET_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
         max_depth: 16,
     };
 
-fn listed_gate_preset_paths(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<Vec<crate::repository_state::VirtualPath>> {
-    use crate::repository_state::VirtualPath;
-    let directory = VirtualPath::GATE_PRESETS;
-    let listing = image
-        .directory_listings()
-        .get(&directory)
-        .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
-    let prefix = directory.relative().as_str();
-    listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .map(|name| VirtualPath::data(format!("{prefix}/{name}")).map_err(Into::into))
-        .collect()
-}
-
-fn parse_captured_gate_presets(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>> {
-    let files = listed_gate_preset_paths(image)?
-        .into_iter()
-        .map(|path| {
-            let bytes = image
-                .file_bytes(&path)?
-                .ok_or_else(|| anyhow!("listed custom gate preset is absent: {path:?}"))?;
-            Ok((path.relative().as_str().to_string(), bytes.to_vec()))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    crate::gate_presets::load_presets_from_custom_files(files)
-}
-
 fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
     vec![
@@ -359,7 +327,7 @@ fn capture_gate_preset_image(
             Vec::new()
         };
         Ok(spec.discover_paths(
-            listed_gate_preset_paths(image)?
+            GatePresetCatalog::paths(image)?
                 .into_iter()
                 .chain(issue_paths)
                 .chain(closure)
@@ -1290,15 +1258,39 @@ impl<S: IssueStore> GateOps<'_, S> {
 
     // Preset management methods
 
-    pub fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        self.exec.storage.list_gate_presets()
+    pub fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self.read_gate_preset_catalog()?.list())
     }
 
-    pub fn show_gate_preset(
-        &self,
-        name: &str,
-    ) -> Result<crate::gate_presets::GatePresetDefinition> {
-        self.exec.storage.get_gate_preset(name)
+    pub fn show_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self.read_gate_preset_catalog()?.get(name)?.clone())
+    }
+
+    fn read_gate_preset_catalog(&self) -> Result<GatePresetCatalog>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{CaptureSpec, VirtualPath};
+
+        let layout = self.exec.require_layout()?;
+        with_read_session(&self.exec.storage, &layout, "gate preset read", |session| {
+            let mut spec =
+                CaptureSpec::new([VirtualPath::GATE_PRESETS], GATE_PRESET_CAPTURE_BUDGET)?;
+            spec.discover_listings([VirtualPath::GATE_PRESETS])?;
+            let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+                Ok(spec.discover_paths(GatePresetCatalog::paths(image)?)?)
+            })?
+            else {
+                return Ok(None);
+            };
+            Ok(Some(GatePresetCatalog::from_image(&image)?))
+        })
     }
 
     /// Apply a gate preset to an issue.
@@ -1353,14 +1345,13 @@ impl<S: IssueStore> GateOps<'_, S> {
                 std::slice::from_ref(&target),
                 claims_guard.as_ref(),
             )?;
-            let preset = parse_captured_gate_presets(&image)?
-                .remove(preset_name)
-                .ok_or_else(|| crate::storage::PresetNotFoundError::new(preset_name))?;
+            let catalog = GatePresetCatalog::from_image(&image)?;
+            let preset = catalog.get(preset_name)?;
             let issue = captured_gate_preset_issue(&image, &target)?;
             let derived = derive_gate_preset_application(
                 issue,
                 captured_gate_registry(&image)?,
-                &preset,
+                preset,
                 timeout_override,
                 PresetGateExclusions {
                     skip_precheck,
@@ -2211,30 +2202,6 @@ mod tests {
         let shown = executor.gates().show_gate_preset("team-review").unwrap();
         assert_eq!(shown.gates.len(), 1);
         assert_eq!(shown.gates[0].key, "review".parse().unwrap());
-    }
-
-    #[test]
-    fn test_memory_gate_preset_reader_rejects_non_regular_json_occupant() {
-        let executor = setup();
-        let path = crate::repository_state::VirtualPath::data("config/gate-presets/directory.json")
-            .unwrap();
-        executor.storage.repository_state().entries.insert(
-            path,
-            crate::repository_state::RepositoryEntry::Directory {
-                identity: crate::repository_state::EntryIdentity::for_bytes(
-                    "memory-preset-directory",
-                    b"directory",
-                )
-                .unwrap(),
-                mode: crate::repository_state::FileMode::Executable,
-            },
-        );
-
-        let error = executor
-            .gates()
-            .list_gate_presets()
-            .expect_err("a .json directory must be rejected");
-        assert!(error.to_string().contains("must be an ordinary file"));
     }
 
     #[test]

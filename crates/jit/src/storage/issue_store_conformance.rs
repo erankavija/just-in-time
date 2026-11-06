@@ -19,8 +19,8 @@ use crate::repository_state::{
 };
 use crate::storage::{
     discover_repository_layout, AmbiguousIdError, GateRunNotFoundError, InMemoryStorage,
-    IssueNotFoundError, IssueStore, JsonFileStorage, PathReadError, PresetNotFoundError,
-    RepositoryStateStore, RepositoryStateStoreError,
+    IssueNotFoundError, IssueStore, JsonFileStorage, PathReadError, RepositoryStateStore,
+    RepositoryStateStoreError,
 };
 use crate::test_harness::git::GitRepository;
 use std::cell::Cell;
@@ -1140,49 +1140,6 @@ fn test_read_repo_file_reads_present_files_and_refuses_unsafe_paths<B: Backend>(
     }
 }
 
-fn test_gate_presets_list_and_get_the_declared_presets<B: Backend>() {
-    let preset = ci_preset();
-    let declared = Repository::<B>::seeded(&[(
-        VirtualPath::data(format!(
-            "{}/{}.json",
-            VirtualPath::GATE_PRESETS.relative().as_str(),
-            preset.name
-        ))
-        .unwrap(),
-        serde_json::to_string(&preset).unwrap(),
-    )]);
-    let listed = declared
-        .store
-        .list_gate_presets()
-        .unwrap()
-        .into_iter()
-        .map(|info| (info.name, info.description, info.gate_count))
-        .collect::<Vec<_>>();
-    let missing = declared.store.get_gate_preset("undeclared").unwrap_err();
-
-    assert_eq!(
-        listed,
-        vec![(
-            preset.name.clone(),
-            preset.description.clone(),
-            preset.gates.len()
-        )]
-    );
-    assert_eq!(
-        declared.store.get_gate_preset(&preset.name).unwrap(),
-        preset
-    );
-    assert!(
-        missing.downcast_ref::<PresetNotFoundError>().is_some(),
-        "{missing:#}"
-    );
-    assert!(Repository::<B>::empty()
-        .store
-        .list_gate_presets()
-        .unwrap()
-        .is_empty());
-}
-
 fn test_read_path_reports_a_missing_file_and_refuses_unsafe_paths<B: Backend>() {
     let repository = Repository::<B>::empty();
     let store = &repository.store;
@@ -1463,7 +1420,6 @@ conformance_suite!(
         test_apply_refuses_a_plan_over_a_byte_identical_image_of_another_session,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
-        test_gate_presets_list_and_get_the_declared_presets,
         test_read_path_reports_a_missing_file_and_refuses_unsafe_paths,
         test_read_path_reads_a_seeded_file_and_refuses_a_directory,
         test_read_path_keeps_exact_bytes_and_decodes_invalid_utf8_lossily,
